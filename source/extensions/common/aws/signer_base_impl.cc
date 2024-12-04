@@ -57,9 +57,6 @@ std::string SignerBaseImpl::getRegion() const { return region_; }
 absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
                                   const absl::string_view override_region) {
 
-  ASSERT(credentials_provider_ != nullptr);
-  ASSERT(x509_credentials_provider_ == nullptr);
-
   if (!query_string_ && !content_hash.empty()) {
     headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   }
@@ -97,8 +94,10 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
       Envoy::Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
   if (query_string_) {
     addRegionQueryParam(query_params, override_region);
-    createQueryParams(query_params, createAuthorizationCredential(credentials, credential_scope),
-                      long_date, credentials.sessionToken(), canonical_headers, expiration_time_);
+    createQueryParams(
+        query_params,
+        createAuthorizationCredential(credentials.accessKeyId().value(), credential_scope),
+        long_date, credentials.sessionToken(), canonical_headers, expiration_time_);
 
     headers.setPath(query_params.replaceQueryString(headers.Path()->value()));
   }
@@ -115,7 +114,9 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
   ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
 
   // Phase 3: Create a signature
-  const auto signature = createSignature(credentials, short_date, string_to_sign, override_region);
+  const auto signature =
+      createSignature(credentials.accessKeyId().value(), credentials.secretAccessKey().value(),
+                      short_date, string_to_sign, override_region);
   // Phase 4: Sign request
   if (query_string_) {
     // Append signature to existing query string
@@ -131,8 +132,8 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     ENVOY_LOG(debug, "Query string signing - New path (sanitised): {}", sanitised_query_string);
 
   } else {
-    const auto authorization_header =
-        createAuthorizationHeader(credentials, credential_scope, canonical_headers, signature);
+    const auto authorization_header = createAuthorizationHeader(
+        credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
 
     headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 
@@ -173,17 +174,10 @@ std::string SignerBaseImpl::createContentHash(Http::RequestMessage& message, boo
 }
 
 std::string
-SignerBaseImpl::createAuthorizationCredential(const Credentials credentials,
+SignerBaseImpl::createAuthorizationCredential(absl::string_view access_key_id,
                                               absl::string_view credential_scope) const {
-  return fmt::format(SignatureConstants::AuthorizationCredentialFormat,
-                     credentials.accessKeyId().value(), credential_scope);
-}
-
-std::string
-SignerBaseImpl::createAuthorizationCredential(const X509Credentials x509_credentials,
-                                              absl::string_view credential_scope) const {
-  return fmt::format(SignatureConstants::AuthorizationCredentialFormat,
-                     x509_credentials.certificateSerial().value(), credential_scope);
+  return fmt::format(SignatureConstants::AuthorizationCredentialFormat, access_key_id,
+                     credential_scope);
 }
 
 void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& query_params,
@@ -213,109 +207,6 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
   query_params.add(
       SignatureQueryParameterValues::AmzSignedHeaders,
       Utility::encodeQueryComponent(Utility::joinCanonicalHeaderNames(signed_headers)));
-}
-
-absl::Status SignerBaseImpl::signX509(Http::RequestMessage& message, bool sign_body,
-                                      const absl::string_view override_region) {
-  const auto content_hash = createContentHash(message, sign_body);
-  auto& headers = message.headers();
-  return signX509(headers, content_hash, override_region);
-}
-
-absl::Status SignerBaseImpl::signX509EmptyPayload(Http::RequestHeaderMap& headers,
-                                                  const absl::string_view override_region) {
-  headers.setReference(SignatureHeaders::get().ContentSha256,
-                       SignatureConstants::HashedEmptyString);
-  return signX509(headers, std::string(SignatureConstants::HashedEmptyString), override_region);
-}
-
-absl::Status SignerBaseImpl::signX509UnsignedPayload(Http::RequestHeaderMap& headers,
-                                                     const absl::string_view override_region) {
-  headers.setReference(SignatureHeaders::get().ContentSha256, SignatureConstants::UnsignedPayload);
-  return signX509(headers, std::string(SignatureConstants::UnsignedPayload), override_region);
-}
-
-absl::Status SignerBaseImpl::signX509(Http::RequestHeaderMap& headers,
-                                      const std::string& content_hash,
-                                      const absl::string_view override_region) {
-
-  const auto& x509_credentials = x509_credentials_provider_->getCredentials();
-
-  ASSERT(credentials_provider_ == nullptr);
-  ASSERT(x509_credentials_provider_ != nullptr);
-
-  if (!x509_credentials.certificateDerB64().has_value() ||
-      !x509_credentials.certificatePrivateKey().has_value() ||
-      !x509_credentials.publicKeySignatureAlgorithm().has_value()) {
-    return absl::Status{absl::StatusCode::kInvalidArgument,
-                        "Unable to sign IAM Roles Anywhere payload - no x509 credentials found"};
-  }
-
-  if (headers.Method() == nullptr) {
-    return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :method header"};
-  }
-  if (headers.Path() == nullptr) {
-    return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
-  }
-
-  ENVOY_LOG(debug, "Begin IAM Roles Anywhere signing");
-
-  const auto long_date = long_date_formatter_.now(time_source_);
-  const auto short_date = short_date_formatter_.now(time_source_);
-
-  if (!content_hash.empty()) {
-    headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
-  }
-
-  addRequiredHeaders(headers, long_date, absl::nullopt, override_region);
-  addRequiredCertHeaders(headers, x509_credentials);
-
-  const auto canonical_headers = Utility::canonicalizeHeaders(headers, excluded_header_matchers_);
-
-  // Phase 1: Create a canonical request
-  const auto credential_scope = createCredentialScope(short_date, override_region);
-
-  // Handle query string parameters by appending them all to the path. Case is important for these
-  // query parameters.
-  auto query_params =
-      Envoy::Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
-
-  auto canonical_request = Utility::createCanonicalRequest(
-      headers.Method()->value().getStringView(), headers.Path()->value().getStringView(),
-      canonical_headers,
-      content_hash.empty() ? SignatureConstants::HashedEmptyString : content_hash,
-      Utility::shouldNormalizeUriPath(service_name_), Utility::useDoubleUriEncode(service_name_));
-  ENVOY_LOG(debug, "Canonical request:\n{}", canonical_request);
-
-  // Phase 2: Create a string to sign
-  std::string string_to_sign =
-      createStringToSign(x509_credentials, canonical_request, long_date, credential_scope);
-  ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
-
-  // Phase 3: Create a signature
-  std::string signature = createSignature(x509_credentials, string_to_sign);
-  // Phase 4: Sign request
-
-  std::string authorization_header =
-      createAuthorizationHeader(x509_credentials, credential_scope, canonical_headers, signature);
-
-  headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
-
-  // Sanitize logged authorization header
-  std::vector<std::string> sanitised_header =
-      absl::StrSplit(authorization_header, absl::ByString("Signature="));
-  ENVOY_LOG(debug, "Header signing - Authorization header (sanitised): {}Signature=*****",
-            sanitised_header[0]);
-  return absl::OkStatus();
-}
-
-void SignerBaseImpl::addRequiredCertHeaders(Http::RequestHeaderMap& headers,
-                                            X509Credentials x509_credentials) {
-  headers.setCopy(SignatureHeaders::get().X509, x509_credentials.certificateDerB64().value());
-  if (x509_credentials.certificateChainDerB64().has_value()) {
-    headers.setCopy(SignatureHeaders::get().X509Chain,
-                    x509_credentials.certificateChainDerB64().value());
-  }
 }
 
 } // namespace Aws

@@ -427,21 +427,21 @@ public:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Http::RequestMessagePtr message_;
-  SigV4SignerImpl signer_;
+  IAMRolesAnywhereSigV4SignerImpl signer_;
   X509Credentials credentials_;
   absl::optional<std::string> region_;
 };
 
 TEST_F(SigV4SignerImplTest, AnonymousCredentials) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(X509Credentials()));
-  auto status = signer_.signX509(*message_);
+  auto status = signer_.sign(*message_);
   EXPECT_FALSE(status.ok());
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
 
 TEST_F(SigV4SignerImplTest, X509EmptyPayload) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(X509Credentials()));
-  auto status = signer_.signX509EmptyPayload(message_->headers());
+  auto status = signer_.signEmptyPayload(message_->headers());
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(
       message_->headers().get(SignatureHeaders::get().ContentSha256)[0]->value().getStringView(),
@@ -450,7 +450,7 @@ TEST_F(SigV4SignerImplTest, X509EmptyPayload) {
 
 TEST_F(SigV4SignerImplTest, X509UnsignedPaylowd) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(X509Credentials()));
-  auto status = signer_.signX509UnsignedPayload(message_->headers());
+  auto status = signer_.signUnsignedPayload(message_->headers());
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(
       message_->headers().get(SignatureHeaders::get().ContentSha256)[0]->value().getStringView(),
@@ -464,7 +464,7 @@ TEST_F(SigV4SignerImplTest, MissingMethod) {
   EXPECT_CALL(*credentials_provider_, getCredentials())
       .WillOnce(Return(X509Credentials("abc", X509Credentials::PublicKeySignatureAlgorithm::ECDSA,
                                        "123", absl::nullopt, "123", time)));
-  auto status = signer_.signX509(*message_);
+  auto status = signer_.sign(*message_);
   EXPECT_EQ(status.message(), "Message is missing :method header");
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
@@ -477,7 +477,7 @@ TEST_F(SigV4SignerImplTest, MissingPath) {
       .WillOnce(Return(X509Credentials("abc", X509Credentials::PublicKeySignatureAlgorithm::ECDSA,
                                        "123", absl::nullopt, "123", time)));
   addMethod("GET");
-  auto status = signer_.signX509(*message_);
+  auto status = signer_.sign(*message_);
   EXPECT_EQ(status.message(), "Message is missing :path header");
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
@@ -503,10 +503,14 @@ TEST_F(SigV4SignerImplTest, FullSignNoChainECDSA) {
                                        server_root_private_key_ecdsa_pem, time)));
   addMethod("POST");
   addHeader(":path", "test");
-  auto status = signer_.signX509(*message_);
-  EXPECT_EQ(message_->headers().get(SigV4SignatureHeaders::get().X509)[0]->value().getStringView(),
+  auto status = signer_.sign(*message_);
+  EXPECT_EQ(message_->headers()
+                .get(IAMRolesAnywhereSigV4SignatureHeaders::get().X509)[0]
+                ->value()
+                .getStringView(),
             server_root_cert_ecdsa_der_b64);
-  EXPECT_TRUE(message_->headers().get(SigV4SignatureHeaders::get().X509Chain).empty());
+  EXPECT_TRUE(
+      message_->headers().get(IAMRolesAnywhereSigV4SignatureHeaders::get().X509Chain).empty());
 
   auto authheader = message_->headers()
                         .get(Envoy::Http::LowerCaseString("Authorization"))[0]
@@ -533,12 +537,17 @@ TEST_F(SigV4SignerImplTest, FullSignWithChainECDSA) {
                                        server_subordinate_private_key_ecdsa_pem, time)));
   addMethod("POST");
   addHeader(":path", "test");
-  auto status = signer_.signX509(*message_);
-  EXPECT_EQ(message_->headers().get(SigV4SignatureHeaders::get().X509)[0]->value().getStringView(),
+  auto status = signer_.sign(*message_);
+  EXPECT_EQ(message_->headers()
+                .get(IAMRolesAnywhereSigV4SignatureHeaders::get().X509)[0]
+                ->value()
+                .getStringView(),
             server_subordinate_cert_ecdsa_der_b64);
-  EXPECT_EQ(
-      message_->headers().get(SigV4SignatureHeaders::get().X509Chain)[0]->value().getStringView(),
-      server_subordinate_chain_ecdsa_der_b64);
+  EXPECT_EQ(message_->headers()
+                .get(IAMRolesAnywhereSigV4SignatureHeaders::get().X509Chain)[0]
+                ->value()
+                .getStringView(),
+            server_subordinate_chain_ecdsa_der_b64);
   auto authheader = message_->headers()
                         .get(Envoy::Http::LowerCaseString("Authorization"))[0]
                         ->value()
@@ -561,10 +570,14 @@ TEST_F(SigV4SignerImplTest, FullSignNoChainRSA) {
                                        server_root_private_key_rsa_pem, time)));
   addMethod("POST");
   addHeader(":path", "test");
-  auto status = signer_.signX509(*message_);
-  EXPECT_EQ(message_->headers().get(SigV4SignatureHeaders::get().X509)[0]->value().getStringView(),
+  auto status = signer_.sign(*message_);
+  EXPECT_EQ(message_->headers()
+                .get(IAMRolesAnywhereSigV4SignatureHeaders::get().X509)[0]
+                ->value()
+                .getStringView(),
             server_root_cert_rsa_der_b64);
-  EXPECT_TRUE(message_->headers().get(SigV4SignatureHeaders::get().X509Chain).empty());
+  EXPECT_TRUE(
+      message_->headers().get(IAMRolesAnywhereSigV4SignatureHeaders::get().X509Chain).empty());
 
   auto authheader = message_->headers()
                         .get(Envoy::Http::LowerCaseString("Authorization"))[0]
@@ -600,58 +613,10 @@ public:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Http::RequestMessagePtr message_;
-  SigV4SignerImpl signer_;
+  IAMRolesAnywhereSigV4SignerImpl signer_;
   X509Credentials credentials_;
   absl::optional<std::string> region_;
 };
-
-class X509SigV4ASignerImplFriend {
-public:
-  X509SigV4ASignerImplFriend(SigV4ASignerImpl* signer) : signer_(signer) {}
-
-  std::string createAuthorizationHeader(
-      ABSL_ATTRIBUTE_UNUSED const X509Credentials x509_credentials,
-      ABSL_ATTRIBUTE_UNUSED const absl::string_view credential_scope,
-      ABSL_ATTRIBUTE_UNUSED const std::map<std::string, std::string>& canonical_headers,
-      ABSL_ATTRIBUTE_UNUSED const absl::string_view signature) const {
-    return signer_->createAuthorizationHeader(x509_credentials, credential_scope, canonical_headers,
-                                              signature);
-  };
-
-  std::string
-  createStringToSign(ABSL_ATTRIBUTE_UNUSED const X509Credentials x509_credentials,
-                     ABSL_ATTRIBUTE_UNUSED const absl::string_view canonical_request,
-                     ABSL_ATTRIBUTE_UNUSED const absl::string_view long_date,
-                     ABSL_ATTRIBUTE_UNUSED const absl::string_view credential_scope) const {
-    return signer_->createStringToSign(x509_credentials, canonical_request, long_date,
-                                       credential_scope);
-  };
-
-  std::string createSignature(ABSL_ATTRIBUTE_UNUSED const X509Credentials credentials,
-                              ABSL_ATTRIBUTE_UNUSED const absl::string_view string_to_sign) const {
-    return signer_->createSignature(credentials, string_to_sign);
-  };
-
-  SigV4ASignerImpl* signer_;
-};
-
-// Test case for coverage - X509 signing for SigV4a has no implementation
-TEST_F(SigV4SignerImplTest, X509CoverageTest) {
-  Event::SimulatedTimeSystem time_system_;
-
-  auto* credentials_provider_ = new NiceMock<MockX509CredentialsProvider>();
-
-  SigV4ASignerImpl headersigner_(
-      "test", "test", X509CredentialsProviderSharedPtr{credentials_provider_}, time_system_);
-
-  auto signer_friend = X509SigV4ASignerImplFriend(&headersigner_);
-  X509Credentials creds;
-  const std::map<std::string, std::string> canonical_headers{};
-  EXPECT_TRUE(
-      signer_friend.createAuthorizationHeader(creds, "test", canonical_headers, "test").empty());
-  EXPECT_TRUE(signer_friend.createStringToSign(creds, "test", "test", "test").empty());
-  EXPECT_TRUE(signer_friend.createSignature(creds, "test").empty());
-}
 
 } // namespace Aws
 } // namespace Common

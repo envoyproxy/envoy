@@ -5,6 +5,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/iam_roles_anywhere_credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
 
@@ -49,11 +50,6 @@ public:
   MOCK_METHOD(absl::Status, sign, (Http::RequestHeaderMap&, const std::string&, absl::string_view));
   MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, absl::string_view));
   MOCK_METHOD(absl::Status, signUnsignedPayload, (Http::RequestHeaderMap&, absl::string_view));
-  MOCK_METHOD(absl::Status, signX509, (Http::RequestMessage&, bool, absl::string_view));
-  MOCK_METHOD(absl::Status, signX509,
-              (Http::RequestHeaderMap&, const std::string&, absl::string_view));
-  MOCK_METHOD(absl::Status, signX509EmptyPayload, (Http::RequestHeaderMap&, absl::string_view));
-  MOCK_METHOD(absl::Status, signX509UnsignedPayload, (Http::RequestHeaderMap&, absl::string_view));
 };
 
 class MockIAMRolesAnywhereCredentialsProvider : public IAMRolesAnywhereCredentialsProvider {
