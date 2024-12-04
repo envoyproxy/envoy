@@ -95,15 +95,16 @@ private:
  * The logic is as follows:
  *   1. IAMRolesAnywhereX509CredentialsProvider retrieves X509 credentials and converts them to
  * required format
- * 
+ *
  *   2. IAMRolesAnywhereCredentialsProvider uses credentials from
  * IAMRolesAnywhereX509CredentialsProvider, and uses them as input to
  * IAMRolesAnywhereSigV4SignerImpl
- * 
+ *
  *   3. Once signing has completed, IAMRolesAnywhereCredentialsProvider requests temporary
  * credentials from IAM Roles Anywhere endpoint using the signed payload
- * 
- *   4. Temporary credentials are returned, which then can be used in normal AWS SigV4/SigV4A signing
+ *
+ *   4. Temporary credentials are returned, which then can be used in normal AWS SigV4/SigV4A
+ * signing
  *
  */
 
