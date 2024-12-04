@@ -67,7 +67,7 @@ jobs:
         - run: |
             xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj \
                        -scheme EnvoySwiftPMExample \
-                       -destination platform="iOS Simulator,name=iPhone 14 Pro Max,OS=16.1"
+                       -destination platform="iOS Simulator,name=iPhone 15 Pro Max,OS=16.3"
           shell: bash
           name: Build app
         # TODO(jpsim): Run app and inspect logs to validate
