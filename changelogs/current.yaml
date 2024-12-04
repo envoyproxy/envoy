@@ -56,7 +56,7 @@ minor_behavior_changes:
 - area: http
   change: |
     If the :ref:`pack_trace_reason <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>`
-is set to false, Envoy will not parse the trace reason from the ``x-request-id`` header to ensure reads and writes of
+    is set to false, Envoy will not parse the trace reason from the ``x-request-id`` header to ensure reads and writes of
     trace reason be consistant.
     If the :ref:`pack_trace_reason <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>`
     is set to true and external ``x-request-id`` value is used, the trace reason in the external request id will not
