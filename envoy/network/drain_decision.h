@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 
 #include "absl/base/attributes.h"
+#include "absl/status/status.h"
 
 namespace Envoy {
 namespace Network {
