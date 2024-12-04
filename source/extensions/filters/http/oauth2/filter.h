@@ -335,8 +335,6 @@ private:
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                  const absl::string_view path_str);
   bool validateNonce(const Http::RequestHeaderMap& headers, const std::string& nonce);
-  const std::string encodeState(const std::string& original_request_url,
-                                const std::string& nonce) const;
 };
 
 } // namespace Oauth2

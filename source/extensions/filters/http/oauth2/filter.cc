@@ -189,6 +189,16 @@ std::string generateFixedLengthNonce(TimeSource& time_source) {
   return nonce;
 }
 
+/**
+ * Encodes the state parameter for the OAuth2 flow.
+ * The state parameter is a base64Url encoded JSON object containing the original request URL and a
+ * nonce for CSRF protection.
+ */
+std::string encodeState(const std::string& original_request_url, const std::string& nonce) {
+  std::string json = fmt::format(R"({{"url":"{}","nonce":"{}"}})", original_request_url, nonce);
+  return Base64Url::encode(json.data(), json.size());
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -495,6 +505,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
 
   std::string state;
   // Encode the original request URL and the nonce to the state parameter
+  // TODO(zhaohuabing): remove the runtime guard once the feature is stable
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_enable_state_nonce")) {
     // Generate a nonce to prevent CSRF attacks
     std::string nonce;
@@ -550,17 +561,6 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
   config_->stats().oauth_unauthorized_rq_.inc();
-}
-
-/**
- * Encodes the state parameter for the OAuth2 flow.
- * The state parameter is a base64Url encoded JSON object containing the original request URL and a
- * nonce for CSRF protection.
- */
-const std::string OAuth2Filter::encodeState(const std::string& original_request_url,
-                                            const std::string& nonce) const {
-  std::string json = fmt::format(R"({{"url":"{}","nonce":"{}"}})", original_request_url, nonce);
-  return Base64Url::encode(json.data(), json.size());
 }
 
 /**
@@ -861,14 +861,17 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   // or nonce.
   std::string original_request_url;
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_enable_state_nonce")) {
+    // Decode the state parameter to get the original request URL and nonce.
     const std::string state = Base64Url::decode(stateVal.value());
     bool has_unknown_field;
     ProtobufWkt::Struct message;
+
     auto status = MessageUtil::loadFromJsonNoThrow(state, message, has_unknown_field);
     if (!status.ok()) {
       ENVOY_LOG(error, "state query param is not a valid JSON: \n{}", state);
       return {false, "", ""};
     }
+
     const auto& filed_value_pair = message.fields();
     if (!filed_value_pair.contains(stateParamsUrl) ||
         !filed_value_pair.contains(stateParamsNonce)) {
@@ -903,6 +906,7 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   return {true, codeVal.value(), original_request_url};
 }
 
+// Validates the nonce in the state parameter against the nonce in the cookie.
 bool OAuth2Filter::validateNonce(const Http::RequestHeaderMap& headers, const std::string& nonce) {
   const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
     return key == config_->cookieNames().oauth_nonce_;
