@@ -23,6 +23,7 @@ _CC_GRPC_SUFFIX = "_cc_grpc"
 _GO_PROTO_SUFFIX = "_go_proto"
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/go-control-plane/"
 _JAVA_PROTO_SUFFIX = "_java_proto"
+_IS_BZLMOD = str(Label("//:invalid")).startswith("@@")
 
 _COMMON_PROTO_DEPS = [
     "@com_google_protobuf//:any_proto",
@@ -42,7 +43,8 @@ _COMMON_PROTO_DEPS = [
 def _proto_mapping(dep, proto_dep_map, proto_suffix):
     mapped = proto_dep_map.get(dep)
     if mapped == None:
-        prefix = "@" + Label(dep).workspace_name if not dep.startswith("//") else ""
+        prefix = "@@" if _IS_BZLMOD else "@"
+        prefix = prefix + Label(dep).repo_name if not dep.startswith("//") else ""
         return prefix + "//" + Label(dep).package + ":" + Label(dep).name + proto_suffix
     return mapped
 

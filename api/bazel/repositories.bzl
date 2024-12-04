@@ -12,7 +12,22 @@ def external_http_archive(name, **kwargs):
         **kwargs
     )
 
-def api_dependencies():
+def api_dependencies(bzlmod = False):
+    external_http_archive(
+        name = "prometheus_metrics_model",
+        build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "com_github_bufbuild_buf",
+        build_file_content = BUF_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "envoy_toolshed",
+    )
+
+    if bzlmod:
+        return
+
     external_http_archive(
         name = "bazel_skylib",
     )
@@ -33,10 +48,6 @@ def api_dependencies():
     )
 
     external_http_archive(
-        name = "prometheus_metrics_model",
-        build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
-    )
-    external_http_archive(
         name = "opencensus_proto",
     )
     external_http_archive(
@@ -51,18 +62,10 @@ def api_dependencies():
         build_file_content = OPENTELEMETRY_BUILD_CONTENT,
     )
     external_http_archive(
-        name = "com_github_bufbuild_buf",
-        build_file_content = BUF_BUILD_CONTENT,
-    )
-    external_http_archive(
         name = "dev_cel",
     )
-
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
-    )
-    external_http_archive(
-        name = "envoy_toolshed",
     )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
@@ -225,3 +228,5 @@ filegroup(
     tags = ["manual"], # buf is downloaded as a linux binary; tagged manual to prevent build for non-linux users
 )
 """
+
+non_module_deps = module_extension(implementation = lambda ctx: api_dependencies(bzlmod = True))
