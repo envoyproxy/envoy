@@ -48,7 +48,7 @@ Http::FilterFactoryCb GolangFilterConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
- absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 GolangFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {

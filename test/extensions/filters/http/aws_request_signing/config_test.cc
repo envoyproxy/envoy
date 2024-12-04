@@ -572,8 +572,11 @@ stat_prefix: foo_prefix
 
   EXPECT_THROW(
       {
-        const auto route_config = factory.createRouteSpecificFilterConfig(
-            proto_config, context, ProtobufMessage::getNullValidationVisitor()).value();
+        const auto route_config =
+            factory
+                .createRouteSpecificFilterConfig(proto_config, context,
+                                                 ProtobufMessage::getNullValidationVisitor())
+                .value();
       },
       EnvoyException);
 }

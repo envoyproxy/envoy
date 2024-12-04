@@ -102,7 +102,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
- absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     const AwsRequestSigningProtoPerRouteConfig& per_route_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {

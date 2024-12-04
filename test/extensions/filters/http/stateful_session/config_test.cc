@@ -72,21 +72,29 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);
 
-  EXPECT_TRUE(factory.createRouteSpecificFilterConfig(proto_route_config, server_context,
-                                                          context.messageValidationVisitor()).ok());
-  EXPECT_TRUE(factory.createRouteSpecificFilterConfig(disabled_config, server_context,
-                                                          context.messageValidationVisitor()).ok());
+  EXPECT_TRUE(factory
+                  .createRouteSpecificFilterConfig(proto_route_config, server_context,
+                                                   context.messageValidationVisitor())
+                  .ok());
+  EXPECT_TRUE(factory
+                  .createRouteSpecificFilterConfig(disabled_config, server_context,
+                                                   context.messageValidationVisitor())
+                  .ok());
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createRouteSpecificFilterConfig(not_exist_config, server_context,
-                                              context.messageValidationVisitor()).value(),
+      factory
+          .createRouteSpecificFilterConfig(not_exist_config, server_context,
+                                           context.messageValidationVisitor())
+          .value(),
       EnvoyException,
       "Didn't find a registered implementation for name: 'envoy.http.stateful_session.not_exist'");
 
   EXPECT_NO_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context)
                       .status()
                       .IgnoreError());
-  EXPECT_TRUE(factory.createRouteSpecificFilterConfig(empty_proto_route_config, server_context,
-                                                          context.messageValidationVisitor()).ok());
+  EXPECT_TRUE(factory
+                  .createRouteSpecificFilterConfig(empty_proto_route_config, server_context,
+                                                   context.messageValidationVisitor())
+                  .ok());
 }
 
 } // namespace
