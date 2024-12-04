@@ -1,5 +1,5 @@
 diff --git a/single-page-app/verify.sh b/single-page-app/verify.sh
-index 582917d..6b1547f 100755
+index 582917d..c5e4ffc 100755
 --- a/single-page-app/verify.sh
 +++ b/single-page-app/verify.sh
 @@ -10,13 +10,11 @@ export PORT_PROXY="${SPA_PORT_PROXY:-11900}"
@@ -96,7 +96,7 @@ index 582917d..6b1547f 100755
      LOCATION=$(_curl "${curl_args[@]}" --head "${proxy_scheme}://localhost:${proxy_port}/login" | grep location)
 -    if [[ "$LOCATION" == *"nonce%3D"* ]]; then
 -        SUPPORT_NONCE="true"
-+    if [[ "$LOCATION" == ${BASE64URL_PREFIX}* ]]; then
++    if [[ "$LOCATION" == *"$BASE64URL_PREFIX"* ]]; then
 +        STATE_BASE64URL_ENCODE="true"
      fi
  
@@ -128,7 +128,7 @@ index 582917d..6b1547f 100755
 +        "${proxy_scheme}://localhost:${proxy_port}/login" \
 +        "${curl_args[@]}"
 +
-+    encoded_state=$(echo -n "{\"url\":\"${proxy_scheme}://localhost:${proxy_port}/login\",\"nonce\":\"12345678\"}" | basenc --base64url)
++    encoded_state=$(echo -n "{\"url\":\"${proxy_scheme}://localhost:${proxy_port}/login\",\"nonce\":\"12345678\"}" | basenc --base64url --wrap=0 | sed 's/=//g')
  
      run_log "Fetch the myhub authorization page"
 -    if [[ "$SUPPORT_NONCE" == "true" ]]; then
