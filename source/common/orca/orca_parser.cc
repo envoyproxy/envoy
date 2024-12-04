@@ -96,11 +96,6 @@ absl::Status tryCopyMetricToOrcaLoadReport(absl::string_view metric_name,
     if (metric_name_without_prefix.empty()) {
       return absl::InvalidArgumentError("utilization metric key is empty.");
     }
-    // Keep consistant with the proto annotation of utilization field.
-    if (value > 1.0) {
-      return absl::InvalidArgumentError(fmt::format(
-          "custom backend load metric value({}) cannot be greater than 1.0.", metric_name));
-    }
 
     orca_load_report.mutable_utilization()->insert(
         {std::string(metric_name_without_prefix), value});

@@ -145,16 +145,6 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsEmptyUtilizationMetricKe
       StatusHelpers::HasStatus(absl::InvalidArgumentError("utilization metric key is empty.")));
 }
 
-TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsBigUtilizationMetricValue) {
-  Http::TestRequestHeaderMapImpl headers{
-      {std::string(kEndpointLoadMetricsHeader),
-       absl::StrCat(kHeaderFormatPrefixText, "utilization.total:1.1")}};
-  EXPECT_THAT(
-      parseOrcaLoadReportHeaders(headers),
-      StatusHelpers::HasStatus(absl::InvalidArgumentError(
-          "custom backend load metric value(utilization.total) cannot be greater than 1.0.")));
-}
-
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderContainsDuplicateNamedMetric) {
   Http::TestRequestHeaderMapImpl headers{
       {std::string(kEndpointLoadMetricsHeader),
