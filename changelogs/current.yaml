@@ -56,7 +56,7 @@ minor_behavior_changes:
 - area: http
   change: |
     If the :ref:`pack_trace_reason <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>`
-    is set to false, Envoy will not parse the trace reason from the ``x-request-id`` header to ensure reads and writes of
+is set to false, Envoy will not parse the trace reason from the ``x-request-id`` header to ensure reads and writes of
     trace reason be consistant.
     If the :ref:`pack_trace_reason <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>`
     is set to true and external ``x-request-id`` value is used, the trace reason in the external request id will not
@@ -66,6 +66,9 @@ minor_behavior_changes:
     :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>`
     is now enabled by default. This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.oauth2_use_refresh_token`` to false.
+    The state parameter is now a base64url-encoded json object including the original request url and a nonce for CSRF protection.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.oauth2_enable_state_nonce`` to false.
 - area: quic
   change: |
     Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
