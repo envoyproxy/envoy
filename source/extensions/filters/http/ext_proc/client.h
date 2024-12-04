@@ -19,7 +19,7 @@ namespace ExternalProcessing {
 
 class ExternalProcessorStream : public StreamBase {
 public:
-  virtual ~ExternalProcessorStream() = default;
+  ~ExternalProcessorStream() override = default;
   virtual void send(envoy::service::ext_proc::v3::ProcessingRequest&& request,
                     bool end_stream) PURE;
   // Idempotent close. Return true if it actually closed.
@@ -39,7 +39,7 @@ using ExternalProcessorStreamPtr = std::unique_ptr<ExternalProcessorStream>;
 
 class ExternalProcessorCallbacks : public RequestCallbacks {
 public:
-  virtual ~ExternalProcessorCallbacks() = default;
+  ~ExternalProcessorCallbacks() override = default;
   virtual void onReceiveMessage(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) PURE;
   virtual void onGrpcError(Grpc::Status::GrpcStatus error) PURE;
@@ -49,7 +49,7 @@ public:
 
 class ExternalProcessorClient : public ClientBase {
 public:
-  virtual ~ExternalProcessorClient() = default;
+  ~ExternalProcessorClient() override = default;
   virtual ExternalProcessorStreamPtr
   start(ExternalProcessorCallbacks& callbacks,
         const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,

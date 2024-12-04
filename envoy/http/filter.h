@@ -310,7 +310,7 @@ public:
 class RouteConfigUpdateRequesterFactory : public Config::UntypedFactory {
 public:
   // UntypedFactory
-  virtual std::string category() const override { return "envoy.route_config_update_requester"; }
+  std::string category() const override { return "envoy.route_config_update_requester"; }
 
   virtual std::unique_ptr<RouteConfigUpdateRequester>
   createRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider) PURE;

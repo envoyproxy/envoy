@@ -403,7 +403,7 @@ public:
                         config->untypedReceivingMetadataNamespaces()) {}
 
   const FilterConfig& config() const { return *config_; }
-  const envoy::config::core::v3::GrpcService& grpc_service_config() const {
+  const envoy::config::core::v3::GrpcService& grpcServiceConfig() const {
     return config_with_hash_key_.config();
   }
 
