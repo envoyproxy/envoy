@@ -40,28 +40,28 @@ class SecretReader {
 public:
   virtual ~SecretReader() = default;
   virtual const std::string& clientSecret() const PURE;
-  virtual const std::string& tokenSecret() const PURE;
+  virtual const std::string& hmacSecret() const PURE;
 };
 
 class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr&& client_secret_provider,
-                  Secret::GenericSecretConfigProviderSharedPtr&& token_secret_provider,
+                  Secret::GenericSecretConfigProviderSharedPtr&& hmac_secret_provider,
                   ThreadLocal::SlotAllocator& tls, Api::Api& api)
       : client_secret_(
             THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
                                       std::move(client_secret_provider), tls, api),
                                   std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)),
-        token_secret_(
+        hmac_secret_(
             THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
-                                      std::move(token_secret_provider), tls, api),
+                                      std::move(hmac_secret_provider), tls, api),
                                   std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)) {}
   const std::string& clientSecret() const override { return client_secret_->secret(); }
-  const std::string& tokenSecret() const override { return token_secret_->secret(); }
+  const std::string& hmacSecret() const override { return hmac_secret_->secret(); }
 
 private:
   std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> client_secret_;
-  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> token_secret_;
+  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> hmac_secret_;
 };
 
 /**
@@ -146,7 +146,7 @@ public:
   const Matchers::PathMatcher& redirectPathMatcher() const { return redirect_matcher_; }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
-  std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
+  std::string hmacSecret() const { return secret_reader_->hmacSecret(); }
   FilterStats& stats() { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }

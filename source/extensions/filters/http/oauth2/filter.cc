@@ -181,9 +181,10 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
 
 // Generates a non-guessable nonce that can be used to prevent CSRF attacks.
 // The nonce is a base64 encoded SHA256 HMAC generated from the current timestamp and a secret.
-std::string generateNonce(const std::vector<uint8_t>& secret, TimeSource& time_source) {
+std::string generateNonce(absl::string_view hmac_secret, TimeSource& time_source) {
+  std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
   std::string timestamp = fmt::format("{}", time_source.systemTime().time_since_epoch().count());
-  return generateHmacBase64(secret, timestamp);
+  return generateHmacBase64(hmac_secret_vec, timestamp);
 }
 
 /**
@@ -463,7 +464,7 @@ Http::FilterHeadersStatus OAuth2Filter::encodeHeaders(Http::ResponseHeaderMap& h
 bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   // We can skip OAuth if the supplied HMAC cookie is valid. Apply the OAuth details as headers
   // if we successfully validate the cookie.
-  validator_->setParams(headers, config_->tokenSecret());
+  validator_->setParams(headers, config_->hmacSecret());
   if (validator_->isValid()) {
     config_->stats().oauth_success_.inc();
     if (config_->forwardBearerToken() && !validator_->token().empty()) {
@@ -514,9 +515,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
       nonce = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
       nonce_cookie_exists = true;
     } else {
-      auto hmac_secret = config_->tokenSecret();
-      std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
-      nonce = generateNonce(hmac_secret_vec, time_source_);
+      nonce = generateNonce(config_->hmacSecret(), time_source_);
     }
 
     // Set the nonce cookie if it does not exist.
@@ -630,7 +629,7 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
 }
 
 std::string OAuth2Filter::getEncodedToken() const {
-  auto token_secret = config_->tokenSecret();
+  auto token_secret = config_->hmacSecret();
   std::vector<uint8_t> token_secret_vec(token_secret.begin(), token_secret.end());
   std::string encoded_token;
 

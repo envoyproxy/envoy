@@ -55,7 +55,7 @@ public:
   const std::string& clientSecret() const override {
     CONSTRUCT_ON_FIRST_USE(std::string, "asdf_client_secret_fdsa");
   }
-  const std::string& tokenSecret() const override {
+  const std::string& hmacSecret() const override {
     CONSTRUCT_ON_FIRST_USE(std::string, "asdf_token_secret_fdsa");
   }
 };
@@ -264,7 +264,7 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
   SDSSecretReader secret_reader(std::move(client_secret_provider), std::move(token_secret_provider),
                                 tls, *api);
   EXPECT_TRUE(secret_reader.clientSecret().empty());
-  EXPECT_TRUE(secret_reader.tokenSecret().empty());
+  EXPECT_TRUE(secret_reader.hmacSecret().empty());
 
   const std::string yaml_client = R"EOF(
 name: client
@@ -279,7 +279,7 @@ generic_secret:
 
   EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client.refvec_, "").ok());
   EXPECT_EQ(secret_reader.clientSecret(), "client_test");
-  EXPECT_EQ(secret_reader.tokenSecret(), "");
+  EXPECT_EQ(secret_reader.hmacSecret(), "");
 
   const std::string yaml_token = R"EOF(
 name: token
@@ -292,7 +292,7 @@ generic_secret:
 
   EXPECT_TRUE(token_callback->onConfigUpdate(decoded_resources_token.refvec_, "").ok());
   EXPECT_EQ(secret_reader.clientSecret(), "client_test");
-  EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
+  EXPECT_EQ(secret_reader.hmacSecret(), "token_test");
 
   const std::string yaml_client_recheck = R"EOF(
 name: client
@@ -305,7 +305,7 @@ generic_secret:
 
   EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "").ok());
   EXPECT_EQ(secret_reader.clientSecret(), "client_test_recheck");
-  EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
+  EXPECT_EQ(secret_reader.hmacSecret(), "token_test");
 }
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
