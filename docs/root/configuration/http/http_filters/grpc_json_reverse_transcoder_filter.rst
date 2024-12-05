@@ -24,7 +24,7 @@ How to generate proto descriptor set
 Envoy has to know the proto descriptor of your gRPC service in order to do the transcoding.
 
 To generate a protobuf descriptor set for the gRPC service, you'll also need to clone the
-googleapis repository from GitHub before running protoc, as you'll need annotations.proto
+googleapis repository from GitHub before running ``protoc``, as you'll need annotations.proto
 in your include path, to define the HTTP mapping.
 
 .. code-block:: console
@@ -32,7 +32,7 @@ in your include path, to define the HTTP mapping.
   $ git clone https://github.com/googleapis/googleapis
   $ GOOGLEAPIS_DIR=<your-local-googleapis-folder>
 
-Then run protoc to generate the descriptor set. For example using the test
+Then run ``protoc`` to generate the descriptor set. For example using the test
 :repo:`bookstore.proto <test/proto/bookstore.proto>` provided in the Envoy repository:
 
 .. code-block:: console
@@ -52,4 +52,6 @@ gRPC or RESTful JSON requests to localhost:51051.
 .. literalinclude:: _include/grpc-json-reverse-transcoder-filter.yaml
     :language: yaml
     :linenos:
+    :lines: 9-35
+    :emphasize-lines: 11-14
     :caption: :download:`grpc-json-reverse-transcoder-filter.yaml <_include/grpc-json-reverse-transcoder-filter.yaml>`
