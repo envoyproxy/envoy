@@ -1513,7 +1513,7 @@ TEST_F(StrictDnsClusterImplTest, NegativeDnsJitter) {
       false);
   EXPECT_THROW_WITH_MESSAGE(
       auto x = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_),
-      EnvoyException, "Invalid duration: Expected positive duration: seconds: -1\n");
+      EnvoyException, "Expected positive duration: seconds: -1\n");
 }
 TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
