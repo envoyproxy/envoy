@@ -8,6 +8,11 @@
 #include "envoy/stats/stats_macros.h"
 
 namespace Envoy {
+
+namespace Upstream {
+class ClusterManager;
+}
+
 namespace Network {
 
 /**
@@ -21,6 +26,9 @@ public:
 
   // Returns the dispatcher that created this ReverseConnectionManager.
   virtual Event::Dispatcher& dispatcher() const PURE;
+
+  // Returns the global cluster manager.
+  virtual  Upstream::ClusterManager& clusterManager() const PURE;;
 
   /**
    * Sets the stats scope for logging initiated reverse connections with the local

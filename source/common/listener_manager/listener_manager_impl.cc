@@ -375,13 +375,6 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
   }
 }
 
-void ListenerManagerImpl::setClusterManagerForWorkers(Upstream::ClusterManager* cluster_manager) {
-  ASSERT(cluster_manager != nullptr);
-  for (const auto& worker : workers_) {
-    worker->getDispatcher().setClusterManager(cluster_manager);
-  }
-}
-
 void ListenerManagerImpl::enableReverseConnections(
     Network::RevConnRegistry& reverse_conn_registry) {
   for (const auto& worker : workers_) {

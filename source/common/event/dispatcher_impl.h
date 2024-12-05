@@ -106,8 +106,6 @@ public:
   runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override;
   virtual void setConnectionHandler(Network::ConnectionHandler* connection_handler) override;
   virtual Network::ConnectionHandler* connectionHandler() override { return connection_handler_; }
-  virtual void setClusterManager(Upstream::ClusterManager* cluster_manager) override;
-  Upstream::ClusterManager* getClusterManager() override;
 
 private:
   // Holds a reference to the watchdog registered with this dispatcher and the timer used to ensure
@@ -184,8 +182,6 @@ private:
   WatchdogRegistrationPtr watchdog_registration_;
   const ScaledRangeTimerManagerPtr scaled_timer_manager_;
   Network::ConnectionHandler* connection_handler_;
-  // Dispatcher holds a raw pointer to the cluster manager to obtain thread local cluster, etc.
-  Upstream::ClusterManager* cluster_manager_;
 };
 
 } // namespace Event

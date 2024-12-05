@@ -300,17 +300,6 @@ public:
    * @return the Connection Handler.
    */
   virtual Network::ConnectionHandler* connectionHandler() PURE;
-
-  /**
-   * Sets the dispatcher's cluster manager pointer.
-   * @param cluster_manager the upstream cluster manager object.
-   */
-  virtual void setClusterManager(Upstream::ClusterManager* cluster_manager) PURE;
-
-  /**
-   * @return the cluster manager pointer.
-   */
-  virtual Upstream::ClusterManager* getClusterManager() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

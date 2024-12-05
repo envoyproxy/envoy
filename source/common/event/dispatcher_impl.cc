@@ -103,15 +103,6 @@ void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
       std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
 }
 
-void DispatcherImpl::setClusterManager(Upstream::ClusterManager* cluster_manager) {
-  cluster_manager_ = cluster_manager;
-}
-
-Upstream::ClusterManager* DispatcherImpl::getClusterManager() {
-  ASSERT(cluster_manager_ != nullptr);
-  return cluster_manager_;
-}
-
 void DispatcherImpl::setConnectionHandler(Network::ConnectionHandler* connection_handler) {
   connection_handler_ = connection_handler;
 };
