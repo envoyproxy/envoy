@@ -11,10 +11,20 @@ This is a filter which allows a gRPC client to send requests to Envoy and get pr
 to a RESTful JSON API service. The HTTP mapping for the gRPC service has to be defined by
 `custom options <https://cloud.google.com/service-management/reference/rpc/google.api#http>`_.
 
+Unsupported options from ``google.api.http``
+--------------------------------------------
+* **additional_binding**: The gRPC-JSON reverse transcoder ignores this options, if set, as it makes binding a
+  gRPC method to a single HTTP endpoint difficult.
+* **response_body**: The gRPC-JSON reverse transcoder uses the whole response from the upstream service
+  as a response to the gRPC client and ignores this options, if set.
+
 JSON mapping
 ------------
 
 The protobuf to JSON mapping is defined `here <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
+
+* **NOTE:** The gRPC-JSON reverse transcoder ignores the ``json_name`` option and uses the proto field names
+  as the JSON names by default.
 
 .. _config_grpc_json_reverse_transcoder_generate_proto_descriptor_set:
 
