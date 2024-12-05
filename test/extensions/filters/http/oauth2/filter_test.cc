@@ -40,7 +40,7 @@ static const std::string TEST_TOKEN_SECRET_ID = "MyTokenSecretKnoxID";
 static const std::string TEST_DEFAULT_SCOPE = "user";
 static const std::string TEST_ENCODED_AUTH_SCOPES = "user%20openid%20email";
 static const std::string TEST_STATE_NONCE = "IPOom6PfIoFS+MmiV04aTJai8vUYlzyO5zUgT2G8mZA=";
-// {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"IPOom6PfIoFS+MmiV04aTJai8vUYlzyO5zUgT2G8mZA="}
+// {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"${TEST_STATE_NONCE}"}
 static const std::string TEST_ENCODED_STATE =
     "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwibm9uY2"
     "UiOiJJUE9vbTZQZklvRlMrTW1pVjA0YVRKYWk4dlVZbHp5TzV6VWdUMkc4bVpBPSJ9";
@@ -1254,7 +1254,7 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
 
 // Verify that we 401 the request if the state query param contains the callback URL.
 TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
-  // {"url":"https://traffic.example.com/_oauth","nonce":"IPOom6PfIoFS+MmiV04aTJai8vUYlzyO5zUgT2G8mZA="}
+  // {"url":"https://traffic.example.com/_oauth","nonce":"${TEST_STATE_NONCE}"}
   static const std::string state_with_callback_url =
       "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vX29hdXRoIiwibm9uY2UiOiJJUE9vbTZQZklvRlMrTW1p"
       "VjA0YVRKYWk4dlVZbHp5TzV6VWdUMkc4bVpBPSJ9";
