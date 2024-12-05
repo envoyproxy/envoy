@@ -106,10 +106,14 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
         config.upstream_log_options().upstream_log_flush_interval()));
   }
 
-  if (config.upstream_http_filters_size() > 0) {
+  if (!config.upstream_http_filters().empty()) {
+    creation_status =
+        Http::FilterChainUtility::checkUpstreamHttpFiltersList(config.upstream_http_filters());
+    if (!creation_status.ok()) {
+      return;
+    }
+
     auto& server_factory_ctx = context.serverFactoryContext();
-    const Http::FilterChainUtility::FiltersList& upstream_http_filters =
-        config.upstream_http_filters();
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             server_factory_ctx);
@@ -120,8 +124,8 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*filter_config_provider_manager, server_factory_ctx,
                context.serverFactoryContext().clusterManager(), *upstream_ctx_, prefix);
-    SET_AND_RETURN_IF_NOT_OK(helper.processFilters(upstream_http_filters, "router upstream http",
-                                                   "router upstream http",
+    SET_AND_RETURN_IF_NOT_OK(helper.processFilters(config.upstream_http_filters(),
+                                                   "router upstream http", "router upstream http",
                                                    upstream_http_filter_factories_),
                              creation_status);
   }

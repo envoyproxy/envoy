@@ -1020,11 +1020,12 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager, bool only_create_if_configured,
+  bool createFilterChain(Http::FilterChainManager& manager,
                          const Http::FilterChainOptions&) const override {
-    if (!has_configured_http_filters_ && only_create_if_configured) {
+    if (http_filter_factories_.empty()) {
       return false;
     }
+
     Http::FilterChainUtility::createFilterChainForFactories(
         manager, Http::EmptyFilterChainOptions{}, http_filter_factories_);
     return true;
