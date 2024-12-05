@@ -544,6 +544,8 @@ TEST_F(OAuth2Test, RequestSignout) {
        "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().Location.get(), "https://traffic.example.com/"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));

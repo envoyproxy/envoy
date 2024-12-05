@@ -591,6 +591,10 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       Http::Headers::get().SetCookie,
       absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
                    cookie_domain));
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_nonce_),
+                   cookie_domain));
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
