@@ -667,7 +667,7 @@ TEST_F(LogicalDnsClusterTest, NegativeDnsJitter) {
                     port_value: 443
   )EOF";
   EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(yaml, false), EnvoyException,
-                            "Invalid duration: Expected positive duration: seconds: -1\n");
+                            "Expected positive duration: seconds: -1\n");
 }
 
 TEST_F(LogicalDnsClusterTest, ExtremeJitter) {
