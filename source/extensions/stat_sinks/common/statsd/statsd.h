@@ -119,12 +119,13 @@ public:
 
   const std::string& getPrefix() { return prefix_; }
 
-private:
+protected:
   TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
                 ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
                 Stats::Scope& scope, absl::Status& creation_status,
                 const std::string& prefix = getDefaultPrefix());
 
+private:
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {
     TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher);
     ~TlsSink() override;

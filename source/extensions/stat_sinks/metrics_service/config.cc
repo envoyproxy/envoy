@@ -25,7 +25,7 @@ MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::MetricsServiceConfig&>(
           config, server.messageValidationContext().staticValidationVisitor());
   const auto& grpc_service = sink_config.grpc_service();
-  RETURN_IF_NOT_OK_REF(Config::Utility::checkTransportVersion(sink_config));
+  RETURN_IF_NOT_OK(Config::Utility::checkTransportVersion(sink_config));
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
   auto client_or_error = server.clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(

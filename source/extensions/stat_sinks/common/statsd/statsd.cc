@@ -212,7 +212,7 @@ TcpStatsdSink::create(const LocalInfo::LocalInfo& local_info, const std::string&
   absl::Status creation_status;
   auto sink = std::unique_ptr<TcpStatsdSink>(new TcpStatsdSink(
       local_info, cluster_name, tls, cluster_manager, scope, creation_status, prefix));
-  RETURN_IF_ERROR(creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
   return sink;
 }
 

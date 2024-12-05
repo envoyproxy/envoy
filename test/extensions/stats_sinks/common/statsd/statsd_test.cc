@@ -193,11 +193,10 @@ TEST_F(TcpStatsdSinkTest, NoHost) {
 }
 
 TEST_F(TcpStatsdSinkTest, WithCustomPrefix) {
-  sink_ = TcpStatsdSink::create(
-              local_info_, "fake_cluster", tls_, cluster_manager_,
-              *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()),
-              "test_prefix")
-              .value();
+  sink_ = *TcpStatsdSink::create(
+      local_info_, "fake_cluster", tls_, cluster_manager_,
+      *(cluster_manager_.active_clusters_["fake_cluster"]->info_->stats_store_.rootScope()),
+      "test_prefix");
 
   NiceMock<Stats::MockCounter> counter;
   counter.name_ = "test_counter";
