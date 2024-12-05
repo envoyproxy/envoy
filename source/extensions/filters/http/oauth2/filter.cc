@@ -153,19 +153,24 @@ std::string encodeHmacHexBase64(const std::vector<uint8_t>& secret, absl::string
   return encoded_hmac;
 }
 
+// Generates a SHA256 HMAC from a secret and a message and returns the result as a base64 encoded
+// string.
+std::string generateHmacBase64(const std::vector<uint8_t>& secret, std::string& message) {
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, message);
+  std::string hmac_string(hmac_result.begin(), hmac_result.end());
+  std::string base64_encoded_hmac;
+  absl::Base64Escape(hmac_string, &base64_encoded_hmac);
+  return base64_encoded_hmac;
+}
+
 std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_view domain,
                              absl::string_view expires, absl::string_view token = "",
                              absl::string_view id_token = "",
                              absl::string_view refresh_token = "") {
-  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  const auto hmac_payload =
+  std::string hmac_payload =
       absl::StrJoin({domain, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
-
-  std::string base64_encoded_hmac;
-  std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, hmac_payload);
-  std::string hmac_string(hmac_result.begin(), hmac_result.end());
-  absl::Base64Escape(hmac_string, &base64_encoded_hmac);
-  return base64_encoded_hmac;
+  return generateHmacBase64(secret, hmac_payload);
 }
 
 std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view domain,
@@ -178,12 +183,7 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
 // The nonce is a base64 encoded SHA256 HMAC generated from the current timestamp and a secret.
 std::string generateNonce(const std::vector<uint8_t>& secret, TimeSource& time_source) {
   std::string timestamp = fmt::format("{}", time_source.systemTime().time_since_epoch().count());
-  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, timestamp);
-  std::string hmac_string(hmac_result.begin(), hmac_result.end());
-  std::string base64_encoded_hmac;
-  absl::Base64Escape(hmac_string, &base64_encoded_hmac);
-  return base64_encoded_hmac;
+  return generateHmacBase64(secret, timestamp);
 }
 
 /**
