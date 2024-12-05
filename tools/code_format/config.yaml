@@ -140,7 +140,6 @@ paths:
     - source/common/grpc/async_client_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
-    - source/common/config/watched_directory.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
     - source/server/hot_restarting_parent.cc
