@@ -174,19 +174,16 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
   return encodeHmacBase64(secret, domain, expires, token, id_token, refresh_token);
 }
 
-// Generates a nonce based on the current time
-std::string generateFixedLengthNonce(TimeSource& time_source) {
-  constexpr size_t length = 16;
-
-  std::string nonce = fmt::format("{}", time_source.systemTime().time_since_epoch().count());
-
-  if (nonce.length() < length) {
-    nonce.append(length - nonce.length(), '0');
-  } else if (nonce.length() > length) {
-    nonce = nonce.substr(0, length);
-  }
-
-  return nonce;
+// Generates a non-guessable nonce that can be used to prevent CSRF attacks.
+// The nonce is a base64 encoded SHA256 HMAC generated from the current timestamp and a secret.
+std::string generateNonce(const std::vector<uint8_t>& secret, TimeSource& time_source) {
+  std::string timestamp = fmt::format("{}", time_source.systemTime().time_since_epoch().count());
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, timestamp);
+  std::string hmac_string(hmac_result.begin(), hmac_result.end());
+  std::string base64_encoded_hmac;
+  absl::Base64Escape(hmac_string, &base64_encoded_hmac);
+  return base64_encoded_hmac;
 }
 
 /**
@@ -517,7 +514,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
       nonce = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
       nonce_cookie_exists = true;
     } else {
-      nonce = generateFixedLengthNonce(time_source_);
+      auto hmac_secret = config_->tokenSecret();
+      std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
+      nonce = generateNonce(hmac_secret_vec, time_source_);
     }
 
     // Set the nonce cookie if it does not exist.
