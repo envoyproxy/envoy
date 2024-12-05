@@ -105,11 +105,6 @@ private:
  */
 class TcpStatsdSink : public Stats::Sink {
 public:
-  TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
-                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-                Stats::Scope& scope, absl::Status& creation_status,
-                const std::string& prefix = getDefaultPrefix());
-
   /**
    * This is a wrapper around the constructor to return StatusOr.
    */
@@ -125,6 +120,11 @@ public:
   const std::string& getPrefix() { return prefix_; }
 
 private:
+  TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+                Stats::Scope& scope, absl::Status& creation_status,
+                const std::string& prefix = getDefaultPrefix());
+
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {
     TlsSink(TcpStatsdSink& parent, Event::Dispatcher& dispatcher);
     ~TlsSink() override;

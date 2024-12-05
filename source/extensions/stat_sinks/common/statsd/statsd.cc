@@ -210,8 +210,8 @@ TcpStatsdSink::create(const LocalInfo::LocalInfo& local_info, const std::string&
                       ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
                       Stats::Scope& scope, const std::string& prefix) {
   absl::Status creation_status;
-  auto sink = std::make_unique<TcpStatsdSink>(local_info, cluster_name, tls, cluster_manager, scope,
-                                              creation_status, prefix);
+  auto sink = std::unique_ptr<TcpStatsdSink>(new TcpStatsdSink(
+      local_info, cluster_name, tls, cluster_manager, scope, creation_status, prefix));
   RETURN_IF_ERROR(creation_status);
   return sink;
 }
