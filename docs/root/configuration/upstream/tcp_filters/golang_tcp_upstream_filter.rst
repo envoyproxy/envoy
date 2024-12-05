@@ -3,7 +3,7 @@
 Golang Tcp Upstream Filter
 ======
 
-When you want to implement http2tcp in Envoy, you can use this to extend Envoy easier.
+This is a filter which can use Golang plugin to achieve **Protocol Convert** from HTTP1 client to any RPC(TCP) server in Envoy.
 
 The Golang Tcp Upstream Filter allows `Golang <https://go.dev/>`_ to be run during both the request
 and response flows of upstream.
@@ -14,10 +14,15 @@ See the `Envoy's Golang tcp upstream filter proposal
 <https://github.com/envoyproxy/envoy/issues/35749>`_
 for more details on the filter's implementation.
 
-Developing a Go plugin
+Developing a Go tcp upstream plugin
 ----------------------
 
-Envoy's Go plugins must implement the :repo:`TcpUpstreamFilter API <contrib/golang/common/go/api/filter.go>`.
+Envoy's Go tcp upstream plugins must implement the :repo:`TcpUpstreamFilter API <contrib/golang/common/go/api/filter.go>`.
+
+Here is the introduction about the TcpUpstreamFilter API:
+* EncodeHeaders: get http1 request headers and decide whether to directly send rpc frame to tcp server.
+* EncodeData: get http1 request body and convert it to rpc frame, then send that to tcp server. and you can control whether to half-close upstream conn by Envoy.
+* OnUpstreamData: aggregate and verify multi rpc frame from tcp server, then convert complete rpc frame to http1 body, finally construct http1 response headers to http1 client.
 
 .. attention::
   The Go plugin API is not yet stable, you are **strongly** recommended to use the same version of Go plugin SDK and Envoy.

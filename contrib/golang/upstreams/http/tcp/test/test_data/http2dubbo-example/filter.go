@@ -44,9 +44,9 @@ type tcpUpstreamFilter struct {
   - @param bufferForUpstreamData supplies data to be set for sending to upstream.
   - @param endOfStream if end of stream.
   - @return api.SendDataStatus tell c++ side next action:
-    1.SendDataWithTunneling: Send data with upstream conn tunneling;
-    2.SendDataWithNotTunneling: aSend data with upstream conn not tunneling;
-    3.NotSendData: Not Send data to upstream.
+    1.TcpUpstreamContinue: will go to encodeData, encodeData will streaming get each_data_piece.
+    2.TcpUpstreamStopAndBuffer: will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole data one-off.
+    3.TcpUpstreamSendData: directly send data to upstream, and encodeData will not be called even when downstream_req has body.
 
 *
 */
@@ -92,9 +92,8 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, buffer
   - @param bufferForUpstreamData supplies data to be set for sending to upstream.
   - @param endOfStream if end of stream.
   - @return api.SendDataStatus tell c++ side next action:
-    1.SendDataWithTunneling: Send data with upstream conn tunneling;
-    2.SendDataWithNotTunneling: aSend data with upstream conn not tunneling;
-    3.NotSendData: Not Send data to upstream.
+    1.TcpUpstreamContinue: streaming send data to upstream, go side get each_data_piece, may be called multipled times.
+    2.TcpUpstreamStopAndBuffer: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot be used when end_stream=true).
 
 *
 */
@@ -154,9 +153,9 @@ const (
   - @param buffer supplies data to be set for sending to downstream.
   - @param endOfStream if end of stream.
   - @return api.ReceiveDataStatus tell c++ side next action:
-    1.ReceiveDataContinue: need more data from upstream;
-    2.ReceiveDataFinish: aggregate data success, return to downstream;
-    3.ReceiveDataFailure: protocol error, directly return to downstream.
+    1.TcpUpstreamContinue: go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
+    2.TcpUpstreamStopAndBuffer: every data trigger will call go side, and go side get buffer data from start.
+    3.TcpUpstreamSendData: send data and headers to downstream which means the whole resp to http is finished.
 
 *
 */

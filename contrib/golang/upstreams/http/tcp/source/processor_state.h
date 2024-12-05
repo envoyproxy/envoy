@@ -89,7 +89,7 @@ enum class TcpUpstreamStatus {
   *
   * Here is the specific explanation in different funcs:
   * encodeHeaders: will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole data one-off.
-  * encodeData: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot bed used when end_stream=true)
+  * encodeData: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot be used when end_stream=true)
   * onUpstreamData: every data trigger will call go side, and go side get buffer data from start.
   */
   TcpUpstreamStopAndBuffer,
