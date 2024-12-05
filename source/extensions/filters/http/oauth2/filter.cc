@@ -878,7 +878,8 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
   std::string nonce = filed_value_pair.at(stateParamsNonce).string_value();
   if (!validateNonce(headers, nonce)) {
-    ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonce);
+    ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}",
+              nonce); // todo zhaohuabing
     return {false, "", ""};
   }
   const std::string original_request_url = filed_value_pair.at(stateParamsUrl).string_value();

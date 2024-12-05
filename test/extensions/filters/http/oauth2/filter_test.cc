@@ -1222,6 +1222,7 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
   };
 
   Http::TestRequestHeaderMapImpl expected_headers{
@@ -1245,10 +1246,10 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
 
 // Verify that we 401 the request if the state query param contains the callback URL.
 TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
-  // {"url":"https://traffic.example.com/_oauth","nonce":"${TEST_STATE_NONCE}"}
+  // {"url":"https://traffic.example.com/_oauth","nonce":"00000000075bcd15"}
   static const std::string state_with_callback_url =
-      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vX29hdXRoIiwibm9uY2UiOiJJUE9vbTZQZklvRlMrTW1p"
-      "VjA0YVRKYWk4dlVZbHp5TzV6VWdUMkc4bVpBPSJ9";
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vX29hdXRoIiwibm9uY2UiOiIwMDAwMDAwMDA3NWJjZDE1"
+      "In0";
 
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -1263,6 +1264,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
   };
 
   Http::TestRequestHeaderMapImpl expected_response_headers{
@@ -1295,6 +1297,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
@@ -2194,7 +2197,7 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensExpiredIdToken) {
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensNoExpClaimInIdToken) {
-init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
+  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
                  1200 /* default_refresh_token_expires_in */));
@@ -2320,9 +2323,6 @@ TEST_F(OAuth2Test, CookieValidatorInTransition) {
 // - The filter gets a new bearer and refresh tokens via the current refresh token
 // - The filter continues to handler the request without redirection to the user agent
 TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
-  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-  //test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
