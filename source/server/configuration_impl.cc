@@ -130,7 +130,9 @@ absl::Status MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap&
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
 
   // clusterManagerFromProto() and init() have to be called consecutively.
-  cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(bootstrap);
+  auto manager_or_error = cluster_manager_factory.clusterManagerFromProto(bootstrap);
+  RETURN_IF_NOT_OK_REF(manager_or_error.status());
+  cluster_manager_ = std::move(*manager_or_error);
   status = cluster_manager_->initialize(bootstrap);
   RETURN_IF_NOT_OK(status);
 

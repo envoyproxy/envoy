@@ -274,11 +274,12 @@ public:
    *                       update. It can be overridden by setting `remove_ignored` to true while
    *                       calling removeCluster(). This is useful for clusters whose lifecycle
    *                       is managed with custom implementation, e.g., DFP clusters.
-   * @return true if the action results in an add/update of a cluster.
+   * @return true if the action results in an add/update of a cluster, an error
+   * status if the config is invalid.
    */
-  virtual bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                  const std::string& version_info,
-                                  const bool avoid_cds_removal = false) PURE;
+  virtual absl::StatusOr<bool>
+  addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                     const std::string& version_info, const bool avoid_cds_removal = false) PURE;
 
   /**
    * Set a callback that will be invoked when all primary clusters have been initialized.
@@ -572,7 +573,7 @@ public:
    * The cluster manager initialize() method needs to be called right after this method.
    * Please check https://github.com/envoyproxy/envoy/issues/33218 for details.
    */
-  virtual ClusterManagerPtr
+  virtual absl::StatusOr<ClusterManagerPtr>
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
   /**

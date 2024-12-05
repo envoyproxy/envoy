@@ -191,7 +191,7 @@ void MetadataCredentialsProviderBase::createCluster(bool new_timer) {
                    cluster_type_str, cluster_name_, host_port);
   }
 
-  context_->clusterManager().addOrUpdateCluster(cluster, "");
+  THROW_IF_NOT_OK(context_->clusterManager().addOrUpdateCluster(cluster, "").status());
 }
 
 // A thread local callback that occurs on every worker thread during cluster initialization.
