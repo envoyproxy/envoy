@@ -379,9 +379,6 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
       {Http::Headers::get().Scheme.get(), "https"},
   };
 
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
@@ -443,8 +440,6 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
 
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
   // Verify that the foo=bar query parameter is preserved in the redirect.
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
@@ -499,9 +494,6 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
-
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
 
   // Verify that the foo=bar query parameter is preserved in the redirect.
   Http::TestResponseHeaderMapImpl response_headers{
@@ -758,10 +750,6 @@ TEST_F(OAuth2Test, SetBearerToken) {
  * in the query parameters.
  */
 TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
-  });
   init();
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
@@ -770,9 +758,6 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Scheme.get(), "https"},
   };
-
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
 
   // This is the immediate response - a redirect to the auth cluster.
   Http::TestResponseHeaderMapImpl first_response_headers{
@@ -1379,13 +1364,6 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
  * Expected behavior: HTTP Utility should not strip the parameters of the original request.
  */
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
-  });
   init();
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
@@ -1468,9 +1446,6 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
 }
 
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
       {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
@@ -1569,11 +1544,6 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
   // Set SystemTime to a fixed point so we get consistent nonce between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
-  });
   init(getConfig(true, false,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY,
@@ -1916,7 +1886,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshToken) {
 }
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndDefaultRefreshTokenExpiresIn) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -1964,7 +1933,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndDefaultRefr
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndRefreshTokenExpiresInFromJwt) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -2016,7 +1984,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndRefreshToke
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndExpiredRefreshToken) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -2069,7 +2036,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndExpiredRefr
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndNoExpClaimInRefreshToken) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -2122,7 +2088,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndNoExpClaimI
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensIdTokenExpiresInFromJwt) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -2175,7 +2140,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensIdTokenExpiresInFromJwt) {
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensExpiredIdToken) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -2230,8 +2194,7 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensExpiredIdToken) {
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensNoExpClaimInIdToken) {
-
-  init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
+init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
                  1200 /* default_refresh_token_expires_in */));
@@ -2357,8 +2320,8 @@ TEST_F(OAuth2Test, CookieValidatorInTransition) {
 // - The filter gets a new bearer and refresh tokens via the current refresh token
 // - The filter continues to handler the request without redirection to the user agent
 TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  //test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
 
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
@@ -2472,7 +2435,6 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
 }
 
 TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
@@ -2525,9 +2487,6 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
 }
 
 TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
@@ -2590,7 +2549,6 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
  * Expected behavior: the filter should should return 401 Unauthorized response.
  */
 TEST_F(OAuth2Test, AjaxRefreshDoesNotRedirect) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
@@ -2631,7 +2589,6 @@ TEST_F(OAuth2Test, AjaxRefreshDoesNotRedirect) {
 }
 
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
 
   const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) - 10;
@@ -2697,7 +2654,6 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
 }
 
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_BASIC_AUTH
