@@ -199,7 +199,6 @@ public:
   ~MockDrainDecision() override;
 
   MOCK_METHOD(bool, drainClose, (), (const));
-  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
 };
 
 class MockListenerFilter : public ListenerFilter {

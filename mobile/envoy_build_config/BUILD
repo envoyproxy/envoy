@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         "extension_registry_platform_additions",
         "@envoy//source/common/http/matching:inputs_lib",
+        "@envoy//source/common/network:default_client_connection_factory",
         "@envoy//source/common/network:socket_lib",
         "@envoy//source/common/quic:quic_transport_socket_factory_lib",
         "@envoy//source/common/router:upstream_codec_filter_lib",

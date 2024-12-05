@@ -342,7 +342,7 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
 
 DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
     envoy::config::listener::v3::Listener::DrainType drain_type) {
-  return DrainManagerPtr{new DrainManagerImpl(server_, drain_type, server_.dispatcher())};
+  return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
 DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
