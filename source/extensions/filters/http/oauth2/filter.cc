@@ -180,11 +180,8 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
 }
 
 // Generates a non-guessable nonce that can be used to prevent CSRF attacks.
-// The nonce is a base64 encoded SHA256 HMAC generated from the current timestamp and a secret.
-std::string generateNonce(absl::string_view hmac_secret, TimeSource& time_source) {
-  std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
-  std::string timestamp = fmt::format("{}", time_source.systemTime().time_since_epoch().count());
-  return generateHmacBase64(hmac_secret_vec, timestamp);
+std::string generateNonce(Random::RandomGenerator& random) {
+  return Hex::uint64ToHex(random.random());
 }
 
 /**
@@ -302,11 +299,12 @@ bool OAuth2CookieValidator::timestampIsValid() const {
 bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
 
 OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
-                           std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source)
+                           std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source,
+                           Random::RandomGenerator& random)
     : validator_(std::make_shared<OAuth2CookieValidator>(time_source, config->cookieNames(),
                                                          config->cookieDomain())),
-      oauth_client_(std::move(oauth_client)), config_(std::move(config)),
-      time_source_(time_source) {
+      oauth_client_(std::move(oauth_client)), config_(std::move(config)), time_source_(time_source),
+      random_(random) {
 
   oauth_client_->setCallbacks(*this);
 }
@@ -512,7 +510,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
     nonce = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
     nonce_cookie_exists = true;
   } else {
-    nonce = generateNonce(config_->hmacSecret(), time_source_);
+    nonce = generateNonce(random_);
   }
 
   // Set the nonce cookie if it does not exist.

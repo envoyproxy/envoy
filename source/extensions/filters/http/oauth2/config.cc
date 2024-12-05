@@ -83,7 +83,8 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
             std::make_unique<OAuth2ClientImpl>(cluster_manager, config->oauthTokenEndpoint(),
                                                config->retryPolicy(), config->defaultExpiresIn());
         callbacks.addStreamFilter(std::make_shared<OAuth2Filter>(
-            config, std::move(oauth_client), context.serverFactoryContext().timeSource()));
+            config, std::move(oauth_client), context.serverFactoryContext().timeSource(),
+            context.serverFactoryContext().api().randomGenerator()));
       };
 }
 

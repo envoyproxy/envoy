@@ -39,11 +39,11 @@ static const std::string TEST_CLIENT_SECRET_ID = "MyClientSecretKnoxID";
 static const std::string TEST_TOKEN_SECRET_ID = "MyTokenSecretKnoxID";
 static const std::string TEST_DEFAULT_SCOPE = "user";
 static const std::string TEST_ENCODED_AUTH_SCOPES = "user%20openid%20email";
-static const std::string TEST_STATE_NONCE = "IPOom6PfIoFS+MmiV04aTJai8vUYlzyO5zUgT2G8mZA=";
-// {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"${TEST_STATE_NONCE}"}
+static const std::string TEST_STATE_NONCE = "00000000075bcd15";
+// {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"00000000075bcd15"}
 static const std::string TEST_ENCODED_STATE =
     "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwibm9uY2"
-    "UiOiJJUE9vbTZQZklvRlMrTW1pVjA0YVRKYWk4dlVZbHp5TzV6VWdUMkc4bVpBPSJ9";
+    "UiOiIwMDAwMDAwMDA3NWJjZDE1In0";
 
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -106,7 +106,9 @@ public:
     std::unique_ptr<OAuth2Client> oauth_client_ptr{oauth_client_};
 
     config_ = config;
-    filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr), test_time_);
+    ON_CALL(test_random_, random()).WillByDefault(Return(123456789));
+    filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr), test_time_,
+                                             test_random_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     validator_ = std::make_shared<MockOAuth2CookieValidator>();
@@ -229,6 +231,7 @@ public:
   Stats::IsolatedStoreImpl store_;
   Stats::Scope& scope_{*store_.rootScope()};
   Event::SimulatedTimeSystem test_time_;
+  NiceMock<Random::MockRandomGenerator> test_random_;
 };
 
 // Verifies that the OAuth SDSSecretReader correctly updates dynamic generic secret.
@@ -1219,8 +1222,9 @@ TEST_F(OAuth2Test, CookieValidatorCanUpdateToken) {
 
 // Verify that we 401 the request if the state query param doesn't contain a valid URL.
 TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
-  // {"url":"blah","nonce":"}
-  static const std::string state_with_invalid_url = "eyJ1cmwiOiJibGFoIiwibm9uY2UiOiJ9";
+  // {"url":"blah","nonce":"00000000075bcd15"}
+  static const std::string state_with_invalid_url =
+      "eyJ1cmwiOiJibGFoIiwibm9uY2UiOiIwMDAwMDAwMDA3NWJjZDE1In0";
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},

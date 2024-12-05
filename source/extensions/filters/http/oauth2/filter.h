@@ -268,7 +268,7 @@ class OAuth2Filter : public Http::PassThroughFilter,
                      Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
-               TimeSource& time_source);
+               TimeSource& time_source, Random::RandomGenerator& random);
 
   // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -316,6 +316,7 @@ private:
   std::unique_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr config_;
   TimeSource& time_source_;
+  Random::RandomGenerator& random_;
 
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)
