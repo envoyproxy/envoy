@@ -6,6 +6,7 @@
 
 import datetime
 import html
+import icalendar
 import os
 import pathlib
 import sys
@@ -23,11 +24,49 @@ from aio.core.functional import async_property
 from aio.run import runner
 
 ENVOY_REPO = "envoyproxy/envoy-setec"
-
+CALENDAR = "https://calendar.google.com/calendar/ical/pbvju567n6cbkp6kss87mkbptr4oj21t%40import.calendar.google.com/public/basic.ics"  # noqa: E501
 SLACK_EXPORT_URL = "https://api.slack.com/apps/A023NPQQ33K/oauth?"
 
 
 class RepoNotifier(runner.Runner):
+
+    @cached_property
+    def opsgenie_to_slack(self):
+        return ({v["opsgenie"]: v["slack"] for v in
+                 self.reviewers.values() if "opsgenie" in v})
+
+    @async_property
+    async def oncall_slack_handle(self):
+        opsgenie_string = await self.oncall_string
+        # Snag the first name from the "oncall transitioning to" entry.
+        opsgenie_name = opsgenie_string.split(' ', 1)[0]
+        # Check that the name is in the OPSGENIE_TO_SLACK list, else cc alyssa.
+        if not (uid := self.opsgenie_to_slack.get(opsgenie_name)):
+            print("could not find", opsgenie_name)
+            return self.opsgenie_to_slack.get('Alyssa')
+        return uid
+
+    @async_property(cache=True)
+    async def oncall_string(self):
+        now = datetime.datetime.now()
+        sunday = now - datetime.timedelta(days=now.weekday() + 1)
+        monday = now - datetime.timedelta(days=now.weekday())
+        priorweek = now - datetime.timedelta(14)
+
+        # Handle the event being created before today.
+        date = priorweek.strftime("%Y%m%d")
+        response = await self.session.get(f"{CALENDAR}?getdate={date}")
+        content = await response.read()
+        parsed_calendar = icalendar.Calendar.from_ical(content)
+
+        for component in parsed_calendar.walk():
+            if component.name == "VEVENT":
+                if (sunday.date() == component.decoded("dtstart").date()):
+                    return component.get("summary")
+                if (monday.date() == component.decoded("dtstart").date()):
+                    return component.get("summary")
+        print("unable to find this week's oncall")
+        return "unable to find this week's oncall"
 
     @property
     def dry_run(self):
@@ -132,7 +171,7 @@ class RepoNotifier(runner.Runner):
 
             is_approved = any(label["name"] in (
                 "patch:approved", "patch/complete")
-                              for label in issue["labels"])
+                for label in issue["labels"])
 
             is_cve = (
                 "cve/next"
@@ -153,8 +192,8 @@ class RepoNotifier(runner.Runner):
                 "notifier:ignore"
                 in [label["name"] for label in issue["labels"]])
             # If an non-CVE issue hasn't been updated in a week, notify.
-            if (not is_cve and age > self.weekend_offset(167) and
-               issue["assignees"]) and not should_ignore:
+            if (not is_cve and age > self.weekend_offset(167)
+               and issue["assignees"]) and not should_ignore:
                 stalled_issues.append(message)
 
             has_assignee = False
@@ -193,6 +232,11 @@ class RepoNotifier(runner.Runner):
             unassigned = "\n".join(await self.unassigned_issues)
             stalled = "\n".join(await self.stalled_issues)
             stalled_cve = "\n".join(await self.stalled_cve_issues)
+            if unassigned or stalled or stalled_cve:
+                oncall_handle = await self.oncall_slack_handle
+                await self.send_message(
+                    channel='#envoy-security-team',
+                    text=(f"Oncall now <@{oncall_handle}>"))
             if unassigned:
                 await self.send_message(
                     channel='#envoy-security-team',
