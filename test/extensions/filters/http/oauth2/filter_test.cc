@@ -1545,8 +1545,6 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
  * Expected behavior: Cookie domain should be set to the domain in the config.
  */
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
   init(getConfig(true, false,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY,
@@ -1612,6 +1610,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
   EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
   EXPECT_EQ(config_->clusterName(), "auth.example.com");
 
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
   const std::chrono::seconds expiredTime(10);
   filter_->updateTokens("accessToken", "idToken", "refreshToken", expiredTime);
 
@@ -1620,10 +1620,10 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
   Http::TestRequestHeaderMapImpl second_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthHMAC=IyFL1rx3SoaHv2rufMo4nRLHPwTCDAY2fnJ1cpIOcpY=;"
+       "OauthHMAC=vU9fV//fsKp9ARyrz/HZx2CqWFCmUygihdl18qR5u78=;"
        "domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=123456799;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
+       "OauthExpires=10;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "BearerToken=accessToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
