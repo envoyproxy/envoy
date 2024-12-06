@@ -426,7 +426,7 @@ public:
 
   void encodeComplete() override {
     if (config_->observabilityMode()) {
-      logGrpcStreamInfo();
+      logStreamInfo();
     }
   }
 
@@ -435,7 +435,8 @@ public:
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
   void onGrpcError(Grpc::Status::GrpcStatus error) override;
   void onGrpcClose() override;
-  void logGrpcStreamInfo() override;
+  void logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info);
+  void logStreamInfo() override;
 
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
