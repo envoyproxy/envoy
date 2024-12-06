@@ -13,7 +13,6 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
-    "envoy.tracers.opencensus",
     # Extensions that require CEL.
     "envoy.access_loggers.extension_filters.cel",
     "envoy.rate_limit_descriptors.expr",
@@ -178,13 +177,11 @@ def envoy_dependencies(skip_targets = []):
     _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
     _com_github_alibaba_hessian2_codec()
-    _com_github_tencent_rapidjson()
     _com_github_nlohmann_json()
     _com_github_ncopa_suexec()
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
-    _io_opencensus_cpp()
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _v8()
@@ -559,12 +556,6 @@ def _com_github_skyapm_cpp2sky():
         name = "skywalking_data_collect_protocol",
     )
 
-def _com_github_tencent_rapidjson():
-    external_http_archive(
-        name = "com_github_tencent_rapidjson",
-        build_file = "@envoy//bazel/external:rapidjson.BUILD",
-    )
-
 def _com_github_nlohmann_json():
     external_http_archive(
         name = "com_github_nlohmann_json",
@@ -681,11 +672,6 @@ def _com_google_protobuf():
     native.bind(
         name = "upb_reflection",
         actual = "@com_google_protobuf//upb:reflection",
-    )
-
-def _io_opencensus_cpp():
-    external_http_archive(
-        name = "io_opencensus_cpp",
     )
 
 def _com_github_curl():

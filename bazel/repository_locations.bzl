@@ -876,22 +876,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/alibaba/hessian2-codec/blob/{version}/LICENSE",
     ),
-    com_github_tencent_rapidjson = dict(
-        project_name = "RapidJSON",
-        project_desc = "Fast JSON parser/generator for C++",
-        project_url = "https://rapidjson.org",
-        version = "dfbe1db9da455552f7a9ad5d2aea17dd9d832ac1",
-        sha256 = "a2faafbc402394df0fa94602df4b5e4befd734aad6bb55dfef46f62fcaf1090b",
-        strip_prefix = "rapidjson-{version}",
-        urls = ["https://github.com/Tencent/rapidjson/archive/{version}.tar.gz"],
-        use_category = ["observability_ext"],
-        # Rapidjson is used in the external dependency of zipkin tracer.
-        extensions = ["envoy.tracers.zipkin", "envoy.tracers.opencensus"],
-        release_date = "2019-12-03",
-        cpe = "cpe:2.3:a:tencent:rapidjson:*",
-        license = "RapidJSON",
-        license_url = "https://github.com/Tencent/rapidjson/blob/{version}/license.txt",
-    ),
     com_github_nlohmann_json = dict(
         project_name = "nlohmann JSON",
         project_desc = "Fast JSON parser/generator for C++",
@@ -900,7 +884,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "0d8ef5af7f9794e3263480193c491549b2ba6cc74bb018906202ada498a79406",
         strip_prefix = "json-{version}",
         urls = ["https://github.com/nlohmann/json/archive/v{version}.tar.gz"],
-        # This will be a replacement for rapidJSON used in extensions and may also be a fast
+        # This has replaced rapidJSON used in extensions and may also be a fast
         # replacement for protobuf JSON.
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2023-11-28",
@@ -1154,21 +1138,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/WebAssembly/wasm-c-api/blob/{version}/LICENSE",
     ),
-    io_opencensus_cpp = dict(
-        project_name = "OpenCensus C++",
-        project_desc = "OpenCensus tracing library",
-        project_url = "https://github.com/census-instrumentation/opencensus-cpp",
-        version = "f68a2d0ea43eb61a4b7889f09987294c4f94d436",
-        sha256 = "b5fd69da558d08480e254c7e2a91e23a88ec8b72d9aec1a6c2329d7560a61744",
-        strip_prefix = "opencensus-cpp-{version}",
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/{version}.tar.gz"],
-        use_category = ["observability_ext"],
-        extensions = ["envoy.tracers.opencensus"],
-        release_date = "2022-09-20",
-        cpe = "N/A",
-        license = "Apache-2.0",
-        license_url = "https://github.com/census-instrumentation/opencensus-cpp/blob/{version}/LICENSE",
-    ),
     # Curl usage is under deprecation and will be removed by Q3 2024 before v1.31 release in July-2024.
     # See https://github.com/envoyproxy/envoy/issues/11816 & https://github.com/envoyproxy/envoy/pull/30731.
     com_github_curl = dict(
@@ -1184,7 +1153,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.http.aws_lambda",
             "envoy.filters.http.aws_request_signing",
             "envoy.grpc_credentials.aws_iam",
-            "envoy.tracers.opencensus",
         ],
         release_date = "2024-07-31",
         cpe = "cpe:2.3:a:haxx:libcurl:*",
@@ -1225,12 +1193,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "dbc5afc116f8279911c06b2d2ea47723c2ade20e",
-        sha256 = "981b2bd789d7279b557f35fa0a930df76d396e14059d8e493f42321753b60a08",
+        version = "c4d62db878dcc92ebbae9cf5e873b231b7b46868",
+        sha256 = "dcf290413e7062ac54f59c4b8fda0861059a39ec8c40fb2c3e28d3631ced9cf8",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2024-11-18",
+        release_date = "2024-12-04",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",

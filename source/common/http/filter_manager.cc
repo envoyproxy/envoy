@@ -1042,7 +1042,7 @@ void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
   // For early error handling, do a best-effort attempt to create a filter chain
   // to ensure access logging. If the filter chain already exists this will be
   // a no-op.
-  createFilterChain();
+  createDownstreamFilterChain();
 
   if (prepared_local_reply_) {
     return;
@@ -1083,6 +1083,10 @@ void DownstreamFilterManager::executeLocalReplyIfPrepared() {
   Utility::encodeLocalReply(state_.destroyed_, std::move(prepared_local_reply_));
 }
 
+FilterManager::CreateChainResult DownstreamFilterManager::createDownstreamFilterChain() {
+  return createFilterChain(filter_chain_factory_, false);
+}
+
 void DownstreamFilterManager::sendLocalReplyViaFilterChain(
     bool is_grpc_request, Code code, absl::string_view body,
     const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
@@ -1092,7 +1096,7 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
   // For early error handling, do a best-effort attempt to create a filter chain
   // to ensure access logging. If the filter chain already exists this will be
   // a no-op.
-  createFilterChain();
+  createDownstreamFilterChain();
 
   Utility::sendLocalReply(
       state_.destroyed_,
@@ -1629,11 +1633,9 @@ void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_st
   tracked_object_stack.add(filter_manager_callbacks_.scope());
 }
 
-bool FilterManager::createFilterChain() {
-  if (state_.created_filter_chain_) {
-    return false;
-  }
-  bool upgrade_rejected = false;
+FilterManager::UpgradeResult
+FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
+                                        const FilterChainOptionsImpl& options) {
   const HeaderEntry* upgrade = nullptr;
   if (filter_manager_callbacks_.requestHeaders()) {
     upgrade = filter_manager_callbacks_.requestHeaders()->Upgrade();
@@ -1644,28 +1646,49 @@ bool FilterManager::createFilterChain() {
     }
   }
 
-  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
-  // to set valid initial route only when the downstream callbacks is available.
-  FilterChainOptionsImpl options(
-      filter_manager_callbacks_.downstreamCallbacks().has_value() ? streamInfo().route() : nullptr);
-
-  state_.created_filter_chain_ = true;
-  if (upgrade != nullptr) {
-    const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
-
-    if (filter_chain_factory_.createUpgradeFilterChain(upgrade->value().getStringView(),
-                                                       upgrade_map, *this, options)) {
-      filter_manager_callbacks_.upgradeFilterChainCreated();
-      return true;
-    } else {
-      upgrade_rejected = true;
-      // Fall through to the default filter chain. The function calling this
-      // will send a local reply indicating that the upgrade failed.
-    }
+  if (upgrade == nullptr) {
+    // No upgrade header, no upgrade filter chain.
+    return UpgradeResult::UpgradeUnneeded;
   }
 
-  filter_chain_factory_.createFilterChain(*this, false, options);
-  return !upgrade_rejected;
+  const Router::RouteEntry::UpgradeMap* upgrade_map = filter_manager_callbacks_.upgradeMap();
+  return filter_chain_factory.createUpgradeFilterChain(upgrade->value().getStringView(),
+                                                       upgrade_map, *this, options)
+             ? UpgradeResult::UpgradeAccepted
+             : UpgradeResult::UpgradeRejected;
+}
+
+FilterManager::CreateChainResult
+FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory,
+                                 bool only_create_if_configured) {
+  if (state_.create_chain_result_.created()) {
+    return state_.create_chain_result_;
+  }
+
+  OptRef<DownstreamStreamFilterCallbacks> downstream_callbacks =
+      filter_manager_callbacks_.downstreamCallbacks();
+
+  // This filter chain options is only used for the downstream HTTP filter chains for now. So, try
+  // to set valid initial route only when the downstream callbacks is available.
+  FilterChainOptionsImpl options(downstream_callbacks.has_value() ? streamInfo().route() : nullptr);
+
+  UpgradeResult upgrade = UpgradeResult::UpgradeUnneeded;
+
+  // Only try the upgrade filter chain for downstream filter chains.
+  if (downstream_callbacks.has_value()) {
+    upgrade = createUpgradeFilterChain(filter_chain_factory, options);
+    if (upgrade == UpgradeResult::UpgradeAccepted) {
+      // Upgrade filter chain is created. Return the result directly.
+      state_.create_chain_result_ = CreateChainResult(true, upgrade);
+      return state_.create_chain_result_;
+    }
+    // If the upgrade is unnecessary or the upgrade filter chain is rejected, fall through to
+    // create the default filter chain.
+  }
+
+  state_.create_chain_result_ = CreateChainResult(
+      filter_chain_factory.createFilterChain(*this, only_create_if_configured, options), upgrade);
+  return state_.create_chain_result_;
 }
 
 void ActiveStreamDecoderFilter::requestDataDrained() {
@@ -1720,11 +1743,11 @@ bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers)
 
   if (headers != nullptr) {
     // The call to setResponseHeaders is needed to ensure that the headers are properly logged in
-    // access logs before the stream is destroyed. Since the function expects a ResponseHeaderPtr&&,
-    // ownership of the headers must be passed. This cannot happen earlier in the flow (such as in
-    // the call to setupRedirect) because at that point it is still possible for the headers to be
-    // used in a different logical branch. We work around this by creating a copy and passing
-    // ownership of the copy instead.
+    // access logs before the stream is destroyed. Since the function expects a
+    // ResponseHeaderPtr&&, ownership of the headers must be passed. This cannot happen earlier in
+    // the flow (such as in the call to setupRedirect) because at that point it is still possible
+    // for the headers to be used in a different logical branch. We work around this by creating a
+    // copy and passing ownership of the copy instead.
     ResponseHeaderMapPtr headers_copy = createHeaderMap<ResponseHeaderMapImpl>(*headers);
     parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers_copy));
     parent_.filter_manager_callbacks_.chargeStats(*headers);

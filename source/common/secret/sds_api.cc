@@ -270,8 +270,9 @@ void TlsCertificateSdsApi::setSecret(
           secret.tls_certificate());
   resolved_tls_certificate_secrets_ = nullptr;
   if (secret.tls_certificate().has_watched_directory()) {
-    watched_directory_ = std::make_unique<Config::WatchedDirectory>(
-        secret.tls_certificate().watched_directory(), dispatcher_);
+    watched_directory_ = THROW_OR_RETURN_VALUE(
+        Config::WatchedDirectory::create(secret.tls_certificate().watched_directory(), dispatcher_),
+        std::unique_ptr<Config::WatchedDirectory>);
   } else {
     watched_directory_.reset();
   }
@@ -324,8 +325,10 @@ void CertificateValidationContextSdsApi::setSecret(
           secret.validation_context());
   resolved_certificate_validation_context_secrets_ = nullptr;
   if (secret.validation_context().has_watched_directory()) {
-    watched_directory_ = std::make_unique<Config::WatchedDirectory>(
-        secret.validation_context().watched_directory(), dispatcher_);
+    watched_directory_ =
+        THROW_OR_RETURN_VALUE(Config::WatchedDirectory::create(
+                                  secret.validation_context().watched_directory(), dispatcher_),
+                              std::unique_ptr<Config::WatchedDirectory>);
   } else {
     watched_directory_.reset();
   }

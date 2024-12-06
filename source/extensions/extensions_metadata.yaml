@@ -1215,13 +1215,6 @@ envoy.tracers.datadog:
   status: stable
   type_urls:
   - envoy.config.trace.v3.DatadogConfig
-envoy.tracers.opencensus:
-  categories:
-  - envoy.tracers
-  security_posture: unknown
-  status: stable
-  type_urls:
-  - envoy.config.trace.v3.OpenCensusConfig
 envoy.tracers.opentelemetry:
   categories:
   - envoy.tracers

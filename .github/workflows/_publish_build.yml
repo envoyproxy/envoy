@@ -78,8 +78,7 @@ jobs:
           bazel-extra: >-
             --config=remote-cache-envoy-engflow
           rbe: false
-          # TODO(phlax): Switch this back to medium size
-          runs-on: envoy-arm64-large
+          runs-on: envoy-arm64-medium
 
   distribution:
     permissions:
