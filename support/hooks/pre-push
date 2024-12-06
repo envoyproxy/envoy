@@ -1,92 +1,243 @@
 #!/usr/bin/env bash
+
+set -e -o pipefail
+
 #
 # A git commit hook that will automatically run format checking and DCO signoff
 # checking before the push is successful.
 #
 # To enable this hook, run `bootstrap`, or run the following from the root of
 # the repo. (Note that `bootstrap` will correctly install this even if this code
-# is located in a submodule, while the following won't.)
-#
-# $ ln -s ../../support/hooks/pre-push .git/hooks/pre-push
+# is located in a submodule.)
 
 if [[ -e .env ]]; then
     # shellcheck disable=SC1091
     . .env
 fi
 
-if [[ -n "$NO_VERIFY" ]]; then
-    exit 0
-fi
+echo_ () {
+    local format message pre post possible_formats
+    format="$1"
+    message="$2"
+    IFS=',' read -ra formats <<< "$format"
+    echo_args=("-e")
+    possible_formats=(
+        "bold:\e[1m:\e[0m"
+        "underline:\e[4m:\e[0m"
+        "italic:\e[3m:\e[0m"
+        "blink:\e[5m:\e[0m"
+        "reverse:\e[7m:\e[0m"
+        "black:\e[30m:\e[0m"
+        "red:\e[31m:\e[0m"
+        "green:\e[32m:\e[0m"
+        "yellow:\e[33m:\e[0m"
+        "blue:\e[34m:\e[0m"
+        "purple:\e[35m:\e[0m"
+        "cyan:\e[36m:\e[0m"
+        "white:\e[37m:\e[0m"
+        "bg_black:\e[40m:\e[0m"
+        "bg_red:\e[41m:\e[0m"
+        "bg_green:\e[42m:\e[0m"
+        "bg_yellow:\e[43m:\e[0m"
+        "bg_blue:\e[44m:\e[0m"
+        "bg_magenta:\e[45m:\e[0m"
+        "bg_cyan:\e[46m:\e[0m"
+        "bg_white:\e[47m:\e[0m"
+    )
+    pre=()
+    post=()
+    for format in "${formats[@]}"; do
+        if [[ "$format" == "n" ]]; then
+           echo_args+=(-n)
+        fi
+    done
+    for possible in "${possible_formats[@]}"; do
+        name="$(echo "${possible}" | cut -d: -f1)"
+        for format in "${formats[@]}"; do
+            if [[ "$name" == "$format" ]]; then
+                possible_pre="$(echo "${possible}" | cut -d: -f2)"
+                possible_post="$(echo "${possible}" | cut -d: -f3)"
+                pre+=("$possible_pre")
+                post+=("$possible_post")
+            fi
+        done
+    done
+    prefix="$(printf %s "${pre[@]}" $'\n')"
+    postfix="$(printf %s "${post[@]}" $'\n')"
+    echo "${echo_args[@]}" "${prefix}${message}${postfix}"
+}
 
-DUMMY_SHA=0000000000000000000000000000000000000000
+welcome () {
+    echo
+    echo_ 'bold,underline,purple' "\t⬡ Welcome to Envoy development!"
+    echo
+    echo -n "Before PRs are pushed we like the code to be checked, "
+    echo_ 'bold,n' "this can take a while "
+    echo "especially the first time."
+    echo
+    echo "To run the checks you will need bazel installed or to configure an alternative method."
+    echo
+    echo "You can disable the checks with the following command:"
+    echo
+    echo "    $ echo NO_VERIFY=1 >> .env"
+    echo
+    echo "Please see https://github.com/envoyproxy/envoy/hooks/README.md for further options, or check \`.env.example\`"
+    echo
+    echo "Please select from the following options:"
+    echo
+    echo_ bold,n 0
+    echo " Continue with the checks (default)"
+    echo_ bold,n 1
+    echo " Continue with the checks, after configuring the hook to use the Envoy build container"
+    echo_ bold,n 2
+    echo " Skip the checks this time, ask me again"
+    echo_ bold,n 3
+    echo " Skip the checks forever"
+    echo_ bold,n 4
+    echo " Exit now to check the docs"
+    echo
+    echo_ bold,n "Please enter a choice (0): "
+    read -n 1 -r < /dev/tty
+    echo
+    case "$REPLY" in
+        1)
+            export PREPUSH_COMMAND_PREFIX=./ci/run_envoy_docker.sh
+            echo PREPUSH_COMMAND_PREFIX=./ci/run_envoy_docker.sh >> .env
+            ;;
+        2)
+            exit 0
+            ;;
+        3)
+            export NO_VERIFY=1
+            echo NO_VERIFY=1 >> .env
+            ;;
+        4)
+            echo "Exiting ..."
+            return 1
+            ;;
+    esac
+    echo "PREPUSH_MESSAGE_SHOWN=1" >> .env
+}
 
-# shellcheck disable=SC2016
-echo 'Running pre-push check; to skip this step use `push --no-verify` or add `NO_VERIFY=1` to `.env`'
-echo
-AUTHOR=$(git var GIT_AUTHOR_IDENT | sed -n 's/^\(.*>\).*$/\1/p')
-
-# shellcheck disable=SC2034
-while read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA
-do
-  if [ "$LOCAL_SHA" = $DUMMY_SHA ]
-  then
-    # Branch deleted. Do nothing.
-    exit 0
-  else
-    if [ "$REMOTE_SHA" = $DUMMY_SHA ]
-    then
-      # New branch. Verify the last commit, since this is very likely where the new code is
-      # (though there is no way to know for sure). In the extremely uncommon case in which someone
-      # pushes more than 1 new commit to a branch, CI will enforce full checking.
-      RANGE="$LOCAL_SHA~1..$LOCAL_SHA"
-    else
-      # Updating branch. Verify new commits.
-      RANGE="$REMOTE_SHA..$LOCAL_SHA"
+check_bazel () {
+    if command -v bazel &> /dev/null; then
+        return
     fi
+    echo
+    echo_ bold "\tUnable to find \`bazel\` command, exiting"
+    echo
+    echo "Instructions for installing bazel can be found here:"
+    echo
+    echo "    https://github.com/envoyproxy/envoy/hooks/README.md#installing-bazel"
+    echo
+    echo "You can disable the checks with the following command:"
+    echo
+    echo "    $ echo NO_VERIFY=1 >> .env"
+    echo
+    echo "To use the bazel provided by the Envoy build container:"
+    echo
+    echo "    $ echo PREPUSH_COMMAND_PREFIX=./ci/run_env_docker.sh >> .env"
+    echo
+    echo "Please see https://github.com/envoyproxy/envoy/hooks/README.md for further options, or check \`.env.example\`"
+    echo
+    exit 1
+}
 
+check_dco () {
+    local range="$1" signed_off not_signed_off hash
     # Verify DCO signoff. We do this before the format checker, since it has
     # some probability of failing spuriously, while this check never should.
     #
     # In general, we can't assume that the commits are signed off by author
     # pushing, so we settle for just checking that there is a signoff at all.
-    SIGNED_OFF=$(git rev-list --no-merges --author "$AUTHOR" --grep "^Signed-off-by: " "$RANGE")
-    NOT_SIGNED_OFF=$(git rev-list --no-merges --author "$AUTHOR" "$RANGE" | grep -Fxv "$SIGNED_OFF")
-    if [ -n "$NOT_SIGNED_OFF" ]
-    then
-      echo >&2 "ERROR: The following commits do not have DCO signoff:"
-      while read -r commit; do
-        echo "  $(git log --pretty=oneline --abbrev-commit -n 1 "$commit")"
-      done <<< "$NOT_SIGNED_OFF"
-      exit 1
+    signed_off="$(git rev-list --no-merges --author "${AUTHOR}" --grep "^Signed-off-by: " "${range}")"
+    not_signed_off="$(git rev-list --no-merges --author "${AUTHOR}" "${range}" | grep -Fxv "${signed_off}" || :)"
+    if [[ -n "$not_signed_off" ]]; then
+        echo >&2 "ERROR: The following commits do not have DCO signoff:"
+        while read -r commit; do
+            hash="$(git log --pretty=oneline --abbrev-commit -n 1 "$commit")"
+            echo "  ${hash}"
+        done <<< "$not_signed_off"
+        exit 1
     fi
+}
 
-    # NOTE: The `tools` directory will be the same relative to the support
-    # directory, independent of whether we're in a submodule, so no need to use
-    # our `relpath` helper.
-    SCRIPT_DIR="$(dirname "$(realpath "$0")")/../../tools"
+get_diff_range () {
+    local local_sha="$1" remote_sha="$2"
+    if [[ "$remote_sha" == "$DUMMY_SHA" ]]; then
+        # New branch. Verify the last commit, since this is very likely where the new code is
+        # (though there is no way to know for sure). In the extremely uncommon case in which someone
+        # pushes more than 1 new commit to a branch, CI will enforce full checking.
+        echo "${local_sha}~1..${local_sha}"
+    else
+        # Updating branch. Verify new commits.
+        echo "${remote_sha}..${local_sha}"
+    fi
+}
 
-    _CHANGES=$(git diff --name-only "$RANGE" --diff-filter=ACMR --ignore-submodules=all 2>&1 | tr '\n' ' ')
-    IFS=' ' read -ra CHANGES <<< "$_CHANGES"
+check_format () {
+    local range="$1" changes _changes
+    if [[ -e .env ]]; then
+        # shellcheck disable=SC1091
+        . .env
+    fi
+    _changes="$(git diff --name-only "$range" --diff-filter=ACMR --ignore-submodules=all 2>&1 | tr '\n' ' ')"s
+    IFS=' ' read -ra changes <<< "$_changes"
+    export ENVOY_DOCKER_BUILD_DIR
+    "${PREPUSH_COMMAND_PREFIX}" \
+        bazel --max_idle_secs=1 run -s \
+          --ui_event_filters=-finish,-info,-start,-subcommand,-stdout,-stderr \
+          --noannounce_rc \
+          --subcommands=false \
+          --noshow_loading_progress \
+          --noshow_progress \
+          //tools/code:check \
+          -- -s main \
+             -v warn || exit 1
 
-    echo -ne "  Checking format for ${CHANGES[*]} - "
-    bazel run //tools/code_format:check_format -- check "${CHANGES[@]}" || exit 1
-    # TODO(phlax): It seems this is not running in CI anymore and is now finding issues
-    # in merged PRs. Unify this hook and format checks in CI when the new format tool is rolled
-    # out.
-    # echo "  Checking spelling for $i"
-    # "$SCRIPT_DIR"/spelling/check_spelling_pedantic.py check "${CHANGES[@]}" || exit 1
+    "${PREPUSH_COMMAND_PREFIX}" \
+        bazel --max_idle_secs=1 run -s \
+          --ui_event_filters=-finish,-info,-start,-subcommand,-stdout,-stderr \
+          --noannounce_rc \
+          --subcommands=false \
+          --noshow_loading_progress \
+          --noshow_progress \
+          //tools/code_format:check_format \
+          -- check "${changes[@]}" \
+        || exit 1
+}
 
-    # TODO(mattklein123): Optimally we would be able to do this on a per-file basis.
-    "$SCRIPT_DIR"/proto_format/proto_format.sh check || exit 1
+on_push () {
+    local local_sha remote_sha
+    # local_ref="$1"
+    local_sha="$2"
+    # remote_ref="$3"
+    remote_sha="$4"
+    if [[ "$local_sha" == "$DUMMY_SHA" ]]; then
+        # Branch deleted. Do nothing.
+        exit 0
+    fi
+    range="$(get_diff_range "${local_sha}" "${remote_sha}")"
+    check_dco "$range"
+    check_format "$range"
+}
 
-    bazel run //tools/code:check -- \
-          -s main \
-          -v warn || exit 1
+if [[ -z "$PREPUSH_MESSAGE_SHOWN" ]]; then
+    welcome
+fi
 
-    # Check correctness of repositories definitions.
-    echo "  Checking repositories definitions"
-    "$SCRIPT_DIR"/check_repositories.sh || exit 1
-  fi
-done
+if [[ -n "$NO_VERIFY" ]]; then
+    exit 0
+fi
 
-exit 0
+if [[ -z "$PREPUSH_COMMAND_PREFIX" ]]; then
+    check_bazel
+fi
+
+DUMMY_SHA=0000000000000000000000000000000000000000
+
+AUTHOR=$(git var GIT_AUTHOR_IDENT | sed -n 's/^\(.*>\).*$/\1/p')
+
+if read -r _local_ref _local_sha _remote_ref _remote_sha; then
+    on_push "$_local_ref" "$_local_sha" "$_remote_ref" "$_remote_sha"
+fi
