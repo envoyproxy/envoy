@@ -40,7 +40,7 @@ using Http::LowerCaseString;
 struct ConfigOptions {
   bool downstream_filter = true;
   bool failure_mode_allow = false;
-  int64_t timeout = 900000000;
+  int64_t timeout = 10;
   std::string cluster = "ext_proc_server_0";
 };
 
@@ -107,7 +107,7 @@ public:
           proto_config_.mutable_http_service()->mutable_http_service()->mutable_http_uri();
       http_uri->set_uri("ext_proc_server_0:9000");
       http_uri->set_cluster(config_option.cluster);
-      http_uri->mutable_timeout()->set_nanos(config_option.timeout);
+      http_uri->mutable_timeout()->set_seconds(config_option.timeout);
 
       if (config_option.failure_mode_allow) {
         proto_config_.set_failure_mode_allow(true);
@@ -361,8 +361,8 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
 
   processRequestHeadersMessage(http_side_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Travel forward 400 ms exceeding 200ms filter timeout.
-                                 timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(400));
+                                 // Travel forward 4000 ms exceeding 2000ms filter timeout.
+                                 timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(4000));
                                  return false;
                                });
   // ext_proc filter timeouts sends a 504 local reply depending on runtime flag.
@@ -372,7 +372,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
 // Http timeout value set to 10ms. Test HTTP timeout.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
   ConfigOptions config_option = {};
-  config_option.timeout = 10000000;
+  config_option.timeout = 1;
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
   initializeConfig(config_option);
@@ -381,8 +381,9 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
 
   processRequestHeadersMessage(http_side_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Travel forward 50 ms exceeding 10ms HTTP URI timeout setting.
-                                 timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(50));
+                                 // Travel forward 1200 ms exceeding 1000ms HTTP URI timeout
+                                 // setting.
+                                 timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(1200));
                                  return true;
                                });
 
