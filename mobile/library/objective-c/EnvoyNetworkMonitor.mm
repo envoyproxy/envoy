@@ -58,6 +58,7 @@
     }
 
     BOOL isCellular = nw_path_uses_interface_type(path, nw_interface_type_cellular);
+    int network = 0;
     if (!isCellular) {
       if (nw_path_uses_interface_type(path, nw_interface_type_wifi)) {
         network |= static_cast<int>(Envoy::NetworkType::WLAN);
