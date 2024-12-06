@@ -82,6 +82,20 @@ void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatt
   formatter_ = std::move(formatter);
 }
 
+spdlog::formatter* DelegatingLogSink::get_formatter() {
+  spdlog::formatter* result = nullptr;
+
+  // This function might be called from within a signal handler, and this mutex might
+  // already being held by the formatter. Hence the `TryLock()`, to avoid a deadlock.
+  if (format_mutex_.TryLock()) {
+    if (formatter_) {
+      result = formatter_.get();
+    }
+    format_mutex_.Unlock();
+  }
+  return result;
+}
+
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   absl::ReleasableMutexLock lock(&format_mutex_);
   absl::string_view msg_view = absl::string_view(msg.payload.data(), msg.payload.size());
