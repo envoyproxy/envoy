@@ -103,6 +103,15 @@ message RateLimitDescriptor {
 
     // Descriptor value.
     string value = 2 [(validate.rules).string = {min_len: 1}];
+
+    // A per-descriptor override for the number of hits added to the matched limit by a request.
+    // This value takes precedence over the globally configured value. If neither this field nor
+    // the global value is set, the matched limit is incremented by 1 for each request.
+    //
+    // Additionally, this value can be overridden by setting the filter state value
+    // `envoy.ratelimit.hits_addend` to the desired number. If an invalid number (e.g., < 0) is
+    // provided, it will be ignored.
+    uint32 hits_addend = 3;
   }
 
   // Override rate limit to apply to this descriptor instead of the limit
