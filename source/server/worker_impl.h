@@ -68,6 +68,7 @@ public:
   void stopListener(Network::ListenerConfig& listener,
                     const Network::ExtraShutdownListenerOptions& options,
                     std::function<void()> completion) override;
+  virtual Event::Dispatcher& getDispatcher() override { return *dispatcher_; }
 
 private:
   void threadRoutine(OptRef<GuardDog> guard_dog, const std::function<void()>& cb);

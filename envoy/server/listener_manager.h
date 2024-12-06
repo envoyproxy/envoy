@@ -23,6 +23,10 @@ namespace Filter {
 class TcpListenerFilterConfigProviderManagerImpl;
 } // namespace Filter
 
+namespace Upstream {
+class ClusterManager;
+}
+
 namespace Server {
 
 /**
@@ -272,6 +276,16 @@ public:
    * @return TRUE if the worker has started or FALSE if not.
    */
   virtual bool isWorkerStarted() PURE;
+
+  /*
+   * Set the cluster manager pointer for all workers.
+   */
+  virtual void setClusterManagerForWorkers(Upstream::ClusterManager* cluster_manager) PURE;
+
+  /*
+   * Enable reverse connections on each worker.
+   */
+  virtual void enableReverseConnections(Network::RevConnRegistry& reverse_conn_registry) PURE;
 };
 
 // overload operator| to allow ListenerManager::listeners(ListenerState) to be called using a

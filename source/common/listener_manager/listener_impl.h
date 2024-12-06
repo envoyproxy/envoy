@@ -264,7 +264,7 @@ public:
     ASSERT(listen_socket_options_list_.size() > address_index);
     return listen_socket_options_list_[address_index];
   }
-  const std::string& versionInfo() const { return version_info_; }
+  const std::string& versionInfo() const override { return version_info_; }
   bool reusePort() const { return reuse_port_; }
   static bool getReusePortOrDefault(Server::Instance& server,
                                     const envoy::config::listener::v3::Listener& config,
@@ -307,6 +307,11 @@ public:
   Network::InternalListenerConfigOptRef internalListenerConfig() override {
     return internal_listener_config_ != nullptr ? *internal_listener_config_
                                                 : Network::InternalListenerConfigOptRef();
+  }
+  Network::ReverseConnectionListenerConfigOptRef reverseConnectionListenerConfig() const override {
+    return reverse_connection_listener_config_ != nullptr
+               ? *reverse_connection_listener_config_
+               : Network::ReverseConnectionListenerConfigOptRef();
   }
   Network::ConnectionBalancer&
   connectionBalancer(const Network::Address::Instance& address) override {
@@ -398,6 +403,7 @@ private:
   // Helpers for constructor.
   void buildAccessLog(const envoy::config::listener::v3::Listener& config);
   absl::Status buildInternalListener(const envoy::config::listener::v3::Listener& config);
+  absl::Status buildReverseConnectionListener(const envoy::config::listener::v3::Listener& config);
   absl::Status validateConfig();
   bool buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
@@ -428,7 +434,7 @@ private:
   const Network::Socket::Type socket_type_;
 
   std::vector<Network::ListenSocketFactoryPtr> socket_factories_;
-  const bool bind_to_port_;
+  bool bind_to_port_;
   const bool mptcp_enabled_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
@@ -461,6 +467,7 @@ private:
   const bool continue_on_listener_filters_timeout_;
   std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;
   std::unique_ptr<Network::InternalListenerConfig> internal_listener_config_;
+  std::unique_ptr<Network::ReverseConnectionListenerConfig> reverse_connection_listener_config_;
   // The key is the address string, the value is the address specific connection balancer.
   // TODO (soulxu): Add hash support for address, then needn't a string address as key anymore.
   absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers_;

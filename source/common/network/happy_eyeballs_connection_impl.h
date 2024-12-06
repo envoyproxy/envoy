@@ -95,6 +95,10 @@ public:
                                     dispatcher, address_list, upstream_local_address_selector,
                                     socket_factory, transport_socket_options, host, options,
                                     happy_eyeballs_config)) {}
+  const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
+  void setConnectionReused(bool) override { PANIC("not implemented"); }
+  void setActiveConnectionReused(bool) override { PANIC("not implemented"); }
+  bool isActiveConnectionReused() override { PANIC("not implemented"); }
 };
 
 } // namespace Network

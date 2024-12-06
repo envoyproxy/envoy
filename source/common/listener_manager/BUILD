@@ -54,6 +54,7 @@ envoy_cc_library(
         "//source/common/quic:quic_stat_names_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/network/http_connection_manager:config",
+        "//source/extensions/reverse_connection:reverse_connection_listener_config_lib",
         "//source/extensions/udp_packet_writer/default:config",
         "//source/extensions/upstreams/http/generic:config",
         "//source/server:api_listener_lib",
@@ -66,6 +67,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/listener/proxy_protocol/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/reverse_connection/reverse_connection_listener_config/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/raw_buffer/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/udp_packet_writer/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
@@ -176,6 +178,7 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:connection_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/reverse_connection:active_reverse_connection_listener_lib",
         "//source/server:active_udp_listener",
         "//source/server:listener_manager_factory_lib",
     ],
