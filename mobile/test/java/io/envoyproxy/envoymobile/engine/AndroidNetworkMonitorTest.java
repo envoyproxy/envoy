@@ -136,7 +136,7 @@ public class AndroidNetworkMonitorTest {
     shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
     callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
 
-    verify(mockEnvoyEngine).onDefaultNetworkChanged(2;
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(2);
   }
 
   @Test
