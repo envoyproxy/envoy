@@ -4,8 +4,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
-#include <utility>
 
 #include "envoy/api/api.h"
 #include "envoy/extensions/filters/http/grpc_json_reverse_transcoder/v3/transcoder.pb.h"
@@ -36,18 +34,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonReverseTranscoder {
-
-struct HttpRequestParams {
-  std::string method;
-  std::string http_rule_path;
-  std::string http_body_field;
-};
-
-struct MethodInfo {
-  bool is_request_http_body;
-  bool is_response_http_body;
-  bool is_request_nested_http_body;
-};
 
 // TranscoderImpl wraps the request and response translators and provides access
 // the input and output streams for the translators.
@@ -85,21 +71,24 @@ public:
           GrpcJsonReverseTranscoder& transcoder_config,
       Api::Api& api);
 
-  absl::Status CreateTranscoder(absl::string_view path, TranscoderInputStream& request_input,
-                                TranscoderInputStream& response_input,
-                                std::unique_ptr<Transcoder>& transcoder,
-                                HttpRequestParams& request_params, MethodInfo& method_info) const;
+  // Takes the value of the path header of a gRPC request and returns its path descriptor.
+  const Protobuf::MethodDescriptor* GetMethodDescriptor(absl::string_view path) const;
+
+  // Checks if the request body field is of type `google.api.HttpBody`.
+  bool IsRequestNestedHttpBody(const Protobuf::MethodDescriptor* method_descriptor,
+                               const std::string& request_body_field) const;
+
+  absl::StatusOr<std::unique_ptr<Transcoder>>
+  CreateTranscoder(const Protobuf::MethodDescriptor* method_descriptor,
+                   TranscoderInputStream& request_input,
+                   TranscoderInputStream& response_input) const;
 
   absl::optional<uint32_t> max_request_body_size_;
   absl::optional<uint32_t> max_response_body_size_;
   absl::optional<std::string> api_version_header_;
 
 private:
-  absl::Status
-  ExtractHttpAnnotationValues(const Envoy::Protobuf::MethodDescriptor* method_descriptor,
-                              std::string& http_rule_path, std::string& body_field,
-                              std::string& method) const;
-  Envoy::Protobuf::DescriptorPool descriptor_pool_;
+  Protobuf::DescriptorPool descriptor_pool_;
   std::unique_ptr<TypeHelper> type_helper_;
 };
 

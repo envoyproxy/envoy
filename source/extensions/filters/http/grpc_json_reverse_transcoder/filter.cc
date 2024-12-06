@@ -29,15 +29,14 @@
 #include "source/extensions/filters/http/grpc_json_reverse_transcoder/filter_config.h"
 #include "source/extensions/filters/http/grpc_json_reverse_transcoder/utils.h"
 
-#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
-#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
+#include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
 #include "google/api/httpbody.pb.h"
 #include "nlohmann/json.hpp"
@@ -55,12 +54,65 @@ using ::Envoy::Http::StreamEncoderFilterCallbacks;
 using ::Envoy::Protobuf::io::CodedInputStream;
 using ::Envoy::Protobuf::io::CodedOutputStream;
 using ::Envoy::Protobuf::io::StringOutputStream;
+using ::google::api::HttpRule;
 using ::nlohmann::json;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonReverseTranscoder {
+
+namespace {
+
+// AppendHttpBodyEnvelope wraps the response returned from the upstream server
+// in a google.api.HttpBody message.
+void AppendHttpBodyEnvelope(Buffer::Instance& output, std::string content_type,
+                            uint64_t content_length) {
+  // Manually encode the protobuf envelope for the body.
+  // See https://developers.google.com/protocol-buffers/docs/encoding#embedded
+  // for wire format.
+
+  std::string proto_envelope;
+  {
+    // For memory safety, the StringOutputStream needs to be destroyed before
+    // we read the string.
+
+    // http_body_tag is the protobuf field tag with the higher bits representing the
+    // field number and the lower bits representing the wire type. The wire type in
+    // this case is 2, i.e. length-delimited record.
+    constexpr uint32_t http_body_tag = (google::api::HttpBody::kDataFieldNumber << 3) | 2;
+
+    ::google::api::HttpBody body;
+    body.set_content_type(std::move(content_type));
+
+    uint64_t envelope_size = body.ByteSizeLong() + CodedOutputStream::VarintSize32(http_body_tag) +
+                             CodedOutputStream::VarintSize64(content_length);
+
+    proto_envelope.reserve(envelope_size);
+
+    StringOutputStream string_stream(&proto_envelope);
+    CodedOutputStream coded_stream(&string_stream);
+
+    body.SerializeToCodedStream(&coded_stream);
+    coded_stream.WriteTag(http_body_tag);
+    coded_stream.WriteVarint64(content_length);
+  }
+
+  output.add(proto_envelope);
+}
+
+bool ReadToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& buffer) {
+  const void* out;
+  int size;
+  while (stream.Next(&out, &size)) {
+    if (size == 0)
+      return true;
+    buffer.add(out, size);
+  }
+  return false;
+}
+
+} // namespace
 
 struct RcDetailsValues {
   // The gRPC json transcoder filter failed to transcode when processing request
@@ -77,16 +129,16 @@ using RcDetails = ConstSingleton<RcDetailsValues>;
 // The placeholder for the API version in the HTTP path.
 constexpr absl::string_view kHTTPPathAPIVersionPlaceholder = "{$api_version}";
 
-void GrpcJsonReverseTranscoderFilter::ReplaceAPIVersionInPath(const RequestHeaderMap& headers,
-                                                              std::string& path) const {
+void GrpcJsonReverseTranscoderFilter::ReplaceAPIVersionInPath() {
   if (!per_route_config_->api_version_header_.has_value()) {
     return;
   }
   Http::HeaderMap::GetResult api_version_header =
-      headers.get(Http::LowerCaseString(per_route_config_->api_version_header_.value()));
+      request_headers_->get(Http::LowerCaseString(per_route_config_->api_version_header_.value()));
   if (!api_version_header.empty()) {
     absl::string_view api_version = api_version_header[0]->value().getStringView();
-    path = absl::StrReplaceAll(path, {{kHTTPPathAPIVersionPlaceholder, api_version}});
+    http_request_path_template_ = absl::StrReplaceAll(
+        http_request_path_template_, {{kHTTPPathAPIVersionPlaceholder, api_version}});
   }
 }
 
@@ -97,7 +149,7 @@ void GrpcJsonReverseTranscoderFilter::InitPerRouteConfig() {
   per_route_config_ = route_local ? route_local : config_.get();
 }
 
-void GrpcJsonReverseTranscoderFilter::MaybeExpandBufferLimits() {
+void GrpcJsonReverseTranscoderFilter::MaybeExpandBufferLimits() const {
   const uint32_t max_request_body_size = per_route_config_->max_request_body_size_.value_or(0);
   const uint32_t max_response_body_size = per_route_config_->max_response_body_size_.value_or(0);
   if (max_request_body_size > decoder_callbacks_->decoderBufferLimit()) {
@@ -108,7 +160,7 @@ void GrpcJsonReverseTranscoderFilter::MaybeExpandBufferLimits() {
   }
 }
 
-bool GrpcJsonReverseTranscoderFilter::DecoderBufferLimitReached(uint64_t buffer_length) {
+bool GrpcJsonReverseTranscoderFilter::DecoderBufferLimitReached(uint64_t buffer_length) const {
   const uint32_t max_size =
       per_route_config_->max_request_body_size_.value_or(decoder_callbacks_->decoderBufferLimit());
   if (buffer_length > max_size) {
@@ -123,7 +175,7 @@ bool GrpcJsonReverseTranscoderFilter::DecoderBufferLimitReached(uint64_t buffer_
   return false;
 }
 
-bool GrpcJsonReverseTranscoderFilter::EncoderBufferLimitReached(uint64_t buffer_length) {
+bool GrpcJsonReverseTranscoderFilter::EncoderBufferLimitReached(uint64_t buffer_length) const {
   const uint32_t max_size =
       per_route_config_->max_response_body_size_.value_or(encoder_callbacks_->encoderBufferLimit());
   if (buffer_length > max_size) {
@@ -138,7 +190,7 @@ bool GrpcJsonReverseTranscoderFilter::EncoderBufferLimitReached(uint64_t buffer_
   return false;
 }
 
-bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfRequestTranscoderFailed() {
+bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfRequestTranscoderFailed() const {
   const auto& status = transcoder_->RequestStatus();
   if (status.ok())
     return false;
@@ -150,7 +202,7 @@ bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfRequestTranscoderFailed() 
   return true;
 }
 
-bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfResponseTranscoderFailed() {
+bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfResponseTranscoderFailed() const {
   const auto& status = transcoder_->ResponseStatus();
   if (status.ok())
     return false;
@@ -161,18 +213,6 @@ bool GrpcJsonReverseTranscoderFilter::CheckAndRejectIfResponseTranscoderFailed()
                    StringUtil::replaceAllEmptySpace(MessageUtil::codeEnumToString(status.code())),
                    "}"));
   return true;
-}
-
-bool GrpcJsonReverseTranscoderFilter::ReadToBuffer(Protobuf::io::ZeroCopyInputStream& stream,
-                                                   Buffer::Instance& buffer) {
-  const void* out;
-  int size;
-  while (stream.Next(&out, &size)) {
-    if (size == 0)
-      return true;
-    buffer.add(out, size);
-  }
-  return false;
 }
 
 Status::GrpcStatus
@@ -186,8 +226,7 @@ GrpcJsonReverseTranscoderFilter::GrpcStatusFromHeaders(ResponseHeaderMap& header
   }
 }
 
-bool GrpcJsonReverseTranscoderFilter::BuildRequestFromHttpBody(RequestHeaderMap& headers,
-                                                               Buffer::Instance& data) {
+bool GrpcJsonReverseTranscoderFilter::BuildRequestFromHttpBody(Buffer::Instance& data) {
   std::vector<Grpc::Frame> frames;
   static_cast<void>(decoder_.decode(data, frames));
   if (frames.empty()) {
@@ -206,47 +245,12 @@ bool GrpcJsonReverseTranscoderFilter::BuildRequestFromHttpBody(RequestHeaderMap&
       }
       const std::string body = static_cast<std::string>(http_body.data());
       data.add(body);
-      headers.setContentType(http_body.content_type());
-      headers.setContentLength(body.size());
-      headers.setPath(request_params_.http_rule_path);
+      request_headers_->setContentType(http_body.content_type());
+      request_headers_->setContentLength(body.size());
+      request_headers_->setPath(http_request_path_template_);
     }
   }
   return true;
-}
-
-void GrpcJsonReverseTranscoderFilter::AppendHttpBodyEnvelope(Buffer::Instance& output,
-                                                             std::string content_type,
-                                                             uint64_t content_length) {
-  // Manually encode the protobuf envelope for the body.
-  // See https://developers.google.com/protocol-buffers/docs/encoding#embedded
-  // for wire format.
-
-  std::string proto_envelope;
-  {
-    // For memory safety, the StringOutputStream needs to be destroyed before
-    // we read the string.
-    const uint32_t length_delimited_field = 2;
-    const uint32_t http_body_field_tag =
-        (google::api::HttpBody::kDataFieldNumber << 3) | length_delimited_field;
-
-    ::google::api::HttpBody body;
-    body.set_content_type(std::move(content_type));
-
-    uint64_t envelope_size = body.ByteSizeLong() +
-                             CodedOutputStream::VarintSize32(http_body_field_tag) +
-                             CodedOutputStream::VarintSize64(content_length);
-
-    proto_envelope.reserve(envelope_size);
-
-    StringOutputStream string_stream(&proto_envelope);
-    CodedOutputStream coded_stream(&string_stream);
-
-    body.SerializeToCodedStream(&coded_stream);
-    coded_stream.WriteTag(http_body_field_tag);
-    coded_stream.WriteVarint64(content_length);
-  }
-
-  output.add(proto_envelope);
 }
 
 void GrpcJsonReverseTranscoderFilter::SendHttpBodyResponse(Buffer::Instance* data) {
@@ -265,21 +269,21 @@ void GrpcJsonReverseTranscoderFilter::SendHttpBodyResponse(Buffer::Instance* dat
   }
 }
 
-bool GrpcJsonReverseTranscoderFilter::CreateDataBuffer(json& payload,
+bool GrpcJsonReverseTranscoderFilter::CreateDataBuffer(const json& payload,
                                                        Buffer::OwnedImpl& buffer) const {
-  if (!payload.contains(request_params_.http_body_field)) {
+  if (!payload.contains(http_request_body_field_)) {
     ENVOY_STREAM_LOG(error, "Failed to find the field, `{}`, from the gRPC request message",
-                     *decoder_callbacks_, request_params_.http_body_field);
+                     *decoder_callbacks_, http_request_body_field_);
     decoder_callbacks_->sendLocalReply(
         Code::BadRequest, "Failed to get the request body from the gRPC message", nullptr,
         Status::WellKnownGrpcStatus::InvalidArgument,
         absl::StrCat(RcDetails::get().grpc_transcode_failed, "{failed_to_create_request_body}"));
     return false;
   }
-  if (method_info_.is_request_nested_http_body) {
+  if (is_request_nested_http_body_) {
     std::string decoded_body;
-    if (!absl::WebSafeBase64Unescape(
-            payload[request_params_.http_body_field]["data"].get<std::string>(), &decoded_body)) {
+    if (!absl::WebSafeBase64Unescape(payload[http_request_body_field_]["data"].get<std::string>(),
+                                     &decoded_body)) {
       decoder_callbacks_->sendLocalReply(
           Code::BadRequest, "Failed to decode the request body from the gRPC message", nullptr,
           Status::WellKnownGrpcStatus::InvalidArgument,
@@ -287,14 +291,53 @@ bool GrpcJsonReverseTranscoderFilter::CreateDataBuffer(json& payload,
       return false;
     }
     buffer.add(decoded_body);
-    if (payload[request_params_.http_body_field].contains("content_type")) {
+    if (payload[http_request_body_field_].contains("content_type")) {
       request_headers_->setContentType(
-          payload[request_params_.http_body_field]["content_type"].get<std::string>());
+          payload[http_request_body_field_]["content_type"].get<std::string>());
     }
   } else {
-    buffer.add(payload[request_params_.http_body_field].dump());
+    buffer.add(payload[http_request_body_field_].dump());
   }
   return true;
+}
+
+absl::Status GrpcJsonReverseTranscoderFilter::ExtractHttpAnnotationValues(
+    const Protobuf::MethodDescriptor* method_descriptor) {
+  HttpRule http_rule = method_descriptor->options().GetExtension(google::api::http);
+  switch (http_rule.pattern_case()) {
+  case HttpRule::PatternCase::kGet:
+    http_request_method_ = Http::Headers::get().MethodValues.Get;
+    http_request_path_template_ = http_rule.get();
+    break;
+  case HttpRule::PatternCase::kPost:
+    http_request_method_ = Http::Headers::get().MethodValues.Post;
+    http_request_path_template_ = http_rule.post();
+    break;
+  case HttpRule::PatternCase::kPut:
+    http_request_method_ = Http::Headers::get().MethodValues.Put;
+    http_request_path_template_ = http_rule.put();
+    break;
+  case HttpRule::PatternCase::kDelete:
+    http_request_method_ = Http::Headers::get().MethodValues.Delete;
+    http_request_path_template_ = http_rule.delete_();
+    break;
+  case HttpRule::PatternCase::kPatch:
+    http_request_method_ = Http::Headers::get().MethodValues.Patch;
+    http_request_path_template_ = http_rule.patch();
+    break;
+  case HttpRule::PatternCase::kCustom:
+    http_request_method_ = http_rule.custom().kind();
+    http_request_path_template_ = http_rule.custom().path();
+    break;
+  default:
+    ENVOY_STREAM_LOG(error,
+                     "The grpc method, {}, is either missing the http annotation or is configured "
+                     "with an invalid http verb",
+                     *decoder_callbacks_, method_descriptor->name());
+    return absl::InvalidArgumentError("Invalid or missing http annotations");
+  }
+  http_request_body_field_ = http_rule.body();
+  return absl::OkStatus();
 }
 
 void GrpcJsonReverseTranscoderFilter::setDecoderFilterCallbacks(
@@ -314,15 +357,35 @@ FilterHeadersStatus GrpcJsonReverseTranscoderFilter::decodeHeaders(RequestHeader
     ENVOY_STREAM_LOG(info, "Request headers are passed through", *decoder_callbacks_);
     return FilterHeadersStatus::Continue;
   }
-  ENVOY_STREAM_LOG(info, "Initializing per route config, if available", *decoder_callbacks_);
+  ENVOY_STREAM_LOG(debug, "Initializing per route config, if available", *decoder_callbacks_);
   InitPerRouteConfig();
 
-  const auto status =
-      per_route_config_->CreateTranscoder(headers.getPathValue(), request_in_, response_in_,
-                                          transcoder_, request_params_, method_info_);
+  absl::string_view path = headers.getPathValue();
+  const auto* method_descriptor = per_route_config_->GetMethodDescriptor(path);
+  if (method_descriptor == nullptr) {
+    ENVOY_STREAM_LOG(error, "Couldn't find a gRPC method matching {}", *decoder_callbacks_, path);
+    decoder_callbacks_->sendLocalReply(
+        Code::BadRequest, absl::StrCat("Couldn't find a gRPC method matching: ", path), nullptr,
+        Status::WellKnownGrpcStatus::InvalidArgument,
+        absl::StrCat(RcDetails::get().grpc_transcode_failed_early, "{",
+                     StringUtil::replaceAllEmptySpace(
+                         MessageUtil::codeEnumToString(absl::StatusCode::kNotFound)),
+                     "}"));
+    return FilterHeadersStatus::StopIteration;
+  }
+  if (method_descriptor->client_streaming() || method_descriptor->server_streaming()) {
+    ENVOY_STREAM_LOG(error, "The HTTP REST backend doesn't support request/response streaming",
+                     *decoder_callbacks_);
+    decoder_callbacks_->sendLocalReply(
+        Code::BadRequest, "The HTTP REST backend doesn't support request/response streaming",
+        nullptr, Status::WellKnownGrpcStatus::InvalidArgument,
+        absl::StrCat(RcDetails::get().grpc_transcode_failed_early, "{streaming_not_supported}"));
+    return FilterHeadersStatus::StopIteration;
+  }
 
+  absl::Status status = ExtractHttpAnnotationValues(method_descriptor);
   if (!status.ok()) {
-    ENVOY_STREAM_LOG(error, "Failed to create a transcoder instance: {}", *decoder_callbacks_,
+    ENVOY_STREAM_LOG(error, "Failed to extract http annotations: {}", *decoder_callbacks_,
                      status.message());
     decoder_callbacks_->sendLocalReply(
         Code::BadRequest, status.message(), nullptr, Status::WellKnownGrpcStatus::InvalidArgument,
@@ -332,15 +395,42 @@ FilterHeadersStatus GrpcJsonReverseTranscoderFilter::decodeHeaders(RequestHeader
     return FilterHeadersStatus::StopIteration;
   }
 
-  ReplaceAPIVersionInPath(headers, request_params_.http_rule_path);
+  is_request_http_body_ = method_descriptor->input_type()->full_name() ==
+                          google::api::HttpBody::descriptor()->full_name();
+  is_response_http_body_ = method_descriptor->output_type()->full_name() ==
+                           google::api::HttpBody::descriptor()->full_name();
+
+  if (!is_request_http_body_) {
+    is_request_nested_http_body_ =
+        per_route_config_->IsRequestNestedHttpBody(method_descriptor, http_request_body_field_);
+  }
+
+  absl::StatusOr<std::unique_ptr<Transcoder>> transcoder_or =
+      per_route_config_->CreateTranscoder(method_descriptor, request_in_, response_in_);
+
+  if (!transcoder_or.ok()) {
+    ENVOY_STREAM_LOG(error, "Failed to create a transcoder instance: {}", *decoder_callbacks_,
+                     transcoder_or.status().message());
+    decoder_callbacks_->sendLocalReply(
+        Code::BadRequest, transcoder_or.status().message(), nullptr,
+        Status::WellKnownGrpcStatus::InvalidArgument,
+        absl::StrCat(RcDetails::get().grpc_transcode_failed_early, "{",
+                     StringUtil::replaceAllEmptySpace(
+                         MessageUtil::codeEnumToString(transcoder_or.status().code())),
+                     "}"));
+    return FilterHeadersStatus::StopIteration;
+  }
+  transcoder_ = std::move(transcoder_or.value());
+  request_headers_ = &headers;
+
+  ReplaceAPIVersionInPath();
 
   MaybeExpandBufferLimits();
 
   request_content_type_ = headers.getContentTypeValue();
   headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
-  headers.setMethod(request_params_.method);
+  headers.setMethod(http_request_method_);
   headers.removeContentLength();
-  request_headers_ = &headers;
 
   decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
 
@@ -353,9 +443,9 @@ FilterDataStatus GrpcJsonReverseTranscoderFilter::decodeData(Buffer::Instance& d
     ENVOY_STREAM_LOG(info, "Request data is passed through", *decoder_callbacks_);
     return FilterDataStatus::Continue;
   }
-  if (method_info_.is_request_http_body) {
+  if (is_request_http_body_) {
     ENVOY_STREAM_LOG(debug, "Request message is of type HttpBody", *decoder_callbacks_);
-    if (absl::StrContains(request_params_.http_rule_path, "{")) {
+    if (absl::StrContains(http_request_path_template_, "{")) {
       ENVOY_STREAM_LOG(error,
                        "The path for the request message of type "
                        "google.api.HttpBody shouldn't contain any variables "
@@ -369,7 +459,7 @@ FilterDataStatus GrpcJsonReverseTranscoderFilter::decodeData(Buffer::Instance& d
           absl::StrCat(RcDetails::get().grpc_transcode_failed, "{failed_to_create_request_path}"));
       return FilterDataStatus::StopIterationNoBuffer;
     }
-    if (BuildRequestFromHttpBody(*request_headers_, data)) {
+    if (BuildRequestFromHttpBody(data)) {
       return FilterDataStatus::Continue;
     }
     return FilterDataStatus::StopIterationAndBuffer;
@@ -404,8 +494,8 @@ FilterDataStatus GrpcJsonReverseTranscoderFilter::decodeData(Buffer::Instance& d
   // Check if there is a request body to be sent with the HTTP request. If yes,
   // is it the entire gRPC request message or just a field from the request
   // message.
-  if (!request_params_.http_body_field.empty()) {
-    if (request_params_.http_body_field == "*") {
+  if (!http_request_body_field_.empty()) {
+    if (http_request_body_field_ == "*") {
       ENVOY_STREAM_LOG(debug, "Using the entire gRPC message as the request body",
                        *decoder_callbacks_);
       data.move(request_buffer_);
@@ -415,13 +505,13 @@ FilterDataStatus GrpcJsonReverseTranscoderFilter::decodeData(Buffer::Instance& d
         return FilterDataStatus::StopIterationNoBuffer;
       }
       ENVOY_STREAM_LOG(debug, "Using the field, {}, from the gRPC message as the request body",
-                       *decoder_callbacks_, request_params_.http_body_field);
+                       *decoder_callbacks_, http_request_body_field_);
       data.move(buffer);
     }
     request_headers_->setContentLength(data.length());
   }
   absl::StatusOr<std::string> path =
-      BuildPath(payload, request_params_.http_rule_path, request_params_.http_body_field);
+      BuildPath(payload, http_request_path_template_, http_request_body_field_);
   if (!path.ok()) {
     ENVOY_STREAM_LOG(error, "Failed to build the path header: {}", *decoder_callbacks_,
                      path.status().message());
@@ -482,7 +572,7 @@ FilterDataStatus GrpcJsonReverseTranscoderFilter::encodeData(Buffer::Instance& d
                      "the trailers later.",
                      *encoder_callbacks_);
     error_buffer_.move(data);
-  } else if (method_info_.is_response_http_body) {
+  } else if (is_response_http_body_) {
     response_data_.move(data);
     if (EncoderBufferLimitReached(response_data_.length())) {
       return FilterDataStatus::StopIterationNoBuffer;
@@ -511,7 +601,7 @@ FilterDataStatus GrpcJsonReverseTranscoderFilter::encodeData(Buffer::Instance& d
     ENVOY_STREAM_LOG(debug, "Adding the response error payload to the trailers",
                      *encoder_callbacks_);
     trailers.setGrpcMessage(BuildGrpcMessage(error_buffer_));
-  } else if (method_info_.is_response_http_body) {
+  } else if (is_response_http_body_) {
     SendHttpBodyResponse(&data);
   } else {
     data.move(response_buffer_);
@@ -529,7 +619,7 @@ FilterTrailersStatus GrpcJsonReverseTranscoderFilter::encodeTrailers(ResponseTra
     ENVOY_STREAM_LOG(debug, "Adding the response error payload to the trailers",
                      *encoder_callbacks_);
     trailers.setGrpcMessage(BuildGrpcMessage(error_buffer_));
-  } else if (method_info_.is_response_http_body) {
+  } else if (is_response_http_body_) {
     SendHttpBodyResponse(nullptr);
   } else {
     encoder_callbacks_->addEncodedData(response_buffer_, false);
