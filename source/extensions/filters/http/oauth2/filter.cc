@@ -190,7 +190,9 @@ std::string generateNonce(Random::RandomGenerator& random) {
  * nonce for CSRF protection.
  */
 std::string encodeState(const std::string& original_request_url, const std::string& nonce) {
-  std::string json = fmt::format(R"({{"url":"{}","nonce":"{}"}})", original_request_url, nonce);
+  std::string buffer;
+  absl::string_view sanitized_url = Json::sanitize(buffer, original_request_url);
+  std::string json = fmt::format(R"({{"url":"{}","nonce":"{}"}})", sanitized_url, nonce);
   return Base64Url::encode(json.data(), json.size());
 }
 
@@ -894,7 +896,8 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
 }
 
 // Validates the nonce in the state parameter against the nonce in the cookie.
-bool OAuth2Filter::validateNonce(const Http::RequestHeaderMap& headers, const std::string& nonce) {
+bool OAuth2Filter::validateNonce(const Http::RequestHeaderMap& headers,
+                                 const std::string& nonce) const {
   const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
     return key == config_->cookieNames().oauth_nonce_;
   });

@@ -1366,6 +1366,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
  *
  * Expected behavior: HTTP Utility should not strip the parameters of the original request.
  */
+// TODO(zhaohuabing): this test seems redundant and should be removed.
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   init();
   // First construct the initial request to the oauth filter with URI parameters.
@@ -1448,6 +1449,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   filter_->finishGetAccessTokenFlow();
 }
 
+// TODO(zhaohuabing): this test seems redundant and should be removed.
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
@@ -1632,6 +1634,112 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
        "RefreshToken=refreshToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://traffic.example.com/original_path?var1=1&var2=2"},
+  };
+
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
+
+  filter_->finishGetAccessTokenFlow();
+}
+
+/**
+ * Testing oauth state with special characters that must be escaped in JSON.
+ *
+ * Expected behavior: the JSON string in the state query parameter should be correctly escaped and
+ * the final redirect should equal the original request.
+ */
+TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
+  init();
+  const std::string url_with_special_characters =
+      R"(/original_path?query="value"&key=val\ue#frag<ment>{data}[info]|test\^space)";
+  const std::string test_encoded_state_with_special_characters =
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD9xdWVyeT1cInZhbHVlXCIma2V5"
+      "PXZhbFxcdWUjZnJhZzxtZW50PntkYXRhfVtpbmZvXXx0ZXN0XFxec3BhY2UiLCJub25jZSI6IjAwMDAwMDAwMDc1YmNk"
+      "MTUifQ";
+  // First construct the initial request to the oauth filter with URI parameters.
+  Http::TestRequestHeaderMapImpl first_request_headers{
+      {Http::Headers::get().Path.get(), url_with_special_characters},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  // This is the immediate response - a redirect to the auth cluster.
+  Http::TestResponseHeaderMapImpl first_response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID +
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + test_encoded_state_with_special_characters +
+           "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
+           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%"
+           "3Dbar%"
+           "3Fvar1%3D1%26var2%3D2"},
+  };
+
+  // Fail the validation to trigger the OAuth flow.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Check that the redirect includes URL encoded query parameter characters.
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&first_response_headers), true));
+
+  // This represents the beginning of the OAuth filter.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(first_request_headers, false));
+
+  // This represents the callback request from the authorization server.
+  Http::TestRequestHeaderMapImpl second_request_headers{
+      {Http::Headers::get().Cookie.get(),
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Path.get(),
+       "/_oauth?code=123&state=" + test_encoded_state_with_special_characters},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+  // Deliberately fail the HMAC validation check.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
+                                                  "https://traffic.example.com" + TEST_CALLBACK,
+                                                  AuthType::UrlEncodedBody));
+
+  // Invoke the callback logic. As a side effect, state_ will be populated.
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
+            filter_->decodeHeaders(second_request_headers, false));
+
+  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
+  EXPECT_EQ(config_->clusterName(), "auth.example.com");
+
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+  const std::chrono::seconds expiredTime(10);
+  filter_->updateTokens("accessToken", "idToken", "refreshToken", expiredTime);
+
+  // Expected response after the callback & validation is complete - verifying we kept the
+  // state and method of the original request, including the query string parameters.
+  Http::TestRequestHeaderMapImpl second_response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(), "OauthHMAC="
+                                             "OYnODPsSGabEpZ2LAiPxyjAFgN/7/5Xg24G7jUoUbyI=;"
+                                             "path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "OauthExpires=10;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=accessToken;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(), "IdToken=idToken;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=refreshToken;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(),
+       "https://traffic.example.com" + url_with_special_characters},
   };
 
   EXPECT_CALL(decoder_callbacks_,
