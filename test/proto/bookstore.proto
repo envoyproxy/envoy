@@ -53,6 +53,12 @@ service Bookstore {
       get: "/shelves/{shelf}/books"
     };
   }
+
+  rpc ListBooksNonStreaming(ListBooksRequest) returns (ListBooksResponse) {
+    option (google.api.http) = {
+      get: "/shelves/{shelf}/books:unary"
+    };
+  }
   // Creates a new book.
   rpc CreateBook(CreateBookRequest) returns (Book) {
     option (google.api.http) = {
@@ -292,6 +298,10 @@ message ListBooksRequest {
   int64 author = 2;
   // Theme of the books to list.
   string theme = 3;
+}
+
+message ListBooksResponse {
+  repeated Book books = 1;
 }
 
 // Request message for CreateBook method.

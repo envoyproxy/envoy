@@ -12,9 +12,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/grpc/common.h"
-#include "source/common/http/headers.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/version/api_version.h"
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -84,95 +82,40 @@ GrpcJsonReverseTranscoderConfig::GrpcJsonReverseTranscoderConfig(
                             : absl::make_optional(transcoder_config.api_version_header());
 }
 
-absl::Status GrpcJsonReverseTranscoderConfig::ExtractHttpAnnotationValues(
-    const Protobuf::MethodDescriptor* method_descriptor, std::string& http_rule_path,
-    std::string& body_field, std::string& method) const {
-  if (!method_descriptor->options().HasExtension(google::api::http)) {
-    ENVOY_LOG(error, "Method, {}, is missing the google.api.http option.",
-              method_descriptor->full_name());
-    return absl::InvalidArgumentError(absl::StrCat("Method, ", method_descriptor->full_name(),
-                                                   ", is missing the google.api.http option."));
-  }
-
-  HttpRule http_rule = method_descriptor->options().GetExtension(google::api::http);
-  switch (http_rule.pattern_case()) {
-  case HttpRule::PatternCase::kGet:
-    method = Envoy::Http::Headers::get().MethodValues.Get;
-    http_rule_path = http_rule.get();
-    break;
-  case HttpRule::PatternCase::kPost:
-    method = Envoy::Http::Headers::get().MethodValues.Post;
-    http_rule_path = http_rule.post();
-    break;
-  case HttpRule::PatternCase::kPut:
-    method = Envoy::Http::Headers::get().MethodValues.Put;
-    http_rule_path = http_rule.put();
-    break;
-  case HttpRule::PatternCase::kDelete:
-    method = Envoy::Http::Headers::get().MethodValues.Delete;
-    http_rule_path = http_rule.delete_();
-    break;
-  case HttpRule::PatternCase::kPatch:
-    method = Envoy::Http::Headers::get().MethodValues.Patch;
-    http_rule_path = http_rule.patch();
-    break;
-  case HttpRule::PatternCase::kCustom:
-    method = http_rule.custom().kind();
-    http_rule_path = http_rule.custom().path();
-    break;
-  default:
-    return absl::InvalidArgumentError("Invalid HTTP verb");
-  }
-  body_field = http_rule.body();
-  return absl::OkStatus();
+const Protobuf::MethodDescriptor*
+GrpcJsonReverseTranscoderConfig::GetMethodDescriptor(absl::string_view path) const {
+  std::string grpc_method = absl::StrReplaceAll(path.substr(1), {{"/", "."}});
+  return descriptor_pool_.FindMethodByName(grpc_method);
 }
 
-absl::Status GrpcJsonReverseTranscoderConfig::CreateTranscoder(
-    absl::string_view path, TranscoderInputStream& request_input,
-    TranscoderInputStream& response_input, std::unique_ptr<Transcoder>& transcoder,
-    HttpRequestParams& request_params, MethodInfo& method_info) const {
-  std::string grpc_method = absl::StrReplaceAll(path.substr(1), {{"/", "."}});
-  const Protobuf::MethodDescriptor* method_descriptor =
-      descriptor_pool_.FindMethodByName(grpc_method);
-
-  if (method_descriptor == nullptr) {
-    ENVOY_LOG(error, "Couldn't find the gRPC method: {}", grpc_method);
-    return absl::NotFoundError(absl::StrCat("Couldn't find the gRPC method: ", grpc_method));
-  }
-
-  method_info.is_request_http_body = method_descriptor->input_type()->full_name() ==
-                                     google::api::HttpBody::descriptor()->full_name();
-  method_info.is_response_http_body = method_descriptor->output_type()->full_name() ==
-                                      google::api::HttpBody::descriptor()->full_name();
-
-  absl::Status status =
-      ExtractHttpAnnotationValues(method_descriptor, request_params.http_rule_path,
-                                  request_params.http_body_field, request_params.method);
-  if (!status.ok()) {
-    return status;
-  }
-
+bool GrpcJsonReverseTranscoderConfig::IsRequestNestedHttpBody(
+    const Protobuf::MethodDescriptor* method_descriptor,
+    const std::string& http_request_body_field) const {
   std::string request_type_url =
       Grpc::Common::typeUrl(method_descriptor->input_type()->full_name());
-  if (!request_params.http_body_field.empty() && request_params.http_body_field != "*") {
-    const Envoy::ProtobufWkt::Type* request_type =
-        type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
-    std::vector<const Envoy::ProtobufWkt::Field*> request_body_field_path;
-    status = type_helper_->ResolveFieldPath(*request_type, request_params.http_body_field,
-                                            &request_body_field_path);
-    if (!status.ok()) {
-      return status;
-    }
-    if (request_body_field_path.empty()) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to resolve the request type: ", request_type_url));
-    }
-    const Envoy::ProtobufWkt::Type* request_body_type =
-        type_helper_->Info()->GetTypeByTypeUrl(request_body_field_path.back()->type_url());
-    method_info.is_request_nested_http_body =
-        request_body_type != nullptr &&
-        request_body_type->name() == google::api::HttpBody::descriptor()->full_name();
+  if (http_request_body_field.empty() || http_request_body_field == "*") {
+    return false;
   }
+  const ProtobufWkt::Type* request_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
+  std::vector<const ProtobufWkt::Field*> request_body_field_path;
+  absl::Status status = type_helper_->ResolveFieldPath(*request_type, http_request_body_field,
+                                                       &request_body_field_path);
+  if (!status.ok() || request_body_field_path.empty()) {
+    ENVOY_LOG(error, "Failed to resolve the request type: {}", request_type_url);
+    return false;
+  }
+  const ProtobufWkt::Type* request_body_type =
+      type_helper_->Info()->GetTypeByTypeUrl(request_body_field_path.back()->type_url());
+
+  return request_body_type != nullptr &&
+         request_body_type->name() == google::api::HttpBody::descriptor()->full_name();
+}
+
+absl::StatusOr<std::unique_ptr<Transcoder>> GrpcJsonReverseTranscoderConfig::CreateTranscoder(
+    const Protobuf::MethodDescriptor* method_descriptor, TranscoderInputStream& request_input,
+    TranscoderInputStream& response_input) const {
+  std::string request_type_url =
+      Grpc::Common::typeUrl(method_descriptor->input_type()->full_name());
 
   RequestTranslateOptions request_translate_options;
   // Setting this to true because we use body field from the google.api.http
@@ -198,9 +141,8 @@ absl::Status GrpcJsonReverseTranscoderConfig::CreateTranscoder(
   auto response_translator = std::make_unique<ResponseTranslator>(
       type_helper_->Resolver(), &response_input, std::move(response_info), false, true);
 
-  transcoder = std::make_unique<TranscoderImpl>(std::move(request_translator),
-                                                std::move(response_translator));
-  return absl::OkStatus();
+  return std::make_unique<TranscoderImpl>(std::move(request_translator),
+                                          std::move(response_translator));
 }
 
 } // namespace GrpcJsonReverseTranscoder
