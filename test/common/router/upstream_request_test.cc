@@ -143,20 +143,8 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
 
   EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain)
       .Times(2)
-      .WillRepeatedly(Invoke([&](Http::FilterChainManager& manager, bool only_create_if_configured,
-                                 const Http::FilterChainOptions&) -> bool {
-        if (only_create_if_configured) {
-          return false;
-        }
-        auto factory = createDecoderFilterFactoryCb(filter);
-        manager.applyFilterFactoryCb({}, factory);
-        Http::FilterFactoryCb factory_cb =
-            [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
-        };
-        manager.applyFilterFactoryCb({}, factory_cb);
-        return true;
-      }));
+      .WillRepeatedly(Invoke([&](Http::FilterChainManager&,
+                                 const Http::FilterChainOptions&) -> bool { return false; }));
 
   initialize();
   ASSERT_TRUE(filter->callbacks_ != nullptr);
