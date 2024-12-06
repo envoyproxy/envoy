@@ -303,6 +303,11 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.cx_pool_ready_duration``
     to get the duration from when the upstream request was created to when the upstream connection pool is ready.
+- area: tls_inspector filter
+  change: |
+    added :ref:`enable_ja4_fingerprinting
+    <envoy_v3_api_field_extensions.filters.listener.tls_inspector.v3.TlsInspector.enable_ja4_fingerprinting>` to create
+    JA4 fingerprint hash from Client Hello message.
 
 deprecated:
 - area: rbac

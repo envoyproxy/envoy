@@ -74,6 +74,11 @@ public:
   }
   absl::string_view ja3Hash() const override { return connectionInfoProvider().ja3Hash(); }
 
+  void setJA4Hash(absl::string_view ja4_hash) override {
+    connectionInfoProvider().setJA4Hash(ja4_hash);
+  }
+  absl::string_view ja4Hash() const override { return connectionInfoProvider().ja4Hash(); }
+
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
     return ioHandle().lastRoundTripTime();
   }

@@ -207,7 +207,8 @@ public:
                                            bool multiple_addresses = false);
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
-  static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false);
+  static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false,
+                                        bool enable_ja4_fingerprinting = false);
 
   // A string for the test inspector filter.
   static std::string testInspectorFilter();

@@ -387,7 +387,9 @@ public:
   MOCK_METHOD(void, setRequestedServerName, (absl::string_view));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(void, setJA3Hash, (absl::string_view));
+  MOCK_METHOD(void, setJA4Hash, (absl::string_view));
   MOCK_METHOD(absl::string_view, ja3Hash, (), (const));
+  MOCK_METHOD(absl::string_view, ja4Hash, (), (const));
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr&));
   MOCK_METHOD(void, addOptions_, (const Socket::OptionsSharedPtr&));
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, options, (), (const));
