@@ -6278,7 +6278,7 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
     const Http::EmptyFilterChainOptions options;
     EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
 
-    EXPECT_CALL(manager, applyFilterFactoryCb(_, _)).Time(0);
+    EXPECT_CALL(manager, applyFilterFactoryCb(_, _)).Times(0);
     EXPECT_FALSE(cluster->info()->createFilterChain(manager));
   }
 
