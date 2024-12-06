@@ -2443,7 +2443,10 @@ PerFilterConfigs::createRouteSpecificFilterConfig(
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
   RETURN_IF_NOT_OK(
       Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config));
-  auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
+  auto object_status =
+      factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
+  RETURN_IF_NOT_OK(object_status.status());
+  auto object = object_status.value();
   if (object == nullptr) {
     if (is_optional) {
       ENVOY_LOG(

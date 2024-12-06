@@ -159,7 +159,7 @@ Tracing providers have varying level of support for getting and setting baggage:
 
 * Lightstep (and any OpenTelemetry-compliant tracer) can read/write baggage
 * Zipkin support is not yet implemented
-* X-Ray and OpenCensus don't support baggage
+* X-Ray doesn't support baggage
 
 Different types of span
 -----------------------

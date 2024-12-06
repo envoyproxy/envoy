@@ -91,10 +91,15 @@ LoadClusterEntryHandlePtr ProxyFilterConfig::addDynamicCluster(
       // Set avoid_cds_removal to true to prevent the cluster from being removed during a CDS
       // update. As this cluster lifecycle is managed by DFP cluster, it should not be removed by
       // CDS. https://github.com/envoyproxy/envoy/issues/35171
-      cluster_manager_.addOrUpdateCluster(
-          cluster, version_info,
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"));
+      absl::Status status =
+          cluster_manager_
+              .addOrUpdateCluster(
+                  cluster, version_info,
+                  Runtime::runtimeFeatureEnabled(
+                      "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"))
+              .status();
+      ENVOY_BUG(status.ok(),
+                absl::StrCat("Failed to update DFP cluster due to ", status.message()));
     });
   } else {
     ENVOY_LOG(debug, "cluster='{}' already created, waiting it warming", cluster_name);

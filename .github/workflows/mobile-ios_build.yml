@@ -49,7 +49,7 @@ jobs:
       container-command:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12-large
+      runs-on: macos-14
       source: |
         source ./ci/mac_ci_setup.sh
         ./bazelw shutdown
@@ -89,7 +89,7 @@ jobs:
       container-command:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12-large
+      runs-on: macos-14-xlarge
       source: |
         source ./ci/mac_ci_setup.sh
         ./bazelw shutdown
@@ -135,7 +135,7 @@ jobs:
       container-command:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-12-large
+      runs-on: macos-14-xlarge
       source: |
         source ./ci/mac_ci_setup.sh
       steps-post: |
