@@ -71,7 +71,7 @@ minor_behavior_changes:
     ``envoy.reloadable_features.oauth2_use_refresh_token`` to false.
 - area: oauth2
   change: |
-    The state parameter in the OAuth2 authorization request has been changed to a base64url-encoded json object.
+    The ``state`` parameter in the OAuth2 authorization request has been changed to a base64url-encoded JSON object.
     The json object contains the original request URL and a nonce for CSRF prevention.
 - area: quic
   change: |
