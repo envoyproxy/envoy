@@ -303,6 +303,9 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.cx_pool_ready_duration``
     to get the duration from when the upstream request was created to when the upstream connection pool is ready.
+- area: matcher
+  change: |
+    added support for ``xds.type.matcher.v3.ServerNameMatcher`` trie-based matching.
 
 deprecated:
 - area: rbac

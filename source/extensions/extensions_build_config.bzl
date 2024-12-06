@@ -468,6 +468,7 @@ EXTENSIONS = {
     #
 
     "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
+    "envoy.matching.custom_matchers.domain_matcher":   "//source/extensions/common/matcher:domain_matcher_lib",
 
     #
     # Header Validators
