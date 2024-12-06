@@ -563,6 +563,12 @@ def _com_github_skyapm_cpp2sky():
         patch_args = ["-p1"],
     )
 
+def _com_github_tencent_rapidjson():
+    external_http_archive(
+        name = "com_github_tencent_rapidjson",
+        build_file = "@envoy//bazel/external:rapidjson.BUILD",
+    )
+
 def _com_github_nlohmann_json():
     external_http_archive(
         name = "com_github_nlohmann_json",
