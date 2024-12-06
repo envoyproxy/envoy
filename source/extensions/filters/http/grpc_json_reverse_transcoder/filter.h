@@ -1,7 +1,5 @@
 #pragma once
 
-#include <sys/types.h>
-
 #include <cstdint>
 #include <memory>
 #include <nlohmann/adl_serializer.hpp>
@@ -84,26 +82,22 @@ private:
   // MaybeExpandBufferLimits expands the buffer limits for the request and
   // response if the limits are set in the reverse transcoder config and are
   // greater than the default limits.
-  void MaybeExpandBufferLimits();
-  bool DecoderBufferLimitReached(uint64_t buffer_length);
-  bool EncoderBufferLimitReached(uint64_t buffer_length);
-  bool CheckAndRejectIfRequestTranscoderFailed();
-  bool CheckAndRejectIfResponseTranscoderFailed();
-  bool ReadToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& buffer);
+  void MaybeExpandBufferLimits() const;
+  bool DecoderBufferLimitReached(uint64_t buffer_length) const;
+  bool EncoderBufferLimitReached(uint64_t buffer_length) const;
+  bool CheckAndRejectIfRequestTranscoderFailed() const;
+  bool CheckAndRejectIfResponseTranscoderFailed() const;
   Grpc::Status::GrpcStatus GrpcStatusFromHeaders(Http::ResponseHeaderMap& headers);
   void InitPerRouteConfig();
   // BuildRequestFromHttpBody reads the contents of the data field of the
   // google.api.HttpBody message and builds the request body out of it.
-  bool BuildRequestFromHttpBody(Http::RequestHeaderMap& headers, Buffer::Instance& data);
-  // AppendHttpBodyEnvelope wraps the response returned from the upstream server
-  // in a google.api.HttpBody message.
-  void AppendHttpBodyEnvelope(Buffer::Instance& output, std::string content_type,
-                              uint64_t content_length);
+  bool BuildRequestFromHttpBody(Buffer::Instance& data);
   // SendHttpBodyResponse sends the response returned from the upstream server
   // as a google.api.HttpBody message.
   void SendHttpBodyResponse(Buffer::Instance* data);
-  void ReplaceAPIVersionInPath(const Http::RequestHeaderMap& headers, std::string& path) const;
-  bool CreateDataBuffer(nlohmann::json& payload, Buffer::OwnedImpl& buffer) const;
+  void ReplaceAPIVersionInPath();
+  bool CreateDataBuffer(const nlohmann::json& payload, Buffer::OwnedImpl& buffer) const;
+  absl::Status ExtractHttpAnnotationValues(const Protobuf::MethodDescriptor* method_descriptor);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_;
@@ -121,8 +115,13 @@ private:
   Grpc::Decoder decoder_;
   Http::RequestHeaderMap* request_headers_;
 
-  HttpRequestParams request_params_;
-  MethodInfo method_info_;
+  std::string http_request_method_;
+  std::string http_request_path_template_;
+  std::string http_request_body_field_;
+
+  bool is_request_http_body_;
+  bool is_response_http_body_;
+  bool is_request_nested_http_body_;
 
   std::string request_content_type_;
   std::string response_content_type_;

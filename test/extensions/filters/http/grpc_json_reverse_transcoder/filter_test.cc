@@ -117,7 +117,7 @@ protected:
 // Test the header encoding.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, GrpcRequest) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {":path", "/bookstore.Bookstore/BulkCreateShelf"},
+                                         {":path", "/bookstore.Bookstore/CreateShelf"},
                                          {"content-type", "application/grpc"}};
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
@@ -174,7 +174,7 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeBody) {
 // from the gRPC message will be added to the path as query params.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, GrpcRequestWithQueryParams) {
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {":path", "/bookstore.Bookstore/ListBooks"},
+                                         {":path", "/bookstore.Bookstore/ListBooksNonStreaming"},
                                          {"content-type", "application/grpc"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
   bookstore::ListBooksRequest request;
@@ -183,7 +183,8 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, GrpcRequestWithQueryParams) {
   request.set_theme("Science Fiction");
   auto request_data = Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(*request_data, true));
-  EXPECT_EQ(headers.getPathValue(), "/shelves/12345/books?author=567&theme=Science%20Fiction");
+  EXPECT_EQ(headers.getPathValue(),
+            "/shelves/12345/books:unary?author=567&theme=Science%20Fiction");
 }
 
 // Test the transcoding of the request when whole gRPC message will be sent as a
@@ -676,6 +677,30 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, ResponseTranscodingFailure) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(response, false));
 }
 
+TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeRequestWithCustomOption) {
+  Http::TestRequestHeaderMapImpl req_headers{{":method", "POST"},
+                                             {":path", "/bookstore.Bookstore/BookstoreOptions"},
+                                             {"content-type", "application/grpc"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(req_headers, false));
+  EXPECT_EQ(req_headers.getMethodValue(), Http::Headers::get().MethodValues.Options);
+}
+
+TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeRequestWithMissingHTTPAnnotaions) {
+  Http::TestRequestHeaderMapImpl req_headers{{":method", "POST"},
+                                             {":path", "/bookstore.Bookstore/GetBook"},
+                                             {"content-type", "application/grpc"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(req_headers, false));
+  EXPECT_EQ(req_headers.getPathValue(), "/bookstore.Bookstore/GetBook");
+}
+
+TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscoderStreamingMethod) {
+  Http::TestRequestHeaderMapImpl req_headers{{":method", "POST"},
+                                             {":path", "/bookstore.Bookstore/BulkCreateShelf"},
+                                             {"content-type", "application/grpc"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(req_headers, false));
+  EXPECT_EQ(req_headers.getPathValue(), "/bookstore.Bookstore/BulkCreateShelf");
+}
+
 // Test metadata and 1xxHeaders encoding and trailer decoding.
 TEST_F(GrpcJsonReverseTranscoderFilterTest, MiscEncodingAndDecoding) {
   Http::TestRequestTrailerMapImpl decode_trailers;
@@ -733,59 +758,12 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, ConfigWithoutDescriptor) {
 TEST_F(GrpcJsonReverseTranscoderFilterTest, CreateTranscoder) {
   auto config = GrpcJsonReverseTranscoderConfig(bookstoreProtoConfig(), *api_);
 
-  std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder1;
+  const auto* cb_descriptor = config.GetMethodDescriptor("/bookstore.Bookstore/CreateBook");
+  EXPECT_TRUE(cb_descriptor);
   TranscoderInputStreamImpl request_in1, response_in1;
-  HttpRequestParams request_params1;
-  MethodInfo method_info1;
-  absl::Status status =
-      config.CreateTranscoder("/bookstore.Bookstore/CreateBook", request_in1, response_in1,
-                              transcoder1, request_params1, method_info1);
-  EXPECT_TRUE(status.ok());
-  EXPECT_TRUE(transcoder1);
-  EXPECT_EQ(request_params1.method, Http::Headers::get().MethodValues.Put);
-  EXPECT_EQ(request_params1.http_body_field, "book");
-  EXPECT_EQ(request_params1.http_rule_path, "/shelves/{shelf}/books");
-
-  std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder2;
-  TranscoderInputStreamImpl request_in2, response_in2;
-  HttpRequestParams request_params2;
-  MethodInfo method_info2;
-  status = config.CreateTranscoder("/bookstore.Bookstore/BookstoreOptions", request_in2,
-                                   response_in2, transcoder2, request_params2, method_info2);
-  EXPECT_TRUE(status.ok());
-  EXPECT_TRUE(transcoder2);
-  EXPECT_EQ(request_params2.method, Http::Headers::get().MethodValues.Options);
-  EXPECT_TRUE(request_params2.http_body_field.empty());
-  EXPECT_EQ(request_params2.http_rule_path, "/shelves/{shelf}");
-}
-
-// Test creation of a transcoder instance for a gRPC method that doesn't
-// exist in the proto descriptor.
-TEST_F(GrpcJsonReverseTranscoderFilterTest, CreateTranscoderInvalidMethod) {
-  auto config = GrpcJsonReverseTranscoderConfig(bookstoreProtoConfig(), *api_);
-
-  std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
-  TranscoderInputStreamImpl request_in_, response_in_;
-  HttpRequestParams request_params;
-  MethodInfo method_info;
-  absl::Status status =
-      config.CreateTranscoder("/bookstore.Bookstore/InvalidMethod", request_in_, response_in_,
-                              transcoder_, request_params, method_info);
-  EXPECT_EQ(status.code(), absl::StatusCode::kNotFound);
-}
-
-// Test creation of a transcoder instance for a gRPC method without `google.api.http` annotation.
-TEST_F(GrpcJsonReverseTranscoderFilterTest, CreateTranscoderWithoutHttpAnnotations) {
-  auto config = GrpcJsonReverseTranscoderConfig(bookstoreProtoConfig(), *api_);
-
-  std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
-  TranscoderInputStreamImpl request_in_, response_in_;
-  HttpRequestParams request_params;
-  MethodInfo method_info;
-  absl::Status status =
-      config.CreateTranscoder("/bookstore.Bookstore/GetBook", request_in_, response_in_,
-                              transcoder_, request_params, method_info);
-  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  StatusOr<std::unique_ptr<Transcoder>> transcoder1_or =
+      config.CreateTranscoder(cb_descriptor, request_in1, response_in1);
+  EXPECT_TRUE(transcoder1_or.ok());
 }
 
 } // namespace

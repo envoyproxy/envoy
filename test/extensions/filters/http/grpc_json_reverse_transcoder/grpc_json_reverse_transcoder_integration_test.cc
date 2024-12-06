@@ -290,11 +290,12 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, RequestWithQueryParams) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  Http::TestRequestHeaderMapImpl request_headers({{":scheme", "http"},
-                                                  {":method", "POST"},
-                                                  {":authority", "foo"},
-                                                  {":path", "/bookstore.Bookstore/ListBooks"},
-                                                  {"content-type", "application/grpc"}});
+  Http::TestRequestHeaderMapImpl request_headers(
+      {{":scheme", "http"},
+       {":method", "POST"},
+       {":authority", "foo"},
+       {":path", "/bookstore.Bookstore/ListBooksNonStreaming"},
+       {"content-type", "application/grpc"}});
 
   auto encoder_decoder = codec_client_->startRequest(request_headers);
   request_encoder_ = &encoder_decoder.first;
@@ -315,7 +316,7 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, RequestWithQueryParams) {
               HeaderValueOf(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get));
   EXPECT_THAT(upstream_request_->headers(),
               Http::HeaderValueOf(Http::Headers::get().Path,
-                                  "/shelves/12345/books?author=567&theme=Science%20Fiction"));
+                                  "/shelves/12345/books:unary?author=567&theme=Science%20Fiction"));
 
   Http::TestResponseHeaderMapImpl response_headers;
   response_headers.setStatus(200);
@@ -323,7 +324,8 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, RequestWithQueryParams) {
 
   upstream_request_->encodeHeaders(response_headers, false);
 
-  std::string response_str = "{\"id\":123,\"author\":\"John Doe\",\"title\":\"Kids book\"}";
+  std::string response_str =
+      "{\"books\":[{\"id\":123,\"author\":\"John Doe\",\"title\":\"Kids book\"}]}";
   Buffer::OwnedImpl response_data;
   response_data.add(response_str);
   upstream_request_->encodeData(response_data, true);
@@ -336,10 +338,11 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, RequestWithQueryParams) {
   EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().ContentType,
                                                  Http::Headers::get().ContentTypeValues.Grpc));
 
-  bookstore::Book expected_res;
-  expected_res.set_id(123);
-  expected_res.set_title("Kids book");
-  expected_res.set_author("John Doe");
+  bookstore::ListBooksResponse expected_res;
+  auto* book = expected_res.add_books();
+  book->set_id(123);
+  book->set_title("Kids book");
+  book->set_author("John Doe");
   auto serialized_res = Grpc::Common::serializeToGrpcFrame(expected_res);
   EXPECT_EQ(response->body(), serialized_res->toString());
 
