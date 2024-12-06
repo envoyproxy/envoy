@@ -107,13 +107,9 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
   }
 
   if (!config.upstream_http_filters().empty()) {
-    creation_status =
-        Http::FilterChainUtility::checkUpstreamHttpFiltersList(config.upstream_http_filters());
-    if (!creation_status.ok()) {
-      return;
-    }
-
-    auto& server_factory_ctx = context.serverFactoryContext();
+    // TODO(wbpcode): To validate the terminal filter is upstream codec filter by the proto.
+    Server::Configuration::ServerFactoryContext& server_factory_ctx =
+        context.serverFactoryContext();
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             server_factory_ctx);
