@@ -140,7 +140,7 @@ message RateLimit {
 // Also applies to Local rate limiting :ref:`using descriptors <config_http_filters_local_rate_limit_descriptors>`.
 // [#not-implemented-hide:]
 message RateLimitConfig {
-  // [#next-free-field: 10]
+  // [#next-free-field: 11]
   message Action {
     // The following descriptor entry is appended to the descriptor:
     //
