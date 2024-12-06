@@ -303,6 +303,10 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.cx_pool_ready_duration``
     to get the duration from when the upstream request was created to when the upstream connection pool is ready.
+- area: health_check
+  change: |
+    Added new health check filter stats including total requests, successful/failed checks, cached responses, and
+    cluster health status counters. These stats help track health check behavior and cluster health state.
 
 deprecated:
 - area: rbac
