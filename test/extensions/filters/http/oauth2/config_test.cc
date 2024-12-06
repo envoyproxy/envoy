@@ -25,7 +25,7 @@ namespace {
 
 // This loads one of the secrets in credentials, and fails the other one.
 void expectInvalidSecretConfig(const std::string& failed_secret_name,
-                               const std::string& exception_message) {
+                               const std::string& status_message) {
   const std::string yaml = R"EOF(
 config:
   token_endpoint:
@@ -74,9 +74,9 @@ config:
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException, exception_message);
+  const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(), testing::HasSubstr(status_message));
 }
 
 } // namespace
@@ -164,9 +164,11 @@ TEST(ConfigTest, CreateFilterMissingConfig) {
   envoy::extensions::filters::http::oauth2::v3::OAuth2 proto_config;
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW_WITH_MESSAGE(
-      config.createFilterFactoryFromProtoTyped(proto_config, "whatever", factory_context),
-      EnvoyException, "config must be present for global config");
+  const auto result =
+      config.createFilterFactoryFromProtoTyped(proto_config, "whatever", factory_context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr("config must be present for global config"));
 }
 
 TEST(ConfigTest, WrongCookieName) {
@@ -275,10 +277,11 @@ config:
       .WillByDefault(Return(std::make_shared<Secret::GenericSecretConfigProviderImpl>(
           envoy::extensions::transport_sockets::tls::v3::GenericSecret())));
 
-  EXPECT_THROW_WITH_REGEX(
-      factory.createFilterFactoryFromProto(*proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException,
-      "invalid combination of forward_bearer_token and preserve_authorization_header");
+  const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(),
+              testing::HasSubstr(
+                  "invalid combination of forward_bearer_token and preserve_authorization_header"));
 }
 
 } // namespace Oauth2
