@@ -78,6 +78,8 @@ std::chrono::seconds JwksAsyncFetcher::getCacheDuration(const RemoteJwks& remote
   return DefaultCacheExpirationSec;
 }
 
+void JwksAsyncFetcher::resetFetchTimer() { refetch_timer_->enableTimer(good_refetch_duration_); }
+
 void JwksAsyncFetcher::fetch() {
   if (fetcher_) {
     fetcher_->cancel();
