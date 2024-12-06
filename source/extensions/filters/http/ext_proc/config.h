@@ -21,7 +21,7 @@ public:
   ExternalProcessingFilterConfig() : DualFactoryBase("envoy.filters.http.ext_proc") {}
 
 private:
-  static constexpr uint64_t DefaultMessageTimeoutMs = 200;
+  static constexpr uint64_t DefaultMessageTimeoutMs = 3000;
   static constexpr uint64_t DefaultMaxMessageTimeoutMs = 0;
 
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
