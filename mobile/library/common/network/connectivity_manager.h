@@ -203,7 +203,7 @@ public:
    * @param network, the OS-preferred network.
    * @returns configuration key to associate with any related calls.
    */
-  static envoy_netconf_t setPreferredNetwork(NetworkType network);
+  static envoy_netconf_t setPreferredNetwork(int network);
 
   ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
                           DnsCacheManagerSharedPtr dns_cache_manager)
