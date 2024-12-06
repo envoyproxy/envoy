@@ -14,7 +14,9 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {}
 };
 
-TEST_F(HTTPTypedPerFilterConfigTest, RejectUnsupportedTypedPerFilterConfig) {
+using HTTPTypedPerFilterConfigDeathTest = HTTPTypedPerFilterConfigTest;
+
+TEST_F(HTTPTypedPerFilterConfigDeathTest, RejectUnsupportedTypedPerFilterConfig) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {
@@ -35,7 +37,7 @@ TEST_F(HTTPTypedPerFilterConfigTest, RejectUnsupportedTypedPerFilterConfig) {
                              "route specific configurations");
 }
 
-TEST_F(HTTPTypedPerFilterConfigTest, RejectUnknownHttpFilterInTypedPerFilterConfig) {
+TEST_F(HTTPTypedPerFilterConfigDeathTest, RejectUnknownHttpFilterInTypedPerFilterConfig) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {

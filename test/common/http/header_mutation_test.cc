@@ -272,7 +272,7 @@ TEST(HeaderMutationsTest, BasicOrder) {
   }
 }
 
-TEST(HeaderMutationTest, Death) {
+TEST(HeaderMutationDeathTest, Death) {
   ProtoHeaderMutatons proto_mutations;
   proto_mutations.Add();
 
