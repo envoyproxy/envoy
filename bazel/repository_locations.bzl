@@ -1047,7 +1047,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2024-11-19",
         strip_prefix = "rules_cc-{version}",
         urls = ["https://github.com/bazelbuild/rules_cc/releases/download/{version}/rules_cc-{version}.tar.gz"],
-        use_category = ["build"],
+        use_category = [
+            "build",
+            "controlplane",
+            "dataplane_core",
+        ],
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_cc/blob/{version}/LICENSE",
     ),
