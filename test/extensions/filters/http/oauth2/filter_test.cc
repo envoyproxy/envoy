@@ -750,7 +750,6 @@ TEST_F(OAuth2Test, SetBearerToken) {
  * in the query parameters.
  */
 TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
-  init();
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
       {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
@@ -1307,8 +1306,6 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
 TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
-
-  init();
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1368,7 +1365,6 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
  */
 // TODO(zhaohuabing): this test seems redundant and should be removed.
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
-  init();
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
       {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
@@ -1649,7 +1645,6 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
  * the final redirect should equal the original request.
  */
 TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
-  init();
   const std::string url_with_special_characters =
       R"(/original_path?query="value"&key=val\ue#frag<ment>{data}[info]|test\^space)";
   const std::string test_encoded_state_with_special_characters =
