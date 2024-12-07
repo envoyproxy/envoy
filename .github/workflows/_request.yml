@@ -151,14 +151,14 @@ jobs:
     # TODO(phlax): shift this to ci/request action above
     - name: Check Docker cache (x64)
       id: cache-exists-docker-x64
-      uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a  # v4.1.2
+      uses: actions/cache/restore@1bd1e32a3bdc45362d1e726936510720a7c30a57  # v4.2.0
       with:
         lookup-only: true
         path: /tmp/cache
         key: ${{ fromJSON(steps.data.outputs.value).request.build-image.default }}
     - name: Check Docker cache (arm64)
       id: cache-exists-docker-arm64
-      uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a  # v4.1.2
+      uses: actions/cache/restore@1bd1e32a3bdc45362d1e726936510720a7c30a57  # v4.2.0
       with:
         lookup-only: true
         path: /tmp/cache
