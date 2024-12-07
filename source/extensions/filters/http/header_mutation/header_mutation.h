@@ -56,7 +56,7 @@ class ParameterMutationAppend : public ParameterMutation {
 public:
   ParameterMutationAppend(absl::string_view key, Formatter::FormatterPtr formatter,
                           ParameterAppendProto::KeyValueAppendAction action)
-      : key_(key), formatter_(std::move(formatter)), action_(action){};
+      : key_(key), formatter_(std::move(formatter)), action_(action) {}
 
   void mutateQueryParameter(Http::Utility::QueryParamsMulti& params,
                             const Formatter::HttpFormatterContext& context,
