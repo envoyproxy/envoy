@@ -1,6 +1,3 @@
-#include <memory>
-#include <string>
-
 #include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
@@ -10,7 +7,6 @@
 
 #include "test/mocks/server/factory_context.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -76,7 +72,7 @@ config:
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(), testing::HasSubstr(status_message));
+  EXPECT_EQ(result.status().message(), status_message);
 }
 
 } // namespace
@@ -167,8 +163,7 @@ TEST(ConfigTest, CreateFilterMissingConfig) {
   const auto result =
       config.createFilterFactoryFromProtoTyped(proto_config, "whatever", factory_context);
   EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr("config must be present for global config"));
+  EXPECT_EQ(result.status().message(), "config must be present for global config");
 }
 
 TEST(ConfigTest, WrongCookieName) {
@@ -279,9 +274,10 @@ config:
 
   const auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
   EXPECT_FALSE(result.ok());
-  EXPECT_THAT(result.status().message(),
-              testing::HasSubstr(
-                  "invalid combination of forward_bearer_token and preserve_authorization_header"));
+  EXPECT_EQ(result.status().message(),
+            "invalid combination of forward_bearer_token and preserve_authorization_header "
+            "configuration. If forward_bearer_token is set to true, then "
+            "preserve_authorization_header must be false");
 }
 
 } // namespace Oauth2
