@@ -184,7 +184,6 @@ paths:
     - source/extensions/filters/http/grpc_field_extraction
     - source/extensions/filters/http/grpc_json_transcoder
     - source/extensions/filters/http/grpc_stats
-    - source/extensions/filters/http/header_mutation
     - source/extensions/filters/http/header_to_metadata
     - source/extensions/filters/http/health_check
     - source/extensions/filters/http/ip_tagging
