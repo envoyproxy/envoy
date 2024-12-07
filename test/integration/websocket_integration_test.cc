@@ -307,7 +307,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   sendBidirectionalData();
 
   test_server_->waitForCounterGe("http.config_test.downstream_rq_idle_timeout", 1);
-  waitForClientDisconnectOrReset();
+  waitForClientDisconnectOrReset(Http::StreamResetReason::RemoteResetNoError);
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
 
