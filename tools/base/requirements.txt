@@ -1290,9 +1290,9 @@ six==1.16.0 \
     #   python-dateutil
     #   sphinxcontrib-httpdomain
     #   thrift
-slack-sdk==3.33.4 \
-    --hash=sha256:5e109847f6b6a22d227609226ba4ed936109dc00675bddeb7e0bee502d3ee7e0 \
-    --hash=sha256:9f30cb3c9c07b441c49d53fc27f9f1837ad1592a7e9d4ca431f53cdad8826cc6
+slack-sdk==3.33.5 \
+    --hash=sha256:a5e74c00c99dc844ad93e501ab764a20d86fa8184bbc9432af217496f632c4ee \
+    --hash=sha256:b8cccadfa3d4005a5e6529f52000d25c583f46173fda8e9136fdd2bc58923ff6
     # via -r requirements.in
 smmap==5.0.1 \
     --hash=sha256:dceeb6c0028fdb6734471eb07c0cd2aae706ccaecab45965ee83f11c8d3b1f62 \
