@@ -6758,12 +6758,9 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
   ASSERT_EQ(load_metric_stats_map, nullptr);
 }
 
-class TestOrcaLoadReportCallbacks : public Filter::OrcaLoadReportCallbacks {
+class TestOrcaLoadReportLbData : public Upstream::HostLbPolicyData {
 public:
-  MOCK_METHOD(absl::Status, onOrcaLoadReport,
-              (const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-               const Upstream::HostDescription&),
-              (override));
+  MOCK_METHOD(absl::Status, onHostLoadReport, (const Upstream::HostLoadReport&), (override));
 };
 
 TEST_F(RouterTest, OrcaLoadReportCallbacks) {
@@ -6779,16 +6776,17 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
 
-  // Configure ORCA callbacks to receive the report.
-  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
+  // Configure the HostLbData to receive the report.
+  auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
+  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
+
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
-  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _))
-      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-                           const Upstream::HostDescription&) {
+  EXPECT_CALL(*host_lb_policy_data_raw_ptr, onHostLoadReport(_))
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
         received_orca_load_report = orca_load_report;
         return absl::OkStatus();
       }));
-  router_->setOrcaLoadReportCallbacks(callbacks);
 
   // Send ORCA report in the headers.
   xds::data::orca::v3::OrcaLoadReport headers_orca_load_report;

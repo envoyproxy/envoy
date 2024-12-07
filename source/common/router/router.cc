@@ -376,13 +376,13 @@ FilterUtility::StrictHeaderChecker::checkHeader(Http::RequestHeaderMap& headers,
   PANIC("unexpectedly reached");
 }
 
-Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host) {
+Stats::StatName Filter::upstreamZone(OptRef<const Upstream::HostDescription> upstream_host) {
   return upstream_host ? upstream_host->localityZoneStatName() : config_->empty_stat_name_;
 }
 
 void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                 const Http::ResponseHeaderMap& response_headers,
-                                Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                OptRef<const Upstream::HostDescription> upstream_host,
                                 bool dropped) {
   // Passing the response_status_code explicitly is an optimization to avoid
   // multiple calls to slow Http::Utility::getResponseStatus.
@@ -436,7 +436,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
 }
 
 void Filter::chargeUpstreamCode(Http::Code code,
-                                Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                OptRef<const Upstream::HostDescription> upstream_host,
                                 bool dropped) {
   const uint64_t response_status_code = enumToInt(code);
   const auto fake_response_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
@@ -568,7 +568,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // See if we are supposed to immediately kill some percentage of this cluster's traffic.
   if (cluster_->maintenanceMode()) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
-    chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
+    chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, true);
     callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, "maintenance mode",
         [modify_headers, this](Http::ResponseHeaderMap& headers) {
@@ -871,7 +871,7 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
 
 void Filter::sendNoHealthyUpstreamResponse() {
   callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
-  chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, false);
+  chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, false);
   callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "no healthy upstream", modify_headers_,
                              absl::nullopt,
                              StreamInfo::ResponseCodeDetails::get().NoHealthyUpstream);
@@ -1280,14 +1280,14 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
       stats_.rq_reset_after_downstream_response_started_.inc();
     }
   } else {
-    Upstream::HostDescriptionConstSharedPtr upstream_host = upstream_request.upstreamHost();
+    OptRef<const Upstream::HostDescription> upstream_host = upstream_request.upstreamHost();
 
     chargeUpstreamCode(code, upstream_host, dropped);
     // If we had non-5xx but still have been reset by backend or timeout before
     // starting response, we treat this as an error. We only get non-5xx when
     // timeout_response_code_ is used for code above, where this member can
     // assume values such as 204 (NoContent).
-    if (upstream_host != nullptr && !Http::CodeUtility::is5xx(enumToInt(code))) {
+    if (upstream_host.has_value() && !Http::CodeUtility::is5xx(enumToInt(code))) {
       upstream_host->stats().rq_error_.inc();
     }
   }
@@ -2101,7 +2101,7 @@ bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
     if (config_->random_.bernoulli(cluster.dropOverload())) {
       ENVOY_STREAM_LOG(debug, "The request is dropped by DROP_OVERLOAD", *callbacks_);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DropOverLoad);
-      chargeUpstreamCode(Http::Code::ServiceUnavailable, nullptr, true);
+      chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, true);
       callbacks_->sendLocalReply(
           Http::Code::ServiceUnavailable, "drop overload",
           [modify_headers, this](Http::ResponseHeaderMap& headers) {
@@ -2129,10 +2129,14 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   }
   // Check whether we need to send the load report to the LRS or invoke the ORCA
   // callbacks.
-  auto host = upstream_request.upstreamHost();
-  const bool need_to_send_load_report =
-      (host != nullptr) && cluster_->lrsReportMetricNames().has_value();
-  if (!need_to_send_load_report && orca_load_report_callbacks_.expired()) {
+  OptRef<const Upstream::HostDescription> upstream_host = upstream_request.upstreamHost();
+  if (!upstream_host.has_value()) {
+    return;
+  }
+
+  OptRef<Upstream::HostLbPolicyData> host_lb_policy_data = upstream_host->lbPolicyData();
+
+  if (!cluster_->lrsReportMetricNames().has_value() && !host_lb_policy_data.has_value()) {
     return;
   }
 
@@ -2146,15 +2150,16 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
 
   orca_load_report_received_ = true;
 
-  if (need_to_send_load_report) {
+  if (cluster_->lrsReportMetricNames().has_value()) {
     ENVOY_STREAM_LOG(trace, "Adding ORCA load report {} to load metrics", *callbacks_,
                      orca_load_report->DebugString());
-    Envoy::Orca::addOrcaLoadReportToLoadMetricStats(cluster_->lrsReportMetricNames().value(),
-                                                    orca_load_report.value(),
-                                                    host->loadMetricStats());
+    Envoy::Orca::addOrcaLoadReportToLoadMetricStats(
+        *cluster_->lrsReportMetricNames(), *orca_load_report, upstream_host->loadMetricStats());
   }
-  if (auto callbacks = orca_load_report_callbacks_.lock(); callbacks != nullptr) {
-    const absl::Status status = callbacks->onOrcaLoadReport(*orca_load_report, *host);
+  if (host_lb_policy_data.has_value()) {
+    ENVOY_LOG(trace, "orca_load_report for {} report = {}", upstream_host->address()->asString(),
+              (*orca_load_report).DebugString());
+    const absl::Status status = host_lb_policy_data->onHostLoadReport(*orca_load_report);
     if (!status.ok()) {
       ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
                        status.message());

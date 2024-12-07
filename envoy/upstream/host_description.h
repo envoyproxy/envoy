@@ -16,9 +16,12 @@
 #include "envoy/upstream/resource_manager.h"
 
 #include "absl/strings/string_view.h"
+#include "xds/data/orca/v3/orca_load_report.pb.h"
 
 namespace Envoy {
 namespace Upstream {
+
+using HostLoadReport = xds::data::orca::v3::OrcaLoadReport;
 
 using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Metadata>;
 
@@ -83,6 +86,23 @@ public:
   // Returns an owning pointer to the current load metrics and clears the map.
   virtual StatMapPtr latch() PURE;
 };
+
+/**
+ * Base interface for attaching LbPolicy-specific data to individual hosts.
+ */
+class HostLbPolicyData {
+public:
+  virtual ~HostLbPolicyData() = default;
+
+  /**
+   * Invoked when a new orca report is received for this upstream host to
+   * update the host lb policy data.
+   * @param report supplies the ORCA load report of this upstream host.
+   */
+  virtual absl::Status onHostLoadReport(const HostLoadReport& report) PURE;
+};
+
+using HostLbPolicyDataPtr = std::unique_ptr<HostLbPolicyData>;
 
 class ClusterInfo;
 
@@ -244,6 +264,27 @@ public:
   virtual Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
                                 const envoy::config::core::v3::Metadata* metadata) const PURE;
+
+  /**
+   * Set load balancing policy related data to the host.
+   * NOTE: this method should only be called at main thread before the host is used
+   * across worker threads.
+   */
+  virtual void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
+
+  /**
+   * Get the load balancing policy related data of the host.
+   * @return the optional reference to the load balancing policy related data of the host.
+   */
+  virtual OptRef<HostLbPolicyData> lbPolicyData() const PURE;
+
+  /**
+   * Get the typed load balancing policy related data of the host.
+   * @return the optional reference to the typed load balancing policy related data of the host.
+   */
+  template <class HostLbPolicyDataType> OptRef<HostLbPolicyDataType> typedLbPolicyData() const {
+    return makeOptRefFromPtr(dynamic_cast<HostLbPolicyDataType*>(lbPolicyData().ptr()));
+  }
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
