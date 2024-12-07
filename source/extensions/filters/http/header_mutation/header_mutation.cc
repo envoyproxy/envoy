@@ -128,7 +128,7 @@ void HeaderMutation::initializeRouteConfigs(Http::StreamFilterCallbacks* callbac
   // override the more general virtual host and route table configs.
   //
   // So, if most_specific_header_mutations_wins is false, we need to reverse the order
-  // of route configs
+  // of route configs.
   if (!config_->mostSpecificHeaderMutationsWins()) {
     std::reverse(route_configs_.begin(), route_configs_.end());
   }
