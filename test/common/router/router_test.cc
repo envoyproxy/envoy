@@ -6760,7 +6760,7 @@ TEST_F(RouterTest, OrcaLoadReport_NoConfiguredMetricNames) {
 
 class TestOrcaLoadReportLbData : public Upstream::HostLbPolicyData {
 public:
-  MOCK_METHOD(absl::Status, onHostLoadReport, (const Upstream::HostLoadReport&), (override));
+  MOCK_METHOD(absl::Status, onOrcaLoadReport, (const Upstream::OrcaLoadReport&), (override));
 };
 
 TEST_F(RouterTest, OrcaLoadReportCallbacks) {
@@ -6782,7 +6782,7 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
   cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
 
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
-  EXPECT_CALL(*host_lb_policy_data_raw_ptr, onHostLoadReport(_))
+  EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_))
       .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
         received_orca_load_report = orca_load_report;
         return absl::OkStatus();

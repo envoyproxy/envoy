@@ -60,7 +60,7 @@ public:
   absl::Status updateClientSideDataFromOrcaLoadReport(
       const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
       ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData& client_side_data) {
-    return client_side_data.onHostLoadReport(orca_load_report);
+    return client_side_data.onOrcaLoadReport(orca_load_report);
   }
 
   void setHostClientSideWeight(HostSharedPtr& host, uint32_t weight,
@@ -287,7 +287,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
     xds::data::orca::v3::OrcaLoadReport orca_load_report;
     orca_load_report.set_rps_fractional(1000);
     orca_load_report.set_application_utilization(0.5);
-    EXPECT_EQ(host->lbPolicyData()->onHostLoadReport(orca_load_report), absl::OkStatus());
+    EXPECT_EQ(host->lbPolicyData()->onOrcaLoadReport(orca_load_report), absl::OkStatus());
     EXPECT_EQ(host->weight(), 1);
   }
   // Update weights on hosts.

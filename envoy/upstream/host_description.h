@@ -21,7 +21,7 @@
 namespace Envoy {
 namespace Upstream {
 
-using HostLoadReport = xds::data::orca::v3::OrcaLoadReport;
+using OrcaLoadReport = xds::data::orca::v3::OrcaLoadReport;
 
 using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Metadata>;
 
@@ -99,7 +99,7 @@ public:
    * update the host lb policy data.
    * @param report supplies the ORCA load report of this upstream host.
    */
-  virtual absl::Status onHostLoadReport(const HostLoadReport& report) PURE;
+  virtual absl::Status onOrcaLoadReport(const OrcaLoadReport& report) PURE;
 };
 
 using HostLbPolicyDataPtr = std::unique_ptr<HostLbPolicyData>;

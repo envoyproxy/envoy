@@ -61,7 +61,7 @@ public:
         : report_handler_(std::move(handler)), weight_(weight), non_empty_since_(non_empty_since),
           last_update_time_(last_update_time) {}
 
-    absl::Status onHostLoadReport(const Upstream::HostLoadReport& report) override;
+    absl::Status onOrcaLoadReport(const Upstream::OrcaLoadReport& report) override;
 
     // Update the weight and timestamps for first and last update time.
     void updateWeightNow(uint32_t weight, const MonotonicTime& now) {
