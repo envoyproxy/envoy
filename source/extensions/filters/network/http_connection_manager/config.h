@@ -377,7 +377,7 @@ private:
  */
 class HttpConnectionManagerFactory {
 public:
-  static std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
+  static absl::StatusOr<std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>>
   createHttpConnectionManagerFactoryFromProto(
       const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
           proto_config,
