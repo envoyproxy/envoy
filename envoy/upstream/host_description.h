@@ -99,7 +99,9 @@ public:
    * update the host lb policy data.
    * @param report supplies the ORCA load report of this upstream host.
    */
-  virtual absl::Status onOrcaLoadReport(const OrcaLoadReport& report) PURE;
+  virtual absl::Status onOrcaLoadReport(const OrcaLoadReport& /*report*/) {
+    return absl::OkStatus();
+  }
 };
 
 using HostLbPolicyDataPtr = std::unique_ptr<HostLbPolicyData>;
