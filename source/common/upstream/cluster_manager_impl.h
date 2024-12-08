@@ -582,9 +582,12 @@ private:
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
-      absl::optional<HttpPoolData> httpConnPool(ResourcePriority priority,
+      HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+      absl::optional<HttpPoolData> httpConnPool(HostConstSharedPtr host, ResourcePriority priority,
                                                 absl::optional<Http::Protocol> downstream_protocol,
                                                 LoadBalancerContext* context) override;
+      absl::optional<TcpPoolData> tcpConnPool(HostConstSharedPtr host, ResourcePriority priority,
+                                              LoadBalancerContext* context) override;
       absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
                                               LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
@@ -620,14 +623,14 @@ private:
 
     private:
       Http::ConnectionPool::Instance*
-      httpConnPoolImpl(ResourcePriority priority,
+      httpConnPoolImpl(HostConstSharedPtr host, ResourcePriority priority,
                        absl::optional<Http::Protocol> downstream_protocol,
-                       LoadBalancerContext* context, bool peek);
+                       LoadBalancerContext* context);
 
-      Tcp::ConnectionPool::Instance* tcpConnPoolImpl(ResourcePriority priority,
-                                                     LoadBalancerContext* context, bool peek);
+      Tcp::ConnectionPool::Instance* tcpConnPoolImpl(HostConstSharedPtr host,
+                                                     ResourcePriority priority,
+                                                     LoadBalancerContext* context);
 
-      HostConstSharedPtr chooseHost(LoadBalancerContext* context);
       HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context);
 
       ThreadLocalClusterManagerImpl& parent_;
