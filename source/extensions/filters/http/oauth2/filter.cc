@@ -179,9 +179,29 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
   return encodeHmacBase64(secret, domain, expires, token, id_token, refresh_token);
 }
 
-// Generates a non-guessable nonce that can be used to prevent CSRF attacks.
-std::string generateNonce(Random::RandomGenerator& random) {
-  return Hex::uint64ToHex(random.random());
+// Generates a CSRF token that can be used to prevent CSRF attacks.
+// The token is in the format of <nonce>.<hmac(nonce)> recommended by OWASP.
+// See
+// https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#signed-double-submit-cookie-recommended
+std::string generateCsrfToken(const std::string& hmac_secret, Random::RandomGenerator& random) {
+  std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
+  std::string random_string = Hex::uint64ToHex(random.random());
+  std::string hmac = generateHmacBase64(hmac_secret_vec, random_string);
+  std::string csrf_token = fmt::format("{}.{}", random_string, hmac);
+  return csrf_token;
+}
+
+// validate the csrf token hmac to prevent csrf token forgery
+bool validateCsrfTokenHmac(const std::string& hmac_secret, const std::string& csrf_token) {
+  size_t pos = csrf_token.find('.');
+  if (pos == std::string::npos) {
+    return false;
+  }
+
+  std::string token = std::string(csrf_token.substr(0, pos));
+  std::string hmac = std::string(csrf_token.substr(pos + 1));
+  std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
+  return generateHmacBase64(hmac_secret_vec, token) == hmac;
 }
 
 /**
@@ -487,7 +507,7 @@ bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) con
   return true;
 }
 
-void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const {
+void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
   // Construct the correct scheme. We default to https since this is a requirement for OAuth to
@@ -503,16 +523,16 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
 
   // Encode the original request URL and the nonce to the state parameter.
   // Generate a nonce to prevent CSRF attacks.
-  std::string nonce;
+  std::string csrf_token;
   bool nonce_cookie_exists = false;
   const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
     return key == config_->cookieNames().oauth_nonce_;
   });
   if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) != nonce_cookie.end()) {
-    nonce = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
+    csrf_token = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
     nonce_cookie_exists = true;
   } else {
-    nonce = generateNonce(random_);
+    csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
   }
 
   // Set the nonce cookie if it does not exist.
@@ -527,9 +547,17 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
     }
     response_headers->addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(config_->cookieNames().oauth_nonce_, "=", nonce, cookie_tail_http_only));
+        absl::StrCat(config_->cookieNames().oauth_nonce_, "=", csrf_token, cookie_tail_http_only));
   }
-  const std::string state = encodeState(original_url, nonce);
+
+  // Validate the CSRF token HMAC if the nonce cookie exists.
+  if (nonce_cookie_exists && !validateCsrfTokenHmac(config_->hmacSecret(), csrf_token)) {
+    ENVOY_LOG(error, "Invalid CSRF token HMAC: {}", csrf_token);
+    sendUnauthorizedResponse();
+    return;
+  }
+
+  const std::string state = encodeState(original_url, csrf_token);
 
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
@@ -879,7 +907,7 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   // in the attacker's account.
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
   std::string nonce = filed_value_pair.at(stateParamsNonce).string_value();
-  if (!validateNonce(headers, nonce)) {
+  if (!validateCsrfToken(headers, nonce)) {
     ENVOY_LOG(error, "nonce cookie does not match nonce in the state: \n{}", nonce);
     return {false, "", ""};
   }
@@ -896,14 +924,16 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
 }
 
 // Validates the nonce in the state parameter against the nonce in the cookie.
-bool OAuth2Filter::validateNonce(const Http::RequestHeaderMap& headers,
-                                 const std::string& nonce) const {
-  const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
-    return key == config_->cookieNames().oauth_nonce_;
-  });
+bool OAuth2Filter::validateCsrfToken(const Http::RequestHeaderMap& headers,
+                                     const std::string& csrf_token) const {
+  const auto csrf_token_cookie =
+      Http::Utility::parseCookies(headers, [this](absl::string_view key) {
+        return key == config_->cookieNames().oauth_nonce_;
+      });
 
-  if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) != nonce_cookie.end() &&
-      nonce_cookie.at(config_->cookieNames().oauth_nonce_) == nonce) {
+  if (csrf_token_cookie.find(config_->cookieNames().oauth_nonce_) != csrf_token_cookie.end() &&
+      csrf_token_cookie.at(config_->cookieNames().oauth_nonce_) == csrf_token &&
+      validateCsrfTokenHmac(config_->hmacSecret(), csrf_token)) {
     return true;
   }
   return false;
