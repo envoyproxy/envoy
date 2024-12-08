@@ -6829,17 +6829,17 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
 
-  // Configure ORCA callbacks to receive the report.
-  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
+  // Configure the HostLbData to receive the report.
+  auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
+  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
+
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
-  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _))
-      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-                           const Upstream::HostDescription&) {
+  EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_))
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
         received_orca_load_report = orca_load_report;
-        // Return an error that gets logged by router filter.
-        return absl::InvalidArgumentError("Unexpected ORCA load Report");
+        return absl::OkStatus();
       }));
-  router_->setOrcaLoadReportCallbacks(callbacks);
 
   // Send metrics in the trailers.
   xds::data::orca::v3::OrcaLoadReport orca_load_report;
@@ -6867,11 +6867,12 @@ TEST_F(RouterTest, OrcaLoadReportInvalidHeaderValue) {
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, true);
 
-  // Configure ORCA callbacks to receive the report, but don't expect it to be
+  // Configure the HostLbData to receive the report, but don't expect it to be
   // called for invalid orca header.
-  auto callbacks = std::make_shared<TestOrcaLoadReportCallbacks>();
-  EXPECT_CALL(*callbacks, onOrcaLoadReport(_, _)).Times(0);
-  router_->setOrcaLoadReportCallbacks(callbacks);
+  auto host_lb_policy_data = std::make_unique<TestOrcaLoadReportLbData>();
+  auto host_lb_policy_data_raw_ptr = host_lb_policy_data.get();
+  cm_.thread_local_cluster_.conn_pool_.host_->lb_policy_data_ = std::move(host_lb_policy_data);
+  EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_)).Times(0);
 
   // Send report with invalid ORCA proto.
   std::string proto_string = "Invalid ORCA proto value";
