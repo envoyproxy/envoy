@@ -8,6 +8,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include <bcrypt/BCrypt.hpp>
 
 namespace Envoy {
 namespace Extensions {
@@ -101,7 +102,12 @@ bool BasicAuthFilter::validateUser(const UserMap& users, absl::string_view usern
     return false;
   }
 
-  return computeSHA1(password) == user->second.hash;
+  if (absl::StartsWith(user->second.hash, "{SHA}")) {
+    return user->second.hash == absl::StrCat("{SHA}", computeSHA1(password));
+  }
+
+  std::string password_string{password.data(), password.length()};
+  return BCrypt::validatePassword(password_string, user->second.hash);
 }
 
 Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,
