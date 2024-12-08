@@ -1110,20 +1110,23 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
-    Server::Configuration::ServerFactoryContext& factory_context, const ClusterProto& cluster) {
-  // Handle the lb subset config case first.
-  // Note it is possible to have a lb_subset_config without actually having any subset selectors.
-  // In this case the subset load balancer should not be used.
-  if (cluster.has_lb_subset_config() && !cluster.lb_subset_config().subset_selectors().empty()) {
-    auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
-        "envoy.load_balancing_policies.subset");
-    if (lb_factory != nullptr) {
-      return Result{lb_factory, lb_factory->loadConfig(factory_context, cluster)};
-    }
+    Server::Configuration::ServerFactoryContext& context, const ClusterProto& cluster) {
+  if (!cluster.has_lb_subset_config() ||
+      // Note it is possible to have a lb_subset_config without actually having any
+      // subset selectors. In this case the subset load balancer should not be used.
+      cluster.lb_subset_config().subset_selectors().empty()) {
+    return getTypedLbConfigFromLegacyProtoWithoutSubset(context, cluster);
+  }
+
+  auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+      "envoy.load_balancing_policies.subset");
+  if (lb_factory == nullptr) {
     return absl::InvalidArgumentError("No subset load balancer factory found");
   }
 
-  return getTypedLbConfigFromLegacyProtoWithoutSubset(factory_context, cluster);
+  auto subset_lb_config_or_error = lb_factory->loadLegacyConfig(cluster, context);
+  RETURN_IF_NOT_OK_REF(subset_lb_config_or_error.status());
+  return Result{lb_factory, std::move(subset_lb_config_or_error.value())};
 }
 
 using ProtocolOptionsHashMap =

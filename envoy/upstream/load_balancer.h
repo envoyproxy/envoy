@@ -11,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "xds/data/orca/v3/orca_load_report.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -24,6 +25,8 @@ class ConnectionLifetimeCallbacks;
 } // namespace ConnectionPool
 } // namespace Http
 namespace Upstream {
+
+using ClusterProto = envoy::config::cluster::v3::Cluster;
 
 /**
  * Context information passed to a load balancer to use when choosing a host. Not all load
@@ -310,6 +313,22 @@ public:
   virtual LoadBalancerConfigPtr
   loadConfig(Server::Configuration::ServerFactoryContext& factory_context,
              const Protobuf::Message& config) PURE;
+
+  /**
+   * This method is used to validate and create load balancer config from legacy proto config.
+   *
+   * @return LoadBalancerConfigPtr a new load balancer config or error.
+   *
+   * @param cluster supplies the legacy proto config of the cluster.
+   * @param context supplies the load balancer factory context.
+   */
+  virtual absl::StatusOr<LoadBalancerConfigPtr>
+  loadLegacyConfig(const ClusterProto& cluster,
+                   Server::Configuration::ServerFactoryContext& context) {
+    UNREFERENCED_PARAMETER(cluster);
+    UNREFERENCED_PARAMETER(context);
+    return nullptr;
+  }
 
   std::string category() const override { return "envoy.load_balancing_policies"; }
 };
