@@ -51,11 +51,12 @@ public:
                     const absl::optional<std::string>& provider, bool allow_failed,
                     bool allow_missing, JwksCache& jwks_cache,
                     Upstream::ClusterManager& cluster_manager,
-                    CreateJwksFetcherCb create_jwks_fetcher_cb, TimeSource& time_source)
+                    CreateJwksFetcherCb create_jwks_fetcher_cb, TimeSource& time_source,
+                    Event::Dispatcher& dispatcher)
       : jwks_cache_(jwks_cache), cm_(cluster_manager),
         create_jwks_fetcher_cb_(create_jwks_fetcher_cb), check_audience_(check_audience),
         provider_(provider), is_allow_failed_(allow_failed), is_allow_missing_(allow_missing),
-        time_source_(time_source) {}
+        time_source_(time_source), dispatcher_(dispatcher) {}
   // Following functions are for JwksFetcher::JwksReceiver interface
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
@@ -130,6 +131,9 @@ private:
   const bool is_allow_missing_;
   TimeSource& time_source_;
   ::google::jwt_verify::Jwt* jwt_{};
+  Event::Dispatcher& dispatcher_;
+  // Set to true if this JWT in this request caused a KID mismatch.
+  bool kid_mismatch_request_{false};
 };
 
 std::string AuthenticatorImpl::name() const {
@@ -279,6 +283,8 @@ void AuthenticatorImpl::startVerify() {
             return;
           }
         }
+        ENVOY_LOG(debug, "Triggering refetch due to KID mismatch");
+        kid_mismatch_request_ = true;
       }
     } else {
       verifyKey();
@@ -297,7 +303,9 @@ void AuthenticatorImpl::startVerify() {
     }
     fetcher_->fetch(*parent_span_, *this);
     // Disallow fetches across other worker threads due to in-flight fetch.
-    jwks_data_->allowRemoteJwksFetch(absl::nullopt, true);
+    if (kid_mismatch_request_) {
+      dispatcher_.post([this]() { jwks_data_->allowRemoteJwksFetch(absl::nullopt, true); });
+    }
     return;
   }
   // No valid keys for this issuer. This may happen as a result of incorrect local
@@ -307,13 +315,14 @@ void AuthenticatorImpl::startVerify() {
 
 void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   jwks_cache_.stats().jwks_fetch_success_.inc();
+
   const Status status =
       jwks_data_
-          ->setRemoteJwks(
-              std::move(jwks),
-              jwks_data_->getJwtProvider().remote_jwks().has_async_fetch() &&
-                  jwks_data_->getJwtProvider().remote_jwks().refetch_jwks_on_kid_mismatch())
+          ->setRemoteJwks(std::move(jwks),
+                          jwks_data_->getJwtProvider().remote_jwks().has_async_fetch() &&
+                              kid_mismatch_request_)
           ->getStatus();
+
   if (status != Status::Ok) {
     doneWithStatus(status);
   } else {
@@ -437,15 +446,10 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
   // On successful retrieval & verification of JWKS due to KID mismatch,
   //  - If retrieved due to KID being empty, trigger backoff.
   //  - Else, shut down backoff.
-  if (jwks_data_->getJwtProvider().remote_jwks().refetch_jwks_on_kid_mismatch() &&
-      jwks_data_->getJwksObj() != nullptr && !jwks_data_->isExpired() &&
-      !jwks_data_->isRemoteJwksFetchAllowed()) {
-    if (!jwt_->kid_.empty()) {
-      jwks_data_->allowRemoteJwksFetch(true, false);
-    } else {
-      jwks_data_->allowRemoteJwksFetch(false, false);
-    }
+  if (kid_mismatch_request_ && !jwks_data_->isRemoteJwksFetchAllowed()) {
+    dispatcher_.post([this]() { jwks_data_->allowRemoteJwksFetch(!jwt_->kid_.empty(), false); });
   }
+
   doneWithStatus(Status::Ok);
 }
 
@@ -478,12 +482,11 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
     // Forward the failed status to dynamic metadata
     ENVOY_LOG(debug, "status is: {}", ::google::jwt_verify::getStatusString(status));
 
-    // Trigger backoff and disallow fetch when retrieval & verification is due to KID mismatch and
-    // fails.
-    if (jwks_data_->getJwtProvider().remote_jwks().refetch_jwks_on_kid_mismatch() &&
-        jwks_data_->getJwksObj() != nullptr && jwks_data_->getJwksObj() != nullptr &&
-        !jwks_data_->isRemoteJwksFetchAllowed()) {
-      jwks_data_->allowRemoteJwksFetch(false, false);
+    // Trigger backoff to disallow further fetches when retrieval & verification is due to KID
+    // mismatch and fails.
+    if (kid_mismatch_request_ && !jwks_data_->isRemoteJwksFetchAllowed()) {
+
+      dispatcher_.post([this]() { jwks_data_->allowRemoteJwksFetch(false, false); });
     }
 
     std::string failed_status_in_metadata;
@@ -542,10 +545,10 @@ AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
                                        bool allow_failed, bool allow_missing, JwksCache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager,
                                        CreateJwksFetcherCb create_jwks_fetcher_cb,
-                                       TimeSource& time_source) {
+                                       TimeSource& time_source, Event::Dispatcher& dispatcher) {
   return std::make_unique<AuthenticatorImpl>(check_audience, provider, allow_failed, allow_missing,
                                              jwks_cache, cluster_manager, create_jwks_fetcher_cb,
-                                             time_source);
+                                             time_source, dispatcher);
 }
 
 } // namespace JwtAuthn

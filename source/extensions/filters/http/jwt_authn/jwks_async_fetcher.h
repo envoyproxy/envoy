@@ -40,7 +40,8 @@ public:
   JwksAsyncFetcher(const envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks& remote_jwks,
                    Server::Configuration::FactoryContext& context, CreateJwksFetcherCb fetcher_fn,
                    JwtAuthnFilterStats& stats, JwksDoneFetched done_fn,
-                   isRemoteJwksFetchAllowedCb is_fetch_allowed_fn,allowRemoteJwksFetchCb allow_fetch_fn);
+                   isRemoteJwksFetchAllowedCb is_fetch_allowed_fn,
+                   allowRemoteJwksFetchCb allow_fetch_fn);
 
   // Get the remote Jwks cache duration.
   static std::chrono::seconds

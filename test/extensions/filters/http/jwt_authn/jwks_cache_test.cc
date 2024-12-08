@@ -98,7 +98,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
 
-  EXPECT_EQ(jwks->setRemoteJwks(std::move(jwks_))->getStatus(), Status::Ok);
+  EXPECT_EQ(jwks->setRemoteJwks(std::move(jwks_), false)->getStatus(), Status::Ok);
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
   EXPECT_FALSE(jwks->isExpired());
 
@@ -117,7 +117,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwksWithDefaultCacheDuration) {
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
 
-  EXPECT_EQ(jwks->setRemoteJwks(std::move(jwks_))->getStatus(), Status::Ok);
+  EXPECT_EQ(jwks->setRemoteJwks(std::move(jwks_), false)->getStatus(), Status::Ok);
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
   EXPECT_FALSE(jwks->isExpired());
 }

@@ -53,7 +53,7 @@ public:
         check_audience, provider, allow_failed, allow_missing, filter_config_->getJwksCache(),
         filter_config_->cm(),
         [this](Upstream::ClusterManager&, const RemoteJwks&) { return std::move(fetcher_); },
-        filter_config_->timeSource());
+        filter_config_->timeSource(), filter_config_->dispatcher());
     jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
   }
@@ -222,8 +222,8 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithSingleKidJwks) {
       ->set_refetch_jwks_on_kid_mismatch(true);
   createAuthenticator();
 
-  jwks_ = Jwks::createFrom(PublicKey1, Jwks::JWKS);
   // JWT signed by KID1. Authenticator fetches the first JWKS, PublicKey1 that contains KID1.
+  jwks_ = Jwks::createFrom(PublicKey1, Jwks::JWKS);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
@@ -231,9 +231,9 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithSingleKidJwks) {
   Http::TestRequestHeaderMapImpl headers{
       {"Authorization", "Bearer " + std::string(GoodTokenWithKid1)}};
   expectVerifyStatus(Status::Ok, headers);
-  jwks_ = Jwks::createFrom(PublicKey1, Jwks::JWKS);
 
   // JWT signed by KID2. Authenticator refetches the current JWKS, PublicKey1 that fails target JWT.
+  jwks_ = Jwks::createFrom(PublicKey1, Jwks::JWKS);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
@@ -241,9 +241,20 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithSingleKidJwks) {
   headers =
       Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodTokenWithKid2)}};
   expectVerifyStatus(Status::JwksKidAlgMismatch, headers);
-  jwks_ = Jwks::createFrom(PublicKey2, Jwks::JWKS);
 
-  // JWT signed by KID2. Authenticator refetches the new JWKS, PublicKey2 that contains KID2.
+  // Backoff triggered due to previous failed JWKS validation causing no fetch.
+  jwks_ = Jwks::createFrom(PublicKey2, Jwks::JWKS);
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
+  headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodTokenWithKid2)}};
+  expectVerifyStatus(Status::JwksKidAlgMismatch, headers);
+
+  // Successful JWKS validation to end backoff.
+  headers =
+      Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodTokenWithKid1)}};
+  expectVerifyStatus(Status::Ok, headers);
+
+  // Attempt refetching KID2 due to backoff completion
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
@@ -1194,7 +1205,7 @@ public:
 
   void createAuthenticator(const absl::optional<std::string>& provider) {
     auth_ = Authenticator::create(nullptr, provider, false, false, jwks_cache_, cm_,
-                                  mock_fetcher_.AsStdFunction(), time_system_);
+                                  mock_fetcher_.AsStdFunction(), time_system_, dispatcher_);
   }
 
   void expectVerifyStatus(Status expected_status, Http::RequestHeaderMap& headers) {
@@ -1221,6 +1232,7 @@ public:
   NiceMock<Tracing::MockSpan> parent_span_;
   std::string out_name_;
   ProtobufWkt::Struct out_extracted_data_;
+  Event::MockDispatcher dispatcher_;
 };
 
 TEST_F(AuthenticatorJwtCacheTest, TestNonProvider) {

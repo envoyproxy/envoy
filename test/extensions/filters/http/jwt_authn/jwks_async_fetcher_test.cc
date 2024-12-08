@@ -68,7 +68,8 @@ public:
               });
         },
         stats_,
-        [this](google::jwt_verify::JwksPtr&& jwks) { out_jwks_array_.push_back(std::move(jwks)); });
+        [this](google::jwt_verify::JwksPtr&& jwks) { out_jwks_array_.push_back(std::move(jwks)); },
+        []() -> bool { return false; }, [](absl::optional<bool>, bool) { ; });
 
     if (initManagerUsed()) {
       init_target_handle_->initialize(init_watcher_);
