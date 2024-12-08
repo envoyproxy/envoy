@@ -6260,7 +6260,8 @@ TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
 }
 
 TEST_F(ClusterInfoImplTest, FilterChain) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
+  {
+    const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -6270,15 +6271,42 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
         explicit_http_config:
           http2_protocol_options: {}
   )EOF",
-                                                       Network::Address::IpVersion::v4);
+                                                         Network::Address::IpVersion::v4);
 
-  auto cluster = makeCluster(yaml);
-  Http::MockFilterChainManager manager;
-  const Http::EmptyFilterChainOptions options;
-  EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
+    auto cluster = makeCluster(yaml);
+    Http::MockFilterChainManager manager;
+    const Http::EmptyFilterChainOptions options;
+    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
 
-  EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
-  cluster->info()->createFilterChain(manager);
+    EXPECT_CALL(manager, applyFilterFactoryCb(_, _)).Times(0);
+    EXPECT_FALSE(cluster->info()->createFilterChain(manager));
+  }
+
+  {
+    const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        http_filters:
+        - name: envoy.filters.http.upstream_codec
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec
+  )EOF",
+                                                         Network::Address::IpVersion::v4);
+
+    auto cluster = makeCluster(yaml);
+    Http::MockFilterChainManager manager;
+    const Http::EmptyFilterChainOptions options;
+    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
+
+    EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
+    EXPECT_TRUE(cluster->info()->createFilterChain(manager));
+  }
 }
 
 class PriorityStateManagerTest : public Event::TestUsingSimulatedTime,

@@ -877,12 +877,8 @@ public:
   /**
    * Set up the Encoder/Decoder filter chain.
    * @param filter_chain_factory the factory to create the filter chain.
-   * @param only_create_if_configured whether to only create the filter chain if it is configured
-   *        explicitly. This only makes sense for upstream HTTP filter chain.
-   *
    */
-  CreateChainResult createFilterChain(const FilterChainFactory& filter_chain_factory,
-                                      bool only_create_if_configured);
+  CreateChainResult createFilterChain(const FilterChainFactory& filter_chain_factory);
 
   OptRef<const Network::Connection> connection() const { return connection_; }
 
