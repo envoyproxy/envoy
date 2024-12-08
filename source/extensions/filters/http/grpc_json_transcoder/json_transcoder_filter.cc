@@ -179,7 +179,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       if (method->options().HasExtension(google::api::http)) {
         http_rule = method->options().GetExtension(google::api::http);
       } else if (proto_config.auto_mapping()) {
-        auto post = "/" + service->full_name() + "/" + method->name();
+        auto post = absl::StrCat("/", service->full_name(), "/", method->name());
         http_rule.set_post(post);
         http_rule.set_body("*");
       }
