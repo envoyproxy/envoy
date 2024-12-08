@@ -37,33 +37,37 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
   uint32_t added_or_updated = 0;
   uint32_t skipped = 0;
   for (const auto& resource : added_resources) {
-    envoy::config::cluster::v3::Cluster cluster;
+    // Holds a reference to the name of the currently parsed cluster resource.
+    // This is needed for the CATCH clause below.
+    absl::string_view cluster_name = EMPTY_STRING;
     TRY_ASSERT_MAIN_THREAD {
-      cluster = dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
+      const envoy::config::cluster::v3::Cluster& cluster =
+          dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
+      cluster_name = cluster.name();
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
         exception_msgs.push_back(
-            fmt::format("{}: duplicate cluster {} found", cluster.name(), cluster.name()));
+            fmt::format("{}: duplicate cluster {} found", cluster_name, cluster_name));
         continue;
       }
       auto update_or_error = cm_.addOrUpdateCluster(cluster, resource.get().version());
       if (!update_or_error.status().ok()) {
         exception_msgs.push_back(
-            fmt::format("{}: {}", cluster.name(), update_or_error.status().message()));
+            fmt::format("{}: {}", cluster_name, update_or_error.status().message()));
         continue;
       }
       if (*update_or_error) {
         any_applied = true;
-        ENVOY_LOG(debug, "{}: add/update cluster '{}'", name_, cluster.name());
+        ENVOY_LOG(debug, "{}: add/update cluster '{}'", name_, cluster_name);
         ++added_or_updated;
       } else {
-        ENVOY_LOG(debug, "{}: add/update cluster '{}' skipped", name_, cluster.name());
+        ENVOY_LOG(debug, "{}: add/update cluster '{}' skipped", name_, cluster_name);
         ++skipped;
       }
     }
     END_TRY
     CATCH(const EnvoyException& e,
-          { exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what())); });
+          { exception_msgs.push_back(fmt::format("{}: {}", cluster_name, e.what())); });
   }
 
   for (const auto& resource_name : removed_resources) {
