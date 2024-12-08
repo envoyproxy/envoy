@@ -66,7 +66,7 @@ const _renderApiVersionLabel = (linkUrl) => {
 
   const apiLabel = document.createElement("sup");
   apiLabel.className = filtered[0] + '-version-label';
-  apiLabel.innerHTML = filtered[0];
+  apiLabel.innerText = filtered[0];
   return apiLabel;
 }
 // </ENVOY>
