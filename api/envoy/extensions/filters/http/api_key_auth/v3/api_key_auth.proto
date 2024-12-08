@@ -2,12 +2,11 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.api_key_auth.v3;
 
-import "envoy/config/core/v3/base.proto";
-
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.api_key_auth.v3";
 option java_outer_classname = "ApiKeyAuthProto";
@@ -17,38 +16,88 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: APIKey Auth]
-// [#not-implemented-hide:]
 // APIKey Auth :ref:`configuration overview <config_http_filters_api_key_auth>`.
 // [#extension: envoy.filters.http.api_key_auth]
 
 // API Key HTTP authentication.
 //
-// Example:
+// For example, the following configuration configures the filter to authenticate the clients using
+// the API key from the header ``X-API-KEY``. And only the clients with the key ``real-key`` are
+// considered as authenticated.
 //
 // .. code-block:: yaml
 //
-//    authentication_header: "X-API-KEY"
-//    keys:
-//      inline_string: |-
-//        clientID1:apiKey1
-//        clientID2:apiKey2
+//    credentials:
+//    - key: real-key
+//      client: user
+//    key_sources:
+//     - header: "X-API-KEY"
 //
-message APIKeyAuth {
-  // keys used to authenticate the client.
-  // It should be a map of clientID to apiKey.
-  // The clientID serves solely for identification purposes and isn't used for authentication.
-  config.core.v3.DataSource keys = 1 [(udpa.annotations.sensitive) = true];
+message ApiKeyAuth {
+  // The credentials that are used to authenticate the clients.
+  repeated Credential credentials = 1 [(udpa.annotations.sensitive) = true];
 
-  // The header name to fetch the key.
-  // If multiple values are present in the given header, the filter rejects the request.
-  // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
-  string authentication_header = 2;
+  // The key sources to fetch the key from the coming request.
+  repeated KeySource key_sources = 2;
+}
 
-  // The query parameter name to fetch the key.
-  // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
-  string authentication_query = 3;
+// API key auth configuration of per route or per virtual host or per route configuration.
+message ApiKeyAuthPerRoute {
+  // The credentials that are used to authenticate the clients. If this field is non-empty, then the
+  // credentials in the filter level configuration will be ignored and the credentials in this
+  // configuration will be used.
+  repeated Credential credentials = 1 [(udpa.annotations.sensitive) = true];
+
+  // The key sources to fetch the key from the coming request. If this field is non-empty, then the
+  // key sources in the filter level configuration will be ignored and the key sources in this
+  // configuration will be used.
+  repeated KeySource key_sources = 2;
+
+  // A list of clients that are allowed to access the route or vhost. The clients listed here
+  // should be subset of the clients listed in the ``credentials`` to provide authorization control
+  // after the authentication is successful. If the list is empty, then all authenticated clients
+  // are allowed. This provides very limited but simple authorization. If more complex authorization
+  // is required, then use the :ref:`HTTP RBAC filter <config_http_filters_rbac>` instead.
+  //
+  // .. note::
+  //   Setting this field and ``credentials`` at the same configuration entry is not an error but
+  //   also makes no much sense because they provide similar functionality. Please only use
+  //   one of them at same configuration entry except for the case that you want to share the same
+  //   credentials list across multiple routes but still use different allowed clients for each
+  //   route.
+  //
+  repeated string allowed_clients = 3;
+}
+
+// Single credential entry that contains the API key and the related client id.
+message Credential {
+  // The value of the unique API key.
+  string key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The unique id or identity that used to identify the client or consumer.
+  string client = 2 [(validate.rules).string = {min_len: 1}];
+}
+
+message KeySource {
+  // The header name to fetch the key. If multiple header values are present, the first one will be
+  // used. If the header value starts with 'Bearer ', this prefix will be stripped to get the
+  // key value.
+  //
+  // If set, takes precedence over ``query`` and ``cookie``.
+  string header = 1
+      [(validate.rules).string =
+           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
+
+  // The query parameter name to fetch the key. If multiple query values are present, the first one
+  // will be used.
+  //
+  // The field will be used if ``header`` is not set. If set, takes precedence over ``cookie``.
+  string query = 2 [(validate.rules).string = {max_len: 1024}];
 
   // The cookie name to fetch the key.
-  // Only one of authentication_header, authentication_query, or authentication_cookie should be set.
-  string authentication_cookie = 4;
+  //
+  // The field will be used if the ``header`` and ``query`` are not set.
+  string cookie = 3
+      [(validate.rules).string =
+           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
 }
