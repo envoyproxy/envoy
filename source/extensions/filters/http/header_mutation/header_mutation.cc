@@ -44,17 +44,13 @@ void ParameterMutationAppend::mutateQueryParameter(
 }
 
 Mutations::Mutations(const MutationsProto& config, absl::Status& creation_status) {
-  {
-    auto value_or_error = HeaderMutations::create(config.request_mutations());
-    SET_AND_RETURN_IF_NOT_OK(value_or_error.status(), creation_status);
-    request_mutations_ = std::move(value_or_error.value());
-  }
+  auto request_mutations_or_error = HeaderMutations::create(config.request_mutations());
+  SET_AND_RETURN_IF_NOT_OK(request_mutations_or_error.status(), creation_status);
+  request_mutations_ = std::move(request_mutations_or_error.value());
 
-  {
-    auto value_or_error = HeaderMutations::create(config.response_mutations());
-    SET_AND_RETURN_IF_NOT_OK(value_or_error.status(), creation_status);
-    response_mutations_ = std::move(value_or_error.value());
-  }
+  auto response_mutations_or_error = HeaderMutations::create(config.response_mutations());
+  SET_AND_RETURN_IF_NOT_OK(response_mutations_or_error.status(), creation_status);
+  response_mutations_ = std::move(response_mutations_or_error.value());
 
   for (const auto& mutation : config.parameter_mutations()) {
     if (mutation.has_append()) {
