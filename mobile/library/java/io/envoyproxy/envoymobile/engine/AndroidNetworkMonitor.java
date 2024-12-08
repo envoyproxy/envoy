@@ -116,14 +116,20 @@ public class AndroidNetworkMonitor {
 
     private void onDefaultNetworkChanged(NetworkCapabilities networkCapabilities) {
       if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+        int networkType = 0;
         if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
             networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI_AWARE)) {
-          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.WLAN);
+          networkType |= EnvoyNetworkType.WLAN.getValue();
         } else if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.WWAN);
+          networkType |= EnvoyNetworkType.WWAN.getValue();
         } else {
-          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.GENERIC);
+          networkType |= EnvoyNetworkType.GENERIC.getValue();
         }
+        // A network can be both VPN and another type, so we need to check for VPN separately.
+        if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+          networkType |= EnvoyNetworkType.GENERIC.getValue();
+        }
+        envoyEngine.onDefaultNetworkChanged(networkType);
       }
       previousTransportTypes = getTransportTypes(networkCapabilities);
     }

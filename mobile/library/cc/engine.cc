@@ -1,6 +1,5 @@
 #include "engine.h"
 
-#include "library/common/engine_types.h"
 #include "library/common/internal_engine.h"
 #include "library/common/types/c_types.h"
 
@@ -27,9 +26,7 @@ std::string Engine::dumpStats() { return engine_->dumpStats(); }
 
 envoy_status_t Engine::terminate() { return engine_->terminate(); }
 
-void Engine::onDefaultNetworkChanged(NetworkType network) {
-  engine_->onDefaultNetworkChanged(network);
-}
+void Engine::onDefaultNetworkChanged(int network) { engine_->onDefaultNetworkChanged(network); }
 
 void Engine::onDefaultNetworkUnavailable() { engine_->onDefaultNetworkUnavailable(); }
 
