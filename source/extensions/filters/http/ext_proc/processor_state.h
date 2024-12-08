@@ -101,7 +101,6 @@ public:
   bool completeBodyAvailable() const { return complete_body_available_; }
   void setCompleteBodyAvailable(bool d) { complete_body_available_ = d; }
   void setHasNoBody(bool b) { no_body_ = b; }
-  void setTrailersAvailable(bool d) { trailers_available_ = d; }
   bool bodyReplaced() const { return body_replaced_; }
   bool bodyReceived() const { return body_received_; }
   void setBodyReceived(bool b) { body_received_ = b; }
@@ -248,8 +247,6 @@ protected:
   bool no_body_ : 1 = false;
   // If true, then the filter received the complete body
   bool complete_body_available_ : 1 = false;
-  // If true, then the filter received the trailers
-  bool trailers_available_ : 1 = false;
   // If true, the trailers is already sent to the server.
   bool trailers_sent_to_server_ : 1 = false;
   // If true, then a CONTINUE_AND_REPLACE status was used on a response
