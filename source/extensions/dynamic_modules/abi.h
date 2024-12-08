@@ -17,11 +17,13 @@
 // same version of the ABI.
 
 #ifdef __cplusplus
+#include <cstdbool>
 #include <cstddef>
 
 extern "C" {
 #else
 
+#include <stdbool.h>
 #include <stddef.h>
 #endif
 
@@ -67,6 +69,99 @@ typedef const void* envoy_dynamic_module_type_http_filter_config_envoy_ptr;
  * released when envoy_dynamic_module_on_http_filter_config_destroy is called for the same pointer.
  */
 typedef const void* envoy_dynamic_module_type_http_filter_config_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_http_filter_envoy_ptr is a raw pointer to the DynamicModuleHttpFilter
+ * class in Envoy. This is passed to the module when creating a new HTTP filter for each HTTP stream
+ * and used to access the HTTP filter-scoped information such as headers, body, trailers, etc.
+ *
+ * This has 1:1 correspondence with envoy_dynamic_module_type_http_filter_module_ptr in the module.
+ *
+ * OWNERSHIP: Envoy owns the pointer, and can be accessed by the module until the filter is
+ * destroyed, i.e. envoy_dynamic_module_on_http_filter_destroy is called.
+ */
+typedef const void* envoy_dynamic_module_type_http_filter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_http_filter_module_ptr is a pointer to an in-module HTTP filter
+ * corresponding to an Envoy HTTP filter. The filter is responsible for processing each HTTP stream.
+ *
+ * This has 1:1 correspondence with the DynamicModuleHttpFilter class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_http_filter_destroy is called for the same pointer.
+ */
+typedef const void* envoy_dynamic_module_type_http_filter_module_ptr;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_request_headers_status represents the status of the
+ * filter after processing the HTTP request headers. This corresponds to `FilterHeadersStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum {
+  envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_request_headers_status_StopIteration,
+  envoy_dynamic_module_type_on_http_filter_request_headers_status_ContinueAndDontEndStream,
+  envoy_dynamic_module_type_on_http_filter_request_headers_status_StopAllIterationAndBuffer,
+  envoy_dynamic_module_type_on_http_filter_request_headers_status_StopAllIterationAndWatermark,
+} envoy_dynamic_module_type_on_http_filter_request_headers_status;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_request_body_status represents the status of the filter
+ * after processing the HTTP request body. This corresponds to `FilterDataStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum {
+  envoy_dynamic_module_type_on_http_filter_request_body_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_request_body_status_StopIterationAndBuffer,
+  envoy_dynamic_module_type_on_http_filter_request_body_status_StopIterationAndWatermark,
+  envoy_dynamic_module_type_on_http_filter_request_body_status_StopIterationNoBuffer
+} envoy_dynamic_module_type_on_http_filter_request_body_status;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_request_trailers_status represents the status of the
+ * filter after processing the HTTP request trailers. This corresponds to `FilterTrailersStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum {
+  envoy_dynamic_module_type_on_http_filter_request_trailers_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_request_trailers_status_StopIteration
+} envoy_dynamic_module_type_on_http_filter_request_trailers_status;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_response_headers_status represents the status of the
+ * filter after processing the HTTP response headers. This corresponds to `FilterHeadersStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum {
+  envoy_dynamic_module_type_on_http_filter_response_headers_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_response_headers_status_StopIteration,
+  envoy_dynamic_module_type_on_http_filter_response_headers_status_ContinueAndDontEndStream,
+  envoy_dynamic_module_type_on_http_filter_response_headers_status_StopAllIterationAndBuffer,
+  envoy_dynamic_module_type_on_http_filter_response_headers_status_StopAllIterationAndWatermark,
+} envoy_dynamic_module_type_on_http_filter_response_headers_status;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_response_body_status represents the status of the filter
+ * after processing the HTTP response body. This corresponds to `FilterDataStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum {
+  envoy_dynamic_module_type_on_http_filter_response_body_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_response_body_status_StopIterationAndBuffer,
+  envoy_dynamic_module_type_on_http_filter_response_body_status_StopIterationAndWatermark,
+  envoy_dynamic_module_type_on_http_filter_response_body_status_StopIterationNoBuffer
+} envoy_dynamic_module_type_on_http_filter_response_body_status;
+
+/**
+ * envoy_dynamic_module_type_on_http_filter_response_trailers_status represents the status of the
+ * filter after processing the HTTP response trailers. This corresponds to `FilterTrailersStatus` in
+ * envoy/http/filter.h.
+ */
+typedef enum {
+  envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue,
+  envoy_dynamic_module_type_on_http_filter_response_trailers_status_StopIteration
+} envoy_dynamic_module_type_on_http_filter_response_trailers_status;
 
 // -----------------------------------------------------------------------------
 // ------------------------------- Event Hooks ---------------------------------
@@ -126,6 +221,129 @@ envoy_dynamic_module_on_http_filter_config_new(
  */
 void envoy_dynamic_module_on_http_filter_config_destroy(
     envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_new is called when the HTTP filter is created for each HTTP
+ * stream.
+ *
+ * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration.
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return envoy_dynamic_module_type_http_filter_module_ptr is the pointer to the in-module HTTP
+ * filter. Returning nullptr indicates a failure to initialize the module. When it fails, the stream
+ * will be closed.
+ */
+envoy_dynamic_module_type_http_filter_module_ptr envoy_dynamic_module_on_http_filter_new(
+    envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr,
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_request_headers is called when the HTTP request headers are
+ * received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param end_of_stream is true if the request headers are the last data.
+ * @return envoy_dynamic_module_type_on_http_filter_request_headers_status is the status of the
+ * filter.
+ */
+envoy_dynamic_module_type_on_http_filter_request_headers_status
+envoy_dynamic_module_on_http_filter_request_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_request_body is called when a new data frame of the HTTP
+ * request body is received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param end_of_stream is true if the request body is the last data.
+ * @return envoy_dynamic_module_type_on_http_filter_request_body_status is the status of the filter.
+ */
+envoy_dynamic_module_type_on_http_filter_request_body_status
+envoy_dynamic_module_on_http_filter_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_request_trailers is called when the HTTP request trailers are
+ * received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @return envoy_dynamic_module_type_on_http_filter_request_trailers_status is the status of the
+ * filter.
+ */
+envoy_dynamic_module_type_on_http_filter_request_trailers_status
+envoy_dynamic_module_on_http_filter_request_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_response_headers is called when the HTTP response headers are
+ * received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param end_of_stream is true if the response headers are the last data.
+ * @return envoy_dynamic_module_type_on_http_filter_response_headers_status is the status of the
+ * filter.
+ */
+envoy_dynamic_module_type_on_http_filter_response_headers_status
+envoy_dynamic_module_on_http_filter_response_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_response_body is called when a new data frame of the HTTP
+ * response body is received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param end_of_stream is true if the response body is the last data.
+ * @return envoy_dynamic_module_type_on_http_filter_response_body_status is the status of the
+ * filter.
+ */
+envoy_dynamic_module_type_on_http_filter_response_body_status
+envoy_dynamic_module_on_http_filter_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, bool end_of_stream);
+
+/**
+ * envoy_dynamic_module_on_http_filter_response_trailers is called when the HTTP response trailers
+ * are received.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @return envoy_dynamic_module_type_on_http_filter_response_trailers_status is the status of the
+ * filter.
+ */
+envoy_dynamic_module_type_on_http_filter_response_trailers_status
+envoy_dynamic_module_on_http_filter_response_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_destroy is called when the HTTP filter is destroyed for each
+ * HTTP stream.
+ *
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter.
+ */
+void envoy_dynamic_module_on_http_filter_destroy(
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
 
 #ifdef __cplusplus
 }

@@ -39,12 +39,11 @@ absl::StatusOr<DynamicModulePtr> newDynamicModule(const absl::string_view object
       dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_program_init)>(
           "envoy_dynamic_module_on_program_init");
 
-  if (init_function == nullptr) {
-    return absl::InvalidArgumentError(
-        "Failed to resolve symbol envoy_dynamic_module_on_program_init");
+  if (!init_function.ok()) {
+    return init_function.status();
   }
 
-  const char* abi_version = (*init_function)();
+  const char* abi_version = (*init_function.value())();
   if (abi_version == nullptr) {
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to initialize dynamic module: ", object_file_path));
