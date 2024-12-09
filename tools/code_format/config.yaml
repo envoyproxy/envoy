@@ -229,7 +229,6 @@ paths:
     - source/extensions/rate_limit_descriptors
     - source/extensions/resource_monitors
     - source/extensions/router/cluster_specifiers/lua/lua_cluster_specifier.cc
-    - source/extensions/stat_sinks
     - source/extensions/string_matcher/lua/match.cc
     - source/extensions/tracers
     - source/extensions/transport_sockets/internal_upstream
