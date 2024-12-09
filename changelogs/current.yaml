@@ -324,5 +324,5 @@ deprecated:
     favor of :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>`.
 - area: aws_iam
   change: |
-    The :ref:`aws_iam extension <envoy_v3_api_msg_config.grpc_credential.v3/AwsIamConfig>` is deprecated and will be
+    The :ref:`aws_iam extension <envoy_v3_api_msg_config.grpc_credential.v3.AwsIamConfig>` is deprecated and will be
     deleted from Envoy in a future release, no later than Envoy 1.35, but possibly sooner.
