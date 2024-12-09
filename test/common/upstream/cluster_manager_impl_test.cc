@@ -1493,8 +1493,8 @@ public:
     return std::make_unique<MetadataWriterLbImpl>();
   }
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Server::Configuration::ServerFactoryContext&,
-                                             const Protobuf::Message&) override {
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf::Message&) override {
     return std::make_unique<Upstream::LoadBalancerConfig>();
   }
 };
