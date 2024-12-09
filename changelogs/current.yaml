@@ -248,6 +248,14 @@ new_features:
 - area: tracers
   change: |
     Set resource ``telemetry.sdk.*`` and scope ``otel.scope.name|version`` attributes for the OpenTelemetry tracer.
+- area: http_inspector
+  change: |
+    Changed the behaviour of HttpInspector. Previously, a static buffer of 8KiB was inspected, and anything larger
+    (e.g. a GET request with >8KiB of params) would cause the listener filter to hang.  Now, there is a configurable
+    initial_read_buffer_size and max_read_buffer_size in HttpInspector and if the HTTP version is not identified
+    with initial_read_buffer_size request bytes buffered, it will iteratively double up to max_read_buffer_size.
+    If http cannot be determined with max_read_buffer_size bytes, the connection is closed. The default
+    initial and max buffer sizes are 8KiB and 64KiB respectively.
 - area: lua
   change: |
     Added ssl :ref:`parsedSubjectPeerCertificate() <config_http_filters_lua_parsed_name>` API.
