@@ -88,6 +88,9 @@ minor_behavior_changes:
   change: |
     Increase only the statistics counter ``missing_source_origin`` for requests with a missing source origin.
     Previously, the ``request_invalid`` counter was also increased for such requests.
+- area: rate_limit
+  change: |
+    add ``WEEK`` to the unit of time for rate limit.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
