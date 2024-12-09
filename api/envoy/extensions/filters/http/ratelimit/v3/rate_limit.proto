@@ -140,7 +140,7 @@ message RateLimit {
 // Also applies to Local rate limiting :ref:`using descriptors <config_http_filters_local_rate_limit_descriptors>`.
 // [#not-implemented-hide:]
 message RateLimitConfig {
-  // [#next-free-field: 11]
+  // [#next-free-field: 10]
   message Action {
     // The following descriptor entry is appended to the descriptor:
     //
@@ -304,22 +304,6 @@ message RateLimitConfig {
       // [#extension-category: envoy.rate_limit_descriptors]
       config.core.v3.TypedExtensionConfig extension = 9;
     }
-
-    // If true, the action will be applied when the HTTP stream completes. The default value is false.
-    // This is useful when the rate limit budget needs to reflect the response context that is not available
-    // on the request path.
-    //
-    // For example, let's say the upstream service calculates the usage statistics and returns them in the response body
-    // and we want to utilize these numbers to apply the rate limit action for the subsequent requests.
-    // Combined with another filter that can set the desired addend based on the response (e.g. Lua filter),
-    // this can be used to subtract the usage statistics from the rate limit budget.
-    //
-    // An action applied on the stream completion is "fire-and-forget" by nature, and rate limit is not enforced by this action.
-    // In other words, the current request won't be blocked by the rate limit action applied on the stream completion, but the
-    // budget will be updated for the subsequent requests based on the action with this field set to true.
-    // Users should ensure that the rate limit is enforced by the actions applied on the request path, i.e. the ones
-    // with this field set to false.
-    bool apply_on_stream_done = 10;
   }
 
   message Override {
