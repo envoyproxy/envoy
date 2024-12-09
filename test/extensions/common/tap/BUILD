@@ -28,6 +28,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/tap:admin",
         "//source/extensions/common/tap:tap_config_base",
+        "//source/extensions/tap_sinks/udp_sink:config",
         "//test/mocks/server:admin_mocks",
         "//test/mocks/server:admin_stream_mocks",
         "//test/mocks/server:server_mocks",
