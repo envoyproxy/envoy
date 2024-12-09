@@ -562,8 +562,8 @@ envoy.filters.http.wasm:
   categories:
   - envoy.filters.http
   - envoy.filters.http.upstream
-  security_posture: unknown
-  status: alpha
+  security_posture: robust_to_untrusted_downstream
+  status: stable
   status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.wasm.v3.Wasm
