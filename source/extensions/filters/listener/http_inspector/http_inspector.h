@@ -51,19 +51,14 @@ enum class ParseState {
  */
 class Config {
 public:
-  Config(
-      Stats::Scope& scope,
-      const envoy::extensions::filters::listener::http_inspector::v3::HttpInspector& proto_config);
+  Config(Stats::Scope& scope);
 
   const HttpInspectorStats& stats() const { return stats_; }
 
   static constexpr uint32_t DEFAULT_INITIAL_BUFFER_SIZE = 8 * 1024;
   static constexpr uint32_t MAX_INSPECT_SIZE = 64 * 1024;
 
-  size_t initialReadBufferSize() const { return initial_read_buffer_size_; }
-
 private:
-  const uint32_t initial_read_buffer_size_;
   HttpInspectorStats stats_;
 };
 

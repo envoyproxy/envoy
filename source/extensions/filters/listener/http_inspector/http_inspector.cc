@@ -18,17 +18,14 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace HttpInspector {
 
-Config::Config(
-    Stats::Scope& scope,
-    const envoy::extensions::filters::listener::http_inspector::v3::HttpInspector& proto_config)
-    : initial_read_buffer_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          proto_config, initial_read_buffer_size, DEFAULT_INITIAL_BUFFER_SIZE)),
-      stats_{ALL_HTTP_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "http_inspector."))} {}
+Config::Config(Stats::Scope& scope)
+    : stats_{ALL_HTTP_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "http_inspector."))} {}
 
 const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 
 Filter::Filter(const ConfigSharedPtr config)
-    : config_(config), no_op_callbacks_(), requested_read_bytes_(config->initialReadBufferSize()) {
+    : config_(config), no_op_callbacks_(),
+      requested_read_bytes_(Config::DEFAULT_INITIAL_BUFFER_SIZE) {
   // Filter for only Request Message types with NoOp Parser callbacks.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_inspector_use_balsa_parser")) {
     // Set both allow_custom_methods and enable_trailers to true with BalsaParser.

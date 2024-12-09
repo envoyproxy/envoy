@@ -37,9 +37,7 @@ std::string testParamToString(const ::testing::TestParamInfo<Http1ParserImpl>& i
 class HttpInspectorTest : public testing::TestWithParam<Http1ParserImpl> {
 public:
   HttpInspectorTest()
-      : cfg_(std::make_shared<Config>(
-            *store_.rootScope(),
-            envoy::extensions::filters::listener::http_inspector::v3::HttpInspector())),
+      : cfg_(std::make_shared<Config>(*store_.rootScope())),
         io_handle_(
             Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, absl::nullopt, {})),
         parser_impl_(GetParam()) {}
@@ -67,7 +65,7 @@ public:
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
         *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
-        cfg_->initialReadBufferSize() == 0, cfg_->initialReadBufferSize());
+        Config::DEFAULT_INITIAL_BUFFER_SIZE == 0, Config::DEFAULT_INITIAL_BUFFER_SIZE);
   }
 
   void testHttpInspectMultipleReadsNotFound(absl::string_view header, bool http2 = false) {
@@ -685,8 +683,7 @@ TEST_P(HttpInspectorTest, HttpExceedMaxBufferSize) {
   std::string spaces(Config::MAX_INSPECT_SIZE, ' ');
   const std::string data = absl::StrCat(method, spaces, http);
 
-  envoy::extensions::filters::listener::http_inspector::v3::HttpInspector proto_config;
-  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  cfg_ = std::make_shared<Config>(*store_.rootScope());
 
   init();
   buffer_->resetCapacity(Config::MAX_INSPECT_SIZE);
@@ -710,13 +707,14 @@ TEST_P(HttpInspectorTest, HttpExceedMaxBufferSize) {
 }
 
 TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
-  std::string data = "GET /index?x=0123456789&y=0123456789&z=0123456789 HTTP/1.0\r\n";
-  //                  0               16              32              48
+  uint32_t buffer_size = Config::DEFAULT_INITIAL_BUFFER_SIZE;
 
-  envoy::extensions::filters::listener::http_inspector::v3::HttpInspector proto_config;
-  uint32_t buffer_size = 16;
-  proto_config.mutable_initial_read_buffer_size()->set_value(buffer_size);
-  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  absl::string_view method = "GET", http = "/index HTTP/1.0\r\n";
+
+  // Want to test doubling a couple times.
+  std::string spaces(buffer_size * 3, ' ');
+
+  const std::string data = absl::StrCat(method, spaces, http);
 
   init();
 
