@@ -14,6 +14,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Grpc Credentials AWS IAM]
 // Configuration for AWS IAM Grpc Credentials Plugin
+// .. warning::
+//
+//    This extension is deprecated and will be deleted in a future Envoy release, no
+//    later than Envoy 1.35, but possibly sooner.
+//
 // [#extension: envoy.grpc_credentials.aws_iam]
 
 message AwsIamConfig {
@@ -25,12 +30,12 @@ message AwsIamConfig {
   // of the Grpc endpoint.
   //
   // Example: appmesh
-  string service_name = 1 [(validate.rules).string = {min_len: 1}];
+  string service_name = 1 [(validate.rules).string = {min_len: 1}, deprecated = true];
 
   // The `region <https://docs.aws.amazon.com/general/latest/gr/rande.html>`_ hosting the Grpc
   // endpoint. If unspecified, the extension will use the value in the ``AWS_REGION`` environment
   // variable.
   //
   // Example: us-west-2
-  string region = 2;
+  string region = 2 [deprecated = true];
 }
