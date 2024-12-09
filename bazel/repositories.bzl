@@ -617,6 +617,11 @@ def _com_google_protobuf():
     external_http_archive(
         name = "rules_python",
     )
+    external_http_archive(
+        name = "rules_java",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_java.patch"],
+    )
 
     for platform in PROTOC_VERSIONS:
         # Ideally we dont use a private build artefact as done here.
