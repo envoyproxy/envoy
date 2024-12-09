@@ -28,9 +28,7 @@ namespace Udp {
 // UpstreamRequest of Router, creates a UDPUpstream object and hands over the created socket to it.
 class UdpConnPool : public Router::GenericConnPool {
 public:
-  UdpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-              Upstream::LoadBalancerContext* ctx)
-      : host_(thread_local_cluster.loadBalancer().chooseHost(ctx)) {}
+  UdpConnPool(Upstream::HostConstSharedPtr host) : host_(host) {}
 
   // Creates a UDPUpstream object for a new stream.
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;

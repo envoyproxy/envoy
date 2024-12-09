@@ -569,9 +569,12 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
             config_->regexEngine()),
         std::unique_ptr<Http::NullRouteImpl>);
   }
-  generic_conn_pool_ = factory->createGenericConnPool(
-      cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
-      upstream_decoder_filter_callbacks_, getStreamInfo());
+  Upstream::HostConstSharedPtr host = cluster.chooseHost(this);
+  if (host) {
+    generic_conn_pool_ = factory->createGenericConnPool(
+        host, cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
+        upstream_decoder_filter_callbacks_, getStreamInfo());
+  }
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;

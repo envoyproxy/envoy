@@ -125,6 +125,7 @@ InstanceBase::~InstanceBase() {
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
   dispatcher_->shutdown();
+  ENVOY_LOG(debug, "shut down dispatcher");
 
 #ifdef ENVOY_PERFETTO
   if (tracing_session_ != nullptr) {
