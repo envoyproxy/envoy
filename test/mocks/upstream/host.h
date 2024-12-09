@@ -115,6 +115,8 @@ public:
               (const Network::Address::InstanceConstSharedPtr& dest_address,
                const envoy::config::core::v3::Metadata* metadata),
               (const));
+  MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
+  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -124,6 +126,7 @@ public:
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
+  HostLbPolicyDataPtr lb_policy_data_;
   envoy::config::core::v3::Locality locality_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
