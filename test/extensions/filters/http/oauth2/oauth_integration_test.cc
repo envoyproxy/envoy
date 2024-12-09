@@ -326,8 +326,10 @@ typed_config:
 
     Http::TestRequestHeaderMapImpl headers{
         {":method", "GET"},
-        {":path", "/callback?code=foo&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%"
-                  "252F_oauth%26nonce%3D1234567890000000"},
+        {":path",
+         "/callback?code=foo&state="
+         "eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwibm9uY2UiOiIxMjM0NTY3ODkwM"
+         "DAwMDAwIn0"}, // {"url":"http://traffic.example.com/not/_oauth","nonce":"1234567890000000"}
         {":scheme", "http"},
         {"x-forwarded-proto", "http"},
         {":authority", "authority"},
@@ -363,8 +365,10 @@ typed_config:
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl headersWithCookie{
         {":method", "GET"},
-        {":path", "/callback?code=foo&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%"
-                  "252F_oauth%26nonce%3D1234567890000000"},
+        {":path",
+         "/callback?code=foo&state="
+         "eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwibm9uY2UiOiIxMjM0NTY3ODkwM"
+         "DAwMDAwIn0"}, // {"url":"http://traffic.example.com/not/_oauth","nonce":"1234567890000000"}
         {":scheme", "http"},
         {"x-forwarded-proto", "http"},
         {":authority", "authority"},

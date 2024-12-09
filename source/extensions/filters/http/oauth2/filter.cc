@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
@@ -152,19 +153,24 @@ std::string encodeHmacHexBase64(const std::vector<uint8_t>& secret, absl::string
   return encoded_hmac;
 }
 
+// Generates a SHA256 HMAC from a secret and a message and returns the result as a base64 encoded
+// string.
+std::string generateHmacBase64(const std::vector<uint8_t>& secret, std::string& message) {
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, message);
+  std::string hmac_string(hmac_result.begin(), hmac_result.end());
+  std::string base64_encoded_hmac;
+  absl::Base64Escape(hmac_string, &base64_encoded_hmac);
+  return base64_encoded_hmac;
+}
+
 std::string encodeHmacBase64(const std::vector<uint8_t>& secret, absl::string_view domain,
                              absl::string_view expires, absl::string_view token = "",
                              absl::string_view id_token = "",
                              absl::string_view refresh_token = "") {
-  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  const auto hmac_payload =
+  std::string hmac_payload =
       absl::StrJoin({domain, expires, token, id_token, refresh_token}, HmacPayloadSeparator);
-
-  std::string base64_encoded_hmac;
-  std::vector<uint8_t> hmac_result = crypto_util.getSha256Hmac(secret, hmac_payload);
-  std::string hmac_string(hmac_result.begin(), hmac_result.end());
-  absl::Base64Escape(hmac_string, &base64_encoded_hmac);
-  return base64_encoded_hmac;
+  return generateHmacBase64(secret, hmac_payload);
 }
 
 std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view domain,
@@ -173,19 +179,21 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
   return encodeHmacBase64(secret, domain, expires, token, id_token, refresh_token);
 }
 
-// Generates a nonce based on the current time
-std::string generateFixedLengthNonce(TimeSource& time_source) {
-  constexpr size_t length = 16;
+// Generates a non-guessable nonce that can be used to prevent CSRF attacks.
+std::string generateNonce(Random::RandomGenerator& random) {
+  return Hex::uint64ToHex(random.random());
+}
 
-  std::string nonce = fmt::format("{}", time_source.systemTime().time_since_epoch().count());
-
-  if (nonce.length() < length) {
-    nonce.append(length - nonce.length(), '0');
-  } else if (nonce.length() > length) {
-    nonce = nonce.substr(0, length);
-  }
-
-  return nonce;
+/**
+ * Encodes the state parameter for the OAuth2 flow.
+ * The state parameter is a base64Url encoded JSON object containing the original request URL and a
+ * nonce for CSRF protection.
+ */
+std::string encodeState(const std::string& original_request_url, const std::string& nonce) {
+  std::string buffer;
+  absl::string_view sanitized_url = Json::sanitize(buffer, original_request_url);
+  std::string json = fmt::format(R"({{"url":"{}","nonce":"{}"}})", sanitized_url, nonce);
+  return Base64Url::encode(json.data(), json.size());
 }
 
 } // namespace
@@ -293,11 +301,12 @@ bool OAuth2CookieValidator::timestampIsValid() const {
 bool OAuth2CookieValidator::isValid() const { return hmacIsValid() && timestampIsValid(); }
 
 OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
-                           std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source)
+                           std::unique_ptr<OAuth2Client>&& oauth_client, TimeSource& time_source,
+                           Random::RandomGenerator& random)
     : validator_(std::make_shared<OAuth2CookieValidator>(time_source, config->cookieNames(),
                                                          config->cookieDomain())),
-      oauth_client_(std::move(oauth_client)), config_(std::move(config)),
-      time_source_(time_source) {
+      oauth_client_(std::move(oauth_client)), config_(std::move(config)), time_source_(time_source),
+      random_(random) {
 
   oauth_client_->setCallbacks(*this);
 }
@@ -370,7 +379,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       if (config_->redirectPathMatcher().match(original_request_url.pathAndQueryParams())) {
         ENVOY_LOG(debug, "state url query params {} matches the redirect path matcher",
                   original_request_url.pathAndQueryParams());
-        // TODO(zhaohuabing): Should return 401 unauthorized or 400 bad request?
         sendUnauthorizedResponse();
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -456,7 +464,7 @@ Http::FilterHeadersStatus OAuth2Filter::encodeHeaders(Http::ResponseHeaderMap& h
 bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   // We can skip OAuth if the supplied HMAC cookie is valid. Apply the OAuth details as headers
   // if we successfully validate the cookie.
-  validator_->setParams(headers, config_->tokenSecret());
+  validator_->setParams(headers, config_->hmacSecret());
   if (validator_->isValid()) {
     config_->stats().oauth_success_.inc();
     if (config_->forwardBearerToken() && !validator_->token().empty()) {
@@ -482,7 +490,6 @@ bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) con
 void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const {
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
-
   // Construct the correct scheme. We default to https since this is a requirement for OAuth to
   // succeed. However, if a downstream client explicitly declares the "http" scheme for whatever
   // reason, we also use "http" when constructing our redirect uri to the authorization server.
@@ -491,12 +498,11 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
   if (Http::Utility::schemeIsHttp(headers.getSchemeValue())) {
     scheme = Http::Headers::get().SchemeValues.Http;
   }
-
   const std::string base_path = absl::StrCat(scheme, "://", host_);
-  const std::string full_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
-  const std::string escaped_url = Http::Utility::PercentEncoding::urlEncodeQueryParameter(full_url);
+  const std::string original_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
 
-  // Generate a nonce to prevent CSRF attacks
+  // Encode the original request URL and the nonce to the state parameter.
+  // Generate a nonce to prevent CSRF attacks.
   std::string nonce;
   bool nonce_cookie_exists = false;
   const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
@@ -506,7 +512,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
     nonce = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
     nonce_cookie_exists = true;
   } else {
-    nonce = generateFixedLengthNonce(time_source_);
+    nonce = generateNonce(random_);
   }
 
   // Set the nonce cookie if it does not exist.
@@ -523,11 +529,10 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
         Http::Headers::get().SetCookie,
         absl::StrCat(config_->cookieNames().oauth_nonce_, "=", nonce, cookie_tail_http_only));
   }
+  const std::string state = encodeState(original_url, nonce);
 
-  // Encode the original request URL and the nonce to the state parameter
-  const std::string state =
-      absl::StrCat(stateParamsUrl, "=", escaped_url, "&", stateParamsNonce, "=", nonce);
-  const std::string escaped_state = Http::Utility::PercentEncoding::urlEncodeQueryParameter(state);
+  auto query_params = config_->authorizationQueryParams();
+  query_params.overwrite(queryParamsState, state);
 
   Formatter::FormatterPtr formatter = THROW_OR_RETURN_VALUE(
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
@@ -535,17 +540,14 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) const 
       formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
   const std::string escaped_redirect_uri =
       Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri);
-
-  auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
-  query_params.overwrite(queryParamsState, escaped_state);
+
   // Copy the authorization endpoint URL to replace its query params.
   auto authorization_endpoint_url = config_->authorizationEndpointUrl();
   const std::string path_and_query_params = query_params.replaceQueryString(
       Http::HeaderString(authorization_endpoint_url.pathAndQueryParams()));
   authorization_endpoint_url.setPathAndQueryParams(path_and_query_params);
   const std::string new_url = authorization_endpoint_url.toString();
-
   response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
 
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
@@ -582,6 +584,10 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
       absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
+                   cookie_domain));
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_nonce_),
                    cookie_domain));
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
@@ -621,7 +627,7 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
 }
 
 std::string OAuth2Filter::getEncodedToken() const {
-  auto token_secret = config_->tokenSecret();
+  auto token_secret = config_->hmacSecret();
   std::vector<uint8_t> token_secret_vec(token_secret.begin(), token_secret.end());
   std::string encoded_token;
 
@@ -848,22 +854,21 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   }
 
   // Return 401 unauthorized if the state query parameter does not contain the original request URL
-  // and nonce. state is an HTTP URL encoded string that contains the url and nonce, for example:
-  // state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%3D1234567890000000".
-  std::string state = Http::Utility::PercentEncoding::urlDecodeQueryParameter(stateVal.value());
-  const auto state_parameters = Http::Utility::QueryParamsMulti::parseParameters(state, 0, true);
-  auto urlVal = state_parameters.getFirstValue(stateParamsUrl);
-  auto nonceVal = state_parameters.getFirstValue(stateParamsNonce);
-  if (!urlVal.has_value() || !nonceVal.has_value()) {
-    ENVOY_LOG(error, "state query param does not contain url or nonce: \n{}", state);
+  // or nonce.
+  // Decode the state parameter to get the original request URL and nonce.
+  const std::string state = Base64Url::decode(stateVal.value());
+  bool has_unknown_field;
+  ProtobufWkt::Struct message;
+
+  auto status = MessageUtil::loadFromJsonNoThrow(state, message, has_unknown_field);
+  if (!status.ok()) {
+    ENVOY_LOG(error, "state query param is not a valid JSON: \n{}", state);
     return {false, "", ""};
   }
 
-  // Return 401 unauthorized if the URL in the state is not valid.
-  std::string original_request_url = urlVal.value();
-  Http::Utility::Url url;
-  if (!url.initialize(original_request_url, false)) {
-    ENVOY_LOG(error, "state url {} can not be initialized", original_request_url);
+  const auto& filed_value_pair = message.fields();
+  if (!filed_value_pair.contains(stateParamsUrl) || !filed_value_pair.contains(stateParamsNonce)) {
+    ENVOY_LOG(error, "state query param does not contain url or nonce: \n{}", state);
     return {false, "", ""};
   }
 
@@ -873,15 +878,26 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   // sessions via CSRF attack. The attack can result in victims saving their sensitive data
   // in the attacker's account.
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
-  if (!validateNonce(headers, nonceVal.value())) {
-    ENVOY_LOG(error, "nonce cookie does not match nonce query param: \n{}", nonceVal.value());
+  std::string nonce = filed_value_pair.at(stateParamsNonce).string_value();
+  if (!validateNonce(headers, nonce)) {
+    ENVOY_LOG(error, "nonce cookie does not match nonce in the state: \n{}", nonce);
+    return {false, "", ""};
+  }
+  const std::string original_request_url = filed_value_pair.at(stateParamsUrl).string_value();
+
+  // Return 401 unauthorized if the URL in the state is not valid.
+  Http::Utility::Url url;
+  if (!url.initialize(original_request_url, false)) {
+    ENVOY_LOG(error, "state url {} can not be initialized", original_request_url);
     return {false, "", ""};
   }
 
   return {true, codeVal.value(), original_request_url};
 }
 
-bool OAuth2Filter::validateNonce(const Http::RequestHeaderMap& headers, const std::string& nonce) {
+// Validates the nonce in the state parameter against the nonce in the cookie.
+bool OAuth2Filter::validateNonce(const Http::RequestHeaderMap& headers,
+                                 const std::string& nonce) const {
   const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
     return key == config_->cookieNames().oauth_nonce_;
   });
