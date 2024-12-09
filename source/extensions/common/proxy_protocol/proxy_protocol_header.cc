@@ -111,12 +111,26 @@ void generateV2Header(const Network::Address::Ip& source_address,
 }
 
 bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer::Instance& out,
-                      bool pass_all_tlvs, const absl::flat_hash_set<uint8_t>& pass_through_tlvs) {
-  uint64_t extension_length = 0;
-  for (auto&& tlv : proxy_proto_data.tlv_vector_) {
+                      bool pass_all_tlvs, const absl::flat_hash_set<uint8_t>& pass_through_tlvs,
+                      const absl::flat_hash_map<uint8_t, std::vector<unsigned char>>& custom_tlvs) {
+  std::vector<Envoy::Network::ProxyProtocolTLV> combined_tlv_vector_;
+  for (const auto& [type, value] : custom_tlvs) {
+    combined_tlv_vector_.push_back({type, {value.begin(), value.end()}});
+  }
+  for (const auto& tlv : proxy_proto_data.tlv_vector_) {
     if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
+      // Skip any TLV when pass_all_tlvs is disabled, or the TLV is not in the pass_through_tlvs.
       continue;
     }
+    if (custom_tlvs.find(tlv.type) != custom_tlvs.end()) {
+      // Skip the TLV if it is already in the custom TLVs.
+      continue;
+    }
+    combined_tlv_vector_.push_back(tlv);
+  }
+
+  uint64_t extension_length = 0;
+  for (auto&& tlv : combined_tlv_vector_) {
     extension_length += PROXY_PROTO_V2_TLV_TYPE_LENGTH_LEN + tlv.value.size();
     if (extension_length > std::numeric_limits<uint16_t>::max()) {
       ENVOY_LOG_MISC(
@@ -141,16 +155,13 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
   generateV2Header(src.addressAsString(), dst.addressAsString(), src.port(), dst.port(),
                    src.version(), static_cast<uint16_t>(extension_length), out);
 
-  // Generate the TLV vector.
-  for (auto&& tlv : proxy_proto_data.tlv_vector_) {
-    if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
-      continue;
-    }
+  for (auto&& tlv : combined_tlv_vector_) {
     out.add(&tlv.type, 1);
     uint16_t size = htons(static_cast<uint16_t>(tlv.value.size()));
     out.add(&size, sizeof(uint16_t));
     out.add(&tlv.value.front(), tlv.value.size());
   }
+
   return true;
 }
 

@@ -44,6 +44,7 @@ private:
   void generateHeaderV1();
   void generateHeaderV2();
   Network::IoResult writeHeader();
+  absl::flat_hash_map<uint8_t, std::vector<unsigned char>> buildCustomTLVs();
 
   Network::TransportSocketOptionsConstSharedPtr options_;
   Network::TransportSocketCallbacks* callbacks_{};
