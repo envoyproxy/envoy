@@ -61,6 +61,7 @@ TEST(UtilityResponseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_overload_manager(true);
   common_access_log_expected.mutable_response_flags()->set_dns_resolution_failure(true);
   common_access_log_expected.mutable_response_flags()->set_downstream_remote_reset(true);
+  common_access_log_expected.mutable_response_flags()->set_reset_no_error(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }
