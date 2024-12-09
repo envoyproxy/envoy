@@ -128,7 +128,7 @@ public:
    * - Force refresh the hosts in the DNS cache (will take `setIpVersionToRemove` into account).
    * - Optionally (if configured) clear HTTP/3 broken status.
    */
-  void onDefaultNetworkChanged(NetworkType network);
+  void onDefaultNetworkChanged(int network);
 
   /**
    * This functions does the following when the default network is unavailable.
