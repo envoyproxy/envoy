@@ -1232,7 +1232,7 @@ public:
   ClusterInfoConstSharedPtr info() const override { return info_; }
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
-  void initialize(std::function<void()> callback) override;
+  void initialize(std::function<absl::Status()> callback) override;
   UnitFloat dropOverload() const override { return drop_overload_; }
   const std::string& dropCategory() const override { return drop_category_; }
   void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
@@ -1301,7 +1301,7 @@ private:
   void reloadHealthyHosts(const HostSharedPtr& host);
 
   bool initialization_started_{};
-  std::function<void()> initialization_complete_callback_;
+  std::function<absl::Status()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;

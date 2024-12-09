@@ -280,7 +280,6 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # tracers
 /*/extensions/tracers/zipkin @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/dynamic_ot @wbpcode @Shikugawa @basvanbeek
-/*/extensions/tracers/opencensus @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/common @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/common/ot @wbpcode @Shikugawa @basvanbeek
 # ext_authz

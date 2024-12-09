@@ -96,7 +96,10 @@ public:
     ON_CALL(initialized_, ready()).WillByDefault(testing::Invoke([this] {
       init_complete_ = true;
     }));
-    cluster_->initialize([&]() -> void { initialized_.ready(); });
+    cluster_->initialize([&]() {
+      initialized_.ready();
+      return absl::OkStatus();
+    });
     handle_ = std::make_shared<OriginalDstClusterHandle>(cluster_);
   }
 

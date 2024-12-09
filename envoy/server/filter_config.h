@@ -242,7 +242,7 @@ public:
    * @return RouteSpecificFilterConfigConstSharedPtr allow the filter to pre-process per route
    * config. Returned object will be stored in the loaded route configuration.
    */
-  virtual Router::RouteSpecificFilterConfigConstSharedPtr
+  virtual absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfig(const Protobuf::Message&, ServerFactoryContext&,
                                   ProtobufMessage::ValidationVisitor&) {
     return nullptr;
