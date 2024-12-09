@@ -33,7 +33,7 @@ on:
         required: true
       runs-on:
         type: string
-        default: ubuntu-24.04
+        default:
       lock-repository:
         type: string
         default: envoyproxy/ci-mutex
@@ -47,7 +47,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    runs-on: ${{ inputs.runs-on || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runs-on || fromJSON(inputs.request).config.ci.agent-ubuntu }}
     name: "[${{ inputs.arch }}] Prime Bazel cache"
     if: ${{ ! fromJSON(inputs.caches).bazel[inputs.arch] }}
     steps:

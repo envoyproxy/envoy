@@ -47,7 +47,7 @@ env:
 jobs:
   incoming:
     if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read

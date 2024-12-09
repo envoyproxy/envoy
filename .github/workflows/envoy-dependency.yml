@@ -49,7 +49,7 @@ jobs:
       ${{ inputs.task == 'bazel' && 'bazel' || 'bazel/api' }}
       /${{ inputs.dependency }}
       /${{ inputs.version }})
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - id: appauth
       name: Appauth
@@ -130,7 +130,7 @@ jobs:
            && github.event.inputs.task == 'build-image'
       }}
     name: Update build image (PR)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - id: appauth
       name: Appauth
@@ -225,7 +225,7 @@ jobs:
         working-directory: envoy
 
   scheduled:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: >-
       ${{
           github.repository == 'envoyproxy/envoy'

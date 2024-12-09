@@ -26,7 +26,7 @@ on:
         default:
       runs-on:
         type: string
-        default: ubuntu-24.04
+        default:
       lock-repository:
         type: string
         default: envoyproxy/ci-mutex

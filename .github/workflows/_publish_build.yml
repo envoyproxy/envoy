@@ -71,7 +71,6 @@ jobs:
           bazel-extra: >-
             --config=remote-envoy-engflow
           rbe: true
-          runs-on: ubuntu-24.04
         - target: release.server_only
           name: Release (arm64)
           arch: arm64
@@ -118,7 +117,6 @@ jobs:
         - target: distribution
           name: Package debs (x64)
           arch: x64
-          runs-on: ubuntu-24.04
         - target: distribution
           name: Package debs (arm64)
           arch: arm64
@@ -143,7 +141,6 @@ jobs:
         release.arm64: envoy/arm64/bin/
         release.x64: envoy/x64/bin/
       request: ${{ inputs.request }}
-      runs-on: ${{ matrix.runs-on }}
       source: |
         export NO_BUILD_SETUP=1
         export ENVOY_DOCKER_IN_DOCKER=1
@@ -156,7 +153,6 @@ jobs:
         include:
         - target: docker
           name: Docker (Linux multiarch)
-          runs-on: ubuntu-24.04
 
   sign:
     permissions:
@@ -186,7 +182,6 @@ jobs:
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       import-gpg: true
       request: ${{ inputs.request }}
-      runs-on: ubuntu-24.04
       source: |
         export NO_BUILD_SETUP=1
       trusted: ${{ inputs.trusted }}

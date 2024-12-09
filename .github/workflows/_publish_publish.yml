@@ -74,7 +74,7 @@ jobs:
     # In turn the archive repo triggers an update in the website so the new release docs are
     # included in the published site
     if: ${{ inputs.trusted && github.repository == 'envoyproxy/envoy' }}
-    runs-on: ubuntu-22.04
+    runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
     needs:
     - publish
     steps:
