@@ -139,6 +139,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   route_ = std::move(*route_or_error);
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
   stream_info_.setIsShadow(options.is_shadow);
+  stream_info_.setShouldSchemeMatchUpstream(true);
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);
   stream_info_.route_ = route_;
 
