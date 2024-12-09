@@ -30,7 +30,8 @@ private:
       const std::string& stats_prefix, DualInfo dual_info,
       Server::Configuration::ServerFactoryContext& context) override;
 
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig&,
       Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };

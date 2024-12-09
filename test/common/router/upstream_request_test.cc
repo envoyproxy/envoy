@@ -84,7 +84,7 @@ TEST_F(UpstreamRequestTest, TestAccessors) {
 // UpstreamRequest is responsible for adding proper gRPC annotations to spans.
 TEST_F(UpstreamRequestTest, DecodeHeadersGrpcSpanAnnotations) {
   envoy::extensions::filters::http::router::v3::Router router_proto;
-  router_config_ = std::make_unique<Router::FilterConfig>(
+  router_config_ = *Router::FilterConfig::create(
       pool_.add("prefix"), context_, ShadowWriterPtr(new MockShadowWriter()), router_proto);
   EXPECT_CALL(router_filter_interface_, config()).WillRepeatedly(ReturnRef(*router_config_));
 
@@ -114,7 +114,7 @@ TEST_F(UpstreamRequestTest,
   // Enable tracing in config.
   envoy::extensions::filters::http::router::v3::Router router_proto;
   router_proto.set_start_child_span(true);
-  router_config_ = std::make_unique<Router::FilterConfig>(
+  router_config_ = *Router::FilterConfig::create(
       pool_.add("prefix"), context_, ShadowWriterPtr(new MockShadowWriter()), router_proto);
   EXPECT_CALL(router_filter_interface_, config()).WillRepeatedly(ReturnRef(*router_config_));
 

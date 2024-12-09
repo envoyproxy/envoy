@@ -1,7 +1,6 @@
 version: v1
 deps:
 - buf.build/googleapis/googleapis:62f35d8aed1149c291d606d958a7ce32
-- buf.build/opencensus/opencensus
 - buf.build/prometheus/client-model
 - buf.build/opentelemetry/opentelemetry
 - buf.build/gogo/protobuf

@@ -2,6 +2,9 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: tracing
+  change: |
+    Removed support for (long deprecated) opencensus tracing extension.
 - area: wasm
   change: |
     The route cache will not be cleared by default if the wasm extension modified the request headers and
@@ -85,6 +88,9 @@ minor_behavior_changes:
   change: |
     Increase only the statistics counter ``missing_source_origin`` for requests with a missing source origin.
     Previously, the ``request_invalid`` counter was also increased for such requests.
+- area: rate_limit
+  change: |
+    add ``WEEK`` to the unit of time for rate limit.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -103,6 +109,9 @@ bug_fixes:
     Fixed metric for ADS disconnection counters using Google GRPC client. This extracts the GRPC client prefix specified
     in the :ref:`google_grpc <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>` resource used for ADS, and adds
     that as a tag ``envoy_google_grpc_client_prefix`` to the Prometheus stats.
+- area: golang
+  change:
+    Fixes a crash during Golang GC caused by accessing deleted decoder_callbacks. The bug was introduced in 1.31.0.
 - area: access_log
   change: |
     Relaxed the restriction on SNI logging to allow the ``_`` character, even if
@@ -135,6 +144,9 @@ bug_fixes:
   change: |
     Fixed bug where dynamic_forward_proxy udp session filter disabled buffer in filter config
     instead of disabling buffer for the filter instance.
+- area: csrf
+  change: |
+    Handle requests that have a "privacy sensitive" / opaque origin (``Origin: null``) as if the request had no origin information.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -165,6 +177,9 @@ removed_config_or_runtime:
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
+- area: aws
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials``.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.reloadable_features.exclude_host_in_eds_status_draining``.
@@ -209,6 +224,9 @@ new_features:
     :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` access log
     formatter operator. The following time points were added: ``%US_CX_BEG%``,
     ``%US_CX_END%``, ``%US_HS_END%``.
+- area: lua
+  change: |
+    Add logging functions to all lua objects. Previously these were only available on the Lua http filter request handle.
 - area: access log
   change: |
     Added fields for :ref:`DOWNSTREAM_DIRECT_LOCAL_ADDRESS and DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT <config_access_log_format>`.
@@ -296,6 +314,10 @@ new_features:
     Added  :ref:`refetch_jwks_on_kid_mismatch
     <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.RemoteJwks.refetch_jwks_on_kid_mismatch>`
     to allow filter to refetch JWKS when extracted JWT's KID does not match cached JWKS's KID.
+- area: health_check
+  change: |
+    Added new health check filter stats including total requests, successful/failed checks, cached responses, and
+    cluster health status counters. These stats help track health check behavior and cluster health state.
 
 deprecated:
 - area: rbac

@@ -105,7 +105,7 @@ const _displayItem = (item, searchTerms) => {
   let linkEl = listItem.appendChild(document.createElement("a"));
   linkEl.href = linkUrl + anchor;
   linkEl.dataset.score = score;
-  linkEl.innerText = title;
+  linkEl.innerHTML = title;
   // <ENVOY>
   const apiVersion = _renderApiVersionLabel(linkUrl);
   if (apiVersion !== "") {
@@ -129,7 +129,7 @@ const _displayItem = (item, searchTerms) => {
 };
 const _finishSearch = (resultCount) => {
   Search.stopPulse();
-  Search.title.textContent = _("Search Results");
+  Search.title.innerText = _("Search Results");
   if (!resultCount)
     Search.status.innerText = Documentation.gettext(
       "Your search did not match any documents. Please make sure that all words are spelled correctly and that you've selected enough categories."

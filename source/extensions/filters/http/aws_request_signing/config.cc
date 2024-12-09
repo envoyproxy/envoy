@@ -48,8 +48,9 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
       regionOpt = region_provider->getRegion();
     }
     if (!regionOpt.has_value()) {
-      throw EnvoyException("AWS region is not set in xDS configuration and failed to retrieve from "
-                           "environment variable or AWS profile/config files.");
+      return absl::InvalidArgumentError(
+          "AWS region is not set in xDS configuration and failed to retrieve from "
+          "environment variable or AWS profile/config files.");
     }
     region = regionOpt.value();
   }
@@ -67,8 +68,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
                     server_context, region, config.credential_provider())
               : std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
                     server_context.api(), makeOptRef(server_context),
-                    server_context.singletonManager(), region,
-                    Extensions::Common::Aws::Utility::fetchMetadata);
+                    server_context.singletonManager(), region, nullptr);
   if (!credentials_provider.ok()) {
     return credentials_provider.status();
   }
@@ -85,8 +85,9 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm
     if (isARegionSet(region)) {
-      throw EnvoyException("SigV4 region string cannot contain wildcards or commas. Region sets "
-                           "can be specified when using signing_algorithm: AWS_SIGV4A.");
+      return absl::InvalidArgumentError(
+          "SigV4 region string cannot contain wildcards or commas. Region sets "
+          "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         config.service_name(), region, credentials_provider.value(), server_context, matcher_config,
@@ -102,7 +103,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     const AwsRequestSigningProtoPerRouteConfig& per_route_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
@@ -120,8 +121,9 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
       regionOpt = region_provider->getRegion();
     }
     if (!regionOpt.has_value()) {
-      throw EnvoyException("AWS region is not set in xDS configuration and failed to retrieve from "
-                           "environment variable or AWS profile/config files.");
+      return absl::InvalidArgumentError(
+          "AWS region is not set in xDS configuration and failed to retrieve from "
+          "environment variable or AWS profile/config files.");
     }
     region = regionOpt.value();
   }
@@ -137,9 +139,9 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
                     context, region, per_route_config.aws_request_signing().credential_provider())
               : std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
                     context.api(), makeOptRef(context), context.singletonManager(), region,
-                    Extensions::Common::Aws::Utility::fetchMetadata);
+                    nullptr);
   if (!credentials_provider.ok()) {
-    throw EnvoyException(std::string(credentials_provider.status().message()));
+    return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
   }
 
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
@@ -155,8 +157,9 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm
     if (isARegionSet(region)) {
-      throw EnvoyException("SigV4 region string cannot contain wildcards or commas. Region sets "
-                           "can be specified when using signing_algorithm: AWS_SIGV4A.");
+      return absl::InvalidArgumentError(
+          "SigV4 region string cannot contain wildcards or commas. Region sets "
+          "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
         per_route_config.aws_request_signing().service_name(), region, credentials_provider.value(),
