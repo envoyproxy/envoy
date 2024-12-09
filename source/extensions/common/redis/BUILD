@@ -34,3 +34,21 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "async_redis_client_lib",
+    srcs = ["async_redis_client_impl.cc"],
+    hdrs = ["async_redis_client_impl.h"],
+    deps = [
+        "//source/common/tcp:async_tcp_client_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/network/common/redis:codec_lib",
+        #":cluster_refresh_manager_interface",
+        #"//envoy/event:dispatcher_interface",
+        #"//envoy/singleton:manager_interface",
+        #"//envoy/upstream:cluster_manager_interface",
+        #"//source/common/common:lock_guard_lib",
+        #"//source/common/common:thread_annotations",
+        #"//source/common/common:thread_lib",
+    ],
+)
