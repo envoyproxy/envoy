@@ -792,8 +792,6 @@ TEST_P(DownstreamProtocolIntegrationTest, TeSanitization) {
   }
 
   autonomous_upstream_ = true;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
-
   default_request_headers_.setTE("gzip");
 
   initialize();
@@ -815,8 +813,6 @@ TEST_P(DownstreamProtocolIntegrationTest, TeSanitizationTrailers) {
   }
 
   autonomous_upstream_ = true;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
-
   default_request_headers_.setTE("trailers");
 
   initialize();
@@ -838,8 +834,6 @@ TEST_P(DownstreamProtocolIntegrationTest, TeSanitizationTrailersMultipleValuesAn
   }
 
   autonomous_upstream_ = true;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
-
   default_request_headers_.setTE("chunked;q=0.8  ,  trailers  ,deflate  ");
 
   initialize();
