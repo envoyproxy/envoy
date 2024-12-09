@@ -28,11 +28,16 @@ public:
    * @param symbol_ref the symbol to look up.
    * @return the symbol if found, otherwise nullptr.
    */
-  template <typename T> T getFunctionPointer(const absl::string_view symbol_ref) const {
+  template <typename T>
+  absl::StatusOr<T> getFunctionPointer(const absl::string_view symbol_ref) const {
     static_assert(std::is_pointer<T>::value &&
                       std::is_function<typename std::remove_pointer<T>::type>::value,
                   "T must be a function pointer type");
-    return reinterpret_cast<T>(getSymbol(symbol_ref));
+    auto symbol = getSymbol(symbol_ref);
+    if (symbol == nullptr) {
+      return absl::InvalidArgumentError("Failed to resolve symbol " + std::string(symbol_ref));
+    }
+    return reinterpret_cast<T>(symbol);
   }
 
 private:
