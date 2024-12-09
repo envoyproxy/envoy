@@ -36,10 +36,6 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
 
 static uint16_t default_port = 6379;
 
-bool isClusterProvidedLb(const Upstream::ClusterInfo& info) {
-  return info.loadBalancerFactory().name() == "envoy.load_balancing_policies.cluster_provided";
-}
-
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -168,8 +164,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
   OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type =
       info->clusterType();
-  is_redis_cluster_ = isClusterProvidedLb(*info) && cluster_type.has_value() &&
-                      cluster_type->name() == "envoy.clusters.redis";
+  is_redis_cluster_ = cluster_type.has_value() && cluster_type->name() == "envoy.clusters.redis";
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {
