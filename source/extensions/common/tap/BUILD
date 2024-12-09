@@ -34,6 +34,7 @@ envoy_cc_library(
         "//source/extensions/common/matcher:matcher_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/tap_sinks/udp_sink/v3:pkg_cc_proto",
     ],
 )
 

@@ -271,6 +271,7 @@ proto_library(
         "//envoy/extensions/stat_sinks/open_telemetry/v3:pkg",
         "//envoy/extensions/stat_sinks/wasm/v3:pkg",
         "//envoy/extensions/string_matcher/lua/v3:pkg",
+        "//envoy/extensions/tap_sinks/udp_sink/v3:pkg",
         "//envoy/extensions/tracers/opentelemetry/resource_detectors/v3:pkg",
         "//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg",
         "//envoy/extensions/transport_sockets/alts/v3:pkg",

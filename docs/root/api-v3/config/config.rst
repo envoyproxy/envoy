@@ -42,6 +42,7 @@ Extensions
   retry/retry
   stat_sinks/stat_sinks
   string_matcher/string_matcher
+  tap_sinks/tap_sinks
   transport_socket/transport_socket
   upstream/upstream
   wasm/wasm

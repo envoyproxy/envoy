@@ -3,6 +3,7 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/extensions/tap_sinks/udp_sink/v3/udp_sink.pb.validate.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "source/common/common/assert.h"
@@ -98,11 +99,6 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     sink_ = std::make_unique<FilePerTapSink>(sinks[0].file_per_tap());
     sink_to_use_ = sink_.get();
     break;
-  case ProtoOutputSink::OutputSinkTypeCase::kUdpSink: {
-    sink_ = std::make_unique<UdpTapSink>(sinks[0].udp_sink());
-    sink_to_use_ = sink_.get();
-    ENVOY_LOG_MISC(debug, "Done init UDP sink configure data");
-  } break;
   case ProtoOutputSink::OutputSinkTypeCase::kCustomSink: {
     TapSinkFactory& tap_sink_factory =
         Envoy::Config::Utility::getAndCheckFactory<TapSinkFactory>(sinks[0].custom_sink());
@@ -115,6 +111,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
       config = Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(),
                                                             tsf_context.messageValidationVisitor(),
                                                             tap_sink_factory);
+      sink_ = tap_sink_factory.createTransportSinkPtr(*config, tsf_context);
     } else {
       Server::Configuration::FactoryContext& http_context =
           absl::get<HttpContextRef>(context).get();
@@ -122,9 +119,9 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
           sinks[0].custom_sink().typed_config(),
           http_context.serverFactoryContext().messageValidationContext().staticValidationVisitor(),
           tap_sink_factory);
+      sink_ = tap_sink_factory.createHttpSinkPtr(*config, http_context);
     }
 
-    sink_ = tap_sink_factory.createSinkPtr(*config, context);
     sink_to_use_ = sink_.get();
     break;
   }
@@ -285,67 +282,6 @@ void FilePerTapSink::FilePerTapSinkHandle::submitTrace(
     break;
   }
 }
-
-// The implemented code for UDP sink
-UdpTapSink::UdpTapSink(const envoy::config::tap::v3::UDPSink& config) : config_(config) {
-  if (config_.udp_address().protocol() != envoy::config::core::v3::SocketAddress::UDP) {
-    ENVOY_LOG_MISC(warn, "{}: Only suport UDP and invalid protocol", __func__);
-    return;
-  }
-
-  // Verify the address (ipv4/ipv6)
-  udp_server_address_ = Network::Utility::parseInternetAddressNoThrow(
-      config_.udp_address().address(), static_cast<uint16_t>(config_.udp_address().port_value()),
-      false);
-  if (!udp_server_address_) {
-    ENVOY_LOG_MISC(warn, "{}: Invalid configuration for address {} or port_value {}", __func__,
-                   config_.udp_address().address().c_str(), config_.udp_address().port_value());
-    return;
-  }
-
-  // Create socket
-  udp_socket_ =
-      std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, udp_server_address_,
-                                            nullptr, Network::SocketCreationOptions{});
-
-  // Create udp writer
-  udp_packet_writer_ = std::make_unique<Network::UdpDefaultWriter>(udp_socket_->ioHandle());
-}
-
-UdpTapSink::~UdpTapSink() { ENVOY_LOG_MISC(warn, "{}: UDP UdpTapSink() is called", __func__); }
-
-void UdpTapSink::UdpTapSinkHandle::submitTrace(TraceWrapperPtr&& trace,
-                                               envoy::config::tap::v3::OutputSink::Format format) {
-  switch (format) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
-  case envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED:
-  case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
-    // will implement above format if it is needed
-    ENVOY_LOG_MISC(debug,
-                   "{}: Not support PROTO_BINARY, PROTO_BINARY_LENGTH_DELIMITED,  PROTO_TEXT\n",
-                   __func__);
-    break;
-  case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
-  case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING: {
-    if (!parent_.isUdpPacketWriterCreated()) {
-      ENVOY_LOG_MISC(debug, "{}: udp writter isn't created yet", __func__);
-      break;
-    }
-    std::string json_string = MessageUtil::getJsonStringFromMessageOrError(*trace, true, true);
-    auto udp_data = std::make_unique<Buffer::OwnedImpl>(json_string);
-    // Construct Buffer instance
-    Buffer::Instance& buffer = *udp_data;
-    Api::IoCallUint64Result write_result =
-        parent_.udp_packet_writer_->writePacket(buffer, nullptr, *parent_.udp_server_address_);
-    if (!write_result.ok()) {
-      ENVOY_LOG_MISC(debug, "{}: Failed to send UDP packet!", __func__);
-    }
-  } break;
-  }
-  return;
-}
-// The end of UDP sink
 
 } // namespace Tap
 } // namespace Common
