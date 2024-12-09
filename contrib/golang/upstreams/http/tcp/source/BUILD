@@ -28,11 +28,9 @@ envoy_cc_library(
     name = "upstream_request_lib",
     srcs = [
         "upstream_request.cc",
-        "processor_state.cc",
     ],
     hdrs = [
         "upstream_request.h",
-        "processor_state.h",
     ],
     visibility = ["//visibility:public"],
     deps = [
@@ -63,7 +61,6 @@ envoy_cc_contrib_extension(
     srcs = ["cgo.cc"],
     hdrs = [
         "upstream_request.h",
-        "processor_state.h",
     ],
     visibility = ["//visibility:public"],
     deps = [

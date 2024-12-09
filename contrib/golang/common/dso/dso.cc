@@ -270,19 +270,19 @@ void TcpUpstreamDsoImpl::envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 p0) {
   return envoy_go_tcp_upstream_destroy_plugin_config_(p0);
 }
 
-GoUint64 TcpUpstreamDsoImpl::envoyGoEncodeHeader(processState* state, GoUint64 end_stream, GoUint64 header_num,  GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) {
+GoUint64 TcpUpstreamDsoImpl::envoyGoEncodeHeader(httpRequest* req, GoUint64 end_stream, GoUint64 header_num,  GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) {
   ASSERT(envoy_go_encode_header_ != nullptr);
-  return envoy_go_encode_header_(state, end_stream, header_num, header_bytes, buf_ptr, buf_len);
+  return envoy_go_encode_header_(req, end_stream, header_num, header_bytes, buf_ptr, buf_len);
 }
 
-GoUint64 TcpUpstreamDsoImpl::envoyGoEncodeData(processState* state, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len) {
+GoUint64 TcpUpstreamDsoImpl::envoyGoEncodeData(httpRequest* req, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len) {
   ASSERT(envoy_go_on_upstream_data_ != nullptr);
-  return envoy_go_on_encode_data_(state, end_stream, buf_ptr, buf_len);
+  return envoy_go_on_encode_data_(req, end_stream, buf_ptr, buf_len);
 }
 
-GoUint64 TcpUpstreamDsoImpl::envoyGoOnUpstreamData(processState* state, GoUint64 end_stream, GoUint64 header_num, GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) {
+GoUint64 TcpUpstreamDsoImpl::envoyGoOnUpstreamData(httpRequest* req, GoUint64 end_stream, GoUint64 header_num, GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) {
   ASSERT(envoy_go_on_upstream_data_ != nullptr);
-  return envoy_go_on_upstream_data_(state, end_stream, header_num, header_bytes, buf_ptr, buf_len);
+  return envoy_go_on_upstream_data_(req, end_stream, header_num, header_bytes, buf_ptr, buf_len);
 }
 
 void TcpUpstreamDsoImpl::envoyGoOnTcpUpstreamDestroy(httpRequest* p0) {

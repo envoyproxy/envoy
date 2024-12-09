@@ -34,7 +34,6 @@ import "C"
 import (
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -46,9 +45,6 @@ import (
 var (
 	configNumGenerator uint64
 	configCache        = &sync.Map{} // uint64 -> config(interface{})
-	// From get a cached merged_config_id_ in getMergedConfigId on the C++ side,
-	// to get the merged config by the id on the Go side, 2 seconds should be long enough.
-	delayDeleteTime = time.Second * 2 // 2s
 )
 
 //export envoyGoOnTcpUpstreamConfig
