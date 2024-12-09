@@ -124,6 +124,9 @@ def envoy_dependencies(skip_targets = []):
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
 
+    # Setup Bazel shell rules
+    external_http_archive(name = "rules_shell")
+
     # Setup Bazel C++ rules
     external_http_archive("rules_cc")
 
