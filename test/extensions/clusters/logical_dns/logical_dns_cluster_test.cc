@@ -67,7 +67,10 @@ protected:
           membership_updated_.ready();
           return absl::OkStatus();
         });
-    cluster_->initialize([&]() -> void { initialized_.ready(); });
+    cluster_->initialize([&]() {
+      initialized_.ready();
+      return absl::OkStatus();
+    });
   }
 
   absl::Status factorySetupFromV3Yaml(const std::string& yaml) {

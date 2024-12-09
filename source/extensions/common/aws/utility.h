@@ -92,7 +92,7 @@ public:
   static std::string getSTSEndpoint(absl::string_view region);
 
   /**
-   * Fetch AWS instance or task metadata.
+   * Fetch AWS instance or task metadata with curl.
    *
    * @param message An HTTP request.
    * @return Metadata document or nullopt in case if unable to fetch it.
@@ -102,7 +102,7 @@ public:
    * @note This is not main loop safe method as it is blocking. It is intended to be used from the
    * gRPC auth plugins that are able to schedule blocking plugins on a different thread.
    */
-  static absl::optional<std::string> fetchMetadata(Http::RequestMessage& message);
+  static absl::optional<std::string> fetchMetadataWithCurl(Http::RequestMessage& message);
 
   /**
    * @brief Creates the prototype for a static cluster towards a credentials provider

@@ -67,8 +67,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
                     server_context, region, config.credential_provider())
               : std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
                     server_context.api(), makeOptRef(server_context),
-                    server_context.singletonManager(), region,
-                    Extensions::Common::Aws::Utility::fetchMetadata);
+                    server_context.singletonManager(), region, nullptr);
   if (!credentials_provider.ok()) {
     return credentials_provider.status();
   }
@@ -137,7 +136,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
                     context, region, per_route_config.aws_request_signing().credential_provider())
               : std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
                     context.api(), makeOptRef(context), context.singletonManager(), region,
-                    Extensions::Common::Aws::Utility::fetchMetadata);
+                    nullptr);
   if (!credentials_provider.ok()) {
     throw EnvoyException(std::string(credentials_provider.status().message()));
   }

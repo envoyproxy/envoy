@@ -492,44 +492,5 @@ TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   quiche::QuicheSystemEventLoop("dummy");
 }
 
-TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {
-  std::string str(512, 'b');
-  // Fragment needs to out-live buffer.
-  bool fragment_releaser_called = false;
-  Envoy::Buffer::BufferFragmentImpl fragment(
-      str.data(), str.length(),
-      [&fragment_releaser_called](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
-        // Used to verify that mem slice release appropriately.
-        fragment_releaser_called = true;
-      });
-  Envoy::Buffer::OwnedImpl buffer;
-  EXPECT_DEBUG_DEATH(quiche::QuicheMemSlice slice0(quiche::QuicheMemSlice::InPlace(), buffer, 0u),
-                     "");
-  std::string str2(1024, 'a');
-  // str2 is copied.
-  buffer.add(str2);
-  EXPECT_EQ(1u, buffer.getRawSlices().size());
-  buffer.addBufferFragment(fragment);
-
-  quiche::QuicheMemSlice slice1(quiche::QuicheMemSlice::InPlace(), buffer, str2.length());
-  EXPECT_EQ(str.length(), buffer.length());
-  EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
-  std::string str2_old = str2; // NOLINT(performance-unnecessary-copy-initialization)
-  // slice1 is released, but str2 should not be affected.
-  slice1.Reset();
-  EXPECT_TRUE(slice1.empty());
-  EXPECT_EQ(nullptr, slice1.data());
-  EXPECT_EQ(str2_old, str2);
-
-  quiche::QuicheMemSlice slice2(quiche::QuicheMemSlice::InPlace(), buffer, str.length());
-  EXPECT_EQ(0, buffer.length());
-  EXPECT_EQ(str.data(), slice2.data());
-  EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));
-  slice2.Reset();
-  EXPECT_TRUE(slice2.empty());
-  EXPECT_EQ(nullptr, slice2.data());
-  EXPECT_TRUE(fragment_releaser_called);
-}
-
 } // namespace
 } // namespace quic

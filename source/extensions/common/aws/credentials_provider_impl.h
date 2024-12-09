@@ -190,10 +190,6 @@ protected:
   // Set Credentials shared_ptr on all threads.
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds);
 
-  // Returns true if http async client can be used instead of libcurl to fetch the aws credentials,
-  // else false.
-  bool useHttpAsyncClient();
-
   Api::Api& api_;
   // The optional server factory context.
   ServerFactoryContextOptRef context_;

@@ -1736,7 +1736,7 @@ ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) con
   return *resource_managers_.managers_[enumToInt(priority)];
 }
 
-void ClusterImplBase::initialize(std::function<void()> callback) {
+void ClusterImplBase::initialize(std::function<absl::Status()> callback) {
   ASSERT(!initialization_started_);
   ASSERT(initialization_complete_callback_ == nullptr);
   initialization_complete_callback_ = callback;
@@ -1798,7 +1798,7 @@ void ClusterImplBase::finishInitialization() {
   }
 
   if (snapped_callback != nullptr) {
-    snapped_callback();
+    THROW_IF_NOT_OK(snapped_callback());
   }
 }
 
