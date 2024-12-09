@@ -865,7 +865,7 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
     }
   }
 
-  HostConstSharedPtr host = thread_local_cluster.chooseHost(this);
+  Upstream::HostConstSharedPtr host = thread_local_cluster.chooseHost(this);
   if (!host) {
     return nullptr;
   }
