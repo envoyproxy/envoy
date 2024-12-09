@@ -309,12 +309,12 @@ message RateLimitConfig {
     // This is useful when the rate limit budget needs to reflect the response context that is not available
     // on the request path.
     //
-    // For example, let's say the upstream service calculates the usage statistics and returns them in the response
+    // For example, let's say the upstream service calculates the usage statistics and returns them in the response body
     // and we want to utilize these numbers to apply the rate limit action for the subsequent requests.
-    // Combined with another filter that can set ``envoy.ratelimit.hits_addend`` based on the response (e.g. Lua filter),
+    // Combined with another filter that can set the desired addend based on the response (e.g. Lua filter),
     // this can be used to subtract the usage statistics from the rate limit budget.
     //
-    // The action applied on the stream completion is "fire-and-forget" by nature, and rate limit is not enforced by this action.
+    // An action applied on the stream completion is "fire-and-forget" by nature, and rate limit is not enforced by this action.
     // Users should ensure that the rate limit is enforced by the actions applied on the request path, i.e. the ones
     // with this field set to false.
     bool apply_on_stream_done = 10;
