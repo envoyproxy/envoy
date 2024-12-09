@@ -79,42 +79,42 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
 
             for (const auto& key : *keys) {
               const auto use = key->getString("use");
-              if (!use.ok() || use->empty()) {
-                ENVOY_LOG(error, "missing 'use' field found in cert for domain: '{}'", domain_name);
+              // Currently only support x509, not jwt.
+              if (!use.ok() || *use != "x509-svid") {
+                  ENVOY_LOG(error, "missing or invalid 'use' field found in cert for domain: '{}'",
+                            domain_name);
+                  return false;
+              }
+              const auto& certs = key->getStringArray("x5c");
+              if (!certs.ok()) {
+                ENVOY_LOG(error, "missing 'x5c' field found in cert for domain: '{}'",
+                          domain_name);
                 return false;
               }
-              if (*use == "x509-svid") {
-                const auto& certs = key->getStringArray("x5c");
-                if (!certs.ok()) {
-                  ENVOY_LOG(error, "missing 'x5c' field found in cert for domain: '{}'",
+              for (const auto& cert : *certs) {
+                std::string decoded_cert = Envoy::Base64::decode(cert);
+                if (decoded_cert.empty()) {
+                  ENVOY_LOG(error, "Invalid or empty cert decoded in domain '{}'", domain_name);
+                  return false;
+                }
+
+                const unsigned char* cert_data =
+                    reinterpret_cast<const unsigned char*>(decoded_cert.data());
+                bssl::UniquePtr<X509> x509(d2i_X509(nullptr, &cert_data, decoded_cert.size()));
+                if (!x509) {
+                  ENVOY_LOG(error,
+                            "Failed to create x509 object while loading certs in domain '{}'",
                             domain_name);
                   return false;
                 }
-                for (const auto& cert : *certs) {
-                  std::string decoded_cert = Envoy::Base64::decode(cert);
-                  if (decoded_cert.empty()) {
-                    ENVOY_LOG(error, "Empty cert decoded in domain '{}'", domain_name);
-                    return false;
-                  }
-
-                  const unsigned char* cert_data =
-                      reinterpret_cast<const unsigned char*>(decoded_cert.data());
-                  bssl::UniquePtr<X509> x509(d2i_X509(nullptr, &cert_data, decoded_cert.size()));
-                  if (!x509) {
-                    ENVOY_LOG(error,
-                              "Failed to create x509 object while loading certs in domain '{}'",
-                              domain_name);
-                    return false;
-                  }
-                  if (X509_STORE_add_cert(spiffe_data->trust_bundle_stores[domain_name].get(),
-                                          x509.get()) != 1) {
-                    ENVOY_LOG(error,
-                              "Failed to add x509 object while loading certs for domain '{}'",
-                              domain_name);
-                    return false;
-                  }
-                  spiffe_data->ca_certs.push_back(std::move(x509));
+                if (X509_STORE_add_cert(spiffe_data->trust_bundle_stores[domain_name].get(),
+                                        x509.get()) != 1) {
+                  ENVOY_LOG(error,
+                            "Failed to add x509 object while loading certs for domain '{}'",
+                            domain_name);
+                  return false;
                 }
+                spiffe_data->ca_certs.push_back(std::move(x509));
               }
             }
 

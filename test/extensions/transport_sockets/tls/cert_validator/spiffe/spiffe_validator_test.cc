@@ -773,6 +773,42 @@ typed_config:
   validator().updateDigestForSessionId(md, hash_buffer, SHA256_DIGEST_LENGTH);
 }
 
+TEST_F(TestSPIFFEValidator, InvalidTrustBundleMapConfig) {
+  {
+  EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_bundles:
+  filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_empty_keys.json"
+  )EOF")),
+                            EnvoyException, "Failed to load SPIFFE Bundle map"");
+  }
+
+  {
+  EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_bundles:
+  filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_invalid_key.json"
+  )EOF")),
+                            EnvoyException, "Failed to load SPIFFE Bundle map"");
+  }
+
+  {
+  EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_bundles:
+  filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_missing_use.json"
+  )EOF")),
+                            EnvoyException, "Failed to load SPIFFE Bundle map"");
+  }
+
+}
+
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomainBundleMappingInline) {
   auto trust_bundle_path =
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/trust_bundles.json");
