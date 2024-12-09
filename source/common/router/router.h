@@ -199,7 +199,7 @@ public:
 /**
  * Configuration for the router filter.
  */
-class FilterConfig : Http::FilterChainFactory {
+class FilterConfig : public Http::FilterChainFactory {
 public:
   FilterConfig(Server::Configuration::CommonFactoryContext& factory_context,
                Stats::StatName stat_prefix, const LocalInfo::LocalInfo& local_info,
@@ -230,10 +230,18 @@ public:
     }
   }
 
+  static absl::StatusOr<std::unique_ptr<FilterConfig>>
+  create(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+         ShadowWriterPtr&& shadow_writer,
+         const envoy::extensions::filters::http::router::v3::Router& config);
+
+protected:
   FilterConfig(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
-               const envoy::extensions::filters::http::router::v3::Router& config);
+               const envoy::extensions::filters::http::router::v3::Router& config,
+               absl::Status& creation_status);
 
+public:
   bool createFilterChain(
       Http::FilterChainManager& manager, bool only_create_if_configured = false,
       const Http::FilterChainOptions& options = Http::EmptyFilterChainOptions{}) const override {

@@ -180,7 +180,7 @@ absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 LogicalDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                                             ClusterFactoryContext& context) {
   auto dns_resolver_or_error = selectDnsResolver(cluster, context);
-  THROW_IF_NOT_OK(dns_resolver_or_error.status());
+  THROW_IF_NOT_OK_REF(dns_resolver_or_error.status());
 
   const auto& load_assignment = cluster.load_assignment();
   const auto& locality_lb_endpoints = load_assignment.endpoints();

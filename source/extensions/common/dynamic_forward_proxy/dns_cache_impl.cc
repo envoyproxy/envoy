@@ -25,20 +25,23 @@ absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
         "DNS Cache [{}] configured with preresolve_hostnames={} larger than max_hosts={}",
         config.name(), config.preresolve_hostnames().size(), max_hosts));
   }
+  auto resolver_or_error =
+      selectDnsResolver(config, context.serverFactoryContext().mainThreadDispatcher(),
+                        context.serverFactoryContext());
+  RETURN_IF_NOT_OK_REF(resolver_or_error.status());
 
-  return std::shared_ptr<DnsCacheImpl>(new DnsCacheImpl(context, config));
+  return std::shared_ptr<DnsCacheImpl>(
+      new DnsCacheImpl(context, config, std::move(*resolver_or_error)));
 }
 
 DnsCacheImpl::DnsCacheImpl(
     Server::Configuration::GenericFactoryContext& context,
-    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
+    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
+    Network::DnsResolverSharedPtr&& resolver)
     : main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       config_(config), random_generator_(context.serverFactoryContext().api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(THROW_OR_RETURN_VALUE(
-          selectDnsResolver(config, main_thread_dispatcher_, context.serverFactoryContext()),
-          Network::DnsResolverSharedPtr)),
-      tls_slot_(context.serverFactoryContext().threadLocal()),
+      resolver_(std::move(resolver)), tls_slot_(context.serverFactoryContext().threadLocal()),
       scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
       resource_manager_(*scope_, context.serverFactoryContext().runtime(), config.name(),
@@ -495,7 +498,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
     primary_host_info->host_info_->setDetails(details_with_maybe_trace);
 
-    THROW_IF_NOT_OK(runAddUpdateCallbacks(host, primary_host_info->host_info_));
+    absl::Status host_status = runAddUpdateCallbacks(host, primary_host_info->host_info_);
+    ENVOY_BUG(host_status.ok(),
+              absl::StrCat("Failed to update DFP host due to ", host_status.message()));
     primary_host_info->host_info_->setFirstResolveComplete();
     address_changed = true;
     stats_.host_address_changed_.inc();
