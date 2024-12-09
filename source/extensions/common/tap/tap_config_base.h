@@ -6,6 +6,7 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/extensions/tap_sinks/udp_sink/v3/udp_sink.pb.h"
 
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
@@ -158,7 +159,7 @@ private:
 // UDP sink definition
 class UdpTapSink : public Sink {
 public:
-  UdpTapSink(const envoy::config::tap::v3::UDPSink& config);
+  UdpTapSink(const envoy::extensions::tap_sinks::udp_sink::v3::UdpSink& config);
   // below one is only for UT
   UdpTapSink(Network::UdpPacketWriterPtr&& utUdpPacketWriter)
       : udp_packet_writer_(std::move(utUdpPacketWriter)) {
@@ -190,7 +191,7 @@ private:
     const uint64_t trace_id_;
   };
 
-  const envoy::config::tap::v3::UDPSink config_;
+  const envoy::extensions::tap_sinks::udp_sink::v3::UdpSink config_;
 
   // Store the configured UDP address and port
   Network::Address::InstanceConstSharedPtr udp_server_address_ = nullptr;
@@ -199,7 +200,29 @@ private:
   // UDP client writer created with client socket
   Network::UdpPacketWriterPtr udp_packet_writer_ = nullptr;
 };
+
 // The end of UDP sink
+// The UDP sink factory
+class UdpTapSinkFactory : public TapSinkFactory {
+public:
+  ~UdpTapSinkFactory() override = default;
+  std::string category() const override { return "envoy.tap.sinks.udp"; }
+  std::string name() const override { return "envoy.tap.sinks.udp"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::tap_sinks::udp_sink::v3::UdpSink>();
+  }
+  /**
+   * Create a UDP Sink that can be used for writing out data produced by the tap filter.
+   * @param config supplies the protobuf configuration for the sink factory
+   * @param cluster_manager is a ClusterManager from the HTTP/transport socket context
+   */
+  // SinkPtr createSinkPtr(const Protobuf::Message& config, SinkContext context) override;
+  SinkPtr createSinkPtr(const Protobuf::Message& config,
+                        Server::Configuration::TransportSocketFactoryContext& tsf_context) override;
+  SinkPtr createSinkPtr(const Protobuf::Message& config,
+                        Server::Configuration::FactoryContext& http_context) override;
+};
+// The end UDP sink factory
 
 } // namespace Tap
 } // namespace Common

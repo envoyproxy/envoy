@@ -178,7 +178,7 @@ public:
 };
 
 TEST_F(UdpTapSinkTest, TestConstructNotSupportTCPprotocol) {
-  envoy::config::tap::v3::UDPSink loc_udp_sink;
+  envoy::extensions::tap_sinks::udp_sink::v3::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
   socket_address->set_port_value(8080);
@@ -188,7 +188,7 @@ TEST_F(UdpTapSinkTest, TestConstructNotSupportTCPprotocol) {
 }
 
 TEST_F(UdpTapSinkTest, TestConstructBadUDPAddress) {
-  envoy::config::tap::v3::UDPSink loc_udp_sink;
+  envoy::extensions::tap_sinks::udp_sink::v3::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   socket_address->set_port_value(65539);
@@ -198,7 +198,7 @@ TEST_F(UdpTapSinkTest, TestConstructBadUDPAddress) {
 }
 
 TEST_F(UdpTapSinkTest, TestConstructGoodUDPAddress) {
-  envoy::config::tap::v3::UDPSink loc_udp_sink;
+  envoy::extensions::tap_sinks::udp_sink::v3::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   socket_address->set_port_value(8080);
@@ -208,14 +208,14 @@ TEST_F(UdpTapSinkTest, TestConstructGoodUDPAddress) {
 }
 
 TEST_F(UdpTapSinkTest, TestSubmitTraceNotUdpPacketWriter) {
-  envoy::config::tap::v3::UDPSink loc_udp_sink;
+  envoy::extensions::tap_sinks::udp_sink::v3::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
   UdpTapSink loc_udp_tap_sink(loc_udp_sink);
 
   // Create UdpTapSinkHandle
   PerTapSinkHandlePtr local_handle =
-      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kUdpSink);
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kCustomSink);
 
   Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
       Extensions::Common::Tap::makeTraceWrapper();
@@ -225,7 +225,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceNotUdpPacketWriter) {
 
 TEST_F(UdpTapSinkTest, TestSubmitTraceForNotSUpportedFormat) {
   // Construct UdpTapSink object
-  envoy::config::tap::v3::UDPSink loc_udp_sink;
+  envoy::extensions::tap_sinks::udp_sink::v3::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   socket_address->set_port_value(8080);
@@ -234,7 +234,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceForNotSUpportedFormat) {
 
   // Create UdpTapSinkHandle
   PerTapSinkHandlePtr local_handle =
-      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kUdpSink);
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kCustomSink);
 
   Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
       Extensions::Common::Tap::makeTraceWrapper();
@@ -290,7 +290,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOk) {
 
   // Create UdpTapSinkHandle
   PerTapSinkHandlePtr local_handle =
-      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kUdpSink);
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kCustomSink);
 
   Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
       Extensions::Common::Tap::makeTraceWrapper();
@@ -306,7 +306,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendNotOk) {
 
   // Create UdpTapSinkHandle
   PerTapSinkHandlePtr local_handle =
-      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kUdpSink);
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kCustomSink);
 
   Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
       Extensions::Common::Tap::makeTraceWrapper();

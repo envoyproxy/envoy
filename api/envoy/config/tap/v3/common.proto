@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.config.tap.v3;
 
 import "envoy/config/common/matcher/v3/matcher.proto";
-import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
@@ -185,7 +184,7 @@ message OutputConfig {
 }
 
 // Tap output sink configuration.
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message OutputSink {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.OutputSink";
@@ -264,9 +263,6 @@ message OutputSink {
 
     // Tap output filter will be defined by an extension type
     core.v3.TypedExtensionConfig custom_sink = 6;
-
-    // UDP sink
-    UDPSink udp_sink = 7;
   }
 }
 
@@ -315,10 +311,4 @@ message StreamingGrpcSink {
 
   // The gRPC server that hosts the Tap Sink Service.
   core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
-}
-
-// The UDP sink message
-message UDPSink {
-  // only protocol UDP is supported even if using SocketAddress
-  core.v3.SocketAddress udp_address = 1;
 }
