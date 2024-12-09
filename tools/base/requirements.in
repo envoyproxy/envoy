@@ -49,6 +49,7 @@ sphinxcontrib.googleanalytics
 sphinxcontrib-htmlhelp>=2.0.5
 sphinxcontrib-qthelp>=1.0.7
 sphinxcontrib-serializinghtml>=1.1.10
+sphinx-rtd-theme>=3.0.2
 thrift
 verboselogs
 yapf
