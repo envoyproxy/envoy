@@ -315,6 +315,8 @@ message RateLimitConfig {
     // this can be used to subtract the usage statistics from the rate limit budget.
     //
     // An action applied on the stream completion is "fire-and-forget" by nature, and rate limit is not enforced by this action.
+    // In other words, the current request won't be blocked by the rate limit action applied on the stream completion, but the
+    // budget will be updated for the subsequent requests based on the action with this field set to true.
     // Users should ensure that the rate limit is enforced by the actions applied on the request path, i.e. the ones
     // with this field set to false.
     bool apply_on_stream_done = 10;
