@@ -76,6 +76,8 @@ public:
   Upstream::ClusterManager& cm() const { return cm_; }
   TimeSource& timeSource() const { return time_source_; }
 
+  Event::Dispatcher& dispatcher() const { return dispatcher_; }
+
   // FilterConfig
 
   JwtAuthnFilterStats& stats() override { return stats_; }
@@ -112,7 +114,8 @@ public:
                           const absl::optional<std::string>& provider, bool allow_failed,
                           bool allow_missing) const override {
     return Authenticator::create(check_audience, provider, allow_failed, allow_missing,
-                                 getJwksCache(), cm(), Common::JwksFetcher::create, timeSource());
+                                 getJwksCache(), cm(), Common::JwksFetcher::create, timeSource(),
+                                 dispatcher());
   }
 
 private:
@@ -147,6 +150,7 @@ private:
   // all requirement_names for debug
   std::string all_requirement_names_;
   TimeSource& time_source_;
+  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace JwtAuthn
