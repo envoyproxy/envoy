@@ -65,11 +65,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     return;
   }
 
-  std::vector<Envoy::RateLimit::Descriptor> descriptors;
-
   const Router::RouteEntry* route_entry = route->routeEntry();
   // Get all applicable rate limit policy entries for the route.
-  populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, headers);
+  populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors_, headers);
 
   VhRateLimitOptions vh_rate_limit_option = getVirtualHostRateLimitOption(route);
 
@@ -77,27 +75,31 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   case VhRateLimitOptions::Ignore:
     break;
   case VhRateLimitOptions::Include:
-    populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
+    populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors_, headers);
     break;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
-      populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
+      populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors_, headers);
     }
     break;
   }
+  makeRateLimitRequest();
+}
 
-  const StreamInfo::UInt32Accessor* hits_addend_filter_state =
-      callbacks_->streamInfo().filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
-          HitsAddendFilterStateKey);
-  double hits_addend = 0;
-  if (hits_addend_filter_state != nullptr) {
-    hits_addend = hits_addend_filter_state->value();
-  }
+void Filter::makeRateLimitRequest() {
+  if (!descriptors_.empty()) {
+    // TODO: Make addend configirable via substituion command.
+    const StreamInfo::UInt32Accessor* hits_addend_filter_state =
+        callbacks_->streamInfo().filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
+            HitsAddendFilterStateKey);
+    double hits_addend = 0;
+    if (hits_addend_filter_state != nullptr) {
+      hits_addend = hits_addend_filter_state->value();
+    }
 
-  if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(*this, getDomain(), descriptors, callbacks_->activeSpan(),
+    client_->limit(*this, getDomain(), descriptors_, callbacks_->activeSpan(),
                    callbacks_->streamInfo(), hits_addend);
     initiating_call_ = false;
   }
@@ -158,9 +160,14 @@ Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap&) {
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) {}
 
 void Filter::onDestroy() {
-  if (state_ == State::Calling) {
-    state_ = State::Complete;
-    client_->cancel();
+  if (config_->applyOnStreamDone()) {
+    state_ = State::OnStreamDone;
+    makeRateLimitRequest();
+  } else {
+    if (state_ == State::Calling) {
+      state_ = State::Complete;
+      client_->cancel();
+    }
   }
 }
 
@@ -170,6 +177,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Http::RequestHeaderMapPtr&& request_headers_to_add,
                       const std::string& response_body,
                       Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
+  if (state_ == State::OnStreamDone) {
+    // We have no more work to do as the rate limit request made during on completion is
+    // fire-and-forget.
+    return;
+  }
   state_ = State::Complete;
   response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
