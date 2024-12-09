@@ -225,8 +225,8 @@ private:
       watermark_callbacks_->get().onSidestreamBelowLowWatermark();
     }
   }
-  void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) override {}
-  void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) override {}
+  void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
+  void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void sendGoAwayAndClose() override {}
 
   void setDecoderBufferLimit(uint32_t) override {
