@@ -305,7 +305,7 @@ message RateLimitConfig {
       config.core.v3.TypedExtensionConfig extension = 9;
     }
 
-    // If true, the action will be also applied when the HTTP stream completes. The default value is false.
+    // If true, the action will be applied when the HTTP stream completes. The default value is false.
     // This is useful when the rate limit budget needs to reflect the response context that is not available
     // on the request path.
     //
@@ -314,9 +314,10 @@ message RateLimitConfig {
     // Combined with another filter that can set ``envoy.ratelimit.hits_addend`` based on the response (e.g. Lua filter),
     // this can be used to subtract the usage statistics from the rate limit budget.
     //
-    // The action taken place on the stream completion is "lazy" by nature, and the rate limit won't be applied to
-    // the current request, but to the subsequent requests that match the descriptor.
-    bool extra_addend_on_stream_done = 10;
+    // The action applied on the stream completion is "fire-and-forget" by nature, and rate limit is not enforced by this action.
+    // Users should ensure that the rate limit is enforced by the actions applied on the request path, i.e. the ones
+    // with this field set to false.
+    bool apply_on_stream_done = 10;
   }
 
   message Override {
