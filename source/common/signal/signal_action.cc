@@ -13,8 +13,19 @@ namespace Envoy {
 constexpr int SignalAction::FATAL_SIGS[];
 
 void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
-  BackwardsTrace tracer;
+  // By default spdlog calls `localtime_r()`, which is not safe to call from within
+  // a signal handler. This is undefined behavior that leads to SIGSEGV on some platforms.
+  // Thankfully spdlog does not call `localtime_r()` when `need_localtime` is set to false.
+  auto sink = Envoy::Logger::Registry::getSink().get();
+  auto formatter = sink->get_formatter();
+  if (formatter) {
+    spdlog::pattern_formatter* p_formatter = dynamic_cast<spdlog::pattern_formatter*>(formatter);
+    if (p_formatter) {
+      p_formatter->need_localtime(false);
+    }
+  }
 
+  BackwardsTrace tracer;
   tracer.logFault(strsignal(sig), info->si_addr);
   if (context != nullptr) {
     tracer.captureFrom(context);
