@@ -181,6 +181,11 @@ build:mobile-remote-ci-linux-asan --config=mobile-clang-asan
 build:mobile-remote-ci-linux-asan --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci-linux-asan --config=remote-ci
 build:mobile-remote-ci-linux-asan --build_tests_only
+# This is probably not the right place to put this, since this target
+# isn't engflow-specific. However, we only need to enable rbe_pool for
+# asan builds right now and this should help unblock testing on the PR.
+# TODO(asedeno): Figure out something better before merging.
+build:mobile-remote-ci-linux-asan --define=engflow_rbe=true
 test:mobile-remote-ci-linux-asan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 
 #############################################################################

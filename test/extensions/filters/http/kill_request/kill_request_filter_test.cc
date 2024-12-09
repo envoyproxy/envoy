@@ -21,7 +21,7 @@ namespace {
 using ::testing::AnyNumber;
 using ::testing::Return;
 
-class KillRequestFilterTest : public testing::Test {
+class KillRequestFilterDeathTest : public testing::Test {
 protected:
   void
   setUpTest(const envoy::extensions::filters::http::kill_request::v3::KillRequest& kill_request) {
@@ -39,7 +39,7 @@ protected:
   Http::TestResponseHeaderMapImpl response_headers_;
 };
 
-TEST_F(KillRequestFilterTest, KillRequestCrashEnvoy) {
+TEST_F(KillRequestFilterDeathTest, KillRequestCrashEnvoy) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(1);
   setUpTest(kill_request);
@@ -50,7 +50,7 @@ TEST_F(KillRequestFilterTest, KillRequestCrashEnvoy) {
                "KillRequestFilter is crashing Envoy!!!");
 }
 
-TEST_F(KillRequestFilterTest, KillRequestCrashEnvoyWithCustomKillHeader) {
+TEST_F(KillRequestFilterDeathTest, KillRequestCrashEnvoyWithCustomKillHeader) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(1);
   kill_request.set_kill_request_header("x-custom-kill-request");
@@ -62,7 +62,7 @@ TEST_F(KillRequestFilterTest, KillRequestCrashEnvoyWithCustomKillHeader) {
                "KillRequestFilter is crashing Envoy!!!");
 }
 
-TEST_F(KillRequestFilterTest, KillRequestWithMillionDenominatorCrashEnvoy) {
+TEST_F(KillRequestFilterDeathTest, KillRequestWithMillionDenominatorCrashEnvoy) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(1);
   kill_request.mutable_probability()->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
@@ -74,7 +74,7 @@ TEST_F(KillRequestFilterTest, KillRequestWithMillionDenominatorCrashEnvoy) {
                "KillRequestFilter is crashing Envoy!!!");
 }
 
-TEST_F(KillRequestFilterTest, KillRequestDisabledWhenIsKillRequestEnabledReturnsFalse) {
+TEST_F(KillRequestFilterDeathTest, KillRequestDisabledWhenIsKillRequestEnabledReturnsFalse) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(0);
   setUpTest(kill_request);
@@ -86,7 +86,7 @@ TEST_F(KillRequestFilterTest, KillRequestDisabledWhenIsKillRequestEnabledReturns
 
 // Kill request should be enabled when isKillRequestEnabled returns true
 // from the route level configuration.
-TEST_F(KillRequestFilterTest, KillRequestEnabledFromRouteLevelConfiguration) {
+TEST_F(KillRequestFilterDeathTest, KillRequestEnabledFromRouteLevelConfiguration) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(0);
   setUpTest(kill_request);
@@ -106,7 +106,7 @@ TEST_F(KillRequestFilterTest, KillRequestEnabledFromRouteLevelConfiguration) {
 
 // Kill request should be disabled when isKillRequestEnabled returns false
 // from the route level configuration.
-TEST_F(KillRequestFilterTest, KillRequestDisabledRouteLevelConfiguration) {
+TEST_F(KillRequestFilterDeathTest, KillRequestDisabledRouteLevelConfiguration) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(0);
   setUpTest(kill_request);
@@ -118,7 +118,7 @@ TEST_F(KillRequestFilterTest, KillRequestDisabledRouteLevelConfiguration) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
-TEST_F(KillRequestFilterTest, KillRequestDisabledWhenHeaderIsMissing) {
+TEST_F(KillRequestFilterDeathTest, KillRequestDisabledWhenHeaderIsMissing) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(100);
   setUpTest(kill_request);
@@ -127,7 +127,7 @@ TEST_F(KillRequestFilterTest, KillRequestDisabledWhenHeaderIsMissing) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
-TEST_F(KillRequestFilterTest, KillRequestDisabledWhenHeaderValueIsInvalid) {
+TEST_F(KillRequestFilterDeathTest, KillRequestDisabledWhenHeaderValueIsInvalid) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(100);
   setUpTest(kill_request);
@@ -137,42 +137,42 @@ TEST_F(KillRequestFilterTest, KillRequestDisabledWhenHeaderValueIsInvalid) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
-TEST_F(KillRequestFilterTest, DecodeDataReturnsContinue) {
+TEST_F(KillRequestFilterDeathTest, DecodeDataReturnsContinue) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   setUpTest(kill_request);
   Buffer::OwnedImpl data;
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
 }
 
-TEST_F(KillRequestFilterTest, DecodeTrailersReturnsContinue) {
+TEST_F(KillRequestFilterDeathTest, DecodeTrailersReturnsContinue) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   setUpTest(kill_request);
   Http::TestRequestTrailerMapImpl request_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 }
 
-TEST_F(KillRequestFilterTest, Encode1xxHeadersReturnsContinue) {
+TEST_F(KillRequestFilterDeathTest, Encode1xxHeadersReturnsContinue) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   setUpTest(kill_request);
   Http::TestResponseHeaderMapImpl response_headers;
   EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers));
 }
 
-TEST_F(KillRequestFilterTest, EncodeTrailersReturnsContinue) {
+TEST_F(KillRequestFilterDeathTest, EncodeTrailersReturnsContinue) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   setUpTest(kill_request);
   Http::TestResponseTrailerMapImpl response_trailers;
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
 }
 
-TEST_F(KillRequestFilterTest, EncodeMetadataReturnsContinue) {
+TEST_F(KillRequestFilterDeathTest, EncodeMetadataReturnsContinue) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   setUpTest(kill_request);
   Http::MetadataMap metadata_map;
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
 }
 
-TEST_F(KillRequestFilterTest, CanKillOnResponse) {
+TEST_F(KillRequestFilterDeathTest, CanKillOnResponse) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(1);
   kill_request.set_direction(
@@ -186,7 +186,7 @@ TEST_F(KillRequestFilterTest, CanKillOnResponse) {
                "KillRequestFilter is crashing Envoy!!!");
 }
 
-TEST_F(KillRequestFilterTest, KillsBasedOnDirection) {
+TEST_F(KillRequestFilterDeathTest, KillsBasedOnDirection) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   kill_request.mutable_probability()->set_numerator(1);
   kill_request.set_direction(
@@ -204,7 +204,7 @@ TEST_F(KillRequestFilterTest, KillsBasedOnDirection) {
                "KillRequestFilter is crashing Envoy!!!");
 }
 
-TEST_F(KillRequestFilterTest, PerRouteKillSettingFound) {
+TEST_F(KillRequestFilterDeathTest, PerRouteKillSettingFound) {
   envoy::extensions::filters::http::kill_request::v3::KillRequest kill_request;
   setUpTest(kill_request);
   request_headers_.addCopy("x-envoy-kill-request", "true");

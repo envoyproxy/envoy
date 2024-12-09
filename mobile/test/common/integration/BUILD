@@ -21,6 +21,7 @@ envoy_cc_test(
         ],
         "//conditions:default": [],
     }),
+    rbe_pool = "6gig",
     repository = "@envoy",
     shard_count = 6,
     deps = [
@@ -46,6 +47,7 @@ envoy_cc_test_library(
     hdrs = [
         "base_client_integration_test.h",
     ],
+    rbe_pool = "6gig",
     repository = "@envoy",
     deps = [
         "//library/cc:engine_builder_lib",
@@ -70,6 +72,7 @@ envoy_cc_test_library(
     data = [
         "@envoy//test/config/integration/certs",
     ],
+    rbe_pool = "6gig",
     repository = "@envoy",
     deps = [
         "//library/common:engine_common_lib",
