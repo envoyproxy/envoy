@@ -569,7 +569,7 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
             config_->regexEngine()),
         std::unique_ptr<Http::NullRouteImpl>);
   }
-  auto host = cluster.chooseHost(this);
+  HostConstSharedPtr host = cluster.chooseHost(this);
   if (host) {
     generic_conn_pool_ = factory->createGenericConnPool(
         host, cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
