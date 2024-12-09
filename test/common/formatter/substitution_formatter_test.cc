@@ -669,6 +669,28 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                 ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
   }
 
+  {
+    StreamInfoFormatter upstream_format("UPSTREAM_HOST_NAME_WITHOUT_PORT");
+
+    // Hostname includes port.
+    mock_host->hostname_ = "upstream_host_xxx:443";
+    EXPECT_EQ("upstream_host_xxx", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("upstream_host_xxx")));
+
+    // Hostname doesn't include port.
+    mock_host->hostname_ = "upstream_host_xxx";
+    EXPECT_EQ("upstream_host_xxx", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("upstream_host_xxx")));
+
+    // Hostname is not used then the main address (only the ip) is used.
+    mock_host->hostname_.clear();
+    EXPECT_EQ("10.0.0.1", upstream_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("10.0.0.1")));
+  }
+
   auto test_upstream_remote_address =
       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("10.0.0.2", 80)};
   auto default_upstream_remote_address = stream_info.upstreamInfo()->upstreamRemoteAddress();
@@ -842,6 +864,18 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter format("DOWNSTREAM_DIRECT_LOCAL_ADDRESS");
+    auto address = Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance(
+             "127.1.2.3", 6745)},
+         original_address = stream_info.downstream_connection_info_provider_->localAddress();
+    stream_info.downstream_connection_info_provider_->setLocalAddress(address);
+    EXPECT_EQ("127.0.0.2:0", format.formatWithContext({}, stream_info));
+    EXPECT_THAT(format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("127.0.0.2:0")));
+    stream_info.downstream_connection_info_provider_->setLocalAddress(original_address);
+  }
+
+  {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT");
     EXPECT_EQ("127.0.0.2", upstream_format.formatWithContext({}, stream_info));
     EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
@@ -849,31 +883,71 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_PORT");
+    StreamInfoFormatter format("DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT");
+    EXPECT_EQ("127.0.0.2", format.formatWithContext({}, stream_info));
+    EXPECT_THAT(format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("127.0.0.2")));
+  }
+
+  {
+    StreamInfoFormatter format("DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT");
+    auto address = Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv4Instance("127.1.2.3", 8900)};
+    stream_info.downstream_connection_info_provider_->setLocalAddress(address);
+    EXPECT_EQ("127.0.0.2", format.formatWithContext({}, stream_info));
+    EXPECT_THAT(format.formatValueWithContext({}, stream_info),
+                ProtoEq(ValueUtil::stringValue("127.0.0.2")));
+  }
+
+  {
+    StreamInfoFormatter format("DOWNSTREAM_DIRECT_LOCAL_PORT");
+    EXPECT_EQ("0", format.formatWithContext({}, stream_info));
+    EXPECT_THAT(format.formatValueWithContext({}, stream_info), ProtoEq(ValueUtil::numberValue(0)));
+  }
+
+  {
+    StreamInfoFormatter downstream_local_port_format("DOWNSTREAM_LOCAL_PORT"),
+        downstream_direct_downstream_local_port_format("DOWNSTREAM_DIRECT_LOCAL_PORT");
 
     // Validate for IPv4 address
     auto address = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv4Instance("127.1.2.3", 8443)};
     stream_info.downstream_connection_info_provider_->setLocalAddress(address);
-    EXPECT_EQ("8443", upstream_format.formatWithContext({}, stream_info));
-    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+    EXPECT_EQ("8443", downstream_local_port_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(downstream_local_port_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(8443)));
+
+    EXPECT_EQ("0",
+              downstream_direct_downstream_local_port_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(
+        downstream_direct_downstream_local_port_format.formatValueWithContext({}, stream_info),
+        ProtoEq(ValueUtil::numberValue(0)));
 
     // Validate for IPv6 address
     address =
         Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv6Instance("::1", 9443)};
     stream_info.downstream_connection_info_provider_->setLocalAddress(address);
-    EXPECT_EQ("9443", upstream_format.formatWithContext({}, stream_info));
-    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+    EXPECT_EQ("9443", downstream_local_port_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(downstream_local_port_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::numberValue(9443)));
 
+    EXPECT_EQ("0",
+              downstream_direct_downstream_local_port_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(
+        downstream_direct_downstream_local_port_format.formatValueWithContext({}, stream_info),
+        ProtoEq(ValueUtil::numberValue(0)));
     // Validate for Pipe
     address =
         Network::Address::InstanceConstSharedPtr{*Network::Address::PipeInstance::create("/foo")};
     stream_info.downstream_connection_info_provider_->setLocalAddress(address);
-    EXPECT_EQ("", upstream_format.formatWithContext({}, stream_info));
-    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
+    EXPECT_EQ("", downstream_local_port_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(downstream_local_port_format.formatValueWithContext({}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ("0",
+              downstream_direct_downstream_local_port_format.formatWithContext({}, stream_info));
+    EXPECT_THAT(
+        downstream_direct_downstream_local_port_format.formatValueWithContext({}, stream_info),
+        ProtoEq(ValueUtil::numberValue(0)));
   }
 
   {
@@ -1106,8 +1180,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     std::vector<std::string> time_points{
-        "DS_RX_BEG", "DS_RX_END", "US_TX_BEG", "US_TX_END",         "US_RX_BEG",
-        "US_RX_END", "DS_TX_BEG", "DS_TX_END", "custom_time_point",
+        "DS_RX_BEG", "DS_RX_END", "US_CX_BEG", "US_CX_END", "US_HS_END", "US_TX_BEG",
+        "US_TX_END", "US_RX_BEG", "US_RX_END", "DS_TX_BEG", "DS_TX_END", "custom_time_point",
     };
 
     std::vector<std::string> precisions{"ms", "us", "ns"};
@@ -1151,43 +1225,61 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(2000000))));
       stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
-      // US_TX_BEG
+      // US_CX_BEG
       EXPECT_CALL(time_system, monotonicTime)
           .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(3000000))));
+      stream_info.upstream_info_->upstreamTiming().upstream_connect_start_ =
+          time_system.monotonicTime();
+
+      // US_CX_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
+      stream_info.upstream_info_->upstreamTiming().upstream_connect_complete_ =
+          time_system.monotonicTime();
+
+      // US_HS_END
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+      stream_info.upstream_info_->upstreamTiming().upstream_handshake_complete_ =
+          time_system.monotonicTime();
+
+      // US_TX_BEG
+      EXPECT_CALL(time_system, monotonicTime)
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(6000000))));
       stream_info.upstream_info_->upstreamTiming().first_upstream_tx_byte_sent_ =
           time_system.monotonicTime();
 
       // US_TX_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(4000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(7000000))));
       stream_info.upstream_info_->upstreamTiming().last_upstream_tx_byte_sent_ =
           time_system.monotonicTime();
 
       // US_RX_BEG
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(8000000))));
       stream_info.upstream_info_->upstreamTiming().first_upstream_rx_byte_received_ =
           time_system.monotonicTime();
 
       // US_RX_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(6000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(9000000))));
       stream_info.upstream_info_->upstreamTiming().last_upstream_rx_byte_received_ =
           time_system.monotonicTime();
 
       // DS_TX_BEG
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(7000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(10000000))));
       stream_info.downstream_timing_.onFirstDownstreamTxByteSent(time_system);
 
       // DS_TX_END
       EXPECT_CALL(time_system, monotonicTime)
-          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(8000000))));
+          .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(11000000))));
       stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
 
       // custom_time_point
       stream_info.downstream_timing_.setValue("custom_time_point",
-                                              MonotonicTime(std::chrono::nanoseconds(9000000)));
+                                              MonotonicTime(std::chrono::nanoseconds(12000000)));
 
       for (size_t start_index = 0; start_index < time_points.size(); start_index++) {
         for (size_t end_index = 0; end_index < time_points.size(); end_index++) {

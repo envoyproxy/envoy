@@ -68,7 +68,21 @@ def envoy_copts(repository, test = False):
                    "-Wc++2a-extensions",
                    "-Wrange-loop-analysis",
                ],
-               repository + "//bazel:gcc_build": ["-Wno-maybe-uninitialized"],
+               repository + "//bazel:gcc_build": [
+                   "-Wno-maybe-uninitialized",
+                   # GCC implementation of this warning is too noisy.
+                   #
+                   # It generates warnings even in cases where there is no ambiguity
+                   # between the overloaded version of a method and the hidden version
+                   # from the base class. E.g., when the two have different number of
+                   # arguments or incompatible types and therefore a wrong function
+                   # cannot be called by mistake without triggering a compiler error.
+                   #
+                   # As a safeguard, this warning is only disabled for GCC builds, so
+                   # if Clang catches a problem in the code we would get a warning
+                   # anyways.
+                   "-Wno-error=overloaded-virtual",
+               ],
                # Allow 'nodiscard' function results values to be discarded for test code only
                # TODO(envoyproxy/windows-dev): Replace /Zc:preprocessor with /experimental:preprocessor
                # for msvc versions between 15.8 through 16.4.x. see

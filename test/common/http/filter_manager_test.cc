@@ -71,7 +71,7 @@ public:
     EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
   }
 
-  std::unique_ptr<FilterManager> filter_manager_;
+  std::unique_ptr<DownstreamFilterManager> filter_manager_;
   NiceMock<MockFilterManagerCallbacks> filter_manager_callbacks_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Network::MockConnection> connection_;
@@ -98,7 +98,7 @@ TEST_F(FilterManagerTest, RequestHeadersOrResponseHeadersAccess) {
         manager.applyFilterFactoryCb({}, encoder_factory);
         return true;
       }));
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   RequestHeaderMapPtr request_headers{
       new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -172,7 +172,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
         return true;
       }));
 
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   filter_manager_->requestHeadersInitialized();
 
@@ -237,7 +237,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
       .WillByDefault(Return(makeOptRef(*grpc_headers)));
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   filter_manager_->requestHeadersInitialized();
   EXPECT_CALL(local_reply_, rewrite(_, _, _, _, _, _));
@@ -280,7 +280,7 @@ TEST_F(FilterManagerTest, OnLocalReply) {
         return true;
       }));
 
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
   filter_manager_->requestHeadersInitialized();
   filter_manager_->decodeHeaders(*headers, true);
 
@@ -343,7 +343,7 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
         return true;
       }));
 
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
   filter_manager_->requestHeadersInitialized();
   filter_manager_->decodeHeaders(*headers, true);
 
@@ -399,7 +399,7 @@ TEST_F(FilterManagerTest, ResetIdleTimer) {
         manager.applyFilterFactoryCb({}, decoder_factory);
         return true;
       }));
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
   decoder_filter->callbacks_->resetIdleTimer();
@@ -418,7 +418,7 @@ TEST_F(FilterManagerTest, SetAndGetUpstreamOverrideHost) {
         manager.applyFilterFactoryCb({}, decoder_factory);
         return true;
       }));
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   decoder_filter->callbacks_->setUpstreamOverrideHost(std::make_pair("1.2.3.4", true));
 
@@ -440,7 +440,7 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfig) {
         manager.applyFilterFactoryCb({"custom-name"}, decoder_factory);
         return true;
       }));
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   std::shared_ptr<Router::MockRoute> route(new NiceMock<Router::MockRoute>());
   auto route_config = std::make_shared<Router::RouteSpecificFilterConfig>();
@@ -488,7 +488,7 @@ TEST_F(FilterManagerTest, GetRouteLevelFilterConfigForNullRoute) {
         manager.applyFilterFactoryCb({"custom-name"}, decoder_factory);
         return true;
       }));
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   std::shared_ptr<Router::MockRoute> route(new NiceMock<Router::MockRoute>());
   auto route_config = std::make_shared<Router::RouteSpecificFilterConfig>();
@@ -521,7 +521,7 @@ TEST_F(FilterManagerTest, MetadataContinueAll) {
         manager.applyFilterFactoryCb({"configName2"}, decoder_factory);
         return true;
       }));
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   // Decode path:
   EXPECT_CALL(*filter_1, decodeHeaders(_, _)).WillOnce(Return(FilterHeadersStatus::StopIteration));
@@ -593,7 +593,7 @@ TEST_F(FilterManagerTest, DecodeMetadataSendsLocalReply) {
         manager.applyFilterFactoryCb({"configName2"}, factory);
         return true;
       }));
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   RequestHeaderMapPtr basic_headers{
       new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
@@ -640,7 +640,7 @@ TEST_F(FilterManagerTest, MetadataContinueAllFollowedByHeadersLocalReply) {
         manager.applyFilterFactoryCb({"configName2"}, decoder_factory);
         return true;
       }));
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   // Decode path:
   EXPECT_CALL(*filter_1, decodeHeaders(_, _)).WillOnce(Return(FilterHeadersStatus::StopIteration));
@@ -680,7 +680,7 @@ TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
         manager.applyFilterFactoryCb({"configName2"}, factory);
         return true;
       }));
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   // Encode headers first, as metadata can't get ahead of headers.
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
@@ -717,7 +717,7 @@ TEST_F(FilterManagerTest, IdleTimerResets) {
         manager.applyFilterFactoryCb({"configName1"}, factory);
         return true;
       }));
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
 
   RequestHeaderMapPtr basic_headers{
       new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};

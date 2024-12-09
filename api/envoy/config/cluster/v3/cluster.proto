@@ -965,7 +965,7 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  google.protobuf.Duration dns_jitter = 58;
+  google.protobuf.Duration dns_jitter = 58 [(validate.rules).duration = {gte {}}];
 
   // If the DNS failure refresh rate is specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,

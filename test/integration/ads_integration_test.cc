@@ -2904,14 +2904,14 @@ TEST_P(AdsReplacementIntegrationTest, ReplaceAdsConfig) {
   const absl::flat_hash_map<std::string, std::string> empty_initial_resource_versions_map;
   EXPECT_TRUE(compareDiscoveryRequest(
       Config::TypeUrl::get().Cluster, "", {}, {}, {}, true, Grpc::Status::WellKnownGrpcStatus::Ok,
-      "", second_xds_stream_.get(), OptRef(cds_eds_initial_resource_versions_map)));
+      "", second_xds_stream_.get(), makeOptRef(cds_eds_initial_resource_versions_map)));
   EXPECT_TRUE(compareDiscoveryRequest(
       Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}, {"cluster_0"}, {}, false,
       Grpc::Status::WellKnownGrpcStatus::Ok, "", second_xds_stream_.get(),
-      OptRef(cds_eds_initial_resource_versions_map)));
+      makeOptRef(cds_eds_initial_resource_versions_map)));
   EXPECT_TRUE(compareDiscoveryRequest(
       Config::TypeUrl::get().Listener, "", {}, {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok,
-      "", second_xds_stream_.get(), OptRef(empty_initial_resource_versions_map)));
+      "", second_xds_stream_.get(), makeOptRef(empty_initial_resource_versions_map)));
   // Send a CDS response with new resources.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {buildCluster("replaced_cluster")},

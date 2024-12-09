@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <memory>
 #include <string>
@@ -246,7 +247,10 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
       false);
   auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
 
-  cluster->initialize([&]() -> void { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
@@ -439,7 +443,10 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsIsInializedImmediately) {
 
   auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
   EXPECT_CALL(initialized, ready());
-  cluster->initialize([&]() -> void { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
@@ -475,7 +482,10 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster->setHealthChecker(health_checker);
-  cluster->initialize([&]() -> void { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(initialized, ready());
@@ -520,7 +530,10 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
 
   // Initialized without completing DNS resolution.
   EXPECT_CALL(initialized, ready());
-  cluster->initialize([&]() -> void { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
@@ -637,7 +650,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
         return absl::OkStatus();
       });
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -770,7 +783,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster->setHealthChecker(health_checker);
-  cluster->initialize([&]() -> void {});
+  cluster->initialize([&]() -> absl::Status { return absl::OkStatus(); });
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
@@ -831,7 +844,10 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster->setHealthChecker(health_checker);
   ReadyWatcher initialized;
-  cluster->initialize([&initialized]() { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
@@ -910,7 +926,10 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster->setHealthChecker(health_checker);
   ReadyWatcher initialized;
-  cluster->initialize([&initialized]() { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
   EXPECT_CALL(initialized, ready());
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
@@ -1053,7 +1072,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
         return absl::OkStatus();
       });
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1270,7 +1289,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
         return absl::OkStatus();
       });
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
@@ -1414,7 +1433,7 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
 
   auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   // Failing response kicks the failure refresh backoff strategy.
   ON_CALL(random_, random()).WillByDefault(Return(8000));
@@ -1469,7 +1488,7 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
         return absl::OkStatus();
       });
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   // TTL is recorded when the DNS response is successful and not empty
   EXPECT_CALL(membership_updated, ready());
@@ -1490,6 +1509,30 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
                          TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
+TEST_F(StrictDnsClusterImplTest, NegativeDnsJitter) {
+  const std::string yaml = R"EOF(
+    name: name
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    dns_refresh_rate: 4s
+    dns_jitter: -1s
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  EXPECT_THROW_WITH_MESSAGE(
+      auto x = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_),
+      EnvoyException, "Invalid duration: Expected positive duration: seconds: -1\n");
+}
 TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
@@ -1519,7 +1562,7 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
 
   auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   uint64_t random_return = 8500;
   uint64_t jitter_ms = random_return % 1000;
@@ -1531,6 +1574,40 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
   resolver.dns_callback_(
       Network::DnsResolver::ResolutionStatus::Completed, "",
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(ttl_s)));
+}
+
+TEST_F(StrictDnsClusterImplTest, ExtremeJitter) {
+  ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    dns_refresh_rate: 1s
+    dns_jitter: 1000s
+    respect_dns_ttl: true
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  EXPECT_CALL(*resolver.timer_, enableTimer(testing::Ge(std::chrono::milliseconds(1000)), _));
+  ON_CALL(random_, random()).WillByDefault(Return(std::numeric_limits<int64_t>::min()));
+  resolver.dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(1)));
 }
 
 // Ensures that HTTP/2 user defined SETTINGS parameter validation is enforced on clusters.
@@ -2072,7 +2149,7 @@ TEST_F(StaticClusterImplTest, InitialHosts) {
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -2109,7 +2186,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
@@ -2144,7 +2221,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostname) {
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("foo", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
@@ -2178,7 +2255,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostnameWithHealthChecks) {
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("foo", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
@@ -2230,7 +2307,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[1]->healthyHosts().size());
@@ -2274,7 +2351,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 2);
@@ -2319,7 +2396,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(Host::Health::Degraded,
@@ -2350,7 +2427,7 @@ TEST_F(StaticClusterImplTest, AltStatName) {
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
   // Increment a stat and verify it is emitted with alt_stat_name
   cluster->info()->trafficStats()->upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.staticcluster_stats.upstream_rq_total").value());
@@ -2379,7 +2456,7 @@ TEST_F(StaticClusterImplTest, RingHash) {
       true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("envoy.load_balancing_policies.ring_hash",
@@ -2416,7 +2493,7 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
       true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ("envoy.load_balancing_policies.round_robin",
             cluster->info()->loadBalancerFactory().name());
@@ -2461,7 +2538,7 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
       true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ("envoy.load_balancing_policies.least_request",
             cluster->info()->loadBalancerFactory().name());
@@ -2509,7 +2586,7 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
   Outlier::MockDetector* detector = new Outlier::MockDetector();
   EXPECT_CALL(*detector, addChangedStateCb(_));
   cluster->setOutlierDetector(Outlier::DetectorSharedPtr{detector});
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(2UL, cluster->info()->endpointStats().membership_healthy_.value());
@@ -2572,7 +2649,10 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->setHealthChecker(health_checker);
 
   ReadyWatcher initialized;
-  cluster->initialize([&initialized] { initialized.ready(); });
+  cluster->initialize([&initialized] {
+    initialized.ready();
+    return absl::OkStatus();
+  });
 
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -2713,7 +2793,10 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
   cluster->setHealthChecker(health_checker);
 
   ReadyWatcher initialized;
-  cluster->initialize([&initialized] { initialized.ready(); });
+  cluster->initialize([&initialized] {
+    initialized.ready();
+    return absl::OkStatus();
+  });
 
   // The endpoint with disabled active health check should not be set FAILED_ACTIVE_HC
   // at beginning.
@@ -2765,7 +2848,7 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1024U, cluster->info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(1024U,
@@ -2854,7 +2937,7 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
       true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_TRUE(cluster->info()->addedViaApi());
@@ -3130,7 +3213,7 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
       true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_TRUE(cluster->info()->addedViaApi());
@@ -3168,7 +3251,7 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_TRUE(cluster->info()->addedViaApi());
@@ -3222,7 +3305,7 @@ TEST_F(StaticClusterImplTest, NoHostsTest) {
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
@@ -3760,7 +3843,7 @@ TEST_F(StaticClusterImplTest, HappyEyeballsConfig) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
   envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig expected_config;
   expected_config.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
@@ -4758,7 +4841,7 @@ public:
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }
   ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override { PANIC("not implemented"); }
-  Router::RouteSpecificFilterConfigConstSharedPtr
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfig(const Protobuf::Message&,
                                   Server::Configuration::ServerFactoryContext&,
                                   ProtobufMessage::ValidationVisitor&) override {
@@ -6233,7 +6316,7 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 
   NiceMock<Random::MockRandomGenerator> random;

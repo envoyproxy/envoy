@@ -50,7 +50,7 @@ DnsResolverImpl::DnsResolverImpl(
           config, query_timeout_seconds, DEFAULT_QUERY_TIMEOUT_SECONDS))),
       query_tries_(static_cast<uint32_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, query_tries, DEFAULT_QUERY_TRIES))),
-      resolvers_csv_(resolvers_csv),
+      rotate_nameservers_(config.rotate_nameservers()), resolvers_csv_(resolvers_csv),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
   AresOptions options = defaultAresOptions();
@@ -118,6 +118,12 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
   options.options_.timeout = query_timeout_seconds_;
   options.optmask_ |= ARES_OPT_TRIES;
   options.options_.tries = query_tries_;
+
+  if (rotate_nameservers_) {
+    options.optmask_ |= ARES_OPT_ROTATE;
+  } else {
+    options.optmask_ |= ARES_OPT_NOROTATE;
+  }
 
   return options;
 }

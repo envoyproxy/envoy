@@ -1,8 +1,11 @@
 #pragma once
 
 #include "envoy/extensions/load_balancing_policies/client_side_weighted_round_robin/v3/client_side_weighted_round_robin.pb.h"
+#include "envoy/thread_local/thread_local.h"
+#include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/common/callback_impl.h"
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 #include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
@@ -21,7 +24,8 @@ using OrcaLoadReportProto = xds::data::orca::v3::OrcaLoadReport;
 class ClientSideWeightedRoundRobinLbConfig : public Upstream::LoadBalancerConfig {
 public:
   ClientSideWeightedRoundRobinLbConfig(const ClientSideWeightedRoundRobinLbProto& lb_proto,
-                                       Event::Dispatcher& main_thread_dispatcher);
+                                       Event::Dispatcher& main_thread_dispatcher,
+                                       ThreadLocal::SlotAllocator& tls_slot_allocator);
 
   // Parameters for weight calculation from Orca Load report.
   std::vector<std::string> metric_names_for_computing_utilization;
@@ -32,6 +36,7 @@ public:
   std::chrono::milliseconds weight_update_period;
 
   Event::Dispatcher& main_thread_dispatcher_;
+  ThreadLocal::SlotAllocator& tls_slot_allocator_;
 };
 
 /**
@@ -131,6 +136,12 @@ public:
     TimeSource& time_source_;
   };
 
+  // Thread local shim to store callbacks for weight updates of worker local lb.
+  class ThreadLocalShim : public Envoy::ThreadLocal::ThreadLocalObject {
+  public:
+    Common::CallbackManager<uint32_t> apply_weights_cb_helper_;
+  };
+
   // This class is used to handle the load balancing on the worker thread.
   class WorkerLocalLb : public RoundRobinLoadBalancer {
   public:
@@ -139,15 +150,15 @@ public:
         ClusterLbStats& stats, Runtime::Loader& runtime, Random::RandomGenerator& random,
         const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
         const ClientSideWeightedRoundRobinLbConfig& client_side_weighted_round_robin_config,
-        TimeSource& time_source);
+        TimeSource& time_source, OptRef<ThreadLocalShim> tls_shim);
 
   private:
     friend class ClientSideWeightedRoundRobinLoadBalancerFriend;
 
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
-    bool alwaysUseEdfScheduler() const override { return true; };
 
     std::shared_ptr<OrcaLoadReportHandler> orca_load_report_handler_;
+    Common::CallbackHandlePtr apply_weights_cb_handle_;
   };
 
   // Factory used to create worker-local load balancer on the worker thread.
@@ -158,14 +169,24 @@ public:
                          const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
                          Envoy::Random::RandomGenerator& random, TimeSource& time_source)
         : lb_config_(lb_config), cluster_info_(cluster_info), priority_set_(priority_set),
-          runtime_(runtime), random_(random), time_source_(time_source) {}
+          runtime_(runtime), random_(random), time_source_(time_source) {
+      const auto* typed_lb_config =
+          dynamic_cast<const ClientSideWeightedRoundRobinLbConfig*>(lb_config.ptr());
+      ASSERT(typed_lb_config != nullptr);
+      tls_ =
+          ThreadLocal::TypedSlot<ThreadLocalShim>::makeUnique(typed_lb_config->tls_slot_allocator_);
+      tls_->set([](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalShim>(); });
+    }
 
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override;
 
     bool recreateOnHostChange() const override { return false; }
 
+    void applyWeightsToAllWorkers(uint32_t priority);
+
   protected:
     OptRef<const Upstream::LoadBalancerConfig> lb_config_;
+    std::unique_ptr<Envoy::ThreadLocal::TypedSlot<ThreadLocalShim>> tls_;
 
     const Upstream::ClusterInfo& cluster_info_;
     const Upstream::PrioritySet& priority_set_;
@@ -200,7 +221,8 @@ private:
   void updateWeightsOnMainThread();
 
   // Update weights using client side host LB policy data for all `hosts`.
-  void updateWeightsOnHosts(const HostVector& hosts);
+  // Returns true if any host weight is updated.
+  bool updateWeightsOnHosts(const HostVector& hosts);
 
   // Add client side host LB policy data to all `hosts`.
   static void addClientSideLbPolicyDataToHosts(const HostVector& hosts);

@@ -2512,7 +2512,9 @@ TEST_P(QuicHttpIntegrationTest, StreamTimeoutWithHalfClose) {
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   quic::QuicStream* stream = quic_session->GetActiveStream(0);
   // Only send RESET_STREAM to close write side of this stream.
-  stream->ResetWriteSide(quic::QuicResetStreamError::FromInternal(quic::QUIC_STREAM_NO_ERROR));
+  quic_session->MaybeSendRstStreamFrame(
+      stream->id(), quic::QuicResetStreamError::FromInternal(quic::QUIC_STREAM_NO_ERROR),
+      stream->stream_bytes_written());
 
   // Wait for the server to timeout this request and the local reply.
   EXPECT_TRUE(response->waitForEndStream());

@@ -57,9 +57,9 @@ test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 # Allow tags to influence execution requirements
 common --experimental_allow_tags_propagation
 
+build:linux --copt=-fdebug-types-section
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
-build:linux --copt=-fdebug-types-section
 build:linux --copt=-fPIC
 build:linux --copt=-Wno-deprecated-declarations
 build:linux --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
@@ -95,6 +95,21 @@ build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 build:gcc --test_env=HEAPCHECK=
 build:gcc --action_env=BAZEL_COMPILER=gcc
 build:gcc --action_env=CC=gcc --action_env=CXX=g++
+# This is to work around a bug in GCC that makes debug-types-section
+# option not play well with fission:
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=110885
+build:gcc --copt=-fno-debug-types-section
+# These trigger errors in multiple places both in Envoy dependecies
+# and in Envoy code itself when using GCC.
+# And in all cases the reports appear to be clear false positives.
+build:gcc --copt=-Wno-error=restrict
+build:gcc --copt=-Wno-error=uninitialized
+build:gcc --cxxopt=-Wno-missing-requires
+# We need this because -Wno-missing-requires options is rather new
+# in GCC, so flags -Wno-missing-requires exists in GCC 12, but does
+# not in GCC 11 and GCC 11 is what is used in docker-gcc
+# configuration currently
+build:gcc --cxxopt=-Wno-unknown-warning
 
 # Clang-tidy
 # TODO(phlax): enable this, its throwing some errors as well as finding more issues
@@ -142,6 +157,7 @@ build:clang-asan --linkopt=-fsanitize=vptr,function
 
 # macOS
 build:macos --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
+build:macos --copt=-Wno-deprecated-declarations
 build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
@@ -374,6 +390,7 @@ build:docker-clang-libc++ --config=docker-sandbox
 build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:docker-gcc --config=docker-sandbox
+build:docker-gcc --config=gcc
 build:docker-gcc --config=rbe-toolchain-gcc
 
 build:docker-asan --config=docker-sandbox
@@ -513,26 +530,32 @@ build:rbe-engflow --bes_upload_mode=fully_async
 build:rbe-engflow --nolegacy_important_outputs
 
 # RBE (Engflow Envoy)
-build:common-envoy-engflow --google_default_credentials=false
-build:common-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:common-envoy-engflow --grpc_keepalive_time=60s
-build:common-envoy-engflow --grpc_keepalive_timeout=30s
+common:common-envoy-engflow --google_default_credentials=false
+common:common-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
+common:common-envoy-engflow --grpc_keepalive_time=60s
+common:common-envoy-engflow --grpc_keepalive_timeout=30s
 
-build:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
-build:cache-envoy-engflow --remote_timeout=3600s
-build:bes-envoy-engflow --bes_backend=grpcs://mordenite.cluster.engflow.com/
-build:bes-envoy-engflow --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
-build:bes-envoy-engflow --bes_timeout=3600s
-build:bes-envoy-engflow --bes_upload_mode=fully_async
-build:bes-envoy-engflow --nolegacy_important_outputs
-build:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
-build:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:7adc40c09508f957624c4d2e0f5aeecb73a59207ee6ded53b107eac828c091b2
-build:rbe-envoy-engflow --jobs=200
-build:rbe-envoy-engflow --define=engflow_rbe=true
+common:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
+common:cache-envoy-engflow --remote_timeout=3600s
+common:bes-envoy-engflow --bes_backend=grpcs://mordenite.cluster.engflow.com/
+common:bes-envoy-engflow --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
+common:bes-envoy-engflow --bes_timeout=3600s
+common:bes-envoy-engflow --bes_upload_mode=fully_async
+common:bes-envoy-engflow --nolegacy_important_outputs
+common:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
+common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:7adc40c09508f957624c4d2e0f5aeecb73a59207ee6ded53b107eac828c091b2
+common:rbe-envoy-engflow --jobs=200
+common:rbe-envoy-engflow --define=engflow_rbe=true
 
-build:remote-envoy-engflow --config=common-envoy-engflow
-build:remote-envoy-engflow --config=cache-envoy-engflow
-build:remote-envoy-engflow --config=rbe-envoy-engflow
+common:remote-envoy-engflow --config=common-envoy-engflow
+common:remote-envoy-engflow --config=cache-envoy-engflow
+common:remote-envoy-engflow --config=rbe-envoy-engflow
+
+common:remote-cache-envoy-engflow --config=common-envoy-engflow
+common:remote-cache-envoy-engflow --config=cache-envoy-engflow
+
+# Specifies the rustfmt.toml for all rustfmt_test targets.
+build --@rules_rust//rust/settings:rustfmt.toml=//:rustfmt.toml
 
 #############################################################################
 # debug: Various Bazel debugging flags

@@ -40,7 +40,7 @@ RouteSpecificFilterConfigConstSharedPtr RouteEntryImpl::createRouteSpecificFilte
     return nullptr;
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *message);
+  THROW_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *message));
   return factory->createRouteSpecificFilterConfig(*message, factory_context, validator);
 }
 

@@ -61,9 +61,9 @@ SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(
     if (factory != nullptr) {
       // Load and validate the configuration.
       auto sub_lb_proto_message = factory->createEmptyConfigProto();
-      Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
-                                             factory_context.messageValidationVisitor(),
-                                             *sub_lb_proto_message);
+      THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+          policy.typed_extension_config().typed_config(),
+          factory_context.messageValidationVisitor(), *sub_lb_proto_message));
 
       auto lb_config_or_error = factory->loadConfig(factory_context, *sub_lb_proto_message);
       SET_AND_RETURN_IF_NOT_OK(lb_config_or_error.status(), creation_status);

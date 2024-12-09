@@ -186,6 +186,11 @@ public:
    * @returns the default DNS cache set up in base configuration or nullptr.
    */
   virtual Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() PURE;
+
+  /**
+   * Returns the cluster manager for this Envoy Mobile instance
+   */
+  virtual Upstream::ClusterManager& clusterManager() PURE;
 };
 
 class ConnectivityManagerImpl : public ConnectivityManager,
@@ -234,6 +239,7 @@ public:
                                                     SocketMode socket_mode) override;
   envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options) override;
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() override;
+  Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
 
 private:
   struct NetworkState {

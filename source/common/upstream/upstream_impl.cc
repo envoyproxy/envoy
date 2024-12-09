@@ -111,8 +111,8 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
         fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(
-      typed_config, factory_context.messageValidationVisitor(), *proto_config);
+  RETURN_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(
+      typed_config, factory_context.messageValidationVisitor(), *proto_config));
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
@@ -499,10 +499,7 @@ void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health
   // Clear all old EDS health flags first.
   HostImplBase::healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
   HostImplBase::healthFlagClear(Host::HealthFlag::DEGRADED_EDS_HEALTH);
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-    HostImplBase::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
-  }
+  HostImplBase::healthFlagClear(Host::HealthFlag::EDS_STATUS_DRAINING);
 
   // Set the appropriate EDS health flag.
   switch (health_status) {
@@ -512,10 +509,7 @@ void HostImplBase::setEdsHealthFlag(envoy::config::core::v3::HealthStatus health
     HostImplBase::healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
     break;
   case envoy::config::core::v3::DRAINING:
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.exclude_host_in_eds_status_draining")) {
-      HostImplBase::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
-    }
+    HostImplBase::healthFlagSet(Host::HealthFlag::EDS_STATUS_DRAINING);
     break;
   case envoy::config::core::v3::DEGRADED:
     HostImplBase::healthFlagSet(Host::HealthFlag::DEGRADED_EDS_HEALTH);
@@ -736,7 +730,7 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
                            hosts_per_locality_, excluded_hosts_per_locality_, locality_weights_,
                            overprovisioning_factor_, seed);
 
-  runUpdateCallbacks(hosts_added, hosts_removed);
+  THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
 }
 
 void HostSetImpl::rebuildLocalityScheduler(
@@ -880,8 +874,7 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
       host_sets_priority_update_cbs_.push_back(
           host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
                                                const HostVector& hosts_removed) {
-            runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
-            return absl::OkStatus();
+            return runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
           }));
       host_sets_.push_back(std::move(host_set));
     }
@@ -908,7 +901,7 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
                     hosts_removed, seed, weighted_priority_health, overprovisioning_factor);
 
   if (!batch_update_) {
-    runUpdateCallbacks(hosts_added, hosts_removed);
+    THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
   }
 }
 
@@ -922,7 +915,7 @@ void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
   HostVector net_hosts_added = filterHosts(scope.all_hosts_added_, scope.all_hosts_removed_);
   HostVector net_hosts_removed = filterHosts(scope.all_hosts_removed_, scope.all_hosts_added_);
 
-  runUpdateCallbacks(net_hosts_added, net_hosts_removed);
+  THROW_IF_NOT_OK(runUpdateCallbacks(net_hosts_added, net_hosts_removed));
 }
 
 void PrioritySetImpl::BatchUpdateScope::updateHosts(
@@ -1404,8 +1397,10 @@ ClusterInfoImpl::ClusterInfoImpl(
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
     auto message = factory.createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
-                                           factory_context.messageValidationVisitor(), *message);
+    SET_AND_RETURN_IF_NOT_OK(
+        Config::Utility::translateOpaqueConfig(
+            proto_config.typed_config(), factory_context.messageValidationVisitor(), *message),
+        creation_status);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, upstream_context_);
     filter_factories_.push_back(
@@ -1416,9 +1411,9 @@ ClusterInfoImpl::ClusterInfoImpl(
   if (http_protocol_options_) {
     Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
     has_configured_http_filters_ = !http_filters.empty();
-    static const std::string upstream_codec_type_url =
+    static const std::string upstream_codec_type_url(
         envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance()
-            .GetTypeName();
+            .GetTypeName());
     if (http_filters.empty()) {
       auto* codec_filter = http_filters.Add();
       codec_filter->set_name("envoy.filters.http.upstream_codec");
@@ -1479,8 +1474,9 @@ ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& 
     if (factory != nullptr) {
       // Load and validate the configuration.
       auto proto_message = factory->createEmptyConfigProto();
-      Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
-                                             context.messageValidationVisitor(), *proto_message);
+      RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+          policy.typed_extension_config().typed_config(), context.messageValidationVisitor(),
+          *proto_message));
 
       load_balancer_factory_ = factory;
       auto lb_config_or_error = factory->loadConfig(context, *proto_message);
@@ -1745,7 +1741,7 @@ ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) con
   return *resource_managers_.managers_[enumToInt(priority)];
 }
 
-void ClusterImplBase::initialize(std::function<void()> callback) {
+void ClusterImplBase::initialize(std::function<absl::Status()> callback) {
   ASSERT(!initialization_started_);
   ASSERT(initialization_complete_callback_ == nullptr);
   initialization_complete_callback_ = callback;
@@ -1807,7 +1803,7 @@ void ClusterImplBase::finishInitialization() {
   }
 
   if (snapped_callback != nullptr) {
-    snapped_callback();
+    THROW_IF_NOT_OK(snapped_callback());
   }
 }
 

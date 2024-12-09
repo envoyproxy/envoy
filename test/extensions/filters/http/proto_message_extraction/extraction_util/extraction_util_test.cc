@@ -40,7 +40,6 @@ using ::Envoy::Protobuf::FieldMask;
 using Envoy::Protobuf::FileDescriptorSet;
 using ::Envoy::Protobuf::Type;
 using ::Envoy::Protobuf::field_extraction::CordMessageData;
-using ::Envoy::Protobuf::io::CodedInputStream;
 using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
@@ -128,7 +127,7 @@ const char kTestResponse[] = R"pb(
 class ExtractionUtilTest : public ::testing::Test {
 protected:
   ExtractionUtilTest() = default;
-  const Protobuf::Type* FindType(const std::string& type_url) {
+  const Protobuf::Type* findType(const std::string& type_url) {
     absl::StatusOr<const Protobuf::Type*> result = type_helper_->Info()->ResolveTypeUrl(type_url);
     if (!result.ok()) {
       return nullptr;
@@ -166,7 +165,7 @@ protected:
         Protobuf::util::NewTypeResolverForDescriptorPool("type.googleapis.com",
                                                          descriptor_pool_.get()));
 
-    type_finder_ = std::bind_front(&ExtractionUtilTest::FindType, this);
+    type_finder_ = std::bind_front(&ExtractionUtilTest::findType, this);
 
     if (!Protobuf::TextFormat::ParseFromString(kTestRequest, &test_request_proto_)) {
       LOG(ERROR) << "Failed to parse textproto: " << kTestRequest;
@@ -185,14 +184,14 @@ protected:
     labels_.clear();
   }
 
-  FieldMask* GetFieldMaskWith(const std::string& path) {
+  FieldMask* getFieldMaskWith(const std::string& path) {
     field_mask_.clear_paths();
     field_mask_.add_paths(path);
     return &field_mask_;
   }
 
   // Helper function to create a Struct with nested fields
-  Struct CreateNestedStruct(const std::vector<std::string>& path, const std::string& final_value) {
+  Struct createNestedStruct(const std::vector<std::string>& path, const std::string& final_value) {
     Struct root;
     Struct* current = &root;
     for (const auto& piece : path) {
@@ -338,12 +337,12 @@ TEST_F(ExtractionUtilTest, SingularFieldUseLastValue_NonEmptyLastValue) {
 }
 
 TEST_F(ExtractionUtilTest, RedactStructRecursively_EmptyPath) {
-  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  Struct message_struct = createNestedStruct({"level1", "level2"}, "value");
   EXPECT_TRUE(RedactStructRecursively({}, {}, &message_struct).ok());
 }
 
 TEST_F(ExtractionUtilTest, RedactStructRecursively_InvalidPath) {
-  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  Struct message_struct = createNestedStruct({"level1", "level2"}, "value");
   std::vector<std::string> path_pieces = {"invalid", "path_end"};
   EXPECT_TRUE(
       RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
@@ -356,7 +355,7 @@ TEST_F(ExtractionUtilTest, RedactStructRecursively_InvalidPath) {
 }
 
 TEST_F(ExtractionUtilTest, RedactStructRecursively_ValidPath) {
-  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  Struct message_struct = createNestedStruct({"level1", "level2"}, "value");
   std::vector<std::string> path_pieces = {"level1", "level2"};
   EXPECT_TRUE(
       RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
@@ -369,7 +368,7 @@ TEST_F(ExtractionUtilTest, RedactStructRecursively_ValidPath) {
 }
 
 TEST_F(ExtractionUtilTest, RedactStructRecursively_MissingIntermediateField) {
-  Struct message_struct = CreateNestedStruct({"level1"}, "value");
+  Struct message_struct = createNestedStruct({"level1"}, "value");
   std::vector<std::string> path_pieces = {"level1", "level2"};
   EXPECT_TRUE(
       RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct).ok());
@@ -382,7 +381,7 @@ TEST_F(ExtractionUtilTest, RedactStructRecursively_MissingIntermediateField) {
 }
 
 TEST_F(ExtractionUtilTest, RedactStructRecursively_EmptyPathPiece) {
-  Struct message_struct = CreateNestedStruct({"level1", "level2"}, "value");
+  Struct message_struct = createNestedStruct({"level1", "level2"}, "value");
   std::vector<std::string> path_pieces = {"level1", ""};
   EXPECT_EQ(RedactStructRecursively(path_pieces.cbegin(), path_pieces.cend(), &message_struct),
             absl::InvalidArgumentError("path piece cannot be empty."));
@@ -397,7 +396,7 @@ TEST_F(ExtractionUtilTest, RedactStructRecursively_NullptrMessageStruct) {
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_bytes) {
   EXPECT_EQ(3,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("bucket.objects"), test_request_raw_proto_));
+                                     getFieldMaskWith("bucket.objects"), test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, FindSingularLastValue_SingleStringField) {
@@ -441,147 +440,147 @@ TEST_F(ExtractionUtilTest, FindSingularLastValue_RepeatedMessageField) {
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_string) {
   EXPECT_EQ(1, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("repeated_strings"),
+                                        getFieldMaskWith("repeated_strings"),
                                         test_request_raw_proto_));
   EXPECT_EQ(2, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_strings"),
+                                        getFieldMaskWith("proto2_message.repeated_strings"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_message) {
-  EXPECT_EQ(2, ExtractRepeatedFieldSize(*response_type_, type_finder_, GetFieldMaskWith("buckets"),
+  EXPECT_EQ(2, ExtractRepeatedFieldSize(*response_type_, type_finder_, getFieldMaskWith("buckets"),
                                         test_response_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_map) {
   EXPECT_EQ(2, ExtractRepeatedFieldSize(*response_type_, type_finder_,
-                                        GetFieldMaskWith("sub_buckets"), test_response_raw_proto_));
+                                        getFieldMaskWith("sub_buckets"), test_response_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_enum) {
   EXPECT_EQ(4,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_enum"), test_request_raw_proto_));
+                                     getFieldMaskWith("repeated_enum"), test_request_raw_proto_));
   EXPECT_EQ(4, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_enum"),
+                                        getFieldMaskWith("proto2_message.repeated_enum"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_double) {
   EXPECT_EQ(1,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_double"), test_request_raw_proto_));
+                                     getFieldMaskWith("repeated_double"), test_request_raw_proto_));
   EXPECT_EQ(1, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_double"),
+                                        getFieldMaskWith("proto2_message.repeated_double"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_float) {
   EXPECT_EQ(2,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_float"), test_request_raw_proto_));
+                                     getFieldMaskWith("repeated_float"), test_request_raw_proto_));
   EXPECT_EQ(2, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_float"),
+                                        getFieldMaskWith("proto2_message.repeated_float"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_int64) {
   EXPECT_EQ(3,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_int64"), test_request_raw_proto_));
+                                     getFieldMaskWith("repeated_int64"), test_request_raw_proto_));
   EXPECT_EQ(3, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_int64"),
+                                        getFieldMaskWith("proto2_message.repeated_int64"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_uint64) {
   EXPECT_EQ(4,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_uint64"), test_request_raw_proto_));
+                                     getFieldMaskWith("repeated_uint64"), test_request_raw_proto_));
   EXPECT_EQ(4, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_uint64"),
+                                        getFieldMaskWith("proto2_message.repeated_uint64"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_int32) {
   EXPECT_EQ(5,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_int32"), test_request_raw_proto_));
+                                     getFieldMaskWith("repeated_int32"), test_request_raw_proto_));
   EXPECT_EQ(5, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_int32"),
+                                        getFieldMaskWith("proto2_message.repeated_int32"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_fixed64) {
   EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("repeated_fixed64"),
+                                        getFieldMaskWith("repeated_fixed64"),
                                         test_request_raw_proto_));
   EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_fixed64"),
+                                        getFieldMaskWith("proto2_message.repeated_fixed64"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_fixed32) {
   EXPECT_EQ(7, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("repeated_fixed32"),
+                                        getFieldMaskWith("repeated_fixed32"),
                                         test_request_raw_proto_));
   EXPECT_EQ(7, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_fixed32"),
+                                        getFieldMaskWith("proto2_message.repeated_fixed32"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_bool) {
   EXPECT_EQ(5,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_bool"), test_request_raw_proto_));
+                                     getFieldMaskWith("repeated_bool"), test_request_raw_proto_));
 
   EXPECT_EQ(5, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_bool"),
+                                        getFieldMaskWith("proto2_message.repeated_bool"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_uint32) {
   EXPECT_EQ(8,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_uint32"), test_request_raw_proto_));
+                                     getFieldMaskWith("repeated_uint32"), test_request_raw_proto_));
   EXPECT_EQ(8, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_uint32"),
+                                        getFieldMaskWith("proto2_message.repeated_uint32"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_sfixed64) {
   EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("repeated_sfixed64"),
+                                        getFieldMaskWith("repeated_sfixed64"),
                                         test_request_raw_proto_));
   EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_sfixed64"),
+                                        getFieldMaskWith("proto2_message.repeated_sfixed64"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_sfixed32) {
   EXPECT_EQ(7, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("repeated_sfixed32"),
+                                        getFieldMaskWith("repeated_sfixed32"),
                                         test_request_raw_proto_));
   EXPECT_EQ(7, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_sfixed32"),
+                                        getFieldMaskWith("proto2_message.repeated_sfixed32"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_sint32) {
   EXPECT_EQ(5,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_sint32"), test_request_raw_proto_));
+                                     getFieldMaskWith("repeated_sint32"), test_request_raw_proto_));
   EXPECT_EQ(5, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_sint32"),
+                                        getFieldMaskWith("proto2_message.repeated_sint32"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_sint64) {
   EXPECT_EQ(6,
             ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("repeated_sint64"), test_request_raw_proto_));
+                                     getFieldMaskWith("repeated_sint64"), test_request_raw_proto_));
   EXPECT_EQ(6, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("proto2_message.repeated_sint64"),
+                                        getFieldMaskWith("proto2_message.repeated_sint64"),
                                         test_request_raw_proto_));
 }
 
@@ -589,55 +588,55 @@ TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_OK_DefaultValue) {
   test_request_proto_.clear_repeated_strings();
   test_request_raw_proto_ = CordMessageData(test_request_proto_.SerializeAsCord());
   EXPECT_EQ(0, ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                        GetFieldMaskWith("repeated_strings"),
+                                        getFieldMaskWith("repeated_strings"),
                                         test_request_raw_proto_));
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_EmptyPath) {
-  EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_, GetFieldMaskWith(""),
+  EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_, getFieldMaskWith(""),
                                      test_request_raw_proto_),
             0);
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_NonRepeatedField) {
-  EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_, GetFieldMaskWith("bucket.ratio"),
+  EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_, getFieldMaskWith("bucket.ratio"),
                                      test_request_raw_proto_),
             0);
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_UnknownField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("bucket.unknown"), test_request_raw_proto_),
+                                     getFieldMaskWith("bucket.unknown"), test_request_raw_proto_),
             0);
-  EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_, GetFieldMaskWith("unknown"),
+  EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_, getFieldMaskWith("unknown"),
                                      test_request_raw_proto_),
             0);
   EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("unknown1.unknown2"),
+                                     getFieldMaskWith("unknown1.unknown2"),
                                      test_request_raw_proto_),
             0);
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_NonLeafPrimitiveTypeField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*request_type_, type_finder_,
-                                     GetFieldMaskWith("bucket.name.unknown"),
+                                     getFieldMaskWith("bucket.name.unknown"),
                                      test_request_raw_proto_),
             0);
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_NonLeafMapField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*response_type_, type_finder_,
-                                     GetFieldMaskWith("sub_buckets.objects"),
+                                     getFieldMaskWith("sub_buckets.objects"),
                                      test_response_raw_proto_),
             0);
 }
 
 TEST_F(ExtractionUtilTest, ExtractRepeatedFieldSize_Error_NonLeafRepeatedField) {
   EXPECT_LT(ExtractRepeatedFieldSize(*response_type_, type_finder_,
-                                     GetFieldMaskWith("buckets.name"), test_response_raw_proto_),
+                                     getFieldMaskWith("buckets.name"), test_response_raw_proto_),
             0);
   EXPECT_LT(ExtractRepeatedFieldSize(*response_type_, type_finder_,
-                                     GetFieldMaskWith("buckets.objects"), test_response_raw_proto_),
+                                     getFieldMaskWith("buckets.objects"), test_response_raw_proto_),
             0);
 }
 

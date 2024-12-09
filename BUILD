@@ -74,3 +74,7 @@ package_group(
         "//mobile/...",
     ],
 )
+
+exports_files([
+    "rustfmt.toml",
+])

@@ -91,6 +91,8 @@ public:
   size_t size() const override;
   HttpServerPropertiesCache::Http3StatusTracker&
   getOrCreateHttp3StatusTracker(const Origin& origin) override;
+  void markHttp3Broken(const Origin& origin) override;
+  bool isHttp3Broken(const Origin& origin) override;
   void resetBrokenness() override;
   void resetStatus() override;
 
@@ -138,6 +140,13 @@ private:
   // Returns the canonical suffix, if any, associated with `hostname`.
   absl::string_view getCanonicalSuffix(absl::string_view hostname);
 
+  // Returns the canonical origin from the canonical_h3_broken_map, if any, associated with
+  // `hostname`.
+  absl::optional<Origin> getCanonicalOriginForHttp3Brokenness(absl::string_view hostname);
+
+  // Updates the canonical origin for http3 brokenness book keeping.
+  void maybeSetCanonicalOriginForHttp3Brokenness(const Origin& origin);
+
   // Returns the canonical origin, if any, associated with `hostname`.
   absl::optional<Origin> getCanonicalOrigin(absl::string_view hostname);
 
@@ -150,7 +159,11 @@ private:
   // Contains a map of servers which could share the same alternate protocol.
   // Map from a Canonical suffix to an actual origin, which has a plausible alternate
   // protocol mapping.
-  std::map<std::string, Origin> canonical_alt_svc_map_;
+  absl::flat_hash_map<std::string, Origin> canonical_alt_svc_map_;
+
+  // Contains a map of origins whose http3 status are known.
+  // Map from a canonical suffix to an actual origin that can provide http3 brokenness info.
+  absl::flat_hash_map<std::string, Origin> canonical_h3_brokenness_map_;
 
   // Contains list of suffixes (for example ".c.youtube.com",
   // ".googlevideo.com", ".googleusercontent.com") of canonical hostnames.
