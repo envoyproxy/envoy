@@ -189,7 +189,6 @@ public:
   }
 
   void allowRemoteJwksFetch(absl::optional<bool> stop_backoff, bool fetch_in_flight) override {
-    // Verify this is being executed in the main thread.
     ASSERT(dispatcher_.isThreadSafe());
 
     if (stop_backoff.has_value()) {
@@ -233,7 +232,6 @@ private:
 
   // Set jwks shared_ptr to all threads.
   void setJwksToAllThreads(JwksConstSharedPtr shared_jwks) {
-    // JwksConstSharedPtr shared_jwks = std::move(jwks);
     tls_.runOnAllThreads([shared_jwks](OptRef<ThreadLocalCache> obj) {
       obj->jwks_ = shared_jwks;
       obj->expire_ = std::chrono::steady_clock::time_point::max();
