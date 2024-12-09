@@ -105,7 +105,7 @@ const _displayItem = (item, searchTerms) => {
   let linkEl = listItem.appendChild(document.createElement("a"));
   linkEl.href = linkUrl + anchor;
   linkEl.dataset.score = score;
-  linkEl.innerText = title;
+  linkEl.innerHTML = title;
   // <ENVOY>
   const apiVersion = _renderApiVersionLabel(linkUrl);
   if (apiVersion !== "") {
