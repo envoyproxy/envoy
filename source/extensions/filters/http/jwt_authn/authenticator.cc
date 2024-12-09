@@ -283,9 +283,9 @@ void AuthenticatorImpl::startVerify() {
             return;
           }
         }
-        ENVOY_LOG(debug, "Triggering refetch due to KID mismatch");
-        kid_mismatch_request_ = true;
       }
+      ENVOY_LOG(info, "Triggering refetch of JWKS due to KID mismatch");
+      kid_mismatch_request_ = true;
     } else {
       verifyKey();
       return;
@@ -297,7 +297,7 @@ void AuthenticatorImpl::startVerify() {
   // fine for provider name requirements, as each provider has only one issuer, but for allow
   // missing or failed there can be more than one issuers. This can be optimized; the same remote
   // jwks fetching can be shared by two requests.
-  if (jwks_data_->getJwtProvider().has_remote_jwks()) {
+  if (jwks_data_->getJwtProvider().has_remote_jwks() && jwks_data_->isRemoteJwksFetchAllowed()) {
     if (!fetcher_) {
       fetcher_ = create_jwks_fetcher_cb_(cm_, jwks_data_->getJwtProvider().remote_jwks());
     }
@@ -309,7 +309,7 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
   // No valid keys for this issuer. This may happen as a result of incorrect local
-  // JWKS configuration.
+  // JWKS configuration or backoff blocking remote fetching.
   doneWithStatus(Status::JwksNoValidKeys);
 }
 
@@ -485,7 +485,6 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
     // Trigger backoff to disallow further fetches when retrieval & verification is due to KID
     // mismatch and fails.
     if (kid_mismatch_request_ && !jwks_data_->isRemoteJwksFetchAllowed()) {
-
       dispatcher_.post([this]() { jwks_data_->allowRemoteJwksFetch(false, false); });
     }
 

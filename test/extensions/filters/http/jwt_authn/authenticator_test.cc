@@ -215,8 +215,8 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithMultipleKidJwks) {
   expectVerifyStatus(Status::JwtVerificationFail, headers);
 }
 
-// Test to validate refetching JWKS when `PublicKey` is split based on KIDs
-TEST_F(AuthenticatorTest, TestRefetchingJwksWithSingleKidJwks) {
+// Test to validate refetching JWKS and backoff when `PublicKey` is split based on KIDs
+TEST_F(AuthenticatorTest, TestRefetchingJwksAndBackoffWithSingleKidJwks) {
   (*proto_config_.mutable_providers())[std::string(ProviderName)]
       .mutable_remote_jwks()
       ->set_refetch_jwks_on_kid_mismatch(true);
@@ -254,7 +254,7 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithSingleKidJwks) {
       Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodTokenWithKid1)}};
   expectVerifyStatus(Status::Ok, headers);
 
-  // Attempt refetching KID2 due to backoff completion
+  // Attempt refetching KID2 due to backoff completion.
   EXPECT_CALL(*raw_fetcher_, fetch(_, _))
       .WillOnce(Invoke([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
@@ -264,7 +264,8 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithSingleKidJwks) {
   expectVerifyStatus(Status::Ok, headers);
 }
 
-TEST_F(AuthenticatorTest, TestRefetchingJwksWithNoKidJwt) {
+// Test to validate refetching JWKS and backoff when JWT contains no KID.
+TEST_F(AuthenticatorTest, TestRefetchingJwksAndBackoffWithNoKidJwt) {
   (*proto_config_.mutable_providers())[std::string(ProviderName)]
       .mutable_remote_jwks()
       ->set_refetch_jwks_on_kid_mismatch(true);
@@ -286,6 +287,12 @@ TEST_F(AuthenticatorTest, TestRefetchingJwksWithNoKidJwt) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
   headers = Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  expectVerifyStatus(Status::Ok, headers);
+
+  // Backoff triggered, hence no fetch.
+  EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
+  headers = Http::TestRequestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  // Verification done against existing JWKS cache due to active backoff.
   expectVerifyStatus(Status::Ok, headers);
 }
 
