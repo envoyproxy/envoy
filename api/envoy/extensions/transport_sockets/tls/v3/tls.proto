@@ -139,7 +139,7 @@ message DownstreamTlsContext {
   //
   bool disable_stateful_session_resumption = 10;
 
-  // Maximum lifetime of TLS sessions in seconds. If specified, ``session_timeout`` will change the maximum lifetime
+  // Maximum lifetime of TLS sessions. If specified, ``session_timeout`` will change the maximum lifetime
   // of the TLS session.
   //
   // This serves as a hint for the `TLS session ticket lifetime (for TLSv1.2) <https://tools.ietf.org/html/rfc5077#section-5.6>`_.
