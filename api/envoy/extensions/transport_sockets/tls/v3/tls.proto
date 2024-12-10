@@ -77,8 +77,7 @@ message UpstreamTlsContext {
   // the ``keyUsage`` is incompatible with TLS usage.
   //
   // .. note::
-  //   The default value is ``false`` (i.e., enforcement off). It is expected to change to ``true`` in a future
-  // release.
+  //   The default value is ``false`` (i.e., enforcement off). It is expected to change to ``true`` in a future release.
   //
   // The ``ssl.was_key_usage_invalid`` in :ref:`listener metrics <config_listener_stats>` metric will be incremented
   // for configurations that would fail if this option were enabled.
@@ -137,10 +136,12 @@ message DownstreamTlsContext {
   //
   // .. note::
   //   This applies only to TLSv1.2 and earlier.
+  //
   bool disable_stateful_session_resumption = 10;
 
   // Maximum lifetime of TLS sessions in seconds. If specified, ``session_timeout`` will change the maximum lifetime
   // of the TLS session.
+  //
   // This serves as a hint for the `TLS session ticket lifetime (for TLSv1.2) <https://tools.ietf.org/html/rfc5077#section-5.6>`_.
   // Only whole seconds are considered; fractional seconds are ignored.
   google.protobuf.Duration session_timeout = 6 [(validate.rules).duration = {
@@ -164,6 +165,7 @@ message DownstreamTlsContext {
   //
   // .. note::
   //   This has no effect when using TLSv1_3.
+  //
   bool prefer_client_ciphers = 11;
 }
 
