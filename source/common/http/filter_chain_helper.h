@@ -22,6 +22,9 @@ using UpstreamFilterConfigProviderManager =
     Filter::FilterConfigProviderManager<Filter::HttpFilterFactoryCb,
                                         Server::Configuration::UpstreamFactoryContext>;
 
+using FiltersList = Protobuf::RepeatedPtrField<
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
+
 // Allows graceful handling of missing configuration for ECDS.
 class MissingConfigFilter : public Http::PassThroughDecoderFilter {
 public:
@@ -48,13 +51,15 @@ public:
     bool disabled{};
   };
 
-  using FilterFactoriesList = std::list<FilterFactoryProvider>;
+  using FilterFactoriesList = std::vector<FilterFactoryProvider>;
   using FiltersList = Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
 
   static void createFilterChainForFactories(Http::FilterChainManager& manager,
                                             const FilterChainOptions& options,
                                             const FilterFactoriesList& filter_factories);
+
+  static absl::Status checkUpstreamHttpFiltersList(const FiltersList& filters);
 
   static std::shared_ptr<DownstreamFilterConfigProviderManager>
   createSingletonDownstreamFilterConfigProviderManager(
@@ -80,15 +85,13 @@ public:
         server_context_(server_context), cluster_manager_(cluster_manager),
         factory_context_(factory_context), stats_prefix_(stats_prefix) {}
 
-  using FiltersList = Protobuf::RepeatedPtrField<
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter>;
-
   // Process the filters in this filter chain.
   absl::Status processFilters(const FiltersList& filters, const std::string& prefix,
                               const std::string& filter_chain_type,
                               FilterFactoriesList& filter_factories) {
 
     DependencyManager dependency_manager;
+    filter_factories.reserve(filters.size());
     for (int i = 0; i < filters.size(); i++) {
       absl::Status status =
           processFilter(filters[i], i, prefix, filter_chain_type, i == filters.size() - 1,

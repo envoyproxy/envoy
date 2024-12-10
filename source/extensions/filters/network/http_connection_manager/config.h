@@ -139,7 +139,7 @@ public:
 
   // Http::FilterChainFactory
   bool createFilterChain(
-      Http::FilterChainManager& manager, bool = false,
+      Http::FilterChainManager& manager,
       const Http::FilterChainOptions& = Http::EmptyFilterChainOptions{}) const override;
   using FilterFactoriesList = Envoy::Http::FilterChainUtility::FilterFactoriesList;
   struct FilterConfig {

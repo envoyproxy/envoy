@@ -45,7 +45,6 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 namespace {
 
-using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
 using FilterFactoryMap = std::map<std::string, HttpConnectionManagerConfig::FilterConfig>;
 
 HttpConnectionManagerConfig::UpgradeMap::const_iterator
@@ -790,7 +789,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager, bool,
+bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager,
                                                     const Http::FilterChainOptions& options) const {
   Http::FilterChainUtility::createFilterChainForFactories(manager, options, filter_factories_);
   return true;

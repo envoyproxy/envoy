@@ -115,7 +115,7 @@ public:
   bool createQuicListenerFilterChain(Network::QuicListenerFilterManager&) override { return true; }
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager, bool,
+  bool createFilterChain(Http::FilterChainManager& manager,
                          const Http::FilterChainOptions&) const override;
   bool createUpgradeFilterChain(absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
                                 Http::FilterChainManager&,
