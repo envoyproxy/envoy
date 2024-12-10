@@ -76,7 +76,8 @@ message UpstreamTlsContext {
   // Controls enforcement of the ``keyUsage`` extension in peer certificates. If set to ``true``, the handshake will fail if
   // the ``keyUsage`` is incompatible with TLS usage.
   //
-  // **Note:** The default value is ``false`` (i.e., enforcement off). It is expected to change to ``true`` in a future
+  // .. note::
+  //   The default value is ``false`` (i.e., enforcement off). It is expected to change to ``true`` in a future
   // release.
   //
   // The ``ssl.was_key_usage_invalid`` in :ref:`listener metrics <config_listener_stats>` metric will be incremented
