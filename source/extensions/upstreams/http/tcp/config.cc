@@ -11,7 +11,7 @@ namespace Tcp {
 Router::GenericConnPoolPtr TcpGenericConnPoolFactory::createGenericConnPool(
     Upstream::ThreadLocalCluster& thread_local_cluster,
     Router::GenericConnPoolFactory::UpstreamProtocol, Upstream::ResourcePriority priority,
-    absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx) const {
+    absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx, const Protobuf::Message&) const {
   auto ret = std::make_unique<TcpConnPool>(thread_local_cluster, priority, ctx);
   return (ret->valid() ? std::move(ret) : nullptr);
 }

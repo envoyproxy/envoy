@@ -1605,7 +1605,8 @@ public:
                         GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         Upstream::ResourcePriority priority,
                         absl::optional<Http::Protocol> downstream_protocol,
-                        Upstream::LoadBalancerContext* ctx) const PURE;
+                        Upstream::LoadBalancerContext* ctx,
+                        const Protobuf::Message& config) const PURE;
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;

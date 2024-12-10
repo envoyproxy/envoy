@@ -201,6 +201,60 @@ private:
 
 using NetworkFilterDsoPtr = std::shared_ptr<NetworkFilterDso>;
 
+
+class TcpUpstreamDso : public Dso {
+public:
+  TcpUpstreamDso() = default;
+  TcpUpstreamDso(const std::string dso_name) : Dso(dso_name){};
+  ~TcpUpstreamDso() override = default;
+
+  virtual GoUint64 envoyGoOnTcpUpstreamConfig(httpConfig* p0) PURE;
+
+  virtual void envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 p0) PURE;
+
+  virtual GoUint64 envoyGoEncodeHeader(httpRequest* req, GoUint64 end_stream, GoUint64 header_num,  GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) PURE;
+
+  virtual GoUint64 envoyGoEncodeData(httpRequest* req, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len) PURE;
+
+  virtual GoUint64 envoyGoOnUpstreamData(httpRequest* req, GoUint64 end_stream, GoUint64 header_num, GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) PURE;
+
+  virtual void envoyGoOnTcpUpstreamDestroy(httpRequest* p0) PURE;
+
+};
+
+class TcpUpstreamDsoImpl : public TcpUpstreamDso {
+public:
+  TcpUpstreamDsoImpl(const std::string dso_name);
+  ~TcpUpstreamDsoImpl() override = default;
+
+  GoUint64 envoyGoOnTcpUpstreamConfig(httpConfig* p0) override;
+
+  void envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 p0) override;
+
+  GoUint64 envoyGoEncodeHeader(httpRequest* req, GoUint64 end_stream, GoUint64 header_num,  GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) override;
+
+  GoUint64 envoyGoEncodeData(httpRequest* req, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len) override;
+
+  GoUint64 envoyGoOnUpstreamData(httpRequest* req, GoUint64 end_stream, GoUint64 header_num, GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len) override;
+
+  void envoyGoOnTcpUpstreamDestroy(httpRequest* p0) override;
+
+private:
+  GoUint64 (*envoy_go_on_tcp_upstream_config_)(httpConfig* p0) = {nullptr};
+
+  void (*envoy_go_tcp_upstream_destroy_plugin_config_)(GoUint64 p0) = {nullptr};
+
+  GoUint64 (*envoy_go_encode_header_)(httpRequest* req, GoUint64 p1, GoUint64 p2, GoUint64 p3, GoUint64 buf_ptr, GoUint64 buf_len) = {nullptr};
+
+  GoUint64 (*envoy_go_on_encode_data_)(httpRequest* req, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len) = {nullptr};
+                                            
+  GoUint64 (*envoy_go_on_upstream_data_)(httpRequest* req, GoUint64 end_stream, GoUint64 header_size, GoUint64 header_byte_size,  GoUint64 buf_ptr, GoUint64 buf_len) = {nullptr};
+
+  void (*envoy_go_on_tcp_upstream_destroy_)(httpRequest* p0) = {nullptr};
+};
+
+using TcpUpstreamDsoPtr = std::shared_ptr<TcpUpstreamDso>;
+
 /*
  * We do not unload a dynamic library once it is loaded. This is because
  * Go shared library could not be unload by dlclose yet, see:

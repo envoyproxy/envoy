@@ -34,6 +34,12 @@ type (
 	EmptyDownstreamFilter struct{}
 	// EmptyUpstreamFilter provides the no-op implementation of the UpstreamFilter interface
 	EmptyUpstreamFilter struct{}
+	// EmptyTcpUpstreamFilter provides the no-op implementation of the EmptyTcpUpstreamFilter interface
+	EmptyTcpUpstreamFilter struct{}
+
+	PassThroughTcpUpstream struct {
+		EmptyTcpUpstreamFilter
+	}
 )
 
 // request
@@ -335,4 +341,46 @@ type GaugeMetric interface {
 
 // TODO
 type HistogramMetric interface {
+}
+
+type TcpUpstreamCallbackHandler interface {
+	// GetRouteName returns the name of the route which got matched
+	GetRouteName() string
+	// GetVirtualClusterName returns the name of the virtual cluster which got matched
+	GetVirtualClusterName() string
+	// SetSelfHalfCloseForUpstreamConn default is false
+	SetSelfHalfCloseForUpstreamConn(enabled bool)
+}
+
+type TcpUpstreamFilter interface {
+	// Invoked when header is delivered from the downstream.
+	EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) TcpUpstreamStatus
+	// Streaming, Invoked when data is delivered from the downstream.
+	EncodeData(buffer BufferInstance, endOfStream bool) TcpUpstreamStatus
+	// Streaming, Called when data is read on from tcp upstream.
+	// (Be careful: when return TcpUpstreamContinue, resp headers will be send to http, from then on, further resp headers will not be send)
+	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) TcpUpstreamStatus
+	// destroy filter
+	OnDestroy()
+}
+
+func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, bufferForUpstreamData BufferInstance, endOfStream bool) TcpUpstreamStatus {
+	return TcpUpstreamContinue
+}
+
+func (*EmptyTcpUpstreamFilter) EncodeData(buffer BufferInstance, endOfStream bool) TcpUpstreamStatus {
+	return TcpUpstreamContinue
+}
+
+func (*EmptyTcpUpstreamFilter) OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) TcpUpstreamStatus {
+	return TcpUpstreamContinue
+}
+
+func (*EmptyTcpUpstreamFilter) OnDestroy() {
+}
+
+type TcpUpstreamFactory func(config interface{}, callbacks TcpUpstreamCallbackHandler) TcpUpstreamFilter
+
+type TcpUpstreamConfigParser interface {
+	Parse(any *anypb.Any) (interface{}, error)
 }
