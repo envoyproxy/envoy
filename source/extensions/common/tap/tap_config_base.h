@@ -6,7 +6,12 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/extensions/tap_sinks/udp_sink/v3/udp_sink.pb.h"
 
+#include "source/common/network/socket_impl.h"
+#include "source/common/network/socket_interface.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/utility.h"
 #include "source/extensions/common/matcher/matcher.h"
 #include "source/extensions/common/tap/tap.h"
 
@@ -150,6 +155,74 @@ private:
 
   const envoy::config::tap::v3::FilePerTapSink config_;
 };
+
+// UDP sink definition
+class UdpTapSink : public Sink {
+public:
+  UdpTapSink(const envoy::extensions::tap_sinks::udp_sink::v3::UdpSink& config);
+  // below one is only for UT
+  UdpTapSink(Network::UdpPacketWriterPtr&& utUdpPacketWriter)
+      : udp_packet_writer_(std::move(utUdpPacketWriter)) {
+    // Construct a fake udp_server_address_ to let UT pass
+    std::string utUdpServerAddress("127.0.0.1");
+    udp_server_address_ =
+        Network::Utility::parseInternetAddressNoThrow(utUdpServerAddress, 8080, false);
+  }
+  ~UdpTapSink();
+
+  // Sink
+  PerTapSinkHandlePtr
+  createPerTapSinkHandle(uint64_t trace_id,
+                         envoy::config::tap::v3::OutputSink::OutputSinkTypeCase) override {
+    return std::make_unique<UdpTapSinkHandle>(*this, trace_id);
+  }
+  bool isUdpPacketWriterCreated(void) { return (udp_packet_writer_ != nullptr); }
+
+private:
+  struct UdpTapSinkHandle : public PerTapSinkHandle {
+    UdpTapSinkHandle(UdpTapSink& parent, uint64_t trace_id)
+        : parent_(parent), trace_id_(trace_id) {}
+
+    // PerTapSinkHandle
+    void submitTrace(TraceWrapperPtr&& trace,
+                     envoy::config::tap::v3::OutputSink::Format format) override;
+
+    UdpTapSink& parent_;
+    const uint64_t trace_id_;
+  };
+
+  const envoy::extensions::tap_sinks::udp_sink::v3::UdpSink config_;
+
+  // Store the configured UDP address and port
+  Network::Address::InstanceConstSharedPtr udp_server_address_ = nullptr;
+  // UDP client socket
+  Network::SocketPtr udp_socket_ = nullptr;
+  // UDP client writer created with client socket
+  Network::UdpPacketWriterPtr udp_packet_writer_ = nullptr;
+};
+
+// The end of UDP sink
+// The UDP sink factory
+class UdpTapSinkFactory : public TapSinkFactory {
+public:
+  ~UdpTapSinkFactory() override = default;
+  std::string category() const override { return "envoy.tap.sinks.udp"; }
+  std::string name() const override { return "envoy.tap.sinks.udp"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::tap_sinks::udp_sink::v3::UdpSink>();
+  }
+  /**
+   * Create a UDP Sink that can be used for writing out data produced by the tap filter.
+   * @param config supplies the protobuf configuration for the sink factory
+   * @param cluster_manager is a ClusterManager from the HTTP/transport socket context
+   */
+  // SinkPtr createSinkPtr(const Protobuf::Message& config, SinkContext context) override;
+  SinkPtr createSinkPtr(const Protobuf::Message& config,
+                        Server::Configuration::TransportSocketFactoryContext& tsf_context) override;
+  SinkPtr createSinkPtr(const Protobuf::Message& config,
+                        Server::Configuration::FactoryContext& http_context) override;
+};
+// The end UDP sink factory
 
 } // namespace Tap
 } // namespace Common

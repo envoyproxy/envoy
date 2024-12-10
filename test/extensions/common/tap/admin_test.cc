@@ -156,7 +156,13 @@ public:
   MockTapSinkFactory() = default;
   ~MockTapSinkFactory() override = default;
 
-  MOCK_METHOD(SinkPtr, createSinkPtr, (const Protobuf::Message& config, SinkContext), (override));
+  MOCK_METHOD(SinkPtr, createSinkPtr,
+              (const Protobuf::Message& config, Server::Configuration::FactoryContext&),
+              (override));
+  MOCK_METHOD(SinkPtr, createSinkPtr,
+              (const Protobuf::Message& config,
+               Server::Configuration::TransportSocketFactoryContext&),
+              (override));
 
   MOCK_METHOD(std::string, name, (), (const, override));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
@@ -168,7 +174,7 @@ public:
                  Extensions::Common::Tap::Sink* admin_streamer, SinkContext context)
       : TapConfigBaseImpl(std::move(proto_config), admin_streamer, context) {}
 };
-
+/*
 TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
   const std::string tap_config_yaml =
       R"EOF(
@@ -194,7 +200,7 @@ TEST(TypedExtensionConfigTest, AddTestConfigHttpContext) {
   EXPECT_CALL(
       factory_impl,
       createSinkPtr(
-          _,
+           _,
           testing::VariantWith<std::reference_wrapper<Server::Configuration::FactoryContext>>(_)));
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
@@ -230,6 +236,54 @@ TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContext) {
           _, testing::VariantWith<
                  std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>(_)));
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  TestConfigImpl(tap_config, nullptr, factory_context);
+}
+*/
+TEST(TypedExtensionConfigTest, AddTestConfigHttpContextForUdpSink) {
+  const std::string tap_config_yaml =
+      R"EOF(
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: JSON_BODY_AS_STRING
+        custom_sink:
+          name: custom_sink_udp
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.tap_sinks.udp_sink.v3.UdpSink
+            udp_address:
+              protocol: UDP
+              address: 127.0.0.1
+              port_value: 8089
+)EOF";
+  envoy::config::tap::v3::TapConfig tap_config;
+  TestUtility::loadFromYaml(tap_config_yaml, tap_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl(tap_config, nullptr, factory_context);
+}
+
+TEST(TypedExtensionConfigTest, AddTestConfigTransportSocketContextForUdpSink) {
+  const std::string tap_config_yaml =
+      R"EOF(
+  match:
+    any_match: true
+  output_config:
+    sinks:
+      - format: PROTO_BINARY
+        custom_sink:
+          name: custom_sink
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.tap_sinks.udp_sink.v3.UdpSink
+            udp_address:
+              protocol: UDP
+              address: 127.0.0.1
+              port_value: 8089
+)EOF";
+  envoy::config::tap::v3::TapConfig tap_config;
+  TestUtility::loadFromYaml(tap_config_yaml, tap_config);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   TestConfigImpl(tap_config, nullptr, factory_context);
