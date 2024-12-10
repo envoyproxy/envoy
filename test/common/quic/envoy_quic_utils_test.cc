@@ -275,7 +275,7 @@ TEST(EnvoyQuicUtilsTest, EnvoyResetReasonToQuicResetErrorCodeImpossibleCases) {
 
 TEST(EnvoyQuicUtilsTest, QuicResetErrorToEnvoyResetReason) {
   EXPECT_EQ(quicRstErrorToEnvoyLocalResetReason(quic::QUIC_STREAM_NO_ERROR),
-            Http::StreamResetReason::LocalReset);
+            Http::StreamResetReason::RemoteResetNoError);
   EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECTION_ERROR),
             Http::StreamResetReason::ConnectionTermination);
   EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECT_ERROR),

@@ -94,7 +94,7 @@ public:
   void encodeData(Buffer::Instance& data, bool end_stream);
   void encodeData(std::string data, bool end_stream);
   void encodeTrailers(const Http::HeaderMap& trailers);
-  void encodeResetStream();
+  void encodeResetStream(Http::StreamResetReason reason = Http::StreamResetReason::LocalReset);
   void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector);
   void readDisable(bool disable);
   const Http::RequestHeaderMap& headers() {
