@@ -71,7 +71,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
   {
     envoy::service::ratelimit::v3::RateLimitRequest request;
     Http::TestRequestHeaderMapImpl headers;
-    GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}}, 0);
+    GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar", 0}}}}, 0);
     EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(client_), _, _))
         .WillOnce(
             Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
@@ -83,7 +83,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
               return &async_request_;
             }));
 
-    client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance(),
+    client_.limit(request_callbacks_, "foo", {{{{"foo", "bar", 0}}}}, Tracing::NullSpan::instance(),
                   stream_info_);
 
     client_.onCreateInitialMetadata(headers);
@@ -99,11 +99,11 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
   {
     envoy::service::ratelimit::v3::RateLimitRequest request;
     Http::TestRequestHeaderMapImpl headers;
-    GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}}, 0);
+    GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar", 0}, {"bar", "baz", 0}}}}, 0);
     EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), _, _, _))
         .WillOnce(Return(&async_request_));
 
-    client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}, {"bar", "baz"}}}},
+    client_.limit(request_callbacks_, "foo", {{{{"foo", "bar", 0}, {"bar", "baz", 0}}}},
                   Tracing::NullSpan::instance(), stream_info_);
 
     client_.onCreateInitialMetadata(headers);
@@ -119,13 +119,15 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     envoy::service::ratelimit::v3::RateLimitRequest request;
     GrpcClientImpl::createRequest(
         request, "foo",
-        {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}}, 0);
+        {{{{"foo", "bar", 0}, {"bar", "baz", 0}}}, {{{"foo2", "bar2", 0}, {"bar2", "baz2", 0}}}},
+        0);
     EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), _, _, _))
         .WillOnce(Return(&async_request_));
 
-    client_.limit(request_callbacks_, "foo",
-                  {{{{"foo", "bar"}, {"bar", "baz"}}}, {{{"foo2", "bar2"}, {"bar2", "baz2"}}}},
-                  Tracing::NullSpan::instance(), stream_info_);
+    client_.limit(
+        request_callbacks_, "foo",
+        {{{{"foo", "bar", 0}, {"bar", "baz", 0}}}, {{{"foo2", "bar2", 0}, {"bar2", "baz2", 0}}}},
+        Tracing::NullSpan::instance(), stream_info_);
 
     response = std::make_unique<envoy::service::ratelimit::v3::RateLimitResponse>();
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::Error, _, _, _, _, _));
@@ -137,13 +139,14 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     Http::TestRequestHeaderMapImpl headers;
     GrpcClientImpl::createRequest(
         request, "foo",
-        {{{{"foo", "bar"}, {"bar", "baz"}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE}}}}, 0);
+        {{{{"foo", "bar", 0}, {"bar", "baz", 0}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE}}}},
+        0);
     EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), _, _, _))
         .WillOnce(Return(&async_request_));
 
     client_.limit(
         request_callbacks_, "foo",
-        {{{{"foo", "bar"}, {"bar", "baz"}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE}}}},
+        {{{{"foo", "bar", 0}, {"bar", "baz", 0}}, {{42, envoy::type::v3::RateLimitUnit::MINUTE}}}},
         Tracing::NullSpan::instance(), stream_info_);
 
     client_.onCreateInitialMetadata(headers);
@@ -161,7 +164,7 @@ TEST_F(RateLimitGrpcClientTest, Cancel) {
 
   EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _)).WillOnce(Return(&async_request_));
 
-  client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance(),
+  client_.limit(request_callbacks_, "foo", {{{{"foo", "bar", 0}}}}, Tracing::NullSpan::instance(),
                 stream_info_);
 
   EXPECT_CALL(async_request_, cancel());
@@ -174,7 +177,7 @@ TEST_F(RateLimitGrpcClientTest, RequestWithHitsAddend) {
   envoy::service::ratelimit::v3::RateLimitRequest request;
   Http::TestRequestHeaderMapImpl headers;
   uint32_t hits_addend = 5;
-  GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar"}}}}, hits_addend);
+  GrpcClientImpl::createRequest(request, "foo", {{{{"foo", "bar", 0}}}}, hits_addend);
   EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(client_), _, _))
       .WillOnce(
           Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
@@ -186,7 +189,7 @@ TEST_F(RateLimitGrpcClientTest, RequestWithHitsAddend) {
             return &async_request_;
           }));
 
-  client_.limit(request_callbacks_, "foo", {{{{"foo", "bar"}}}}, Tracing::NullSpan::instance(),
+  client_.limit(request_callbacks_, "foo", {{{{"foo", "bar", 0}}}}, Tracing::NullSpan::instance(),
                 stream_info_, hits_addend);
 
   client_.onCreateInitialMetadata(headers);
@@ -196,6 +199,93 @@ TEST_F(RateLimitGrpcClientTest, RequestWithHitsAddend) {
   response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OVER_LIMIT);
   EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("over_limit")));
   EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _, _, _, _, _));
+  client_.onSuccess(std::move(response), span_);
+}
+
+// Now add these test cases:
+TEST_F(RateLimitGrpcClientTest, CreateRequestWithEntryLevelHitsAddend) {
+  envoy::service::ratelimit::v3::RateLimitRequest request;
+  const uint32_t global_hits = 1;
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors = {{{
+      {"key1", "value1", 5}, // Entry with hits_addend override
+      {"key2", "value2", 0}  // Entry without override
+  }}};
+
+  GrpcClientImpl::createRequest(request, "test_domain", descriptors, global_hits);
+
+  ASSERT_EQ(request.domain(), "test_domain");
+  ASSERT_EQ(request.hits_addend(), global_hits);
+  ASSERT_EQ(request.descriptors_size(), 1);
+
+  const auto& descriptor = request.descriptors(0);
+  ASSERT_EQ(descriptor.entries_size(), 2);
+
+  // First entry should have hits_addend override
+  EXPECT_EQ(descriptor.entries(0).key(), "key1");
+  EXPECT_EQ(descriptor.entries(0).value(), "value1");
+  EXPECT_EQ(descriptor.entries(0).hits_addend(), 5);
+
+  // Second entry should have default hits_addend
+  EXPECT_EQ(descriptor.entries(1).key(), "key2");
+  EXPECT_EQ(descriptor.entries(1).value(), "value2");
+  EXPECT_EQ(descriptor.entries(1).hits_addend(), 0);
+}
+
+TEST_F(RateLimitGrpcClientTest, CreateRequestWithMultipleDescriptors) {
+  envoy::service::ratelimit::v3::RateLimitRequest request;
+  const uint32_t global_hits = 2;
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors = {
+      {{
+          {"key1", "value1", 3} // First descriptor with override
+      }},
+      {{
+          {"key2", "value2", 0}, // Second descriptor with explicit zero
+          {"key3", "value3", 0}  // Entry without override
+      }}};
+
+  GrpcClientImpl::createRequest(request, "test_domain", descriptors, global_hits);
+
+  ASSERT_EQ(request.descriptors_size(), 2);
+
+  // Check first descriptor
+  const auto& descriptor1 = request.descriptors(0);
+  ASSERT_EQ(descriptor1.entries_size(), 1);
+  EXPECT_EQ(descriptor1.entries(0).key(), "key1");
+  EXPECT_EQ(descriptor1.entries(0).value(), "value1");
+  EXPECT_EQ(descriptor1.entries(0).hits_addend(), 3);
+
+  // Check second descriptor
+  const auto& descriptor2 = request.descriptors(1);
+  ASSERT_EQ(descriptor2.entries_size(), 2);
+  EXPECT_EQ(descriptor2.entries(0).key(), "key2");
+  EXPECT_EQ(descriptor2.entries(0).value(), "value2");
+  EXPECT_EQ(descriptor2.entries(0).hits_addend(), 0);
+  EXPECT_EQ(descriptor2.entries(1).key(), "key3");
+  EXPECT_EQ(descriptor2.entries(1).value(), "value3");
+  EXPECT_EQ(descriptor2.entries(1).hits_addend(), 0);
+}
+
+TEST_F(RateLimitGrpcClientTest, FullRequestResponseCycleWithHitsAddend) {
+  envoy::service::ratelimit::v3::RateLimitRequest request;
+  Http::TestRequestHeaderMapImpl headers;
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors = {{{{"key1", "value1", 5}}}};
+
+  const uint32_t global_hits = 1;
+  GrpcClientImpl::createRequest(request, "test_domain", descriptors, global_hits);
+
+  EXPECT_CALL(*async_client_, sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(client_), _, _))
+      .WillOnce(Return(&async_request_));
+
+  client_.limit(request_callbacks_, "test_domain", descriptors, Tracing::NullSpan::instance(),
+                stream_info_, global_hits);
+
+  auto response = std::make_unique<envoy::service::ratelimit::v3::RateLimitResponse>();
+  response->set_overall_code(envoy::service::ratelimit::v3::RateLimitResponse::OK);
+  EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("ok")));
+  EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _, _, _, _));
   client_.onSuccess(std::move(response), span_);
 }
 

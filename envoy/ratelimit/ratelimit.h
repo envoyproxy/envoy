@@ -30,14 +30,15 @@ struct RateLimitOverride {
 struct DescriptorEntry {
   std::string key_;
   std::string value_;
+  uint32_t hits_addend_;
 
   friend bool operator==(const DescriptorEntry& lhs, const DescriptorEntry& rhs) {
-    return lhs.key_ == rhs.key_ && lhs.value_ == rhs.value_;
+    return lhs.key_ == rhs.key_ && lhs.value_ == rhs.value_ && lhs.hits_addend_ == rhs.hits_addend_;
   }
   template <typename H>
   friend H AbslHashValue(H h, // NOLINT(readability-identifier-naming)
                          const DescriptorEntry& entry) {
-    return H::combine(std::move(h), entry.key_, entry.value_);
+    return H::combine(std::move(h), entry.key_, entry.value_, entry.hits_addend_);
   }
 };
 
@@ -73,7 +74,7 @@ struct LocalDescriptor {
 
   std::string toString() const {
     return absl::StrJoin(entries_, ", ", [](std::string* out, const auto& e) {
-      absl::StrAppend(out, e.key_, "=", e.value_);
+      absl::StrAppend(out, e.key_, "=", e.value_, "(", e.hits_addend_, ")");
     });
   }
 
