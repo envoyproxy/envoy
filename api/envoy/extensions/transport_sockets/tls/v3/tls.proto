@@ -154,9 +154,10 @@ message DownstreamTlsContext {
   // Defaults to ``LENIENT_STAPLING``
   OcspStaplePolicy ocsp_staple_policy = 8 [(validate.rules).enum = {defined_only: true}];
 
-  // Allows multiple certificates in the Downstream transport socket for different SNI.
-  // If the client provides an SNI with no matching certificate, Envoy will decide to perform a full certificate scan
-  // based on this config.
+  // Multiple certificates are allowed in Downstream transport socket to serve different SNI.
+  // This option controls the behavior when no matching certificate is found for the received SNI value,
+  // or no SNI value was sent. If enabled, all certificates will be evaluated for a match for non-SNI criteria
+  // such as key type and OCSP settings. If disabled, the first provided certificate will be used.
   // Defaults to ``false``. See more details in :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>`.
   google.protobuf.BoolValue full_scan_certs_on_sni_mismatch = 9;
 
