@@ -1,4 +1,4 @@
-agent-ubuntu: ubuntu-22.04
+agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
   repo: envoyproxy/envoy-build-ubuntu
