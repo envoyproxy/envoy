@@ -93,20 +93,10 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
-    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_, _, _))
+    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_, _))
         .WillByDefault(
-            Invoke([&](Envoy::Http::FilterChainManager& manager, bool only_create_if_configured,
-                       const Envoy::Http::FilterChainOptions&) -> bool {
-              if (only_create_if_configured) {
-                return false;
-              }
-              Envoy ::Http::FilterFactoryCb factory_cb =
-                  [](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-                callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
-              };
-              manager.applyFilterFactoryCb({}, factory_cb);
-              return true;
-            }));
+            Invoke([&](Envoy::Http::FilterChainManager&,
+                       const Envoy::Http::FilterChainOptions&) -> bool { return false; }));
     EXPECT_CALL(mock_router_filter_, downstreamHeaders())
         .Times(AnyNumber())
         .WillRepeatedly(Return(&request_));
