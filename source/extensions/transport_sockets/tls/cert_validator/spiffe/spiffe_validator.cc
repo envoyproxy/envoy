@@ -81,14 +81,13 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
               const auto use = key->getString("use");
               // Currently only support x509, not jwt.
               if (!use.ok() || *use != "x509-svid") {
-                  ENVOY_LOG(error, "missing or invalid 'use' field found in cert for domain: '{}'",
-                            domain_name);
-                  return false;
+                ENVOY_LOG(error, "missing or invalid 'use' field found in cert for domain: '{}'",
+                          domain_name);
+                return false;
               }
               const auto& certs = key->getStringArray("x5c");
               if (!certs.ok()) {
-                ENVOY_LOG(error, "missing 'x5c' field found in cert for domain: '{}'",
-                          domain_name);
+                ENVOY_LOG(error, "missing 'x5c' field found in cert for domain: '{}'", domain_name);
                 return false;
               }
               for (const auto& cert : *certs) {
@@ -109,8 +108,7 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
                 }
                 if (X509_STORE_add_cert(spiffe_data->trust_bundle_stores[domain_name].get(),
                                         x509.get()) != 1) {
-                  ENVOY_LOG(error,
-                            "Failed to add x509 object while loading certs for domain '{}'",
+                  ENVOY_LOG(error, "Failed to add x509 object while loading certs for domain '{}'",
                             domain_name);
                   return false;
                 }

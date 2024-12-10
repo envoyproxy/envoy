@@ -806,7 +806,6 @@ typed_config:
   )EOF")),
                             EnvoyException, "Failed to load SPIFFE Bundle map"");
   }
-
 }
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomainBundleMappingInline) {
