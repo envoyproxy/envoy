@@ -134,7 +134,8 @@ message DownstreamTlsContext {
 
   // If ``true``, the TLS server will not maintain a session cache of TLS sessions.
   //
-  // **Note:** This applies only to TLSv1.2 and earlier.
+  // .. note::
+  //   This applies only to TLSv1.2 and earlier.
   bool disable_stateful_session_resumption = 10;
 
   // Maximum lifetime of TLS sessions in seconds. If specified, ``session_timeout`` will change the maximum lifetime
