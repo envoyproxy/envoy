@@ -522,11 +522,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Just-In-Time compiler for Lua",
         project_url = "https://luajit.org",
         # LuaJIT only provides rolling releases
-        version = "d06beb0480c5d1eb53b3343e78063950275aa281",
-        sha256 = "6abd146a1dfa240a965748f63221633446affa2a715e3eb03879136e3efb95f4",
+        version = "19878ec05c239ccaf5f3d17af27670a963e25b8b",
+        sha256 = "e91acbe181cf6ffa3ef15870b8e620131002240ba24c5c779fd0131db021517f",
         strip_prefix = "LuaJIT-{version}",
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/{version}.tar.gz"],
-        release_date = "2024-03-10",
+        release_date = "2024-11-28",
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.filters.http.lua",
