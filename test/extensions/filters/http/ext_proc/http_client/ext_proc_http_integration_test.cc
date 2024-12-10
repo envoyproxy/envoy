@@ -353,7 +353,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutation) {
 }
 
 // Ext_proc filter timeout is set to default value which is 2s. HTTP Async client timeout
-// is set to a much larger number 10s.  Test the case that the side stream server does not
+// is set to a much larger number 10s. Test the case that the side stream server does not
 // send response in time which triggers ext_proc filter timeout.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
@@ -372,7 +372,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
 }
 
 // Ext_proc filter timeout is set to default value which is 2s. HTTP Async client timeout
-// is set to a smaller number 1s.  Test the case that the side stream server does not
+// is set to a smaller number 1s. Test the case that the side stream server does not
 // send response in time which triggers HTTP async client timeout.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
   ConfigOptions config_option = {};
