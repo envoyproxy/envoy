@@ -408,7 +408,8 @@ public:
   createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         Upstream::ResourcePriority, absl::optional<Envoy::Http::Protocol> protocol,
-                        Upstream::LoadBalancerContext*) const override {
+                        Upstream::LoadBalancerContext*, 
+                        const Protobuf::Message& ) const override {
     if (upstream_protocol != UpstreamProtocol::HTTP) {
       return nullptr;
     }

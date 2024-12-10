@@ -450,3 +450,89 @@ var (
 )
 
 // *************** errors end **************//
+
+// Info types called by tcp upstream that can get the corresponding info from c++ side.
+type TcpUpstreamInfoType int
+
+const (
+	TcpUpstreamInfoRouterName  TcpUpstreamInfoType = 0
+	TcpUpstreamInfoClusterName TcpUpstreamInfoType = 1
+)
+
+func (t TcpUpstreamInfoType) String() string {
+	switch t {
+	case TcpUpstreamInfoRouterName:
+		return "TcpUpstreamInfoRouterName"
+	case TcpUpstreamInfoClusterName:
+		return "TcpUpstreamInfoClusterName"
+	}
+	return "unknown"
+}
+
+type EndStreamType int
+
+const (
+	NotEndStream EndStreamType = 0
+	EndStream    EndStreamType = 1
+)
+
+func (t EndStreamType) String() string {
+	switch t {
+	case NotEndStream:
+		return "NotEndStream"
+	case EndStream:
+		return "EndStream"
+	}
+	return "unknown"
+}
+
+// Status codes returned by tcp upstream extension.
+type TcpUpstreamStatus int
+
+const (
+	/**
+	* Area of status: encodeHeaders, encodeData, onUpstreamData
+	*
+	* Used when you want to leave the current func area and continue further func. (when streaming, go side get each_data_piece, may be called multipled times)
+	*
+	* Here is the specific explanation in different funcs:
+	* encodeHeaders: will go to encodeData, go side in encodeData will streaming get each_data_piece.
+	* encodeData: streaming send data to upstream, go side get each_data_piece, may be called multipled times.
+	* onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
+	 */
+	TcpUpstreamContinue TcpUpstreamStatus = 0
+
+	/**
+	 * Area of status: encodeHeaders, encodeData, onUpstreamData
+	 *
+	 * Used when you want to buffer data.
+	 *
+	 * Here is the specific explanation in different funcs:
+	 * encodeHeaders: will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole data one-off.
+	 * encodeData: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot bed used when end_stream=true)
+	 * onUpstreamData: every data trigger will call go side, and go side get buffer data from start.
+	 */
+	TcpUpstreamStopAndBuffer TcpUpstreamStatus = 1
+
+	/** Area of status: encodeHeaders, onUpstreamData
+	 *
+	 * Used when you do not want to send data to upstream in encodeHeaders, or send data to downstream in onUpstreamData.
+	 *
+	 * Here is the specific explanation in different funcs:
+	 * encodeHeaders: directly send data to upstream, and encodeData will not be called even when downstream_req has body.
+	 * onUpstreamData: pass data and headers to downstream which means the whole resp to http is finished.
+	 */
+	TcpUpstreamSendData TcpUpstreamStatus = 2
+)
+
+func (s TcpUpstreamStatus) String() string {
+	switch s {
+	case TcpUpstreamContinue:
+		return "TcpUpstreamContinue"
+	case TcpUpstreamStopAndBuffer:
+		return "TcpUpstreamStopAndBuffer"
+	case TcpUpstreamSendData:
+		return "TcpUpstreamSendData"
+	}
+	return "unknown"
+}
