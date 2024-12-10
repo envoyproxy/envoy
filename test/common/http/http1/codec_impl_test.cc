@@ -2139,6 +2139,35 @@ TEST_P(Http1ServerConnectionImplTest, IgnoreUpgradeH2cCloseEtc) {
   expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
 }
 
+TEST_P(Http1ServerConnectionImplTest, IgnoreUpgradeTLSRequest) {
+  codec_settings_.ignore_http_11_upgrade_ = true;
+
+  initialize();
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":authority", "www.somewhere.com"}, {":scheme", "http"}, {":path", "/"}, {":method", "GET"}};
+  Buffer::OwnedImpl buffer("GET http://www.somewhere.com/ HTTP/1.1\r\nConnection: Upgrade\r\n"
+                           "Upgrade: TLS/1.2\r\nHost: bah\r\n\r\n");
+  expectHeadersTest(Protocol::Http11, true, buffer, expected_headers);
+}
+
+TEST_P(Http1ServerConnectionImplTest, UpgradeTLSRequest) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<MockRequestDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestRequestHeaderMapImpl expected_headers{
+      {":path", "/"}, {":method", "GET"}, {"connection", "upgrade"}, {"upgrade", "TLS/1.2"}};
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false));
+  ;
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: TLS/1.2\r\n\r\n");
+  auto status = codec_->dispatch(buffer);
+  EXPECT_TRUE(status.ok());
+}
+
 TEST_P(Http1ServerConnectionImplTest, UpgradeRequest) {
   initialize();
 

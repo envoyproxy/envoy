@@ -248,6 +248,8 @@ public:
 
   struct {
     const std::string H2c{"h2c"};
+    const std::string TlsPrefix{
+        "tls/"}; // A valid upgrade request includes a version, such as "TLS/1.2".
     const std::string WebSocket{"websocket"};
     const std::string ConnectUdp{"connect-udp"};
   } UpgradeValues;

@@ -310,6 +310,11 @@ new_features:
   change: |
     Added new health check filter stats including total requests, successful/failed checks, cached responses, and
     cluster health status counters. These stats help track health check behavior and cluster health state.
+- area: http
+  change: |
+    Added default false :ref:`ignore_http_11_upgrade
+    <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.ignore_http_11_upgrade>`. When set to true, Upgrade headers
+    will be removed rather than rejecting the request.
 
 deprecated:
 - area: rbac
