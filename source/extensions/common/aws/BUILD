@@ -162,7 +162,6 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/tracing:http_tracer_lib",
         "@com_google_absl//absl/time",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
@@ -182,7 +181,6 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//source/common/common:base64_lib",
         "//source/common/config:datasource_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )

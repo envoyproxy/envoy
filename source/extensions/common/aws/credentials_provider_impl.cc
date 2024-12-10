@@ -1092,7 +1092,7 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
     const auto initialization_timer = std::chrono::seconds(2);
     return std::make_shared<WebIdentityCredentialsProvider>(
         context.api(), context, nullptr, MetadataFetcher::create, "", token, sts_endpoint, role_arn,
-        role_session_name, refresh_state, initialization_timer, cluster_name);    
+        role_session_name, refresh_state, initialization_timer, cluster_name);
   } else if (config.has_iam_roles_anywhere()) {
     const auto& roles_anywhere = config.iam_roles_anywhere();
     const std::string iam_roles_anywhere_endpoint = Utility::getRolesAnywhereEndpoint(region);
