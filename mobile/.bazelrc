@@ -137,7 +137,7 @@ build:mobile-release-android --compilation_mode=opt
 
 # Instrument Envoy Mobile's C++ code for coverage
 coverage --instrumentation_filter="//library/common[/:]"
-coverage --experimental_collect_code_coverage_for_generated_files
+coverage --action_env=VERBOSE_COVERAGE=1 --host_action_env=VERBOSE_COVERAGE=1 --test_env=VERBOSE_COVERAGE=1
 
 #############################################################################
 # Experimental EngFlow Remote Execution Configs
