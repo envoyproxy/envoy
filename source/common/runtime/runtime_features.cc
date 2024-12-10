@@ -167,6 +167,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
+// A flag to enable normalization of RDS provider config. (see PR 37180).
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_normalize_rds_provider_config);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
