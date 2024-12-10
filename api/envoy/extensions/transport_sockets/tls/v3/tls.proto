@@ -51,10 +51,10 @@ message UpstreamTlsContext {
   bool auto_host_sni = 6;
 
   // If true, replaces any Subject Alternative Name (SAN) validations with a validation for a DNS SAN matching
-  // the SNI value sent. The validation uses the actual requested SNI, regardless of its configuration.
+  // the SNI value sent. The validation uses the actual requested SNI, regardless of how the SNI is configured.
   //
-  // This option ensures correct SAN validation when an SNI value is provided and expected to match the server
-  // certificate's SAN.
+  // For common cases where an SNI value is present and the server certificate should include a corresponding SAN,
+  // this option ensures the SAN is properly validated.
   //
   // See the :ref:`validation configuration <start_quick_start_securing_validation>` for how this interacts with
   // other validation options.
