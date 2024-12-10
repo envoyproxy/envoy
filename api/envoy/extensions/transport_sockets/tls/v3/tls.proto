@@ -163,7 +163,8 @@ message DownstreamTlsContext {
   // If ``true``, allows the downstream client's preferred cipher to be used during the handshake. If ``false``, Envoy defaults
   // to using its preferred cipher.
   //
-  // **Note:** This has no effect when using TLSv1_3.
+  // .. note::
+  //   This has no effect when using TLSv1_3.
   bool prefer_client_ciphers = 11;
 }
 
