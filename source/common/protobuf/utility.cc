@@ -789,7 +789,7 @@ const ProtobufWkt::Value& ValueUtil::nullValue() {
   return *v;
 }
 
-ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
+ProtobufWkt::Value ValueUtil::stringValue(absl::string_view str) {
   ProtobufWkt::Value val;
   val.set_string_value(str);
   return val;
