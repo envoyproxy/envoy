@@ -28,18 +28,19 @@ public:
                                               Random::RandomGenerator& random,
                                               TimeSource& time_source) override;
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Server::Configuration::ServerFactoryContext&,
-                                             const Protobuf::Message& config) override {
-    auto active_or_legacy =
-        Common::ActiveOrLegacy<Upstream::MaglevLbProto, Upstream::ClusterProto>::get(&config);
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadConfig(Server::Configuration::ServerFactoryContext&,
+             const Protobuf::Message& config) override {
+    ASSERT(dynamic_cast<const MaglevLbProto*>(&config) != nullptr);
+    const MaglevLbProto& typed_config = dynamic_cast<const MaglevLbProto&>(config);
+    // TODO(wbocode): to merge the legacy and typed config and related constructors into one.
+    return Upstream::LoadBalancerConfigPtr{new Upstream::TypedMaglevLbConfig(typed_config)};
+  }
 
-    ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
-
-    return active_or_legacy.hasLegacy()
-               ? Upstream::LoadBalancerConfigPtr{new Upstream::LegacyMaglevLbConfig(
-                     *active_or_legacy.legacy())}
-               : Upstream::LoadBalancerConfigPtr{
-                     new Upstream::TypedMaglevLbConfig(*active_or_legacy.active())};
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadLegacy(Server::Configuration::ServerFactoryContext&,
+             const Upstream::ClusterProto& cluster) override {
+    return Upstream::LoadBalancerConfigPtr{new Upstream::LegacyMaglevLbConfig(cluster)};
   }
 };
 
