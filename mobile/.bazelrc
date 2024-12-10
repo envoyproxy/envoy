@@ -140,6 +140,7 @@ coverage --instrumentation_filter="//library/common[/:]"
 # coverage --instrumentation_filter="//[/:]"
 coverage --action_env=VERBOSE_COVERAGE=1 --host_action_env=VERBOSE_COVERAGE=1 --test_env=VERBOSE_COVERAGE=1
 coverage --test_env=CC_CODE_COVERAGE_SCRIPT=external/envoy/bazel/coverage/collect_cc_coverage.sh
+coverage --coverage_support=@envoy//bazel/coverage:coverage_support
 
 #############################################################################
 # Experimental EngFlow Remote Execution Configs
