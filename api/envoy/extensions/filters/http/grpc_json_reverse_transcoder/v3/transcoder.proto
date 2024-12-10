@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.grpc_json_reverse_transcoder.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_json_reverse_transcoder.v3";
+option java_outer_classname = "TranscoderProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/grpc_json_reverse_transcoder/v3;grpc_json_reverse_transcoderv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: gRPC-JSON reverse transcoder]
+// gRPC-JSON reverse transcoder :ref:`configuration overview <config_http_filters_grpc_json_reverse_transcoder>`.
+// [#extension: envoy.filters.http.grpc_json_reverse_transcoder]
+
+// [#next-free-field: 6]
+// ``GrpcJsonReverseTranscoder`` is the filter configuration for the gRPC JSON
+// reverse transcoder. The reverse transcoder acts as a bridge between a gRPC
+// client and an HTTP/JSON server, converting the gRPC request into HTTP/JSON
+// for the HTTP backend and the HTTP/JSON response back to gRPC for the gRPC
+// client. This effectively reverses the behavior of the
+// :ref:`grpc_json_transcoder filter <config_http_filters_grpc_json_transcoder>`,
+// allowing a gRPC client to communicate with an HTTP/JSON server.
+message GrpcJsonReverseTranscoder {
+  // Supplies the filename of
+  // :ref:`the proto descriptor set
+  // <config_grpc_json_reverse_transcoder_generate_proto_descriptor_set>` for the gRPC services.
+  // If set, takes precedence over the ``descriptor_binary`` field.
+  string descriptor_path = 1;
+
+  // Supplies the binary content of
+  // :ref:`the proto descriptor set
+  // <config_grpc_json_reverse_transcoder_generate_proto_descriptor_set>` for the gRPC services.
+  // If ``descriptor_path`` is set, this field is not used.
+  bytes descriptor_binary = 2;
+
+  // The maximum size of a request body to be transcoded, in bytes. A body exceeding this size will
+  // provoke a ``gRPC status: ResourceExhausted`` response.
+  //
+  // Large values may cause envoy to use a lot of memory if there are many
+  // concurrent requests.
+  //
+  // If unset, the current stream buffer size is used.
+  google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {gt: 0}];
+
+  // The maximum size of a response body to be transcoded, in bytes. A body exceeding this size will
+  // provoke a ``gRPC status: Internal`` response.
+  //
+  // Large values may cause envoy to use a lot of memory if there are many
+  // concurrent requests.
+  //
+  // If unset, the current stream buffer size is used.
+  google.protobuf.UInt32Value max_response_body_size = 4 [(validate.rules).uint32 = {gt: 0}];
+
+  // The name of the header field that has the API version of the request.
+  string api_version_header = 5;
+}
