@@ -19,7 +19,7 @@ Http::FilterFactoryCb ApiKeyAuthFilterFactory::createFilterFactoryFromProtoTyped
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 ApiKeyAuthFilterFactory::createRouteSpecificFilterConfigTyped(
     const ApiKeyAuthPerRouteProto& proto_config, Server::Configuration::ServerFactoryContext&,
     ProtobufMessage::ValidationVisitor&) {

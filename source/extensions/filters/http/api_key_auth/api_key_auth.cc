@@ -14,9 +14,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ApiKeyAuth {
 
-RouteConfig::RouteConfig(const ApiKeyAuthPerRouteProto& proto) : override_config_(proto) {
-  allowed_clients_.insert(proto.allowed_clients().begin(), proto.allowed_clients().end());
-}
+RouteConfig::RouteConfig(const ApiKeyAuthPerRouteProto& proto)
+    : override_config_(proto),
+      allowed_clients_(proto.allowed_clients().begin(), proto.allowed_clients().end()) {}
 
 KeySources::Source::Source(absl::string_view header, absl::string_view query,
                            absl::string_view cookie) {
