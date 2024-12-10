@@ -7,7 +7,6 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/optref.h"
-#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/http/message.h"
@@ -16,13 +15,11 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
-#include "source/common/config/datasource.h"
 #include "source/common/init/target_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-#include "source/extensions/common/aws/signer.h"
 
 #include "absl/strings/string_view.h"
 
@@ -409,22 +406,6 @@ public:
 };
 
 /**
- * Credential provider based on an inline credential.
- */
-class InlineCredentialProvider : public CredentialsProvider {
-public:
-  explicit InlineCredentialProvider(absl::string_view access_key_id,
-                                    absl::string_view secret_access_key,
-                                    absl::string_view session_token)
-      : credentials_(access_key_id, secret_access_key, session_token) {}
-
-  Credentials getCredentials() override { return credentials_; }
-
-private:
-  const Credentials credentials_;
-};
-
-/**
  * Default AWS credentials provider chain.
  *
  * Reference implementation:
@@ -485,6 +466,22 @@ private:
         sts_endpoint, role_arn, role_session_name, refresh_state, initialization_timer,
         cluster_name);
   }
+};
+
+/**
+ * Credential provider based on an inline credential.
+ */
+class InlineCredentialProvider : public CredentialsProvider {
+public:
+  explicit InlineCredentialProvider(absl::string_view access_key_id,
+                                    absl::string_view secret_access_key,
+                                    absl::string_view session_token)
+      : credentials_(access_key_id, secret_access_key, session_token) {}
+
+  Credentials getCredentials() override { return credentials_; }
+
+private:
+  const Credentials credentials_;
 };
 
 /**
