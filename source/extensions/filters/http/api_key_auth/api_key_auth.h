@@ -138,8 +138,8 @@ public:
   }
 
 private:
-  ApiKeyAuthConfig override_config_;
-  absl::flat_hash_set<std::string> allowed_clients_;
+  const ApiKeyAuthConfig override_config_;
+  const absl::flat_hash_set<std::string> allowed_clients_;
 };
 
 struct AuthResult {
@@ -173,7 +173,7 @@ private:
     return ApiKeyAuthStats{ALL_API_KEY_AUTH_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
-  ApiKeyAuthConfig default_config_;
+  const ApiKeyAuthConfig default_config_;
   ApiKeyAuthStats stats_;
 };
 

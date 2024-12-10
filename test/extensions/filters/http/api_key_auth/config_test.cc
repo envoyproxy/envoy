@@ -93,8 +93,10 @@ TEST(ApiKeyAuthFilterFactoryTest, NormalFactory) {
   status_or.value()(filter_callback);
 
   const auto route_config =
-      factory.createRouteSpecificFilterConfig(scope_proto_config, context.server_factory_context_,
-                                              ProtobufMessage::getNullValidationVisitor());
+      factory
+          .createRouteSpecificFilterConfig(scope_proto_config, context.server_factory_context_,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
   EXPECT_TRUE(route_config != nullptr);
 }
 
