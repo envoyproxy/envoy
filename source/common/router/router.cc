@@ -864,7 +864,13 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
       upstream_protocol = UpstreamProtocol::TCP;
     }
   }
-  return factory->createGenericConnPool(thread_local_cluster, upstream_protocol,
+
+  Upstream::HostConstSharedPtr host = thread_local_cluster.chooseHost(this);
+  if (!host) {
+    return nullptr;
+  }
+
+  return factory->createGenericConnPool(host, thread_local_cluster, upstream_protocol,
                                         route_entry_->priority(),
                                         callbacks_->streamInfo().protocol(), this);
 }
