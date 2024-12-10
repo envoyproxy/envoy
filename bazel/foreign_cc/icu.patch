@@ -1375,19 +1375,6 @@ index 2d85cdb..0000000
 -        "U_I18N_IMPLEMENTATION",
 -    ],
 -)
-diff --git a/icu4c/source/icudefs.mk.in b/icu4c/source/icudefs.mk.in
-index 2c35816..4ad6f52 100644
---- a/icu4c/source/icudefs.mk.in
-+++ b/icu4c/source/icudefs.mk.in
-@@ -117,7 +117,7 @@ EXEEXT = @EXEEXT@
- CC = @CC@
- CXX = @CXX@
- AR = @AR@
--ARFLAGS = @ARFLAGS@ r
-+ARFLAGS = @ARFLAGS@
- RANLIB = @RANLIB@
- COMPILE_LINK_ENVVAR = @COMPILE_LINK_ENVVAR@
- UCLN_NO_AUTO_CLEANUP = @UCLN_NO_AUTO_CLEANUP@
 diff --git a/icu4c/source/stubdata/BUILD.bazel b/icu4c/source/stubdata/BUILD.bazel
 deleted file mode 100644
 index 20344ef..0000000
