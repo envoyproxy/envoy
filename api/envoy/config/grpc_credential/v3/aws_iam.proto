@@ -32,8 +32,8 @@ message AwsIamConfig {
   //
   // Example: appmesh
   string service_name = 1 [
-    (validate.rules).string = {min_len: 1},
     deprecated = true,
+    (validate.rules).string = {min_len: 1},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
