@@ -14,14 +14,11 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/aws/iam_roles_anywhere_credentials_provider_impl.h"
 #include "source/extensions/common/aws/iam_roles_anywhere_sigv4_signer_impl.h"
-#include "source/extensions/common/aws/signer_base_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
-#include "credentials_provider.h"
 #include "fmt/chrono.h"
-#include "metadata_fetcher.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -1105,7 +1102,7 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
     const auto& roles_anywhere = config.iam_roles_anywhere();
     const std::string iam_roles_anywhere_endpoint = Utility::getRolesAnywhereEndpoint(region);
     std::string role_session_name;
-    if (roles_anywhere.role_session_name().empty()) {
+    if (!roles_anywhere.role_session_name().empty()) {
       role_session_name = roles_anywhere.role_session_name();
     } else {
       role_session_name = sessionName(context.api());
@@ -1115,11 +1112,11 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
     if (roles_anywhere.has_session_duration()) {
       session_duration = PROTOBUF_GET_SECONDS_OR_DEFAULT(
           roles_anywhere, session_duration,
-          Extensions::Common::Aws::SignatureQueryParameterValues::DefaultExpiration);
+          Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration);
     }
 
     const auto initialization_timer = std::chrono::seconds(2);
-    // const auto cert_chain =
+
     absl::optional<envoy::config::core::v3::DataSource> cert_chain;
     if (roles_anywhere.has_certificate_chain()) {
       cert_chain = roles_anywhere.certificate_chain();

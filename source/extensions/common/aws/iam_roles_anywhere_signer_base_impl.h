@@ -34,6 +34,7 @@ public:
   static constexpr absl::string_view ShortDateFormat = "%Y%m%d";
   static constexpr absl::string_view UnsignedPayload = "UNSIGNED-PAYLOAD";
   static constexpr absl::string_view AuthorizationCredentialFormat = "{}/{}";
+  static constexpr uint16_t DefaultExpiration = 900;
 };
 
 using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::StringMatcher>;

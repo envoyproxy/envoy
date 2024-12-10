@@ -154,7 +154,8 @@ public:
   }
   ~IamRolesAnywhereCredentialsProviderTest() override = default;
 
-  void setupProvider(std::string cert, std::string pkey, std::string chain = "") {
+  void setupProvider(std::string cert, std::string pkey, std::string chain = "",
+                     std::string session = "session", uint16_t duration = 3600) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
 
     EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
@@ -197,7 +198,7 @@ public:
           return std::move(metadata_fetcher_);
         },
         MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh, std::chrono::seconds(2),
-        "arn:role-arn", "arn:profile-arn", "arn:trust-anchor-arn", "session", 3600,
+        "arn:role-arn", "arn:profile-arn", "arn:trust-anchor-arn", session, duration,
         "ap-southeast-2", "rolesanywhere.ap-southeast-2.amazonaws.com", certificate_data_source_,
         private_key_data_source_, cert_chain_data_source_);
   }

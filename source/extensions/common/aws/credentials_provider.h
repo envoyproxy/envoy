@@ -68,10 +68,12 @@ public:
   };
 
   // X509 Credentials
-  X509Credentials(std::string certificate_b64,
+  X509Credentials(absl::string_view certificate_b64,
                   PublicKeySignatureAlgorithm certificate_signature_algorithm,
-                  std::string certificate_serial, absl::optional<std::string> certificate_chain_b64,
-                  std::string certificate_private_key_pem, SystemTime certificate_expiration_time)
+                  absl::string_view certificate_serial,
+                  absl::optional<absl::string_view> certificate_chain_b64,
+                  absl::string_view certificate_private_key_pem,
+                  SystemTime certificate_expiration_time)
       : certificate_b64_(certificate_b64),
         certificate_private_key_pem_(certificate_private_key_pem),
         certificate_serial_(certificate_serial),
