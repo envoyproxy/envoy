@@ -203,8 +203,9 @@ void GlobalRateLimitClientImpl::createBucketImpl(const BucketId& bucket_id, size
   sendUsageReportImpl(initial_report);
 
   writeBucketsToTLS();
-  if (callbacks_)
+  if (callbacks_) {
     callbacks_->onBucketCreated(buckets_cache_[id]->bucket_id, id);
+  }
 }
 
 // This helper function reads from the current usage caches & sends the
@@ -247,8 +248,9 @@ createTokenBucketFromAction(const RateLimitStrategy& strategy, TimeSource& time_
 }
 
 void GlobalRateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
-  if (!response)
+  if (!response) {
     return;
+  }
   main_dispatcher_.post(
       [&, response = std::move(response)]() { onQuotaResponseImpl(response.get()); });
 }
@@ -348,8 +350,9 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
   }
   // Push updates to TLS.
   writeBucketsToTLS();
-  if (callbacks_)
+  if (callbacks_) {
     callbacks_->onQuotaResponseProcessed();
+  }
 }
 
 void GlobalRateLimitClientImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
@@ -376,13 +379,15 @@ bool GlobalRateLimitClientImpl::startStreamImpl() {
 }
 
 void GlobalRateLimitClientImpl::startSendReportsTimerImpl() {
-  if (send_reports_timer_)
+  if (send_reports_timer_) {
     return;
+  }
   ENVOY_LOG(debug, "Start the usage reporting timer for the RLQS stream.");
   send_reports_timer_ = main_dispatcher_.createTimer([&]() {
     onSendReportsTimer();
-    if (callbacks_)
+    if (callbacks_) {
       callbacks_->onUsageReportsSent();
+    }
     send_reports_timer_->enableTimer(send_reports_interval_);
   });
   send_reports_timer_->enableTimer(send_reports_interval_);
@@ -406,8 +411,9 @@ void GlobalRateLimitClientImpl::startActionExpirationTimer(CachedBucket* cached_
   // Pointer safety as all writes are against the source-of-truth.
   cached_bucket->action_expiration_timer = main_dispatcher_.createTimer([&, id, cached_bucket]() {
     onActionExpirationTimer(cached_bucket, id);
-    if (callbacks_)
+    if (callbacks_) {
       callbacks_->onActionExpiration();
+    }
   });
   std::chrono::milliseconds ttl = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::seconds(cached_bucket->cached_action->quota_assignment_action()
@@ -493,8 +499,9 @@ void GlobalRateLimitClientImpl::startFallbackExpirationTimer(CachedBucket* cache
   // Pointer safety as all writes are against the source-of-truth.
   cached_bucket->fallback_expiration_timer = main_dispatcher_.createTimer([&, id, cached_bucket]() {
     onFallbackExpirationTimer(cached_bucket, id);
-    if (callbacks_)
+    if (callbacks_) {
       callbacks_->onFallbackExpiration();
+    }
   });
   cached_bucket->fallback_expiration_timer->enableTimer(cached_bucket->fallback_ttl);
 }

@@ -13,7 +13,6 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
-    "envoy.tracers.opencensus",
     # Extensions that require CEL.
     "envoy.access_loggers.extension_filters.cel",
     "envoy.rate_limit_descriptors.expr",
@@ -125,6 +124,9 @@ def envoy_dependencies(skip_targets = []):
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
 
+    # Setup Bazel C++ rules
+    external_http_archive("rules_cc")
+
     # Setup external Bazel rules
     _foreign_cc_dependencies()
 
@@ -178,13 +180,11 @@ def envoy_dependencies(skip_targets = []):
     _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
     _com_github_alibaba_hessian2_codec()
-    _com_github_tencent_rapidjson()
     _com_github_nlohmann_json()
     _com_github_ncopa_suexec()
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
-    _io_opencensus_cpp()
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _v8()
@@ -554,15 +554,13 @@ def _com_github_datadog_dd_trace_cpp():
 def _com_github_skyapm_cpp2sky():
     external_http_archive(
         name = "com_github_skyapm_cpp2sky",
+        patches = ["@envoy//bazel:com_github_skyapm_cpp2sky.patch"],
+        patch_args = ["-p1"],
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
-    )
-
-def _com_github_tencent_rapidjson():
-    external_http_archive(
-        name = "com_github_tencent_rapidjson",
-        build_file = "@envoy//bazel/external:rapidjson.BUILD",
+        patches = ["@envoy//bazel:skywalking_data_collect_protocol.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_nlohmann_json():
@@ -618,6 +616,11 @@ def _com_google_absl():
 def _com_google_protobuf():
     external_http_archive(
         name = "rules_python",
+    )
+    external_http_archive(
+        name = "rules_java",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_java.patch"],
     )
 
     for platform in PROTOC_VERSIONS:
@@ -681,11 +684,6 @@ def _com_google_protobuf():
     native.bind(
         name = "upb_reflection",
         actual = "@com_google_protobuf//upb:reflection",
-    )
-
-def _io_opencensus_cpp():
-    external_http_archive(
-        name = "io_opencensus_cpp",
     )
 
 def _com_github_curl():

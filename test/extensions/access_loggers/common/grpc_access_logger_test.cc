@@ -61,10 +61,11 @@ public:
       bool stream, const Grpc::RawAsyncClientSharedPtr& client,
       const Protobuf::MethodDescriptor& service_method,
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
-    if (stream)
+    if (stream) {
       return std::make_unique<
           Common::StreamingGrpcAccessLogClient<ProtobufWkt::Struct, ProtobufWkt::Struct>>(
           client, service_method, GrpcCommon::optionalRetryPolicy(config));
+    }
     return std::make_unique<
         Common::UnaryGrpcAccessLogClient<ProtobufWkt::Struct, ProtobufWkt::Struct>>(
         client, service_method, GrpcCommon::optionalRetryPolicy(config),

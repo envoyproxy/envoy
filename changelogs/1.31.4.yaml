@@ -1,0 +1,18 @@
+date: December 8, 2024
+
+minor_behavior_changes:
+- area: dns
+  change: |
+    Patched c-ares to address CVE-2024-25629.
+
+bug_fixes:
+- area: access_log
+  change: |
+    Relaxed the restriction on SNI logging to allow the ``_`` character, even if
+    ``envoy.reloadable_features.sanitize_sni_in_access_log`` is enabled.
+- area: tracers
+  change: |
+    Avoid possible overflow when setting span attributes in Dynatrace sampler.
+- area: validation/tools
+  change: |
+    Add back missing extension for ``schema_validator_tool``.

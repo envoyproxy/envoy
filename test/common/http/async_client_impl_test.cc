@@ -497,7 +497,6 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   EXPECT_NE(request, nullptr);
 
   StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
-  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
 
   // Registering a new watermark callback should note that the high watermark has already been hit.
   EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
@@ -558,7 +557,6 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
 
   StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
   request->setWatermarkCallbacks(watermark_callbacks);
-  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
   request->sendData(data, false);

@@ -123,7 +123,7 @@ jobs:
           name: Package debs (arm64)
           arch: arm64
           cache-build-image-key-suffix: -arm64
-          runs-on: envoy-arm64-small
+          runs-on: github-arm64-2c-8gb
 
   docker:
     permissions:

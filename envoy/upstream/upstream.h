@@ -1307,7 +1307,7 @@ public:
    *        time initialization. E.g., for a dynamic DNS cluster the initialize callback will be
    *        called when initial DNS resolution is complete.
    */
-  virtual void initialize(std::function<void()> callback) PURE;
+  virtual void initialize(std::function<absl::Status()> callback) PURE;
 
   /**
    * @return the phase in which the cluster is initialized at boot. This mechanism is used such that

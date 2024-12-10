@@ -234,6 +234,8 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoding_state_.setDecoderFilterCallbacks(callbacks);
+    // We initilizes dispatcher as soon as it is available.
+    dispatcher_ = &callbacks.dispatcher();
   }
 
   // Http::StreamEncoderFilter
@@ -307,7 +309,7 @@ private:
   const StreamInfo::StreamInfo& streamInfo() const { return decoding_state_.streamInfo(); }
   StreamInfo::StreamInfo& streamInfo() { return decoding_state_.streamInfo(); }
   bool isThreadSafe() { return decoding_state_.isThreadSafe(); };
-  Event::Dispatcher& getDispatcher() { return decoding_state_.getDispatcher(); }
+  Event::Dispatcher& getDispatcher() { return *dispatcher_; }
 
   bool doHeaders(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers, bool end_stream);
   GolangStatus doHeadersGo(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
@@ -357,6 +359,8 @@ private:
   // And it's safe to read them before onDestroy in C++ side.
   DecodingProcessorState& decoding_state_;
   EncodingProcessorState& encoding_state_;
+
+  Event::Dispatcher* dispatcher_;
 
   // lock for has_destroyed_/etc, to avoid race between envoy c thread and go thread (when calling
   // back from go).
