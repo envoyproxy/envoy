@@ -137,6 +137,7 @@ build:mobile-release-android --compilation_mode=opt
 
 # Instrument Envoy Mobile's C++ code for coverage
 coverage --instrumentation_filter="//library/common[/:]"
+# coverage --instrumentation_filter="//[/:]"
 coverage --action_env=VERBOSE_COVERAGE=1 --host_action_env=VERBOSE_COVERAGE=1 --test_env=VERBOSE_COVERAGE=1
 
 #############################################################################
@@ -198,10 +199,10 @@ test:mobile-remote-ci-linux-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################
 # Clang environment variables (keep in sync with //third_party/rbe_configs)
 # Coverage environment variables (keep in sync with //third_party/rbe_configs)
-build:mobile-ci-linux-coverage --action_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:mobile-ci-linux-coverage --test_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:mobile-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
-build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
+build:mobile-ci-linux-coverage --action_env=GCOV=llvm-profdata
+build:mobile-ci-linux-coverage --test_env=GCOV=llvm-profdata
+# build:mobile-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
+# build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
 build:mobile-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --build_tests_only
