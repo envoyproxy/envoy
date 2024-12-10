@@ -45,7 +45,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 59]
+// [#next-free-field: 60]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -74,6 +74,10 @@ message Cluster {
     // type<arch_overview_service_discovery_types_original_destination>`
     // for an explanation.
     ORIGINAL_DST = 4;
+
+    // Using below cluster type, ensures envoy can dynamically pick a connected upstream endpoint
+    // by using downstream request headers.
+    REVERSE_CONNECTION = 5;
   }
 
   // Refer to :ref:`load balancer type <arch_overview_load_balancing_types>` architecture
@@ -556,6 +560,16 @@ message Cluster {
     // The dynamic metadata key to override destination address.
     // First the request metadata is considered, then the connection one.
     type.metadata.v3.MetadataKey metadata_key = 4;
+  }
+
+  // Specific configuration for a cluster configured as REVERSE_CONNECTION cluster.
+  message RevConClusterConfig {
+    // List of HTTP headers to look for in downstream request headers, to deduce the
+    // upstream endpoint.
+    repeated string http_header_names = 1;
+
+    // Time interval after which envoy attempts to clean the stale host entries.
+    google.protobuf.Duration cleanup_interval = 2;
   }
 
   // Common configuration for all load balancer implementations.
@@ -1086,6 +1100,9 @@ message Cluster {
 
     // Optional configuration for the RoundRobin load balancing policy.
     RoundRobinLbConfig round_robin_lb_config = 56;
+
+    // Optional configuration for the ReverseConnectionLB load balancing policy.
+    RevConClusterConfig rev_con_cluster_config = 59;
   }
 
   // Common configuration for all load balancer implementations.
