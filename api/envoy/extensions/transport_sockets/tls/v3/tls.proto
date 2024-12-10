@@ -161,8 +161,8 @@ message DownstreamTlsContext {
   // Defaults to ``false``. See more details in :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>`.
   google.protobuf.BoolValue full_scan_certs_on_sni_mismatch = 9;
 
-  // If ``true``, allows the downstream client's preferred cipher to be used during the handshake. If ``false``, Envoy defaults
-  // to using its preferred cipher.
+  // If ``true``, the downstream client's preferred cipher is used during the handshake. If ``false``, Envoy
+  // uses its preferred cipher.
   //
   // .. note::
   //   This has no effect when using TLSv1_3.
