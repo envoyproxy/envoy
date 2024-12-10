@@ -332,7 +332,7 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
   const std::string expected = R"({
     "text": "401 filter formatter",
     "path": "/bar/foo",
-    "code": 401,
+    "code": 400,
     "body": "401 body text"
 })";
   EXPECT_TRUE(TestUtility::jsonStringEqual(body_, expected));
@@ -344,7 +344,7 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
   EXPECT_EQ(code_, static_cast<Http::Code>(411));
   EXPECT_EQ(stream_info_.responseCode(), 411U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "411");
-  EXPECT_EQ(body_, "411 body text 411 default formatter");
+  EXPECT_EQ(body_, "411 body text 410 default formatter");
   EXPECT_EQ(content_type_, "text/plain");
 }
 
@@ -465,7 +465,7 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
   EXPECT_EQ(code_, static_cast<Http::Code>(411));
   EXPECT_EQ(stream_info_.responseCode(), 411U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "411");
-  EXPECT_EQ(body_, "<h1>411 body text</h1> 411 default formatter");
+  EXPECT_EQ(body_, "<h1>411 body text</h1> 410 default formatter");
   EXPECT_EQ(content_type_, "text/html; charset=UTF-8");
 
   // code=420 matches the third filter; rewrite code and body
