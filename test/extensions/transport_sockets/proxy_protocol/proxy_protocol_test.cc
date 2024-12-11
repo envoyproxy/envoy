@@ -700,6 +700,51 @@ TEST_F(ProxyProtocolTest, V2IPV6DownstreamAddressesAndTLVsWithoutPassConfig) {
   proxy_protocol_socket_->doWrite(msg, false);
 }
 
+// Test injects V2 PROXY protocol with custom TLVs from the config-level field.
+TEST_F(ProxyProtocolTest, V2CustomTLVsFromConfig) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
+  auto dst_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv6Instance("1:100:200:3::", 2));
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
+  Network::TransportSocketOptionsConstSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(*Network::Utility::resolveUrl("tcp://[e:b:c:f::]:8080"));
+
+  absl::flat_hash_set<uint8_t> pass_through_tlvs{};
+  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
+      {0x96, {'m', 'o', 'r', 'e', 'd', 'a', 't', 'a'}},
+  };
+  Buffer::OwnedImpl expected_buff{};
+  EXPECT_TRUE(Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, false,
+                                                      pass_through_tlvs, custom_tlvs));
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto tlv_entry = config.add_entries();
+  tlv_entry->set_type(0x96);
+  tlv_entry->set_value("moredata");
+  initialize(config, socket_options);
+
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return {length, Api::IoError::none()};
+      }));
+  auto msg = Buffer::OwnedImpl("some data");
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
+
+  auto resp = proxy_protocol_socket_->doWrite(msg, false);
+  EXPECT_EQ(resp.bytes_processed_, expected_buff.length());
+}
+
 // Test injects V2 PROXY protocol with custom TLVs from host metadata.
 TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
   auto src_addr =
@@ -722,7 +767,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
   const std::string metadata_key =
       Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
 
-  envoy::extensions::transport_sockets::proxy_protocol::v3::CustomTlvMetadata custom_tlv_metadata;
+  ProxyProtocolConfig custom_tlv_metadata;
   auto entry = custom_tlv_metadata.add_entries();
   entry->set_type(0x96);
   entry->set_value("moredata");
@@ -735,13 +780,80 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
 
   absl::flat_hash_set<uint8_t> pass_through_tlvs{};
   std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
-      {0x96, {'m', 'o', 'r', 'e', 'd', 'a', 't', 'a'}}};
+      {0x96, {'m', 'o', 'r', 'e', 'd', 'a', 't', 'a'}},
+  };
   Buffer::OwnedImpl expected_buff{};
   EXPECT_TRUE(Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, false,
                                                       pass_through_tlvs, custom_tlvs));
 
   ProxyProtocolConfig config;
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  initialize(config, socket_options);
+
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return {length, Api::IoError::none()};
+      }));
+  auto msg = Buffer::OwnedImpl("some data");
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
+
+  auto resp = proxy_protocol_socket_->doWrite(msg, false);
+  EXPECT_EQ(resp.bytes_processed_, expected_buff.length());
+}
+
+// Test injects V2 PROXY protocol with custom TLVs and validates that host metadata will
+// overwrite any TLVs set in the config.
+TEST_F(ProxyProtocolTest, V2CustomTLVsOverwriteHostMetadata) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
+  auto dst_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv6Instance("1:100:200:3::", 2));
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
+  Network::TransportSocketOptionsConstSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(*Network::Utility::resolveUrl("tcp://[e:b:c:f::]:8080"));
+
+  auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  const std::string metadata_key =
+      Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
+
+  ProxyProtocolConfig custom_tlv_metadata;
+  auto entry = custom_tlv_metadata.add_entries();
+  entry->set_type(0x96);
+  entry->set_value("foo");
+
+  ProtobufWkt::Any typed_metadata;
+  typed_metadata.PackFrom(custom_tlv_metadata);
+  metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
+  EXPECT_CALL(*host, metadata()).Times(testing::AnyNumber()).WillRepeatedly(Return(metadata));
+  transport_callbacks_.connection_.streamInfo().upstreamInfo()->setUpstreamHost(host);
+
+  absl::flat_hash_set<uint8_t> pass_through_tlvs{};
+  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
+      {0x96, {'f', 'o', 'o'}},
+      {0x97, {'b', 'a', 'z'}},
+  };
+  Buffer::OwnedImpl expected_buff{};
+  EXPECT_TRUE(Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, false,
+                                                      pass_through_tlvs, custom_tlvs));
+
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto tlv_entry = config.add_entries();
+  tlv_entry->set_type(0x96);
+  tlv_entry->set_value("bar");
+  tlv_entry = config.add_entries();
+  tlv_entry->set_type(0x97);
+  tlv_entry->set_value("baz");
   initialize(config, socket_options);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
@@ -779,10 +891,10 @@ TEST_F(ProxyProtocolTest, V2CustomAndPassthroughTLVs) {
   const std::string metadata_key =
       Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
 
-  envoy::extensions::transport_sockets::proxy_protocol::v3::CustomTlvMetadata custom_tlv_metadata;
+  ProxyProtocolConfig custom_tlv_metadata;
   auto entry = custom_tlv_metadata.add_entries();
   entry->set_type(0x96);
-  entry->set_value("moredata");
+  entry->set_value("foo");
 
   ProtobufWkt::Any typed_metadata;
   typed_metadata.PackFrom(custom_tlv_metadata);
@@ -792,7 +904,8 @@ TEST_F(ProxyProtocolTest, V2CustomAndPassthroughTLVs) {
 
   absl::flat_hash_set<uint8_t> pass_through_tlvs{0x5};
   std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
-      {0x96, {'m', 'o', 'r', 'e', 'd', 'a', 't', 'a'}}};
+      {0x96, {'f', 'o', 'o'}},
+  };
   Buffer::OwnedImpl expected_buff{};
   EXPECT_TRUE(Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, true,
                                                       pass_through_tlvs, custom_tlvs));
@@ -836,7 +949,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVInvalidMetadata) {
   const std::string metadata_key =
       Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
 
-  envoy::extensions::transport_sockets::proxy_protocol::v3::CustomTlvMetadata custom_tlv_metadata;
+  ProxyProtocolConfig custom_tlv_metadata;
   auto valid_entry = custom_tlv_metadata.add_entries();
   valid_entry->set_type(0x96);
   valid_entry->set_value("cluster_0");
@@ -855,7 +968,8 @@ TEST_F(ProxyProtocolTest, V2CustomTLVInvalidMetadata) {
 
   absl::flat_hash_set<uint8_t> pass_through_tlvs{0x5};
   std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
-      {0x96, {'c', 'l', 'u', 's', 't', 'e', 'r', '_', '0'}}};
+      {0x96, {'c', 'l', 'u', 's', 't', 'e', 'r', '_', '0'}},
+  };
   Buffer::OwnedImpl expected_buff{};
   EXPECT_TRUE(Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, true,
                                                       pass_through_tlvs, custom_tlvs));

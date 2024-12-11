@@ -258,7 +258,7 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2WithDuplicateCustomTLVKeys) {
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
 
-TEST(ProxyProtocolHeaderTest, GeneratesV2WithSharedProxyAndCustomTLVKeys) {
+TEST(ProxyProtocolHeaderTest, GeneratesV2WithCustomTLVsPrecendence) {
   const uint8_t v2_protocol[] = {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
       0x0a, 0x21, 0x11, 0x00, 0x10, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01,

@@ -40,6 +40,15 @@ UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
       pass_through_tlvs_.insert(0xFF & tlv_type);
     }
   }
+  for (const auto& entry : config.entries()) {
+    if (entry.value().empty()) {
+      ENVOY_LOG(warn, "Skipping custom TLV with type {} due to empty value", entry.type());
+      continue;
+    }
+    config_tlvs_.emplace_back(Network::ProxyProtocolTLV{
+        static_cast<uint8_t>(entry.type()),
+        std::vector<unsigned char>(entry.value().begin(), entry.value().end())});
+  }
 }
 
 void UpstreamProxyProtocolSocket::setTransportSocketCallbacks(
@@ -95,9 +104,21 @@ void UpstreamProxyProtocolSocket::generateHeaderV2() {
   if (!options_ || !options_->proxyProtocolOptions().has_value()) {
     Common::ProxyProtocol::generateV2LocalHeader(header_buffer_);
   } else {
+    // process any custom TLVs from the host metadata.
+    auto host_metadata_tlv_types = processCustomTLVsFromHost();
+    // backfill any custom TLVs defined the config that are not in the host metadata.
+    for (const auto& tlv : config_tlvs_) {
+      // Skip any TLV that is already in the custom TLVs. We want the host
+      // metadata value to take precedence when there is a conflict.
+      if (host_metadata_tlv_types.contains(tlv.type)) {
+        continue;
+      }
+      custom_tlvs_.push_back(tlv);
+    }
+
     const auto options = options_->proxyProtocolOptions().value();
     if (!Common::ProxyProtocol::generateV2Header(options, header_buffer_, pass_all_tlvs_,
-                                                 pass_through_tlvs_, buildCustomTLVs())) {
+                                                 pass_through_tlvs_, custom_tlvs_)) {
       // There is a warn log in generateV2Header method.
       stats_.v2_tlvs_exceed_max_length_.inc();
     }
@@ -169,47 +190,48 @@ void UpstreamProxyProtocolSocketFactory::hashKey(
   }
 }
 
-std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::buildCustomTLVs() {
-  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs;
+absl::flat_hash_set<uint8_t> UpstreamProxyProtocolSocket::processCustomTLVsFromHost() {
+  absl::flat_hash_set<uint8_t> host_metadata_tlv_types;
 
   const auto& upstream_info = callbacks_->connection().streamInfo().upstreamInfo();
   if (upstream_info == nullptr) {
-    return custom_tlvs;
+    return host_metadata_tlv_types;
   }
   Upstream::HostDescriptionConstSharedPtr host = upstream_info->upstreamHost();
   if (host == nullptr) {
-    return custom_tlvs;
+    return host_metadata_tlv_types;
   }
   auto metadata = host->metadata();
   if (metadata == nullptr) {
-    return custom_tlvs;
+    return host_metadata_tlv_types;
   }
 
   const auto filter_it = metadata->typed_filter_metadata().find(
       Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL);
   if (filter_it == metadata->typed_filter_metadata().end()) {
-    ENVOY_LOG(trace, "no custom TLVs found in upstream host metadata");
-    return custom_tlvs;
+    ENVOY_LOG(trace, "No custom TLVs found in upstream host metadata");
+    return host_metadata_tlv_types;
   }
 
-  envoy::extensions::transport_sockets::proxy_protocol::v3::CustomTlvMetadata custom_metadata;
-  if (!filter_it->second.UnpackTo(&custom_metadata)) {
-    ENVOY_LOG(warn, "failed to unpack custom TLVs from upstream host metadata");
-    return custom_tlvs;
+  ProxyProtocolConfig tlvs_metadata;
+  if (!filter_it->second.UnpackTo(&tlvs_metadata)) {
+    ENVOY_LOG(warn, "Failed to unpack custom TLVs from upstream host metadata");
+    return host_metadata_tlv_types;
   }
-  for (const auto& tlv : custom_metadata.entries()) {
-    // prevent empty TLV values
-    if (tlv.value().empty()) {
-      ENVOY_LOG(warn, "empty custom TLV value found in upstream host metadata for type {}",
-                tlv.type());
+
+  // process the custom TLVs from the host metadata first.
+  for (const auto& entry : tlvs_metadata.entries()) {
+    // prevent empty values from being added to custom TLVs.
+    if (entry.value().empty()) {
+      ENVOY_LOG(warn, "Skipping custom TLV with type {} due to empty value", entry.type());
       continue;
     }
-    custom_tlvs.emplace_back(Network::ProxyProtocolTLV{
-        static_cast<uint8_t>(tlv.type()),
-        std::vector<unsigned char>(tlv.value().begin(), tlv.value().end())});
+    custom_tlvs_.emplace_back(Network::ProxyProtocolTLV{
+        static_cast<uint8_t>(entry.type()),
+        std::vector<unsigned char>(entry.value().begin(), entry.value().end())});
   }
 
-  return custom_tlvs;
+  return host_metadata_tlv_types;
 }
 
 } // namespace ProxyProtocol
