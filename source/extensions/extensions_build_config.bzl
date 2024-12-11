@@ -298,6 +298,12 @@ EXTENSIONS = {
     "envoy.tracers.opentelemetry.samplers.dynatrace":         "//source/extensions/tracers/opentelemetry/samplers/dynatrace:config",
 
     #
+    # Tap sinks 
+    #
+
+    "envoy.tap_sinks.udp_sink":                     "//source/extensions/tap_sinks/udp_sink:config",
+
+    #
     # Transport sockets
     #
 
