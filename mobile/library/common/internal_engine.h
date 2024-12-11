@@ -127,8 +127,17 @@ public:
    *   the DNS response in the subsequent DNS resolutions.
    * - Force refresh the hosts in the DNS cache (will take `setIpVersionToRemove` into account).
    * - Optionally (if configured) clear HTTP/3 broken status.
+   * - Optionally (if configured) drain all connections.
    */
-  void onDefaultNetworkChanged(NetworkType network);
+  void onDefaultNetworkChanged(NetworkType network_type);
+
+  void onDefaultNetworkChangedAndroid(ConnectionType connection_type, int64_t net_id);
+
+  void onNetworkDisconnectAndroid(int64_t net_id);
+
+  void onNetworkConnectAndroid(ConnectionType connection_type, int64_t net_id);
+
+  void purgeActiveNetworkListAndroid(const std::vector<int64_t>& active_network_ids);
 
   /**
    * This functions does the following when the default network is unavailable.

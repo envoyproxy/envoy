@@ -279,10 +279,11 @@ void InternalEngine::onDefaultNetworkAvailable() {
   ENVOY_LOG_MISC(trace, "Calling the default network available callback");
 }
 
-void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
+void InternalEngine::onDefaultNetworkChanged(NetworkType network_type) {
   ENVOY_LOG_MISC(trace, "Calling the default network changed callback");
-  dispatcher_->post([&, network]() -> void {
-    envoy_netconf_t configuration = Network::ConnectivityManagerImpl::setPreferredNetwork(network);
+  dispatcher_->post([&, network_type]() -> void {
+    envoy_netconf_t configuration =
+        Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
       // The IP version to remove flag must be set first before refreshing the DNS cache so that
@@ -318,6 +319,25 @@ void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
     }
     connectivity_manager_->refreshDns(configuration, true);
   });
+}
+
+void InternalEngine::onDefaultNetworkChangedAndroid(ConnectionType /*connection_type*/,
+                                                    int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling the default network changed callback on Android");
+}
+
+void InternalEngine::onNetworkDisconnectAndroid(int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling network disconnect callback on Android");
+}
+
+void InternalEngine::onNetworkConnectAndroid(ConnectionType /*connection_type*/,
+                                             int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling network connect callback on Android");
+}
+
+void InternalEngine::purgeActiveNetworkListAndroid(
+    const std::vector<int64_t>& /*active_network_ids*/) {
+  ENVOY_LOG_MISC(trace, "Calling network purge callback on Android");
 }
 
 void InternalEngine::onDefaultNetworkUnavailable() {

@@ -2,6 +2,7 @@ package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
+import io.envoyproxy.envoymobile.engine.types.EnvoyConnectionType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
 
@@ -71,6 +72,30 @@ public interface EnvoyEngine {
    * A callback into the Envoy Engine when the default network type was changed.
    */
   void onDefaultNetworkChanged(EnvoyNetworkType network);
+
+  /**
+   * A callback into the Envoy Engine when the default network type was changed.
+   * @param net_id NetID of device's current default connected network.
+   */
+  void onDefaultNetworkChangedV2(EnvoyConnectionType network_type, long net_id);
+
+  /**
+   * A callback into the Envoy Engine when the network with the given net_id gets disconnected.
+   */
+  void onNetworkDisconnect(long net_id);
+
+  /**
+   * A callback into the Envoy Engine when the network with the given net_id gets connected.
+   */
+  void onNetworkConnect(EnvoyConnectionType network_type, long net_id);
+
+  /**
+   * A callback into the Envoy Engineto to cause a purge of cached lists of active networks,
+   * of any networks not in the accompanying list of active networks. This is issued if a period
+   * elapsed where disconnected notifications may have been missed, and acts to keep cached lists of
+   * active networks accurate.
+   */
+  void purgeActiveNetworkList(long[] activeNetIds);
 
   /**
    * A callback into the Envoy Engine when the default network is unavailable.
