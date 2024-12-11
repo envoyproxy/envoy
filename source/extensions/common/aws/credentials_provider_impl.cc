@@ -1095,7 +1095,8 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
         role_session_name, refresh_state, initialization_timer, cluster_name);
   } else if (config.has_iam_roles_anywhere()) {
     const auto& roles_anywhere = config.iam_roles_anywhere();
-    const std::string iam_roles_anywhere_endpoint = Utility::getRolesAnywhereEndpoint(region);
+    const std::string iam_roles_anywhere_endpoint =
+        Utility::getRolesAnywhereEndpoint(region) + ":443";
     std::string role_session_name;
     if (!roles_anywhere.role_session_name().empty()) {
       role_session_name = roles_anywhere.role_session_name();

@@ -114,12 +114,13 @@ WgTQAfHx04TA8rljw5lyGxOZJQ3WIvsc4qCn2Q1Dv+AjpLNZq411
 class MessageMatcher : public testing::MatcherInterface<Http::RequestMessage&> {
 public:
   explicit MessageMatcher(Http::RequestMessage& expected_message)
-  // explicit MessageMatcher(const Http::TestRequestHeaderMapImpl& expected_headers)
+      // explicit MessageMatcher(const Http::TestRequestHeaderMapImpl& expected_headers)
       : expected_message_(expected_message) {}
 
-   bool MatchAndExplain(Http::RequestMessage& message,
+  bool MatchAndExplain(Http::RequestMessage& message,
                        testing::MatchResultListener* result_listener) const override {
-    bool equal = TestUtility::headerMapEqualIgnoreOrder(message.headers(), expected_message_.headers());
+    bool equal =
+        TestUtility::headerMapEqualIgnoreOrder(message.headers(), expected_message_.headers());
     if (!equal) {
       *result_listener << "\n"
                        << TestUtility::addLeftAndRightPadding("Expected header map:") << "\n"
@@ -130,19 +131,18 @@ public:
                        << TestUtility::addLeftAndRightPadding("") // line full of padding
                        << "\n";
     }
-    if(!expected_message_.bodyAsString().empty())
-    {
-      if(message.bodyAsString() != expected_message_.bodyAsString())
-      {
+    if (!expected_message_.bodyAsString().empty()) {
+      if (message.bodyAsString() != expected_message_.bodyAsString()) {
         equal = 0;
         *result_listener << "\n"
-                  << TestUtility::addLeftAndRightPadding("Expected message body:") << "\n"
-                  << expected_message_.bodyAsString()
-                  << TestUtility::addLeftAndRightPadding("is not equal to actual message body:")
-                  << "\n"
-                  << message.bodyAsString()
-                  << TestUtility::addLeftAndRightPadding("") // line full of padding
-                  << "\n";
+                         << TestUtility::addLeftAndRightPadding("Expected message body:") << "\n"
+                         << expected_message_.bodyAsString()
+                         << TestUtility::addLeftAndRightPadding(
+                                "is not equal to actual message body:")
+                         << "\n"
+                         << message.bodyAsString()
+                         << TestUtility::addLeftAndRightPadding("") // line full of padding
+                         << "\n";
       }
     }
     return equal;
@@ -156,8 +156,7 @@ private:
   Http::RequestMessage& expected_message_;
 };
 
-testing::Matcher<Http::RequestMessage&>
-messageMatches(Http::RequestMessage& expected_message) {
+testing::Matcher<Http::RequestMessage&> messageMatches(Http::RequestMessage& expected_message) {
   return testing::MakeMatcher(new MessageMatcher(expected_message));
 }
 
@@ -265,7 +264,7 @@ public:
   Http::TestRequestHeaderMapImpl rsa_headers_nochain_{
       {":path", "/sessions"},
       {":authority", "rolesanywhere.ap-southeast-2.amazonaws.com"},
-      {":scheme", "http"},
+      {":scheme", "https"},
       {":method", "POST"},
       {"content-type", "application/json"},
       {"authorization",
@@ -303,7 +302,7 @@ public:
   Http::TestRequestHeaderMapImpl rsa_headers_chain_{
       {":path", "/sessions"},
       {":authority", "rolesanywhere.ap-southeast-2.amazonaws.com"},
-      {":scheme", "http"},
+      {":scheme", "https"},
       {":method", "POST"},
       {"content-type", "application/json"},
       {"x-amz-date", "20180102T030405Z"},
@@ -358,7 +357,7 @@ public:
   Http::TestRequestHeaderMapImpl rsa_headers_chain_fast_forward_{
       {":path", "/sessions"},
       {":authority", "rolesanywhere.ap-southeast-2.amazonaws.com"},
-      {":scheme", "http"},
+      {":scheme", "https"},
       {":method", "POST"},
       {"content-type", "application/json"},
       {"x-amz-date", "20180102T050405Z"},
@@ -431,9 +430,10 @@ public:
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
   // This is what we expect to see requested by the signer
 
-  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
+  auto headers =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
   Http::RequestMessageImpl message(std::move(headers));
-  
+
   expectDocument(201, "", message);
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
@@ -454,9 +454,10 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningInvalidChainOk) {
 
-  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
+  auto headers =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
   Http::RequestMessageImpl message(std::move(headers));
-  
+
   expectDocument(201, "", message);
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
@@ -475,11 +476,143 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningInvalidChainOk
   auto creds = provider_->getCredentials();
 }
 
+TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningCustomSessionName) {
+
+  auto headers =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
+
+  Http::RequestMessageImpl message(std::move(headers));
+  message.headers().setCopy(
+      Http::LowerCaseString("authorization"),
+      "AWS4-X509-RSA-SHA256 "
+      "Credential=131827979019394590882466519576505238184/20180102/ap-southeast-2/rolesanywhere/"
+      "aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-x509, "
+      "Signature="
+      "1b578c0283f15a0ef61dbf967877cbbad1bbbae056921e336bafafa38c466f38d0ad5c39a45f70728064fb1bae21"
+      "0db085d35c2a8f810dcd94adc6e78cccd79e012bfc675cbfc7149e07ecf9464dd985663bab91350ce8b120204ce3"
+      "99858f6c30696e3f8e409bc6b23a4c377f1c11f409d31fb7732028bb73985ed030e3ae4670b4c5877fd00d17b6e3"
+      "424fb1f7070ea078bf598082e0810c9b9fa0b7b54e248f8bd51494fc9ad8c8a6d86e253bb0d7b7a17d17cf22b0c9"
+      "ca25df7112bf90c31d6c47e2ecf1bd43e9137dadcbd1c6c65ac59c84ab723b10679a58faba0fac996f638950e1e9"
+      "b722215c37d42d2e364e0be234bd46704e44938fb904804f0ca7");
+  message.headers().setCopy(Http::LowerCaseString("x-amz-content-sha256"),
+                            "229d2f52a6b6d64706c163c3abc8f19b5e661d9a8d6d4ec684b1e71f14edf7e5");
+
+  message.body().add("{\"durationSeconds\": 3600, \"profileArn\": \"arn:profile-arn\", "
+                     "\"roleArn\": \"arn:role-arn\", \"trustAnchorArn\": \"arn:trust-anchor-arn\", "
+                     "\"roleSessionName\": \"mysession\"}");
+
+  expectDocument(201, "", message);
+
+  time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
+
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "abc", "mysession");
+
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+
+  init_target_->initialize(init_watcher_);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
+  auto creds = provider_->getCredentials();
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningBlankSessionName) {
+
+  auto headers =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
+
+  Http::RequestMessageImpl message(std::move(headers));
+  message.headers().setCopy(
+      Http::LowerCaseString("authorization"),
+      "AWS4-X509-RSA-SHA256 "
+      "Credential=131827979019394590882466519576505238184/20180102/ap-southeast-2/rolesanywhere/"
+      "aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-x509, "
+      "Signature="
+      "09bee21035a040e96194dc42d7e48bacc0c6be47d226be00501b3ce6389227b6b2ad67321d0b87c673bd51554e2c"
+      "86571b7ba6aae628bcba8d2b587d5108474f969ee168b1fb4d8d0dfac8b8cbabfeb3ad0a2d80f87eaae3afbbfeea"
+      "d69d6f9a53fab98a8bdc72613fb4cea898c9d5d0e0a6c5806a46c7833e0acb8992d8f0ef0d0498acacb6cc81c90b"
+      "0bfa50aed7814f24b3b6509fdbe6181e1218650784829cc331270c19982c8924434fc52f92c19037ba0aa790ad4d"
+      "6dbb5e66cd017a066fc0fb058b04a711fa5f91e25e748ce44be98d9ce4b0665726b8ca93ccad1f87f8f3e4079472"
+      "b321306c2320038828ff21703e08b1a77a696d3e5e326cdcf50a");
+  message.headers().setCopy(Http::LowerCaseString("x-amz-content-sha256"),
+                            "3351f0119309ca7d266e49d34647662de4053d521f17227958be5f4d44f014a8");
+
+  message.body().add(
+      "{\"durationSeconds\": 3600, \"profileArn\": \"arn:profile-arn\", \"roleArn\": "
+      "\"arn:role-arn\", \"trustAnchorArn\": \"arn:trust-anchor-arn\"}");
+
+  expectDocument(201, "", message);
+
+  time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
+
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "abc", "");
+
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+
+  init_target_->initialize(init_watcher_);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
+  auto creds = provider_->getCredentials();
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningCustomDuration) {
+
+  auto headers =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
+
+  Http::RequestMessageImpl message(std::move(headers));
+  message.headers().setCopy(
+      Http::LowerCaseString("authorization"),
+      "AWS4-X509-RSA-SHA256 "
+      "Credential=131827979019394590882466519576505238184/20180102/ap-southeast-2/rolesanywhere/"
+      "aws4_request, SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date;x-amz-x509, "
+      "Signature="
+      "369ec50ce45ec2586dc9adc394c46bc2bb06fc31141047a094eaad6c97619e9217f1b19d2941dbd1a4396edfeed0"
+      "fbf35b93faf414275de8d798d86557a3bb09ce6d0ce62e642e551076def486ce338c31d9b5e4e5f8d4d6396c2afb"
+      "e523df533fa5f1c3f2056bd06950b06edd4f9abd18057df395cb17eaec4a6a5571848dc380d598f26e4051b0bc82"
+      "197da01d760e29dd13c960425a823887c6b3fb16d416fca59b5b1bc2cbeca7275977a665c8bca101b8de81c38993"
+      "e57bc8949afbbcd5ff88df52e796f45cd254b6441cc62f76acf4a7c632e2963ad9d8f8c4329a03c97be56109faf0"
+      "a5ea4e7619c052330a83da8fbf6c475c353adf621a307eab1271");
+  message.headers().setCopy(Http::LowerCaseString("x-amz-content-sha256"),
+                            "7458c6feacdabcbde5c0a5b3058497c47e7f48530efde3d1fab51329081b2fdd");
+
+  message.body().add("{\"durationSeconds\": 123, \"profileArn\": \"arn:profile-arn\", \"roleArn\": "
+                     "\"arn:role-arn\", \"trustAnchorArn\": \"arn:trust-anchor-arn\", "
+                     "\"roleSessionName\": \"mysession\"}");
+
+  expectDocument(201, "", message);
+
+  time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
+
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "abc", "mysession", 123);
+
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+
+  init_target_->initialize(init_watcher_);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  timer_->invokeCallback();
+
+  auto creds = provider_->getCredentials();
+}
+
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningWithChain) {
 
   auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
   Http::RequestMessageImpl message(std::move(headers));
-  
+
   expectDocument(201, "", message);
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
@@ -505,7 +638,6 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, CredentialExpiration) {
 
   auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
   Http::RequestMessageImpl message(std::move(headers));
-  
 
   expectDocument(201, R"EOF(
 {
@@ -540,9 +672,10 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, CredentialExpiration) {
   EXPECT_EQ("token", credentials.sessionToken().value());
   time_system_.advanceTimeWait(std::chrono::hours(2));
 
-  auto headers2 = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_fast_forward_}};
+  auto headers2 = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{rsa_headers_chain_fast_forward_}};
   Http::RequestMessageImpl message2(std::move(headers2));
-  
+
   expectDocument(201, R"EOF(
 {
   "credentialSet": [
@@ -572,9 +705,9 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, InvalidExpiration) {
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
-auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
   Http::RequestMessageImpl message(std::move(headers));
-  
+
   expectDocument(201, R"EOF(
 {
   "credentialSet": [
@@ -606,9 +739,9 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, BadJsonResponse) {
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
-auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
   Http::RequestMessageImpl message(std::move(headers));
-  
+
   expectDocument(201, R"EOF(
 {
  invalidJson
@@ -635,9 +768,9 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, BadCredentialSetValue) {
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
-auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
   Http::RequestMessageImpl message(std::move(headers));
-  
+
   expectDocument(201, R"EOF(
 {
   "credentialSet": 1
@@ -664,9 +797,9 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, BadCredentialSetArray) {
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
-auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
   Http::RequestMessageImpl message(std::move(headers));
-  
+
   expectDocument(201, R"EOF(
 {
   "credentialSet": [
@@ -698,7 +831,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, EmptyJsonResponse) {
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
   auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
   Http::RequestMessageImpl message(std::move(headers));
-  
+
   expectDocument(201, "", message);
 
   setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,

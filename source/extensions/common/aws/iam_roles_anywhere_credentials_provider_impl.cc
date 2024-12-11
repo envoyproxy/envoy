@@ -153,6 +153,8 @@ absl::Status IAMRolesAnywhereX509CredentialsProvider::pemToAlgorithmSerialExpira
 
   int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1Time(), X509_get0_notAfter(cert.get()));
   ASSERT(rc == 1);
+  // Casting to <time_t (64bit)> to prevent multiplication overflow when certificate not-after date
+  // beyond 2038-01-19T03:14:08Z.
   time = std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
 
   OPENSSL_free(bndec);
@@ -285,7 +287,7 @@ std::chrono::seconds IAMRolesAnywhereX509CredentialsProvider::getCacheDuration()
       REFRESH_INTERVAL -
       REFRESH_GRACE_PERIOD /*TODO: Add jitter from context.api().randomGenerator()*/);
 }
- 
+
 IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context,
     CreateMetadataFetcherCb create_metadata_fetcher_cb,
@@ -338,9 +340,9 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   ENVOY_LOG(debug, "Getting AWS credentials from the rolesanywhere service at URI: {}", uri_);
 
   Http::RequestMessageImpl message;
-  message.headers().setScheme(Http::Headers::get().SchemeValues.Http);
+  message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Post);
-  message.headers().setHost(uri_);
+  message.headers().setHost(Http::Utility::parseAuthority(uri_).host_);
   message.headers().setPath("/sessions");
   message.headers().setContentType("application/json");
 
