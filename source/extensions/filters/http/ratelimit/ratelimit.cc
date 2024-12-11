@@ -88,7 +88,6 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
 void Filter::makeRateLimitRequest() {
   if (!descriptors_.empty()) {
-    // TODO: Make addend configirable via substituion command.
     const StreamInfo::UInt32Accessor* hits_addend_filter_state =
         callbacks_->streamInfo().filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
             HitsAddendFilterStateKey);
