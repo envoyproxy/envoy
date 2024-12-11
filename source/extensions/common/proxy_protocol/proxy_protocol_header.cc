@@ -127,7 +127,7 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
   }
   for (const auto& tlv : proxy_proto_data.tlv_vector_) {
     if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
-      // Skip any TLV when pass_all_tlvs is disabled, or the TLV is not in the pass_through_tlvs.
+      // Skip any TLV that is not in the set of passthrough TLVs.
       continue;
     }
     if (seen_types.contains(tlv.type)) {

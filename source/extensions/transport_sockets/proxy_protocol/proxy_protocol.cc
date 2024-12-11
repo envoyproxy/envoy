@@ -104,9 +104,9 @@ void UpstreamProxyProtocolSocket::generateHeaderV2() {
   if (!options_ || !options_->proxyProtocolOptions().has_value()) {
     Common::ProxyProtocol::generateV2LocalHeader(header_buffer_);
   } else {
-    // process any custom TLVs from the host metadata.
+    // Process any custom TLVs from the host metadata.
     auto host_metadata_tlv_types = processCustomTLVsFromHost();
-    // backfill any custom TLVs defined the config that are not in the host metadata.
+    // Populate any custom TLVs defined the config that are not in the host metadata.
     for (const auto& tlv : config_tlvs_) {
       // Skip any TLV that is already in the custom TLVs. We want the host
       // metadata value to take precedence when there is a conflict.
@@ -214,7 +214,9 @@ absl::flat_hash_set<uint8_t> UpstreamProxyProtocolSocket::processCustomTLVsFromH
   }
 
   ProxyProtocolConfig tlvs_metadata;
-  if (!filter_it->second.UnpackTo(&tlvs_metadata)) {
+  auto status = absl::OkStatus();
+  status = MessageUtil::unpackTo(filter_it->second, tlvs_metadata);
+  if (!status.ok()) {
     ENVOY_LOG(warn, "Failed to unpack custom TLVs from upstream host metadata");
     return host_metadata_tlv_types;
   }
