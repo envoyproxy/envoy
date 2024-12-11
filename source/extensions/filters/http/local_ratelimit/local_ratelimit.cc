@@ -112,8 +112,8 @@ FilterConfig::FilterConfig(
       always_consume_default_token_bucket_, std::move(share_provider));
 }
 
-Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result FilterConfig::requestAllowed(
-    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
+FilterConfig::requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) const {
   return rate_limiter_->requestAllowed(request_descriptors);
 }
 
@@ -148,7 +148,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   used_config_->stats().enabled_.inc();
 
-  std::vector<RateLimit::LocalDescriptor> descriptors;
+  std::vector<RateLimit::Descriptor> descriptors;
   if (used_config_->hasDescriptors()) {
     if (used_config_->hasRateLimitConfigs()) {
       used_config_->populateDescriptors(headers, decoder_callbacks_->streamInfo(), descriptors);
@@ -214,7 +214,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
-Filter::requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) {
+Filter::requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) {
   return used_config_->rateLimitPerConnection()
              ? getPerConnectionRateLimiter().requestAllowed(request_descriptors)
              : used_config_->requestAllowed(request_descriptors);
@@ -242,7 +242,7 @@ const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConne
   return typed_state->value();
 }
 
-void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
+void Filter::populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors,
                                  Http::RequestHeaderMap& headers) {
   Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   if (!route || !route->routeEntry()) {
@@ -270,7 +270,7 @@ void Filter::populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descri
 }
 
 void Filter::populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
-                                 std::vector<RateLimit::LocalDescriptor>& descriptors,
+                                 std::vector<RateLimit::Descriptor>& descriptors,
                                  Http::RequestHeaderMap& headers) {
   for (const Router::RateLimitPolicyEntry& rate_limit :
        rate_limit_policy.getApplicableRateLimit(used_config_->stage())) {
@@ -279,8 +279,8 @@ void Filter::populateDescriptors(const Router::RateLimitPolicy& rate_limit_polic
     if (!disable_key.empty()) {
       continue;
     }
-    rate_limit.populateLocalDescriptors(descriptors, used_config_->localInfo().clusterName(),
-                                        headers, decoder_callbacks_->streamInfo());
+    rate_limit.populateDescriptors(descriptors, used_config_->localInfo().clusterName(), headers,
+                                   decoder_callbacks_->streamInfo());
   }
 }
 
