@@ -63,7 +63,8 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
           ->iterate([&spiffe_data, &success](const std::string& domain_name,
                                              const Envoy::Json::Object& domain_object) -> bool {
             if (spiffe_data->trust_bundle_stores.contains(domain_name)) {
-              ENVOY_LOG(warn, "Duplicate domain '{}' in SPIFFE bundle map", domain_name);
+              ENVOY_LOG(error, "Duplicate domain '{}' in SPIFFE bundle map", domain_name);
+              return (success = false);
             } else {
               spiffe_data->trust_bundle_stores[domain_name] = X509StorePtr(X509_STORE_new());
             }
