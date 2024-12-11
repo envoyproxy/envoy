@@ -52,10 +52,9 @@ SetFilterStateConfig::createRouteSpecificFilterConfigTyped(
 
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
 
-  const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
+  return std::make_shared<Filters::Common::SetFilterState::Config>(
       proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
       generic_context);
-  return filter_config;
 }
 
 Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoWithServerContextTyped(
