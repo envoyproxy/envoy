@@ -69,7 +69,7 @@ public:
 
 class RateLimitTokenBucket : public TokenBucketContext {
 public:
-  virtual bool consume(double factor = 1.0) PURE;
+  virtual bool consume(double factor = 1.0, uint32_t tokens = 1) PURE;
   virtual void onFillTimer(uint64_t refill_counter, double factor = 1.0) PURE;
   virtual std::chrono::milliseconds fillInterval() const PURE;
   virtual double fillRate() const PURE;
@@ -86,7 +86,7 @@ public:
                    LocalRateLimiterImpl& parent);
 
   // RateLimitTokenBucket
-  bool consume(double factor) override;
+  bool consume(double factor = 1.0, uint32_t tokens = 1) override;
   void onFillTimer(uint64_t refill_counter, double factor) override;
   std::chrono::milliseconds fillInterval() const override { return fill_interval_; }
   double fillRate() const override { return fill_rate_; }
@@ -115,7 +115,7 @@ public:
                     std::chrono::milliseconds fill_interval, TimeSource& time_source);
 
   // RateLimitTokenBucket
-  bool consume(double factor) override;
+  bool consume(double factor = 1.0, uint32_t tokens = 1) override;
   void onFillTimer(uint64_t, double) override {}
   std::chrono::milliseconds fillInterval() const override { return {}; }
   double fillRate() const override { return token_bucket_.fillRate(); }
@@ -145,7 +145,7 @@ public:
       ShareProviderSharedPtr shared_provider = nullptr);
   ~LocalRateLimiterImpl();
 
-  Result requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  Result requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) const;
 
 private:
   void onFillTimer();

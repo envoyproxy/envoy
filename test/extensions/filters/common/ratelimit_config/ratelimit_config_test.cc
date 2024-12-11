@@ -194,9 +194,9 @@ TEST_F(RateLimitConfigTest, SinglePolicy) {
 
   EXPECT_EQ(1U, config_->size());
 
-  std::vector<Envoy::RateLimit::LocalDescriptor> descriptors;
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
   config_->populateDescriptors(headers_, stream_info_, "", descriptors);
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"remote_address", "10.0.0.1"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", "10.0.0.1"}}}}),
               testing::ContainerEq(descriptors));
 }
 
@@ -212,15 +212,102 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActions) {
 
   setupTest(yaml);
 
-  std::vector<Envoy::RateLimit::LocalDescriptor> descriptors;
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
   config_->populateDescriptors(headers_, stream_info_, "", descriptors);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>(
-                  {Envoy::RateLimit::LocalDescriptor{
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                  {Envoy::RateLimit::Descriptor{
                        {{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}},
-                   Envoy::RateLimit::LocalDescriptor{{{"destination_cluster", "fake_cluster"}}}}),
+                   Envoy::RateLimit::Descriptor{{{"destination_cluster", "fake_cluster"}}}}),
               testing::ContainerEq(descriptors));
+}
+
+TEST_F(RateLimitConfigTest, HasHitsAddendButEmtpy) {
+  const std::string yaml = R"EOF(
+    actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_addend: {}
+  )EOF";
+
+  ProtoRateLimit rate_limit;
+  TestUtility::loadFromYaml(yaml, rate_limit);
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(rate_limit, factory_context_, creation_status);
+
+  EXPECT_TRUE(absl::StartsWith(creation_status.message(),
+                               "hits_addend must contain either a format or a number"));
+}
+
+TEST_F(RateLimitConfigTest, HasHitsAddendButBothAreSet) {
+  const std::string yaml = R"EOF(
+    actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_addend:
+      number: 1
+      format: "%BYTES_RECEIVED%"
+  )EOF";
+
+  ProtoRateLimit rate_limit;
+  TestUtility::loadFromYaml(yaml, rate_limit);
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(rate_limit, factory_context_, creation_status);
+
+  EXPECT_TRUE(absl::StartsWith(creation_status.message(),
+                               "hits_addend must contain either a format or a number"));
+}
+
+TEST_F(RateLimitConfigTest, HasHitsAddendButFormatWrong) {
+  const std::string yaml = R"EOF(
+    actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_addend:
+      format: "%BYTES_RECEIVED%%BYTES_RECEIVED%"
+  )EOF";
+
+  ProtoRateLimit rate_limit;
+  TestUtility::loadFromYaml(yaml, rate_limit);
+
+  absl::Status creation_status;
+  RateLimitPolicy policy(rate_limit, factory_context_, creation_status);
+
+  std::cout << creation_status.message() << std::endl;
+  EXPECT_EQ(creation_status.message(), "hits_addend format must contain exactly one substitution");
+}
+
+TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndHitsAddend) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_addend:
+      format: "%BYTES_RECEIVED%"
+  - actions:
+    - destination_cluster: {}
+    hits_addend:
+      number: 3
+  )EOF";
+
+  setupTest(yaml);
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+  stream_info_.bytes_received_ = 321;
+  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+
+  std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
+      {{{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}},
+      {{{"destination_cluster", "fake_cluster"}}}};
+  expected_descriptors[0].hits_addend_ = 321;
+  expected_descriptors[1].hits_addend_ = 3;
+
+  EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
 }
 
 class RateLimitPolicyTest : public testing::Test {
@@ -239,7 +326,7 @@ public:
   Http::TestRequestHeaderMapImpl headers_;
   std::shared_ptr<Router::MockRoute> route_{new NiceMock<Router::MockRoute>()};
 
-  std::vector<Envoy::RateLimit::LocalDescriptor> descriptors_;
+  std::vector<Envoy::RateLimit::Descriptor> descriptors_;
   Network::Address::InstanceConstSharedPtr default_remote_address_{
       new Network::Address::Ipv4Instance("10.0.0.1")};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
@@ -260,7 +347,7 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   std::unique_ptr<RateLimitPolicy> rate_limit_entry_;
   Http::TestRequestHeaderMapImpl headers_;
-  std::vector<Envoy::RateLimit::LocalDescriptor> descriptors_;
+  std::vector<Envoy::RateLimit::Descriptor> descriptors_;
   std::shared_ptr<Router::MockRoute> route_{new NiceMock<Router::MockRoute>()};
 
   Network::Address::InstanceConstSharedPtr default_remote_address_{
@@ -278,7 +365,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"remote_address", "10.0.0.1"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", "10.0.0.1"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -292,9 +379,9 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>(
-                  {{{{"masked_remote_address", "10.0.0.1/32"}}}}),
-              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::Descriptor>({{{{"masked_remote_address", "10.0.0.1/32"}}}}),
+      testing::ContainerEq(descriptors_));
 }
 
 TEST_F(RateLimitPolicyTest, MaskedRemoteAddressIpv4) {
@@ -308,9 +395,9 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>(
-                  {{{{"masked_remote_address", "10.0.0.0/16"}}}}),
-              testing::ContainerEq(descriptors_));
+  EXPECT_THAT(
+      std::vector<Envoy::RateLimit::Descriptor>({{{{"masked_remote_address", "10.0.0.0/16"}}}}),
+      testing::ContainerEq(descriptors_));
 }
 
 TEST_F(RateLimitPolicyIpv6Test, MaskedRemoteAddressIpv6Default) {
@@ -323,7 +410,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>(
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
                   {{{{"masked_remote_address", "2001:abcd:ef01:2345:6789:abcd:ef01:234/128"}}}}),
               testing::ContainerEq(descriptors_));
 }
@@ -339,7 +426,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>(
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
                   {{{{"masked_remote_address", "2001:abcd:ef01:2345::/64"}}}}),
               testing::ContainerEq(descriptors_));
 }
@@ -371,7 +458,7 @@ actions:
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
 
   EXPECT_THAT(
-      std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"source_cluster", "service_cluster"}}}}),
+      std::vector<Envoy::RateLimit::Descriptor>({{{{"source_cluster", "service_cluster"}}}}),
       testing::ContainerEq(descriptors_));
 }
 
@@ -386,7 +473,7 @@ actions:
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
 
   EXPECT_THAT(
-      std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"destination_cluster", "fake_cluster"}}}}),
+      std::vector<Envoy::RateLimit::Descriptor>({{{{"destination_cluster", "fake_cluster"}}}}),
       testing::ContainerEq(descriptors_));
 }
 
@@ -403,9 +490,8 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
 
-  EXPECT_THAT(
-      std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"my_header_name", "test_value"}}}}),
-      testing::ContainerEq(descriptors_));
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"}}}}),
+              testing::ContainerEq(descriptors_));
 }
 
 // Validate that a descriptor is added if the missing request header
@@ -428,9 +514,8 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
 
-  EXPECT_THAT(
-      std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"my_header_name", "test_value"}}}}),
-      testing::ContainerEq(descriptors_));
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"}}}}),
+              testing::ContainerEq(descriptors_));
 }
 
 // Tests if the descriptors are added if one of the headers is missing
@@ -483,7 +568,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"generic_key", "fake_key"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -499,7 +584,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"fake_key", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -515,7 +600,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"generic_key", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -544,7 +629,7 @@ filter_metadata:
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"fake_key", "foo"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -574,7 +659,7 @@ filter_metadata:
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"fake_key", "foo"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -605,7 +690,7 @@ filter_metadata:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"fake_key", "foo"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -635,7 +720,7 @@ filter_metadata:
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"fake_key", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -756,7 +841,7 @@ filter_metadata:
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"fake_key", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -804,7 +889,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"header_match", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -825,7 +910,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"fake_key", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -865,7 +950,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"header_match", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -905,7 +990,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"query_match", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -926,7 +1011,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"fake_key", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -966,7 +1051,7 @@ actions:
 
   rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
 
-  EXPECT_THAT(std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"query_match", "fake_value"}}}}),
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
 }
 
@@ -1002,7 +1087,7 @@ actions:
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
 
   EXPECT_THAT(
-      std::vector<Envoy::RateLimit::LocalDescriptor>(
+      std::vector<Envoy::RateLimit::Descriptor>(
           {{{{"destination_cluster", "fake_cluster"}, {"source_cluster", "service_cluster"}}}}),
       testing::ContainerEq(descriptors_));
 }
@@ -1041,9 +1126,8 @@ TEST_F(RateLimitPolicyTest, RequestMatchInput) {
 
   rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
 
-  EXPECT_THAT(
-      std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"my_header_name", "test_value"}}}}),
-      testing::ContainerEq(descriptors_));
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"}}}}),
+              testing::ContainerEq(descriptors_));
 }
 
 TEST_F(RateLimitPolicyTest, RequestMatchInputEmpty) {
@@ -1097,7 +1181,7 @@ actions:
 
     rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
     EXPECT_THAT(
-        std::vector<Envoy::RateLimit::LocalDescriptor>({{{{"source_cluster", "service_cluster"}}}}),
+        std::vector<Envoy::RateLimit::Descriptor>({{{{"source_cluster", "service_cluster"}}}}),
         testing::ContainerEq(descriptors_));
   }
 
