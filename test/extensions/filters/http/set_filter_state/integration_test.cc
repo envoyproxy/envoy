@@ -14,6 +14,7 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -66,6 +67,44 @@ public:
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers_, true));
   }
 
+  void runPerRouteFilter(const std::string& listener_yaml_config,
+                         const std::string& per_route_yaml_config) {
+    Server::GenericFactoryContextImpl generic_context(context_);
+
+    envoy::extensions::filters::http::set_filter_state::v3::Config listener_proto_config;
+    TestUtility::loadFromYaml(listener_yaml_config, listener_proto_config);
+    auto listener_config = std::make_shared<Filters::Common::SetFilterState::Config>(
+        listener_proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
+        generic_context);
+
+    envoy::extensions::filters::http::set_filter_state::v3::Config route_proto_config;
+    TestUtility::loadFromYaml(per_route_yaml_config, route_proto_config);
+    Filters::Common::SetFilterState::Config route_config(
+        route_proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
+        generic_context);
+
+    NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+    EXPECT_CALL(*decoder_callbacks.route_, mostSpecificPerFilterConfig(_))
+        .WillOnce(Return(&route_config));
+
+    auto filter = std::make_shared<SetFilterState>(listener_config);
+    filter->setDecoderFilterCallbacks(decoder_callbacks);
+    EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(info_));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers_, true));
+
+    // Test the factory method.
+    {
+      NiceMock<Server::Configuration::MockServerFactoryContext> context;
+      SetFilterStateConfig factory;
+      Router::RouteSpecificFilterConfigConstSharedPtr route_config =
+          factory
+              .createRouteSpecificFilterConfig(route_proto_config, context,
+                                               ProtobufMessage::getNullValidationVisitor())
+              .value();
+      EXPECT_TRUE(route_config.get());
+    }
+  }
+
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Http::TestRequestHeaderMapImpl headers_{{"test-header", "test-value"}};
   NiceMock<StreamInfo::MockStreamInfo> info_;
@@ -83,6 +122,52 @@ TEST_F(SetMetadataIntegrationTest, FromHeader) {
   const auto* foo = info_.filterState()->getDataReadOnly<Router::StringAccessor>("foo");
   ASSERT_NE(nullptr, foo);
   EXPECT_EQ(foo->serializeAsString(), "test-value");
+}
+
+TEST_F(SetMetadataIntegrationTest, RouteLevel) {
+  const std::string listener_config = R"EOF(
+  on_request_headers:
+  - object_key: both
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "listener-%REQ(test-header)%"
+  - object_key: listener-only
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "listener"
+  )EOF";
+  const std::string route_config = R"EOF(
+  on_request_headers:
+  - object_key: both
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "route-%REQ(test-header)%"
+  - object_key: route-only
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "route"
+  )EOF";
+  runPerRouteFilter(listener_config, route_config);
+
+  const auto* both = info_.filterState()->getDataReadOnly<Router::StringAccessor>("both");
+  ASSERT_NE(nullptr, both);
+  // Route takes precedence
+  EXPECT_EQ(both->serializeAsString(), "route-test-value");
+
+  const auto* listener =
+      info_.filterState()->getDataReadOnly<Router::StringAccessor>("listener-only");
+  ASSERT_NE(nullptr, listener);
+  // Only set on listener
+  EXPECT_EQ(listener->serializeAsString(), "listener");
+
+  const auto* route = info_.filterState()->getDataReadOnly<Router::StringAccessor>("route-only");
+  ASSERT_NE(nullptr, route);
+  // Only set on route
+  EXPECT_EQ(route->serializeAsString(), "route");
 }
 
 } // namespace SetFilterState

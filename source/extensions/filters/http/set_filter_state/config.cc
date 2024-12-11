@@ -45,17 +45,16 @@ Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 SetFilterStateConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
 
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
 
-  const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
+  return std::make_shared<const Filters::Common::SetFilterState::Config>(
       proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
       generic_context);
-  return filter_config;
 }
 
 Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoWithServerContextTyped(
