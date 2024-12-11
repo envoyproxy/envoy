@@ -1084,7 +1084,7 @@ void DownstreamFilterManager::executeLocalReplyIfPrepared() {
 }
 
 FilterManager::CreateChainResult DownstreamFilterManager::createDownstreamFilterChain() {
-  return createFilterChain(filter_chain_factory_, false);
+  return createFilterChain(filter_chain_factory_);
 }
 
 void DownstreamFilterManager::sendLocalReplyViaFilterChain(
@@ -1659,8 +1659,7 @@ FilterManager::createUpgradeFilterChain(const FilterChainFactory& filter_chain_f
 }
 
 FilterManager::CreateChainResult
-FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory,
-                                 bool only_create_if_configured) {
+FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory) {
   if (state_.create_chain_result_.created()) {
     return state_.create_chain_result_;
   }
@@ -1686,8 +1685,8 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory,
     // create the default filter chain.
   }
 
-  state_.create_chain_result_ = CreateChainResult(
-      filter_chain_factory.createFilterChain(*this, only_create_if_configured, options), upgrade);
+  state_.create_chain_result_ =
+      CreateChainResult(filter_chain_factory.createFilterChain(*this, options), upgrade);
   return state_.create_chain_result_;
 }
 

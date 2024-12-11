@@ -9,6 +9,7 @@ HTTP filters
   adaptive_concurrency_filter
   admission_control_filter
   aws_lambda_filter
+  api_key_auth_filter
   aws_request_signing_filter
   bandwidth_limit_filter
   basic_auth_filter
