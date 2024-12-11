@@ -173,7 +173,7 @@ void Filter::onDestroy() {
       state_ = State::PendingReuqestOnStreamDone;
       // Since this filter is being destroyed, we need to keep the client alive until the request
       // is complete. So we add this filter to the destroy pending list at the filter config level.
-      config_->addDestroyPendingFilter(shared_from_this());
+      config_->destroyPendingFilters().add(shared_from_this());
     }
   }
 }
@@ -188,7 +188,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     // Since this filter is already destroyed from HCM perspective, there's nothing to do here.
     // Simply remove it from the destroy pending list which in turn will release the filter shared
     // pointer.
-    config_->removeDestroyPendingFilter(*this);
+    config_->destroyPendingFilters().remove(*this);
     return;
   }
   state_ = State::Complete;
@@ -351,7 +351,7 @@ std::string Filter::getDomain() {
   return config_->domain();
 }
 
-DestroyPendingFilterThreadLocal::~DestroyPendingFilterThreadLocal() {
+DestroyPendingFiltersThreadLocal::~DestroyPendingFiltersThreadLocal() {
   for (const auto& filter : map_) {
     filter.second->client()->cancel();
   }

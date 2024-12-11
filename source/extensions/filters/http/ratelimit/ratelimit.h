@@ -41,24 +41,27 @@ using FilterSharedPtr = std::shared_ptr<Filter>;
 /**
  * Thread local storage for destroy pending filters.
  */
-class DestroyPendingFilterThreadLocal : public ThreadLocal::ThreadLocalObject {
+class DestroyPendingFiltersThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
-  DestroyPendingFilterThreadLocal() = default;
+  DestroyPendingFiltersThreadLocal() = default;
   // When this class is destructed, it will cancel all the pending filters and release the shared
   // pointers.
-  ~DestroyPendingFilterThreadLocal() override;
+  ~DestroyPendingFiltersThreadLocal() override;
   /**
    * Add the filter to the destroy pending list.
    * @param filter the filter to add.
    */
-  void addDestroyPendingFilter(FilterSharedPtr filter) {
-    map_.emplace(filter.get(), std::move(filter));
-  }
+  void add(FilterSharedPtr filter) { map_.emplace(filter.get(), std::move(filter)); }
   /**
    * Remove the filter from the destroy pending list.
    * @param filter the const reference to the filter to remove.
    */
-  void removeDestroyPendingFilter(const Filter& filter) { map_.erase(&filter); }
+  void remove(const Filter& filter) { map_.erase(&filter); }
+
+  /**
+   * @return the size of the destroy pending list.
+   */
+  size_t sizeForTesting() const { return map_.size(); }
 
 private:
   // We use a raw pointer as the key to be able to remove filters when the callback is called where
@@ -97,10 +100,10 @@ public:
         apply_on_stream_done_(config.apply_on_stream_done()) {
     if (config.apply_on_stream_done()) {
       pending_filter_slot_ =
-          ThreadLocal::TypedSlot<DestroyPendingFilterThreadLocal>::makeUnique(tls_allocator);
+          ThreadLocal::TypedSlot<DestroyPendingFiltersThreadLocal>::makeUnique(tls_allocator);
       pending_filter_slot_->set(
-          [](Event::Dispatcher&) -> std::shared_ptr<DestroyPendingFilterThreadLocal> {
-            return std::make_shared<DestroyPendingFilterThreadLocal>();
+          [](Event::Dispatcher&) -> std::shared_ptr<DestroyPendingFiltersThreadLocal> {
+            return std::make_shared<DestroyPendingFiltersThreadLocal>();
           });
     }
   }
@@ -122,13 +125,10 @@ public:
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
   Http::Code statusOnError() const { return status_on_error_; }
   bool applyOnStreamDone() const { return apply_on_stream_done_; }
-  void addDestroyPendingFilter(FilterSharedPtr filter) {
+
+  DestroyPendingFiltersThreadLocal& destroyPendingFilters() {
     ASSERT(pending_filter_slot_);
-    (*pending_filter_slot_)->addDestroyPendingFilter(std::move(filter));
-  }
-  void removeDestroyPendingFilter(const Filter& filter) {
-    ASSERT(pending_filter_slot_);
-    (*pending_filter_slot_)->removeDestroyPendingFilter(filter);
+    return *(*pending_filter_slot_);
   }
 
 private:
@@ -161,7 +161,7 @@ private:
 
   // Only used when apply_on_stream_done_ is true to hold the pending filters to outlive the
   // OnDestroy callback.
-  ThreadLocal::TypedSlotPtr<DestroyPendingFilterThreadLocal> pending_filter_slot_ = nullptr;
+  ThreadLocal::TypedSlotPtr<DestroyPendingFiltersThreadLocal> pending_filter_slot_ = nullptr;
 
   const std::string domain_;
   const uint64_t stage_;
@@ -209,7 +209,7 @@ private:
  */
 class Filter : public Http::StreamFilter,
                public Filters::Common::RateLimit::RequestCallbacks,
-               std::enable_shared_from_this<Filter> {
+               public std::enable_shared_from_this<Filter> {
 public:
   Filter(FilterConfigSharedPtr config, Filters::Common::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
