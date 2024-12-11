@@ -316,7 +316,7 @@ public:
     yaml += enable_merge_window ? merge_window_enabled : merge_window_disabled;
 
     const auto& bootstrap = parseBootstrapFromV3Yaml(yaml);
-    absl::Status creation_status;
+    absl::Status creation_status = absl::OkStatus();
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
