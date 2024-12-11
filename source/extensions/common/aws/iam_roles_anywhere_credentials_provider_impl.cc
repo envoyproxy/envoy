@@ -285,7 +285,7 @@ std::chrono::seconds IAMRolesAnywhereX509CredentialsProvider::getCacheDuration()
       REFRESH_INTERVAL -
       REFRESH_GRACE_PERIOD /*TODO: Add jitter from context.api().randomGenerator()*/);
 }
-
+ 
 IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context,
     CreateMetadataFetcherCb create_metadata_fetcher_cb,

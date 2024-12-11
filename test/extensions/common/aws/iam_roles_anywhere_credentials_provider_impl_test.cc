@@ -113,21 +113,37 @@ WgTQAfHx04TA8rljw5lyGxOZJQ3WIvsc4qCn2Q1Dv+AjpLNZq411
 
 class MessageMatcher : public testing::MatcherInterface<Http::RequestMessage&> {
 public:
-  explicit MessageMatcher(const Http::TestRequestHeaderMapImpl& expected_headers)
-      : expected_headers_(expected_headers) {}
+  explicit MessageMatcher(Http::RequestMessage& expected_message)
+  // explicit MessageMatcher(const Http::TestRequestHeaderMapImpl& expected_headers)
+      : expected_message_(expected_message) {}
 
-  bool MatchAndExplain(Http::RequestMessage& message,
+   bool MatchAndExplain(Http::RequestMessage& message,
                        testing::MatchResultListener* result_listener) const override {
-    const bool equal = TestUtility::headerMapEqualIgnoreOrder(message.headers(), expected_headers_);
+    bool equal = TestUtility::headerMapEqualIgnoreOrder(message.headers(), expected_message_.headers());
     if (!equal) {
       *result_listener << "\n"
                        << TestUtility::addLeftAndRightPadding("Expected header map:") << "\n"
-                       << expected_headers_
+                       << expected_message_.headers()
                        << TestUtility::addLeftAndRightPadding("is not equal to actual header map:")
                        << "\n"
                        << message.headers()
                        << TestUtility::addLeftAndRightPadding("") // line full of padding
                        << "\n";
+    }
+    if(!expected_message_.bodyAsString().empty())
+    {
+      if(message.bodyAsString() != expected_message_.bodyAsString())
+      {
+        equal = 0;
+        *result_listener << "\n"
+                  << TestUtility::addLeftAndRightPadding("Expected message body:") << "\n"
+                  << expected_message_.bodyAsString()
+                  << TestUtility::addLeftAndRightPadding("is not equal to actual message body:")
+                  << "\n"
+                  << message.bodyAsString()
+                  << TestUtility::addLeftAndRightPadding("") // line full of padding
+                  << "\n";
+      }
     }
     return equal;
   }
@@ -137,12 +153,12 @@ public:
   void DescribeNegationTo(::std::ostream* os) const override { *os << "Message does not match"; }
 
 private:
-  const Http::TestRequestHeaderMapImpl expected_headers_;
+  Http::RequestMessage& expected_message_;
 };
 
 testing::Matcher<Http::RequestMessage&>
-messageMatches(const Http::TestRequestHeaderMapImpl& expected_headers) {
-  return testing::MakeMatcher(new MessageMatcher(expected_headers));
+messageMatches(Http::RequestMessage& expected_message) {
+  return testing::MakeMatcher(new MessageMatcher(expected_message));
 }
 
 class IamRolesAnywhereCredentialsProviderTest : public testing::Test {
@@ -220,9 +236,9 @@ public:
   }
 
   void expectDocument(const uint64_t status_code, const std::string&& document,
-                      Http::TestRequestHeaderMapImpl headers) {
+                      Http::RequestMessage& message) {
 
-    EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
+    EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(message), _, _))
         .WillRepeatedly(Invoke([this, status_code, document = std::move(document)](
                                    Http::RequestMessage&, Tracing::Span&,
                                    MetadataFetcher::MetadataReceiver& receiver) {
@@ -414,7 +430,11 @@ public:
 // Test cases created from python implementation of iam roles anywhere session
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
   // This is what we expect to see requested by the signer
-  expectDocument(201, "", rsa_headers_nochain_);
+
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  
+  expectDocument(201, "", message);
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
@@ -434,7 +454,10 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningInvalidChainOk) {
 
-  expectDocument(201, "", rsa_headers_nochain_);
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  
+  expectDocument(201, "", message);
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
@@ -454,7 +477,10 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningInvalidChainOk
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningWithChain) {
 
-  expectDocument(201, "", rsa_headers_chain_);
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  
+  expectDocument(201, "", message);
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
@@ -477,6 +503,10 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, CredentialExpiration) {
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  
+
   expectDocument(201, R"EOF(
 {
   "credentialSet": [
@@ -491,7 +521,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, CredentialExpiration) {
   ]
 }
  )EOF",
-                 rsa_headers_chain_);
+                 message);
 
   setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
                 server_root_chain_rsa_pem);
@@ -510,6 +540,9 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, CredentialExpiration) {
   EXPECT_EQ("token", credentials.sessionToken().value());
   time_system_.advanceTimeWait(std::chrono::hours(2));
 
+  auto headers2 = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_fast_forward_}};
+  Http::RequestMessageImpl message2(std::move(headers2));
+  
   expectDocument(201, R"EOF(
 {
   "credentialSet": [
@@ -524,7 +557,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, CredentialExpiration) {
   ]
 }
  )EOF",
-                 rsa_headers_chain_fast_forward_);
+                 message2);
   // Timer will have been advanced by ten minutes, so check that firing it will refresh the
   // credentials
   EXPECT_CALL(*raw_metadata_fetcher_, cancel());
@@ -539,6 +572,9 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, InvalidExpiration) {
 
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
+auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  
   expectDocument(201, R"EOF(
 {
   "credentialSet": [
@@ -553,7 +589,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, InvalidExpiration) {
   ]
 }
  )EOF",
-                 rsa_headers_chain_);
+                 message);
 
   setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
                 server_root_chain_rsa_pem);
@@ -568,15 +604,17 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, InvalidExpiration) {
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, BadJsonResponse) {
 
-  // InSequence sequence;
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
+auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  
   expectDocument(201, R"EOF(
 {
  invalidJson
 }
  )EOF",
-                 rsa_headers_chain_);
+                 message);
 
   setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
                 server_root_chain_rsa_pem);
@@ -595,15 +633,17 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, BadJsonResponse) {
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, BadCredentialSetValue) {
 
-  // InSequence sequence;
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
+auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  
   expectDocument(201, R"EOF(
 {
   "credentialSet": 1
 }
  )EOF",
-                 rsa_headers_chain_);
+                 message);
 
   setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
                 server_root_chain_rsa_pem);
@@ -622,9 +662,11 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, BadCredentialSetValue) {
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, BadCredentialSetArray) {
 
-  // InSequence sequence;
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
 
+auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  
   expectDocument(201, R"EOF(
 {
   "credentialSet": [
@@ -634,7 +676,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, BadCredentialSetArray) {
   ]
 }
  )EOF",
-                 rsa_headers_chain_);
+                 message);
 
   setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
                 server_root_chain_rsa_pem);
@@ -653,10 +695,11 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, BadCredentialSetArray) {
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, EmptyJsonResponse) {
 
-  // InSequence sequence;
   time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
-
-  expectDocument(201, "", rsa_headers_chain_);
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  
+  expectDocument(201, "", message);
 
   setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
                 server_root_chain_rsa_pem);
