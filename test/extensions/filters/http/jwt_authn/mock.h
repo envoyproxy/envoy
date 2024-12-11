@@ -88,7 +88,9 @@ public:
               (), (const));
   MOCK_METHOD(const ::google::jwt_verify::Jwks*, getJwksObj, (), (const));
   MOCK_METHOD(bool, isExpired, (), (const));
-  MOCK_METHOD(const ::google::jwt_verify::Jwks*, setRemoteJwks, (JwksConstPtr &&), ());
+  MOCK_METHOD(const ::google::jwt_verify::Jwks*, setRemoteJwks, (JwksConstPtr&&, bool), ());
+  MOCK_METHOD(bool, isRemoteJwksFetchAllowed, (), ());
+  MOCK_METHOD(void, allowRemoteJwksFetch, (absl::optional<bool>, bool), ());
   MOCK_METHOD(JwtCache&, getJwtCache, (), ());
 
   envoy::extensions::filters::http::jwt_authn::v3::JwtProvider jwt_provider_;

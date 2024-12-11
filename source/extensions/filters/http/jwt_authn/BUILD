@@ -55,6 +55,7 @@ envoy_cc_library(
         "jwks_async_fetcher_lib",
         ":jwt_cache_lib",
         "//source/common/config:datasource_lib",
+        "//source/common/config:utility_lib",
         "@com_github_google_jwt_verify//:jwt_verify_lib",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
