@@ -157,7 +157,7 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
   request_msg_converter_ = std::make_unique<MessageConverter>(
       std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
 
-  return Envoy::Http::FilterHeadersStatus::StopIteration;
+  return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
 Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data, bool end_stream) {
@@ -274,7 +274,7 @@ Envoy::Http::FilterHeadersStatus Filter::encodeHeaders(Envoy::Http::ResponseHead
   response_msg_converter_ = std::make_unique<MessageConverter>(
       std::move(cord_message_data_factory), encoder_callbacks_->encoderBufferLimit());
 
-  return Http::FilterHeadersStatus::StopIteration;
+  return Http::FilterHeadersStatus::Continue;
 }
 
 Envoy::Http::FilterDataStatus Filter::encodeData(Envoy::Buffer::Instance& data, bool end_stream) {
