@@ -124,6 +124,9 @@ def envoy_dependencies(skip_targets = []):
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
 
+    # Setup Bazel shell rules
+    external_http_archive(name = "rules_shell")
+
     # Setup Bazel C++ rules
     external_http_archive("rules_cc")
 
@@ -616,6 +619,11 @@ def _com_google_absl():
 def _com_google_protobuf():
     external_http_archive(
         name = "rules_python",
+    )
+    external_http_archive(
+        name = "rules_java",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_java.patch"],
     )
 
     for platform in PROTOC_VERSIONS:
