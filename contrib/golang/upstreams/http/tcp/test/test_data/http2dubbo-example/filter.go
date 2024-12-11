@@ -179,11 +179,6 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 
 	// =========== step 2: aggregate multi dubbo frame when server has big response =========== //
 	if buffer.Len() < (int(bodyLength) + hessian.HEADER_LENGTH) {
-		if endOfStream {
-			api.LogErrorf("[OnUpstreamData] upstream bad endOfStream")
-			buffer.SetString("bad endOfStream")
-			return api.TcpUpstreamSendData
-		}
 		api.LogInfof("[OnUpstreamData] NeedMoreData for Body")
 		return api.TcpUpstreamStopAndBuffer
 	}

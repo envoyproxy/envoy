@@ -53,6 +53,45 @@ type httpRequest struct {
 	// protect multiple cases:
 	// 1. protect req_->strValue in the C++ side from being used concurrently.
 	mutex sync.Mutex
+
+	// decodingState and encodingState are part of httpRequest, not another GC object.
+	// So, no cycle reference, GC finalizer could work well.
+	decodingState processState
+	encodingState processState
+}
+
+// processState implements the FilterCallbacks interface.
+type processState struct {
+	request      *httpRequest
+	processState *C.processState
+}
+
+func (s *processState) RecoverPanic() {
+	if e := recover(); e != nil {
+		buf := debug.Stack()
+
+		if e == errRequestFinished || e == errFilterDestroyed {
+			api.LogInfof("http: panic serving: %v (Client may cancel the request prematurely)\n%s", e, buf)
+		} else {
+			api.LogErrorf("http: panic serving: %v\n%s", e, buf)
+		}
+
+		switch e {
+		case errRequestFinished, errFilterDestroyed:
+			// do nothing
+
+		case errNotInGo:
+			// We can not send local reply now, since not in go now,
+			// will delay to the next time entering Go.
+			s.request.pInfo = panicInfo{
+				paniced: true,
+				details: fmt.Sprint(e),
+			}
+
+		default:
+			// do nothing
+		}
+	}
 }
 
 func (r *httpRequest) pluginName() string {
@@ -68,22 +107,6 @@ func (r *httpRequest) recoverPanic() {
 			api.LogInfof("tcp upstream: panic serving: %v (Client may cancel the request prematurely)\n%s", e, buf)
 		} else {
 			api.LogErrorf("tcp upstream: panic serving: %v\n%s", e, buf)
-		}
-
-		switch e {
-		case errRequestFinished, errFilterDestroyed:
-			// do nothing
-
-		case errNotInGo:
-			// We can not send local reply now, since not in go now,
-			// will delay to the next time entering Go.
-			r.pInfo = panicInfo{
-				paniced: true,
-				details: fmt.Sprint(e),
-			}
-
-		default:
-			// do nothing
 		}
 	}
 }

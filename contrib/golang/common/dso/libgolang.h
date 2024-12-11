@@ -204,15 +204,15 @@ extern void envoyGoTcpUpstreamDestroyPluginConfig(GoUint64 id);
 
 // go:linkname envoyGoEncodeHeader
 // github.com/envoyproxy/envoy/contrib/golang/filters/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp.envoyGoEncodeHeader
-extern GoUint64 envoyGoEncodeHeader(httpRequest* r, GoUint64 end_stream, GoUint64 header_num,  GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len);
+extern GoUint64 envoyGoEncodeHeader(processState* r, GoUint64 end_stream, GoUint64 header_num,  GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len);
 
 // go:linkname envoyGoEncodeData
 // github.com/envoyproxy/envoy/contrib/golang/filters/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp.envoyGoEncodeData
-extern GoUint64 envoyGoEncodeData(httpRequest* r, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len);
+extern GoUint64 envoyGoEncodeData(processState* state, GoUint64 end_stream, GoUint64 buf_ptr, GoUint64 buf_len);
 
 // go:linkname envoyGoOnUpstreamData
 // github.com/envoyproxy/envoy/contrib/golang/filters/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp.envoyGoOnUpstreamData
-extern GoUint64 envoyGoOnUpstreamData(httpRequest* r, GoUint64 end_stream, GoUint64 header_num, GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len);
+extern GoUint64 envoyGoOnUpstreamData(processState* state, GoUint64 end_stream, GoUint64 header_num, GoUint64 header_bytes, GoUint64 buf_ptr, GoUint64 buf_len);
 
 // go:linkname envoyGoOnTcpUpstreamDestroy
 // github.com/envoyproxy/envoy/contrib/golang/filters/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp.envoyGoOnTcpUpstreamDestroy

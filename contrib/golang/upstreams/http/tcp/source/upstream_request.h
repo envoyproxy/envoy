@@ -18,6 +18,8 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
+#include "processor_state.h"
+#include "processor_state.h"
 
 #include "contrib/golang/common/dso/dso.h"
 
@@ -42,63 +44,6 @@ class FilterConfig;
 class Filter;
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
-
-/**
-  * This describes the processor state.
-*/
-enum class FilterState {
-  // Waiting header
-  WaitingHeader,
-  // Processing header in Go
-  ProcessingHeader,
-  // Waiting data
-  WaitingData,
-  // Waiting all data
-  WaitingAllData,
-  // Processing data in Go
-  ProcessingData,
-  // All done
-  Done,
-};
-/**
-  * An enum specific for Golang status.
-*/
-enum class TcpUpstreamStatus {
-  /** 
-  * Area of status: encodeHeaders, encodeData, onUpstreamData
-  *
-  * Used when you want to leave the current func area and continue further func. (when streaming, go side get each_data_piece, may be called multipled times)
-  *
-  * Here is the specific explanation in different funcs:
-  * encodeHeaders: will go to encodeData, go side in encodeData will streaming get each_data_piece.
-  * encodeData: streaming send data to upstream, go side get each_data_piece, may be called multipled times.
-  * onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
-  */
-  TcpUpstreamContinue,
-
-  /** 
-  * Area of status: encodeHeaders, encodeData, onUpstreamData
-  *
-  * Used when you want to buffer data.
-  *
-  * Here is the specific explanation in different funcs:
-  * encodeHeaders: will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole data one-off.
-  * encodeData: buffer further whole data, go side in encodeData get whole data one-off.(Be careful: This status MUST NOT be returned when end_stream is true.)
-  * onUpstreamData: every data trigger will call go side, and go side get buffer data from start.(Be careful: This status MUST NOT be returned when end_stream is true.)
-  */
-  TcpUpstreamStopAndBuffer,
-
-  /** Area of status: encodeHeaders, onUpstreamData
-  *
-  * Used when you want to send data to upstream in encodeHeaders, or send data to downstream in onUpstreamData.
-  *
-  * Here is the specific explanation in different funcs:
-  * encodeHeaders: directly send data to upstream, and encodeData will not be called even when downstream_req has body.
-  * onUpstreamData: send data and headers to downstream which means the whole resp to http is finished.
-  */
-  TcpUpstreamSendData,
-};
-
 
 /**
  * Configuration for the Tcp Upstream golang extension filter.
@@ -199,6 +144,7 @@ public:
     ClusterName,
   };
 
+  void initRequest();
   void initResponse();
 
   // GenericUpstream
@@ -219,52 +165,28 @@ public:
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
   void trySendProxyData(bool send_data_to_upstream, bool end_stream);
-  void encodeDataGo(Buffer::Instance& data, bool end_stream);
+  void encodeDataGo(ProcessorState* state, Buffer::Instance& data, bool end_stream);
   void sendDataToDownstream(Buffer::Instance& data, bool end_stream);
 
-  CAPIStatus copyHeaders(GoString* go_strs, char* go_buf);
-  CAPIStatus setRespHeader(absl::string_view key, absl::string_view value, headerAction act);
-  CAPIStatus copyBuffer(Buffer::Instance* buffer, char* data);
-  CAPIStatus drainBuffer(Buffer::Instance* buffer, uint64_t length);
-  CAPIStatus setBufferHelper(Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
+  CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
+  CAPIStatus setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value, headerAction act);
+  CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
+  CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
+  CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
   CAPIStatus setSelfHalfCloseForUpstreamConn(int enabled);
 
-  // store response header for http
-  const Envoy::Http::RequestOrResponseHeaderMap* req_headers_{nullptr};
-  // store response header for http
-  std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers_{nullptr};
+  DecodingProcessorState* decodingState() { return decoding_state_; }
+  EncodingProcessorState* encodingState() { return encoding_state_; }
+
+  EncodingProcessorState* encoding_state_;
+  DecodingProcessorState* decoding_state_;
 
   const Router::RouteEntry* route_entry_;
+  // store response header for http
+  std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers_{nullptr};
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
   std::string strValue;
-  int state_;
-
-  /* data buffer */
-  // add data to state buffer
-  virtual void addBufferData(Buffer::Instance& data) {
-    if (data_buffer_ == nullptr) {
-      data_buffer_ = std::make_unique<Buffer::OwnedImpl>();
-    }
-    data_buffer_->move(data);
-  };
-
-  std::string stateStr();
-  FilterState filterState() const { return static_cast<FilterState>(state_); }
-  void setFilterState(FilterState st) { state_ = static_cast<int>(st); }
-  bool isProcessingInGo() {
-    return filterState() == FilterState::ProcessingHeader || filterState() == FilterState::ProcessingData;
-  }
-  // get state buffer
-  Buffer::Instance& getBufferData() { return *data_buffer_.get(); };
-  bool isBufferDataEmpty() { return data_buffer_ == nullptr || data_buffer_->length() == 0; };
-  void drainBufferData();
-
-  void handleHeaderGolangStatus(TcpUpstreamStatus status);
-  void handleDataGolangStatus(const TcpUpstreamStatus status, bool end_stream);
-
-protected:
-  Buffer::InstancePtr data_buffer_{nullptr};
 
 private:
   Router::UpstreamToDownstream* upstream_request_;

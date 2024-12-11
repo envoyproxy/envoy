@@ -82,8 +82,8 @@ func capiStatusToStr(status C.CAPIStatus) string {
 	return "unknown status"
 }
 
-func (c *cgoApiImpl) CopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
-	req := (*httpRequest)(r)
+func (c *cgoApiImpl) CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string {
+	state := (*processState)(s)
 	var strs []string
 	if num <= maxStackAllocedHeaderSize {
 		// NOTE: only const length slice may be allocated on stack.
@@ -98,7 +98,7 @@ func (c *cgoApiImpl) CopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map
 	// we have to make sure the all strings is not using before reusing,
 	// but strings may be alive beyond the request life.
 	buf := make([]byte, bytes)
-	res := C.envoyGoTcpUpstreamCopyHeaders(unsafe.Pointer(req.req), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
+	res := C.envoyGoTcpUpstreamCopyHeaders(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
 	handleCApiStatus(res)
 
 	m := make(map[string][]string, num)
@@ -116,44 +116,44 @@ func (c *cgoApiImpl) CopyHeaders(r unsafe.Pointer, num uint64, bytes uint64) map
 	return m
 }
 
-func (c *cgoApiImpl) SetRespHeader(r unsafe.Pointer, key string, value string, add bool) {
-	req := (*httpRequest)(r)
+func (c *cgoApiImpl) SetRespHeader(s unsafe.Pointer, key string, value string, add bool) {
+	state := (*processState)(s)
 	var act C.headerAction
 	if add {
 		act = C.HeaderAdd
 	} else {
 		act = C.HeaderSet
 	}
-	res := C.envoyGoTcpUpstreamSetRespHeader(unsafe.Pointer(req.req), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
+	res := C.envoyGoTcpUpstreamSetRespHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
 		unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), act)
 	handleCApiStatus(res)
 }
 
-func (c *cgoApiImpl) GetBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) []byte {
-	req := (*httpRequest)(r)
+func (c *cgoApiImpl) GetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte {
+	state := (*processState)(s)
 	buf := make([]byte, length)
-	res := C.envoyGoTcpUpstreamGetBuffer(unsafe.Pointer(req.req), C.uint64_t(bufferPtr), unsafe.Pointer(unsafe.SliceData(buf)))
+	res := C.envoyGoTcpUpstreamGetBuffer(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), unsafe.Pointer(unsafe.SliceData(buf)))
 	handleCApiStatus(res)
 	return unsafe.Slice(unsafe.SliceData(buf), length)
 }
 
-func (c *cgoApiImpl) DrainBuffer(r unsafe.Pointer, bufferPtr uint64, length uint64) {
-	req := (*httpRequest)(r)
-	res := C.envoyGoTcpUpstreamDrainBuffer(unsafe.Pointer(req.req), C.uint64_t(bufferPtr), C.uint64_t(length))
+func (c *cgoApiImpl) DrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) {
+	state := (*processState)(s)
+	res := C.envoyGoTcpUpstreamDrainBuffer(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), C.uint64_t(length))
 	handleCApiStatus(res)
 }
 
-func (c *cgoApiImpl) SetBufferHelper(r unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction) {
-	req := (*httpRequest)(r)
-	c.setBufferHelper(req, bufferPtr, unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), action)
+func (c *cgoApiImpl) SetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction) {
+	state := (*processState)(s)
+	c.setBufferHelper(state, bufferPtr, unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), action)
 }
 
-func (c *cgoApiImpl) SetBytesBufferHelper(r unsafe.Pointer, bufferPtr uint64, value []byte, action api.BufferAction) {
-	req := (*httpRequest)(r)
-	c.setBufferHelper(req, bufferPtr, unsafe.Pointer(unsafe.SliceData(value)), C.int(len(value)), action)
+func (c *cgoApiImpl) SetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action api.BufferAction) {
+	state := (*processState)(s)
+	c.setBufferHelper(state, bufferPtr, unsafe.Pointer(unsafe.SliceData(value)), C.int(len(value)), action)
 }
 
-func (c *cgoApiImpl) setBufferHelper(req *httpRequest, bufferPtr uint64, data unsafe.Pointer, length C.int, action api.BufferAction) {
+func (c *cgoApiImpl) setBufferHelper(state *processState, bufferPtr uint64, data unsafe.Pointer, length C.int, action api.BufferAction) {
 	var act C.bufferAction
 	switch action {
 	case api.SetBuffer:
@@ -163,7 +163,7 @@ func (c *cgoApiImpl) setBufferHelper(req *httpRequest, bufferPtr uint64, data un
 	case api.PrependBuffer:
 		act = C.Prepend
 	}
-	res := C.envoyGoTcpUpstreamSetBufferHelper(unsafe.Pointer(req.req), C.uint64_t(bufferPtr), data, length, act)
+	res := C.envoyGoTcpUpstreamSetBufferHelper(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), data, length, act)
 	handleCApiStatus(res)
 }
 

@@ -51,11 +51,12 @@ typedef enum { // NOLINT(modernize-use-using)
 } CAPIStatus;
 
 // tcp upstream
-CAPIStatus envoyGoTcpUpstreamCopyHeaders(void* r, void* strs, void* buf);
-CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* r, void* key_data, int key_len, void* value_data, int value_len, headerAction action);
-CAPIStatus envoyGoTcpUpstreamGetBuffer(void* r, uint64_t buffer, void* value);
-CAPIStatus envoyGoTcpUpstreamDrainBuffer(void* r, uint64_t buffer, uint64_t length);
-CAPIStatus envoyGoTcpUpstreamSetBufferHelper(void* r, uint64_t buffer, void* data, int length, bufferAction action);
+CAPIStatus envoyGoTcpUpstreamGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data, int* value_len);
+CAPIStatus envoyGoTcpUpstreamCopyHeaders(void* s, void* strs, void* buf);
+CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len, void* value_data, int value_len, headerAction action);
+CAPIStatus envoyGoTcpUpstreamGetBuffer(void* s, uint64_t buffer, void* value);
+CAPIStatus envoyGoTcpUpstreamDrainBuffer(void* s, uint64_t buffer, uint64_t length);
+CAPIStatus envoyGoTcpUpstreamSetBufferHelper(void* s, uint64_t buffer, void* data, int length, bufferAction action);
 CAPIStatus envoyGoTcpUpstreamGetStringValue(void* r, int id, uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(void* r, int enabled);
 

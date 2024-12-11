@@ -73,18 +73,31 @@ func (f *requestMap) Clear() {
 	})
 }
 
-func getOrCreateRequest(r *C.httpRequest) *httpRequest {
+func getOrCreateState(s *C.processState) *processState {
+	r := s.req
 	req := getRequest(r)
 	if req == nil {
 		req = createRequest(r)
 	}
-	return req
+	if s.is_encoding == 0 {
+		if req.decodingState.processState == nil {
+			req.decodingState.processState = s
+		}
+		return &req.decodingState
+	}
+
+	if req.encodingState.processState == nil {
+		req.encodingState.processState = s
+	}
+	return &req.encodingState
 }
 
 func createRequest(r *C.httpRequest) *httpRequest {
 	req := &httpRequest{
 		req: r,
 	}
+	req.decodingState.request = req
+	req.encodingState.request = req
 
 	err := Requests.StoreReq(r, req)
 	if err != nil {
@@ -105,11 +118,12 @@ func getRequest(r *C.httpRequest) *httpRequest {
 }
 
 //export envoyGoEncodeHeader
-func envoyGoEncodeHeader(r *C.httpRequest, endStream, headerNum, headerBytes, buffer, length uint64) uint64 {
-	req := getOrCreateRequest(r)
+func envoyGoEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, buffer, length uint64) uint64 {
+	state := getOrCreateState(s)
 
+	req := state.request
 	buf := &httpBuffer{
-		req:                 req,
+		state:               state,
 		envoyBufferInstance: buffer,
 		length:              length,
 	}
@@ -117,13 +131,13 @@ func envoyGoEncodeHeader(r *C.httpRequest, endStream, headerNum, headerBytes, bu
 		buf.SetString(req.pInfo.details)
 		return uint64(api.TcpUpstreamSendData)
 	}
-	defer req.recoverPanic()
+	defer state.RecoverPanic()
 
 	filter := req.tcpUpstreamFilter
 	header := &requestHeaderMapImpl{
 		requestOrResponseHeaderMapImpl{
 			headerMapImpl{
-				req:         req,
+				state:       state,
 				headerNum:   headerNum,
 				headerBytes: headerBytes,
 			},
@@ -133,11 +147,12 @@ func envoyGoEncodeHeader(r *C.httpRequest, endStream, headerNum, headerBytes, bu
 }
 
 //export envoyGoEncodeData
-func envoyGoEncodeData(r *C.httpRequest, endStream, buffer, length uint64) uint64 {
-	req := getOrCreateRequest(r)
+func envoyGoEncodeData(s *C.processState, endStream, buffer, length uint64) uint64 {
+	state := getOrCreateState(s)
 
+	req := state.request
 	buf := &httpBuffer{
-		req:                 req,
+		state:               state,
 		envoyBufferInstance: buffer,
 		length:              length,
 	}
@@ -145,7 +160,7 @@ func envoyGoEncodeData(r *C.httpRequest, endStream, buffer, length uint64) uint6
 		buf.SetString(req.pInfo.details)
 		return uint64(api.TcpUpstreamContinue)
 	}
-	defer req.recoverPanic()
+	defer state.RecoverPanic()
 
 	filter := req.tcpUpstreamFilter
 
@@ -153,12 +168,13 @@ func envoyGoEncodeData(r *C.httpRequest, endStream, buffer, length uint64) uint6
 }
 
 //export envoyGoOnUpstreamData
-func envoyGoOnUpstreamData(r *C.httpRequest, endStream, headerNum, headerBytes, buffer, length uint64) uint64 {
+func envoyGoOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes, buffer, length uint64) uint64 {
 
-	req := getOrCreateRequest(r)
+	state := getOrCreateState(s)
 
+	req := state.request
 	buf := &httpBuffer{
-		req:                 req,
+		state:               state,
 		envoyBufferInstance: buffer,
 		length:              length,
 	}
@@ -166,13 +182,13 @@ func envoyGoOnUpstreamData(r *C.httpRequest, endStream, headerNum, headerBytes, 
 		buf.SetString(req.pInfo.details)
 		return uint64(api.TcpUpstreamContinue)
 	}
-	defer req.recoverPanic()
+	defer state.RecoverPanic()
 
 	filter := req.tcpUpstreamFilter
 	header := &responseHeaderMapImpl{
 		requestOrResponseHeaderMapImpl{
 			headerMapImpl{
-				req:         req,
+				state:       state,
 				headerNum:   headerNum,
 				headerBytes: headerBytes,
 			},
