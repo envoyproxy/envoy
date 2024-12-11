@@ -41,6 +41,7 @@ Bencoded
 CIO
 cbegin
 cend
+constness
 deadcode
 DFP
 Dynatrace

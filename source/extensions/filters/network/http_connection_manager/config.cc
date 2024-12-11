@@ -45,7 +45,6 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 namespace {
 
-using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
 using FilterFactoryMap = std::map<std::string, HttpConnectionManagerConfig::FilterConfig>;
 
 HttpConnectionManagerConfig::UpgradeMap::const_iterator
@@ -291,13 +290,12 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
     Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers) {
   Utility::Singletons singletons = Utility::createSingletons(context);
 
-  auto filter_config = THROW_OR_RETURN_VALUE(
-      Utility::createConfig(proto_config, context, *singletons.date_provider_,
-                            *singletons.route_config_provider_manager_,
-                            singletons.scoped_routes_config_provider_manager_.get(),
-                            *singletons.tracer_manager_,
-                            *singletons.filter_config_provider_manager_),
-      std::shared_ptr<HttpConnectionManagerConfig>);
+  auto config_or_error = Utility::createConfig(
+      proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
+      *singletons.filter_config_provider_manager_);
+  RETURN_IF_NOT_OK_REF(config_or_error.status());
+  auto filter_config = std::move(*config_or_error);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
@@ -790,7 +788,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager, bool,
+bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager,
                                                     const Http::FilterChainOptions& options) const {
   Http::FilterChainUtility::createFilterChainForFactories(manager, options, filter_factories_);
   return true;
@@ -868,20 +866,19 @@ HttpConnectionManagerConfig::getHeaderValidatorStats([[maybe_unused]] Http::Prot
 }
 #endif
 
-std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>
+absl::StatusOr<std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers) {
   Utility::Singletons singletons = Utility::createSingletons(context);
 
-  auto filter_config = THROW_OR_RETURN_VALUE(
-      Utility::createConfig(proto_config, context, *singletons.date_provider_,
-                            *singletons.route_config_provider_manager_,
-                            singletons.scoped_routes_config_provider_manager_.get(),
-                            *singletons.tracer_manager_,
-                            *singletons.filter_config_provider_manager_),
-      std::shared_ptr<HttpConnectionManagerConfig>);
+  auto config_or_error = Utility::createConfig(
+      proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
+      singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
+      *singletons.filter_config_provider_manager_);
+  RETURN_IF_NOT_OK_REF(config_or_error.status());
+  auto filter_config = std::move(*config_or_error);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.

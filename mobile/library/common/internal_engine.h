@@ -129,7 +129,7 @@ public:
    * - Optionally (if configured) clear HTTP/3 broken status.
    * - Optionally (if configured) drain all connections.
    */
-  void onDefaultNetworkChanged(NetworkType network_type);
+  void onDefaultNetworkChanged(int network);
 
   void onDefaultNetworkChangedAndroid(ConnectionType connection_type, int64_t net_id);
 

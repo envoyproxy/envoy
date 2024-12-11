@@ -279,7 +279,7 @@ void InternalEngine::onDefaultNetworkAvailable() {
   ENVOY_LOG_MISC(trace, "Calling the default network available callback");
 }
 
-void InternalEngine::onDefaultNetworkChanged(NetworkType network_type) {
+void InternalEngine::onDefaultNetworkChanged(int network_type) {
   ENVOY_LOG_MISC(trace, "Calling the default network changed callback");
   dispatcher_->post([&, network_type]() -> void {
     envoy_netconf_t configuration =

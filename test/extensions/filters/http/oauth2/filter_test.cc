@@ -39,6 +39,11 @@ static const std::string TEST_CLIENT_SECRET_ID = "MyClientSecretKnoxID";
 static const std::string TEST_TOKEN_SECRET_ID = "MyTokenSecretKnoxID";
 static const std::string TEST_DEFAULT_SCOPE = "user";
 static const std::string TEST_ENCODED_AUTH_SCOPES = "user%20openid%20email";
+static const std::string TEST_STATE_NONCE = "00000000075bcd15";
+// {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"00000000075bcd15"}
+static const std::string TEST_ENCODED_STATE =
+    "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwibm9uY2"
+    "UiOiIwMDAwMDAwMDA3NWJjZDE1In0";
 
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -50,7 +55,7 @@ public:
   const std::string& clientSecret() const override {
     CONSTRUCT_ON_FIRST_USE(std::string, "asdf_client_secret_fdsa");
   }
-  const std::string& tokenSecret() const override {
+  const std::string& hmacSecret() const override {
     CONSTRUCT_ON_FIRST_USE(std::string, "asdf_token_secret_fdsa");
   }
 };
@@ -101,7 +106,9 @@ public:
     std::unique_ptr<OAuth2Client> oauth_client_ptr{oauth_client_};
 
     config_ = config;
-    filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr), test_time_);
+    ON_CALL(test_random_, random()).WillByDefault(Return(123456789));
+    filter_ = std::make_shared<OAuth2Filter>(config_, std::move(oauth_client_ptr), test_time_,
+                                             test_random_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     validator_ = std::make_shared<MockOAuth2CookieValidator>();
@@ -224,6 +231,7 @@ public:
   Stats::IsolatedStoreImpl store_;
   Stats::Scope& scope_{*store_.rootScope()};
   Event::SimulatedTimeSystem test_time_;
+  NiceMock<Random::MockRandomGenerator> test_random_;
 };
 
 // Verifies that the OAuth SDSSecretReader correctly updates dynamic generic secret.
@@ -259,7 +267,7 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
   SDSSecretReader secret_reader(std::move(client_secret_provider), std::move(token_secret_provider),
                                 tls, *api);
   EXPECT_TRUE(secret_reader.clientSecret().empty());
-  EXPECT_TRUE(secret_reader.tokenSecret().empty());
+  EXPECT_TRUE(secret_reader.hmacSecret().empty());
 
   const std::string yaml_client = R"EOF(
 name: client
@@ -274,7 +282,7 @@ generic_secret:
 
   EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client.refvec_, "").ok());
   EXPECT_EQ(secret_reader.clientSecret(), "client_test");
-  EXPECT_EQ(secret_reader.tokenSecret(), "");
+  EXPECT_EQ(secret_reader.hmacSecret(), "");
 
   const std::string yaml_token = R"EOF(
 name: token
@@ -287,7 +295,7 @@ generic_secret:
 
   EXPECT_TRUE(token_callback->onConfigUpdate(decoded_resources_token.refvec_, "").ok());
   EXPECT_EQ(secret_reader.clientSecret(), "client_test");
-  EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
+  EXPECT_EQ(secret_reader.hmacSecret(), "token_test");
 
   const std::string yaml_client_recheck = R"EOF(
 name: client
@@ -300,7 +308,7 @@ generic_secret:
 
   EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "").ok());
   EXPECT_EQ(secret_reader.clientSecret(), "client_test_recheck");
-  EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
+  EXPECT_EQ(secret_reader.hmacSecret(), "token_test");
 }
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
@@ -365,29 +373,25 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   // as a query parameter in response headers.
   init(test_config_);
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/not/_oauth"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "http"},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
-
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
            TEST_CLIENT_ID +
-           "&redirect_uri=http%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_DEFAULT_SCOPE +
-           "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D1234567890000000"},
+           TEST_DEFAULT_SCOPE + "&state=" + TEST_ENCODED_STATE},
   };
 
   // explicitly tell the validator to fail the validation.
@@ -425,10 +429,10 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
                                                 secret_reader, scope_, "test.");
   init(test_config_);
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/not/_oauth"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "http"},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
 
   // Explicitly tell the validator to fail the validation.
@@ -436,24 +440,20 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
 
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
   // Verify that the foo=bar query parameter is preserved in the redirect.
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
            TEST_CLIENT_ID +
            "&foo=bar"
-           "&redirect_uri=http%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_DEFAULT_SCOPE +
-           "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D1234567890000000"},
+           TEST_DEFAULT_SCOPE + "&state=" + TEST_ENCODED_STATE},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -484,10 +484,10 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
                                                 secret_reader, scope_, "test.");
   init(test_config_);
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/not/_oauth"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "http"},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
 
   // Explicitly tell the validator to fail the validation.
@@ -495,25 +495,20 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
   EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
 
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
   // Verify that the foo=bar query parameter is preserved in the redirect.
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
            TEST_CLIENT_ID +
            "&foo=bar"
-           "&redirect_uri=http%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_DEFAULT_SCOPE +
-           "&state=url%3Dhttp%253A%252F%252Ftraffic.example.com%252Fnot%252F_oauth%26nonce%"
-           "3D1234567890000000"},
+           TEST_DEFAULT_SCOPE + "&state=" + TEST_ENCODED_STATE},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -544,6 +539,8 @@ TEST_F(OAuth2Test, RequestSignout) {
        "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().Location.get(), "https://traffic.example.com/"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -694,10 +691,9 @@ TEST_F(OAuth2Test, SetBearerToken) {
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
 
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Fasdf%26nonce%3D1234567890000000"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -732,7 +728,8 @@ TEST_F(OAuth2Test, SetBearerToken) {
        "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=some-refresh-token;path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().Location.get(), "https://asdf"},
+      {Http::Headers::get().Location.get(),
+       "https://traffic.example.com/original_path?var1=1&var2=2"},
   };
 
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -753,27 +750,19 @@ TEST_F(OAuth2Test, SetBearerToken) {
  * in the query parameters.
  */
 TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
-  });
-  init();
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
-      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Scheme.get(), "https"},
   };
 
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
   // This is the immediate response - a redirect to the auth cluster.
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -781,10 +770,8 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
   };
@@ -802,11 +789,9 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
 
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
-      {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -836,7 +821,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
                                              "path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
-       "https://traffic.example.com/test?name=admin&level=trace"},
+       "https://traffic.example.com/original_path?var1=1&var2=2"},
   };
 
   EXPECT_CALL(decoder_callbacks_,
@@ -897,10 +882,9 @@ TEST_F(OAuth2Test, OAuthErrorQueryString) {
  */
 TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Fasdf%26nonce%3D1234567890000000"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -926,10 +910,13 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
  * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
  */
 TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoNonce) {
+  // {"url":"https://traffic.example.com/original_path?var1=1&var2=2"}
+  static const std::string state_without_nonce =
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIn0";
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Fasdf"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_without_nonce},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -953,11 +940,14 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoNonce) {
  * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
  */
 TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidNonce) {
+  // {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"0"}
+  static const std::string state_with_invalid_nonce =
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwibm9u"
+      "Y2UiOiIwIn0";
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Fasdf%26nonce%3D123456788000000"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_with_invalid_nonce},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -984,10 +974,15 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationMalformedState) {
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
 
+  // {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"}
+  static const std::string state_with_invalid_nonce_json =
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwibm9u"
+      "Y2UiOiJ9";
+
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=https%253A%252F%252Fasdf"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_with_invalid_nonce_json},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1211,17 +1206,22 @@ TEST_F(OAuth2Test, CookieValidatorCanUpdateToken) {
 
 // Verify that we 401 the request if the state query param doesn't contain a valid URL.
 TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
+  // {"url":"blah","nonce":"00000000075bcd15"}
+  static const std::string state_with_invalid_url =
+      "eyJ1cmwiOiJibGFoIiwibm9uY2UiOiIwMDAwMDAwMDA3NWJjZDE1In0";
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(),
-       "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES + "&state=blah"},
+       "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
+           "&state=" + state_with_invalid_url},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
   };
 
   Http::TestRequestHeaderMapImpl expected_headers{
@@ -1245,12 +1245,17 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
 
 // Verify that we 401 the request if the state query param contains the callback URL.
 TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
+  // {"url":"https://traffic.example.com/_oauth","nonce":"00000000075bcd15"}
+  static const std::string state_with_callback_url =
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vX29hdXRoIiwibm9uY2UiOiIwMDAwMDAwMDA3NWJjZDE1"
+      "In0";
+
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
-           "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
+           "&state=" + state_with_callback_url},
 
       {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
@@ -1258,6 +1263,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
   };
 
   Http::TestRequestHeaderMapImpl expected_response_headers{
@@ -1283,13 +1289,14 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
-           "&state=https%3A%2F%2Ftraffic.example.com%2F_oauth"},
+           "&state=" + state_with_callback_url},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
@@ -1299,22 +1306,19 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
 TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
-
-  init();
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%3A%2F%2Ftraffic.example.com%2Foriginal_path%3Fvar1%3D1%2526var2%3D2%"
-           "26nonce%3D1234567890000000"},
+           "&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
-      {Http::Headers::get().Cookie.get(), "OauthNonce=1234567890000000"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
   };
 
   Http::TestRequestHeaderMapImpl expected_response_headers{
@@ -1340,15 +1344,14 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%3A%2F%2Ftraffic.example.com%2Foriginal_path%3Fvar1%3D1%2526var2%3D2%"
-           "26nonce%3D1234567890000000"},
+           "&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(), "OauthExpires=123"},
       {Http::Headers::get().Cookie.get(), "BearerToken=legit_token"},
       {Http::Headers::get().Cookie.get(),
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
-      {Http::Headers::get().Cookie.get(), "OauthNonce=1234567890000000"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
@@ -1356,22 +1359,18 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
 }
 
 /**
- * Testing oauth state with query string parameters.
+ * Testing oauth state with cookie domain.
  *
- * Expected behavior: HTTP Utility should not strip the parameters of the original request.
+ * Expected behavior: Cookie domain should be set to the domain in the config.
  */
-TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
-  });
-  init();
+TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
+  init(getConfig(true, false,
+                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, true /* set_cookie_domain */));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
-      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -1381,7 +1380,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -1389,12 +1388,9 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
-           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%"
-           "3Dbar%"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
+           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
   };
 
@@ -1412,10 +1408,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -1435,16 +1429,28 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
   EXPECT_EQ(config_->clusterName(), "auth.example.com");
 
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+  const std::chrono::seconds expiredTime(10);
+  filter_->updateTokens("accessToken", "idToken", "refreshToken", expiredTime);
+
   // Expected response after the callback & validation is complete - verifying we kept the
   // state and method of the original request, including the query string parameters.
   Http::TestRequestHeaderMapImpl second_response_headers{
       {Http::Headers::get().Status.get(), "302"},
-      {Http::Headers::get().SetCookie.get(), "OauthHMAC="
-                                             "fV62OgLipChTQQC3UFgDp+l5sCiSb3zt7nCoJiVivWw=;"
-                                             "path=/;Max-Age=;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=vU9fV//fsKp9ARyrz/HZx2CqWFCmUygihdl18qR5u78=;"
+       "domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthExpires=10;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=accessToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=idToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=refreshToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
-       "https://traffic.example.com/test?name=admin&level=trace"},
+       "https://traffic.example.com/original_path?var1=1&var2=2"},
   };
 
   EXPECT_CALL(decoder_callbacks_,
@@ -1453,13 +1459,22 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
   filter_->finishGetAccessTokenFlow();
 }
 
-TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
+/**
+ * Testing oauth state with special characters that must be escaped in JSON.
+ *
+ * Expected behavior: the JSON string in the state query parameter should be correctly escaped and
+ * the final redirect should equal the original request.
+ */
+TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
+  const std::string url_with_special_characters =
+      R"(/original_path?query="value"&key=val\ue#frag<ment>{data}[info]|test\^space)";
+  const std::string test_encoded_state_with_special_characters =
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD9xdWVyeT1cInZhbHVlXCIma2V5"
+      "PXZhbFxcdWUjZnJhZzxtZW50PntkYXRhfVtpbmZvXXx0ZXN0XFxec3BhY2UiLCJub25jZSI6IjAwMDAwMDAwMDc1YmNk"
+      "MTUifQ";
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
-      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Path.get(), url_with_special_characters},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -1469,7 +1484,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -1477,11 +1492,11 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
-           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + test_encoded_state_with_special_characters +
+           "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
+           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%"
+           "3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
   };
 
@@ -1489,7 +1504,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
 
-  // Check that the redirect includes the escaped parameter characters, '?', '&' and '='.
+  // Check that the redirect includes URL encoded query parameter characters.
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&first_response_headers), true));
 
   // This represents the beginning of the OAuth filter.
@@ -1499,15 +1514,13 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
+       "/_oauth?code=123&state=" + test_encoded_state_with_special_characters},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
   };
-
   // Deliberately fail the HMAC validation check.
   EXPECT_CALL(*validator_, setParams(_, _));
   EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
@@ -1542,118 +1555,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParametersFillRefreshAndIdToken) {
       {Http::Headers::get().SetCookie.get(),
        "RefreshToken=refreshToken;path=/;Max-Age=10;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
-       "https://traffic.example.com/test?name=admin&level=trace"},
-  };
-
-  EXPECT_CALL(decoder_callbacks_,
-              encodeHeaders_(HeaderMapEqualRef(&second_response_headers), true));
-
-  filter_->finishGetAccessTokenFlow();
-}
-
-/**
- * Testing oauth state with cookie domain.
- *
- * Expected behavior: Cookie domain should be set to the domain in the config.
- */
-TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.hmac_base64_encoding_only", "true"},
-  });
-  init(getConfig(true, false,
-                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-                     OAuth2Config_AuthType_URL_ENCODED_BODY,
-                 0, false, false, true /* set_cookie_domain */));
-  // First construct the initial request to the oauth filter with URI parameters.
-  Http::TestRequestHeaderMapImpl first_request_headers{
-      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
-      {Http::Headers::get().Scheme.get(), "https"},
-  };
-
-  // This is the immediate response - a redirect to the auth cluster.
-  Http::TestResponseHeaderMapImpl first_response_headers{
-      {Http::Headers::get().Status.get(), "302"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=1234567890000000;domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().Location.get(),
-       "https://auth.example.com/oauth/"
-       "authorize/?client_id=" +
-           TEST_CLIENT_ID +
-           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
-           "&response_type=code"
-           "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
-           "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%"
-           "3Dbar%"
-           "3Fvar1%3D1%26var2%3D2"},
-  };
-
-  // Fail the validation to trigger the OAuth flow.
-  EXPECT_CALL(*validator_, setParams(_, _));
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-
-  // Check that the redirect includes URL encoded query parameter characters.
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&first_response_headers), true));
-
-  // This represents the beginning of the OAuth filter.
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(first_request_headers, false));
-
-  // This represents the callback request from the authorization server.
-  Http::TestRequestHeaderMapImpl second_request_headers{
-      {Http::Headers::get().Cookie.get(),
-       "OauthNonce=1234567890000000;domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Scheme.get(), "https"},
-  };
-  // Deliberately fail the HMAC validation check.
-  EXPECT_CALL(*validator_, setParams(_, _));
-  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
-
-  EXPECT_CALL(*oauth_client_, asyncGetAccessToken("123", TEST_CLIENT_ID, "asdf_client_secret_fdsa",
-                                                  "https://traffic.example.com" + TEST_CALLBACK,
-                                                  AuthType::UrlEncodedBody));
-
-  // Invoke the callback logic. As a side effect, state_ will be populated.
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndBuffer,
-            filter_->decodeHeaders(second_request_headers, false));
-
-  EXPECT_EQ(1, config_->stats().oauth_unauthorized_rq_.value());
-  EXPECT_EQ(config_->clusterName(), "auth.example.com");
-
-  const std::chrono::seconds expiredTime(10);
-  filter_->updateTokens("accessToken", "idToken", "refreshToken", expiredTime);
-
-  // Expected response after the callback & validation is complete - verifying we kept the
-  // state and method of the original request, including the query string parameters.
-  Http::TestRequestHeaderMapImpl second_response_headers{
-      {Http::Headers::get().Status.get(), "302"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthHMAC=IyFL1rx3SoaHv2rufMo4nRLHPwTCDAY2fnJ1cpIOcpY=;"
-       "domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "OauthExpires=123456799;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "BearerToken=accessToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "IdToken=idToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
-      {Http::Headers::get().SetCookie.get(),
-       "RefreshToken=refreshToken;domain=example.com;path=/;Max-Age=10;secure;HttpOnly"},
-      {Http::Headers::get().Location.get(),
-       "https://traffic.example.com/test?name=admin&level=trace"},
+       "https://traffic.example.com" + url_with_special_characters},
   };
 
   EXPECT_CALL(decoder_callbacks_,
@@ -1911,7 +1813,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshToken) {
 }
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndDefaultRefreshTokenExpiresIn) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -1959,7 +1860,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndDefaultRefr
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndRefreshTokenExpiresInFromJwt) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -2011,7 +1911,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndRefreshToke
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndExpiredRefreshToken) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -2064,7 +1963,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndExpiredRefr
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndNoExpClaimInRefreshToken) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -2117,7 +2015,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensUseRefreshTokenAndNoExpClaimI
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensIdTokenExpiresInFromJwt) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -2170,7 +2067,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensIdTokenExpiresInFromJwt) {
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensExpiredIdToken) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -2225,7 +2121,6 @@ TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensExpiredIdToken) {
  */
 
 TEST_F(OAuth2Test, OAuthAccessTokenSucessWithTokensNoExpClaimInIdToken) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_URL_ENCODED_BODY /* encoded_body_type */,
@@ -2352,13 +2247,10 @@ TEST_F(OAuth2Test, CookieValidatorInTransition) {
 // - The filter gets a new bearer and refresh tokens via the current refresh token
 // - The filter continues to handler the request without redirection to the user agent
 TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
-      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -2368,7 +2260,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -2376,10 +2268,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
   };
@@ -2400,10 +2290,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=1234567890000000;domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
-      {Http::Headers::get().Path.get(),
-       "/_oauth?code=123&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%"
-       "253Dadmin%2526level%253Dtrace%26nonce%3D1234567890000000"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -2433,7 +2321,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
                                              "path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(), "OauthExpires=;path=/;Max-Age=;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
-       "https://traffic.example.com/test?name=admin&level=trace"},
+       "https://traffic.example.com/original_path?var1=1&var2=2"},
   };
 
   EXPECT_CALL(decoder_callbacks_,
@@ -2443,7 +2331,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
 
   // the third request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl third_request_headers{
-      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -2471,11 +2359,10 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
 }
 
 TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
-      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -2509,9 +2396,8 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES +
-           "&state=https%3A%2F%2Ftraffic.example.com%2Ftest%3Fname%3Dadmin%26level%3Dtrace"
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE +
+           "resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com"},
   };
 
@@ -2525,13 +2411,10 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenSuccess) {
 }
 
 TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
-  // Set SystemTime to a fixed point so we get consistent nonce between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(123456789)));
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
-      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -2559,7 +2442,7 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
   Http::TestResponseHeaderMapImpl redirect_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=1234567890000000;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -2567,10 +2450,8 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +
-           TEST_ENCODED_AUTH_SCOPES +
-           "&state=url%3Dhttps%253A%252F%252Ftraffic.example.com%252Ftest%253Fname%253Dadmin%"
-           "2526level%253Dtrace%26nonce%3D1234567890000000"
-           "&resource=oauth2-resource&resource=http%3A%2F%2Fexample.com"
+           TEST_ENCODED_AUTH_SCOPES + "&state=" + TEST_ENCODED_STATE + "&resource=oauth2-resource" +
+           "&resource=http%3A%2F%2Fexample.com"
            "&resource=https%3A%2F%2Fexample.com%2Fsome%2Fpath%252F..%252F%2Futf8%C3%83%3Bfoo%3Dbar%"
            "3Fvar1%3D1%26var2%3D2"},
   };
@@ -2592,11 +2473,10 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
  * Expected behavior: the filter should should return 401 Unauthorized response.
  */
 TEST_F(OAuth2Test, AjaxRefreshDoesNotRedirect) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
-      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -2633,14 +2513,13 @@ TEST_F(OAuth2Test, AjaxRefreshDoesNotRedirect) {
 }
 
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */));
 
   const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) - 10;
 
   // the third request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -2699,7 +2578,6 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
 }
 
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
-
   init(getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
                  ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
                      OAuth2Config_AuthType_BASIC_AUTH
@@ -2708,7 +2586,7 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) - 10;
 
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
       {Http::Headers::get().Scheme.get(), "https"},
