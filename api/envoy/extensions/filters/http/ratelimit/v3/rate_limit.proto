@@ -141,7 +141,7 @@ message RateLimit {
   //
   // For example, let's say the upstream service calculates the usage statistics, returns them in the response body
   // and we want to utilize these numbers to apply the rate limit action for the subsequent requests.
-  // Combined with another filter that can set the desired addend based on the response (e.g. Lua filter),
+  // Combined with another filter that can set ``envoy.ratelimit.hits_addend`` based on the response (e.g. Lua filter),
   // this can be used to subtract the usage statistics from the rate limit budget.
   //
   // The rate limit requests sent on the stream completion are "fire-and-forget" by nature, and rate limit is not enforced
