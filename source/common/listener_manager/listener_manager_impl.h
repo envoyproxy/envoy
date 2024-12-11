@@ -209,6 +209,9 @@ public:
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats,
                       Quic::QuicStatNames& quic_stat_names);
 
+  void setClusterManagerForWorkers(Upstream::ClusterManager* cluster_manager) override;
+  void enableReverseConnections(Network::RevConnRegistry& reverse_conn_registry) override;
+
   void onListenerWarmed(ListenerImpl& listener);
   void inPlaceFilterChainUpdate(ListenerImpl& listener);
 

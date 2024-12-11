@@ -13,6 +13,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/non_copyable.h"
+#include "source/extensions/reverse_connection/active_reverse_connection_listener.h"
 #include "source/server/listener_manager_factory.h"
 
 #include "spdlog/spdlog.h"
@@ -57,7 +58,12 @@ public:
   void enableListeners() override;
   void setListenerRejectFraction(UnitFloat reject_fraction) override;
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
-
+  void saveUpstreamConnection(Network::ConnectionSocketPtr&& upstream_socket,
+                              uint64_t listener_tag) override;
+  void enableReverseConnections(Network::RevConnRegistry& reverse_conn_registry) override;
+  Network::LocalRevConnRegistry& reverseConnRegistry() const override {
+    return *local_reverse_conn_registry_;
+  }
   // Network::TcpConnectionHandler
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   Network::BalancedConnectionHandlerOptRef
@@ -89,19 +95,25 @@ private:
     Network::Address::InstanceConstSharedPtr address_;
     uint64_t listener_tag_;
 
-    absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
-                  std::reference_wrapper<Network::UdpListenerCallbacks>,
-                  std::reference_wrapper<Network::InternalListener>>
+    absl::variant<
+        absl::monostate, std::reference_wrapper<ActiveTcpListener>,
+        std::reference_wrapper<Network::UdpListenerCallbacks>,
+        std::reference_wrapper<Network::InternalListener>,
+        std::reference_wrapper<Extensions::ReverseConnection::ActiveReverseConnectionListener>>
         typed_listener_;
 
     // Helpers for accessing the data in the variant for cleaner code.
     ActiveTcpListenerOptRef tcpListener();
     UdpListenerCallbacksOptRef udpListener();
     Network::InternalListenerOptRef internalListener();
+    OptRef<Extensions::ReverseConnection::ActiveReverseConnectionListener>
+    reverseConnectionListener();
   };
 
   struct ActiveListenerDetails {
     std::vector<std::shared_ptr<PerAddressActiveListenerDetails>> per_address_details_list_;
+
+    std::string name_;
 
     using ListenerMethodFn = std::function<void(Network::ConnectionHandler::ActiveListener&)>;
 
@@ -153,12 +165,13 @@ private:
   // This has a value on worker threads, and no value on the main thread.
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
+  Network::LocalRevConnRegistry* local_reverse_conn_registry_;
   OptRef<OverloadManager> overload_manager_;
   OptRef<OverloadManager> null_overload_manager_;
   const std::string per_handler_stat_prefix_;
   // Declare before its users ActiveListenerDetails.
   std::atomic<uint64_t> num_handler_connections_{};
-  absl::flat_hash_map<uint64_t, std::unique_ptr<ActiveListenerDetails>> listener_map_by_tag_;
+  absl::flat_hash_map<uint64_t, std::shared_ptr<ActiveListenerDetails>> listener_map_by_tag_;
   absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>
       tcp_listener_map_by_address_;
   absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>
