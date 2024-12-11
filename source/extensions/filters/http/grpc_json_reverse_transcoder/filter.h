@@ -40,7 +40,7 @@ class GrpcJsonReverseTranscoderFilter : public Http::StreamFilter,
                                         public Logger::Loggable<Logger::Id::http2> {
 public:
   explicit GrpcJsonReverseTranscoderFilter(
-      const std::shared_ptr<GrpcJsonReverseTranscoderConfig>& config)
+      const std::shared_ptr<const GrpcJsonReverseTranscoderConfig>& config)
       : config_(config) {}
   ~GrpcJsonReverseTranscoderFilter() override = default;
 
@@ -103,7 +103,7 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_;
 
   const GrpcJsonReverseTranscoderConfig* per_route_config_;
-  const std::shared_ptr<GrpcJsonReverseTranscoderConfig> config_;
+  const std::shared_ptr<const GrpcJsonReverseTranscoderConfig> config_;
   std::unique_ptr<google::grpc::transcoding::Transcoder> transcoder_;
   TranscoderInputStreamImpl request_in_;
   TranscoderInputStreamImpl response_in_;
