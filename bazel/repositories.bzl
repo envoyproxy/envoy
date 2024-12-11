@@ -124,6 +124,12 @@ def envoy_dependencies(skip_targets = []):
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
 
+    # Setup Bazel shell rules
+    external_http_archive(name = "rules_shell")
+
+    # Setup Bazel C++ rules
+    external_http_archive("rules_cc")
+
     # Setup external Bazel rules
     _foreign_cc_dependencies()
 
@@ -551,9 +557,13 @@ def _com_github_datadog_dd_trace_cpp():
 def _com_github_skyapm_cpp2sky():
     external_http_archive(
         name = "com_github_skyapm_cpp2sky",
+        patches = ["@envoy//bazel:com_github_skyapm_cpp2sky.patch"],
+        patch_args = ["-p1"],
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
+        patches = ["@envoy//bazel:skywalking_data_collect_protocol.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_nlohmann_json():
@@ -609,6 +619,11 @@ def _com_google_absl():
 def _com_google_protobuf():
     external_http_archive(
         name = "rules_python",
+    )
+    external_http_archive(
+        name = "rules_java",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_java.patch"],
     )
 
     for platform in PROTOC_VERSIONS:

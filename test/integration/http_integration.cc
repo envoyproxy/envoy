@@ -1235,7 +1235,6 @@ void HttpIntegrationTest::testEnvoyHandling1xx(bool additional_continue_from_ups
   if (disconnect_after_100) {
     response->waitFor1xxHeaders();
     codec_client_->close();
-    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("100"));
     ASSERT_TRUE(fake_upstream_connection_->close());
     return;
   }

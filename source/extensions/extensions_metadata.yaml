@@ -236,6 +236,14 @@ envoy.filters.http.basic_auth:
   type_urls:
   - envoy.extensions.filters.http.basic_auth.v3.BasicAuth
   - envoy.extensions.filters.http.basic_auth.v3.BasicAuthPerRoute
+envoy.filters.http.api_key_auth:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuth
+  - envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute
 envoy.filters.http.buffer:
   categories:
   - envoy.filters.http
@@ -783,7 +791,7 @@ envoy.filters.udp.dns_filter:
   categories:
   - envoy.filters.udp_listener
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig
 envoy.filters.udp_listener.udp_proxy:
