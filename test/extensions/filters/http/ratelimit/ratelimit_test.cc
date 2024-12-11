@@ -18,6 +18,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -56,7 +57,7 @@ public:
     TestUtility::loadFromYaml(yaml, proto_config);
 
     config_ = std::make_shared<FilterConfig>(proto_config, local_info_, *stats_store_.rootScope(),
-                                             runtime_, http_context_);
+                                             runtime_, http_context_, thread_local_);
 
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
@@ -134,6 +135,7 @@ public:
   FilterConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Router::MockRateLimitPolicyEntry> route_rate_limit_;
   NiceMock<Router::MockRateLimitPolicyEntry> vh_rate_limit_;
   std::vector<RateLimit::Descriptor> descriptor_{{{{"descriptor_key", "descriptor_value"}}}};

@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/ratelimit/ratelimit.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -83,25 +84,25 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     }
     break;
   }
-  makeRateLimitRequest();
-}
 
-void Filter::makeRateLimitRequest() {
   if (!descriptors_.empty()) {
-    const StreamInfo::UInt32Accessor* hits_addend_filter_state =
-        callbacks_->streamInfo().filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
-            HitsAddendFilterStateKey);
-    double hits_addend = 0;
-    if (hits_addend_filter_state != nullptr) {
-      hits_addend = hits_addend_filter_state->value();
-    }
-
     state_ = State::Calling;
     initiating_call_ = true;
     client_->limit(*this, getDomain(), descriptors_, callbacks_->activeSpan(),
-                   callbacks_->streamInfo(), hits_addend);
+                   callbacks_->streamInfo(), getHitAddend());
     initiating_call_ = false;
   }
+}
+
+double Filter::getHitAddend() {
+  const StreamInfo::UInt32Accessor* hits_addend_filter_state =
+      callbacks_->streamInfo().filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
+          HitsAddendFilterStateKey);
+  double hits_addend = 0;
+  if (hits_addend_filter_state != nullptr) {
+    hits_addend = hits_addend_filter_state->value();
+  }
+  return hits_addend;
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
@@ -159,13 +160,20 @@ Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap&) {
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) {}
 
 void Filter::onDestroy() {
-  if (config_->applyOnStreamDone()) {
-    state_ = State::OnStreamDone;
-    makeRateLimitRequest();
+  if (state_ == State::Calling) {
+    state_ = State::Complete;
+    client_->cancel();
   } else {
-    if (state_ == State::Calling) {
-      state_ = State::Complete;
-      client_->cancel();
+    // If the filter doesn't have a outstanding limit request (made during decodeHeaders) and has descriptors,
+    // then we can apply the rate limit on stream done if the config allows it.
+    if (config_->applyOnStreamDone() && !descriptors_.empty()) {
+      client_->cancel(); // Clears the internal state of the client, so that we can reuse it.
+      client_->limit(*this, getDomain(), descriptors_, Tracing::NullSpan::instance(), absl::nullopt,
+                     getHitAddend());
+      state_ = State::PendingReuqestOnStreamDone;
+      // Since this filter is being destroyed, we need to keep the client alive until the request
+      // is complete. So we add this filter to the destroy pending list at the filter config level.
+      config_->addDestroyPendingFilter(shared_from_this());
     }
   }
 }
@@ -176,9 +184,11 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Http::RequestHeaderMapPtr&& request_headers_to_add,
                       const std::string& response_body,
                       Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
-  if (state_ == State::OnStreamDone) {
-    // We have no more work to do as the rate limit request made during on completion is
-    // fire-and-forget.
+  if (state_ == State::PendingReuqestOnStreamDone) {
+    // Since this filter is already destroyed from HCM perspective, there's nothing to do here.
+    // Simply remove it from the destroy pending list which in turn will release the filter shared
+    // pointer.
+    config_->removeDestroyPendingFilter(*this);
     return;
   }
   state_ = State::Complete;
@@ -339,6 +349,13 @@ std::string Filter::getDomain() {
     return specific_per_route_config->domain();
   }
   return config_->domain();
+}
+
+DestroyPendingFilterThreadLocal::~DestroyPendingFilterThreadLocal() {
+  for (const auto& filter : map_) {
+    filter.second->client()->cancel();
+  }
+  map_.clear();
 }
 
 } // namespace RateLimitFilter
