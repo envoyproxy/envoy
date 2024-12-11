@@ -159,7 +159,8 @@ private:
     return Http::Code::InternalServerError;
   }
 
-  // Thread local storage for destory pending Filter by a hash map of shared pointers.
+  // Only used when apply_on_stream_done_ is true to hold the pending filters to outlive the
+  // OnDestroy callback.
   ThreadLocal::TypedSlotPtr<DestroyPendingFilterThreadLocal> pending_filter_slot_ = nullptr;
 
   const std::string domain_;

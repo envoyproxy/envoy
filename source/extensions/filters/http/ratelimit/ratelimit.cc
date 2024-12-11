@@ -164,8 +164,8 @@ void Filter::onDestroy() {
     state_ = State::Complete;
     client_->cancel();
   } else {
-    // If the filter doesn't have a outstanding limit request (made during decodeHeaders) and has descriptors,
-    // then we can apply the rate limit on stream done if the config allows it.
+    // If the filter doesn't have a outstanding limit request (made during decodeHeaders) and has
+    // descriptors, then we can apply the rate limit on stream done if the config allows it.
     if (config_->applyOnStreamDone() && !descriptors_.empty()) {
       client_->cancel(); // Clears the internal state of the client, so that we can reuse it.
       client_->limit(*this, getDomain(), descriptors_, Tracing::NullSpan::instance(), absl::nullopt,
