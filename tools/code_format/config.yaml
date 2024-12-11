@@ -190,7 +190,6 @@ paths:
     - source/extensions/filters/http/json_to_metadata
     - source/extensions/filters/http/jwt_authn
     - source/extensions/filters/http/local_ratelimit
-    - source/extensions/filters/http/oauth2
     - source/extensions/filters/http/file_system_buffer
     - source/extensions/filters/http/header_to_metadata
     - source/extensions/filters/http/on_demand
