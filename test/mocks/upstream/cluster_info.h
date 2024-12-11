@@ -161,8 +161,7 @@ public:
               (const));
 
   MOCK_METHOD(bool, createFilterChain,
-              (Http::FilterChainManager & manager, bool only_create_if_configured,
-               const Http::FilterChainOptions& options),
+              (Http::FilterChainManager & manager, const Http::FilterChainOptions& options),
               (const, override));
   MOCK_METHOD(bool, createUpgradeFilterChain,
               (absl::string_view upgrade_type,
