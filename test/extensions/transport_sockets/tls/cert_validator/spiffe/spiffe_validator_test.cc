@@ -86,23 +86,24 @@ public:
     return ss.str();
   }
 
-  void initialize(std::string yaml) {
+  void initialize(std::string yaml, std::string trust_bundle_file = "") {
     envoy::config::core::v3::TypedExtensionConfig typed_conf;
     TestUtility::loadFromYaml(yaml, typed_conf);
     config_ = std::make_unique<TestCertificateValidationContextConfig>(
         typed_conf, allow_expired_certificate_, san_matchers_);
 
-    EXPECT_CALL(factory_context_.dispatcher_, createFilesystemWatcher_())
-        .WillRepeatedly(testing::Invoke([] {
-          Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
-          EXPECT_CALL(
-              *mock_watcher,
-              addWatch(TestEnvironment::substitute(
-                           "{{ test_rundir }}/test/common/tls/test_data/trust_bundles.json"),
-                       _, _))
-              .WillRepeatedly(testing::Return(absl::OkStatus()));
-          return mock_watcher;
-        }));
+    if (trust_bundle_file != "") {
+      EXPECT_CALL(factory_context_.dispatcher_, createFilesystemWatcher_())
+          .WillRepeatedly(testing::Invoke([trust_bundle_file] {
+            Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
+            EXPECT_CALL(*mock_watcher, addWatch(TestEnvironment::substitute(
+                                                    "{{ test_rundir }}/test/common/tls/test_data/" +
+                                                    trust_bundle_file),
+                                                _, _))
+                .WillRepeatedly(testing::Return(absl::OkStatus()));
+            return mock_watcher;
+          }));
+    }
 
     validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_);
   }
@@ -775,36 +776,36 @@ typed_config:
 
 TEST_F(TestSPIFFEValidator, InvalidTrustBundleMapConfig) {
   {
-  EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
-  filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_empty_keys.json"
+    filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_empty_keys.json"
   )EOF")),
-                            EnvoyException, "Failed to load SPIFFE Bundle map"");
+                              EnvoyException, "Failed to load SPIFFE Bundle map");
   }
 
   {
-  EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
-  filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_invalid_key.json"
+    filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_invalid_key.json"
   )EOF")),
-                            EnvoyException, "Failed to load SPIFFE Bundle map"");
+                              EnvoyException, "Failed to load SPIFFE Bundle map");
   }
 
   {
-  EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
-  filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_missing_use.json"
+    filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_missing_use.json"
   )EOF")),
-                            EnvoyException, "Failed to load SPIFFE Bundle map"");
+                              EnvoyException, "Failed to load SPIFFE Bundle map");
   }
 }
 
@@ -890,7 +891,8 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles.json"
-  )EOF"));
+  )EOF"),
+             "trust_bundles.json");
 
   X509StorePtr store = X509_STORE_new();
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
@@ -957,7 +959,8 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles.json"
-  )EOF"));
+  )EOF"),
+             "trust_bundles.json");
 
   TestSslExtendedSocketInfo info;
   // Chain contains workload, intermediate, and ca cert, so it should be accepted.
@@ -979,7 +982,7 @@ typed_config:
                 .status);
 }
 
-TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainSANMatchingTrustBundles) {
+TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainSANMatchingTrustBundleMapping) {
   const auto config = TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
@@ -1003,7 +1006,7 @@ typed_config:
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix("spiffe://lyft.com/");
     setSanMatchers({matcher});
-    initialize(config);
+    initialize(config, "trust_bundles.json");
     ValidationResults results = validator().doVerifyCertChain(
         *cert_chain, info.createValidateResultCallback(),
         /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
@@ -1014,53 +1017,7 @@ typed_config:
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix("spiffe://example.com/");
     setSanMatchers({matcher});
-    initialize(config);
-    ValidationResults results = validator().doVerifyCertChain(
-        *cert_chain, info.createValidateResultCallback(),
-        /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
-    EXPECT_EQ(ValidationResults::ValidationStatus::Failed, results.status);
-    EXPECT_EQ(Envoy::Ssl::ClientValidationStatus::Failed, results.detailed_status);
-    EXPECT_EQ(1, stats().fail_verify_san_.value());
-    stats().fail_verify_san_.reset();
-  }
-}
-
-TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainSANMatchingTrustBundlesMapping) {
-  const auto config = TestEnvironment::substitute(R"EOF(
-name: envoy.tls.cert_validator.spiffe
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles.json"
-  )EOF");
-
-  X509StorePtr store = X509_STORE_new();
-  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
-  // URI SAN = spiffe://lyft.com/test-team
-  auto cert = readCertFromFile(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
-  X509StoreContextPtr store_ctx = X509_STORE_CTX_new();
-  EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), store.get(), cert.get(), nullptr));
-  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
-  sk_X509_push(cert_chain.get(), cert.release());
-  TestSslExtendedSocketInfo info;
-  info.setCertificateValidationStatus(Envoy::Ssl::ClientValidationStatus::NotValidated);
-  {
-    envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_prefix("spiffe://lyft.com/");
-    setSanMatchers({matcher});
-    initialize(config);
-    ValidationResults results = validator().doVerifyCertChain(
-        *cert_chain, info.createValidateResultCallback(),
-        /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
-    EXPECT_EQ(ValidationResults::ValidationStatus::Successful, results.status);
-    EXPECT_EQ(Envoy::Ssl::ClientValidationStatus::Validated, results.detailed_status);
-  }
-  {
-    envoy::type::matcher::v3::StringMatcher matcher;
-    matcher.set_prefix("spiffe://example.com/");
-    setSanMatchers({matcher});
-    initialize(config);
+    initialize(config, "trust_bundles.json");
     ValidationResults results = validator().doVerifyCertChain(
         *cert_chain, info.createValidateResultCallback(),
         /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "");
