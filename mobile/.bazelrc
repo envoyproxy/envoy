@@ -108,12 +108,12 @@ build:mobile-remote-release-clang --config=ci
 build:mobile-remote-release-clang --config=remote
 
 build:mobile-remote-release-clang-android --config=mobile-remote-release-clang
-build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
+build:mobile-remote-release-clang-android --android_platforms=//:android_x86_64
 build:mobile-remote-release-clang-android --linkopt=-fuse-ld=lld
 
 build:mobile-remote-release-clang-android-publish --config=mobile-remote-release-clang
 build:mobile-remote-release-clang-android-publish --config=mobile-release-android
-build:mobile-remote-release-clang-android-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
+build:mobile-remote-release-clang-android-publish --android_platforms=//:android_x86_32,//:android_x86_64,//:android_armv7,//:android_arm64
 build:mobile-remote-release-clang-android-publish --linkopt=-fuse-ld=lld
 
 # Compile releases optimizing for size (eg -Os, etc).
@@ -137,6 +137,10 @@ build:mobile-release-android --compilation_mode=opt
 
 # Instrument Envoy Mobile's C++ code for coverage
 coverage --instrumentation_filter="//library/common[/:]"
+# coverage --instrumentation_filter="//[/:]"
+coverage --action_env=VERBOSE_COVERAGE=1 --host_action_env=VERBOSE_COVERAGE=1 --test_env=VERBOSE_COVERAGE=1
+# coverage --test_env=CC_CODE_COVERAGE_SCRIPT=external/envoy/bazel/coverage/collect_cc_coverage.sh
+coverage --coverage_support=@envoy//bazel/coverage:coverage_support
 
 #############################################################################
 # Experimental EngFlow Remote Execution Configs
@@ -197,10 +201,10 @@ test:mobile-remote-ci-linux-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################
 # Clang environment variables (keep in sync with //third_party/rbe_configs)
 # Coverage environment variables (keep in sync with //third_party/rbe_configs)
-build:mobile-ci-linux-coverage --action_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:mobile-ci-linux-coverage --test_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:mobile-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
-build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llm/bin/llvm-cov
+build:mobile-ci-linux-coverage --action_env=GCOV=llvm-profdata
+build:mobile-ci-linux-coverage --test_env=GCOV=llvm-profdata
+# build:mobile-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
+# build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
 build:mobile-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --build_tests_only
