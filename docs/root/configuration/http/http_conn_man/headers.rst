@@ -512,6 +512,34 @@ following features are available:
 See the architecture overview on
 :ref:`context propagation <arch_overview_tracing_context_propagation>` for more information.
 
+.. note::
+
+ The behavior of ``x-request-id`` is determined by two key configuration settings:
+
+ 1. ``use_remote_address`` field determines if the proxy treats the request as an "edge request".
+
+   - When ``true``, Envoy generates a new ``x-request-id`` for all requests unless :ref:`preserve_external_request_id<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.preserve_external_request_id>` is set.
+   - When ``false``, Envoy preserves any existing ``x-request-id``.
+
+ 2. ``preserve_external_request_id`` field controls whether to keep existing ``x-request-id`` on the edge requests.
+
+   - Applies only when :ref:`use_remote_address <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>` is set to ``true``.
+   - When ``true``, preserves the existing ``x-request-id`` from external requests.
+   - When ``false``, generates a new ``x-request-id`` for external requests.
+
+ **Common Scenarios:**
+
+ * **Edge Proxy** (``use_remote_address=true``):
+
+   - Always generates a new ``x-request-id`` unless :ref:`preserve_external_request_id <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.preserve_external_request_id>` is enabled.
+   - Typically used for internet-facing load balancers.
+
+ * **Internal Proxy** (``use_remote_address=false``):
+
+   - Always preserves any existing ``x-request-id``.
+   - Generates a new ``x-request-id`` only if one does not already exist.
+   - Typically used for service-to-service communication.
+
 .. _config_http_conn_man_headers_x-ot-span-context:
 
 x-ot-span-context
