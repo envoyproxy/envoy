@@ -1,0 +1,12 @@
+diff --git a/foreign_cc/private/cc_toolchain_util.bzl b/foreign_cc/private/cc_toolchain_util.bzl
+index 9b33974..2287607 100644
+--- a/foreign_cc/private/cc_toolchain_util.bzl
++++ b/foreign_cc/private/cc_toolchain_util.bzl
+@@ -42,6 +42,7 @@ CxxFlagsInfo = provider(
+ # them here when configuring the toolchain flags to pass to the external
+ # build system.
+ FOREIGN_CC_DISABLED_FEATURES = [
++    "default_link_libs",
+     "fdo_instrument",
+     "fdo_optimize",
+     "layering_check",
