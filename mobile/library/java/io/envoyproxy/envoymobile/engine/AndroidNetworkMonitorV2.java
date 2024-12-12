@@ -143,11 +143,11 @@ class NetworkState {
  * <code>EnvoyEngine::onDefaultNetworkChangedV2</code>.</li>
  * </ul>
  */
-public class AndroidNetworkMonitor {
-  private static final String TAG = AndroidNetworkMonitor.class.getSimpleName();
+public class AndroidNetworkMonitorV2 {
+  private static final String TAG = AndroidNetworkMonitorV2.class.getSimpleName();
   private static final String PERMISSION_DENIED_STATS_ELEMENT =
       "android_permissions.network_state_denied";
-  private static volatile AndroidNetworkMonitor mInstance = null;
+  private static volatile AndroidNetworkMonitorV2 mInstance = null;
   private ConnectivityManager mConnectivityManager;
   private EnvoyEngine mEnvoyEngine;
   // {@link Looper} for the thread this object lives on.
@@ -166,25 +166,25 @@ public class AndroidNetworkMonitor {
       return;
     }
 
-    synchronized (AndroidNetworkMonitor.class) {
+    synchronized (AndroidNetworkMonitorV2.class) {
       if (mInstance != null) {
         return;
       }
-      mInstance = new AndroidNetworkMonitor(context, envoyEngine);
+      mInstance = new AndroidNetworkMonitorV2(context, envoyEngine);
     }
   }
 
   /**
-   * Sets the {@link AndroidNetworkMonitor} singleton mInstance to null, so that it can be recreated
-   * when a new EnvoyEngine is created.
+   * Sets the {@link AndroidNetworkMonitorV2} singleton mInstance to null, so that it can be
+   * recreated when a new EnvoyEngine is created.
    */
   @VisibleForTesting
   public static void shutdown() {
     mInstance = null;
   }
 
-  /** @returns The singleton mInstance of {@link AndroidNetworkMonitor}. */
-  public static AndroidNetworkMonitor getInstance() {
+  /** @returns The singleton mInstance of {@link AndroidNetworkMonitorV2}. */
+  public static AndroidNetworkMonitorV2 getInstance() {
     assert mInstance != null;
     return mInstance;
   }
@@ -695,7 +695,7 @@ public class AndroidNetworkMonitor {
     mNetworkState = networkState;
   }
 
-  private AndroidNetworkMonitor(Context context, EnvoyEngine envoyEngine) {
+  private AndroidNetworkMonitorV2(Context context, EnvoyEngine envoyEngine) {
     int permission =
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_NETWORK_STATE);
     if (permission == PackageManager.PERMISSION_DENIED) {
