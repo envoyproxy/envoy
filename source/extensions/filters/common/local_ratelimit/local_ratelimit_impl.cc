@@ -75,7 +75,7 @@ ShareProviderManagerSharedPtr ShareProviderManager::singleton(Event::Dispatcher&
       });
 }
 
-TimerTokenBucket::TimerTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill,
+TimerTokenBucket::TimerTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                                    std::chrono::milliseconds fill_interval, uint64_t multiplier,
                                    LocalRateLimiterImpl& parent)
     : multiplier_(multiplier), parent_(parent), max_tokens_(max_tokens),
@@ -104,10 +104,10 @@ absl::optional<int64_t> TimerTokenBucket::remainingFillInterval() const {
                               absl::Seconds((time_after_last_fill) / 1s));
 }
 
-bool TimerTokenBucket::consume(double, uint32_t to_consume) {
+bool TimerTokenBucket::consume(double, uint64_t to_consume) {
   // Relaxed consistency is used for all operations because we don't care about ordering, just the
   // final atomic correctness.
-  uint32_t expected_tokens = tokens_.load(std::memory_order_relaxed);
+  uint64_t expected_tokens = tokens_.load(std::memory_order_relaxed);
   do {
     // expected_tokens is either initialized above or reloaded during the CAS failure below.
     if (expected_tokens < to_consume) {
@@ -135,12 +135,12 @@ void TimerTokenBucket::onFillTimer(uint64_t refill_counter, double factor) {
     return;
   }
 
-  const uint32_t tokens_per_fill = std::ceil(tokens_per_fill_ * factor);
+  const uint64_t tokens_per_fill = std::ceil(tokens_per_fill_ * factor);
 
   // Relaxed consistency is used for all operations because we don't care about ordering, just the
   // final atomic correctness.
-  uint32_t expected_tokens = tokens_.load(std::memory_order_relaxed);
-  uint32_t new_tokens_value{};
+  uint64_t expected_tokens = tokens_.load(std::memory_order_relaxed);
+  uint64_t new_tokens_value{};
   do {
     // expected_tokens is either initialized above or reloaded during the CAS failure below.
     new_tokens_value = std::min(max_tokens_, expected_tokens + tokens_per_fill);
@@ -156,22 +156,22 @@ void TimerTokenBucket::onFillTimer(uint64_t refill_counter, double factor) {
   fill_time_ = parent_.time_source_.monotonicTime();
 }
 
-AtomicTokenBucket::AtomicTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill,
+AtomicTokenBucket::AtomicTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                                      std::chrono::milliseconds fill_interval,
                                      TimeSource& time_source)
     : token_bucket_(max_tokens, time_source,
                     // Calculate the fill rate in tokens per second.
                     tokens_per_fill / std::chrono::duration<double>(fill_interval).count()) {}
 
-bool AtomicTokenBucket::consume(double factor, uint32_t to_consume) {
+bool AtomicTokenBucket::consume(double factor, uint64_t to_consume) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
   auto cb = [tokens = to_consume / factor](double total) { return total < tokens ? 0.0 : tokens; };
   return token_bucket_.consume(cb) != 0.0;
 }
 
 LocalRateLimiterImpl::LocalRateLimiterImpl(
-    const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
-    const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
+    const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
+    const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
     const Protobuf::RepeatedPtrField<
         envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
     bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider)

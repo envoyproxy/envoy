@@ -304,10 +304,53 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndHitsAddend) {
   std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
       {{{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}},
       {{{"destination_cluster", "fake_cluster"}}}};
-  expected_descriptors[0].hits_addend_ = 321;
-  expected_descriptors[1].hits_addend_ = 3;
 
   EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
+  EXPECT_EQ(321, descriptors[0].hits_addend_.value());
+  EXPECT_EQ(3, descriptors[1].hits_addend_.value());
+}
+
+TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndStringHitsAddend) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    hits_addend:
+      format: "%REQ(x-test-hits-addend)%"
+  )EOF";
+
+  setupTest(yaml);
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+    headers_.setCopy(Http::LowerCaseString("x-test-hits-addend"), "321");
+    config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+    std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
+        {{{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}}};
+
+    EXPECT_THAT(expected_descriptors, testing::ContainerEq(descriptors));
+    EXPECT_EQ(321, descriptors[0].hits_addend_.value());
+  }
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+    headers_.setCopy(Http::LowerCaseString("x-test-hits-addend"), "-1");
+    config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+
+    EXPECT_TRUE(descriptors.empty());
+  }
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+    headers_.setCopy(Http::LowerCaseString("x-test-hits-addend"), "11000000000");
+    config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+
+    EXPECT_TRUE(descriptors.empty());
+  }
 }
 
 class RateLimitPolicyTest : public testing::Test {

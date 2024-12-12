@@ -10,6 +10,8 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
+constexpr double MAX_HITS_ADDEND = 1000000000;
+
 RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
                                  Server::Configuration::CommonFactoryContext& context,
                                  absl::Status& creation_status, bool no_limit) {
@@ -141,13 +143,34 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
 
   // Populate hits_addend if set.
   if (hits_addend_provider_ != nullptr) {
-    const ProtobufWkt::Value hits_addend =
+    const ProtobufWkt::Value hits_addend_value =
         hits_addend_provider_->formatValueWithContext({&headers}, stream_info);
-    if (hits_addend.has_number_value()) {
-      descriptor.hits_addend_ = static_cast<uint32_t>(hits_addend.number_value());
+
+    double hits_addend = 0;
+    bool success = true;
+
+    if (hits_addend_value.has_number_value()) {
+      hits_addend = hits_addend_value.number_value();
+    } else if (hits_addend_value.has_string_value()) {
+      // Attempt to parse the string as a double.
+      success = absl::SimpleAtod(hits_addend_value.string_value(), &hits_addend);
     } else {
-      ENVOY_LOG(warn, "hits_addend must be a number");
+      // Only number and string values are allowed.
+      success = false;
     }
+
+    // Check value range.
+    if (hits_addend < 0 || hits_addend > MAX_HITS_ADDEND) {
+      success = false;
+    }
+
+    if (success) {
+      descriptor.hits_addend_ = static_cast<uint64_t>(hits_addend);
+    } else {
+      ENVOY_LOG(debug, "Invalid hits_addend: {}", hits_addend_value.DebugString());
+      return;
+    }
+
   } else if (hits_addend_.has_value()) {
     descriptor.hits_addend_ = hits_addend_.value();
   }

@@ -51,7 +51,7 @@ using DescriptorEntries = std::vector<DescriptorEntry>;
 struct Descriptor {
   DescriptorEntries entries_;
   absl::optional<RateLimitOverride> limit_ = absl::nullopt;
-  absl::optional<uint32_t> hits_addend_ = absl::nullopt;
+  absl::optional<uint64_t> hits_addend_ = absl::nullopt;
 
   std::string toString() const {
     return absl::StrJoin(entries_, ", ", [](std::string* out, const auto& e) {

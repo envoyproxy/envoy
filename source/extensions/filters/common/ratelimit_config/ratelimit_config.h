@@ -30,7 +30,7 @@ public:
 
 private:
   Formatter::FormatterProviderPtr hits_addend_provider_;
-  absl::optional<uint32_t> hits_addend_;
+  absl::optional<uint64_t> hits_addend_;
   std::vector<Envoy::RateLimit::DescriptorProducerPtr> actions_;
 };
 

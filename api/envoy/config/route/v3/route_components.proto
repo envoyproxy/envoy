@@ -2173,15 +2173,21 @@ message RateLimit {
     // Fixed number of hits to add to the rate limit descriptor.
     //
     // One of the ``number`` or ``format`` fields should be set but not both.
-    google.protobuf.UInt32Value number = 1 [(validate.rules).uint32 = {lte: 100000000}];
+    google.protobuf.UInt64Value number = 1 [(validate.rules).uint64 = {lte: 1000000000}];
 
     // Substitution format string to extract the number of hits to add to the rate limit descriptor.
     // The same :ref:`format specifier <config_access_log_format>` as used for
     // :ref:`HTTP access logging <config_access_log>` applies here.
     //
     // .. note::
-    //   The format string must contain only single valid substitution field that will be replaced
-    //   with a non-negative number.
+    //
+    //   The format string must contains only single valid substitution field. If the format string
+    //   not meets the requirement, the configuration will be rejected.
+    //
+    //   The substitution field should generates a non-negative number or string representation of
+    //   a non-negative number. The value of the non-negative number should be less than or equal
+    //   to 1000000000 like the ``number`` field. If the output of the substitution field not meet
+    //   the requirement, this will be treated as an error and the current descriptor will be ignored.
     //
     // For example, the ``%BYTES_RECEIVED%`` format string will be replaced with the number of bytes
     // received in the request.
