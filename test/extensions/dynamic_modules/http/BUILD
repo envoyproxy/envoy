@@ -12,8 +12,16 @@ envoy_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
-        "//test/extensions/dynamic_modules/test_data/c:no_http_config_destory",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_config_destroy",
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_destroy",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_new",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_request_body",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_request_headers",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_request_trailers",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_body",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_headers",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_response_trailers",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
     ],
     # factory_context_mocks needs this.
