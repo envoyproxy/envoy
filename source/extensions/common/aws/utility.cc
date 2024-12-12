@@ -331,7 +331,7 @@ static size_t curlCallback(char* ptr, size_t, size_t nmemb, void* data) {
   return nmemb;
 }
 
-absl::optional<std::string> Utility::fetchMetadata(Http::RequestMessage& message) {
+absl::optional<std::string> Utility::fetchMetadataWithCurl(Http::RequestMessage& message) {
   static const size_t MAX_RETRIES = 4;
   static const std::chrono::milliseconds RETRY_DELAY{1000};
   static const std::chrono::seconds TIMEOUT{5};

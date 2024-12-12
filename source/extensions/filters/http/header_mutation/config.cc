@@ -19,7 +19,7 @@ HeaderMutationFactoryConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 HeaderMutationFactoryConfig::createRouteSpecificFilterConfigTyped(
     const PerRouteProtoConfig& proto_config, Server::Configuration::ServerFactoryContext&,
     ProtobufMessage::ValidationVisitor&) {

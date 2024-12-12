@@ -146,6 +146,11 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
 
   // Cast away const for necessary modifications in a controlled context.
   extractor_ = const_cast<Extractor*>(extractor);
+
+  // The extractor is created per proto path. In case the of previously received proto path, clear
+  // any cached result from the extractor.
+  extractor_->ClearResult();
+
   auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
       []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 

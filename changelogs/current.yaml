@@ -2,6 +2,9 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: tracing
+  change: |
+    Removed support for (long deprecated) opencensus tracing extension.
 - area: wasm
   change: |
     The route cache will not be cleared by default if the wasm extension modified the request headers and
@@ -66,6 +69,10 @@ minor_behavior_changes:
     :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>`
     is now enabled by default. This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.oauth2_use_refresh_token`` to false.
+- area: oauth2
+  change: |
+    The ``state`` parameter in the OAuth2 authorization request has been changed to a base64url-encoded JSON object.
+    The JSON object contains the original request URL and a nonce for CSRF prevention.
 - area: quic
   change: |
     Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
@@ -85,6 +92,17 @@ minor_behavior_changes:
   change: |
     Increase only the statistics counter ``missing_source_origin`` for requests with a missing source origin.
     Previously, the ``request_invalid`` counter was also increased for such requests.
+- area: rate_limit
+  change: |
+    add ``WEEK`` to the unit of time for rate limit.
+- area: rds
+  change: |
+    When a new RDS provider config is pushed via xDS and the only difference is change to
+    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>`,
+    the already existing provider will be reused. Envoy will not ask RDS server for routes
+    config because existing provider already has up to date routes config.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.normalize_rds_provider_config`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -103,6 +121,9 @@ bug_fixes:
     Fixed metric for ADS disconnection counters using Google GRPC client. This extracts the GRPC client prefix specified
     in the :ref:`google_grpc <envoy_v3_api_field_config.core.v3.GrpcService.google_grpc>` resource used for ADS, and adds
     that as a tag ``envoy_google_grpc_client_prefix`` to the Prometheus stats.
+- area: golang
+  change:
+    Fixes a crash during Golang GC caused by accessing deleted decoder_callbacks. The bug was introduced in 1.31.0.
 - area: access_log
   change: |
     Relaxed the restriction on SNI logging to allow the ``_`` character, even if
@@ -131,6 +152,13 @@ bug_fixes:
 - area: validation/tools
   change: |
     Add back missing extension for ``schema_validator_tool``.
+- area: udp/dynamic_forward_proxy
+  change: |
+    Fixed bug where dynamic_forward_proxy udp session filter disabled buffer in filter config
+    instead of disabling buffer for the filter instance.
+- area: csrf
+  change: |
+    Handle requests that have a "privacy sensitive" / opaque origin (``Origin: null``) as if the request had no origin information.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -155,12 +183,18 @@ removed_config_or_runtime:
 - area: dns
   change: |
     Removed runtime flag ``envoy.reloadable_features.dns_reresolve_on_eai_again`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime flag ``envoy.restart_features.sanitize_te`` and legacy code paths.
 - area: quic
   change: |
     Removed runtime flag ``envoy.restart_features.quic_handle_certs_with_shared_tls_code`` and legacy code paths.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
+- area: aws
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials``.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.reloadable_features.exclude_host_in_eds_status_draining``.
@@ -205,6 +239,9 @@ new_features:
     :ref:`%COMMON_DURATION% <config_access_log_format_common_duration>` access log
     formatter operator. The following time points were added: ``%US_CX_BEG%``,
     ``%US_CX_END%``, ``%US_HS_END%``.
+- area: lua
+  change: |
+    Add logging functions to all lua objects. Previously these were only available on the Lua http filter request handle.
 - area: access log
   change: |
     Added fields for :ref:`DOWNSTREAM_DIRECT_LOCAL_ADDRESS and DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT <config_access_log_format>`.
@@ -237,6 +274,10 @@ new_features:
   change: |
     Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
     by setting a per-session state object under the key ``envoy.udp_proxy.cluster``.
+- area: filters
+  change: |
+    Added :ref:`the Api Key Auth filter <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.ApiKeyAuth>`, which
+    can be used to authenticate requests using an API key.
 - area: CEL-attributes
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.request_attempt_count``
@@ -287,9 +328,20 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.cx_pool_ready_duration``
     to get the duration from when the upstream request was created to when the upstream connection pool is ready.
+- area: health_check
+  change: |
+    Added new health check filter stats including total requests, successful/failed checks, cached responses, and
+    cluster health status counters. These stats help track health check behavior and cluster health state.
+- area: grpc-json
+  change: |
+    Added a new http filter for :ref:`gRPC to JSON transcoding <config_http_filters_grpc_json_reverse_transcoder>`.
 
 deprecated:
 - area: rbac
   change: |
     metadata :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>` is now deprecated in the
     favor of :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>`.
+- area: aws_iam
+  change: |
+    The :ref:`aws_iam extension <envoy_v3_api_msg_config.grpc_credential.v3.AwsIamConfig>` is deprecated and will be
+    deleted from Envoy in a future release, no later than Envoy 1.35, but possibly sooner.
