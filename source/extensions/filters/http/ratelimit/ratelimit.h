@@ -186,8 +186,6 @@ public:
                 const std::string& response_body,
                 Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) override;
 
-  Filters::Common::RateLimit::ClientPtr& client() { return client_; }
-
 private:
   void initiateCall(const Http::RequestHeaderMap& headers);
   void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
