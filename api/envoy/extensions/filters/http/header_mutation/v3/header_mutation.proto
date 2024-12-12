@@ -20,7 +20,7 @@ message Mutations {
   // The request mutations are applied before the request is forwarded to the upstream cluster.
   repeated config.common.mutation_rules.v3.HeaderMutation request_mutations = 1;
 
-  // The query parameter mutations are applied after ``request_mutations`` and before the request
+  // The ``path`` header query parameter mutations are applied after ``request_mutations`` and before the request
   // is forwarded to the next filter in the filter chain.
   repeated config.core.v3.KeyValueMutation parameter_mutations = 3;
 
