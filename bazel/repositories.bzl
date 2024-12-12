@@ -985,9 +985,9 @@ def _rules_ruby():
 
 def _foreign_cc_dependencies():
     external_http_archive(
-    name = "rules_foreign_cc",
-    patches = ["@envoy//bazel:rules_foreign_cc.patch"],
-    patch_args = ["-p1"],
+        name = "rules_foreign_cc",
+        patches = ["@envoy//bazel:rules_foreign_cc.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_maxmind_libmaxminddb():
