@@ -323,7 +323,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   filter_->onDestroy();
   // At this point, the filter should be added to the pending list.
   EXPECT_EQ(config_->destroyPendingFilters().sizeForTesting(), 1);
-  // Calling complete callbacke should make the filter removed from the destroy pending map.
+  // Calling complete callback should make the filter removed from the destroy pending map.
   filter_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr, nullptr, "",
                     nullptr);
   EXPECT_EQ(config_->destroyPendingFilters().sizeForTesting(), 0);
