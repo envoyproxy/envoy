@@ -12,7 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderMutation {
 
-void ParameterMutationAppend::mutateQueryParameter(
+void QueryParameterMutationAppend::mutateQueryParameter(
     Http::Utility::QueryParamsMulti& params, const Formatter::HttpFormatterContext& context,
     const StreamInfo::StreamInfo& stream_info) const {
 
@@ -52,7 +52,7 @@ Mutations::Mutations(const MutationsProto& config, absl::Status& creation_status
   SET_AND_RETURN_IF_NOT_OK(response_mutations_or_error.status(), creation_status);
   response_mutations_ = std::move(response_mutations_or_error.value());
 
-  for (const auto& mutation : config.parameter_mutations()) {
+  for (const auto& mutation : config.query_parameter_mutations()) {
     if (mutation.has_append()) {
       if (!mutation.append().has_record()) {
         creation_status = absl::InvalidArgumentError("No record specified for parameter mutation.");
@@ -66,13 +66,13 @@ Mutations::Mutations(const MutationsProto& config, absl::Status& creation_status
       auto value_or_error =
           Formatter::FormatterImpl::create(mutation.append().record().value().string_value(), true);
       SET_AND_RETURN_IF_NOT_OK(value_or_error.status(), creation_status);
-      parameter_mutations_.emplace_back(std::make_unique<ParameterMutationAppend>(
+      query_query_parameter_mutations_.emplace_back(std::make_unique<QueryParameterMutationAppend>(
           mutation.append().record().key(), std::move(value_or_error.value()),
           mutation.append().action()));
 
     } else if (!mutation.remove().empty()) {
-      parameter_mutations_.emplace_back(
-          std::make_unique<ParameterMutationRemove>(mutation.remove()));
+      query_query_parameter_mutations_.emplace_back(
+          std::make_unique<QueryParameterMutationRemove>(mutation.remove()));
     } else {
       creation_status = absl::InvalidArgumentError("No mutation specified.");
       return;
@@ -85,14 +85,14 @@ void Mutations::mutateRequestHeaders(Http::RequestHeaderMap& headers,
                                      const StreamInfo::StreamInfo& stream_info) const {
   request_mutations_->evaluateHeaders(headers, context, stream_info);
 
-  if (parameter_mutations_.empty() || headers.Path() == nullptr) {
+  if (query_query_parameter_mutations_.empty() || headers.Path() == nullptr) {
     return;
   }
 
   // Mutate query parameters.
   Http::Utility::QueryParamsMulti params =
       Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
-  for (const auto& mutation : parameter_mutations_) {
+  for (const auto& mutation : query_query_parameter_mutations_) {
     mutation->mutateQueryParameter(params, context, stream_info);
   }
   headers.setPath(params.replaceQueryString(headers.Path()->value()));
@@ -112,8 +112,12 @@ HeaderMutationConfig::HeaderMutationConfig(const ProtoConfig& config, absl::Stat
     : mutations_(config.mutations(), creation_status),
       most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()) {}
 
-void HeaderMutation::initializeRouteConfigs(Http::StreamFilterCallbacks* callbacks) {
+void HeaderMutation::maybeInitializeRouteConfigs(Http::StreamFilterCallbacks* callbacks) {
+  if (route_configs_initialized_) {
+    return;
+  }
   route_configs_initialized_ = true;
+
   // Traverse through all route configs to retrieve all available header mutations.
   // `getAllPerFilterConfig` returns in ascending order of specificity (i.e., route table
   // first, then virtual host, then per route).
@@ -134,7 +138,7 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
   Formatter::HttpFormatterContext context{&headers};
   config_->mutations().mutateRequestHeaders(headers, context, decoder_callbacks_->streamInfo());
 
-  initializeRouteConfigs(decoder_callbacks_);
+  maybeInitializeRouteConfigs(decoder_callbacks_);
 
   for (const PerRouteHeaderMutation& route_config : route_configs_) {
     route_config.mutations().mutateRequestHeaders(headers, context,
@@ -148,10 +152,10 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
   Formatter::HttpFormatterContext context{encoder_callbacks_->requestHeaders().ptr(), &headers};
   config_->mutations().mutateResponseHeaders(headers, context, encoder_callbacks_->streamInfo());
 
-  // If we haven't already traversed the route configs, do so now.
-  if (!route_configs_initialized_) {
-    initializeRouteConfigs(encoder_callbacks_);
-  }
+  // Note if the filter before this one has send local reply then the decodeHeaders() will not be
+  // be called and the route config will not be initialized. Try it again here and it will be
+  // no-op if already initialized.
+  maybeInitializeRouteConfigs(encoder_callbacks_);
 
   for (const PerRouteHeaderMutation& route_config : route_configs_) {
     route_config.mutations().mutateResponseHeaders(headers, context,

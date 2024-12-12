@@ -32,7 +32,7 @@ TEST(FactoryTest, FactoryTest) {
           key: "flag-header"
           value: "%REQ(ANOTHER-FLAG-HEADER)%"
         append_action: APPEND_IF_EXISTS_OR_ADD
-    parameter_mutations:
+    query_parameter_mutations:
     - remove: "flag-query"
     - append:
         record:
@@ -69,7 +69,7 @@ TEST(FactoryTest, FactoryTest) {
   {
     const std::string config = R"EOF(
   mutations:
-    parameter_mutations:
+    query_parameter_mutations:
     - remove: ""
   )EOF";
 
@@ -85,7 +85,7 @@ TEST(FactoryTest, FactoryTest) {
   {
     const std::string config = R"EOF(
   mutations:
-    parameter_mutations:
+    query_parameter_mutations:
     - append: {}
   )EOF";
 
@@ -100,7 +100,7 @@ TEST(FactoryTest, FactoryTest) {
   {
     const std::string config = R"EOF(
   mutations:
-    parameter_mutations:
+    query_parameter_mutations:
     - append:
         record:
           key: "key"

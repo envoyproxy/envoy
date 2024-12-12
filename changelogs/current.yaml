@@ -313,7 +313,7 @@ new_features:
 - area: http
   change: |
     Add :ref:`query parameter mutations
-    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.parameter_mutations>`
+    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.query_parameter_mutations>`
     to :ref:`Header Mutation Filter <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
     for adding/removing query parameters on a request.
 

@@ -28,20 +28,30 @@ using MutationsProto = envoy::extensions::filters::http::header_mutation::v3::Mu
 using ParameterMutationProto = envoy::config::core::v3::KeyValueMutation;
 using ParameterAppendProto = envoy::config::core::v3::KeyValueAppend;
 
-class ParameterMutation {
+/**
+ * Interface for mutating query parameters.
+ */
+class QueryParameterMutation {
 public:
-  virtual ~ParameterMutation() = default;
+  virtual ~QueryParameterMutation() = default;
 
+  /**
+   * Mutate the query parameters.
+   * @param params the query parameters to mutate.
+   * @param context the formatter context.
+   * @param stream_info the stream info.
+   */
   virtual void mutateQueryParameter(Http::Utility::QueryParamsMulti& params,
                                     const Formatter::HttpFormatterContext& context,
                                     const StreamInfo::StreamInfo& stream_info) const PURE;
 };
-using ParameterMutationPtr = std::unique_ptr<ParameterMutation>;
+using QueryParameterMutationPtr = std::unique_ptr<QueryParameterMutation>;
 
-class ParameterMutationRemove : public ParameterMutation {
+class QueryParameterMutationRemove : public QueryParameterMutation {
 public:
-  ParameterMutationRemove(absl::string_view key) : key_(key) {}
+  QueryParameterMutationRemove(absl::string_view key) : key_(key) {}
 
+  // QueryParameterMutation
   void mutateQueryParameter(Http::Utility::QueryParamsMulti& params,
                             const Formatter::HttpFormatterContext&,
                             const StreamInfo::StreamInfo&) const override {
@@ -52,12 +62,13 @@ private:
   const std::string key_;
 };
 
-class ParameterMutationAppend : public ParameterMutation {
+class QueryParameterMutationAppend : public QueryParameterMutation {
 public:
-  ParameterMutationAppend(absl::string_view key, Formatter::FormatterPtr formatter,
-                          ParameterAppendProto::KeyValueAppendAction action)
+  QueryParameterMutationAppend(absl::string_view key, Formatter::FormatterPtr formatter,
+                               ParameterAppendProto::KeyValueAppendAction action)
       : key_(key), formatter_(std::move(formatter)), action_(action) {}
 
+  // QueryParameterMutation
   void mutateQueryParameter(Http::Utility::QueryParamsMulti& params,
                             const Formatter::HttpFormatterContext& context,
                             const StreamInfo::StreamInfo& stream_info) const override;
@@ -83,8 +94,8 @@ public:
 
 private:
   std::unique_ptr<HeaderMutations> request_mutations_;
+  std::vector<QueryParameterMutationPtr> query_query_parameter_mutations_;
   std::unique_ptr<HeaderMutations> response_mutations_;
-  std::vector<ParameterMutationPtr> parameter_mutations_;
 };
 
 class PerRouteHeaderMutation : public Router::RouteSpecificFilterConfig {
@@ -123,7 +134,7 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
 
 private:
-  void initializeRouteConfigs(Http::StreamFilterCallbacks* callbacks);
+  void maybeInitializeRouteConfigs(Http::StreamFilterCallbacks* callbacks);
 
   HeaderMutationConfigSharedPtr config_{};
   // The lifetime of route config pointers is same as the matched route.
