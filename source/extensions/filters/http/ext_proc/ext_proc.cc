@@ -416,11 +416,6 @@ Filter::StreamOpenState Filter::openStream() {
 
     stream_ = config_->threadLocalStreamManager().store(std::move(stream_object), config_->stats(),
                                                         config_->deferredCloseTimeout());
-    // For custom access logging purposes. Applicable only for Envoy gRPC as Google gRPC does not
-    // have a proper implementation of streamInfo.
-    if (grpc_service_.has_envoy_grpc() && logging_info_ != nullptr) {
-      logging_info_->setClusterInfo(stream_->streamInfo().upstreamClusterInfo());
-    }
   }
   return StreamOpenState::Ok;
 }
@@ -1039,21 +1034,37 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   stats_.stream_msgs_sent_.inc();
 }
 
-void Filter::logGrpcStreamInfo() {
-  if (!config().grpcService().has_value()) {
+void Filter::logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info) {
+  if (stream_info == nullptr || logging_info_ == nullptr) {
     return;
   }
 
-  if (stream_ != nullptr && logging_info_ != nullptr && grpc_service_.has_envoy_grpc()) {
-    const auto& upstream_meter = stream_->streamInfo().getUpstreamBytesMeter();
-    if (upstream_meter != nullptr) {
-      logging_info_->setBytesSent(upstream_meter->wireBytesSent());
-      logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
-    }
-    // Only set upstream host in logging info once.
-    if (logging_info_->upstreamHost() == nullptr) {
-      logging_info_->setUpstreamHost(stream_->streamInfo().upstreamInfo()->upstreamHost());
-    }
+  const auto& upstream_meter = stream_info->getUpstreamBytesMeter();
+  if (upstream_meter != nullptr) {
+    logging_info_->setBytesSent(upstream_meter->wireBytesSent());
+    logging_info_->setBytesReceived(upstream_meter->wireBytesReceived());
+  }
+  // Only set upstream host in logging info once.
+  if (logging_info_->upstreamHost() == nullptr) {
+    logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+  }
+
+  // Only set cluster info in logging info once.
+  if (logging_info_->clusterInfo() == nullptr) {
+    logging_info_->setClusterInfo(stream_info->upstreamClusterInfo());
+  }
+}
+
+void Filter::logStreamInfo() {
+  if (!config().grpcService().has_value()) {
+    // HTTP service
+    logStreamInfoBase(client_->getStreamInfo());
+    return;
+  }
+
+  if (stream_ != nullptr && grpc_service_.has_envoy_grpc()) {
+    // Envoy gRPC service
+    logStreamInfoBase(&stream_->streamInfo());
   }
 }
 
@@ -1368,7 +1379,7 @@ void Filter::onGrpcClose() {
 
 void Filter::onMessageTimeout() {
   ENVOY_LOG(debug, "message timeout reached");
-  logGrpcStreamInfo();
+  logStreamInfo();
   stats_.message_timeouts_.inc();
   if (config_->failureModeAllow()) {
     // The user would like a timeout to not cause message processing to fail.

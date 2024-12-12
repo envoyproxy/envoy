@@ -42,13 +42,14 @@ pyreadline
 pyyaml
 setuptools
 slack_sdk
-sphinx>=7,<7.5
+sphinx>=8.1.3
 sphinxcontrib-applehelp>=1.0.8
 sphinxcontrib-devhelp>=1.0.6
 sphinxcontrib.googleanalytics
 sphinxcontrib-htmlhelp>=2.0.5
 sphinxcontrib-qthelp>=1.0.7
 sphinxcontrib-serializinghtml>=1.1.10
+sphinx-rtd-theme>=3.0.2
 thrift
 verboselogs
 yapf

@@ -140,7 +140,6 @@ paths:
     - source/common/grpc/async_client_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
-    - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
     - source/server/hot_restarting_parent.cc
     - source/common/io/io_uring_worker_impl.cc
@@ -170,7 +169,6 @@ paths:
     - source/extensions/filters/http/adaptive_concurrency/controller
     - source/extensions/filters/http/admission_control
     - source/extensions/filters/http/aws_lambda
-    - source/extensions/filters/http/aws_request_signing
     - source/extensions/filters/http/bandwidth_limit
     - source/extensions/filters/http/basic_auth
     - source/extensions/filters/http/cache
@@ -229,7 +227,6 @@ paths:
     - source/extensions/rate_limit_descriptors
     - source/extensions/resource_monitors
     - source/extensions/router/cluster_specifiers/lua/lua_cluster_specifier.cc
-    - source/extensions/stat_sinks
     - source/extensions/string_matcher/lua/match.cc
     - source/extensions/tracers
     - source/extensions/transport_sockets/internal_upstream

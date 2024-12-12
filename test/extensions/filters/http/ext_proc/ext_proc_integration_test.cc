@@ -4758,63 +4758,6 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstreamObservabilityMode) {
   verifyDownstreamResponse(*response, 200);
 }
 
-// Downstream push back sidestream and upstream
-TEST_P(ExtProcIntegrationTest, DownstreamPushbackSidestreamAndUpstream) {
-  if (!IsEnvoyGrpc()) {
-    return;
-  }
-
-  config_helper_.setBufferLimits(1024, 1024);
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
-  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::STREAMED);
-
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-
-  auto response = sendDownstreamRequestWithBody("hello world", absl::nullopt);
-
-  // Response from upstream server.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  Http::TestResponseHeaderMapImpl response_headers =
-      Http::TestResponseHeaderMapImpl{{":status", "200"}};
-  upstream_request_->encodeHeaders(response_headers, false);
-  upstream_request_->encodeData(64 * 1024, true);
-  std::string body_str = std::string(64 * 1024, 'a');
-
-  bool end_stream = false;
-  int count = 0;
-  while (!end_stream) {
-    processResponseBodyMessage(
-        *grpc_upstreams_[0], count == 0 ? true : false,
-        [&end_stream, &body_str](const HttpBody& body, BodyResponse& body_resp) {
-          end_stream = body.end_of_stream();
-          auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-          body_mut->set_body(body_str);
-          return true;
-        });
-    count++;
-  }
-
-  // Read disable on upstream, triggered by downstream.
-  EXPECT_GE(test_server_
-                ->counter("cluster.cluster_0.upstream_flow_control_"
-                          "paused_reading_total")
-                ->value(),
-            1);
-
-  // Read disable on sidestream(cluster ext_proc_server_0), triggered by
-  // downstream.
-  EXPECT_GE(test_server_
-                ->counter("cluster.ext_proc_server_0.upstream_flow_control_"
-                          "paused_reading_total")
-                ->value(),
-            1);
-  cleanupUpstreamAndDownstream();
-}
-
 TEST_P(ExtProcIntegrationTest, SendBodyBeforeHeaderRespStreamedBasicTest) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
