@@ -9,6 +9,7 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/numeric/int128.h"
 #include "absl/strings/string_view.h"
@@ -236,6 +237,19 @@ public:
    * @return SocketInterface to be used with the address.
    */
   virtual const Network::SocketInterface& socketInterface() const PURE;
+};
+
+/*
+ * Used to store Instance in filter state.
+ */
+class InstanceConstSharedPtrAccessor : public Envoy::StreamInfo::FilterState::Object {
+public:
+  InstanceConstSharedPtrAccessor(InstanceConstSharedPtr ip) : ip_(std::move(ip)) {}
+
+  InstanceConstSharedPtr getIp() const { return ip_; }
+
+private:
+  InstanceConstSharedPtr ip_;
 };
 
 } // namespace Address

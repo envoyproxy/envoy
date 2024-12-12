@@ -4,6 +4,8 @@ package envoy.type.matcher.v3;
 
 import "envoy/type/matcher/v3/string.proto";
 
+import "xds/core/v3/cidr.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -25,5 +27,8 @@ message FilterStateMatcher {
 
     // Matches the filter state object as a string value.
     StringMatcher string_match = 2;
+
+    // Matchers the filter state object as a ip Instance.
+    xds.core.v3.CidrRange ip_range = 3;
   }
 }
