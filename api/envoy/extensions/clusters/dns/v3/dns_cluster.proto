@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: DNS cluster configuration]
 
-// Configuration for strict and logical DNS clusters.
+// Configuration for DNS discovery clusters.
 // [#extension: envoy.clusters.dns]
 
 // [#next-free-field: 10]
@@ -84,6 +84,7 @@ message DnsCluster {
   // :ref:`AUTO<envoy_v3_api_enum_value_extensions.clusters.common.dns.v3.DnsLookupFamily.AUTO>`.
   common.dns.v3.DnsLookupFamily dns_lookup_family = 8;
 
-  // If true, perform logical DNS resolution. Otherwise, perform strict DNS resolution.
+  // If true, perform :ref:`logical DNS discovery <arch_overview_service_discovery_types_logical_dns>`.
+  // Otherwise, :ref:`strict DNS discovery <arch_overview_service_discovery_types_strict_dns>`
   bool logical = 9;
 }
