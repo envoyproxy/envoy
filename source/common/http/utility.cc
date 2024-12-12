@@ -649,6 +649,40 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
                                  Http::Headers::get().UpgradeValues.WebSocket));
 }
 
+void Utility::removeUpgrade(RequestOrResponseHeaderMap& headers,
+                            std::vector<Matchers::StringMatcherSharedPtr> matchers) {
+  if (headers.Upgrade()) {
+    auto tokens = Envoy::StringUtil::splitToken(headers.getUpgradeValue(), ",", false, true);
+
+    auto end = std::remove_if(tokens.begin(), tokens.end(), [&](absl::string_view token) {
+      return std::any_of(
+          matchers.begin(), matchers.end(),
+          [&token](Matchers::StringMatcherSharedPtr matcher) { return matcher->match(token); });
+    });
+
+    auto new_value = absl::StrJoin(tokens.begin(), end, ",");
+
+    if (new_value.empty()) {
+      headers.removeUpgrade();
+    } else {
+      headers.setUpgrade(new_value);
+    }
+  }
+}
+
+void Utility::removeConnectionUpgrade(RequestOrResponseHeaderMap& headers,
+                                      StringUtil::CaseUnorderedSet tokens_to_remove) {
+  if (headers.Connection()) {
+    std::string new_value =
+        StringUtil::removeTokens(headers.getConnectionValue(), ",", tokens_to_remove, ",");
+    if (new_value.empty()) {
+      headers.removeConnection();
+    } else {
+      headers.setConnection(new_value);
+    }
+  }
+}
+
 Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions& encode_functions,
                                                           const LocalReplyData& local_reply_data) {
   Code response_code = local_reply_data.response_code_;

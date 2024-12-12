@@ -13,6 +13,11 @@ minor_behavior_changes:
     Setting :ref:`dns_query_timeout
     <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>`
     to 0 will disable the the Envoy DNS query timeout and use the underlying DNS implementation timeout.
+- area: http
+  change: |
+    Added :ref:`ignore_http_11_upgrade
+    <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.ignore_http_11_upgrade>`
+    to ignore HTTP/1.1 Upgrade values matching any of the supplied matchers.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
