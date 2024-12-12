@@ -90,32 +90,33 @@ TEST(TestConfig, ConfigIsApplied) {
   const std::string config_str = bootstrap->ShortDebugString();
 
   std::vector<std::string> must_contain = {
-      "connect_timeout { seconds: 123 }",
-      "dns_refresh_rate { seconds: 456 }",
-      "dns_min_refresh_rate { seconds: 567 }",
-      "dns_query_timeout { seconds: 321 }",
-      "dns_failure_refresh_rate { base_interval { seconds: 789 } max_interval { seconds: 987 } }",
-      "connection_idle_interval { nanos: 222000000 }",
-      "connection_keepalive { timeout { seconds: 333 }",
-      "connection_options: \"5RTO\"",
-      "client_connection_options: \"MPQC\"",
-      "hostname: \"www.abc.com\"",
-      "hostname: \"www.def.com\"",
-      "canonical_suffixes: \".opq.com\"",
-      "canonical_suffixes: \".xyz.com\"",
-      "num_timeouts_to_trigger_port_migration { value: 4 }",
-      "idle_network_timeout { seconds: 30 }",
-      "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
+    "connect_timeout { seconds: 123 }",
+    "dns_refresh_rate { seconds: 456 }",
+    "dns_min_refresh_rate { seconds: 567 }",
+    "dns_query_timeout { seconds: 321 }",
+    "dns_failure_refresh_rate { base_interval { seconds: 789 } max_interval { seconds: 987 } }",
+    "connection_idle_interval { nanos: 222000000 }",
+    "connection_keepalive { timeout { seconds: 333 }",
+    "connection_options: \"5RTO\"",
+    "client_connection_options: \"MPQC\"",
+    "hostname: \"www.abc.com\"",
+    "hostname: \"www.def.com\"",
+    "canonical_suffixes: \".opq.com\"",
+    "canonical_suffixes: \".xyz.com\"",
+    "num_timeouts_to_trigger_port_migration { value: 4 }",
+    "idle_network_timeout { seconds: 30 }",
+    "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
 #if !defined(__APPLE__)
-      "key: \"prefer_quic_client_udp_gro\" value { bool_value: true }",
+    "key: \"prefer_quic_client_udp_gro\" value { bool_value: true }",
 #endif
-      "key: \"test_feature_false\" value { bool_value: true }",
-      "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
-      "key: \"app_version\" value { string_value: \"1.2.3\" } }",
-      "key: \"app_id\" value { string_value: \"1234-1234-1234\" } }",
-      "validation_context { trusted_ca {",
-      "initial_stream_window_size { value: 6291456 }",
-      "initial_connection_window_size { value: 15728640 }"};
+    "key: \"test_feature_false\" value { bool_value: true }",
+    "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
+    "key: \"app_version\" value { string_value: \"1.2.3\" } }",
+    "key: \"app_id\" value { string_value: \"1234-1234-1234\" } }",
+    "validation_context { trusted_ca {",
+    "initial_stream_window_size { value: 6291456 }",
+    "initial_connection_window_size { value: 15728640 }"
+  };
 
   for (const auto& string : must_contain) {
     EXPECT_THAT(config_str, HasSubstr(string)) << "'" << string << "' not found in " << config_str;
