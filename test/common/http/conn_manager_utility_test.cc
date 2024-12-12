@@ -2299,17 +2299,5 @@ TEST_F(ConnectionManagerUtilityTest, DiscardTEHeaderWithoutTrailers) {
   EXPECT_EQ("", headers.getTEValue());
 }
 
-// Verify when TE header is present, the value should be kept if the reloadable feature
-// "sanitize_te" is enabled.
-TEST_F(ConnectionManagerUtilityTest, KeepTrailersTEHeaderReloadableFeatureDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.sanitize_te", "false"}});
-
-  TestRequestHeaderMapImpl headers{{"te", "gzip"}};
-  callMutateRequestHeaders(headers, Protocol::Http2);
-
-  EXPECT_EQ("gzip", headers.getTEValue());
-}
-
 } // namespace Http
 } // namespace Envoy

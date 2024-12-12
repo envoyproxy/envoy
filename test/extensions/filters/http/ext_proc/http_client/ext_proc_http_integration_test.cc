@@ -41,7 +41,7 @@ using Http::LowerCaseString;
 struct ConfigOptions {
   bool downstream_filter = true;
   bool failure_mode_allow = false;
-  int64_t timeout = 900000000;
+  int64_t timeout_ms = 900;
   std::string cluster = "ext_proc_server_0";
   bool add_log_filter = false;
 };
@@ -109,7 +109,7 @@ public:
           proto_config_.mutable_http_service()->mutable_http_service()->mutable_http_uri();
       http_uri->set_uri("ext_proc_server_0:9000");
       http_uri->set_cluster(config_option.cluster);
-      http_uri->mutable_timeout()->set_nanos(config_option.timeout);
+      http_uri->mutable_timeout()->set_nanos(config_option.timeout_ms * 1000000);
 
       if (config_option.failure_mode_allow) {
         proto_config_.set_failure_mode_allow(true);
@@ -366,7 +366,9 @@ TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutation) {
   verifyDownstreamResponse(*response, 200);
 }
 
-// Side stream server does not send response trigger timeout.
+// Ext_proc filter timeout is set to default value which is 200ms. HTTP Async client timeout
+// is set to a much larger number 900ms. Test the case that the side stream server does not
+// send response in time which triggers ext_proc filter timeout.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
@@ -375,7 +377,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
 
   processRequestHeadersMessage(http_side_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Travel forward 400 ms exceeding 200ms filter timeout.
+                                 // Travel forward 400ms exceeding 200ms filter timeout.
                                  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(400));
                                  return false;
                                });
@@ -383,10 +385,12 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseFilterTimeout) {
   verifyDownstreamResponse(*response, 504);
 }
 
-// Http timeout value set to 10ms. Test HTTP timeout.
+// Ext_proc filter timeout is set to default value which is 200ms. HTTP Async client timeout
+// is set to a smaller number 100ms. Test the case that the side stream server does not
+// send response in time which triggers HTTP async client timeout.
 TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
   ConfigOptions config_option = {};
-  config_option.timeout = 10000000;
+  config_option.timeout_ms = 100;
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
   initializeConfig(config_option);
@@ -395,8 +399,9 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerResponseHttpClientTimeout) {
 
   processRequestHeadersMessage(http_side_upstreams_[0], true,
                                [this](const HttpHeaders&, HeadersResponse&) {
-                                 // Travel forward 50 ms exceeding 10ms HTTP URI timeout setting.
-                                 timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(50));
+                                 // Travel forward 120 ms exceeding 100ms HTTP URI timeout
+                                 // setting.
+                                 timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(120));
                                  return true;
                                });
 
