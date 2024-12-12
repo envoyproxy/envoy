@@ -23,12 +23,11 @@ Http::FilterHeadersStatus SetFilterState::decodeHeaders(Http::RequestHeaderMap& 
   // Apply listener level configuration first.
   config_.get()->updateFilterState({&headers}, decoder_callbacks_->streamInfo());
 
-  // If configured, apply route level configuration next.
-  auto per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<Filters::Common::SetFilterState::Config>(
-          decoder_callbacks_);
-  if (per_route_config) {
-    per_route_config->updateFilterState({&headers}, decoder_callbacks_->streamInfo());
+  // If configured, apply virtual host and then route level configuration next.
+  auto policies = Http::Utility::getAllPerFilterConfig<Filters::Common::SetFilterState::Config>(
+      decoder_callbacks_);
+  for (auto policy : policies) {
+    policy.get().updateFilterState({&headers}, decoder_callbacks_->streamInfo());
   }
   return Http::FilterHeadersStatus::Continue;
 }

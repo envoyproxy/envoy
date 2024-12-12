@@ -67,14 +67,14 @@ public:
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers_, true));
   }
 
-  void runPerRouteFilter(const std::string& listener_yaml_config,
+  void runPerRouteFilter(const std::string& filter_yaml_config,
                          const std::string& per_route_yaml_config) {
     Server::GenericFactoryContextImpl generic_context(context_);
 
-    envoy::extensions::filters::http::set_filter_state::v3::Config listener_proto_config;
-    TestUtility::loadFromYaml(listener_yaml_config, listener_proto_config);
-    auto listener_config = std::make_shared<Filters::Common::SetFilterState::Config>(
-        listener_proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
+    envoy::extensions::filters::http::set_filter_state::v3::Config filter_proto_config;
+    TestUtility::loadFromYaml(filter_yaml_config, filter_proto_config);
+    auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
+        filter_proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
         generic_context);
 
     envoy::extensions::filters::http::set_filter_state::v3::Config route_proto_config;
@@ -84,10 +84,11 @@ public:
         generic_context);
 
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
-    EXPECT_CALL(*decoder_callbacks.route_, mostSpecificPerFilterConfig(_))
-        .WillOnce(Return(&route_config));
 
-    auto filter = std::make_shared<SetFilterState>(listener_config);
+    EXPECT_CALL(decoder_callbacks, perFilterConfigs())
+        .WillOnce(testing::Invoke(
+            [&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+    auto filter = std::make_shared<SetFilterState>(filter_config);
     filter->setDecoderFilterCallbacks(decoder_callbacks);
     EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(ReturnRef(info_));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(headers_, true));
@@ -125,18 +126,18 @@ TEST_F(SetMetadataIntegrationTest, FromHeader) {
 }
 
 TEST_F(SetMetadataIntegrationTest, RouteLevel) {
-  const std::string listener_config = R"EOF(
+  const std::string filter_config = R"EOF(
   on_request_headers:
   - object_key: both
     factory_key: envoy.string
     format_string:
       text_format_source:
-        inline_string: "listener-%REQ(test-header)%"
-  - object_key: listener-only
+        inline_string: "filter-%REQ(test-header)%"
+  - object_key: filter-only
     factory_key: envoy.string
     format_string:
       text_format_source:
-        inline_string: "listener"
+        inline_string: "filter"
   )EOF";
   const std::string route_config = R"EOF(
   on_request_headers:
@@ -151,18 +152,17 @@ TEST_F(SetMetadataIntegrationTest, RouteLevel) {
       text_format_source:
         inline_string: "route"
   )EOF";
-  runPerRouteFilter(listener_config, route_config);
+  runPerRouteFilter(filter_config, route_config);
 
   const auto* both = info_.filterState()->getDataReadOnly<Router::StringAccessor>("both");
   ASSERT_NE(nullptr, both);
   // Route takes precedence
   EXPECT_EQ(both->serializeAsString(), "route-test-value");
 
-  const auto* listener =
-      info_.filterState()->getDataReadOnly<Router::StringAccessor>("listener-only");
-  ASSERT_NE(nullptr, listener);
-  // Only set on listener
-  EXPECT_EQ(listener->serializeAsString(), "listener");
+  const auto* filter = info_.filterState()->getDataReadOnly<Router::StringAccessor>("filter-only");
+  ASSERT_NE(nullptr, filter);
+  // Only set on filter
+  EXPECT_EQ(filter->serializeAsString(), "filter");
 
   const auto* route = info_.filterState()->getDataReadOnly<Router::StringAccessor>("route-only");
   ASSERT_NE(nullptr, route);
