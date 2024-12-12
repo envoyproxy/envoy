@@ -1,12 +1,14 @@
-diff --git a/foreign_cc/private/cc_toolchain_util.bzl b/foreign_cc/private/cc_toolchain_util.bzl
-index 9b33974..2287607 100644
---- a/foreign_cc/private/cc_toolchain_util.bzl
-+++ b/foreign_cc/private/cc_toolchain_util.bzl
-@@ -42,6 +42,7 @@ CxxFlagsInfo = provider(
- # them here when configuring the toolchain flags to pass to the external
- # build system.
- FOREIGN_CC_DISABLED_FEATURES = [
-+    "default_link_libs",
-     "fdo_instrument",
-     "fdo_optimize",
-     "layering_check",
+diff --git a/toolchains/private/BUILD.bazel b/toolchains/private/BUILD.bazel
+index 4ccdeef..25658e9 100644
+--- a/toolchains/private/BUILD.bazel
++++ b/toolchains/private/BUILD.bazel
+@@ -23,6 +23,9 @@ native_tool_toolchain(
+ make_tool(
+     name = "make_tool",
+     srcs = "@gnumake_src//:all_srcs",
++    features = [
++        "-default_link_libs",
++    ],
+     tags = ["manual"],
+ )
+ 
