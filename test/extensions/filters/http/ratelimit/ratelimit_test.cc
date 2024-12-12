@@ -96,11 +96,6 @@ public:
   domain: foo
   )EOF";
 
-  const std::string filter_config_apply_on_stream_done_ = R"EOF(
-  domain: foo
-  apply_on_stream_done: true
-  )EOF";
-
   const std::string rate_limited_status_config_ = R"EOF(
   domain: foo
   rate_limited_status:
@@ -267,7 +262,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
 }
 
 TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
-  setUpTest(filter_config_apply_on_stream_done_);
+  setUpTest(filter_config_);
   InSequence s;
 
   filter_callbacks_.stream_info_.filter_state_->setData(
@@ -281,9 +276,15 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
               getApplicableRateLimit(0));
 
-  const auto descriptors =
-      std::vector<RateLimit::Descriptor>{{{{"descriptor_key", "descriptor_value"}}}};
-  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptors), _, _, 5))
+  // Make sure that descriptor_two_ will be applied on stream done.
+  EXPECT_CALL(vh_rate_limit_, applyOnStreamDone()).WillOnce(Return(true));
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_two_));
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"descriptor_key", "descriptor_value"}}}}),
+                              _, _, 5))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
@@ -318,7 +319,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
       "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(100),
       StreamInfo::FilterState::StateType::Mutable);
   EXPECT_CALL(*client_, cancel());
-  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptors), _, _, 100))
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptor_two_), _, _, 100))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;

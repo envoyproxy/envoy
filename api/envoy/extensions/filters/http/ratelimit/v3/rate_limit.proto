@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
 // [#extension: envoy.filters.http.ratelimit]
 
-// [#next-free-field: 15]
+// [#next-free-field: 14]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
@@ -134,26 +134,6 @@ message RateLimit {
   // Optional additional prefix to use when emitting statistics. This allows to distinguish
   // emitted statistics between configured ``ratelimit`` filters in an HTTP filter chain.
   string stat_prefix = 13;
-
-  // If true, rate limit requests will also be sent to the rate limit service when the stream completes.
-  // This is useful when the rate limit budget needs to reflect the response context that is not available
-  // on the request path.
-  //
-  // On the stream completion, the filter will reuse the exact same descriptors matched during the request path.
-  // In other words, the descriptors are not recalculated on the stream completion, but the rate limit requests
-  // are sent with the same descriptors as the original request sent during the request path.
-  // For example, request header matching descriptors are available on the stream completion.
-  //
-  // For example, let's say the upstream service calculates the usage statistics, returns them in the response body
-  // and we want to utilize these numbers to apply the rate limit action for the subsequent requests.
-  // Combined with another filter that can set ``envoy.ratelimit.hits_addend`` based on the response (e.g. Lua filter),
-  // this can be used to subtract the usage statistics from the rate limit budget.
-  //
-  // The rate limit requests sent on the stream completion are "fire-and-forget" by nature, and rate limit is not enforced
-  // on the current HTTP stream being completed. The filter will only update the budget for the subsequent requests at
-  // that point. Hence the effect of the rate limit requests made during the stream completion is not visible in the current
-  // but only in the subsequent requests.
-  bool apply_on_stream_done = 14;
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.

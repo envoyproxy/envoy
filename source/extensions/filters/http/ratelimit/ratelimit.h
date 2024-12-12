@@ -61,8 +61,7 @@ public:
         response_headers_parser_(THROW_OR_RETURN_VALUE(
             Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
             Router::HeaderParserPtr)),
-        status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())),
-        apply_on_stream_done_(config.apply_on_stream_done()) {}
+        status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
@@ -80,7 +79,6 @@ public:
   Http::Code rateLimitedStatus() { return rate_limited_status_; }
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
   Http::Code statusOnError() const { return status_on_error_; }
-  bool applyOnStreamDone() const { return apply_on_stream_done_; }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -125,7 +123,6 @@ private:
   const Http::Code rate_limited_status_;
   Router::HeaderParserPtr response_headers_parser_;
   const Http::Code status_on_error_;
-  const bool apply_on_stream_done_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -190,7 +187,7 @@ private:
   void initiateCall(const Http::RequestHeaderMap& headers);
   void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                                     std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                                    const Http::RequestHeaderMap& headers) const;
+                                    const Http::RequestHeaderMap& headers);
   void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
   double getHitAddend();
@@ -210,7 +207,9 @@ private:
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};
-  std::vector<Envoy::RateLimit::Descriptor> descriptors_{};
+  // Holds the descriptors that should be applied on stream done which will be populated during
+  // decodeHeaders.
+  std::vector<Envoy::RateLimit::Descriptor> descriptors_apply_on_stream_done_{};
 };
 
 /**

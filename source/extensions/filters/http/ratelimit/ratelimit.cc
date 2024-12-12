@@ -66,9 +66,11 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     return;
   }
 
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
   const Router::RouteEntry* route_entry = route->routeEntry();
   // Get all applicable rate limit policy entries for the route.
-  populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors_, headers);
+  populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, headers);
 
   VhRateLimitOptions vh_rate_limit_option = getVirtualHostRateLimitOption(route);
 
@@ -76,19 +78,19 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   case VhRateLimitOptions::Ignore:
     break;
   case VhRateLimitOptions::Include:
-    populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors_, headers);
+    populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
     break;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
-      populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors_, headers);
+      populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
     }
     break;
   }
 
-  if (!descriptors_.empty()) {
+  if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
-    client_->limit(*this, getDomain(), descriptors_, callbacks_->activeSpan(),
+    client_->limit(*this, getDomain(), descriptors, callbacks_->activeSpan(),
                    callbacks_->streamInfo(), getHitAddend());
     initiating_call_ = false;
   }
@@ -164,16 +166,16 @@ void Filter::onDestroy() {
     state_ = State::Complete;
     client_->cancel();
   } else {
-    // If the filter doesn't have a outstanding limit request (made during decodeHeaders) and has
+    // If the filter doesn't have an outstanding limit request (made during decodeHeaders) and has
     // descriptors, then we can apply the rate limit on stream done if the config allows it.
-    if (config_->applyOnStreamDone() && !descriptors_.empty()) {
+    if (!descriptors_apply_on_stream_done_.empty()) {
       client_->cancel(); // Clears the internal state of the client, so that we can reuse it.
       // Since this filter is being destroyed, we need to keep the client alive until the request
       // is complete.
       auto callback = new OnStreamDoneCallBack(std::move(client_));
       auto& ref = *callback;
-      callback->client()->limit(ref, getDomain(), descriptors_, Tracing::NullSpan::instance(),
-                                absl::nullopt, getHitAddend());
+      callback->client()->limit(ref, getDomain(), descriptors_apply_on_stream_done_,
+                                Tracing::NullSpan::instance(), absl::nullopt, getHitAddend());
     }
   }
 }
@@ -272,7 +274,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
 
 void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                                           std::vector<RateLimit::Descriptor>& descriptors,
-                                          const Http::RequestHeaderMap& headers) const {
+                                          const Http::RequestHeaderMap& headers) {
   for (const Router::RateLimitPolicyEntry& rate_limit :
        rate_limit_policy.getApplicableRateLimit(config_->stage())) {
     const std::string& disable_key = rate_limit.disableKey();
@@ -281,8 +283,16 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
             fmt::format("ratelimit.{}.http_filter_enabled", disable_key), 100)) {
       continue;
     }
-    rate_limit.populateDescriptors(descriptors, config_->localInfo().clusterName(), headers,
-                                   callbacks_->streamInfo());
+    if (rate_limit.applyOnStreamDone()) {
+      // If the rate limit policy is to be applied on stream done, we populate the descriptors in a
+      // separate vector. This vector will be used to apply the rate limit on stream done.
+      rate_limit.populateDescriptors(descriptors_apply_on_stream_done_,
+                                     config_->localInfo().clusterName(), headers,
+                                     callbacks_->streamInfo());
+    } else {
+      rate_limit.populateDescriptors(descriptors, config_->localInfo().clusterName(), headers,
+                                     callbacks_->streamInfo());
+    }
   }
 }
 
