@@ -1,3 +1,4 @@
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -57,10 +58,10 @@ public:
     TestUtility::loadFromYaml(yaml, proto_config);
 
     config_ = std::make_shared<FilterConfig>(proto_config, local_info_, *stats_store_.rootScope(),
-                                             runtime_, http_context_, thread_local_);
+                                             runtime_, http_context_);
 
     client_ = new Filters::Common::RateLimit::MockClient();
-    filter_ = std::make_shared<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
+    filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(
@@ -138,7 +139,7 @@ public:
   Buffer::OwnedImpl response_data_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
-  std::shared_ptr<Filter> filter_;
+  std::unique_ptr<Filter> filter_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Router::MockRateLimitPolicyEntry> route_rate_limit_;
@@ -317,16 +318,15 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
       // Ensures that addend can be set differently than the request path.
       "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(100),
       StreamInfo::FilterState::StateType::Mutable);
-  // Before making the call, the client should be canceled.
   EXPECT_CALL(*client_, cancel());
-  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptors), _, _, 100));
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptors), _, _, 100))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
   filter_->onDestroy();
-  // At this point, the filter should be added to the pending list.
-  EXPECT_EQ(config_->destroyPendingFilters().sizeForTesting(), 1);
-  // Calling complete callback should make the filter removed from the destroy pending map.
-  filter_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr, nullptr, "",
-                    nullptr);
-  EXPECT_EQ(config_->destroyPendingFilters().sizeForTesting(), 0);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
 }
 
 TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
@@ -1749,18 +1749,6 @@ TEST(ObjectFactory, HitsAddend) {
   auto object = factory->createFromBytes(hits_addend);
   ASSERT_NE(nullptr, object);
   EXPECT_EQ(hits_addend, object->serializeAsString());
-}
-
-TEST_F(HttpRateLimitFilterTest, DestroyPendingFiltersThreadLocal_Destructor) {
-  setUpTest(filter_config_apply_on_stream_done_);
-  config_->destroyPendingFilters().add(filter_);
-  EXPECT_EQ(1, config_->destroyPendingFilters().sizeForTesting());
-  filter_.reset();
-
-  // The client should be reset when the thread local is destroyed, which is done by the
-  // destructor of the config. During the destruction, client_ cancel() should be called.
-  EXPECT_CALL(*client_, cancel());
-  config_.reset();
 }
 
 } // namespace

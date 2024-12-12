@@ -35,40 +35,6 @@ enum class FilterRequestType { Internal, External, Both };
  */
 enum class VhRateLimitOptions { Override, Include, Ignore };
 
-class Filter;
-using FilterSharedPtr = std::shared_ptr<Filter>;
-
-/**
- * Thread local storage for destroy pending filters.
- */
-class DestroyPendingFiltersThreadLocal : public ThreadLocal::ThreadLocalObject {
-public:
-  DestroyPendingFiltersThreadLocal() = default;
-  // When this class is destructed, it will cancel all the pending filters and release the shared
-  // pointers.
-  ~DestroyPendingFiltersThreadLocal() override;
-  /**
-   * Add the filter to the destroy pending list.
-   * @param filter the filter to add.
-   */
-  void add(FilterSharedPtr filter) { map_.emplace(filter.get(), std::move(filter)); }
-  /**
-   * Remove the filter from the destroy pending list.
-   * @param filter the const reference to the filter to remove.
-   */
-  void remove(const Filter& filter) { map_.erase(&filter); }
-
-  /**
-   * @return the size of the destroy pending list.
-   */
-  size_t sizeForTesting() const { return map_.size(); }
-
-private:
-  // We use a raw pointer as the key to be able to remove filters when the callback is called where
-  // shared_from_this() is not available.
-  absl::flat_hash_map<Filter*, FilterSharedPtr> map_ = {};
-};
-
 /**
  * Global configuration for the HTTP rate limit filter.
  */
@@ -76,8 +42,7 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ratelimit::v3::RateLimit& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Http::Context& http_context,
-               ThreadLocal::SlotAllocator& tls_allocator)
+               Runtime::Loader& runtime, Http::Context& http_context)
       : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),
         request_type_(config.request_type().empty() ? stringToType("both")
                                                     : stringToType(config.request_type())),
@@ -97,16 +62,7 @@ public:
             Envoy::Router::HeaderParser::configure(config.response_headers_to_add()),
             Router::HeaderParserPtr)),
         status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())),
-        apply_on_stream_done_(config.apply_on_stream_done()) {
-    if (config.apply_on_stream_done()) {
-      pending_filter_slot_ =
-          ThreadLocal::TypedSlot<DestroyPendingFiltersThreadLocal>::makeUnique(tls_allocator);
-      pending_filter_slot_->set(
-          [](Event::Dispatcher&) -> std::shared_ptr<DestroyPendingFiltersThreadLocal> {
-            return std::make_shared<DestroyPendingFiltersThreadLocal>();
-          });
-    }
-  }
+        apply_on_stream_done_(config.apply_on_stream_done()) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
@@ -125,11 +81,6 @@ public:
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
   Http::Code statusOnError() const { return status_on_error_; }
   bool applyOnStreamDone() const { return apply_on_stream_done_; }
-
-  DestroyPendingFiltersThreadLocal& destroyPendingFilters() {
-    ASSERT(pending_filter_slot_);
-    return *(*pending_filter_slot_);
-  }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -158,10 +109,6 @@ private:
     }
     return Http::Code::InternalServerError;
   }
-
-  // Only used when apply_on_stream_done_ is true to hold the pending filters to outlive the
-  // OnDestroy callback.
-  ThreadLocal::TypedSlotPtr<DestroyPendingFiltersThreadLocal> pending_filter_slot_ = nullptr;
 
   const std::string domain_;
   const uint64_t stage_;
@@ -207,9 +154,7 @@ private:
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
  * rate limiting service before allowing further filter iteration.
  */
-class Filter : public Http::StreamFilter,
-               public Filters::Common::RateLimit::RequestCallbacks,
-               public std::enable_shared_from_this<Filter> {
+class Filter : public Http::StreamFilter, public Filters::Common::RateLimit::RequestCallbacks {
 public:
   Filter(FilterConfigSharedPtr config, Filters::Common::RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
@@ -256,7 +201,7 @@ private:
 
   Http::Context& httpContext() { return config_->httpContext(); }
 
-  enum class State { NotStarted, Calling, Complete, Responded, PendingReuqestOnStreamDone };
+  enum class State { NotStarted, Calling, Complete, Responded };
 
   FilterConfigSharedPtr config_;
   Filters::Common::RateLimit::ClientPtr client_;
@@ -268,6 +213,27 @@ private:
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};
   std::vector<Envoy::RateLimit::Descriptor> descriptors_{};
+};
+
+/**
+ * This implements the rate limit callback that outlives the filter holding the client.
+ * On completion, it deletes itself.
+ */
+class OnStreamDoneCallBack : public Filters::Common::RateLimit::RequestCallbacks {
+public:
+  OnStreamDoneCallBack(Filters::Common::RateLimit::ClientPtr client) : client_(std::move(client)) {}
+  ~OnStreamDoneCallBack() override = default;
+
+  // RateLimit::RequestCallbacks
+  void complete(Filters::Common::RateLimit::LimitStatus,
+                Filters::Common::RateLimit::DescriptorStatusListPtr&&, Http::ResponseHeaderMapPtr&&,
+                Http::RequestHeaderMapPtr&&, const std::string&,
+                Filters::Common::RateLimit::DynamicMetadataPtr&&) override;
+
+  Filters::Common::RateLimit::ClientPtr& client() { return client_; }
+
+private:
+  Filters::Common::RateLimit::ClientPtr client_;
 };
 
 } // namespace RateLimitFilter

@@ -168,12 +168,12 @@ void Filter::onDestroy() {
     // descriptors, then we can apply the rate limit on stream done if the config allows it.
     if (config_->applyOnStreamDone() && !descriptors_.empty()) {
       client_->cancel(); // Clears the internal state of the client, so that we can reuse it.
-      client_->limit(*this, getDomain(), descriptors_, Tracing::NullSpan::instance(), absl::nullopt,
-                     getHitAddend());
-      state_ = State::PendingReuqestOnStreamDone;
       // Since this filter is being destroyed, we need to keep the client alive until the request
-      // is complete. So we add this filter to the destroy pending list at the filter config level.
-      config_->destroyPendingFilters().add(shared_from_this());
+      // is complete.
+      auto callback = new OnStreamDoneCallBack(std::move(client_));
+      auto& ref = *callback;
+      callback->client()->limit(ref, getDomain(), descriptors_, Tracing::NullSpan::instance(),
+                                absl::nullopt, getHitAddend());
     }
   }
 }
@@ -184,13 +184,6 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Http::RequestHeaderMapPtr&& request_headers_to_add,
                       const std::string& response_body,
                       Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
-  if (state_ == State::PendingReuqestOnStreamDone) {
-    // Since this filter is already destroyed from HCM perspective, there's nothing to do here.
-    // Simply remove it from the destroy pending list which in turn will release the filter shared
-    // pointer.
-    config_->destroyPendingFilters().remove(*this);
-    return;
-  }
   state_ = State::Complete;
   response_headers_to_add_ = std::move(response_headers_to_add);
   Http::HeaderMapPtr req_headers_to_add = std::move(request_headers_to_add);
@@ -351,11 +344,12 @@ std::string Filter::getDomain() {
   return config_->domain();
 }
 
-DestroyPendingFiltersThreadLocal::~DestroyPendingFiltersThreadLocal() {
-  for (const auto& filter : map_) {
-    filter.second->client()->cancel();
-  }
-  map_.clear();
+void OnStreamDoneCallBack::complete(Filters::Common::RateLimit::LimitStatus,
+                                    Filters::Common::RateLimit::DescriptorStatusListPtr&&,
+                                    Http::ResponseHeaderMapPtr&&, Http::RequestHeaderMapPtr&&,
+                                    const std::string&,
+                                    Filters::Common::RateLimit::DynamicMetadataPtr&&) {
+  delete this;
 }
 
 } // namespace RateLimitFilter
