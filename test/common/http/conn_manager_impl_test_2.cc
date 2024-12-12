@@ -2403,7 +2403,7 @@ TEST_F(HttpConnectionManagerImplTest, AddDataWithStopAndContinue) {
 // phase and returns StopIteration, executing continueDecoding does not proceed with the processing
 // of subsequent filters.
 TEST_F(HttpConnectionManagerImplTest, CannotContinueDecodingAfterRecreateStream) {
-  setup(false, "");
+  setup();
   decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
   decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
 
@@ -2444,7 +2444,7 @@ TEST_F(HttpConnectionManagerImplTest, CannotContinueDecodingAfterRecreateStream)
 // phase and returns StopIteration, executing continueEncoding does not proceed with the processing
 // of subsequent filters.
 TEST_F(HttpConnectionManagerImplTest, CannotContinueEncodingAfterRecreateStream) {
-  setup(false, "");
+  setup();
   decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
   decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
   encoder_filters_.push_back(new NiceMock<MockStreamEncoderFilter>());
