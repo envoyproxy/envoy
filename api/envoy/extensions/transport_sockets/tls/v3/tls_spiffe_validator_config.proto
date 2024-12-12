@@ -89,5 +89,4 @@ message SPIFFECertValidatorConfig {
   // If DataSource is a file, dynamic file watching will be enabled,
   // and updates to the specified file will trigger a refresh of the trust_bundles.
   config.core.v3.DataSource trust_bundles = 2;
-
 }
