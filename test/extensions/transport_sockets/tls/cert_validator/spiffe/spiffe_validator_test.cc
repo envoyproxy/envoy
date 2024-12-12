@@ -785,7 +785,6 @@ typed_config:
   )EOF")),
                               EnvoyException, "Failed to load SPIFFE Bundle map");
   }
-
   {
     EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
@@ -796,7 +795,6 @@ typed_config:
   )EOF")),
                               EnvoyException, "Failed to load SPIFFE Bundle map");
   }
-
   {
     EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
@@ -824,6 +822,26 @@ typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_zero_domains.json"
+  )EOF")),
+                              EnvoyException, "Failed to load SPIFFE Bundle map");
+  }
+  {
+    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_bundles:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_missing_x5c.json"
+  )EOF")),
+                              EnvoyException, "Failed to load SPIFFE Bundle map");
+  }
+  {
+    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_bundles:
+    filename: "{{ test_rundir }}/test/common/tls/test_data/trust_bundles_invalid_x5c.json"
   )EOF")),
                               EnvoyException, "Failed to load SPIFFE Bundle map");
   }
