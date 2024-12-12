@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.api_key_auth;
+
+import "envoy/extensions/filters/http/api_key_auth/v3/api_key_auth.proto";
+import "test/fuzz/common.proto";
+import "validate/validate.proto";
+
+message ApiKeyAuthFuzzInput {
+  envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuth filter_config = 1
+      [(validate.rules).message = {required: true}];
+
+  envoy.extensions.filters.http.api_key_auth.v3.ApiKeyAuthPerRoute route_config = 2;
+
+  // HTTP request data.
+  test.fuzz.HttpData request_data = 3 [(validate.rules).message = {required: true}];
+}
