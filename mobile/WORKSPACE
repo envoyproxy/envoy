@@ -28,21 +28,6 @@ load("@envoy_mobile//bazel:envoy_mobile_repositories.bzl", "envoy_mobile_reposit
 
 envoy_mobile_repositories()
 
-load("@build_bazel_rules_android//:prereqs.bzl", "rules_android_prereqs")
-rules_android_prereqs()
-load("@build_bazel_rules_android//:defs.bzl", "rules_android_workspace")
-rules_android_workspace()
-
-load("@build_bazel_rules_android//rules:rules.bzl", "android_sdk_repository")
-android_sdk_repository(
-    name = "androidsdk",
-)
-
-register_toolchains(
-    "@build_bazel_rules_android//toolchains/android:android_default_toolchain",
-    "@build_bazel_rules_android//toolchains/android_sdk:android_sdk_tools",
-)
-
 local_repository(
     name = "envoy",
     path = "..",
@@ -113,4 +98,19 @@ load(
 
 provisioning_profile_repository(
     name = "local_provisioning_profiles",
+)
+
+load("@build_bazel_rules_android//:prereqs.bzl", "rules_android_prereqs")
+rules_android_prereqs()
+load("@build_bazel_rules_android//:defs.bzl", "rules_android_workspace")
+rules_android_workspace()
+
+load("@build_bazel_rules_android//rules:rules.bzl", "android_sdk_repository")
+android_sdk_repository(
+    name = "androidsdk",
+)
+
+register_toolchains(
+    "@build_bazel_rules_android//toolchains/android:android_default_toolchain",
+    "@build_bazel_rules_android//toolchains/android_sdk:android_sdk_tools",
 )
