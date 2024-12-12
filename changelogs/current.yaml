@@ -336,9 +336,16 @@ new_features:
   change: |
     Added per descriptor custom hits addend support for local rate limit filter. See :ref:`hits_addend
     <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` for more details.
+- area: grpc-json
+  change: |
+    Added a new http filter for :ref:`gRPC to JSON transcoding <config_http_filters_grpc_json_reverse_transcoder>`.
 
 deprecated:
 - area: rbac
   change: |
     metadata :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>` is now deprecated in the
     favor of :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>`.
+- area: aws_iam
+  change: |
+    The :ref:`aws_iam extension <envoy_v3_api_msg_config.grpc_credential.v3.AwsIamConfig>` is deprecated and will be
+    deleted from Envoy in a future release, no later than Envoy 1.35, but possibly sooner.
