@@ -499,9 +499,6 @@ SplitRequestPtr TransactionRequest::create(Router& router,
       if (command_name == "exec") {
         Common::Redis::RespValuePtr empty_array{new Common::Redis::Client::EmptyArray{}};
         callbacks.onResponse(std::move(empty_array));
-      } else if (command_name == "unwatch") {
-        // Unwatch without any keys (meaning no previous WATCH) is a no-op.
-        localResponse(callbacks, "QUEUED");
       } else {
         localResponse(callbacks, "OK");
       }
@@ -520,6 +517,15 @@ SplitRequestPtr TransactionRequest::create(Router& router,
 
   RouteSharedPtr route;
   if (transaction.key_.empty()) {
+    if (command_name == "unwatch") {
+      // Unwatch without any keys (meaning no previous WATCH) is a no-op.
+      if (transaction.active_) {
+        localResponse(callbacks, "QUEUED");
+      } else {
+        localResponse(callbacks, "OK");
+      }
+    }
+
     transaction.key_ = incoming_request->asArray()[1].asString();
     route = router.upstreamPool(transaction.key_, stream_info);
     Common::Redis::RespValueSharedPtr multi_request =
