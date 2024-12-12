@@ -38,6 +38,8 @@ namespace Envoy {
 
 namespace Ssl {
 
+const int EC_CURVE_INVALID_NID = -1;
+
 struct TlsContext {
   // Each certificate specified for the context has its own SSL_CTX. `SSL_CTXs`
   // are identical with the exception of certificate material, and can be
@@ -47,7 +49,9 @@ struct TlsContext {
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
   std::unique_ptr<OcspResponseWrapper> ocsp_response_;
-  bool is_ecdsa_{};
+  // We initialize the curve name variable to EC_CURVE_INVALID_NID which is used as a sentinel value
+  // for "not an ECDSA context".
+  CurveNID ec_group_curve_name_ = EC_CURVE_INVALID_NID;
   bool is_must_staple_{};
   Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
 
@@ -78,7 +82,8 @@ class ContextImpl : public virtual Envoy::Ssl::Context,
                     protected Logger::Loggable<Logger::Id::config> {
 public:
   virtual absl::StatusOr<bssl::UniquePtr<SSL>>
-  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options);
+  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
+         Upstream::HostDescriptionConstSharedPtr host);
 
   /**
    * Logs successful TLS handshake and updates stats.

@@ -22,7 +22,7 @@ envoy_extension_cc_test(
         "compressor_filter_test.cc",
     ],
     extension_names = ["envoy.filters.http.compressor"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/filters/http/compressor:compressor_filter_lib",
@@ -40,7 +40,7 @@ envoy_extension_cc_test(
         "compressor_filter_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.compressor"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/compression/gzip/compressor:config",
         "//source/extensions/compression/gzip/decompressor:config",
@@ -63,7 +63,7 @@ envoy_extension_cc_test(
         "config_test.cc",
     ],
     extension_names = ["envoy.filters.http.compressor"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mock_config_cc_proto",
         "//source/extensions/filters/http/compressor:config",
@@ -76,7 +76,7 @@ envoy_extension_cc_test(
 envoy_cc_benchmark_binary(
     name = "compressor_filter_speed_test",
     srcs = ["compressor_filter_speed_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/compression/compressor:compressor_factory_interface",
         "//source/common/protobuf:utility_lib",
@@ -100,7 +100,7 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "compressor_filter_speed_test_benchmark_test",
     benchmark_binary = "compressor_filter_speed_test",
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     # TODO(envoyproxy/windows-dev): diagnose clang-cl build test failure
     tags = ["fails_on_windows"],
 )
@@ -116,7 +116,7 @@ envoy_cc_test(
     srcs = [
         "compressor_integration_tests.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":compressor_integration_tests_lib",
         "//source/common/http:header_map_lib",

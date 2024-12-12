@@ -47,9 +47,9 @@ public:
 
   // Overrides for HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& lookup,
-                                     Http::StreamDecoderFilterCallbacks& callbacks) override;
+                                     Http::StreamFilterCallbacks& callbacks) override;
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
-                                     Http::StreamEncoderFilterCallbacks& callbacks) override;
+                                     Http::StreamFilterCallbacks& callbacks) override;
   CacheInfo cacheInfo() const override;
   const CacheStats& stats() const;
 

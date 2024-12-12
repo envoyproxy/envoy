@@ -277,13 +277,13 @@ public:
   // read access to a cache entry before its write is complete. In this case the
   // content-length value may be unset.
   virtual LookupContextPtr makeLookupContext(LookupRequest&& request,
-                                             Http::StreamDecoderFilterCallbacks& callbacks) PURE;
+                                             Http::StreamFilterCallbacks& callbacks) PURE;
 
   // Returns an InsertContextPtr to manage the state of a cache insertion.
   // Responses with a chunked transfer-encoding must be dechunked before
   // insertion.
   virtual InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
-                                             Http::StreamEncoderFilterCallbacks& callbacks) PURE;
+                                             Http::StreamFilterCallbacks& callbacks) PURE;
 
   // Precondition: lookup_context represents a prior cache lookup that required
   // validation.
@@ -321,7 +321,6 @@ public:
   virtual std::shared_ptr<HttpCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
            Server::Configuration::FactoryContext& context) PURE;
-  ~HttpCacheFactory() override = default;
 
 private:
   const std::string name_;

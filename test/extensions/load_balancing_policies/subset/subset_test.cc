@@ -21,6 +21,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
@@ -705,7 +706,7 @@ public:
   }
 
   std::string child_lb_name_{"envoy.load_balancing_policies.round_robin"};
-  NiceMock<MockLoadBalancerFactoryContext> lb_factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   LoadBalancerConfigPtr child_lb_config_;
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
@@ -2333,8 +2334,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
   envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config;
   rr_config.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
-  child_lb_config_ = child_factory->loadConfig(lb_factory_context_, rr_config,
-                                               ProtobufMessage::getStrictValidationVisitor());
+  child_lb_config_ = child_factory->loadConfig(server_context_, rr_config);
   initLbConfigAndLB();
 
   TestLoadBalancerContext context({{"version", "1.1"}});
@@ -2372,8 +2372,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
   envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config;
   rr_config.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
-  child_lb_config_ = child_factory->loadConfig(lb_factory_context_, rr_config,
-                                               ProtobufMessage::getStrictValidationVisitor());
+  child_lb_config_ = child_factory->loadConfig(server_context_, rr_config);
   initLbConfigAndLB();
 
   TestLoadBalancerContext context({{"version", "1.1"}});
@@ -2422,8 +2421,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
   envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config;
   rr_config.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
-  child_lb_config_ = child_factory->loadConfig(lb_factory_context_, rr_config,
-                                               ProtobufMessage::getStrictValidationVisitor());
+  child_lb_config_ = child_factory->loadConfig(server_context_, rr_config);
   initLbConfigAndLB();
 
   TestLoadBalancerContext context({{"version", "1.0"}});

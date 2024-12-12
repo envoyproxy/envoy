@@ -13,7 +13,7 @@ envoy_cc_test(
     name = "aws_iam_grpc_credentials_test",
     srcs = envoy_select_google_grpc(["aws_iam_grpc_credentials_test.cc"]),
     data = ["//test/config/integration/certs"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/grpc_credentials/aws_iam:config",
         "//test/common/grpc:grpc_client_integration_test_harness_lib",

@@ -46,6 +46,8 @@ public:
           if (dns_override.has_value()) {
             *const_cast<std::string*>(&query->dns_name_) = dns_override.value();
           }
+          // Add a dummy trace for test coverage.
+          query->addTrace(100);
           pending_queries_.push_back(PendingQueryInfo{std::move(query), absl::nullopt});
         });
     return raw_new_query;

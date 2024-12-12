@@ -61,7 +61,7 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
 
   // Upstream::LoadBalancerContextBase
-  const StreamInfo::StreamInfo* requestStreamInfo() const override { return stream_info_.get(); }
+  StreamInfo::StreamInfo* requestStreamInfo() const override { return stream_info_.get(); }
 
   void connect();
   void enableHalfClose(bool enabled);

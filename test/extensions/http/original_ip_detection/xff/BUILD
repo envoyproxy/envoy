@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "xff_detection_test",
     srcs = ["xff_test.cc"],
     extension_names = ["envoy.http.original_ip_detection.xff"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.original_ip_detection.xff"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/registry",
         "//source/common/network:address_lib",

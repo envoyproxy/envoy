@@ -24,7 +24,7 @@ Http::FilterFactoryCb BandwidthLimitFilterConfig::createFilterFactoryFromProtoTy
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 BandwidthLimitFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {

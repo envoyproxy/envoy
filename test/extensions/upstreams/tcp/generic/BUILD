@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/stream_info:bool_accessor_lib",
         "//source/common/tcp_proxy",

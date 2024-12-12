@@ -11,7 +11,7 @@ namespace Formatter {
  */
 class HttpSubstitutionFormatUtils {
 public:
-  static FormatterPtr defaultSubstitutionFormatter();
+  static absl::StatusOr<FormatterPtr> defaultSubstitutionFormatter();
 };
 
 } // namespace Formatter

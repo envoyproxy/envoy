@@ -142,8 +142,11 @@ request_rules:
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   HeaderToMetadataConfig factory;
 
-  const auto route_config = factory.createRouteSpecificFilterConfig(
-      proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  const auto route_config =
+      factory
+          .createRouteSpecificFilterConfig(proto_config, context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
   const auto* config = dynamic_cast<const Config*>(route_config.get());
   EXPECT_TRUE(config->doRequest());
   EXPECT_FALSE(config->doResponse());

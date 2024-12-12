@@ -87,7 +87,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   case test::common::http::UtilityTestCase::kInitializeAndValidate: {
     const auto& options = input.initialize_and_validate();
     auto options_or_error = Http2::Utility::initializeAndValidateOptions(options);
-    if (options_or_error.status().ok()) {
+    if (!options_or_error.status().ok()) {
       absl::string_view msg = options_or_error.status().message();
       // initializeAndValidateOptions throws exceptions for 4 different reasons due to malformed
       // settings, so check for them and allow any other exceptions through

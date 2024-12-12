@@ -65,8 +65,8 @@ public:
     RETURN_IF_NOT_OK_REF(commands.status());
     switch (config.format_case()) {
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormat:
-      return std::make_unique<FormatterBaseImpl<FormatterContext>>(
-          config.text_format(), config.omit_empty_values(), *commands);
+      return FormatterBaseImpl<FormatterContext>::create(config.text_format(),
+                                                         config.omit_empty_values(), *commands);
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat:
       return createJsonFormatter<FormatterContext>(
           config.json_format(), true, config.omit_empty_values(),
@@ -76,8 +76,8 @@ public:
       auto data_source_or_error = Config::DataSource::read(config.text_format_source(), true,
                                                            context.serverFactoryContext().api());
       RETURN_IF_NOT_OK(data_source_or_error.status());
-      return std::make_unique<FormatterBaseImpl<FormatterContext>>(
-          *data_source_or_error, config.omit_empty_values(), *commands);
+      return FormatterBaseImpl<FormatterContext>::create(*data_source_or_error,
+                                                         config.omit_empty_values(), *commands);
     }
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::FORMAT_NOT_SET:
       PANIC_DUE_TO_PROTO_UNSET;
@@ -95,11 +95,18 @@ public:
                       bool omit_empty_values, bool sort_properties,
                       const std::vector<CommandParserBasePtr<FormatterContext>>& commands = {}) {
 
+// TODO(alyssawilk, wbpcode) when deprecating logging_with_fast_json_formatter
+// remove LegacyJsonFormatterBaseImpl and StructFormatterBase
+#ifndef ENVOY_DISABLE_EXCEPTIONS
     if (!Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.logging_with_fast_json_formatter")) {
       return std::make_unique<LegacyJsonFormatterBaseImpl<FormatterContext>>(
           struct_format, preserve_types, omit_empty_values, sort_properties, commands);
     }
+#else
+    UNREFERENCED_PARAMETER(preserve_types);
+    UNREFERENCED_PARAMETER(sort_properties);
+#endif
 
     return std::make_unique<JsonFormatterImplBase<FormatterContext>>(struct_format,
                                                                      omit_empty_values, commands);

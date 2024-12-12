@@ -26,6 +26,7 @@ envoy_cc_library(
     name = "udp_proxy_filter_lib",
     srcs = ["udp_proxy_filter.cc"],
     hdrs = ["udp_proxy_filter.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":hash_policy_lib",
         "//envoy/access_log:access_log_interface",

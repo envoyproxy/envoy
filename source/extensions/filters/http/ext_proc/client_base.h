@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,6 +38,7 @@ public:
                            bool end_stream, const uint64_t stream_id, RequestCallbacks* callbacks,
                            StreamBase* stream) PURE;
   virtual void cancel() PURE;
+  virtual const Envoy::StreamInfo::StreamInfo* getStreamInfo() const PURE;
 };
 
 using ClientBasePtr = std::unique_ptr<ClientBase>;

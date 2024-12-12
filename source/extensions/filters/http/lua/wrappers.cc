@@ -202,6 +202,13 @@ int StreamInfoWrapper::luaDownstreamLocalAddress(lua_State* state) {
   return 1;
 }
 
+int StreamInfoWrapper::luaDownstreamDirectLocalAddress(lua_State* state) {
+  const std::string& local_address =
+      stream_info_.downstreamAddressProvider().directLocalAddress()->asString();
+  lua_pushlstring(state, local_address.data(), local_address.size());
+  return 1;
+}
+
 int StreamInfoWrapper::luaDownstreamDirectRemoteAddress(lua_State* state) {
   const std::string& direct_remote_address =
       stream_info_.downstreamAddressProvider().directRemoteAddress()->asString();

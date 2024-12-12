@@ -221,13 +221,13 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description =
-      std::make_shared<Upstream::HostDescriptionImpl>(
+      std::shared_ptr<Upstream::HostDescriptionImpl>(*Upstream::HostDescriptionImpl::create(
           cluster, "",
           *Network::Utility::resolveUrl(
               fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp"))),
           nullptr, nullptr, envoy::config::core::v3::Locality().default_instance(),
           envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-          time_system);
+          time_system));
 
   if (type <= Http::CodecType::HTTP2) {
     Http::CodecClientProd client(type,

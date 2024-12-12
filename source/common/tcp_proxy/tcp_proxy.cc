@@ -562,14 +562,19 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
     // TODO(vikaschoudhary16): Initialize route_ once per cluster.
-    upstream_decoder_filter_callbacks_.route_ = std::make_shared<Http::NullRouteImpl>(
-        cluster.info()->name(),
-        *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()},
-        config_->regexEngine());
+    upstream_decoder_filter_callbacks_.route_ = THROW_OR_RETURN_VALUE(
+        Http::NullRouteImpl::create(
+            cluster.info()->name(),
+            *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()},
+            config_->regexEngine()),
+        std::unique_ptr<Http::NullRouteImpl>);
   }
-  generic_conn_pool_ = factory->createGenericConnPool(
-      cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
-      upstream_decoder_filter_callbacks_, getStreamInfo());
+  Upstream::HostConstSharedPtr host = cluster.chooseHost(this);
+  if (host) {
+    generic_conn_pool_ = factory->createGenericConnPool(
+        host, cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
+        upstream_decoder_filter_callbacks_, getStreamInfo());
+  }
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;

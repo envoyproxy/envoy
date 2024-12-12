@@ -20,8 +20,8 @@ getRedisHealthCheckConfig(const envoy::config::core::v3::HealthCheck& health_che
                           ProtobufMessage::ValidationVisitor& validation_visitor) {
   ProtobufTypes::MessagePtr config =
       ProtobufTypes::MessagePtr{new envoy::extensions::health_checkers::redis::v3::Redis()};
-  Envoy::Config::Utility::translateOpaqueConfig(
-      health_check_config.custom_health_check().typed_config(), validation_visitor, *config);
+  THROW_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(
+      health_check_config.custom_health_check().typed_config(), validation_visitor, *config));
   return MessageUtil::downcastAndValidate<
       const envoy::extensions::health_checkers::redis::v3::Redis&>(*config, validation_visitor);
 }

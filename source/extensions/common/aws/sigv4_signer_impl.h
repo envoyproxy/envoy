@@ -39,6 +39,10 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
  * https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
  */
 class SigV4SignerImpl : public SignerBaseImpl {
+
+  // Allow friend access for signer corpus testing
+  friend class SigV4SignerImplFriend;
+
 public:
   SigV4SignerImpl(absl::string_view service_name, absl::string_view region,
                   const CredentialsProviderSharedPtr& credentials_provider,

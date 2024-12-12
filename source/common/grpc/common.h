@@ -173,8 +173,8 @@ public:
    * Prepare headers for protobuf service.
    */
   static Http::RequestMessagePtr
-  prepareHeaders(const std::string& upstream_cluster, const std::string& service_full_name,
-                 const std::string& method_name,
+  prepareHeaders(absl::string_view upstream_cluster, absl::string_view service_full_name,
+                 absl::string_view method_name,
                  const absl::optional<std::chrono::milliseconds>& timeout);
 
   /**
@@ -187,7 +187,7 @@ public:
    * @param qualified_name packagename.messagename.
    * @return qualified_name prefixed with typeUrlPrefix + "/".
    */
-  static std::string typeUrl(const std::string& qualified_name);
+  static std::string typeUrl(absl::string_view qualified_name);
 
   /**
    * Prepend a gRPC frame header to a Buffer::Instance containing a single gRPC frame.

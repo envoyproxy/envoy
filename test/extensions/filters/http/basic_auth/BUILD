@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     extension_names = ["envoy.filters.http.basic_auth"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/basic_auth:basic_auth_lib",
         "//test/mocks/server:server_mocks",
@@ -27,7 +27,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.basic_auth"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/basic_auth:config",
         "//test/mocks/server:server_mocks",
@@ -40,7 +40,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["basic_auth_integration_test.cc"],
     extension_names = ["envoy.filters.http.basic_auth"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/basic_auth:config",
         "//test/integration:http_protocol_integration_lib",

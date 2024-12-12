@@ -131,6 +131,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
+        "//source/common/event:real_time_system_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/filters/network/common/redis:codec_interface",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",

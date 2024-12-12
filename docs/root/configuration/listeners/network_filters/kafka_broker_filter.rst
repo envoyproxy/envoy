@@ -179,6 +179,36 @@ The responses that can be mutated are:
 
 .. _config_network_filters_kafka_broker_debugging:
 
+Filtering requests
+------------------
+
+Broker filter can be used to filter out unwanted types of requests, e.g. fetch ones or produce ones.
+Both allowlist and denylist are possible.
+
+For example to allow only basic producer acces we can limit the access to the related requests:
+
+.. code-block:: yaml
+
+  - name: envoy.filters.network.kafka_broker
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
+      stat_prefix: prefix
+      api_keys_allowed:
+      - 0 # Produce
+      - 3 # Metadata
+      - 18 # API versions
+
+To disable consumers' read capability, we can just disable Fetch requests:
+
+.. code-block:: yaml
+
+  - name: envoy.filters.network.kafka_broker
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
+      stat_prefix: prefix
+      api_keys_denied:
+      - 1 # Fetch
+
 Debugging
 ---------
 

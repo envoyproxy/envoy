@@ -35,7 +35,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     shard_count = 50,
     tags = [
         "cpu:4",
@@ -86,7 +86,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     shard_count = 16,
     tags = ["skip_on_windows"],
     deps = [

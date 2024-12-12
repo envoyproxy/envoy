@@ -1,7 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -100,7 +100,7 @@ public class AndroidNetworkMonitorTest {
       callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
     });
 
-    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.WLAN);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(2);
   }
 
   @Test
@@ -112,7 +112,7 @@ public class AndroidNetworkMonitorTest {
       callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
     });
 
-    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.WWAN);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(4);
   }
 
   @Test
@@ -124,7 +124,7 @@ public class AndroidNetworkMonitorTest {
       callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
     });
 
-    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.GENERIC);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(1);
   }
 
   @Test
@@ -136,7 +136,7 @@ public class AndroidNetworkMonitorTest {
     shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
     callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
 
-    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.WLAN);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(2);
   }
 
   @Test
@@ -148,7 +148,7 @@ public class AndroidNetworkMonitorTest {
     shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR);
     callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
 
-    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.WWAN);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(4);
   }
 
   @Test
@@ -160,59 +160,87 @@ public class AndroidNetworkMonitorTest {
     shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET);
     callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
 
-    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.GENERIC);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(1);
   }
 
   @Test
   public void testOnCapabilitiesChangedPreviousNetworkNotEmptyCallbackIsCalledWwan() {
     AndroidNetworkMonitor.DefaultNetworkCallback callback =
         new AndroidNetworkMonitor.DefaultNetworkCallback(mockEnvoyEngine);
-    callback.transportType = NetworkCapabilities.TRANSPORT_WIFI;
+    callback.previousTransportTypes.add(NetworkCapabilities.TRANSPORT_WIFI);
     NetworkCapabilities capabilities = ShadowNetworkCapabilities.newInstance();
     shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
     shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR);
     callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
 
-    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.WWAN);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(4);
   }
 
   @Test
   public void testOnCapabilitiesChangedPreviousNetworkNotEmptyCallCallbackIsCalledWlan() {
     AndroidNetworkMonitor.DefaultNetworkCallback callback =
         new AndroidNetworkMonitor.DefaultNetworkCallback(mockEnvoyEngine);
-    callback.transportType = NetworkCapabilities.TRANSPORT_CELLULAR;
+    callback.previousTransportTypes.add(NetworkCapabilities.TRANSPORT_CELLULAR);
     NetworkCapabilities capabilities = ShadowNetworkCapabilities.newInstance();
     shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
     shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
     callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
 
-    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.WLAN);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(2);
   }
 
   @Test
   public void testOnCapabilitiesChangedPreviousNetworkNotEmptyCallbackIsCalledGeneric() {
     AndroidNetworkMonitor.DefaultNetworkCallback callback =
         new AndroidNetworkMonitor.DefaultNetworkCallback(mockEnvoyEngine);
-    callback.transportType = NetworkCapabilities.TRANSPORT_BLUETOOTH;
+    callback.previousTransportTypes.add(NetworkCapabilities.TRANSPORT_BLUETOOTH);
     NetworkCapabilities capabilities = ShadowNetworkCapabilities.newInstance();
     shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
     shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET);
     callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
 
-    verify(mockEnvoyEngine).onDefaultNetworkChanged(EnvoyNetworkType.GENERIC);
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(1);
+  }
+
+  @Test
+  public void testOnCapabilitiesChangedPreviousNetworkLessThanCurrentNetworkCallbackIsCalled() {
+    AndroidNetworkMonitor.DefaultNetworkCallback callback =
+        new AndroidNetworkMonitor.DefaultNetworkCallback(mockEnvoyEngine);
+    callback.previousTransportTypes.add(NetworkCapabilities.TRANSPORT_WIFI);
+    NetworkCapabilities capabilities = ShadowNetworkCapabilities.newInstance();
+    shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
+    shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_VPN);
+    callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
+
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(3);
+  }
+
+  @Test
+  public void testOnCapabilitiesChangedPreviousNetworkMoreThanCurrentNetworkCallbackIsCalled() {
+    AndroidNetworkMonitor.DefaultNetworkCallback callback =
+        new AndroidNetworkMonitor.DefaultNetworkCallback(mockEnvoyEngine);
+    callback.previousTransportTypes.add(NetworkCapabilities.TRANSPORT_WIFI);
+    callback.previousTransportTypes.add(NetworkCapabilities.TRANSPORT_VPN);
+    NetworkCapabilities capabilities = ShadowNetworkCapabilities.newInstance();
+    shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
+    callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
+
+    verify(mockEnvoyEngine).onDefaultNetworkChanged(2);
   }
 
   @Test
   public void testOnCapabilitiesChangedPreviousNetworkNotEmptyCallbackIsNotCalled() {
     AndroidNetworkMonitor.DefaultNetworkCallback callback =
         new AndroidNetworkMonitor.DefaultNetworkCallback(mockEnvoyEngine);
-    callback.transportType = NetworkCapabilities.TRANSPORT_WIFI;
+    callback.previousTransportTypes.add(NetworkCapabilities.TRANSPORT_WIFI);
     NetworkCapabilities capabilities = ShadowNetworkCapabilities.newInstance();
     shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
     shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
     callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
 
-    verify(mockEnvoyEngine, never()).onDefaultNetworkChanged(any());
+    verify(mockEnvoyEngine, never()).onDefaultNetworkChanged(anyInt());
   }
 
   @Test
@@ -223,6 +251,6 @@ public class AndroidNetworkMonitorTest {
     shadowOf(capabilities).addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
     callback.onCapabilitiesChanged(ShadowNetwork.newInstance(0), capabilities);
 
-    verify(mockEnvoyEngine, never()).onDefaultNetworkChanged(any());
+    verify(mockEnvoyEngine, never()).onDefaultNetworkChanged(anyInt());
   }
 }

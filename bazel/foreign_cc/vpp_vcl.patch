@@ -1,5 +1,5 @@
 diff --git src/CMakeLists.txt src/CMakeLists.txt
-index 68d0a4fe6..958918ef1 100644
+index 68d0a4f..9bf7ade 100644
 --- src/CMakeLists.txt
 +++ src/CMakeLists.txt
 @@ -50,13 +50,8 @@ include(cmake/ccache.cmake)
@@ -12,7 +12,7 @@ index 68d0a4fe6..958918ef1 100644
 -  OUTPUT_VARIABLE VPP_VERSION
 -  OUTPUT_STRIP_TRAILING_WHITESPACE
 -)
-
+ 
 +set(VPP_VERSION 24.03-dev)
  if (VPP_PLATFORM)
    set(VPP_VERSION ${VPP_VERSION}-${VPP_PLATFORM_NAME})
@@ -28,7 +28,7 @@ index 68d0a4fe6..958918ef1 100644
  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
    set(SUBDIRS vppinfra)
 diff --git src/cmake/ccache.cmake src/cmake/ccache.cmake
-index a7b395bc6..d6a4c5b30 100644
+index a7b395b..d6a4c5b 100644
 --- src/cmake/ccache.cmake
 +++ src/cmake/ccache.cmake
 @@ -14,7 +14,7 @@
@@ -41,26 +41,26 @@ index a7b395bc6..d6a4c5b30 100644
    find_program(CCACHE_FOUND ccache)
    message(STATUS "Looking for ccache")
 diff --git src/cmake/library.cmake src/cmake/library.cmake
-index 45b3944eb..b1dcc56e1 100644
+index 45b3944..b1dcc56 100644
 --- src/cmake/library.cmake
 +++ src/cmake/library.cmake
 @@ -24,7 +24,7 @@ macro(add_vpp_library lib)
    set_target_properties(${lo} PROPERTIES POSITION_INDEPENDENT_CODE ON)
    target_compile_options(${lo} PUBLIC ${VPP_DEFAULT_MARCH_FLAGS})
-
+ 
 -  add_library(${lib} SHARED)
 +  add_library(${lib} STATIC)
    target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${lo}>)
-
+ 
    if(VPP_LIB_VERSION)
 diff --git src/tools/vppapigen/CMakeLists.txt src/tools/vppapigen/CMakeLists.txt
-index 04ebed548..bfabc3a67 100644
+index 04ebed5..bfabc3a 100644
 --- src/tools/vppapigen/CMakeLists.txt
 +++ src/tools/vppapigen/CMakeLists.txt
 @@ -11,22 +11,6 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
-
+ 
 -find_package(
 -  Python3
 -  REQUIRED
@@ -81,7 +81,7 @@ index 04ebed548..bfabc3a67 100644
    FILES vppapigen.py
    RENAME vppapigen
 diff --git src/tools/vppapigen/vppapigen.py src/tools/vppapigen/vppapigen.py
-index 2b0ce9999..f28a17302 100755
+index 2b0ce99..f28a173 100755
 --- src/tools/vppapigen/vppapigen.py
 +++ src/tools/vppapigen/vppapigen.py
 @@ -7,6 +7,13 @@ import logging
@@ -97,17 +97,57 @@ index 2b0ce9999..f28a17302 100755
 +
  import ply.lex as lex
  import ply.yacc as yacc
-
+ 
 diff --git src/vcl/CMakeLists.txt src/vcl/CMakeLists.txt
-index 610b422d1..c5e6f8ca8 100644
+index 610b422..c5e6f8c 100644
 --- src/vcl/CMakeLists.txt
 +++ src/vcl/CMakeLists.txt
 @@ -35,6 +35,8 @@ if (LDP_HAS_GNU_SOURCE)
    add_compile_definitions(HAVE_GNU_SOURCE)
  endif(LDP_HAS_GNU_SOURCE)
-
+ 
 +file(COPY vppcom.h DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 +
  add_vpp_library(vcl_ldpreload
    SOURCES
    ldp_socket_wrapper.c
+diff --git src/vppinfra/CMakeLists.txt src/vppinfra/CMakeLists.txt
+index f34ceed..51fd2be 100644
+--- src/vppinfra/CMakeLists.txt
++++ src/vppinfra/CMakeLists.txt
+@@ -233,13 +233,28 @@ option(VPP_USE_EXTERNAL_LIBEXECINFO "Use external libexecinfo (useful for non-gl
+ if(VPP_USE_EXTERNAL_LIBEXECINFO)
+   set(EXECINFO_LIB execinfo)
+ endif()
+-add_vpp_library(vppinfra
+-  SOURCES ${VPPINFRA_SRCS}
+-  LINK_LIBRARIES m ${EXECINFO_LIB}
+-  INSTALL_HEADERS ${VPPINFRA_HEADERS}
+-  COMPONENT libvppinfra
+-  LTO
+-)
++
++# GCC versions 11 and 12 at least have some kind of bug when
++# LTO runs out of memory and breaking Envoy builds with gcc
++# as a result. So we conditionally disable LTO on GCC builds
++# to workaround the issue.
++if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
++  add_vpp_library(vppinfra
++    SOURCES ${VPPINFRA_SRCS}
++    LINK_LIBRARIES m ${EXECINFO_LIB}
++    INSTALL_HEADERS ${VPPINFRA_HEADERS}
++    COMPONENT libvppinfra
++  )
++else()
++  add_vpp_library(vppinfra
++    SOURCES ${VPPINFRA_SRCS}
++    LINK_LIBRARIES m ${EXECINFO_LIB}
++    INSTALL_HEADERS ${VPPINFRA_HEADERS}
++    COMPONENT libvppinfra
++    LTO
++  )
++endif()
++
+ 
+ ##############################################################################
+ # vppinfra headers

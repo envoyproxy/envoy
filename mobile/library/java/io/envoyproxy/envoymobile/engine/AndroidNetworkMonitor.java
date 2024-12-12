@@ -15,7 +15,9 @@ import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.content.ContextCompat;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * This class does the following.
@@ -65,10 +67,9 @@ public class AndroidNetworkMonitor {
         NetworkCapabilities.TRANSPORT_BLUETOOTH, NetworkCapabilities.TRANSPORT_ETHERNET,
         NetworkCapabilities.TRANSPORT_VPN,       NetworkCapabilities.TRANSPORT_WIFI_AWARE,
     };
-    private static final int EMPTY_TRANSPORT_TYPE = -1;
 
     private final EnvoyEngine envoyEngine;
-    @VisibleForTesting int transportType = EMPTY_TRANSPORT_TYPE;
+    @VisibleForTesting List<Integer> previousTransportTypes = new ArrayList<>();
 
     DefaultNetworkCallback(EnvoyEngine envoyEngine) { this.envoyEngine = envoyEngine; }
 
@@ -84,13 +85,14 @@ public class AndroidNetworkMonitor {
       // `onCapabilities` is guaranteed to be called immediately after `onAvailable`
       // starting with Android O, so this logic may not work on older Android versions.
       // https://developer.android.com/reference/android/net/ConnectivityManager.NetworkCallback#onCapabilitiesChanged(android.net.Network,%20android.net.NetworkCapabilities)
-      if (transportType == EMPTY_TRANSPORT_TYPE) {
+      if (previousTransportTypes.isEmpty()) {
         // The network was lost previously, see `onLost`.
         onDefaultNetworkChanged(networkCapabilities);
       } else {
-        // Only call the `onDefaultNetworkChanged` callback when there is a change in the
-        // transport type.
-        if (!networkCapabilities.hasTransport(transportType)) {
+        // Only call the `onDefaultNetworkChanged` callback when there is any changes in the
+        // transport types.
+        List<Integer> currentTransportTypes = getTransportTypes(networkCapabilities);
+        if (!previousTransportTypes.equals(currentTransportTypes)) {
           onDefaultNetworkChanged(networkCapabilities);
         }
       }
@@ -99,30 +101,37 @@ public class AndroidNetworkMonitor {
     @Override
     public void onLost(@NonNull Network network) {
       envoyEngine.onDefaultNetworkUnavailable();
-      transportType = EMPTY_TRANSPORT_TYPE;
+      previousTransportTypes.clear();
     }
 
-    private static int getTransportType(NetworkCapabilities networkCapabilities) {
+    private static List<Integer> getTransportTypes(NetworkCapabilities networkCapabilities) {
+      List<Integer> transportTypes = new ArrayList<>();
       for (int type : TRANSPORT_TYPES) {
         if (networkCapabilities.hasTransport(type)) {
-          return type;
+          transportTypes.add(type);
         }
       }
-      return EMPTY_TRANSPORT_TYPE;
+      return transportTypes;
     }
 
     private void onDefaultNetworkChanged(NetworkCapabilities networkCapabilities) {
       if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+        int networkType = 0;
         if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
             networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI_AWARE)) {
-          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.WLAN);
+          networkType |= EnvoyNetworkType.WLAN.getValue();
         } else if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
-          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.WWAN);
+          networkType |= EnvoyNetworkType.WWAN.getValue();
         } else {
-          envoyEngine.onDefaultNetworkChanged(EnvoyNetworkType.GENERIC);
+          networkType |= EnvoyNetworkType.GENERIC.getValue();
         }
+        // A network can be both VPN and another type, so we need to check for VPN separately.
+        if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+          networkType |= EnvoyNetworkType.GENERIC.getValue();
+        }
+        envoyEngine.onDefaultNetworkChanged(networkType);
       }
-      transportType = getTransportType(networkCapabilities);
+      previousTransportTypes = getTransportTypes(networkCapabilities);
     }
   }
 

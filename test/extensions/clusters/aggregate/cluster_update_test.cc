@@ -96,7 +96,7 @@ TEST_P(AggregateClusterUpdateTest, BasicFlow) {
   Upstream::ClusterUpdateCallbacksHandlePtr cb =
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
   auto primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
   auto host = cluster_->loadBalancer().chooseHost(nullptr);
@@ -105,7 +105,7 @@ TEST_P(AggregateClusterUpdateTest, BasicFlow) {
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
 
   EXPECT_TRUE(
-      cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
+      *cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
   auto secondary = cluster_manager_->getThreadLocalCluster("secondary");
   EXPECT_NE(nullptr, secondary);
   host = cluster_->loadBalancer().chooseHost(nullptr);
@@ -113,7 +113,8 @@ TEST_P(AggregateClusterUpdateTest, BasicFlow) {
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("tertiary"), ""));
+  EXPECT_TRUE(
+      *cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("tertiary"), ""));
   auto tertiary = cluster_manager_->getThreadLocalCluster("tertiary");
   EXPECT_NE(nullptr, tertiary);
   host = cluster_->loadBalancer().chooseHost(nullptr);
@@ -129,7 +130,7 @@ TEST_P(AggregateClusterUpdateTest, BasicFlow) {
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
   EXPECT_EQ(3, cluster_manager_->activeClusters().size());
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
   primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
   host = cluster_->loadBalancer().chooseHost(nullptr);
@@ -140,11 +141,11 @@ TEST_P(AggregateClusterUpdateTest, BasicFlow) {
 
 TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
   initialize(default_yaml_config_);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
   auto primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
   EXPECT_TRUE(
-      cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
+      *cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
   auto secondary = cluster_manager_->getThreadLocalCluster("secondary");
   EXPECT_NE(nullptr, secondary);
 

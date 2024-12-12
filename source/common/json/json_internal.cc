@@ -50,39 +50,42 @@ public:
     return FieldSharedPtr{new Field(value)}; // NOLINT(modernize-make-shared)
   }
 
-  void append(FieldSharedPtr field_ptr) {
-    checkType(Type::Array);
+  absl::Status append(FieldSharedPtr field_ptr) {
+    RETURN_IF_NOT_OK(checkType(Type::Array));
     value_.array_value_.push_back(field_ptr);
+    return absl::OkStatus();
   }
-  void insert(const std::string& key, FieldSharedPtr field_ptr) {
-    checkType(Type::Object);
+  absl::Status insert(const std::string& key, FieldSharedPtr field_ptr) {
+    RETURN_IF_NOT_OK(checkType(Type::Object));
     value_.object_value_[key] = field_ptr;
+    return absl::OkStatus();
   }
 
   uint64_t hash() const override;
 
   absl::StatusOr<ValueType> getValue(const std::string& name) const override;
-  bool getBoolean(const std::string& name) const override;
-  bool getBoolean(const std::string& name, bool default_value) const override;
-  double getDouble(const std::string& name) const override;
-  double getDouble(const std::string& name, double default_value) const override;
-  int64_t getInteger(const std::string& name) const override;
-  int64_t getInteger(const std::string& name, int64_t default_value) const override;
-  ObjectSharedPtr getObject(const std::string& name, bool allow_empty) const override;
-  absl::StatusOr<ObjectSharedPtr> getObjectNoThrow(const std::string& name,
-                                                   bool allow_empty) const override;
-  std::vector<ObjectSharedPtr> getObjectArray(const std::string& name,
-                                              bool allow_empty) const override;
-  std::string getString(const std::string& name) const override;
-  std::string getString(const std::string& name, const std::string& default_value) const override;
-  std::vector<std::string> getStringArray(const std::string& name, bool allow_empty) const override;
-  std::vector<ObjectSharedPtr> asObjectArray() const override;
-  std::string asString() const override { return stringValue(); }
+  absl::StatusOr<bool> getBoolean(const std::string& name) const override;
+  absl::StatusOr<bool> getBoolean(const std::string& name, bool default_value) const override;
+  absl::StatusOr<double> getDouble(const std::string& name) const override;
+  absl::StatusOr<double> getDouble(const std::string& name, double default_value) const override;
+  absl::StatusOr<int64_t> getInteger(const std::string& name) const override;
+  absl::StatusOr<int64_t> getInteger(const std::string& name, int64_t default_value) const override;
+  absl::StatusOr<ObjectSharedPtr> getObject(const std::string& name,
+                                            bool allow_empty) const override;
+  absl::StatusOr<std::vector<ObjectSharedPtr>> getObjectArray(const std::string& name,
+                                                              bool allow_empty) const override;
+  absl::StatusOr<std::string> getString(const std::string& name) const override;
+  absl::StatusOr<std::string> getString(const std::string& name,
+                                        const std::string& default_value) const override;
+  absl::StatusOr<std::vector<std::string>> getStringArray(const std::string& name,
+                                                          bool allow_empty) const override;
+  absl::StatusOr<std::vector<ObjectSharedPtr>> asObjectArray() const override;
+  absl::StatusOr<std::string> asString() const override { return stringValue(); }
   std::string asJsonString() const override;
 
   bool empty() const override;
   bool hasObject(const std::string& name) const override;
-  void iterate(const ObjectCallback& callback) const override;
+  absl::Status iterate(const ObjectCallback& callback) const override;
   void validateSchema(const std::string&) const override;
 
 private:
@@ -132,35 +135,34 @@ private:
   explicit Field(bool value) : type_(Type::Boolean) { value_.boolean_value_ = value; }
 
   bool isType(Type type) const { return type == type_; }
-  void checkType(Type type) const {
+  absl::Status checkType(Type type) const {
     if (!isType(type)) {
-      throwExceptionOrPanic(
-          Exception,
-          fmt::format(
-              "JSON field from line {} accessed with type '{}' does not match actual type '{}'.",
-              line_number_start_, typeAsString(type), typeAsString(type_)));
+      return absl::InvalidArgumentError(fmt::format(
+          "JSON field from line {} accessed with type '{}' does not match actual type '{}'.",
+          line_number_start_, typeAsString(type), typeAsString(type_)));
     }
+    return absl::OkStatus();
   }
 
   // Value return type functions.
-  std::string stringValue() const {
-    checkType(Type::String);
+  absl::StatusOr<std::string> stringValue() const {
+    RETURN_IF_NOT_OK(checkType(Type::String));
     return value_.string_value_;
   }
-  std::vector<FieldSharedPtr> arrayValue() const {
-    checkType(Type::Array);
+  absl::StatusOr<std::vector<FieldSharedPtr>> arrayValue() const {
+    RETURN_IF_NOT_OK(checkType(Type::Array));
     return value_.array_value_;
   }
-  bool booleanValue() const {
-    checkType(Type::Boolean);
+  absl::StatusOr<bool> booleanValue() const {
+    RETURN_IF_NOT_OK(checkType(Type::Boolean));
     return value_.boolean_value_;
   }
-  double doubleValue() const {
-    checkType(Type::Double);
+  absl::StatusOr<double> doubleValue() const {
+    RETURN_IF_NOT_OK(checkType(Type::Double));
     return value_.double_value_;
   }
-  int64_t integerValue() const {
-    checkType(Type::Integer);
+  absl::StatusOr<int64_t> integerValue() const {
+    RETURN_IF_NOT_OK(checkType(Type::Integer));
     return value_.integer_value_;
   }
 
@@ -191,9 +193,13 @@ public:
   }
   bool number_unsigned(uint64_t value) override {
     if (value > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
-      throwExceptionOrPanic(
-          Exception, fmt::format("JSON value from line {} is larger than int64_t (not supported)",
-                                 line_number_));
+      // Envoy's code is discouraging the use of exceptions. The following sets
+      // the error details as if an exception occurs, and returns false to stop
+      // parsing.
+      error_ = fmt::format("JSON value from line {} is larger than int64_t (not supported)",
+                           line_number_);
+      error_position_ = absl::StrCat("line: ", line_number_);
+      return false;
     }
     return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
   }
@@ -411,19 +417,19 @@ absl::StatusOr<ValueType> Field::getValue(const std::string& name) const {
   }
 }
 
-bool Field::getBoolean(const std::string& name) const {
-  checkType(Type::Object);
+absl::StatusOr<bool> Field::getBoolean(const std::string& name) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Boolean)) {
-    throwExceptionOrPanic(Exception,
-                          fmt::format("key '{}' missing or not a boolean from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+    return absl::InvalidArgumentError(
+        fmt::format("key '{}' missing or not a boolean from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
   return value_itr->second->booleanValue();
 }
 
-bool Field::getBoolean(const std::string& name, bool default_value) const {
-  checkType(Type::Object);
+absl::StatusOr<bool> Field::getBoolean(const std::string& name, bool default_value) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getBoolean(name);
@@ -431,19 +437,19 @@ bool Field::getBoolean(const std::string& name, bool default_value) const {
   return default_value;
 }
 
-double Field::getDouble(const std::string& name) const {
-  checkType(Type::Object);
+absl::StatusOr<double> Field::getDouble(const std::string& name) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Double)) {
-    throwExceptionOrPanic(Exception,
-                          fmt::format("key '{}' missing or not a double from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+    return absl::InvalidArgumentError(
+        fmt::format("key '{}' missing or not a double from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
   return value_itr->second->doubleValue();
 }
 
-double Field::getDouble(const std::string& name, double default_value) const {
-  checkType(Type::Object);
+absl::StatusOr<double> Field::getDouble(const std::string& name, double default_value) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getDouble(name);
@@ -451,19 +457,19 @@ double Field::getDouble(const std::string& name, double default_value) const {
   return default_value;
 }
 
-int64_t Field::getInteger(const std::string& name) const {
-  checkType(Type::Object);
+absl::StatusOr<int64_t> Field::getInteger(const std::string& name) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Integer)) {
-    throwExceptionOrPanic(Exception,
-                          fmt::format("key '{}' missing or not an integer from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+    return absl::InvalidArgumentError(
+        fmt::format("key '{}' missing or not an integer from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
   return value_itr->second->integerValue();
 }
 
-int64_t Field::getInteger(const std::string& name, int64_t default_value) const {
-  checkType(Type::Object);
+absl::StatusOr<int64_t> Field::getInteger(const std::string& name, int64_t default_value) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getInteger(name);
@@ -471,18 +477,8 @@ int64_t Field::getInteger(const std::string& name, int64_t default_value) const 
   return default_value;
 }
 
-ObjectSharedPtr Field::getObject(const std::string& name, bool allow_empty) const {
-  auto result = getObjectNoThrow(name, allow_empty);
-  if (!result.ok()) {
-    throwExceptionOrPanic(Exception, std::string(result.status().message()));
-  }
-
-  return result.value();
-}
-
-absl::StatusOr<ObjectSharedPtr> Field::getObjectNoThrow(const std::string& name,
-                                                        bool allow_empty) const {
-  checkType(Type::Object);
+absl::StatusOr<ObjectSharedPtr> Field::getObject(const std::string& name, bool allow_empty) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end()) {
     if (allow_empty) {
@@ -499,36 +495,41 @@ absl::StatusOr<ObjectSharedPtr> Field::getObjectNoThrow(const std::string& name,
   return value_itr->second;
 }
 
-std::vector<ObjectSharedPtr> Field::getObjectArray(const std::string& name,
-                                                   bool allow_empty) const {
-  checkType(Type::Object);
+absl::StatusOr<std::vector<ObjectSharedPtr>> Field::getObjectArray(const std::string& name,
+                                                                   bool allow_empty) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
     if (allow_empty && value_itr == value_.object_value_.end()) {
-      return {};
+      std::vector<ObjectSharedPtr> ret;
+      return ret;
     }
-    throwExceptionOrPanic(Exception,
-                          fmt::format("key '{}' missing or not an array from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+    return absl::InvalidArgumentError(
+        fmt::format("key '{}' missing or not an array from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
 
-  std::vector<FieldSharedPtr> array_value = value_itr->second->arrayValue();
-  return {array_value.begin(), array_value.end()};
+  auto array_value_or_error = value_itr->second->arrayValue();
+  RETURN_IF_NOT_OK_REF(array_value_or_error.status());
+  std::vector<FieldSharedPtr>& array_value = array_value_or_error.value();
+  std::vector<ObjectSharedPtr> ret{array_value.begin(), array_value.end()};
+  return ret;
 }
 
-std::string Field::getString(const std::string& name) const {
-  checkType(Type::Object);
+absl::StatusOr<std::string> Field::getString(const std::string& name) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::String)) {
-    throwExceptionOrPanic(Exception,
-                          fmt::format("key '{}' missing or not a string from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+    return absl::InvalidArgumentError(
+        fmt::format("key '{}' missing or not a string from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
   return value_itr->second->stringValue();
 }
 
-std::string Field::getString(const std::string& name, const std::string& default_value) const {
-  checkType(Type::Object);
+absl::StatusOr<std::string> Field::getString(const std::string& name,
+                                             const std::string& default_value) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   auto value_itr = value_.object_value_.find(name);
   if (value_itr != value_.object_value_.end()) {
     return getString(name);
@@ -536,36 +537,39 @@ std::string Field::getString(const std::string& name, const std::string& default
   return default_value;
 }
 
-std::vector<std::string> Field::getStringArray(const std::string& name, bool allow_empty) const {
-  checkType(Type::Object);
+absl::StatusOr<std::vector<std::string>> Field::getStringArray(const std::string& name,
+                                                               bool allow_empty) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   std::vector<std::string> string_array;
   auto value_itr = value_.object_value_.find(name);
   if (value_itr == value_.object_value_.end() || !value_itr->second->isType(Type::Array)) {
     if (allow_empty && value_itr == value_.object_value_.end()) {
       return string_array;
     }
-    throwExceptionOrPanic(Exception,
-                          fmt::format("key '{}' missing or not an array from lines {}-{}", name,
-                                      line_number_start_, line_number_end_));
+    return absl::InvalidArgumentError(
+        fmt::format("key '{}' missing or not an array from lines {}-{}", name, line_number_start_,
+                    line_number_end_));
   }
 
-  std::vector<FieldSharedPtr> array = value_itr->second->arrayValue();
+  auto array_value_or_error = value_itr->second->arrayValue();
+  RETURN_IF_NOT_OK_REF(array_value_or_error.status());
+  std::vector<FieldSharedPtr>& array = array_value_or_error.value();
   string_array.reserve(array.size());
   for (const auto& element : array) {
     if (!element->isType(Type::String)) {
-      throwExceptionOrPanic(Exception,
-                            fmt::format("JSON array '{}' from line {} does not contain all strings",
-                                        name, line_number_start_));
+      return absl::InvalidArgumentError(fmt::format(
+          "JSON array '{}' from line {} does not contain all strings", name, line_number_start_));
     }
-    string_array.push_back(element->stringValue());
+    RETURN_IF_NOT_OK_REF(element->stringValue().status());
+    string_array.push_back(element->stringValue().value());
   }
 
   return string_array;
 }
 
-std::vector<ObjectSharedPtr> Field::asObjectArray() const {
-  checkType(Type::Array);
-  return {value_.array_value_.begin(), value_.array_value_.end()};
+absl::StatusOr<std::vector<ObjectSharedPtr>> Field::asObjectArray() const {
+  RETURN_IF_NOT_OK(checkType(Type::Array));
+  return std::vector<ObjectSharedPtr>{value_.array_value_.begin(), value_.array_value_.end()};
 }
 
 std::string Field::asJsonString() const {
@@ -580,31 +584,33 @@ bool Field::empty() const {
     return value_.object_value_.empty();
   } else if (isType(Type::Array)) {
     return value_.array_value_.empty();
-  } else {
-    throwExceptionOrPanic(
-        Exception,
-        fmt::format("Json does not support empty() on types other than array and object"));
   }
+  IS_ENVOY_BUG("Json does not support empty() on types other than array and object");
+  return false;
 }
 
 bool Field::hasObject(const std::string& name) const {
-  checkType(Type::Object);
+  if (!checkType(Type::Object).ok()) {
+    IS_ENVOY_BUG("HasObject called on non-object");
+    return false;
+  }
   auto value_itr = value_.object_value_.find(name);
   return value_itr != value_.object_value_.end();
 }
 
-void Field::iterate(const ObjectCallback& callback) const {
-  checkType(Type::Object);
+absl::Status Field::iterate(const ObjectCallback& callback) const {
+  RETURN_IF_NOT_OK(checkType(Type::Object));
   for (const auto& item : value_.object_value_) {
     bool stop_iteration = !callback(item.first, *item.second);
     if (stop_iteration) {
       break;
     }
   }
+  return absl::OkStatus();
 }
 
 void Field::validateSchema(const std::string&) const {
-  throwExceptionOrPanic(Exception, "not implemented");
+  IS_ENVOY_BUG("validateSchema not implemented");
 }
 
 bool ObjectHandler::start_object(std::size_t) {
@@ -613,12 +619,12 @@ bool ObjectHandler::start_object(std::size_t) {
 
   switch (state_) {
   case State::ExpectValueOrStartObjectArray:
-    stack_.top()->insert(key_, object);
+    THROW_IF_NOT_OK(stack_.top()->insert(key_, object));
     stack_.push(object);
     state_ = State::ExpectKeyOrEndObject;
     return true;
   case State::ExpectArrayValueOrEndArray:
-    stack_.top()->append(object);
+    THROW_IF_NOT_OK(stack_.top()->append(object));
     stack_.push(object);
     state_ = State::ExpectKeyOrEndObject;
     return true;
@@ -667,12 +673,12 @@ bool ObjectHandler::start_array(std::size_t) {
 
   switch (state_) {
   case State::ExpectValueOrStartObjectArray:
-    stack_.top()->insert(key_, array);
+    THROW_IF_NOT_OK(stack_.top()->insert(key_, array));
     stack_.push(array);
     state_ = State::ExpectArrayValueOrEndArray;
     return true;
   case State::ExpectArrayValueOrEndArray:
-    stack_.top()->append(array);
+    THROW_IF_NOT_OK(stack_.top()->append(array));
     stack_.push(array);
     return true;
   case State::ExpectRoot:
@@ -711,10 +717,10 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
   switch (state_) {
   case State::ExpectValueOrStartObjectArray:
     state_ = State::ExpectKeyOrEndObject;
-    stack_.top()->insert(key_, ptr);
+    THROW_IF_NOT_OK(stack_.top()->insert(key_, ptr));
     return true;
   case State::ExpectArrayValueOrEndArray:
-    stack_.top()->append(ptr);
+    THROW_IF_NOT_OK(stack_.top()->append(ptr));
     return true;
   default:
     return true;
@@ -723,7 +729,7 @@ bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
 
 } // namespace
 
-absl::StatusOr<ObjectSharedPtr> Factory::loadFromStringNoThrow(const std::string& json) {
+absl::StatusOr<ObjectSharedPtr> Factory::loadFromString(const std::string& json) {
   ObjectHandler handler;
   auto json_container = JsonContainer(json.c_str(), &handler);
 
@@ -736,19 +742,11 @@ absl::StatusOr<ObjectSharedPtr> Factory::loadFromStringNoThrow(const std::string
   return handler.getRoot();
 }
 
-ObjectSharedPtr Factory::loadFromString(const std::string& json) {
-  auto result = loadFromStringNoThrow(json);
-  if (!result.ok()) {
-    throwExceptionOrPanic(Exception, std::string(result.status().message()));
-  }
+absl::StatusOr<FieldSharedPtr>
+loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct);
 
-  return result.value();
-}
-
-FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value);
-FieldSharedPtr loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct);
-
-FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value) {
+absl::StatusOr<FieldSharedPtr>
+loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value) {
   switch (protobuf_value.kind_case()) {
   case ProtobufWkt::Value::kStringValue:
     return Field::createValue(protobuf_value.string_value());
@@ -761,28 +759,34 @@ FieldSharedPtr loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_
   case ProtobufWkt::Value::kListValue: {
     FieldSharedPtr array = Field::createArray();
     for (const auto& list_value : protobuf_value.list_value().values()) {
-      array->append(loadFromProtobufValueInternal(list_value));
+      absl::StatusOr<FieldSharedPtr> proto_or_error = loadFromProtobufValueInternal(list_value);
+      RETURN_IF_NOT_OK_REF(proto_or_error.status());
+      RETURN_IF_NOT_OK(array->append(*proto_or_error));
     }
     return array;
   }
   case ProtobufWkt::Value::kStructValue:
     return loadFromProtobufStructInternal(protobuf_value.struct_value());
-  default:
-    throwExceptionOrPanic(Exception, "Protobuf value case not implemented");
+  case ProtobufWkt::Value::KIND_NOT_SET:
+    break;
   }
+  return absl::InvalidArgumentError("Protobuf value case not implemented");
 }
 
-FieldSharedPtr loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct) {
+absl::StatusOr<FieldSharedPtr>
+loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct) {
   auto root = Field::createObject();
   for (const auto& field : protobuf_struct.fields()) {
-    root->insert(field.first, loadFromProtobufValueInternal(field.second));
+    absl::StatusOr<FieldSharedPtr> proto_or_error = loadFromProtobufValueInternal(field.second);
+    RETURN_IF_NOT_OK_REF(proto_or_error.status());
+    RETURN_IF_NOT_OK(root->insert(field.first, *proto_or_error));
   }
 
   return root;
 }
 
 ObjectSharedPtr Factory::loadFromProtobufStruct(const ProtobufWkt::Struct& protobuf_struct) {
-  return loadFromProtobufStructInternal(protobuf_struct);
+  return THROW_OR_RETURN_VALUE(loadFromProtobufStructInternal(protobuf_struct), ObjectSharedPtr);
 }
 
 std::string Factory::serialize(absl::string_view str) {

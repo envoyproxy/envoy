@@ -77,6 +77,125 @@ static RouteConfiguration genRouteConfig(benchmark::State& state,
 }
 
 /**
+ * Generates a route config using matcher tree semantics with n entries.
+ */
+static RouteConfiguration genMatcherTreeRouteConfig(benchmark::State& state) {
+  RouteConfiguration route_config;
+  VirtualHost* v_host = route_config.add_virtual_hosts();
+  v_host->set_name("default");
+  v_host->add_domains("*");
+
+  auto* matcher = v_host->mutable_matcher();
+  auto* matcher_tree = matcher->mutable_matcher_tree();
+
+  // Configure the input to match on the :path header
+  auto* input = matcher_tree->mutable_input();
+  input->set_name("request-headers");
+  auto* typed_config = input->mutable_typed_config();
+  typed_config->set_type_url(
+      "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput");
+
+  // Create the exact match map
+  auto* exact_match_map = matcher_tree->mutable_exact_match_map();
+  auto* map = exact_match_map->mutable_map();
+
+  // Create n routes in the matcher tree
+  for (int i = 0; i < state.range(0); ++i) {
+    std::string path = absl::StrCat("/shelves/shelf_", i, "/route_", i);
+
+    // Create the route configuration
+    Route route;
+    auto* match = route.mutable_match();
+    match->set_prefix("/");
+
+    DirectResponseAction* direct_response = route.mutable_direct_response();
+    direct_response->set_status(200);
+
+    auto* header = route.add_request_headers_to_add();
+    header->mutable_header()->set_key("x-route-header");
+    header->mutable_header()->set_value(absl::StrCat("matcher_tree_", i));
+
+    // Create the matcher action
+    auto& matcher_action = (*map)[path];
+    matcher_action.mutable_action()->set_name("route");
+    matcher_action.mutable_action()->mutable_typed_config()->PackFrom(route);
+  }
+
+  return route_config;
+}
+
+/**
+ * Generates a route config using prefix matcher tree semantics with n shelf groups,
+ * each containing m routes.
+ */
+static RouteConfiguration genPrefixMatcherTreeRouteConfig(benchmark::State& state) {
+  RouteConfiguration route_config;
+  VirtualHost* v_host = route_config.add_virtual_hosts();
+  v_host->set_name("default");
+  v_host->add_domains("*");
+
+  auto* matcher = v_host->mutable_matcher();
+  auto* matcher_tree = matcher->mutable_matcher_tree();
+
+  // Configure the input to match on the :path header
+  auto* input = matcher_tree->mutable_input();
+  input->set_name("request-headers");
+  auto* typed_config = input->mutable_typed_config();
+  typed_config->set_type_url(
+      "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput");
+
+  // Create the prefix match map
+  auto* prefix_match_map = matcher_tree->mutable_prefix_match_map();
+  auto* map = prefix_match_map->mutable_map();
+
+  // We'll create ``sqrt(n)`` shelves with ``sqrt(n)`` routes each to
+  // get n total routes
+  int shelf_count = static_cast<int>(std::sqrt(state.range(0)));
+  int routes_per_shelf = shelf_count;
+
+  // Create shelves with their routes
+  for (int shelf = 0; shelf < shelf_count; ++shelf) {
+    std::string shelf_prefix = absl::StrCat("/shelves/shelf_", shelf);
+
+    // Create a RouteList for this shelf prefix
+    envoy::config::route::v3::RouteList route_list;
+
+    // Add routes for this shelf
+    for (int route = 0; route < routes_per_shelf; ++route) {
+      auto* new_route = route_list.add_routes();
+
+      // Set up the route match
+      auto* match = new_route->mutable_match();
+      match->set_prefix(absl::StrCat(shelf_prefix, "/route_", route));
+
+      // Set up the route action
+      DirectResponseAction* direct_response = new_route->mutable_direct_response();
+      direct_response->set_status(200);
+
+      // Add a header
+      auto* header = new_route->add_request_headers_to_add();
+      header->mutable_header()->set_key("x-route-header");
+      header->mutable_header()->set_value(absl::StrCat("match_tree_", shelf, "_", route));
+    }
+
+    // Add a catch-all route for this shelf
+    auto* catch_all = route_list.add_routes();
+    catch_all->mutable_match()->set_prefix(shelf_prefix);
+    catch_all->mutable_direct_response()->set_status(200);
+    auto* catch_all_header = catch_all->add_request_headers_to_add();
+    catch_all_header->mutable_header()->set_key("x-route-header");
+    catch_all_header->mutable_header()->set_value(absl::StrCat("match_tree_", shelf, "_default"));
+
+    // Create the matcher action for this shelf
+    auto& matcher_action = (*map)[shelf_prefix];
+    matcher_action.mutable_action()->set_name("route");
+    matcher_action.mutable_action()->mutable_typed_config()->PackFrom(route_list);
+  }
+
+  return route_config;
+}
+
+/**
  * Measure the speed of doing a route match against a route table of varying sizes.
  * Why? Currently, route matching is linear in first-to-win ordering.
  *
@@ -137,9 +256,67 @@ static void bmRouteTableSizeWithRegexMatch(benchmark::State& state) {
   bmRouteTableSize(state, RouteMatch::PathSpecifierCase::kSafeRegex);
 }
 
+/**
+ * Benchmark matcher tree route matching performance with exact path matchers in the form of:
+ * - /shelves/shelf_1/route_1
+ * - /shelves/shelf_2/route_2
+ * - etc.
+ */
+static void bmRouteTableSizeWithExactMatcherTree(benchmark::State& state) {
+  // Setup router for benchmarking
+  Api::ApiPtr api = Api::createApiForTest();
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
+
+  // Create router config with matcher tree
+  std::shared_ptr<ConfigImpl> config =
+      *ConfigImpl::create(genMatcherTreeRouteConfig(state), factory_context,
+                          ProtobufMessage::getNullValidationVisitor(), true);
+
+  for (auto _ : state) {
+    // Match against the last route in the config
+    int last_route_num = state.range(0) - 1;
+    config->route(genRequestHeaders(last_route_num), stream_info, 0);
+  }
+}
+
+/**
+ * Benchmark matcher tree route matching performance with prefix path matchers in the form of:
+ * - /shelves/shelf_1/...
+ * - /shelves/shelf_1/...
+ * - ...
+ * - /shelves/shelf_2/...
+ * - /shelves/shelf_2/...
+ * - ...
+ * - etc.
+ */
+static void bmRouteTableSizeWithPrefixMatcherTree(benchmark::State& state) {
+  // Setup router for benchmarking
+  Api::ApiPtr api = Api::createApiForTest();
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
+
+  // Create router config with matcher tree
+  std::shared_ptr<ConfigImpl> config =
+      *ConfigImpl::create(genPrefixMatcherTreeRouteConfig(state), factory_context,
+                          ProtobufMessage::getNullValidationVisitor(), true);
+
+  for (auto _ : state) {
+    // Match against the last route in the last shelf
+    int shelf_count = static_cast<int>(std::sqrt(state.range(0)));
+    int last_route_num = shelf_count - 1;
+    config->route(genRequestHeaders(last_route_num), stream_info, 0);
+  }
+}
+
 BENCHMARK(bmRouteTableSizeWithPathPrefixMatch)->RangeMultiplier(2)->Ranges({{1, 2 << 13}});
 BENCHMARK(bmRouteTableSizeWithExactPathMatch)->RangeMultiplier(2)->Ranges({{1, 2 << 13}});
 BENCHMARK(bmRouteTableSizeWithRegexMatch)->RangeMultiplier(2)->Ranges({{1, 2 << 13}});
+
+BENCHMARK(bmRouteTableSizeWithExactMatcherTree)->RangeMultiplier(2)->Ranges({{1, 2 << 13}});
+BENCHMARK(bmRouteTableSizeWithPrefixMatcherTree)->RangeMultiplier(2)->Ranges({{1, 2 << 13}});
 
 } // namespace
 } // namespace Router

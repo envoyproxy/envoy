@@ -89,11 +89,12 @@ DefaultTlsCertificateSelector::selectTlsContext(const SSL_CLIENT_HELLO& ssl_clie
                                                 Ssl::CertificateSelectionCallbackPtr) {
   absl::string_view sni =
       absl::NullSafeStringView(SSL_get_servername(ssl_client_hello.ssl, TLSEXT_NAMETYPE_host_name));
-  const bool client_ecdsa_capable = server_ctx_.isClientEcdsaCapable(ssl_client_hello);
+  const Ssl::CurveNIDVector client_ecdsa_capabilities =
+      server_ctx_.getClientEcdsaCapabilities(ssl_client_hello);
   const bool client_ocsp_capable = server_ctx_.isClientOcspCapable(ssl_client_hello);
 
   auto [selected_ctx, ocsp_staple_action] =
-      findTlsContext(sni, client_ecdsa_capable, client_ocsp_capable, nullptr);
+      findTlsContext(sni, client_ecdsa_capabilities, client_ocsp_capable, nullptr);
 
   auto stats = server_ctx_.stats();
   if (client_ocsp_capable) {
@@ -162,7 +163,8 @@ Ssl::OcspStapleAction DefaultTlsCertificateSelector::ocspStapleAction(const Ssl:
 }
 
 std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
-DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni, bool client_ecdsa_capable,
+DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni,
+                                              const Ssl::CurveNIDVector& client_ecdsa_capabilities,
                                               bool client_ocsp_capable, bool* cert_matched_sni) {
   bool unused = false;
   if (cert_matched_sni == nullptr) {
@@ -176,20 +178,36 @@ DefaultTlsCertificateSelector::findTlsContext(absl::string_view sni, bool client
   const Ssl::TlsContext* candidate_ctx = nullptr;
   Ssl::OcspStapleAction ocsp_staple_action;
 
+  // If the capabilities list vector is not empty, then the client is ECDSA-capable.
+  const bool client_ecdsa_capable = !client_ecdsa_capabilities.empty();
+
   auto selected = [&](const Ssl::TlsContext& ctx) -> bool {
     auto action = ocspStapleAction(ctx, client_ocsp_capable);
     if (action == Ssl::OcspStapleAction::Fail) {
       // The selected ctx must adhere to OCSP policy
       return false;
     }
-
-    if (client_ecdsa_capable == ctx.is_ecdsa_) {
+    // If the client is ECDSA-capable and the context is ECDSA, we check if it is capable of
+    // handling the curves in the cert in a given TlsContext. If the client is not ECDSA-capable,
+    // we will not std::find anything here and move on. If the context is RSA, we will not find
+    // the value of `EC_CURVE_INVALID_NID` in an vector of ECDSA capabilities.
+    // If we have a matching curve NID in our client capabilities, return `true`.
+    if (std::find(client_ecdsa_capabilities.begin(), client_ecdsa_capabilities.end(),
+                  ctx.ec_group_curve_name_) != client_ecdsa_capabilities.end()) {
       selected_ctx = &ctx;
       ocsp_staple_action = action;
       return true;
     }
 
-    if (client_ecdsa_capable && !ctx.is_ecdsa_ && candidate_ctx == nullptr) {
+    // If the client is not ECDSA-capable and the `ctx` is non-ECDSA, then select this `ctx`.
+    if (!client_ecdsa_capable && ctx.ec_group_curve_name_ == Ssl::EC_CURVE_INVALID_NID) {
+      selected_ctx = &ctx;
+      ocsp_staple_action = action;
+      return true;
+    }
+
+    if (client_ecdsa_capable && ctx.ec_group_curve_name_ == Ssl::EC_CURVE_INVALID_NID &&
+        candidate_ctx == nullptr) {
       // ECDSA cert is preferred if client is ECDSA capable, so RSA cert is marked as a candidate,
       // searching will continue until exhausting all certs or find a exact match.
       candidate_ctx = &ctx;

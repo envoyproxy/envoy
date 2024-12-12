@@ -253,9 +253,10 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
 
       cb_->filterState().setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              socket.connectionInfoProvider().remoteAddress(),
-              socket.connectionInfoProvider().localAddress(), parsed_tlvs_}),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
+              {socket.connectionInfoProvider().remoteAddress(),
+               socket.connectionInfoProvider().localAddress(), parsed_tlvs_},
+              absl::make_optional(header_version_)}),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     } else {
@@ -270,9 +271,10 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
                              proxy_protocol_header_.value().extensions_length_));
       cb_->filterState().setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              proxy_protocol_header_.value().remote_address_,
-              proxy_protocol_header_.value().local_address_, parsed_tlvs_}),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
+              {proxy_protocol_header_.value().remote_address_,
+               proxy_protocol_header_.value().local_address_, parsed_tlvs_},
+              absl::make_optional(header_version_)}),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
@@ -378,19 +380,25 @@ bool Filter::parseV2Header(const char* buf) {
         la4.sin_port = v4->dst_port;
         la4.sin_addr.s_addr = v4->dst_addr;
 
-        TRY_NEEDS_AUDIT_ADDRESS {
+        auto remote_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv4Instance>(
+                &ra4);
+        auto local_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv4Instance>(
+                &la4);
+        if (!remote_address_status.ok() || !local_address_status.ok()) {
           // TODO(ggreenway): make this work without requiring operating system support for an
           // address family.
-          proxy_protocol_header_.emplace(WireHeader{
-              PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
-              hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
-              std::make_shared<Network::Address::Ipv4Instance>(&ra4),
-              std::make_shared<Network::Address::Ipv4Instance>(&la4)});
-        }
-        END_TRY CATCH(const EnvoyException& e, {
-          ENVOY_LOG(debug, "Proxy protocol failure: {}", e.what());
+          ENVOY_LOG(debug, "Proxy protocol failure: {}",
+                    !remote_address_status.ok() ? remote_address_status.status()
+                                                : local_address_status.status());
           return false;
-        });
+        }
+
+        proxy_protocol_header_.emplace(
+            WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
+                       hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
+                       *remote_address_status, *local_address_status});
 
         return true;
       } else if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) {
@@ -413,19 +421,25 @@ bool Filter::parseV2Header(const char* buf) {
         la6.sin6_port = v6->dst_port;
         safeMemcpy(&(la6.sin6_addr.s6_addr), &(v6->dst_addr));
 
-        TRY_NEEDS_AUDIT_ADDRESS {
-          proxy_protocol_header_.emplace(WireHeader{
-              PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
-              hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
-              std::make_shared<Network::Address::Ipv6Instance>(ra6),
-              std::make_shared<Network::Address::Ipv6Instance>(la6)});
-        }
-        END_TRY CATCH(const EnvoyException& e, {
+        auto remote_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv6Instance>(
+                ra6);
+        auto local_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv6Instance>(
+                la6);
+        if (!remote_address_status.ok() || !local_address_status.ok()) {
           // TODO(ggreenway): make this work without requiring operating system support for an
           // address family.
-          ENVOY_LOG(debug, "Proxy protocol failure: {}", e.what());
+          ENVOY_LOG(debug, "Proxy protocol failure: {}",
+                    !remote_address_status.ok() ? remote_address_status.status()
+                                                : local_address_status.status());
           return false;
-        });
+        }
+
+        proxy_protocol_header_.emplace(WireHeader{
+            PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
+            hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
+            *remote_address_status, *local_address_status});
         return true;
       }
     }

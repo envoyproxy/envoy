@@ -128,6 +128,19 @@ public:
   virtual const std::string& serverNameIndication() const PURE;
 
   /**
+   * If true, replaces the SNI for the connection with the hostname of the upstream host, if
+   * the hostname is known.
+   */
+  virtual bool autoHostServerNameIndication() const PURE;
+
+  /**
+   * If true, replace any Subject Alternative Name validations with a validation for a DNS SAN
+   * matching the SNI value sent. Note that the validation will be against the actual requested SNI,
+   * regardless of how it is configured.
+   */
+  virtual bool autoSniSanMatch() const PURE;
+
+  /**
    * @return true if server-initiated TLS renegotiation will be allowed.
    */
   virtual bool allowRenegotiation() const PURE;

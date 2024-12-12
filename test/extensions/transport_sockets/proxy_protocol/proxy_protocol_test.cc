@@ -35,13 +35,16 @@ namespace {
 
 class ProxyProtocolTest : public testing::Test {
 public:
+  ProxyProtocolTest()
+      : stats_(UpstreamProxyProtocolSocketFactory::generateUpstreamProxyProtocolStats(
+            *stats_store_.rootScope())) {}
   void initialize(ProxyProtocolConfig& config,
                   Network::TransportSocketOptionsConstSharedPtr socket_options) {
     auto inner_socket = std::make_unique<NiceMock<Network::MockTransportSocket>>();
     inner_socket_ = inner_socket.get();
     ON_CALL(transport_callbacks_, ioHandle()).WillByDefault(ReturnRef(io_handle_));
     proxy_protocol_socket_ = std::make_unique<UpstreamProxyProtocolSocket>(
-        std::move(inner_socket), socket_options, config, *stats_store_.rootScope());
+        std::move(inner_socket), socket_options, config, stats_);
     proxy_protocol_socket_->setTransportSocketCallbacks(transport_callbacks_);
     proxy_protocol_socket_->onConnected();
   }
@@ -51,6 +54,7 @@ public:
   std::unique_ptr<UpstreamProxyProtocolSocket> proxy_protocol_socket_;
   NiceMock<Network::MockTransportSocketCallbacks> transport_callbacks_;
   Stats::TestUtil::TestStore stats_store_;
+  UpstreamProxyProtocolStats stats_;
 };
 
 // Test injects PROXY protocol header only once

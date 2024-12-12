@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "local_ratelimit_test",
     srcs = ["local_ratelimit_test.cc"],
     extension_names = ["envoy.filters.listener.local_ratelimit"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:listener_filter_buffer_lib",
@@ -34,7 +34,7 @@ envoy_extension_cc_test(
         "local_ratelimit_integration_test.cc",
     ],
     extension_names = ["envoy.filters.listener.local_ratelimit"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/listener/local_ratelimit:config",

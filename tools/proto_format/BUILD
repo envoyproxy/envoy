@@ -2,13 +2,10 @@ load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
-load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data", "envoy_pytool_binary")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
-
-envoy_package()
 
 envoy_py_namespace()
 

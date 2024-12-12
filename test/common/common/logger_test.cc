@@ -357,7 +357,7 @@ TEST(LoggerTest, TestJsonFormatNullAndFixedField) {
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto&) {
-    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
     EXPECT_THAT(msg, HasSubstr("\"Message\":\"hello\""));
     EXPECT_THAT(msg, HasSubstr("\"FixedValue\":\"Fixed\""));
     EXPECT_THAT(msg, HasSubstr("\"NullField\":null"));
@@ -377,19 +377,19 @@ TEST(LoggerTest, TestJsonFormat) {
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _))
       .WillOnce(Invoke([](auto msg, auto& log) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"hello\""));
         EXPECT_EQ(log.logger_name, "misc");
       }))
       .WillOnce(Invoke([](auto msg, auto& log) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"hel\\nlo\""));
         EXPECT_EQ(log.logger_name, "misc");
       }))
       .WillOnce(Invoke([](auto msg, auto& log) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"hel\\\"lo\""));
         EXPECT_EQ(log.logger_name, "misc");
@@ -411,7 +411,7 @@ TEST(LoggerTest, TestJsonFormatWithNestedJsonMessage) {
 
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
-    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
     EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
     EXPECT_THAT(msg, HasSubstr("\"Message\":\"{\\\"nested_message\\\":\\\"hello\\\"}\""));
     EXPECT_THAT(msg, HasSubstr("\"FixedValue\":\"Fixed\""));
@@ -612,7 +612,7 @@ TEST(TaggedLogTest, TestConnEventLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
@@ -696,13 +696,13 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake me\\\"ssage val\""));
         EXPECT_THAT(msg, HasSubstr("\"ke\\\"y\":\"v\\\"al\""));
@@ -729,20 +729,20 @@ TEST(TaggedLogTest, TestTaggedConnLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key_inline\":\"val\""));
@@ -773,7 +773,7 @@ TEST(TaggedLogTest, TestConnLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
@@ -798,14 +798,14 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key\":\"val\""));
@@ -813,7 +813,7 @@ TEST(TaggedLogTest, TestTaggedStreamLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("\"ConnectionId\":\"200\""));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message\""));
         EXPECT_THAT(msg, HasSubstr("\"key_inline\":\"val\""));
@@ -845,7 +845,7 @@ TEST(TaggedLogTest, TestStreamLogWithJsonFormat) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"StreamId\":\"300\""));
@@ -872,7 +872,7 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormatMultipleJFlags) {
         EXPECT_THAT(msg, HasSubstr("TestRandomGenerator"));
       }))
       .WillOnce(Invoke([](auto msg, auto&) {
-        EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+        EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
         EXPECT_THAT(msg, HasSubstr("\"Level\":\"info\""));
         EXPECT_THAT(msg, HasSubstr("\"Message1\":\"fake message val\""));
         EXPECT_THAT(msg, HasSubstr("\"Message2\":\"fake message val\""));

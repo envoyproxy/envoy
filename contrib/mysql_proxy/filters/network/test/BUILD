@@ -93,7 +93,7 @@ envoy_cc_test(
     data = [
         "mysql_test_config.yaml",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mysql_test_utils_lib",
         "//contrib/mysql_proxy/filters/network/source:config",

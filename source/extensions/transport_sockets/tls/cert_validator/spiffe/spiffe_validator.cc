@@ -38,8 +38,9 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
   allow_expired_certificate_ = config->allowExpiredCertificate();
 
   SPIFFEConfig message;
-  Config::Utility::translateOpaqueConfig(config->customValidatorConfig().value().typed_config(),
-                                         ProtobufMessage::getStrictValidationVisitor(), message);
+  THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+      config->customValidatorConfig().value().typed_config(),
+      ProtobufMessage::getStrictValidationVisitor(), message));
 
   if (!config->subjectAltNameMatchers().empty()) {
     for (const auto& matcher : config->subjectAltNameMatchers()) {
@@ -312,7 +313,7 @@ Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const 
 
 class SPIFFEValidatorFactory : public CertValidatorFactory {
 public:
-  CertValidatorPtr
+  absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       Server::Configuration::CommonFactoryContext& context) override {
     return std::make_unique<SPIFFEValidator>(config, stats, context);

@@ -1,0 +1,53 @@
+{#
+  Template for implementation of functions declared in complex_type_h.j2.
+  Rendered templates for each structure in Kafka protocol will be put into 'requests.cc'
+  or 'responses.cc'.
+#}
+
+{% for constructor in complex_type.compute_constructors() %}
+{{ complex_type.name }}::{{ constructor['implementation'] }}{% endfor %}
+
+{# For every field that's used in version, just compute its size using an encoder. #}
+uint32_t {{ complex_type.name }}::computeSize(const EncodingContext& encoder) const {
+  const int16_t api_version = encoder.apiVersion();
+  uint32_t written{0};
+
+  {% for spec in complex_type.compute_serialization_specs() %}
+  if (api_version >= {{ spec.versions[0] }} && api_version < {{ spec.versions[-1] + 1 }}) {
+    written += encoder.{{ spec.compute_size_method_name }}({{ spec.field.name }}_);
+  }
+  {% endfor %}
+
+  return written;
+}
+
+uint32_t {{ complex_type.name }}::computeCompactSize(const EncodingContext& encoder) const {
+  return computeSize(encoder);
+}
+
+{# For every field that's used in version, just serialize it. #}
+uint32_t {{ complex_type.name }}::encode(Buffer::Instance& dst, EncodingContext& encoder) const {
+  const int16_t api_version = encoder.apiVersion();
+  uint32_t written{0};
+
+  {% for spec in complex_type.compute_serialization_specs() %}
+  if (api_version >= {{ spec.versions[0] }} && api_version < {{ spec.versions[-1] + 1 }}) {
+    written += encoder.{{ spec.encode_method_name }}({{ spec.field.name }}_, dst);
+  }
+  {% endfor %}
+
+  return written;
+}
+
+uint32_t {{ complex_type.name }}::encodeCompact(Buffer::Instance& dst, EncodingContext& encoder) const {
+  return encode(dst, encoder);
+}
+
+{% if complex_type.fields|length > 0 %}
+bool {{ complex_type.name }}::operator==(const {{ complex_type.name }}& rhs) const {
+{% else %}
+bool {{ complex_type.name }}::operator==(const {{ complex_type.name }}&) const {
+{% endif %}
+  return true{% for field in complex_type.fields %}
+  && {{ field.name }}_ == rhs.{{ field.name }}_{% endfor %};
+};

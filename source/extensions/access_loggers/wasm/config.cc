@@ -14,8 +14,6 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Wasm {
 
-using Common::Wasm::PluginHandleSharedPtrThreadLocal;
-
 AccessLog::InstanceSharedPtr
 WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_config,
                                               AccessLog::FilterPtr&& filter,
@@ -24,31 +22,10 @@ WasmAccessLogFactory::createAccessLogInstance(const Protobuf::Message& proto_con
       const envoy::extensions::access_loggers::wasm::v3::WasmAccessLog&>(
       proto_config, context.messageValidationVisitor());
 
-  auto plugin = std::make_shared<Common::Wasm::Plugin>(
-      config.config(), envoy::config::core::v3::TrafficDirection::UNSPECIFIED,
-      context.serverFactoryContext().localInfo(), nullptr /* listener_metadata */);
-
-  auto access_log = std::make_shared<WasmAccessLog>(plugin, nullptr, std::move(filter));
-
-  auto callback = [access_log, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
-    // NB: the Slot set() call doesn't complete inline, so all arguments must outlive this call.
-    auto tls_slot = ThreadLocal::TypedSlot<PluginHandleSharedPtrThreadLocal>::makeUnique(
-        context.serverFactoryContext().threadLocal());
-    tls_slot->set([base_wasm, plugin](Event::Dispatcher& dispatcher) {
-      return std::make_shared<PluginHandleSharedPtrThreadLocal>(
-          Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, dispatcher));
-    });
-    access_log->setTlsSlot(std::move(tls_slot));
-  };
-
-  if (!Common::Wasm::createWasm(
-          plugin, context.scope().createScope(""), context.serverFactoryContext().clusterManager(),
-          context.initManager(), context.serverFactoryContext().mainThreadDispatcher(),
-          context.serverFactoryContext().api(), context.serverFactoryContext().lifecycleNotifier(),
-          remote_data_provider_, std::move(callback))) {
-    throw Common::Wasm::WasmException(
-        fmt::format("Unable to create Wasm access log {}", plugin->name_));
-  }
+  auto plugin_config = std::make_unique<Common::Wasm::PluginConfig>(
+      config.config(), context.serverFactoryContext(), context.scope(), context.initManager(),
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, /*metadata=*/nullptr, false);
+  auto access_log = std::make_shared<WasmAccessLog>(std::move(plugin_config), std::move(filter));
 
   context.serverFactoryContext().api().customStatNamespaces().registerStatNamespace(
       Extensions::Common::Wasm::CustomStatNamespace);

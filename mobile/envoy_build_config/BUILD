@@ -19,12 +19,12 @@ envoy_cc_library(
     deps = [
         "extension_registry_platform_additions",
         "@envoy//source/common/http/matching:inputs_lib",
+        "@envoy//source/common/network:default_client_connection_factory",
         "@envoy//source/common/network:socket_lib",
         "@envoy//source/common/quic:quic_transport_socket_factory_lib",
         "@envoy//source/common/router:upstream_codec_filter_lib",
         "@envoy//source/common/tls/cert_validator:cert_validator_lib",
         "@envoy//source/common/upstream:default_local_address_selector_factory",
-        "@envoy//source/common/watchdog:abort_action_config",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "@envoy//source/extensions/compression/brotli/decompressor:config",
         "@envoy//source/extensions/compression/gzip/decompressor:config",

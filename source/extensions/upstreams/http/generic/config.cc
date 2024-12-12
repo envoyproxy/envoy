@@ -13,21 +13,22 @@ namespace Generic {
 using UpstreamProtocol = Envoy::Router::GenericConnPoolFactory::UpstreamProtocol;
 
 Router::GenericConnPoolPtr GenericGenericConnPoolFactory::createGenericConnPool(
-    Upstream::ThreadLocalCluster& thread_local_cluster, UpstreamProtocol upstream_protocol,
-    Upstream::ResourcePriority priority, absl::optional<Envoy::Http::Protocol> downstream_protocol,
+    Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
+    UpstreamProtocol upstream_protocol, Upstream::ResourcePriority priority,
+    absl::optional<Envoy::Http::Protocol> downstream_protocol,
     Upstream::LoadBalancerContext* ctx) const {
   Router::GenericConnPoolPtr conn_pool;
   switch (upstream_protocol) {
   case UpstreamProtocol::HTTP:
     conn_pool = std::make_unique<Upstreams::Http::Http::HttpConnPool>(
-        thread_local_cluster, priority, downstream_protocol, ctx);
+        host, thread_local_cluster, priority, downstream_protocol, ctx);
     return (conn_pool->valid() ? std::move(conn_pool) : nullptr);
   case UpstreamProtocol::TCP:
-    conn_pool =
-        std::make_unique<Upstreams::Http::Tcp::TcpConnPool>(thread_local_cluster, priority, ctx);
+    conn_pool = std::make_unique<Upstreams::Http::Tcp::TcpConnPool>(host, thread_local_cluster,
+                                                                    priority, ctx);
     return (conn_pool->valid() ? std::move(conn_pool) : nullptr);
   case UpstreamProtocol::UDP:
-    conn_pool = std::make_unique<Upstreams::Http::Udp::UdpConnPool>(thread_local_cluster, ctx);
+    conn_pool = std::make_unique<Upstreams::Http::Udp::UdpConnPool>(host);
     return (conn_pool->valid() ? std::move(conn_pool) : nullptr);
   }
 

@@ -5,6 +5,7 @@
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/extensions/common/aws/mocks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
@@ -283,16 +284,17 @@ public:
         });
   }
 
-  void addUpstreamProtocolOptions() {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+  void addUpstreamProtocolOptions(int index = 0) {
+    config_helper_.addConfigModifier(
+        [&, index](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(index);
 
-      ConfigHelper::HttpProtocolOptions protocol_options;
-      protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
-      protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
-      protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
-      ConfigHelper::setProtocolOptions(*cluster, protocol_options);
-    });
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+          protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
+          protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+          ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+        });
   }
 
   ~InitializeFilterTest() override {
@@ -321,9 +323,20 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
   addStandardFilter();
 
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  std::string uuid;
+  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
+  for (const auto& c : test_server_->counters()) {
+    if (absl::StartsWith(c->name(), prefix)) {
+      uuid = c->name().substr(prefix.size(), 36);
+    }
+  }
+  EXPECT_FALSE(uuid.empty());
+  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
+                                     "service_internal-ap-southeast-2_{}",
+                                     uuid);
+
+  test_server_->waitForCounterGe(fmt::format("{}.credential_refreshes_performed", sts_name), 1,
+                                 std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
@@ -338,9 +351,50 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
   addStandardFilter(false);
   addUpstreamProtocolOptions();
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
-                                 "southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+
+  std::string uuid;
+  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
+  for (const auto& c : test_server_->counters()) {
+    if (absl::StartsWith(c->name(), prefix)) {
+      uuid = c->name().substr(prefix.size(), 36);
+    }
+  }
+  EXPECT_FALSE(uuid.empty());
+  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
+                                     "service_internal-ap-southeast-2_{}",
+                                     uuid);
+
+  test_server_->waitForCounterGe(fmt::format("{}.credential_refreshes_performed", sts_name), 1,
+                                 std::chrono::seconds(10));
+}
+
+TEST_F(InitializeFilterTest, TestWithTwoClustersUpstreamCheckForSingletonIMDS) {
+
+  // Instance Profile Credentials only
+  dnsSetup();
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    *bootstrap.mutable_static_resources()->add_clusters() =
+        config_helper_.buildStaticCluster("cluster_1", 12345, "127.0.0.1");
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+    protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
+    protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+    ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+    auto* cluster1 = bootstrap.mutable_static_resources()->mutable_clusters(1);
+    ConfigHelper::setProtocolOptions(*cluster1, protocol_options);
+    addStandardFilter(false);
+  });
+
+  initialize();
+  // We should see a successful credential refresh
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_metadata_server_"
+                                 "internal.credential_refreshes_performed",
+                                 1);
+  // If credential refresh has succeeded, then check we added only a single cluster via the
+  // extension
+  EXPECT_EQ(test_server_->counter("cluster_manager.cluster_added"), 1);
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
@@ -352,9 +406,20 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
-                                 "service_internal-ap-southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  std::string uuid;
+  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
+  for (const auto& c : test_server_->counters()) {
+    if (absl::StartsWith(c->name(), prefix)) {
+      uuid = c->name().substr(prefix.size(), 36);
+    }
+  }
+  EXPECT_FALSE(uuid.empty());
+  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
+                                     "service_internal-ap-southeast-2_{}",
+                                     uuid);
+
+  test_server_->waitForCounterGe(fmt::format("{}.credential_refreshes_performed", sts_name), 1,
+                                 std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
@@ -367,9 +432,20 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
   addStandardFilter();
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
-                                 "service_internal-ap-southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  std::string uuid;
+  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
+  for (const auto& c : test_server_->counters()) {
+    if (absl::StartsWith(c->name(), prefix)) {
+      uuid = c->name().substr(prefix.size(), 36);
+    }
+  }
+  EXPECT_FALSE(uuid.empty());
+  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
+                                     "service_internal-ap-southeast-2_{}",
+                                     uuid);
+
+  test_server_->waitForCounterGe(fmt::format("{}.credential_refreshes_performed", sts_name), 1,
+                                 std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
@@ -387,9 +463,20 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ecs_task_"
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
-                                 "service_internal-ap-southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  std::string uuid;
+  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
+  for (const auto& c : test_server_->counters()) {
+    if (absl::StartsWith(c->name(), prefix)) {
+      uuid = c->name().substr(prefix.size(), 36);
+    }
+  }
+  EXPECT_FALSE(uuid.empty());
+  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
+                                     "service_internal-ap-southeast-2_{}",
+                                     uuid);
+
+  test_server_->waitForCounterGe(fmt::format("{}.credential_refreshes_performed", sts_name), 1,
+                                 std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
@@ -406,9 +493,20 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ecs_task_"
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
-                                 "service_internal-ap-southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  std::string uuid;
+  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
+  for (const auto& c : test_server_->counters()) {
+    if (absl::StartsWith(c->name(), prefix)) {
+      uuid = c->name().substr(prefix.size(), 36);
+    }
+  }
+  EXPECT_FALSE(uuid.empty());
+  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
+                                     "service_internal-ap-southeast-2_{}",
+                                     uuid);
+
+  test_server_->waitForCounterGe(fmt::format("{}.credential_refreshes_performed", sts_name), 1,
+                                 std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
@@ -426,9 +524,20 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ecs_task_"
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
-                                 "service_internal-ap-southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  std::string uuid;
+  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
+  for (const auto& c : test_server_->counters()) {
+    if (absl::StartsWith(c->name(), prefix)) {
+      uuid = c->name().substr(prefix.size(), 36);
+    }
+  }
+  EXPECT_FALSE(uuid.empty());
+  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
+                                     "service_internal-ap-southeast-2_{}",
+                                     uuid);
+
+  test_server_->waitForCounterGe(fmt::format("{}.credential_refreshes_performed", sts_name), 1,
+                                 std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersStandardInstanceProfile) {
@@ -442,9 +551,20 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandardInstanceProfile) {
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_"
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
-                                 "service_internal-ap-southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  std::string uuid;
+  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
+  for (const auto& c : test_server_->counters()) {
+    if (absl::StartsWith(c->name(), prefix)) {
+      uuid = c->name().substr(prefix.size(), 36);
+    }
+  }
+  EXPECT_FALSE(uuid.empty());
+  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
+                                     "service_internal-ap-southeast-2_{}",
+                                     uuid);
+
+  test_server_->waitForCounterGe(fmt::format("{}.credential_refreshes_performed", sts_name), 1,
+                                 std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelInstanceProfile) {
@@ -458,9 +578,20 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelInstanceProfile) {
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_"
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
-                                 "service_internal-ap-southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  std::string uuid;
+  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
+  for (const auto& c : test_server_->counters()) {
+    if (absl::StartsWith(c->name(), prefix)) {
+      uuid = c->name().substr(prefix.size(), 36);
+    }
+  }
+  EXPECT_FALSE(uuid.empty());
+  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
+                                     "service_internal-ap-southeast-2_{}",
+                                     uuid);
+
+  test_server_->waitForCounterGe(fmt::format("{}.credential_refreshes_performed", sts_name), 1,
+                                 std::chrono::seconds(10));
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandardInstanceProfile) {
@@ -475,9 +606,20 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandardInstancePro
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.ec2_instance_"
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
-                                 "service_internal-ap-southeast-2.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
+  std::string uuid;
+  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
+  for (const auto& c : test_server_->counters()) {
+    if (absl::StartsWith(c->name(), prefix)) {
+      uuid = c->name().substr(prefix.size(), 36);
+    }
+  }
+  EXPECT_FALSE(uuid.empty());
+  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
+                                     "service_internal-ap-southeast-2_{}",
+                                     uuid);
+
+  test_server_->waitForCounterGe(fmt::format("{}.credential_refreshes_performed", sts_name), 1,
+                                 std::chrono::seconds(10));
 }
 
 class CdsInteractionTest : public testing::Test, public HttpIntegrationTest {
@@ -574,16 +716,24 @@ TEST_F(CdsInteractionTest, ClusterRemovalRecreatesSTSCluster) {
   initialize();
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 2);
 
+  std::string uuid;
+  std::string prefix = "cluster.sts_token_service_internal-ap-southeast-2_";
+  for (const auto& c : test_server_->counters()) {
+    if (absl::StartsWith(c->name(), prefix)) {
+      uuid = c->name().substr(prefix.size(), 36);
+    }
+  }
+  EXPECT_FALSE(uuid.empty());
+  std::string sts_name = fmt::format("aws.metadata_credentials_provider.sts_token_"
+                                     "service_internal-ap-southeast-2_{}",
+                                     uuid);
+
   cluster_.set_name("testing");
   cds_helper_.setCds({cluster_});
 
   // Should delete our sts cluster and cluster_0
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
-                                 "service_internal-ap-southeast-2.clusters_removed_by_cds",
-                                 1);
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_"
-                                 "service_internal-ap-southeast-2.clusters_readded_after_cds",
-                                 1);
+  test_server_->waitForCounterGe(fmt::format("{}.clusters_removed_by_cds", sts_name), 1);
+  test_server_->waitForCounterGe(fmt::format("{}.clusters_readded_after_cds", sts_name), 1);
 }
 
 TEST_F(CdsInteractionTest, ClusterRemovalRecreatesIMDSCluster) {

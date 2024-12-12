@@ -104,7 +104,8 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
   setUpstreamProtocol(Http::CodecType::HTTP2);
   config_helper_.configureUpstreamTls(
       false, false, absl::nullopt,
-      [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& ctx) {
+      [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& upstream_ctx) {
+        auto& ctx = *upstream_ctx.mutable_common_tls_context();
         auto& params = *ctx.mutable_tls_params();
         params.set_tls_minimum_protocol_version(
             envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
@@ -382,11 +383,7 @@ TEST_P(SslIntegrationTest, LogPeerIpSanUnsupportedIpVersion) {
 
   checkStats();
   auto result = waitForAccessLog(listener_access_log_name_);
-  if (version_ == Network::Address::IpVersion::v4) {
-    EXPECT_EQ(result, "1.2.3.4");
-  } else {
-    EXPECT_EQ(result, "0:1:2:3::4");
-  }
+  EXPECT_EQ(result, "1.2.3.4,0:1:2:3::4");
 }
 
 TEST_P(SslIntegrationTest, AsyncCertValidationSucceeds) {
@@ -703,6 +700,59 @@ public:
       return options.setSigningAlgorithms({"ecdsa_secp256r1_sha256"});
     } else {
       return options.setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"});
+      ;
+    }
+  }
+
+  ClientSslTransportOptions ecdsaP384OnlyClientOptions() {
+    auto options = ClientSslTransportOptions();
+    if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+      return options.setSigningAlgorithms({"ecdsa_secp384r1_sha384", "rsa_pss_rsae_sha256"});
+    } else {
+      return options
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256", "ECDHE-ECDSA-AES128-GCM-SHA256"})
+          .setSigningAlgorithms({"rsa_pss_rsae_sha256", "ecdsa_secp384r1_sha384"})
+          .setCurves({"P-384"});
+    }
+  }
+
+  ClientSslTransportOptions ecdsaP256P384OnlyClientOptions() {
+    auto options = ClientSslTransportOptions();
+    if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+      return options.setSigningAlgorithms(
+          {"ecdsa_secp256r1_sha256", "ecdsa_secp384r1_sha384", "rsa_pss_rsae_sha256"});
+    } else {
+      return options
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256", "ECDHE-ECDSA-AES128-GCM-SHA256"})
+          .setSigningAlgorithms(
+              {"rsa_pss_rsae_sha256", "ecdsa_secp256r1_sha256", "ecdsa_secp384r1_sha384"})
+          .setCurves({"P-256", "P-384"});
+    }
+  }
+
+  ClientSslTransportOptions ecdsaP256P521OnlyClientOptions() {
+    auto options = ClientSslTransportOptions();
+    if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+      return options.setSigningAlgorithms(
+          {"ecdsa_secp256r1_sha256", "ecdsa_secp521r1_sha512", "rsa_pss_rsae_sha256"});
+    } else {
+      return options
+          .setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256", "ECDHE-ECDSA-AES128-GCM-SHA256"})
+          .setSigningAlgorithms(
+              {"rsa_pss_rsae_sha256", "ecdsa_secp256r1_sha256", "ecdsa_secp521r1_sha512"})
+          .setCurves({"P-256", "P-521"});
+    }
+  }
+
+  ClientSslTransportOptions ecdsaAllCurvesClientOptions() {
+    auto options = ClientSslTransportOptions().setClientEcdsaCert(true);
+    if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
+      return options.setSigningAlgorithms({"ecdsa_secp256r1_sha256", "ecdsa_secp384r1_sha384",
+                                           "ecdsa_secp521r1_sha512", "rsa_pss_rsae_sha256"});
+    } else {
+      return options
+          .setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256", "ECDHE-ECDSA-AES128-GCM-SHA256"})
+          .setCurves({"P-256", "P-384", "P-521"});
     }
   }
 
@@ -874,6 +924,82 @@ TEST_P(SslCertficateIntegrationTest, ServerRsaEcdsaClientEcdsaOnly) {
   client_ecdsa_cert_ = true;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ecdsaOnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// Server has RSA and ECDSA P-256 certificates, client only supports
+// P-384 curve. We fall back to RSA certificate.
+TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP256EcdsaClientEcdsaP384Only) {
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+  // We have to set the server curves to allow for ECDH negotiation where client
+  // doesn't support P-256
+  server_curves_.push_back("P-256");
+  server_curves_.push_back("P-384");
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaP384OnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// Server has RSA and ECDSA P-384 certificates, client only supports
+// and P-256 and P-521 curves. We fall back to RSA certificate.
+TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP384EcdsaClientEcdsaP256P521Only) {
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+  server_ecdsa_cert_name_ = "server_ecdsa_p384";
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaP256P521OnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// Server has RSA and ECDSA P-256 certificates, client only supports
+// and P-256 and P-384 curves. We fall back to RSA certificate.
+TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP521EcdsaClientEcdsaP256P384Only) {
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+  server_ecdsa_cert_name_ = "server_ecdsa_p521";
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaP256P384OnlyClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  checkStats();
+}
+
+// Server has RSA and ECDSA P-384 certificates, client supports all curves.
+// We use the ECDSA certificate.
+TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP384EcdsaClientAllCurves) {
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+  server_ecdsa_cert_name_ = "server_ecdsa_p384";
+  client_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaAllCurvesClientOptions());
+  };
+  testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
+  for (const Stats::CounterSharedPtr& counter : test_server_->counters()) {
+    // Useful for debugging when the test is failing.
+    if (counter->name().find("ssl") != std::string::npos) {
+      ENVOY_LOG_MISC(critical, "Found ssl metric: {}", counter->name());
+    }
+  }
+  checkStats();
+}
+
+// Server has RSA and ECDSA P-521 certificates, client supports all curves.
+// We use the ECDSA certificate.
+TEST_P(SslCertficateIntegrationTest, ServerRsaServerEcdsaP521EcdsaClientAllCurves) {
+  server_rsa_cert_ = true;
+  server_ecdsa_cert_ = true;
+  server_ecdsa_cert_name_ = "server_ecdsa_p521";
+  client_ecdsa_cert_ = true;
+  ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
+    return makeSslClientConnection(ecdsaAllCurvesClientOptions());
   };
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   checkStats();

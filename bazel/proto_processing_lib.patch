@@ -1,0 +1,44 @@
+diff --git a/proto_processing_lib/factory_helper.h b/proto_processing_lib/factory_helper.h
+index 95003ff..52298e4 100644
+--- a/proto_processing_lib/factory_helper.h
++++ b/proto_processing_lib/factory_helper.h
+@@ -26,13 +26,6 @@
+ 
+ namespace proto_processing_lib {
+ 
+-// Factory Method to create UnknownFieldChecker.
+-static const proto_processing_lib::proto_scrubber::FieldCheckerInterface*
+-FactoryCreateUnknownFieldChecker() {
+-  return proto_processing_lib::proto_scrubber::UnknownFieldChecker::
+-      GetDefault();
+-}
+-
+ // Factory Method to create UnknownFieldChecker.
+ static std::unique_ptr<proto_processing_lib::FieldMaskTreeInterface>
+ FactoryCreateFieldMaskTree(
+diff --git a/proto_processing_lib/proto_scrubber/field_mask_tree.h b/proto_processing_lib/proto_scrubber/field_mask_tree.h
+index 883f2b5..cdac0ad 100644
+--- a/proto_processing_lib/proto_scrubber/field_mask_tree.h
++++ b/proto_processing_lib/proto_scrubber/field_mask_tree.h
+@@ -72,7 +72,7 @@ class FieldMaskTree : public FieldMaskTreeInterface {
+   // Returns OK if all "paths" are legal, otherwise returns INVALID_ARGUMENT and
+   // the tree will be left in a broken state. Calling this method again on a
+   // broken FieldMaskTree will yield an error of FAILED_PRECONDITION.
+-  absl::Status AddOrIntersectFieldPaths(const std::vector<std::string>& paths);
++  absl::Status AddOrIntersectFieldPaths(const std::vector<std::string>& paths) override;
+ 
+   // Checks if a field is on this tree. Returns "kInclude" if the field is on a
+   // leaf node of the tree, "kPartial" if it's on a non-leaf node and "kExclude"
+@@ -96,10 +96,10 @@ class FieldMaskTree : public FieldMaskTreeInterface {
+   }
+ 
+   // Returns the status of the tree.
+-  absl::Status status() { return status_; }
++  absl::Status status() override { return status_; }
+ 
+   // Returns root node of the tree.
+-  const FieldMaskNode* root() const { return root_.get(); }
++  const FieldMaskNode* root() const override { return root_.get(); }
+ 
+  private:
+   // The root node of the FieldMask tree.

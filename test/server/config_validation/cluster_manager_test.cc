@@ -52,7 +52,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
       ssl_context_manager, secret_manager, quic_stat_names, server);
 
   const envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);
+  ClusterManagerPtr cluster_manager = *factory.clusterManagerFromProto(bootstrap);
   EXPECT_EQ(nullptr, cluster_manager->getThreadLocalCluster("cluster"));
 }
 

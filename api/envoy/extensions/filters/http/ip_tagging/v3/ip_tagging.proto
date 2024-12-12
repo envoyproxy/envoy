@@ -18,6 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // IP tagging :ref:`configuration overview <config_http_filters_ip_tagging>`.
 // [#extension: envoy.filters.http.ip_tagging]
 
+// [#next-free-field: 6]
 message IPTagging {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ip_tagging.v2.IPTagging";
@@ -52,6 +53,38 @@ message IPTagging {
     repeated config.core.v3.CidrRange ip_list = 2;
   }
 
+  // Specify to which header the tags will be written.
+  message IpTagHeader {
+    // Describes how to apply the tags to the headers.
+    enum HeaderAction {
+      // (DEFAULT) The header specified in :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`
+      // will be dropped, before the tags are applied. The incoming header will be "sanitized" regardless of whether the request is internal or external.
+      //
+      // Note that the header will be visible unsanitized to any filters that are invoked before the ip-tag-header filter, unless it has an *x-envoy* prefix.
+      SANITIZE = 0;
+
+      // Tags will be appended to the header specified in
+      // :ref:`ip_tag_header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tag_header>`.
+      //
+      // Please note that this could cause the header to retain values set by the http client regardless of whether the request is internal or external.
+      APPEND_IF_EXISTS_OR_ADD = 1;
+    }
+
+    // Header to use for ip-tagging.
+    //
+    // This header will be sanitized based on the config in
+    // :ref:`action <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.action>`
+    // rather than the defaults for x-envoy prefixed headers.
+    string header = 1
+        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+    // Control if the :ref:`header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.header>`
+    // will be sanitized, or be appended to.
+    //
+    // Default: *SANITIZE*.
+    HeaderAction action = 2;
+  }
+
   // The type of request the filter should apply to.
   RequestType request_type = 1 [(validate.rules).enum = {defined_only: true}];
 
@@ -59,4 +92,9 @@ message IPTagging {
   // Tracked by issue https://github.com/envoyproxy/envoy/issues/2695]
   // The set of IP tags for the filter.
   repeated IPTag ip_tags = 4 [(validate.rules).repeated = {min_items: 1}];
+
+  // Specify to which header the tags will be written.
+  //
+  // If left unspecified, the tags will be appended to the ``x-envoy-ip-tags`` header.
+  IpTagHeader ip_tag_header = 5;
 }

@@ -19,8 +19,9 @@ constexpr char MetricsServiceName[] = "envoy.stat_sinks.metrics_service";
 class MetricsServiceSinkFactory : Logger::Loggable<Logger::Id::config>,
                                   public Server::Configuration::StatsSinkFactory {
 public:
-  Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
-                                 Server::Configuration::ServerFactoryContext& server) override;
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message& config,
+                  Server::Configuration::ServerFactoryContext& server) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

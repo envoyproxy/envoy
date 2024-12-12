@@ -39,9 +39,10 @@ public:
     Upstream::ResourcePriority priority = Upstream::ResourcePriority::Default;
     NiceMock<Upstream::MockClusterManager> cm;
     cm.initializeThreadLocalClusters({"fake_cluster"});
-    EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _))
+    EXPECT_CALL(cm.thread_local_cluster_, tcpConnPool(_, _, _))
         .WillOnce(Return(Upstream::TcpPoolData([]() {}, &mock_pool_)));
-    conn_pool_ = std::make_unique<TcpConnPool>(cm.thread_local_cluster_, priority, nullptr);
+    conn_pool_ =
+        std::make_unique<TcpConnPool>(nullptr, cm.thread_local_cluster_, priority, nullptr);
   }
 
   std::unique_ptr<TcpConnPool> conn_pool_;
@@ -93,20 +94,10 @@ TEST_F(TcpConnPoolTest, Cancel) {
 class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
-    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_, _, _))
+    ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_, _))
         .WillByDefault(
-            Invoke([&](Envoy::Http::FilterChainManager& manager, bool only_create_if_configured,
-                       const Envoy::Http::FilterChainOptions&) -> bool {
-              if (only_create_if_configured) {
-                return false;
-              }
-              Envoy ::Http::FilterFactoryCb factory_cb =
-                  [](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-                callbacks.addStreamDecoderFilter(std::make_shared<Router::UpstreamCodecFilter>());
-              };
-              manager.applyFilterFactoryCb({}, factory_cb);
-              return true;
-            }));
+            Invoke([&](Envoy::Http::FilterChainManager&,
+                       const Envoy::Http::FilterChainOptions&) -> bool { return false; }));
     EXPECT_CALL(mock_router_filter_, downstreamHeaders())
         .Times(AnyNumber())
         .WillRepeatedly(Return(&request_));

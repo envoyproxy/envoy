@@ -15,7 +15,7 @@ namespace Tls {
 class PlatformBridgeCertValidatorFactory : public CertValidatorFactory,
                                            public Config::TypedFactory {
 public:
-  CertValidatorPtr
+  absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       Server::Configuration::CommonFactoryContext& context) override;
 

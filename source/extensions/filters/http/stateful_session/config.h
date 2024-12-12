@@ -23,7 +23,7 @@ private:
   createFilterFactoryFromProtoTyped(const ProtoConfig& proto_config,
                                     const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) override;
-  Router::RouteSpecificFilterConfigConstSharedPtr
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(const PerRouteProtoConfig& proto_config,
                                        Server::Configuration::ServerFactoryContext&,
                                        ProtobufMessage::ValidationVisitor&) override;

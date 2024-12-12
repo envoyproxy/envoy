@@ -156,9 +156,9 @@ TEST_F(ReqWithoutQueryTest, TestParserNotRecognizingCommand) {
 )EOF";
   TestUtility::loadFromYaml(yaml, config_);
 
-  EXPECT_THROW(Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_)
-                   .IgnoreError(),
-               EnvoyException);
+  EXPECT_FALSE(Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_)
+                   .status()
+                   .ok());
 }
 
 } // namespace Formatter

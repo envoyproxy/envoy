@@ -14,8 +14,8 @@ class ConnectionInfoSetterImpl : public ConnectionInfoSetter {
 public:
   ConnectionInfoSetterImpl(const Address::InstanceConstSharedPtr& local_address,
                            const Address::InstanceConstSharedPtr& remote_address)
-      : local_address_(local_address), remote_address_(remote_address),
-        direct_remote_address_(remote_address) {}
+      : local_address_(local_address), direct_local_address_(local_address),
+        remote_address_(remote_address), direct_remote_address_(remote_address) {}
 
   void setDirectRemoteAddressForTest(const Address::InstanceConstSharedPtr& direct_remote_address) {
     direct_remote_address_ = direct_remote_address;
@@ -32,6 +32,9 @@ public:
 
   // ConnectionInfoSetter
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
+  const Address::InstanceConstSharedPtr& directLocalAddress() const override {
+    return direct_local_address_;
+  }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
   }
@@ -89,6 +92,7 @@ public:
 
 private:
   Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr direct_local_address_;
   bool local_address_restored_{false};
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr direct_remote_address_;

@@ -37,7 +37,7 @@ public:
     ~NullOptionalArg() override = default;
   };
 
-  virtual ~ConfigProviderManager() = default;
+  ~ConfigProviderManager() override = default;
 
   /**
    * Returns a dynamic ConfigProvider which receives configuration via an xDS API.

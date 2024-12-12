@@ -12,7 +12,7 @@ envoy_cc_test(
     name = "client_ssl_auth_test",
     srcs = ["client_ssl_auth_test.cc"],
     data = glob(["test_data/**"]),
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//contrib/client_ssl_auth/filters/network/source:client_ssl_auth",
         "//test/mocks/network:network_mocks",
@@ -29,7 +29,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//contrib/client_ssl_auth/filters/network/source:config",
         "//source/common/protobuf:utility_lib",

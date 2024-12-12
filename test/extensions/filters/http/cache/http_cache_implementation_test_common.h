@@ -67,13 +67,10 @@ protected:
   void pumpDispatcher() { delegate_->pumpDispatcher(); }
   LookupContextPtr lookup(absl::string_view request_path);
 
-  absl::Status insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
-                      const absl::string_view body);
-
-  virtual absl::Status insert(LookupContextPtr lookup,
-                              const Http::TestResponseHeaderMapImpl& headers,
-                              const absl::string_view body,
-                              const absl::optional<Http::TestResponseTrailerMapImpl> trailers);
+  virtual absl::Status
+  insert(LookupContextPtr lookup, const Http::TestResponseHeaderMapImpl& headers,
+         const absl::string_view body,
+         const absl::optional<Http::TestResponseTrailerMapImpl> trailers = absl::nullopt);
 
   absl::Status insert(absl::string_view request_path,
                       const Http::TestResponseHeaderMapImpl& headers, const absl::string_view body);

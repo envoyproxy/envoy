@@ -22,7 +22,7 @@ public:
                     Server::Configuration::ServerFactoryContext& context)
       : config_(config), context_(context) {}
 
-  ~ExtProcHttpClient() { cancel(); }
+  ~ExtProcHttpClient() override { cancel(); }
 
   void sendRequest(envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream,
                    const uint64_t stream_id, RequestCallbacks* callbacks,
@@ -36,13 +36,15 @@ public:
   void onFailure(const Http::AsyncClient::Request& request,
                  Http::AsyncClient::FailureReason reason) override;
 
+  const Envoy::StreamInfo::StreamInfo* getStreamInfo() const override;
+
   Server::Configuration::ServerFactoryContext& context() const { return context_; }
 
 private:
   void onError();
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor config_;
   Server::Configuration::ServerFactoryContext& context_;
-  Http::AsyncClient::Request* active_request_{};
+  Http::AsyncClient::OngoingRequest* active_request_{};
   RequestCallbacks* callbacks_{};
 };
 

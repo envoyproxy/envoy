@@ -413,13 +413,7 @@ protected:
     StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 
     Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
-    // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
-    // never called. The watermark value is set to the size of the stream window. As a result this
-    // watermark can never overflow because the peer can never send more bytes than the stream
-    // window without triggering protocol error. This buffer is drained after each DATA frame was
-    // dispatched through the filter chain unless
-    // envoy.reloadable_features.defer_processing_backedup_streams is enabled,
-    // in which case this buffer may accumulate data.
+    // This buffer may accumulate data and be drained in scheduleProcessingOfBufferedData.
     // See source/docs/flow_control.md for more information.
     Buffer::InstancePtr pending_recv_data_;
     Buffer::InstancePtr pending_send_data_;
@@ -439,7 +433,6 @@ protected:
     bool pending_receive_buffer_high_watermark_called_ : 1;
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
-    bool defer_processing_backedup_streams_ : 1;
     // Latch whether this stream is operating with this flag.
     bool extend_stream_lifetime_flag_ : 1;
     absl::string_view details_;
@@ -496,26 +489,6 @@ protected:
     // Marks data consumed by the stream, granting the peer additional stream
     // window.
     void grantPeerAdditionalStreamWindow();
-  };
-
-  // Encapsulates the logic for sending DATA frames on a given stream.
-  // Deprecated. Remove when removing
-  // `envoy_reloadable_features_http2_use_visitor_for_data`.
-  class StreamDataFrameSource : public http2::adapter::DataFrameSource {
-  public:
-    explicit StreamDataFrameSource(StreamImpl& stream) : stream_(stream) {}
-
-    // Returns a pair of the next payload length, and whether that payload is the end of the data
-    // for this stream.
-    std::pair<int64_t, bool> SelectPayloadLength(size_t max_length) override;
-    // Queues the frame header and a DATA frame payload of the specified length for writing.
-    bool Send(absl::string_view frame_header, size_t payload_length) override;
-    // Whether the codec should send the END_STREAM flag on the final DATA frame.
-    bool send_fin() const override { return send_fin_; }
-
-  private:
-    StreamImpl& stream_;
-    bool send_fin_ = false;
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
@@ -765,9 +738,7 @@ protected:
   // Called when a stream encodes to the http2 connection which enables us to
   // keep the active_streams list in LRU if deferred processing.
   void updateActiveStreamsOnEncode(StreamImpl& stream) {
-    if (stream.defer_processing_backedup_streams_) {
-      LinkedList::moveIntoList(stream.removeFromList(active_streams_), active_streams_);
-    }
+    LinkedList::moveIntoList(stream.removeFromList(active_streams_), active_streams_);
   }
 
   // dumpState helper method.

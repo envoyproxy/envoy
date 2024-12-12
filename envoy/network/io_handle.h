@@ -293,15 +293,15 @@ public:
 
   /**
    * Get local address (ip:port pair)
-   * @return local address as @ref Address::InstanceConstSharedPtr
+   * @return local address as @ref Address::InstanceConstSharedPtr or error status.
    */
-  virtual Address::InstanceConstSharedPtr localAddress() PURE;
+  virtual absl::StatusOr<Address::InstanceConstSharedPtr> localAddress() PURE;
 
   /**
    * Get peer's address (ip:port pair)
-   * @return peer's address as @ref Address::InstanceConstSharedPtr
+   * @return peer's address as @ref Address::InstanceConstSharedPtr or error status.
    */
-  virtual Address::InstanceConstSharedPtr peerAddress() PURE;
+  virtual absl::StatusOr<Address::InstanceConstSharedPtr> peerAddress() PURE;
 
   /**
    * Duplicates the handle. This is intended to be used only on listener sockets. (see man dup)

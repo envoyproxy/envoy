@@ -35,6 +35,7 @@ protected:
   bool server_rsa_cert_{true};
   bool server_rsa_cert_ocsp_staple_{false};
   bool server_ecdsa_cert_{false};
+  std::string server_ecdsa_cert_name_{"server_ecdsa"};
   bool server_ecdsa_cert_ocsp_staple_{false};
   bool ocsp_staple_required_{false};
   bool prefer_client_ciphers_{false};

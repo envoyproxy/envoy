@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
     extension_names = ["envoy.formatter.metadata"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/json:json_loader_lib",

@@ -19,7 +19,7 @@ final class SetEventTrackerTest: XCTestCase {
   }
 
   func testSetEventTracker() throws {
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let eventExpectation =
       self.expectation(description: "Passed event tracker receives an event")

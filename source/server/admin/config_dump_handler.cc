@@ -135,13 +135,13 @@ buildNameMatcher(const Http::Utility::QueryParamsMulti& params, Regex::Engine& e
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
   matcher.set_regex(*name_regex);
-  TRY_ASSERT_MAIN_THREAD
-  return Regex::Utility::parseRegex(matcher, engine);
-  END_TRY
-  catch (EnvoyException& e) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Error while parsing name_regex from ", *name_regex, ": ", e.what()));
+  auto regex_or_error = Regex::Utility::parseRegex(matcher, engine);
+  if (regex_or_error.status().ok()) {
+    return std::move(*regex_or_error);
   }
+  return absl::InvalidArgumentError(absl::StrCat("Error while parsing name_regex from ",
+                                                 *name_regex, ": ",
+                                                 regex_or_error.status().message()));
 }
 
 } // namespace

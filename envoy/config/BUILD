@@ -155,3 +155,11 @@ envoy_cc_library(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "xds_manager_interface",
+    hdrs = ["xds_manager.h"],
+    deps = [
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)

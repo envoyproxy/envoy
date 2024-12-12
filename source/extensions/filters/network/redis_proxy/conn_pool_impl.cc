@@ -36,10 +36,6 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
 
 static uint16_t default_port = 6379;
 
-bool isClusterProvidedLb(const Upstream::ClusterInfo& info) {
-  return info.loadBalancerFactory().name() == "envoy.load_balancing_policies.cluster_provided";
-}
-
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -168,8 +164,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
   OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type =
       info->clusterType();
-  is_redis_cluster_ = isClusterProvidedLb(*info) && cluster_type.has_value() &&
-                      cluster_type->name() == "envoy.clusters.redis";
+  is_redis_cluster_ = cluster_type.has_value() && cluster_type->name() == "envoy.clusters.redis";
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {
@@ -385,10 +380,13 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
       }
       END_TRY catch (const EnvoyException&) { return nullptr; }
     }
-    Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
-        cluster_->info(), "", address_ptr, nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
-        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-        envoy::config::core::v3::UNKNOWN, dispatcher_.timeSource())};
+    Upstream::HostSharedPtr new_host{THROW_OR_RETURN_VALUE(
+        Upstream::HostImpl::create(
+            cluster_->info(), "", address_ptr, nullptr, nullptr, 1,
+            envoy::config::core::v3::Locality(),
+            envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+            envoy::config::core::v3::UNKNOWN, dispatcher_.timeSource()),
+        std::unique_ptr<Upstream::HostImpl>)};
     host_address_map_[host_address_map_key] = new_host;
     created_via_redirect_hosts_.push_back(new_host);
     it = host_address_map_.find(host_address_map_key);

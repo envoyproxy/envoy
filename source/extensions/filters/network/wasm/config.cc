@@ -20,7 +20,7 @@ Network::FilterFactoryCb WasmFilterConfig::createFilterFactoryFromProtoTyped(
       Extensions::Common::Wasm::CustomStatNamespace);
   auto filter_config = std::make_shared<FilterConfig>(proto_config, context);
   return [filter_config](Network::FilterManager& filter_manager) -> void {
-    auto filter = filter_config->createFilter();
+    auto filter = filter_config->createContext();
     if (filter) {
       filter_manager.addFilter(filter);
     } // else fail open

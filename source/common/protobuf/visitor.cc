@@ -15,7 +15,7 @@ namespace {
 absl::Status traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::Message& message,
                                    std::vector<const Protobuf::Message*>& parents,
                                    bool was_any_or_top_level, bool recurse_into_any) {
-  visitor.onMessage(message, parents, was_any_or_top_level);
+  RETURN_IF_NOT_OK(visitor.onMessage(message, parents, was_any_or_top_level));
 
   // If told to recurse into Any messages, do that here and skip the rest of the function.
   if (recurse_into_any) {
@@ -23,7 +23,7 @@ absl::Status traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::M
     absl::string_view target_type_url;
 
     if (message.GetTypeName() == "google.protobuf.Any") {
-      auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&message);
+      auto* any_message = Protobuf::DynamicCastMessage<ProtobufWkt::Any>(&message);
       inner_message = Helper::typeUrlToMessage(any_message->type_url());
       target_type_url = any_message->type_url();
       // inner_message must be valid as parsing would have already failed to load if there was an

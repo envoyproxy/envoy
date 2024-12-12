@@ -35,6 +35,7 @@ envoy_cc_library(
         "@envoy_api//envoy/extensions/filters/http/alternate_protocols_cache/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/decompressor/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/header_formatters/preserve_case/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/network/dns_resolver/apple/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg_cc_proto",

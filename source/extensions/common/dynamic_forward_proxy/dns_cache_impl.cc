@@ -25,20 +25,23 @@ absl::StatusOr<std::shared_ptr<DnsCacheImpl>> DnsCacheImpl::createDnsCacheImpl(
         "DNS Cache [{}] configured with preresolve_hostnames={} larger than max_hosts={}",
         config.name(), config.preresolve_hostnames().size(), max_hosts));
   }
+  auto resolver_or_error =
+      selectDnsResolver(config, context.serverFactoryContext().mainThreadDispatcher(),
+                        context.serverFactoryContext());
+  RETURN_IF_NOT_OK_REF(resolver_or_error.status());
 
-  return std::shared_ptr<DnsCacheImpl>(new DnsCacheImpl(context, config));
+  return std::shared_ptr<DnsCacheImpl>(
+      new DnsCacheImpl(context, config, std::move(*resolver_or_error)));
 }
 
 DnsCacheImpl::DnsCacheImpl(
     Server::Configuration::GenericFactoryContext& context,
-    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
+    const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
+    Network::DnsResolverSharedPtr&& resolver)
     : main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       config_(config), random_generator_(context.serverFactoryContext().api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(THROW_OR_RETURN_VALUE(
-          selectDnsResolver(config, main_thread_dispatcher_, context.serverFactoryContext()),
-          Network::DnsResolverSharedPtr)),
-      tls_slot_(context.serverFactoryContext().threadLocal()),
+      resolver_(std::move(resolver)), tls_slot_(context.serverFactoryContext().threadLocal()),
       scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
       resource_manager_(*scope_, context.serverFactoryContext().runtime(), config.name(),
@@ -421,18 +424,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   std::string details_with_maybe_trace = std::string(details);
   if (primary_host_info != nullptr && primary_host_info->active_query_ != nullptr) {
     if (enable_dfp_dns_trace_) {
-      OptRef<const std::vector<Network::ActiveDnsQuery::Trace>> traces =
-          primary_host_info->active_query_->getTraces();
-      if (traces.has_value()) {
-        std::vector<std::string> string_traces;
-        string_traces.reserve(traces.ref().size());
-        std::transform(traces.ref().begin(), traces.ref().end(), std::back_inserter(string_traces),
-                       [](const auto& trace) {
-                         return absl::StrCat(trace.trace_, "=",
-                                             trace.time_.time_since_epoch().count());
-                       });
-        details_with_maybe_trace = absl::StrCat(details, ":", absl::StrJoin(string_traces, ","));
-      }
+      std::string traces = primary_host_info->active_query_->getTraces();
+      details_with_maybe_trace = absl::StrCat(details, ":", traces);
     }
     // `cancel` must be called last because the `ActiveQuery` will be destroyed afterward.
     if (is_timeout) {
@@ -505,7 +498,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
     primary_host_info->host_info_->setDetails(details_with_maybe_trace);
 
-    runAddUpdateCallbacks(host, primary_host_info->host_info_);
+    absl::Status host_status = runAddUpdateCallbacks(host, primary_host_info->host_info_);
+    ENVOY_BUG(host_status.ok(),
+              absl::StrCat("Failed to update DFP host due to ", host_status.message()));
     primary_host_info->host_info_->setFirstResolveComplete();
     address_changed = true;
     stats_.host_address_changed_.inc();
@@ -540,11 +535,12 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   }
 }
 
-void DnsCacheImpl::runAddUpdateCallbacks(const std::string& host,
-                                         const DnsHostInfoSharedPtr& host_info) {
+absl::Status DnsCacheImpl::runAddUpdateCallbacks(const std::string& host,
+                                                 const DnsHostInfoSharedPtr& host_info) {
   for (auto* callbacks : update_callbacks_) {
-    callbacks->callbacks_.onDnsHostAddOrUpdate(host, host_info);
+    RETURN_IF_NOT_OK(callbacks->callbacks_.onDnsHostAddOrUpdate(host, host_info));
   }
+  return absl::OkStatus();
 }
 
 void DnsCacheImpl::runResolutionCompleteCallbacks(const std::string& host,

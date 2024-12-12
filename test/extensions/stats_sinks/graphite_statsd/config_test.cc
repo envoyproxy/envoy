@@ -54,7 +54,7 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, ValidUdpIp) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
   EXPECT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
   EXPECT_NE(udp_sink, nullptr);
@@ -66,8 +66,10 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, ValidUdpIp) {
 TEST(GraphiteStatsdConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
   EXPECT_THROW(
-      GraphiteStatsdSinkFactory().createStatsSink(
-          envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink(), server),
+      GraphiteStatsdSinkFactory()
+          .createStatsSink(envoy::extensions::stat_sinks::graphite_statsd::v3::GraphiteStatsdSink(),
+                           server)
+          .value(),
       ProtoValidationException);
 }
 
@@ -92,7 +94,8 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, CustomBufferSize) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
+  ;
   ASSERT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
   ASSERT_NE(udp_sink, nullptr);
@@ -119,7 +122,8 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, DefaultBufferSize) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
+  ;
   ASSERT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
   ASSERT_NE(udp_sink, nullptr);
@@ -150,7 +154,8 @@ TEST_P(GraphiteStatsdConfigLoopbackTest, WithCustomPrefix) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
+  ;
   ASSERT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
   ASSERT_NE(udp_sink, nullptr);

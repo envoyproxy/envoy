@@ -53,6 +53,102 @@ match_excluded_headers:
   cb(filter_callbacks);
 }
 
+TEST(AwsRequestSigningFilterConfigTest, CredentialProvider_inline) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+credential_provider:
+  inline_credential:
+    access_key_id: access_key
+    secret_access_key: secret_key
+    session_token: session_token
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  AwsRequestSigningProtoConfig expected_config;
+  expected_config.set_service_name("s3");
+  expected_config.set_region("us-west-2");
+  auto* credential_provider =
+      expected_config.mutable_credential_provider()->mutable_inline_credential();
+  credential_provider->set_access_key_id("access_key");
+  credential_provider->set_secret_access_key("secret_key");
+  credential_provider->set_session_token("session_token");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
+TEST(AwsRequestSigningFilterConfigTest, CredentialProvider_assume_role_web_identity) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+credential_provider:
+  assume_role_with_web_identity:
+    web_identity_token: this-is-token
+    role_arn: arn:aws:iam::123456789012:role/role-name
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  AwsRequestSigningProtoConfig expected_config;
+  expected_config.set_service_name("s3");
+  expected_config.set_region("us-west-2");
+  auto credential_provider =
+      expected_config.mutable_credential_provider()->mutable_assume_role_with_web_identity();
+  credential_provider->set_web_identity_token("this-is-token");
+  credential_provider->set_role_arn("arn:aws:iam::123456789012:role/role-name");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
+TEST(AwsRequestSigningFilterConfigTest, CredentialProvider_invalid) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+credential_provider: {}
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  EXPECT_TRUE(proto_config.has_credential_provider());
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  // The config is invalid because the credential provider is empty.
+  absl::StatusOr<Http::FilterFactoryCb> cb =
+      factory.createFilterFactoryFromProto(proto_config, "", context);
+  EXPECT_FALSE(cb.ok());
+  EXPECT_EQ(cb.status().code(), absl::StatusCode::kInvalidArgument);
+}
+
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigExplicitSigningAlgorithm) {
   const std::string yaml = R"EOF(
 service_name: s3
@@ -196,14 +292,11 @@ match_excluded_headers:
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsRequestSigningFilterFactory factory;
 
-  EXPECT_THROW(
-      {
-        Http::FilterFactoryCb cb =
-            factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
-        Http::MockFilterChainFactoryCallbacks filter_callbacks;
-        cb(filter_callbacks);
-      },
-      EnvoyException);
+  const auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "SigV4 region string cannot contain wildcards or commas. Region "
+            "sets can be specified when using signing_algorithm: AWS_SIGV4A.");
 }
 
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4A) {
@@ -270,7 +363,7 @@ stat_prefix: foo_prefix
 
   const auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  ASSERT_NE(route_config, nullptr);
+  ASSERT_TRUE(route_config.ok());
 }
 
 TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4RegionInEnv) {
@@ -296,7 +389,7 @@ stat_prefix: foo_prefix
 
   const auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  ASSERT_NE(route_config, nullptr);
+  ASSERT_TRUE(route_config.ok());
 }
 
 TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4A) {
@@ -321,7 +414,7 @@ stat_prefix: foo_prefix
 
   const auto route_config = factory.createRouteSpecificFilterConfig(
       proto_config, context, ProtobufMessage::getNullValidationVisitor());
-  ASSERT_NE(route_config, nullptr);
+  ASSERT_TRUE(route_config.ok());
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidRegionRouteSpecificFilterConfigSigV4) {
@@ -344,12 +437,12 @@ stat_prefix: foo_prefix
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsRequestSigningFilterFactory factory;
 
-  EXPECT_THROW(
-      {
-        const auto route_config = factory.createRouteSpecificFilterConfig(
-            proto_config, context, ProtobufMessage::getNullValidationVisitor());
-      },
-      EnvoyException);
+  const auto result = factory.createRouteSpecificFilterConfig(
+      proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "SigV4 region string cannot contain wildcards or commas. Region "
+            "sets can be specified when using signing_algorithm: AWS_SIGV4A.");
 }
 
 TEST(AwsRequestSigningFilterConfigTest, SimpleConfigSigV4RegionInEnv) {
@@ -396,14 +489,11 @@ match_excluded_headers:
   AwsRequestSigningFilterFactory factory;
 
   // Should fail as sigv4a requires region explicitly within config
-  EXPECT_THROW(
-      {
-        Http::FilterFactoryCb cb =
-            factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
-        Http::MockFilterChainFactoryCallbacks filter_callbacks;
-        cb(filter_callbacks);
-      },
-      EnvoyException);
+  const auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "AWS region is not set in xDS configuration and failed to retrieve "
+            "from environment variable or AWS profile/config files.");
 }
 
 TEST(AwsRequestSigningFilterConfigTest, UpstreamFactoryTest) {
@@ -440,12 +530,12 @@ stat_prefix: foo_prefix
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsRequestSigningFilterFactory factory;
 
-  EXPECT_THROW(
-      {
-        const auto route_config = factory.createRouteSpecificFilterConfig(
-            proto_config, context, ProtobufMessage::getNullValidationVisitor());
-      },
-      EnvoyException);
+  const auto result = factory.createRouteSpecificFilterConfig(
+      proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "AWS region is not set in xDS configuration and failed to retrieve from "
+            "environment variable or AWS profile/config files.");
 }
 
 TEST(AwsRequestSigningFilterConfigTest, RouteSpecificFilterConfigSigV4ANoRegion) {
@@ -474,12 +564,12 @@ stat_prefix: foo_prefix
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsRequestSigningFilterFactory factory;
 
-  EXPECT_THROW(
-      {
-        const auto route_config = factory.createRouteSpecificFilterConfig(
-            proto_config, context, ProtobufMessage::getNullValidationVisitor());
-      },
-      EnvoyException);
+  const auto result = factory.createRouteSpecificFilterConfig(
+      proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "AWS region is not set in xDS configuration and failed to retrieve from "
+            "environment variable or AWS profile/config files.");
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidRegionNoRegionAvailable) {
@@ -507,14 +597,11 @@ match_excluded_headers:
   AwsRequestSigningFilterFactory factory;
 
   // Should fail as sigv4a requires region explicitly within config
-  EXPECT_THROW(
-      {
-        Http::FilterFactoryCb cb =
-            factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
-        Http::MockFilterChainFactoryCallbacks filter_callbacks;
-        cb(filter_callbacks);
-      },
-      EnvoyException);
+  const auto result = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().message(),
+            "AWS region is not set in xDS configuration and failed to retrieve "
+            "from environment variable or AWS profile/config files.");
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidLowExpirationTime) {

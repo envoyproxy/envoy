@@ -28,7 +28,8 @@ using proxy_wasm::ContextBase;
 
 class TestFilter : public Context {
 public:
-  TestFilter(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
+  TestFilter(Wasm* wasm, uint32_t root_context_id,
+             Common::Wasm::PluginHandleSharedPtr plugin_handle)
       : Context(wasm, root_context_id, plugin_handle) {}
   MOCK_CONTEXT_LOG_;
 
@@ -105,7 +106,7 @@ TEST_P(WasmNetworkFilterTest, BadCode) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter().onNewConnection());
 }
 
-TEST_P(WasmNetworkFilterTest, BadCodeFailOpen) {
+TEST_P(WasmNetworkFilterTest, DEPRECATED_FEATURE_TEST(BadCodeFailOpen)) {
   setupConfig("bad code", "", "", true);
   EXPECT_EQ(wasm_, nullptr);
   setupFilter();
@@ -178,7 +179,7 @@ TEST_P(WasmNetworkFilterTest, CloseStream) {
   filter().onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_P(WasmNetworkFilterTest, SegvFailOpen) {
+TEST_P(WasmNetworkFilterTest, DEPRECATED_FEATURE_TEST(SegvFailOpen)) {
   if (std::get<0>(GetParam()) != "v8" || std::get<1>(GetParam()) != "cpp") {
     return;
   }

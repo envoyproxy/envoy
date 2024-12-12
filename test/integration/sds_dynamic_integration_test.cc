@@ -125,7 +125,8 @@ protected:
   }
 
   void setUpSdsConfig(envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig* secret_config,
-                      const std::string& secret_name) {
+                      const std::string& secret_name,
+                      const std::string& sds_cluster = "sds_cluster.lyft.com") {
     secret_config->set_name(secret_name);
     auto* config_source = secret_config->mutable_sds_config();
     config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
@@ -133,7 +134,7 @@ protected:
     api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
     auto* grpc_service = api_config_source->add_grpc_services();
-    setGrpcService(*grpc_service, "sds_cluster.lyft.com", sdsUpstream()->localAddress());
+    setGrpcService(*grpc_service, sds_cluster, sdsUpstream()->localAddress());
   }
 
   envoy::extensions::transport_sockets::tls::v3::Secret getServerSecretRsa() {
@@ -1117,6 +1118,334 @@ TEST_P(SdsCdsIntegrationTest, BasicSuccess) {
                                                              {}, "42");
   // Successfully removed the dynamic cluster.
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
+}
+
+// Test SDS cluster with dynamic cluster i.e. declared via CDS.
+class SdsDynamicClusterIntegrationTest : public SdsDynamicIntegrationBaseTest {
+public:
+  void initialize() override {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // The static cluster.
+      auto* static_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      static_cluster->MergeFrom(bootstrap.static_resources().clusters(0));
+      // Make a copy of the static cluster to create and set up the dynamic cluster.
+      dynamic_cluster_ = *static_cluster;
+
+      // Set up the first cluster, the CDS cluster.
+      auto* cds_cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cds_cluster->set_name("cds_cluster");
+      cds_cluster->mutable_load_assignment()->set_cluster_name("cds_cluster");
+      ConfigHelper::setHttp2(*cds_cluster);
+
+      if (use_bootstrap_eds_) {
+        // Add a bootstrap EDS cluster as SDS cluster.
+        auto* sds_bootstrap_cluster = bootstrap.mutable_static_resources()->add_clusters();
+        sds_bootstrap_cluster->set_type(envoy::config::cluster::v3::Cluster::EDS);
+        sds_bootstrap_cluster->set_name("sds_bootstrap_cluster");
+        auto* eds_cluster_config = sds_bootstrap_cluster->mutable_eds_cluster_config();
+        eds_cluster_config->mutable_eds_config()->set_resource_api_version(
+            envoy::config::core::v3::ApiVersion::V3);
+        eds_cluster_config->mutable_eds_config()->mutable_path_config_source()->set_path(
+            eds_helper_.edsPath());
+        envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+        cluster_load_assignment.set_cluster_name("sds_bootstrap_cluster");
+
+        auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
+        auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
+        auto* socket_address =
+            endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+        socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+        socket_address->set_port_value(sdsUpstream()->localAddress()->ip()->port());
+        eds_helper_.setEds({cluster_load_assignment});
+        ConfigHelper::setHttp2(*sds_bootstrap_cluster);
+      } else {
+        // Make a copy of the static cluster to create and set up the dynamic SDS cluster.
+        sds_cluster_ = *static_cluster;
+
+        // Set up the second cluster, the SDS cluster.
+        sds_cluster_.set_name(sds_cluster_name_);
+
+        auto* lb_endpoint =
+            sds_cluster_.mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+        lb_endpoint->mutable_endpoint()
+            ->mutable_address()
+            ->mutable_socket_address()
+            ->set_port_value(sdsUpstream()->localAddress()->ip()->port());
+      }
+      ConfigHelper::setHttp2(sds_cluster_);
+
+      // Set up the dynamic cluster to use SDS.
+      dynamic_cluster_.set_name("dynamic");
+      dynamic_cluster_.mutable_connect_timeout()->MergeFrom(
+          ProtobufUtil::TimeUtil::MillisecondsToDuration(500000));
+      auto* transport_socket = dynamic_cluster_.mutable_transport_socket();
+      envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+      auto* secret_config =
+          tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+      setUpSdsConfig(secret_config, "client_cert", sds_cluster_name_);
+
+      transport_socket->set_name("envoy.transport_sockets.tls");
+      transport_socket->mutable_typed_config()->PackFrom(tls_context);
+
+      // Set up the Bootstrap's CDS config to fetch from the CDS cluster.
+      const std::string cds_yaml = R"EOF(
+    api_config_source:
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: cds_cluster
+      set_node_on_first_message_only: true
+)EOF";
+      auto* cds = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
+      TestUtility::loadFromYaml(cds_yaml, *cds);
+    });
+
+    HttpIntegrationTest::initialize();
+  }
+
+  void TearDown() override {
+    {
+      if (valid_sds_cluster_) {
+        AssertionResult result = sds_connection_->close();
+        RELEASE_ASSERT(result, result.message());
+        result = sds_connection_->waitForDisconnect();
+        RELEASE_ASSERT(result, result.message());
+        sds_connection_.reset();
+      }
+    }
+    cleanUpXdsConnection();
+    cleanupUpstreamAndDownstream();
+    codec_client_.reset();
+    test_server_.reset();
+    fake_upstreams_.clear();
+  }
+
+  void createUpstreams() override {
+    // CDS Cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // SDS Cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // Static cluster.
+    addFakeUpstream(Http::CodecType::HTTP1);
+    xds_upstream_ = fake_upstreams_.front().get();
+  }
+
+  std::unique_ptr<FakeUpstream>& cdsUpstream() { return fake_upstreams_[0]; }
+
+  void sendCdsResponse(bool do_not_send_sds_cluster = false) {
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+    if (!do_not_send_sds_cluster) {
+      sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+          Config::TypeUrl::get().Cluster, {sds_cluster_, dynamic_cluster_},
+          {sds_cluster_, dynamic_cluster_}, {}, "55");
+    } else {
+      sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+          Config::TypeUrl::get().Cluster, {dynamic_cluster_}, {dynamic_cluster_}, {}, "55");
+    }
+  }
+
+  void sendSdsResponse2(const envoy::extensions::transport_sockets::tls::v3::Secret& secret,
+                        FakeStream& sds_stream) {
+    envoy::service::discovery::v3::DiscoveryResponse discovery_response;
+    discovery_response.set_version_info("1");
+    discovery_response.set_type_url(Config::TypeUrl::get().Secret);
+    discovery_response.add_resources()->PackFrom(secret);
+    sds_stream.sendGrpcMessage(discovery_response);
+  }
+
+  envoy::config::cluster::v3::Cluster dynamic_cluster_;
+  envoy::config::cluster::v3::Cluster sds_cluster_;
+  bool valid_sds_cluster_{true};
+  bool use_bootstrap_eds_{false};
+  std::string sds_cluster_name_;
+  FakeHttpConnectionPtr sds_connection_;
+  FakeStreamPtr sds_stream_;
+  EdsHelper eds_helper_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SdsDynamicClusterIntegrationTest,
+                         testing::ValuesIn(getSdsTestsParams()), sdsTestParamsToString);
+
+// Validate that Envoy accepts dynamic cluster in SDS ApiConfigSource.
+TEST_P(SdsDynamicClusterIntegrationTest, BasicSuccess) {
+  on_server_init_function_ = [this]() {
+    {
+      // Send CDS response.
+      AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
+      RELEASE_ASSERT(result, result.message());
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+      sendCdsResponse();
+    }
+  };
+  sds_cluster_name_ = "sds_dynamic_cluster.lyft.com";
+  initialize();
+
+  {
+    // Send SDS response.
+    AssertionResult result = sdsUpstream()->waitForHttpConnection(*dispatcher_, sds_connection_);
+    RELEASE_ASSERT(result, result.message());
+
+    result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    sds_stream_->startGrpcStream();
+    sendSdsResponse2(getClientSecret(), *sds_stream_);
+  }
+
+  // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
+  test_server_->waitForGaugeGe("server.state", 0);
+  test_server_->waitForGaugeGe("server.live", 1);
+
+  // Validate that the sds update was successful.
+  test_server_->waitForCounterGe("sds.client_cert.update_success", 1);
+
+  // The 4 clusters are CDS,SDS,static and dynamic cluster.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {}, "42");
+  // Successfully removed the dynamic cluster.
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 2);
+}
+
+// Validate that Envoy accepts bootstrap EDS cluster in SDS ApiConfigSource.
+TEST_P(SdsDynamicClusterIntegrationTest, EdsBootStrapCluster) {
+  on_server_init_function_ = [this]() {
+    {
+      // Send CDS response.
+      AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
+      RELEASE_ASSERT(result, result.message());
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+      sendCdsResponse(true);
+    }
+  };
+  sds_cluster_name_ = "sds_bootstrap_cluster";
+  use_bootstrap_eds_ = true;
+  initialize();
+
+  {
+    // Send SDS response.
+    AssertionResult result = sdsUpstream()->waitForHttpConnection(*dispatcher_, sds_connection_);
+    RELEASE_ASSERT(result, result.message());
+
+    result = sds_connection_->waitForNewStream(*dispatcher_, sds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    sds_stream_->startGrpcStream();
+    sendSdsResponse2(getClientSecret(), *sds_stream_);
+  }
+
+  // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
+  test_server_->waitForGaugeGe("server.state", 0);
+  test_server_->waitForGaugeGe("server.live", 1);
+
+  // Validate that the sds update was successful.
+  test_server_->waitForCounterGe("sds.client_cert.update_success", 1);
+
+  // The 4 clusters are CDS,SDS,static and dynamic cluster.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
+
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {}, "42");
+  // Successfully removed the dynamic cluster.
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
+}
+
+// Validate that Envoy rejects dynamic cluster in SDS ApiConfigSource when runtime feature is
+// turned off.
+TEST_P(SdsDynamicClusterIntegrationTest, RejectDynamicSdsCluster) {
+  on_server_init_function_ = [this]() {
+    {
+      // Send CDS response.
+      AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
+      RELEASE_ASSERT(result, result.message());
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+      sendCdsResponse();
+    }
+  };
+  sds_cluster_name_ = "sds_dynamic_cluster.lyft.com";
+  valid_sds_cluster_ = false;
+  config_helper_.addRuntimeOverride("envoy.restart_features.skip_backing_cluster_check_for_sds",
+                                    "false");
+  initialize();
+
+  // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
+  test_server_->waitForGaugeGe("server.state", 0);
+  test_server_->waitForGaugeGe("server.live", 1);
+
+  // Validate that the cds update was rejected.
+  if (clientType() == Grpc::ClientType::EnvoyGrpc) {
+    test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+  }
+}
+
+// Validate that Envoy starts fine with a non-existent CDS cluster in SDS ApiConfigSource.
+TEST_P(SdsDynamicClusterIntegrationTest, ClusterRefersNonExistentSdsCluster) {
+  on_server_init_function_ = [this]() {
+    {
+      // Send CDS Response.
+      AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
+      RELEASE_ASSERT(result, result.message());
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+      sendCdsResponse(true);
+    }
+  };
+  sds_cluster_name_ = "non_existent_sds_cluster.lyft.com";
+  valid_sds_cluster_ = false;
+  initialize();
+
+  // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
+  test_server_->waitForGaugeGe("server.state", 0);
+  test_server_->waitForGaugeGe("server.live", 1);
+
+  // Validate that the secret update failed because SDS cluster is not found.
+  test_server_->waitForCounterGe("sds.client_cert.update_failure", 1);
+
+  // The 3 clusters are CDS, static and dynamic cluster.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {}, "42");
+  // Successfully removed the dynamic cluster.
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 2);
+}
+
+// Validate that Envoy starts fine with a cyclic dependency between CDS and SDS clusters
+// i.e. CDS cluster refers to dynamic SDS cluster and SDS cluster refers to the same CDS cluster.
+TEST_P(SdsDynamicClusterIntegrationTest, CdsSdsCyclicDependency) {
+  on_server_init_function_ = [this]() {
+    {
+      // CDS.
+      AssertionResult result = cdsUpstream()->waitForHttpConnection(*dispatcher_, xds_connection_);
+      RELEASE_ASSERT(result, result.message());
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+      sendCdsResponse(true);
+    }
+  };
+  sds_cluster_name_ = "dynamic";
+  valid_sds_cluster_ = false;
+  initialize();
+
+  // Validate that Envoy accepts SDS as dynamic cluster and moves to Live state.
+  test_server_->waitForGaugeGe("server.state", 0);
+  test_server_->waitForGaugeGe("server.live", 1);
+  test_server_->waitForCounterGe("sds.client_cert.update_failure", 1);
+
+  // The 3 clusters are CDS, static and dynamic cluster.
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
+
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {}, "42");
+  // Successfully removed the dynamic cluster.
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 2);
 }
 
 class SdsDynamicDownstreamPrivateKeyIntegrationTest : public SdsDynamicDownstreamIntegrationTest {

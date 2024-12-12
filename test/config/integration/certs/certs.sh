@@ -22,9 +22,9 @@ generate_rsa_key() {
   openssl genrsa -out "${1}key.pem" 2048
 }
 
-# $1=<certificate name>
+# $1=<certificate name> $2=<curve name>
 generate_ecdsa_key() {
-  openssl ecparam -name secp256r1 -genkey -out "${1}key.pem"
+  openssl ecparam -name "${2}" -genkey -out "${1}key.pem"
 }
 
 # $1=<certificate name> $2=<CA name> $3=[days]
@@ -88,16 +88,33 @@ generate_rsa_key server ca
 generate_x509_cert server ca
 generate_ocsp_response server ca
 generate_info_header server
+# Generate RSA cert for the server with extra data for a very large certificate
+generate_rsa_key long_server ca
+generate_x509_cert long_server ca
+generate_ocsp_response long_server ca
+generate_info_header long_server
 # Generate RSA cert for the server with different SAN
 generate_rsa_key server2 ca
 generate_x509_cert server2 ca
 generate_info_header server2
-# Generate ECDSA cert for the server.
+# Generate ECDSA P-256 cert for the server.
 cp -f servercert.cfg server_ecdsacert.cfg
-generate_ecdsa_key server_ecdsa ca
+generate_ecdsa_key server_ecdsa secp256r1
 generate_x509_cert server_ecdsa ca
 generate_ocsp_response server_ecdsa ca
 rm -f server_ecdsacert.cfg
+# Generate ECDSA P-384 cert for the server.
+cp -f servercert.cfg server_ecdsa_p384cert.cfg
+generate_ecdsa_key server_ecdsa_p384 secp384r1
+generate_x509_cert server_ecdsa_p384 ca
+generate_ocsp_response server_ecdsa_p384 ca
+rm -f server_ecdsa_p384cert.cfg
+# Generate ECDSA P-521 cert for the server.
+cp -f servercert.cfg server_ecdsa_p521cert.cfg
+generate_ecdsa_key server_ecdsa_p521 secp521r1
+generate_x509_cert server_ecdsa_p521 ca
+generate_ocsp_response server_ecdsa_p521 ca
+rm -f server_ecdsa_p521cert.cfg
 # Generate cert for the client.
 generate_rsa_key client
 generate_x509_cert client ca
@@ -106,7 +123,7 @@ generate_rsa_key client2 ca
 generate_x509_cert client2 intermediate_ca_2
 # Generate ECDSA cert for the client.
 cp -f clientcert.cfg client_ecdsacert.cfg
-generate_ecdsa_key client_ecdsa ca
+generate_ecdsa_key client_ecdsa secp256r1
 generate_x509_cert client_ecdsa ca
 rm -f client_ecdsacert.cfg
 

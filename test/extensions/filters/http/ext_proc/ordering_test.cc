@@ -92,7 +92,7 @@ protected:
     auto stream = std::make_unique<NiceMock<MockStream>>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
     EXPECT_CALL(*stream, streamInfo()).WillRepeatedly(ReturnRef(async_client_stream_info_));
-    EXPECT_CALL(*stream, close());
+    EXPECT_CALL(*stream, closeLocalStream());
     return stream;
   }
 
@@ -213,6 +213,7 @@ protected:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   testing::NiceMock<StreamInfo::MockStreamInfo> async_client_stream_info_;
+  MockStream* stream_ = nullptr;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
@@ -282,7 +283,7 @@ TEST_F(OrderingTest, DefaultOrderingGetWithTimer) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  EXPECT_CALL(*request_timer, disableTimer()).Times(2);
+  EXPECT_CALL(*request_timer, disableTimer()).Times(3);
   sendRequestHeadersReply();
 
   MockTimer* response_timer = new MockTimer(&dispatcher_);
@@ -290,10 +291,15 @@ TEST_F(OrderingTest, DefaultOrderingGetWithTimer) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, continueEncoding());
-  EXPECT_CALL(*response_timer, disableTimer()).Times(2);
+  EXPECT_CALL(*response_timer, disableTimer()).Times(3);
   sendResponseHeadersReply();
   Buffer::OwnedImpl req_body("Hello!");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(req_body, true));
+  // Mimic the server closing the stream with a status code 0.
+  // This will close and cleanup the stream.
+  // This will also cause ProcessorState::onFinishProcessorCall to be called one
+  // more time.
+  closeGrpcStream();
 }
 
 // A normal call with all supported callbacks turned on
@@ -492,13 +498,7 @@ TEST_F(OrderingTest, ResponseSomeDataComesFast) {
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
-  // Some of the data might come back but we should watermark so that we
-  // don't fill the buffer.
-  EXPECT_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark());
   EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->encodeData(resp_body_1, false));
-
-  // When the response does comes back, we should lift the watermark
-  EXPECT_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark());
   sendResponseHeadersReply();
 
   EXPECT_CALL(stream_delegate_, send(_, false));
@@ -549,9 +549,13 @@ TEST_F(OrderingTest, ImmediateResponseOnRequest) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  EXPECT_CALL(*request_timer, disableTimer()).Times(2);
+  EXPECT_CALL(*request_timer, disableTimer()).Times(3);
   sendImmediateResponse500();
   // The rest of the filter isn't necessarily called after this.
+
+  // Mimic the server sends trailers with a "grpc-status: 0".
+  // This will close and cleanup the stream.
+  closeGrpcStream();
 }
 
 // An immediate response on the response path
@@ -564,7 +568,7 @@ TEST_F(OrderingTest, ImmediateResponseOnResponse) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  EXPECT_CALL(*request_timer, disableTimer()).Times(3);
+  EXPECT_CALL(*request_timer, disableTimer()).Times(4);
   sendRequestHeadersReply();
 
   MockTimer* response_timer = new MockTimer(&dispatcher_);
@@ -573,10 +577,14 @@ TEST_F(OrderingTest, ImmediateResponseOnResponse) {
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
-  EXPECT_CALL(*response_timer, disableTimer()).Times(2);
+  EXPECT_CALL(*response_timer, disableTimer()).Times(3);
   sendImmediateResponse500();
   Buffer::OwnedImpl resp_body("Hello!");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));
+
+  // Mimic the server sends trailers with a "grpc-status: 0".
+  // This will close and cleanup the stream.
+  closeGrpcStream();
 }
 
 // *** Tests of out-of-order messages ***
@@ -754,6 +762,8 @@ TEST_F(OrderingTest, GrpcErrorOutOfLine) {
   sendRequestHeadersReply();
 
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  // This will trigger Filter::onGrpcClose, also cause
+  // ProcessorState::onFinishProcessorCall to be called one more time.
   sendGrpcError();
 }
 
@@ -922,11 +932,7 @@ TEST_F(FastFailOrderingTest, GrpcErrorOnStartRequestBodyBufferedPartial) {
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_body, true));
 }
 
-TEST_F(FastFailOrderingTest,
-       GrpcErrorOnTransitionAboveQueueLimitWhenSendingStreamChunkWithDeferredProcessing) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{std::string(Runtime::defer_processing_backedup_streams), "true"}});
-
+TEST_F(FastFailOrderingTest, GrpcErrorOnTransitionAboveQueueLimitWhenSendingStreamChunk) {
   initialize([](ExternalProcessor& cfg) {
     auto* pm = cfg.mutable_processing_mode();
     pm->set_request_header_mode(ProcessingMode::SKIP);

@@ -6,9 +6,13 @@ permissions:
 on:
   workflow_call:
     secrets:
-      gcp-key:
+      gcs-cache-key:
         required: true
+
     inputs:
+      gcs-cache-bucket:
+        type: string
+        required: true
       request:
         type: string
         required: true
@@ -24,20 +28,21 @@ concurrency:
 jobs:
   build:
     secrets:
-      gcp-key: ${{ secrets.gcp-key }}
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
       contents: read
       packages: read
     uses: ./.github/workflows/_run.yml
     name: ${{ matrix.name ||matrix.target }}
     with:
-      # bazel-extra: '--config=remote-envoy-engflow'
+      bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
       error-match: |
         ERROR
         error:
         Error:
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: true
       request: ${{ inputs.request }}
       target: ${{ matrix.target }}

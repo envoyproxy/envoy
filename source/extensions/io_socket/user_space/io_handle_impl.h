@@ -80,8 +80,8 @@ public:
                               unsigned long*) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
   absl::optional<int> domain() override;
-  Network::Address::InstanceConstSharedPtr localAddress() override;
-  Network::Address::InstanceConstSharedPtr peerAddress() override;
+  absl::StatusOr<Network::Address::InstanceConstSharedPtr> localAddress() override;
+  absl::StatusOr<Network::Address::InstanceConstSharedPtr> peerAddress() override;
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;

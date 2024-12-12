@@ -139,10 +139,10 @@ public:
   const Network::ResolvedUdpSocketConfig& upstreamSocketConfig() const override {
     return upstream_socket_config_;
   }
-  const std::vector<AccessLog::InstanceSharedPtr>& sessionAccessLogs() const override {
+  const AccessLog::InstanceSharedPtrVector& sessionAccessLogs() const override {
     return session_access_logs_;
   }
-  const std::vector<AccessLog::InstanceSharedPtr>& proxyAccessLogs() const override {
+  const AccessLog::InstanceSharedPtrVector& proxyAccessLogs() const override {
     return proxy_access_logs_;
   }
   const UdpSessionFilterChainFactory& sessionFilterFactory() const override { return *this; };
@@ -194,8 +194,8 @@ private:
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
-  std::vector<AccessLog::InstanceSharedPtr> session_access_logs_;
-  std::vector<AccessLog::InstanceSharedPtr> proxy_access_logs_;
+  AccessLog::InstanceSharedPtrVector session_access_logs_;
+  AccessLog::InstanceSharedPtrVector proxy_access_logs_;
   UdpTunnelingConfigPtr tunneling_config_;
   std::shared_ptr<UdpSessionFilterConfigProviderManager>
       udp_session_filter_config_provider_manager_;
@@ -219,7 +219,13 @@ public:
                      config, context.messageValidationVisitor()));
     return [shared_config](Network::UdpListenerFilterManager& filter_manager,
                            Network::UdpReadFilterCallbacks& callbacks) -> void {
-      filter_manager.addReadFilter(std::make_unique<UdpProxyFilter>(callbacks, shared_config));
+      if (shared_config->usingPerPacketLoadBalancing()) {
+        filter_manager.addReadFilter(
+            std::make_unique<PerPacketLoadBalancingUdpProxyFilter>(callbacks, shared_config));
+      } else {
+        filter_manager.addReadFilter(
+            std::make_unique<StickySessionUdpProxyFilter>(callbacks, shared_config));
+      }
     };
   }
 

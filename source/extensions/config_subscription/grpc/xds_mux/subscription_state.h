@@ -62,7 +62,9 @@ public:
 
   virtual void markStreamFresh(bool should_send_initial_resource_versions) PURE;
 
-  UpdateAck handleResponse(const RS& response) {
+  // May modify the order of the resources in response_proto to put all the
+  // non-heartbeat resources first.
+  UpdateAck handleResponse(RS& response) {
     // We *always* copy the response's nonce into the next request, even if we're going to make that
     // request a NACK by setting error_detail.
     UpdateAck ack(response.nonce(), typeUrl());
@@ -108,7 +110,9 @@ public:
 
 protected:
   virtual std::unique_ptr<RQ> getNextRequestInternal() PURE;
-  virtual void handleGoodResponse(const RS& message) PURE;
+  // May modify the order of the resources in response_proto to put all the
+  // non-heartbeat resources first.
+  virtual void handleGoodResponse(RS& message) PURE;
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
     // Note that error_detail being set is what indicates that a (Delta)DiscoveryRequest is a NACK.
     ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);

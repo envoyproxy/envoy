@@ -15,6 +15,7 @@
 #include "source/common/access_log/access_log_manager_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/random_generator.h"
+#include "source/common/config/xds_manager_impl.h"
 #include "source/common/grpc/common.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/protobuf/message_validator_impl.h"
@@ -132,6 +133,7 @@ public:
     http_context_.setDefaultTracingConfig(tracing_config);
   }
   void setSinkPredicates(std::unique_ptr<Stats::SinkPredicates>&&) override {}
+  Config::XdsManager& xdsManager() override { return *xds_manager_; }
 
   // Server::WorkerFactory
   WorkerPtr createWorker(uint32_t, OverloadManager&, OverloadManager&,
@@ -184,6 +186,7 @@ private:
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Http::HttpServerPropertiesCacheManager> http_server_properties_cache_manager_;
   std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
+  Config::XdsManagerPtr xds_manager_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;

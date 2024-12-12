@@ -180,15 +180,25 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   // Now that we'll definitely be making the request, add filter state stats if configured to do so.
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
-  if ((config_->emitFilterStateStats() || config_->filterMetadata().has_value()) &&
-      !filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
-    filter_state->setData(decoder_callbacks_->filterConfigName(),
-                          std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
-                          Envoy::StreamInfo::FilterState::StateType::Mutable,
-                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+  if ((config_->emitFilterStateStats() || config_->filterMetadata().has_value())) {
+    if (!filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
+      filter_state->setData(decoder_callbacks_->filterConfigName(),
+                            std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
+                            Envoy::StreamInfo::FilterState::StateType::Mutable,
+                            Envoy::StreamInfo::FilterState::LifeSpan::Request);
 
-    logging_info_ =
-        filter_state->getDataMutable<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName());
+      // This may return nullptr (if there's a value at this name whose type doesn't match or isn't
+      // mutable, for example), so we must check logging_info_ is not nullptr later.
+      logging_info_ =
+          filter_state->getDataMutable<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName());
+    }
+    if (logging_info_ == nullptr) {
+      stats_.filter_state_name_collision_.inc();
+      ENVOY_STREAM_LOG(debug,
+                       "Could not find logging info at {}! (Did another filter already put data "
+                       "at this name?)",
+                       *decoder_callbacks_, decoder_callbacks_->filterConfigName());
+    }
   }
 
   absl::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
@@ -402,6 +412,10 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
 
 void Filter::updateLoggingInfo() {
   if (!config_->emitFilterStateStats()) {
+    return;
+  }
+
+  if (logging_info_ == nullptr) {
     return;
   }
 

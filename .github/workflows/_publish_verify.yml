@@ -5,7 +5,13 @@ permissions:
 
 on:
   workflow_call:
+    secrets:
+      gcs-cache-key:
+        required: true
     inputs:
+      gcs-cache-bucket:
+        type: string
+        required: true
       request:
         type: string
         required: true
@@ -79,12 +85,15 @@ jobs:
               shell: bash
 
   distro:
+    secrets:
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
       contents: read
       packages: read
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
+      arch: ${{ matrix.arch }}
       bazel-extra: ${{ matrix.bazel-extra || '--config=remote-envoy-engflow' }}
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
@@ -92,6 +101,7 @@ jobs:
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
       downloads: |
         release.signed: release.signed
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: ${{ matrix.rbe && matrix.rbe || false }}
       request: ${{ inputs.request }}
       runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
@@ -132,7 +142,5 @@ jobs:
           target: verify_distro
           arch: arm64
           bazel-extra: >-
-            --config=cache-envoy-engflow
-            --config=common-envoy-engflow
-            --config=bes-envoy-engflow
-          runs-on: envoy-arm64-small
+            --config=remote-cache-envoy-engflow
+          runs-on: github-arm64-2c-8gb

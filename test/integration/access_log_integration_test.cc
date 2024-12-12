@@ -54,6 +54,6 @@ TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {
       });
   testRouterDownstreamDisconnectBeforeRequestComplete();
   const std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, HasSubstr("x_forwarded_for\":\"\xEF\xBF\xBD"));
+  EXPECT_THAT(log, HasSubstr("x_forwarded_for\":\"\\u00ec"));
 }
 } // namespace Envoy

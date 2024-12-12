@@ -85,6 +85,8 @@ public:
   RouterTest()
       : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
+    ON_CALL(cm_.thread_local_cluster_, chooseHost(_))
+        .WillByDefault(Return(cm_.thread_local_cluster_.lb_.host_));
   };
 
   void testRequestResponse(bool with_trailers, bool can_use_http3 = true) {
@@ -112,7 +114,7 @@ public:
     callbacks_.route_->route_entry_.connect_config_ =
         absl::make_optional<RouteEntry::ConnectConfig>();
 
-    EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _));
+    EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _));
 
     Http::TestRequestHeaderMapImpl headers;
     HttpTestUtility::addDefaultHeaders(headers);
@@ -374,7 +376,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   ON_CALL(callbacks_.route_->route_entry_, priority())
       .WillByDefault(Return(Upstream::ResourcePriority::High));
   EXPECT_CALL(cm_.thread_local_cluster_,
-              httpConnPool(Upstream::ResourcePriority::High, _, router_.get()));
+              httpConnPool(_, Upstream::ResourcePriority::High, _, router_.get()));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
                            const Http::ConnectionPool::Instance::StreamOptions&)
@@ -407,7 +409,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
   ON_CALL(callbacks_.route_->route_entry_, priority())
       .WillByDefault(Return(Upstream::ResourcePriority::High));
   EXPECT_CALL(cm_.thread_local_cluster_,
-              httpConnPool(Upstream::ResourcePriority::High, _, router_.get()));
+              httpConnPool(_, Upstream::ResourcePriority::High, _, router_.get()));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks,
                            const Http::ConnectionPool::Instance::StreamOptions&)
@@ -436,7 +438,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
 }
 
 TEST_F(RouterTest, Http1Upstream) {
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, absl::optional<Http::Protocol>(), _));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, absl::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
@@ -457,7 +459,7 @@ TEST_F(RouterTest, Http1Upstream) {
 }
 
 TEST_F(RouterTest, Http2Upstream) {
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, absl::optional<Http::Protocol>(), _));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, absl::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
@@ -480,9 +482,9 @@ TEST_F(RouterTest, HashPolicy) {
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Return(absl::optional<uint64_t>(10)));
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(10UL, context->computeHashKey().value());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -507,9 +509,9 @@ TEST_F(RouterTest, HashPolicyNoHash) {
       .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
   EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _, _))
       .WillOnce(Return(absl::optional<uint64_t>()));
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, router_.get()))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, router_.get()))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_FALSE(context->computeHashKey());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -541,9 +543,9 @@ TEST_F(RouterTest, AddCookie) {
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(10UL, context->computeHashKey().value());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -585,9 +587,9 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(10UL, context->computeHashKey().value());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -627,9 +629,9 @@ TEST_F(RouterTest, AddMultipleCookies) {
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(10UL, context->computeHashKey().value());
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -675,9 +677,9 @@ TEST_F(RouterTest, MetadataNoOp) { EXPECT_EQ(nullptr, router_->metadataMatchCrit
 TEST_F(RouterTest, MetadataMatchCriteria) {
   ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
       .WillByDefault(Return(&callbacks_.route_->route_entry_.metadata_matches_criteria_));
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(context->metadataMatchCriteria(),
                   &callbacks_.route_->route_entry_.metadata_matches_criteria_);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
@@ -705,9 +707,9 @@ TEST_F(RouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
 
 TEST_F(RouterTest, NoMetadataMatchCriteria) {
   ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -742,7 +744,7 @@ TEST_F(RouterTest, CancelBeforeBoundToPool) {
 }
 
 TEST_F(RouterTest, NoHost) {
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
@@ -2754,10 +2756,6 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
 // Test when the upstream request gets reset while the client is sending the body
 // with more data arriving but not buffering any data.
 TEST_F(RouterTest, UpstreamResetDuringBodyDataTransferNotBufferingNotEndStream) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.send_local_reply_when_no_buffer_and_upstream_request", "true"}});
-
   Buffer::OwnedImpl decoding_buffer;
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
@@ -2779,39 +2777,6 @@ TEST_F(RouterTest, UpstreamResetDuringBodyDataTransferNotBufferingNotEndStream) 
 
   EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started");
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-}
-
-// Test the original branch when local_reply_when_no_buffer_and_upstream_request runtime is false.
-TEST_F(RouterTest, NormalPathUpstreamResetDuringBodyDataTransferNotBuffering) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.send_local_reply_when_no_buffer_and_upstream_request",
-        "false"}});
-
-  Buffer::OwnedImpl decoding_buffer;
-  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-
-  NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
-
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"}, {"myheader", "present"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, false);
-
-  const std::string body1("body1");
-  Buffer::OwnedImpl buf1(body1);
-  router_->decodeData(buf1, true);
-  EXPECT_EQ(1U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
-
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 }
 
 // Test retrying a request, when the first attempt fails while the client
@@ -3288,7 +3253,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::LocalReset);
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "503"}, {"content-length", "19"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
@@ -6163,9 +6128,9 @@ TEST_F(RouterTest, ApplicationProtocols) {
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         Network::TransportSocketOptionsConstSharedPtr transport_socket_options =
             context->upstreamTransportSocketOptions();
         EXPECT_NE(transport_socket_options, nullptr);
@@ -6341,7 +6306,7 @@ TEST_F(RouterTest, PostHttpUpstream) {
       absl::make_optional<RouteEntry::ConnectConfig>();
 
   // Make sure POST request result in the HTTP pool.
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -6707,7 +6672,7 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
 
 TEST_F(RouterTest, OverwriteSchemeWithUpstreamTransportProtocol) {
   EXPECT_CALL(callbacks_.stream_info_, shouldSchemeMatchUpstream()).WillRepeatedly(Return(true));
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, absl::optional<Http::Protocol>(), _));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, absl::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();

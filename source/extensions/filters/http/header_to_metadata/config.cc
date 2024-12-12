@@ -26,7 +26,7 @@ Http::FilterFactoryCb HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 HeaderToMetadataConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {

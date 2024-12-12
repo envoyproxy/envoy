@@ -695,10 +695,11 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicSuccessWithConfigDump)
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
   EXPECT_EQ("application/json", contentType(response));
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body()).value();
   size_t index = 0;
-  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
-    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
+  auto array = json->getObjectArray("configs").value();
+  for (const Json::ObjectSharedPtr& obj_ptr : array) {
+    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type").value()) == 0);
     index++;
   }
 

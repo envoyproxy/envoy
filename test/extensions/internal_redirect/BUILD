@@ -14,7 +14,7 @@ envoy_cc_test(
     srcs = [
         "redirect_extension_integration_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/internal_redirect/allow_listed_routes:config",

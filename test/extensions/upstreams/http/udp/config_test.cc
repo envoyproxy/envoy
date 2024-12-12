@@ -29,15 +29,13 @@ protected:
 
 TEST_F(UdpGenericConnPoolFactoryTest, CreateValidUdpConnPool) {
   auto host = std::make_shared<Envoy::Upstream::MockHost>();
-  EXPECT_CALL(thread_local_cluster_.lb_, chooseHost).WillOnce(Return(host));
-  EXPECT_TRUE(factory_.createGenericConnPool(thread_local_cluster_,
+  EXPECT_TRUE(factory_.createGenericConnPool(host, thread_local_cluster_,
                                              Router::GenericConnPoolFactory::UpstreamProtocol::UDP,
                                              priority_, Envoy::Http::Protocol::Http2, nullptr));
 }
 
 TEST_F(UdpGenericConnPoolFactoryTest, CreateInvalidUdpConnPool) {
-  EXPECT_CALL(thread_local_cluster_.lb_, chooseHost).WillOnce(Return(nullptr));
-  EXPECT_FALSE(factory_.createGenericConnPool(thread_local_cluster_,
+  EXPECT_FALSE(factory_.createGenericConnPool(nullptr, thread_local_cluster_,
                                               Router::GenericConnPoolFactory::UpstreamProtocol::UDP,
                                               priority_, Envoy::Http::Protocol::Http2, nullptr));
 }

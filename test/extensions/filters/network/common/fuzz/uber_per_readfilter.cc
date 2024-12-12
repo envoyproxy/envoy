@@ -103,7 +103,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
   // HttpConnectionManager} on which we have constraints.
   if (filter_name == NetworkFilterNames::get().DirectResponse) {
     envoy::extensions::filters::network::direct_response::v3::Config& config =
-        *Envoy::Protobuf::DynamicCastToGenerated<
+        *Envoy::Protobuf::DynamicCastMessage<
             envoy::extensions::filters::network::direct_response::v3::Config>(config_message);
     if (config.response().specifier_case() ==
         envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
@@ -112,7 +112,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
     }
   } else if (filter_name == NetworkFilterNames::get().LocalRateLimit) {
     envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit& config =
-        *Envoy::Protobuf::DynamicCastToGenerated<
+        *Envoy::Protobuf::DynamicCastMessage<
             envoy::extensions::filters::network::local_ratelimit::v3::LocalRateLimit>(
             config_message);
     if (config.token_bucket().fill_interval().seconds() > SecondsPerDay) {
@@ -125,7 +125,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
     }
   } else if (filter_name == NetworkFilterNames::get().HttpConnectionManager) {
     envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-        config = *Envoy::Protobuf::DynamicCastToGenerated<
+        config = *Envoy::Protobuf::DynamicCastMessage<
             envoy::extensions::filters::network::http_connection_manager::v3::
                 HttpConnectionManager>(config_message);
     if (config.codec_type() == envoy::extensions::filters::network::http_connection_manager::v3::
@@ -158,7 +158,7 @@ void UberFilterFuzzer::checkInvalidInputForFuzzer(const std::string& filter_name
     }
   } else if (filter_name == NetworkFilterNames::get().EnvoyMobileHttpConnectionManager) {
     envoy::extensions::filters::network::http_connection_manager::v3::
-        EnvoyMobileHttpConnectionManager& config = *Envoy::Protobuf::DynamicCastToGenerated<
+        EnvoyMobileHttpConnectionManager& config = *Envoy::Protobuf::DynamicCastMessage<
             envoy::extensions::filters::network::http_connection_manager::v3::
                 EnvoyMobileHttpConnectionManager>(config_message);
     if (config.config().codec_type() ==

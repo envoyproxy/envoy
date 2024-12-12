@@ -33,6 +33,10 @@ public:
     }
   }
 
+  void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) final {}
+
+  void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) final {}
+
   /**
    * The set function needs to be called by stream decoder filter before side stream connection is
    * established, to apply the backpressure to downstream when it is above watermark,

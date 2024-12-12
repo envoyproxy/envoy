@@ -14,6 +14,34 @@ namespace Filters {
 namespace Common {
 namespace Lua {
 
+void LuaLoggable::scriptLog(spdlog::level::level_enum level, absl::string_view message) {
+  switch (level) {
+  case spdlog::level::trace:
+    ENVOY_LOG(trace, "script log: {}", message);
+    return;
+  case spdlog::level::debug:
+    ENVOY_LOG(debug, "script log: {}", message);
+    return;
+  case spdlog::level::info:
+    ENVOY_LOG(info, "script log: {}", message);
+    return;
+  case spdlog::level::warn:
+    ENVOY_LOG(warn, "script log: {}", message);
+    return;
+  case spdlog::level::err:
+    ENVOY_LOG(error, "script log: {}", message);
+    return;
+  case spdlog::level::critical:
+    ENVOY_LOG(critical, "script log: {}", message);
+    return;
+  case spdlog::level::off:
+    PANIC("unsupported");
+    return;
+  case spdlog::level::n_levels:
+    PANIC("unsupported");
+  }
+}
+
 Coroutine::Coroutine(const std::pair<lua_State*, lua_State*>& new_thread_state)
     : coroutine_state_(new_thread_state, false) {}
 

@@ -882,7 +882,7 @@ void ConfigHelper::configureUpstreamTls(
     bool use_alpn, bool http3,
     absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
         alternate_protocol_cache_config,
-    std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+    std::function<void(envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&)>
         configure_tls_context) {
   addConfigModifier([use_alpn, http3, alternate_protocol_cache_config,
                      configure_tls_context](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -928,15 +928,15 @@ void ConfigHelper::configureUpstreamTls(
               .PackFrom(new_protocol_options);
     }
     envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
-    if (configure_tls_context != nullptr) {
-      configure_tls_context(*tls_context.mutable_common_tls_context());
-    }
     auto* validation_context =
         tls_context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     // The test certs are for *.lyft.com, so make sure SNI matches.
     tls_context.set_sni("foo.lyft.com");
+    if (configure_tls_context != nullptr) {
+      configure_tls_context(tls_context);
+    }
     if (http3) {
       envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport quic_context;
       quic_context.mutable_upstream_tls_context()->CopyFrom(tls_context);
@@ -1320,8 +1320,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-void ConfigHelper::addQuicDownstreamTransportSocketConfig(
-    bool enable_early_data, std::vector<absl::string_view> custom_alpns) {
+void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
       // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
@@ -1334,11 +1333,8 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig(
       [&](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
         initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context,
                       true);
-        for (absl::string_view alpn : custom_alpns) {
-          common_tls_context.add_alpn_protocols(alpn);
-        }
       },
-      enable_early_data);
+      true);
 }
 
 bool ConfigHelper::setAccessLog(
@@ -1523,13 +1519,13 @@ void ConfigHelper::initializeTls(
   }
   if (options.ecdsa_cert_) {
     auto* tls_certificate = common_tls_context.add_tls_certificates();
-    tls_certificate->mutable_certificate_chain()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsacert.pem"));
-    tls_certificate->mutable_private_key()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/server_ecdsakey.pem"));
+    tls_certificate->mutable_certificate_chain()->set_filename(TestEnvironment::runfilesPath(
+        "test/config/integration/certs/" + options.ecdsa_cert_name_ + "cert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(TestEnvironment::runfilesPath(
+        "test/config/integration/certs/" + options.ecdsa_cert_name_ + "key.pem"));
     if (options.ecdsa_cert_ocsp_staple_) {
       tls_certificate->mutable_ocsp_staple()->set_filename(TestEnvironment::runfilesPath(
-          "test/config/integration/certs/server_ecdsa_ocsp_resp.der"));
+          "test/config/integration/certs/" + options.ecdsa_cert_name_ + "_ocsp_resp.der"));
     }
   }
 

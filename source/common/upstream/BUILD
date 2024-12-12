@@ -78,14 +78,13 @@ envoy_cc_library(
     name = "cluster_manager_lib",
     srcs = ["cluster_manager_impl.cc"],
     hdrs = ["cluster_manager_impl.h"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
         ":host_utility_lib",
         ":load_balancer_context_base_lib",
         ":load_stats_reporter_lib",
-        ":od_cds_api_lib",
         "//envoy/api:api_interface",
         "//envoy/config:xds_resources_delegate_interface",
         "//envoy/event:dispatcher_interface",
@@ -298,12 +297,22 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "prod_cluster_info_factory_lib",
+    srcs = ["prod_cluster_info_factory.cc"],
+    hdrs = ["prod_cluster_info_factory.h"],
+    deps = [
+        ":upstream_includes",
+    ],
+)
+
+envoy_cc_library(
     name = "health_discovery_service_lib",
     srcs = ["health_discovery_service.cc"],
     hdrs = ["health_discovery_service.h"],
     deps = [
         ":health_checker_lib",
         ":locality_endpoint_lib",
+        ":prod_cluster_info_factory_lib",
         ":upstream_includes",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
@@ -364,7 +373,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_lib",
     srcs = ["upstream_impl.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":cluster_factory_lib",
         ":default_local_address_selector_factory",

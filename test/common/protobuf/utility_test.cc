@@ -194,22 +194,16 @@ TEST_F(ProtobufUtilityTest, MessageUtilHash) {
   a4.PackFrom(s2);
   a5.PackFrom(s3);
 
-  TestScopedRuntime runtime_;
-  for (std::string runtime_value : {"true", "false"}) {
-    // TODO(ravenblack): when the runtime flag is removed, keep the expects
-    // but remove the loop around them and the extra output.
-    runtime_.mergeValues({{"envoy.restart_features.use_fast_protobuf_hash", runtime_value}});
-    EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2)) << runtime_value;
-    EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3)) << runtime_value;
-    EXPECT_NE(0, MessageUtil::hash(a1)) << runtime_value;
-    // Same keys and values but with the values in a different order should not have
-    // the same hash.
-    EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a4)) << runtime_value;
-    // Different keys with the values in the same order should not have the same hash.
-    EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a5)) << runtime_value;
-    // Struct without 'any' around it should not hash the same as struct inside 'any'.
-    EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1)) << runtime_value;
-  }
+  EXPECT_EQ(MessageUtil::hash(a1), MessageUtil::hash(a2));
+  EXPECT_EQ(MessageUtil::hash(a2), MessageUtil::hash(a3));
+  EXPECT_NE(0, MessageUtil::hash(a1));
+  // Same keys and values but with the values in a different order should not have
+  // the same hash.
+  EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a4));
+  // Different keys with the values in the same order should not have the same hash.
+  EXPECT_NE(MessageUtil::hash(a1), MessageUtil::hash(a5));
+  // Struct without 'any' around it should not hash the same as struct inside 'any'.
+  EXPECT_NE(MessageUtil::hash(s), MessageUtil::hash(a1));
 }
 
 TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
@@ -1430,20 +1424,20 @@ TEST_F(ProtobufUtilityTest, AnyBytes) {
     source.set_value("abc");
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
-    EXPECT_EQ(MessageUtil::anyToBytes(source_any), "abc");
+    EXPECT_EQ(*MessageUtil::anyToBytes(source_any), "abc");
   }
   {
     ProtobufWkt::BytesValue source;
     source.set_value("\x01\x02\x03");
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
-    EXPECT_EQ(MessageUtil::anyToBytes(source_any), "\x01\x02\x03");
+    EXPECT_EQ(*MessageUtil::anyToBytes(source_any), "\x01\x02\x03");
   }
   {
     envoy::config::cluster::v3::Filter filter;
     ProtobufWkt::Any source_any;
     source_any.PackFrom(filter);
-    EXPECT_EQ(MessageUtil::anyToBytes(source_any), source_any.value());
+    EXPECT_EQ(*MessageUtil::anyToBytes(source_any), source_any.value());
   }
 }
 
@@ -1468,19 +1462,18 @@ TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
                ProtoValidationException);
 }
 
-// MessageUtility::unpackToOrThrow() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source_duration);
   ProtobufWkt::Timestamp dst;
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::unpackToOrThrow(source_any, dst), EnvoyException,
-      R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)");
+  EXPECT_THAT(
+      MessageUtil::unpackTo(source_any, dst).message(),
+      testing::ContainsRegex(
+          R"(Unable to unpack as google.protobuf.Timestamp:.*[\n]*\[type.googleapis.com/google.protobuf.Duration\] .*)"));
 }
 
-// MessageUtility::unpackToOrThrow() with API message works at same version.
 TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
   {
     API_NO_BOOST(envoy::api::v2::Cluster) source;
@@ -1488,7 +1481,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
-    MessageUtil::unpackToOrThrow(source_any, dst);
+    ASSERT_TRUE(MessageUtil::unpackTo(source_any, dst).ok());
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
@@ -1497,7 +1490,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
-    MessageUtil::unpackToOrThrow(source_any, dst);
+    ASSERT_TRUE(MessageUtil::unpackTo(source_any, dst).ok());
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
 }

@@ -269,38 +269,68 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
   std::vector<ScopedRouteInfoConstSharedPtr> updated_scopes;
+  std::list<RdsRouteConfigProviderHelperPtr> to_be_removed_rds_providers;
   for (const auto& resource : resources) {
     // Explicit copy so that we can std::move later.
     envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
         dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             resource.get().resource());
-    if (scoped_route_config.route_configuration_name().empty()) {
-      return absl::InvalidArgumentError("route_configuration_name is empty.");
-    }
     const std::string scope_name = scoped_route_config.name();
     if (const auto& scope_info_iter = scoped_route_map_.find(scope_name);
-        scope_info_iter != scoped_route_map_.end() &&
-        scope_info_iter->second->configHash() == MessageUtil::hash(scoped_route_config)) {
-      continue;
+        scope_info_iter != scoped_route_map_.end()) {
+      if (scope_info_iter->second->configHash() == MessageUtil::hash(scoped_route_config)) {
+        continue;
+      }
+      // Remove the old key from scope_names_by_hash_ in case the scope key has changed. (If it
+      // hasn't, we'll just add it back anyway.)
+      if (scope_name_by_hash_.find(scope_info_iter->second->scopeKey().hash()) !=
+          scope_name_by_hash_.end()) {
+        scope_name_by_hash_.erase(scope_info_iter->second->scopeKey().hash());
+      }
     }
     rds.set_route_config_name(scoped_route_config.route_configuration_name());
     std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
     std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
-    if (scoped_route_config.on_demand() == false) {
-      // For default scopes, create a rds helper with rds provider initialized.
-      rds_config_provider_helper =
-          std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
-      scoped_route_info = std::make_shared<ScopedRouteInfo>(
-          std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
+    if (scoped_route_config.has_route_configuration()) {
+      RouteConfigProviderPtr route_config_provider =
+          route_config_provider_manager_.createStaticRouteConfigProvider(
+              scoped_route_config.route_configuration(), factory_context_,
+              factory_context_.messageValidationContext().staticValidationVisitor());
+      scoped_route_info = std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config),
+                                                            route_config_provider->configCast());
+      // If this is an update from a scoped route configuration specifying route_configuration_name
+      // to one specifying route_configuration, then the RDS subscription is no longer needed. We
+      // can remove the RDS config provider, but hold on to them until exiting the loop in case the
+      // subscription is reused by another scope still to be added.
+      auto rds_config_provider_helper_iter = route_provider_by_scope_.find(scope_name);
+      if (rds_config_provider_helper_iter != route_provider_by_scope_.end()) {
+        to_be_removed_rds_providers.emplace_back(
+            std::move(rds_config_provider_helper_iter->second));
+        route_provider_by_scope_.erase(rds_config_provider_helper_iter);
+      }
     } else {
-      // For on demand scopes, create a rds helper with rds provider uninitialized.
-      rds_config_provider_helper =
-          std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name);
-      // scope_route_info->routeConfig() will be nullptr, because RouteConfiguration is not loaded.
-      scoped_route_info =
-          std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
+      if (scoped_route_config.route_configuration_name().empty()) {
+        return absl::InvalidArgumentError("route_configuration_name is empty.");
+      }
+      rds.set_route_config_name(scoped_route_config.route_configuration_name());
+      std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
+      if (scoped_route_config.on_demand() == false) {
+        // For default scopes, create a rds helper with rds provider initialized.
+        rds_config_provider_helper =
+            std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
+        scoped_route_info = std::make_shared<ScopedRouteInfo>(
+            std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
+      } else {
+        // For on demand scopes, create a rds helper with rds provider uninitialized.
+        rds_config_provider_helper =
+            std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name);
+        // scope_route_info->routeConfig() will be nullptr, because RouteConfiguration is not
+        // loaded.
+        scoped_route_info =
+            std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
+      }
+      route_provider_by_scope_[scope_name] = std::move(rds_config_provider_helper);
     }
-    route_provider_by_scope_[scope_name] = std::move(rds_config_provider_helper);
     scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
     scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
     updated_scopes.push_back(scoped_route_info);

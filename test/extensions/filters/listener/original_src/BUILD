@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.listener.original_src"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/listener/original_src:config_lib",
         "@envoy_api//envoy/extensions/filters/listener/original_src/v3:pkg_cc_proto",
@@ -28,7 +28,7 @@ envoy_extension_cc_test(
     name = "original_src_config_factory_test",
     srcs = ["original_src_config_factory_test.cc"],
     extension_names = ["envoy.filters.listener.original_src"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/listener/original_src:config",
         "//source/extensions/filters/listener/original_src:config_lib",
@@ -41,7 +41,7 @@ envoy_extension_cc_test(
     name = "original_src_test",
     srcs = ["original_src_test.cc"],
     extension_names = ["envoy.filters.listener.original_src"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/network:socket_option_lib",
         "//source/extensions/filters/listener/original_src:original_src_lib",
@@ -67,7 +67,7 @@ envoy_cc_fuzz_test(
     name = "original_src_fuzz_test",
     srcs = ["original_src_fuzz_test.cc"],
     corpus = "original_src_corpus",
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":original_src_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/original_src:original_src_lib",

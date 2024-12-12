@@ -19,7 +19,7 @@ final class ResetConnectivityStateTest: XCTestCase {
   }
 
   func testResetConnectivityState() {
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)

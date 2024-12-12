@@ -70,7 +70,46 @@ public:
                                 "first", 2, 3),
           buildDescriptorStatus(4,
                                 envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::HOUR,
-                                "second", 5, 6)}}, );
+                                "second", 5, 6)}},
+        // Test unit conversions
+        {{{"x-ratelimit-limit", "1, 1;w=1;name=\"unit\""},
+          {"x-ratelimit-remaining", "1"},
+          {"x-ratelimit-reset", "1"}},
+         {buildDescriptorStatus(1,
+                                envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::SECOND,
+                                "unit", 1, 1)}},
+        {{{"x-ratelimit-limit", "1, 1;w=60;name=\"unit\""},
+          {"x-ratelimit-remaining", "1"},
+          {"x-ratelimit-reset", "1"}},
+         {buildDescriptorStatus(1,
+                                envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE,
+                                "unit", 1, 1)}},
+        {{{"x-ratelimit-limit", "1, 1;w=3600;name=\"unit\""},
+          {"x-ratelimit-remaining", "1"},
+          {"x-ratelimit-reset", "1"}},
+         {buildDescriptorStatus(
+             1, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::HOUR, "unit", 1, 1)}},
+        {{{"x-ratelimit-limit", "1, 1;w=86400;name=\"unit\""},
+          {"x-ratelimit-remaining", "1"},
+          {"x-ratelimit-reset", "1"}},
+         {buildDescriptorStatus(1, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::DAY,
+                                "unit", 1, 1)}},
+        {{{"x-ratelimit-limit", "1, 1;w=604800;name=\"unit\""},
+          {"x-ratelimit-remaining", "1"},
+          {"x-ratelimit-reset", "1"}},
+         {buildDescriptorStatus(
+             1, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::WEEK, "unit", 1, 1)}},
+        {{{"x-ratelimit-limit", "1, 1;w=2592000;name=\"unit\""},
+          {"x-ratelimit-remaining", "1"},
+          {"x-ratelimit-reset", "1"}},
+         {buildDescriptorStatus(
+             1, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MONTH, "unit", 1, 1)}},
+        {{{"x-ratelimit-limit", "1, 1;w=31536000;name=\"unit\""},
+          {"x-ratelimit-remaining", "1"},
+          {"x-ratelimit-reset", "1"}},
+         {buildDescriptorStatus(1,
+                                envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::YEAR,
+                                "unit", 1, 1)}}, );
   }
 };
 

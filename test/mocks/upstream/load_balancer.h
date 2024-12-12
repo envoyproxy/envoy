@@ -26,12 +26,5 @@ public:
   std::shared_ptr<MockHost> host_{new MockHost()};
 };
 
-class MockLoadBalancerFactoryContext : public LoadBalancerFactoryContext {
-public:
-  MockLoadBalancerFactoryContext() = default;
-  ~MockLoadBalancerFactoryContext() = default;
-  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
-};
-
 } // namespace Upstream
 } // namespace Envoy

@@ -5,7 +5,6 @@ package envoy.extensions.transport_sockets.http_11_proxy.v3;
 import "envoy/config/core/v3/base.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.http_11_proxy.v3";
 option java_outer_classname = "UpstreamHttp11ConnectProto";
@@ -34,6 +33,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // proxy address in ``config::core::v3::Address`` format.
 //
 message Http11ProxyUpstreamTransport {
-  // The underlying transport socket being wrapped.
-  config.core.v3.TransportSocket transport_socket = 1 [(validate.rules).message = {required: true}];
+  // The underlying transport socket being wrapped. Defaults to plaintext (raw_buffer) if unset.
+  config.core.v3.TransportSocket transport_socket = 1;
 }

@@ -103,23 +103,24 @@ extensions/filters/common/original_src @klarose @mattklein123
 # attribute context
 /*/extensions/filters/common/expr @kyessenov @yangminzhu @tyxia
 # webassembly access logger extensions
-/*/extensions/access_loggers/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/access_loggers/wasm @mpwarres @kyessenov @lizan
 # webassembly bootstrap extensions
-/*/extensions/bootstrap/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/bootstrap/wasm @mpwarres @kyessenov @lizan
 # webassembly http extensions
-/*/extensions/filters/http/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/filters/http/wasm @mpwarres @kyessenov @lizan
 # webassembly network extensions
-/*/extensions/filters/network/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/filters/network/wasm @mpwarres @kyessenov @lizan
 # webassembly common extension
-/*/extensions/common/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/common/wasm @mpwarres @kyessenov @lizan
 # webassembly runtimes
-/*/extensions/wasm_runtime/ @mpwarres @lizan @UNOWNED
+/*/extensions/wasm_runtime/ @mpwarres @kyessenov @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @alyssawilk
 /*/extensions/filters/common/fault @rshriram @alyssawilk
+/*/extensions/filters/http/grpc_json_reverse_transcoder @numanelahi @yanavlasov
 /*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @alyssawilk
 /*/extensions/filters/http/router @alyssawilk @mattklein123
 /*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
@@ -137,7 +138,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
 /*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
 # webassembly stat-sink extensions
-/*/extensions/stat_sinks/wasm @mpwarres @lizan @UNOWNED
+/*/extensions/stat_sinks/wasm @mpwarres @kyessenov @lizan
 /*/extensions/resource_monitors/injected_resource @eziskind @yanavlasov
 /*/extensions/resource_monitors/common @eziskind @yanavlasov @nezdolik
 /*/extensions/resource_monitors/fixed_heap @eziskind @yanavlasov @nezdolik
@@ -202,11 +203,13 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/ratelimit @esmet @mattklein123
 /*/extensions/filters/network/ratelimit @esmet @mattklein123
 # HTTP Quota Based Rate Limit
-/*/extensions/filters/http/rate_limit_quota @tyxia @yanavlasov
+/*/extensions/filters/http/rate_limit_quota @tyxia @yanavlasov @bsurber
 # HTTP Bandwidth Limit
 /*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
 # HTTP Basic Auth
 /*/extensions/filters/http/basic_auth @zhaohuabing @wbpcode
+# HTTP API Key Auth
+/*/extensions/filters/http/api_key_auth @wbpcode @sanposhiho
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @alyssawilk @mattklein123
 /*/extensions/http/original_ip_detection/xff @alyssawilk @mattklein123
@@ -280,7 +283,6 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # tracers
 /*/extensions/tracers/zipkin @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/dynamic_ot @wbpcode @Shikugawa @basvanbeek
-/*/extensions/tracers/opencensus @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/common @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/common/ot @wbpcode @Shikugawa @basvanbeek
 # ext_authz
@@ -356,6 +358,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/network/generic_proxy/ @wbpcode @soulxu
 # Dynamic Modules
 /*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
+/*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry
 
 # HTTP credential injector
 /*/extensions/filters/http/credential_injector @zhaohuabing @kyessenov

@@ -44,7 +44,8 @@ public:
          Server::Configuration::CommonFactoryContext& factory_context);
 
   absl::StatusOr<bssl::UniquePtr<SSL>>
-  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) override;
+  newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
+         Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
@@ -54,6 +55,7 @@ private:
   int newSessionKey(SSL_SESSION* session);
 
   const std::string server_name_indication_;
+  const bool auto_host_sni_;
   const bool allow_renegotiation_;
   const bool enforce_rsa_key_usage_;
   const size_t max_session_keys_;

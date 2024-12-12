@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.aws_request_signing.v3;
 
+import "envoy/extensions/common/aws/v3/credential_provider.proto";
 import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/duration.proto";
@@ -21,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.aws_request_signing]
 
 // Top level configuration for the AWS request signing filter.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message AwsRequestSigning {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.aws_request_signing.v2alpha.AwsRequestSigning";
@@ -107,6 +108,10 @@ message AwsRequestSigning {
   // query_string: {}
   //
   QueryString query_string = 7;
+
+  // The credential provider for signing the request. This is optional and if not set,
+  // it will be retrieved from the procedure described in :ref:`config_http_filters_aws_request_signing`.
+  common.aws.v3.AwsCredentialProvider credential_provider = 8;
 }
 
 message AwsRequestSigningPerRoute {

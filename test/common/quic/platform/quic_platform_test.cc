@@ -33,7 +33,6 @@
 #include "quiche/quic/platform/api/quic_flags.h"
 #include "quiche/quic/platform/api/quic_hostname_utils.h"
 #include "quiche/quic/platform/api/quic_logging.h"
-#include "quiche/quic/platform/api/quic_mutex.h"
 #include "quiche/quic/platform/api/quic_server_stats.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_test.h"
@@ -356,27 +355,6 @@ TEST_F(QuicPlatformTest, QuicNotReached) {
 #endif
 }
 
-TEST_F(QuicPlatformTest, QuicMutex) {
-  QuicMutex mu;
-
-  QuicWriterMutexLock wmu(&mu);
-  mu.AssertReaderHeld();
-  mu.WriterUnlock();
-  {
-    quiche::QuicheReaderMutexLock rmu(&mu);
-    mu.AssertReaderHeld();
-  }
-  mu.WriterLock();
-}
-
-TEST_F(QuicPlatformTest, QuicNotification) {
-  QuicNotification notification;
-  EXPECT_FALSE(notification.HasBeenNotified());
-  notification.Notify();
-  notification.WaitForNotification();
-  EXPECT_TRUE(notification.HasBeenNotified());
-}
-
 TEST_F(QuicPlatformTest, QuicTestOutput) {
   Envoy::TestEnvironment::setEnvVar("QUICHE_TEST_OUTPUT_DIR", "/tmp", /*overwrite=*/false);
 
@@ -512,45 +490,6 @@ TEST_F(QuicPlatformTest, TestSystemEventLoop) {
   // build.
   quiche::QuicheRunSystemEventLoopIteration();
   quiche::QuicheSystemEventLoop("dummy");
-}
-
-TEST(EnvoyQuicheMemSliceTest, ConstructMemSliceFromBuffer) {
-  std::string str(512, 'b');
-  // Fragment needs to out-live buffer.
-  bool fragment_releaser_called = false;
-  Envoy::Buffer::BufferFragmentImpl fragment(
-      str.data(), str.length(),
-      [&fragment_releaser_called](const void*, size_t, const Envoy::Buffer::BufferFragmentImpl*) {
-        // Used to verify that mem slice release appropriately.
-        fragment_releaser_called = true;
-      });
-  Envoy::Buffer::OwnedImpl buffer;
-  EXPECT_DEBUG_DEATH(quiche::QuicheMemSlice slice0(quiche::QuicheMemSlice::InPlace(), buffer, 0u),
-                     "");
-  std::string str2(1024, 'a');
-  // str2 is copied.
-  buffer.add(str2);
-  EXPECT_EQ(1u, buffer.getRawSlices().size());
-  buffer.addBufferFragment(fragment);
-
-  quiche::QuicheMemSlice slice1(quiche::QuicheMemSlice::InPlace(), buffer, str2.length());
-  EXPECT_EQ(str.length(), buffer.length());
-  EXPECT_EQ(str2, std::string(slice1.data(), slice1.length()));
-  std::string str2_old = str2; // NOLINT(performance-unnecessary-copy-initialization)
-  // slice1 is released, but str2 should not be affected.
-  slice1.Reset();
-  EXPECT_TRUE(slice1.empty());
-  EXPECT_EQ(nullptr, slice1.data());
-  EXPECT_EQ(str2_old, str2);
-
-  quiche::QuicheMemSlice slice2(quiche::QuicheMemSlice::InPlace(), buffer, str.length());
-  EXPECT_EQ(0, buffer.length());
-  EXPECT_EQ(str.data(), slice2.data());
-  EXPECT_EQ(str, std::string(slice2.data(), slice2.length()));
-  slice2.Reset();
-  EXPECT_TRUE(slice2.empty());
-  EXPECT_EQ(nullptr, slice2.data());
-  EXPECT_TRUE(fragment_releaser_called);
 }
 
 } // namespace

@@ -34,6 +34,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tcp_proxy/upstream.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/od_cds_api_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -190,8 +191,8 @@ public:
                      on_demand_message,
                  Server::Configuration::FactoryContext& context, Stats::Scope& scope)
       : odcds_(context.serverFactoryContext().clusterManager().allocateOdCdsApi(
-            on_demand_message.odcds_config(), OptRef<xds::core::v3::ResourceLocator>(),
-            context.messageValidationVisitor())),
+            &Upstream::OdCdsApiImpl::create, on_demand_message.odcds_config(),
+            OptRef<xds::core::v3::ResourceLocator>(), context.messageValidationVisitor())),
         lookup_timeout_(std::chrono::milliseconds(
             PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
         stats_(generateStats(scope)) {}
@@ -281,7 +282,7 @@ public:
   RouteConstSharedPtr getRegularRouteFromEntries(Network::Connection& connection);
 
   const TcpProxyStats& stats() { return shared_config_->stats(); }
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
   const absl::optional<std::chrono::milliseconds>& idleTimeout() {
     return shared_config_->idleTimeout();
@@ -361,7 +362,7 @@ private:
   RouteConstSharedPtr default_route_;
   std::vector<WeightedClusterEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
-  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
   const uint32_t max_connect_attempts_;
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
@@ -429,7 +430,7 @@ public:
     return &read_callbacks_->connection();
   }
 
-  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+  StreamInfo::StreamInfo* requestStreamInfo() const override {
     return &read_callbacks_->connection().streamInfo();
   }
 
@@ -519,6 +520,7 @@ public:
                         std::function<void(Http::ResponseHeaderMap& headers)>,
                         const absl::optional<Grpc::Status::GrpcStatus>,
                         absl::string_view) override {}
+    void sendGoAwayAndClose() override {}
     void encode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     Http::ResponseHeaderMapOptRef informationalHeaders() override { return {}; }
     void encodeHeaders(Http::ResponseHeaderMapPtr&&, bool, absl::string_view) override {}

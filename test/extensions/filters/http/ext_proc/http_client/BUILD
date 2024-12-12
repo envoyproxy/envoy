@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["http_client_test.cc"],
     extension_names = ["envoy.filters.http.ext_proc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/http:message_lib",
@@ -39,6 +39,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ext_proc:config",
         "//test/common/http:common_lib",
+        "//test/extensions/filters/http/ext_proc:logging_test_filter_lib",
         "//test/extensions/filters/http/ext_proc:utils_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:utility_lib",

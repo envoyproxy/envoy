@@ -9,6 +9,7 @@
 #include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 
+#include "absl/container/inlined_vector.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -25,6 +26,11 @@ namespace Ssl {
 struct TlsContext;
 
 class ServerContextConfig;
+
+using CurveNID = int;
+// Currently this type only ever holds 3 values: P-256, P-384, and P-521, so optimize by using
+// `InlinedVector`.
+using CurveNIDVector = absl::InlinedVector<int, 3>;
 
 class HandshakeCallbacks {
 public:
@@ -231,8 +237,8 @@ public:
    * @return context will have the same lifetime as ``ServerContextImpl``.
    */
   virtual std::pair<const Ssl::TlsContext&, OcspStapleAction>
-  findTlsContext(absl::string_view sni, bool client_ecdsa_capable, bool client_ocsp_capable,
-                 bool* cert_matched_sni) PURE;
+  findTlsContext(absl::string_view sni, const CurveNIDVector& client_ecdsa_capabilities,
+                 bool client_ocsp_capable, bool* cert_matched_sni) PURE;
 };
 
 using TlsCertificateSelectorPtr = std::unique_ptr<TlsCertificateSelector>;

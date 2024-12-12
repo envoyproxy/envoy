@@ -185,14 +185,6 @@ message HttpConnectionManager {
 
     // Configuration for an external tracing provider.
     // If not specified, no tracing will be performed.
-    //
-    // .. attention::
-    //   Please be aware that ``envoy.tracers.opencensus`` provider can only be configured once
-    //   in Envoy lifetime.
-    //   Any attempts to reconfigure it or to use different configurations for different HCM filters
-    //   will be rejected.
-    //   Such a constraint is inherent to OpenCensus itself. It cannot be overcome without changes
-    //   on OpenCensus side.
     config.trace.v3.Tracing.Http provider = 9;
 
     // Create separate tracing span for each upstream request if true. And if this flag is set to true,
@@ -691,7 +683,7 @@ message HttpConnectionManager {
   // information about internal/external addresses.
   //
   // .. warning::
-  //     In the next release, no IP addresses will be considered trusted. If you have tooling such as probes
+  //     As of Envoy 1.33.0 no IP addresses will be considered trusted. If you have tooling such as probes
   //     on your private network which need to be treated as trusted (e.g. changing arbitrary x-envoy headers)
   //     you will have to manually include those addresses or CIDR ranges like:
   //

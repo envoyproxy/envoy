@@ -23,9 +23,9 @@ TEST(WatchedDirectory, All) {
   Filesystem::Watcher::OnChangedCb cb;
   EXPECT_CALL(*watcher, addWatch("foo/bar/", Filesystem::Watcher::Events::MovedTo, _))
       .WillOnce(DoAll(SaveArg<2>(&cb), Return(absl::OkStatus())));
-  WatchedDirectory wd(config, dispatcher);
+  auto wd = *WatchedDirectory::create(config, dispatcher);
   bool called = false;
-  wd.setCallback([&called] {
+  wd->setCallback([&called] {
     called = true;
     return absl::OkStatus();
   });

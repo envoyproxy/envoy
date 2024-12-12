@@ -41,7 +41,47 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/access_log"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/action"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/add_data"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/basic"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/buffer"
   groups:
     contrib-golang:
       patterns:
@@ -91,27 +131,7 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/access_log"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/action"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/buffer"
+  directory: "/contrib/golang/filters/http/test/test_data/property"
   groups:
     contrib-golang:
       patterns:
@@ -131,13 +151,11 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/property"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/websocket"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
   schedule:
     interval: daily
     time: "06:00"

@@ -107,15 +107,14 @@ NetworkConfigurationFilter::resolveProxy(Http::RequestHeaderMap& request_headers
 
   std::weak_ptr<NetworkConfigurationFilter> weak_self = weak_from_this();
   Network::ProxyResolutionResult proxy_resolution_result = proxy_resolver->resolver->resolveProxy(
-      target_url, proxy_settings_,
-      [&weak_self](const std::vector<Network::ProxySettings>& proxies) {
+      target_url, proxy_settings_, [weak_self](const std::vector<Network::ProxySettings>& proxies) {
         RELEASE_ASSERT(
             Thread::MainThread::isMainOrTestThread(),
             "NetworkConfigurationProxy PAC proxy resolver callback not running on main thread.");
         // This is the callback invoked from the Apple APIs resolving the PAC file URL, which
-        // gets invoked on the Envoy thread. We keep a weak_ptr to this filter instance
-        // so that, if the stream is canceled and the filter chain is torn down in the meantime,
-        // we will fail to aquire the weak_ptr lock and won't execute any callbacks on the resolved
+        // gets invoked on a separate thread. We keep a weak_ptr to this filter instance so that,
+        // if the stream is canceled and the filter chain is torn down in the meantime, we will
+        // fail to aquire the weak_ptr lock and won't execute any callbacks on the resolved
         // proxies.
         if (auto filter_ptr = weak_self.lock()) {
           filter_ptr->onProxyResolutionComplete(Network::ProxySettings::create(proxies));

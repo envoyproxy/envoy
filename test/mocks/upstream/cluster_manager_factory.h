@@ -22,7 +22,7 @@ public:
   Secret::MockSecretManager& secretManager() override { return secret_manager_; };
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
-  MOCK_METHOD(ClusterManagerPtr, clusterManagerFromProto,
+  MOCK_METHOD(absl::StatusOr<ClusterManagerPtr>, clusterManagerFromProto,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
 
   MOCK_METHOD(Http::ConnectionPool::InstancePtr, allocateConnPool,

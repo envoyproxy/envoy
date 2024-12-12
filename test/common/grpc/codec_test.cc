@@ -274,8 +274,8 @@ TEST(GrpcCodecTest, decodeSingleFrameWithMultiBuffersOverLimit) {
   decoder.setMaxFrameLength(max_length);
 
   // Both decoding attempts failed due to the total frame size exceeding the limit.
-  for (uint32_t i = 0; i < buffers.size(); ++i) {
-    EXPECT_EQ(decoder.decode(buffers[i], frames).code(), absl::StatusCode::kResourceExhausted);
+  for (auto& buffer : buffers) {
+    EXPECT_EQ(decoder.decode(buffer, frames).code(), absl::StatusCode::kResourceExhausted);
   }
 
   EXPECT_EQ(frames.size(), 0);

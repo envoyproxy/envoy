@@ -56,11 +56,10 @@ public:
   MOCK_METHOD(void, onConfigUpdate,
               (const std::vector<DecodedResourcePtr>& resources, const std::string& version_info));
 
-  MOCK_METHOD(
-      void, onConfigUpdate,
-      (const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-       const std::string& system_version_info));
+  MOCK_METHOD(void, onConfigUpdate,
+              (absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+               const std::string& system_version_info));
   MOCK_METHOD(void, onConfigUpdateFailed,
               (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
 };
@@ -134,8 +133,7 @@ public:
 
   MOCK_METHOD(absl::Status, updateMuxSource,
               (Grpc::RawAsyncClientPtr && primary_async_client,
-               Grpc::RawAsyncClientPtr&& failover_async_client,
-               CustomConfigValidatorsPtr&& custom_config_validators, Stats::Scope& scope,
+               Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
                BackOffStrategyPtr&& backoff_strategy,
                const envoy::config::core::v3::ApiConfigSource& ads_config_source));
 };
@@ -188,10 +186,10 @@ public:
   MOCK_METHOD(const xds::core::v3::ContextParams&, nodeContext, (), (const));
   MOCK_METHOD(const xds::core::v3::ContextParams&, dynamicContext,
               (absl::string_view resource_type_url), (const));
-  MOCK_METHOD(void, setDynamicContextParam,
+  MOCK_METHOD(absl::Status, setDynamicContextParam,
               (absl::string_view resource_type_url, absl::string_view key,
                absl::string_view value));
-  MOCK_METHOD(void, unsetDynamicContextParam,
+  MOCK_METHOD(absl::Status, unsetDynamicContextParam,
               (absl::string_view resource_type_url, absl::string_view key));
   MOCK_METHOD(Common::CallbackHandlePtr, addDynamicContextUpdateCallback,
               (UpdateNotificationCb callback), (const));

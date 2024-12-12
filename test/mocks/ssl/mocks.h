@@ -44,7 +44,6 @@ public:
 
   MOCK_METHOD(bool, peerCertificatePresented, (), (const));
   MOCK_METHOD(bool, peerCertificateValidated, (), (const));
-  MOCK_METHOD(absl::Span<const std::string>, uriSanLocalCertificate, (), (const));
   MOCK_METHOD(const std::string&, sha256PeerCertificateDigest, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, sha256PeerCertificateChainDigests, (), (const));
   MOCK_METHOD(const std::string&, sha1PeerCertificateDigest, (), (const));
@@ -53,14 +52,20 @@ public:
   MOCK_METHOD(absl::Span<const std::string>, serialNumbersPeerCertificates, (), (const));
   MOCK_METHOD(const std::string&, issuerPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, subjectPeerCertificate, (), (const));
-  MOCK_METHOD(absl::Span<const std::string>, uriSanPeerCertificate, (), (const));
+  MOCK_METHOD(ParsedX509NameOptConstRef, parsedSubjectPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, subjectLocalCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificateChain, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, uriSanPeerCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, uriSanLocalCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, dnsSansPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, dnsSansLocalCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, ipSansPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, ipSansLocalCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, emailSansPeerCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, emailSansLocalCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, othernameSansPeerCertificate, (), (const));
+  MOCK_METHOD(absl::Span<const std::string>, othernameSansLocalCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, oidsPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, oidsLocalCertificate, (), (const));
   MOCK_METHOD(absl::optional<SystemTime>, validFromPeerCertificate, (), (const));
@@ -106,6 +111,8 @@ public:
   MOCK_METHOD(Ssl::SslCtxCb, sslctxCb, (), (const, override));
 
   MOCK_METHOD(const std::string&, serverNameIndication, (), (const));
+  MOCK_METHOD(bool, autoHostServerNameIndication, (), (const));
+  MOCK_METHOD(bool, autoSniSanMatch, (), (const));
   MOCK_METHOD(bool, allowRenegotiation, (), (const));
   MOCK_METHOD(bool, enforceRsaKeyUsage, (), (const));
   MOCK_METHOD(size_t, maxSessionKeys, (), (const));
@@ -205,6 +212,7 @@ public:
               trustChainVerification, (), (const));
   MOCK_METHOD(bool, onlyVerifyLeafCertificateCrl, (), (const));
   MOCK_METHOD(absl::optional<uint32_t>, maxVerifyDepth, (), (const));
+  MOCK_METHOD(bool, autoSniSanMatch, (), (const));
 };
 
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {

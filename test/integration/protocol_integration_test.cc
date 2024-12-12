@@ -462,7 +462,7 @@ TEST_P(ProtocolIntegrationTest, PeriodicAccessLog) {
       {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host.com"}});
   waitForNextUpstreamRequest();
   EXPECT_EQ(AccessLogType_Name(AccessLog::AccessLogType::DownstreamPeriodic),
-            waitForAccessLog(access_log_name_));
+            waitForAccessLog(access_log_name_, 0, true));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -792,8 +792,6 @@ TEST_P(DownstreamProtocolIntegrationTest, TeSanitization) {
   }
 
   autonomous_upstream_ = true;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
-
   default_request_headers_.setTE("gzip");
 
   initialize();
@@ -815,8 +813,6 @@ TEST_P(DownstreamProtocolIntegrationTest, TeSanitizationTrailers) {
   }
 
   autonomous_upstream_ = true;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
-
   default_request_headers_.setTE("trailers");
 
   initialize();
@@ -838,8 +834,6 @@ TEST_P(DownstreamProtocolIntegrationTest, TeSanitizationTrailersMultipleValuesAn
   }
 
   autonomous_upstream_ = true;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "true");
-
   default_request_headers_.setTE("chunked;q=0.8  ,  trailers  ,deflate  ");
 
   initialize();
@@ -4770,8 +4764,6 @@ private:
 };
 
 TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
-  config_helper_.addRuntimeOverride("envoy.restart_features.allow_client_socket_creation_failure",
-                                    "true");
   AllowForceFail fail_socket_n_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket_n_};
 

@@ -20,7 +20,7 @@ final class ReceiveDataTests: XCTestCase {
 
   func testReceiveData() {
     let directResponseBody = "response_body"
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
     EnvoyTestServer.setHeadersAndData(
       "x-response-foo", header_value: "aaa", response_body: directResponseBody)
 

@@ -17,7 +17,6 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -92,13 +91,12 @@ message VirtualHost {
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
   // Only one of this and ``matcher`` can be specified.
-  repeated Route routes = 3;
+  repeated Route routes = 3 [(udpa.annotations.field_migrate).oneof_promotion = "route_selection"];
 
-  // [#next-major-version: This should be included in a oneof with routes wrapped in a message.]
   // The match tree to use when resolving route actions for incoming requests. Only one of this and ``routes``
   // can be specified.
   xds.type.matcher.v3.Matcher matcher = 21
-      [(xds.annotations.v3.field_status).work_in_progress = true];
+      [(udpa.annotations.field_migrate).oneof_promotion = "route_selection"];
 
   // Specifies the type of TLS enforcement the virtual host expects. If this option is not
   // specified, there is no TLS requirement for the virtual host.

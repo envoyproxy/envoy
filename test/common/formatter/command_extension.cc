@@ -30,7 +30,7 @@ TestCommandFactory::createCommandParserFromProto(const Protobuf::Message& messag
                                                  Server::Configuration::GenericFactoryContext&) {
   // Cast the config message to the actual type to test that it was constructed properly.
   [[maybe_unused]] const auto& config =
-      *Envoy::Protobuf::DynamicCastToGenerated<const ProtobufWkt::StringValue>(&message);
+      *Envoy::Protobuf::DynamicCastMessage<const ProtobufWkt::StringValue>(&message);
   return std::make_unique<TestCommandParser>();
 }
 
@@ -67,7 +67,7 @@ CommandParserPtr AdditionalCommandFactory::createCommandParserFromProto(
     const Protobuf::Message& message, Server::Configuration::GenericFactoryContext&) {
   // Cast the config message to the actual type to test that it was constructed properly.
   [[maybe_unused]] const auto& config =
-      *Envoy::Protobuf::DynamicCastToGenerated<const ProtobufWkt::UInt32Value>(&message);
+      *Envoy::Protobuf::DynamicCastMessage<const ProtobufWkt::UInt32Value>(&message);
   return std::make_unique<AdditionalCommandParser>();
 }
 
@@ -86,7 +86,7 @@ FailCommandFactory::createCommandParserFromProto(const Protobuf::Message& messag
                                                  Server::Configuration::GenericFactoryContext&) {
   // Cast the config message to the actual type to test that it was constructed properly.
   [[maybe_unused]] const auto& config =
-      *Envoy::Protobuf::DynamicCastToGenerated<const ProtobufWkt::UInt64Value>(&message);
+      *Envoy::Protobuf::DynamicCastMessage<const ProtobufWkt::UInt64Value>(&message);
   return nullptr;
 }
 

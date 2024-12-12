@@ -119,7 +119,7 @@ public:
     return CdsApiPtr{createCds_()};
   }
 
-  ClusterManagerPtr
+  absl::StatusOr<ClusterManagerPtr>
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override {
     return ClusterManagerPtr{clusterManagerFromProto_(bootstrap)};
   }
@@ -173,10 +173,12 @@ public:
       Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
       Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
       Server::Instance& server) {
-    auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{
-        new TestClusterManagerImpl(bootstrap, factory, context, stats, tls, runtime, local_info,
-                                   log_manager, main_thread_dispatcher, admin, validation_context,
-                                   api, http_context, grpc_context, router_context, server)};
+    absl::Status creation_status = absl::OkStatus();
+    auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{new TestClusterManagerImpl(
+        bootstrap, factory, context, stats, tls, runtime, local_info, log_manager,
+        main_thread_dispatcher, admin, validation_context, api, http_context, grpc_context,
+        router_context, server, creation_status)};
+    THROW_IF_NOT_OK(creation_status);
     THROW_IF_NOT_OK(cluster_manager->initialize(bootstrap));
     return cluster_manager;
   }
@@ -208,19 +210,17 @@ public:
 protected:
   using ClusterManagerImpl::ClusterManagerImpl;
 
-  TestClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         ClusterManagerFactory& factory,
-                         Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
-                         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                         const LocalInfo::LocalInfo& local_info,
-                         AccessLog::AccessLogManager& log_manager,
-                         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
-                         Http::Context& http_context, Grpc::Context& grpc_context,
-                         Router::Context& router_context, Server::Instance& server)
+  TestClusterManagerImpl(
+      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+      Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
+      ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+      Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
+      Server::Instance& server, absl::Status& creation_status)
       : ClusterManagerImpl(bootstrap, factory, context, stats, tls, runtime, local_info,
                            log_manager, main_thread_dispatcher, admin, validation_context, api,
-                           http_context, grpc_context, router_context, server) {}
+                           http_context, grpc_context, router_context, server, creation_status) {}
 };
 
 } // namespace Upstream

@@ -43,7 +43,7 @@ public:
   TestLoadBalancerContext(const Network::Connection* connection)
       : TestLoadBalancerContext(connection, nullptr) {}
   TestLoadBalancerContext(const Network::Connection* connection,
-                          const StreamInfo::StreamInfo* request_stream_info)
+                          StreamInfo::StreamInfo* request_stream_info)
       : connection_(connection), request_stream_info_(request_stream_info) {}
   TestLoadBalancerContext(const Network::Connection* connection, const std::string& key,
                           const std::string& value)
@@ -55,14 +55,14 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
-  const StreamInfo::StreamInfo* requestStreamInfo() const override { return request_stream_info_; }
+  StreamInfo::StreamInfo* requestStreamInfo() const override { return request_stream_info_; }
   const Http::RequestHeaderMap* downstreamHeaders() const override {
     return downstream_headers_.get();
   }
 
   absl::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
-  const StreamInfo::StreamInfo* request_stream_info_;
+  StreamInfo::StreamInfo* request_stream_info_;
   Http::RequestHeaderMapPtr downstream_headers_;
 };
 
@@ -96,7 +96,10 @@ public:
     ON_CALL(initialized_, ready()).WillByDefault(testing::Invoke([this] {
       init_complete_ = true;
     }));
-    cluster_->initialize([&]() -> void { initialized_.ready(); });
+    cluster_->initialize([&]() {
+      initialized_.ready();
+      return absl::OkStatus();
+    });
     handle_ = std::make_shared<OriginalDstClusterHandle>(cluster_);
   }
 

@@ -39,7 +39,13 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
   {
     Formatter::FormatterPtr formatter;
     try {
-      formatter = std::make_unique<Formatter::FormatterImpl>(input.format());
+      auto formatter_or_error = Formatter::FormatterImpl::create(input.format(), false);
+      if (!formatter_or_error.status().ok()) {
+        ENVOY_LOG_MISC(debug, "TEXT formatter failed, EnvoyException: {}",
+                       formatter_or_error.status().message());
+        return;
+      }
+      formatter = std::move(*formatter_or_error);
     } catch (const EnvoyException& e) {
       ENVOY_LOG_MISC(debug, "TEXT formatter failed, EnvoyException: {}", e.what());
       return;

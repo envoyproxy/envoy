@@ -33,7 +33,7 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoWithServer
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 FaultFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {

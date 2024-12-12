@@ -31,7 +31,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) BOOL enableInterfaceBinding;
 @property (nonatomic, assign) BOOL enableDrainPostDnsRefresh;
 @property (nonatomic, assign) BOOL enforceTrustChainVerification;
-@property (nonatomic, assign) BOOL forceIPv6;
 @property (nonatomic, assign) BOOL enablePlatformCertificateValidation;
 @property (nonatomic, strong, nullable) NSString *upstreamTlsSni;
 @property (nonatomic, assign) BOOL respectSystemProxySettings;
@@ -70,7 +69,6 @@ NS_ASSUME_NONNULL_BEGIN
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
                         enableDrainPostDnsRefresh:(BOOL)enableDrainPostDnsRefresh
                     enforceTrustChainVerification:(BOOL)enforceTrustChainVerification
-                                        forceIPv6:(BOOL)forceIPv6
               enablePlatformCertificateValidation:(BOOL)enablePlatformCertificateValidation
                                    upstreamTlsSni:(nullable NSString *)upstreamTlsSni
                        respectSystemProxySettings:(BOOL)respectSystemProxySettings

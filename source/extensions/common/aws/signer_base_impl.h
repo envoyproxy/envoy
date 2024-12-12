@@ -45,7 +45,7 @@ public:
   static constexpr absl::string_view HashedEmptyString =
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
-  static constexpr absl::string_view LongDateFormat = "%Y%m%dT%H%M00Z";
+  static constexpr absl::string_view LongDateFormat = "%Y%m%dT%H%M%SZ";
   static constexpr absl::string_view ShortDateFormat = "%Y%m%d";
   static constexpr absl::string_view UnsignedPayload = "UNSIGNED-PAYLOAD";
   static constexpr absl::string_view AuthorizationCredentialFormat = "{}/{}";
@@ -130,6 +130,10 @@ protected:
                          const absl::optional<std::string> session_token,
                          const std::map<std::string, std::string>& signed_headers,
                          const uint16_t expiration_time) const;
+
+  void addRequiredHeaders(Http::RequestHeaderMap& headers, const std::string long_date,
+                          const absl::optional<std::string> session_token,
+                          const absl::string_view override_region);
 
   std::vector<Matchers::StringMatcherPtr>
   defaultMatchers(Server::Configuration::CommonFactoryContext& context) const {

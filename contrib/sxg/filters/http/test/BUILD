@@ -11,7 +11,7 @@ envoy_contrib_package()
 envoy_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/sxg/filters/http/source:config",
@@ -28,7 +28,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//contrib/sxg/filters/http/source:config",
