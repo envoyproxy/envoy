@@ -499,6 +499,9 @@ SplitRequestPtr TransactionRequest::create(Router& router,
       if (command_name == "exec") {
         Common::Redis::RespValuePtr empty_array{new Common::Redis::Client::EmptyArray{}};
         callbacks.onResponse(std::move(empty_array));
+      } else if (command_name == "unwatch") {
+        // Unwatch without any keys is a no-op.
+        localResponse(callbacks, "QUEUED");
       } else {
         localResponse(callbacks, "OK");
       }
