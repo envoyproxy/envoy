@@ -372,19 +372,7 @@ to the next filter.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
-``log*()``
-^^^^^^^^^^
-
-.. code-block:: lua
-
-  handle:logTrace(message)
-  handle:logDebug(message)
-  handle:logInfo(message)
-  handle:logWarn(message)
-  handle:logErr(message)
-  handle:logCritical(message)
-
-Logs a message using Envoy's application logging. *message* is a string to log.
+.. include:: ../../../_include/lua_common.rst
 
 ``httpCall()``
 ^^^^^^^^^^^^^^
@@ -572,9 +560,12 @@ set to true, Envoy responds with a 503 Service Unavailable error.
 
 The function takes two arguments:
 
-* ``host`` (string): The host address to be used for upstream requests.
-* ``strict`` (boolean, optional): If set to true, the request is strictly routed to the overridden host. If the host is
-  unavailable, Envoy returns a 503 error. Defaults to false.
+* ``host`` (string): The upstream host address to use for the request. This must be a valid IP address; otherwise, the
+  Lua script will throw an error.
+* ``strict`` (boolean, optional): Determines whether the HTTP request must be strictly routed to the requested
+  destination. When set to ``true``, if the requested destination is unavailable, Envoy will return a 503 status code.
+  The default value is ``false``, which allows Envoy to fall back to its load balancing mechanism. In this case, if the
+  requested destination is not found, the request will be routed according to the load balancing algorithm.
 
 Example:
 
@@ -653,6 +644,8 @@ Default resolution is millisecond if *resolution* is not set.
 
 Header object API
 -----------------
+
+.. include:: ../../../_include/lua_common.rst
 
 ``add()``
 ^^^^^^^^^
@@ -750,6 +743,8 @@ effects HTTP/1 connections. It will have no effect if the client is HTTP/2 or HT
 Buffer API
 ----------
 
+.. include:: ../../../_include/lua_common.rst
+
 ``length()``
 ^^^^^^^^^^^^
 
@@ -787,6 +782,8 @@ Set the content of wrapped buffer with the input string.
 Metadata object API
 -------------------
 
+.. include:: ../../../_include/lua_common.rst
+
 ``get()``
 ^^^^^^^^^
 
@@ -813,6 +810,8 @@ key. *value* is a *metadata* entry value.
 
 Stream info object API
 -----------------------
+
+.. include:: ../../../_include/lua_common.rst
 
 ``protocol()``
 ^^^^^^^^^^^^^^
@@ -908,6 +907,8 @@ Returns the string representation of :repo:`requested server name <envoy/stream_
 Connection stream info object API
 ---------------------------------
 
+.. include:: ../../../_include/lua_common.rst
+
 ``dynamicMetadata()``
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -919,6 +920,8 @@ Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dyn
 
 Dynamic metadata object API
 ---------------------------
+
+.. include:: ../../../_include/lua_common.rst
 
 ``get()``
 ^^^^^^^^^
@@ -977,6 +980,8 @@ key. *value* is a *dynamicMetadata* entry value.
 Connection object API
 ---------------------
 
+.. include:: ../../../_include/lua_common.rst
+
 ``ssl()``
 ^^^^^^^^^
 
@@ -997,6 +1002,8 @@ Returns an :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_
 
 SSL connection object API
 -------------------------
+
+.. include:: ../../../_include/lua_common.rst
 
 ``peerCertificatePresented()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1248,6 +1255,8 @@ Returns the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS con
 
 Parsed name object API
 ----------------------
+
+.. include:: ../../../_include/lua_common.rst
 
 ``commonName()``
 ^^^^^^^^^^^^^^^^

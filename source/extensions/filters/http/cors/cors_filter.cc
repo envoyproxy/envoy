@@ -206,10 +206,6 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::ResponseHeaderMap& hea
   return Http::FilterHeadersStatus::Continue;
 }
 
-void CorsFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  decoder_callbacks_ = &callbacks;
-}
-
 bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
   for (const auto& allow_origin : allowOrigins()) {
     if (allow_origin->match("*") || allow_origin->match(origin.getStringView())) {

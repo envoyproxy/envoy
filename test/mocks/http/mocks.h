@@ -84,9 +84,9 @@ public:
   MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, ());
   MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, ());
   MOCK_METHOD(void, endStream, ());
+  MOCK_METHOD(void, sendGoAwayAndClose, ());
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
-  MOCK_METHOD(void, upgradeFilterChainCreated, ());
   MOCK_METHOD(void, disarmRequestTimeout, ());
   MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(void, recreateStream, (StreamInfo::FilterStateSharedPtr filter_state));
@@ -202,8 +202,7 @@ public:
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(FilterChainManager& manager, bool,
-                         const FilterChainOptions&) const override {
+  bool createFilterChain(FilterChainManager& manager, const FilterChainOptions&) const override {
     return createFilterChain(manager);
   }
   MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));
@@ -271,6 +270,7 @@ public:
   MOCK_METHOD(void, setDecoderBufferLimit, (uint32_t));
   MOCK_METHOD(uint32_t, decoderBufferLimit, ());
   MOCK_METHOD(bool, recreateStream, (const ResponseHeaderMap* headers));
+  MOCK_METHOD(void, sendGoAwayAndClose, ());
   MOCK_METHOD(void, addUpstreamSocketOptions, (const Network::Socket::OptionsSharedPtr& options));
   MOCK_METHOD(Network::Socket::OptionsSharedPtr, getUpstreamSocketOptions, (), (const));
   MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
