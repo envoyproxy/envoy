@@ -248,6 +248,38 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
   )
 }
 
+/// We wrap the Box<dyn T> in another Box to be able to pass the address of the Box to C, and
+/// retrieve it back when the C code calls the destroy function via [`drop_wrapped_c_void_ptr!`].
+/// This is necessary because the Box<dyn T> is a fat pointer, and we can't pass it directly.
+/// See https://users.rust-lang.org/t/sending-a-boxed-trait-over-ffi/21708 for the exact problem.
+//
+// Implementation note: this can be a simple function taking a type parameter, but we have it as
+// a macro to align with the other macro drop_wrapped_c_void_ptr!.
+macro_rules! wrap_into_c_void_ptr {
+  ($t:expr) => {{
+    let boxed = Box::new($t);
+    Box::into_raw(boxed) as *const ::std::os::raw::c_void
+  }};
+}
+
+/// This macro is used to drop the Box<dyn T> and the underlying object when the C code calls the
+/// destroy function. This is a counterpart to [`wrap_into_c_void_ptr!`].
+//
+// Implementation note: this cannot be a function as we need to cast as *mut *mut dyn T which is
+// not feasible via usual function type params.
+macro_rules! drop_wrapped_c_void_ptr {
+  ($ptr:expr, $t:ident) => {{
+    let config = $ptr as *mut *mut dyn $t;
+
+    // Drop the Box<*mut $t>, and then the Box<$t>, which also
+    // drops the underlying object.
+    unsafe {
+      let _outer = Box::from_raw(config);
+      let _inner = Box::from_raw(*config);
+    }
+  }};
+}
+
 fn envoy_dynamic_module_on_http_filter_config_new_impl(
   envoy_filter_config: EnvoyHttpFilterConfig,
   name: &str,
@@ -255,8 +287,7 @@ fn envoy_dynamic_module_on_http_filter_config_new_impl(
   new_fn: &NewHttpFilterConfigFunction,
 ) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
   if let Some(config) = new_fn(envoy_filter_config, name, config) {
-    let boxed_filter_config_ptr = Box::into_raw(Box::new(config));
-    boxed_filter_config_ptr as abi::envoy_dynamic_module_type_http_filter_config_module_ptr
+    wrap_into_c_void_ptr!(config)
   } else {
     std::ptr::null()
   }
@@ -266,12 +297,7 @@ fn envoy_dynamic_module_on_http_filter_config_new_impl(
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
-  let config = config_ptr as *mut *mut dyn HttpFilterConfig;
-
-  // Drop the Box<*mut dyn HttpFilterConfig>, and then the Box<dyn HttpFilterConfig>, which also
-  // drops the underlying object.
-  let _outer = Box::from_raw(config);
-  let _inner = Box::from_raw(*config);
+  drop_wrapped_c_void_ptr!(config_ptr, HttpFilterConfig);
 }
 
 #[no_mangle]
@@ -294,20 +320,14 @@ fn envoy_dynamic_module_on_http_filter_new_impl(
   filter_config: &dyn HttpFilterConfig,
 ) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
   let filter = filter_config.new_http_filter(envoy_filter_config);
-  let boxed = Box::into_raw(Box::new(filter));
-  boxed as abi::envoy_dynamic_module_type_http_filter_module_ptr
+  wrap_into_c_void_ptr!(filter)
 }
 
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_destroy(
   filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
 ) {
-  let filter = filter_ptr as *mut *mut dyn HttpFilter;
-
-  // Drop the Box<*mut dyn HttpFilter>, and then the Box<dyn HttpFilter>, which also drops the
-  // underlying object.
-  let _outer = Box::from_raw(filter);
-  let _inner = Box::from_raw(*filter);
+  drop_wrapped_c_void_ptr!(filter_ptr, HttpFilter);
 }
 
 #[no_mangle]
