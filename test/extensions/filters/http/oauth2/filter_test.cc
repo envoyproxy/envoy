@@ -39,11 +39,12 @@ static const std::string TEST_CLIENT_SECRET_ID = "MyClientSecretKnoxID";
 static const std::string TEST_TOKEN_SECRET_ID = "MyTokenSecretKnoxID";
 static const std::string TEST_DEFAULT_SCOPE = "user";
 static const std::string TEST_ENCODED_AUTH_SCOPES = "user%20openid%20email";
-static const std::string TEST_STATE_NONCE = "00000000075bcd15";
-// {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"00000000075bcd15"}
+static const std::string TEST_STATE_NONCE =
+    "00000000075bcd15.na6kru4x1pHgocSIeU/mdtHYn58Gh1bqweS4XXoiqVg=";
+// {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"00000000075bcd15.na6kru4x1pHgocSIeU/mdtHYn58Gh1bqweS4XXoiqVg="}
 static const std::string TEST_ENCODED_STATE =
     "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwibm9uY2"
-    "UiOiIwMDAwMDAwMDA3NWJjZDE1In0";
+    "UiOiIwMDAwMDAwMDA3NWJjZDE1Lm5hNmtydTR4MXBIZ29jU0llVS9tZHRIWW41OEdoMWJxd2VTNFhYb2lxVmc9In0";
 
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -1471,7 +1472,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
   const std::string test_encoded_state_with_special_characters =
       "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD9xdWVyeT1cInZhbHVlXCIma2V5"
       "PXZhbFxcdWUjZnJhZzxtZW50PntkYXRhfVtpbmZvXXx0ZXN0XFxec3BhY2UiLCJub25jZSI6IjAwMDAwMDAwMDc1YmNk"
-      "MTUifQ";
+      "MTUubmE2a3J1NHgxcEhnb2NTSWVVL21kdEhZbjU4R2gxYnF3ZVM0WFhvaXFWZz0ifQ";
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
       {Http::Headers::get().Path.get(), url_with_special_characters},
