@@ -19,7 +19,8 @@ public:
   std::string name() const override { return "envoy.upstreams.http.tcp.golang"; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+  createGenericConnPool(Upstream::HostConstSharedPtr host, 
+                        Upstream::ThreadLocalCluster& thread_local_cluster,
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         Upstream::ResourcePriority priority,
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,

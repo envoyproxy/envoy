@@ -177,10 +177,6 @@ func (c *cgoApiImpl) setBufferHelper(state *processState, bufferPtr uint64, data
 
 func (c *cgoApiImpl) GetStringValue(r unsafe.Pointer, id int) (string, bool) {
 	req := (*httpRequest)(r)
-	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
-	// since there might be multiple concurrency goroutines invoking this API on the Go side.
-	req.mutex.Lock()
-	defer req.mutex.Unlock()
 
 	var valueData C.uint64_t
 	var valueLen C.int
@@ -191,13 +187,8 @@ func (c *cgoApiImpl) GetStringValue(r unsafe.Pointer, id int) (string, bool) {
 	return strings.Clone(value), true
 }
 
-func (c *cgoApiImpl) SetSelfHalfCloseForUpstreamConn(r unsafe.Pointer, enabled int) {
-	req := (*httpRequest)(r)
-	// add a lock to protect filter->req_->strValue field in the Envoy side, from being writing concurrency,
-	// since there might be multiple concurrency goroutines invoking this API on the Go side.
-	req.mutex.Lock()
-	defer req.mutex.Unlock()
-
-	res := C.envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(unsafe.Pointer(req.req), C.int(enabled))
+func (c *cgoApiImpl) SetSelfHalfCloseForUpstreamConn(s unsafe.Pointer, enabled int) {
+	state := (*processState)(s)
+	res := C.envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(unsafe.Pointer(state.processState), C.int(enabled))
 	handleCApiStatus(res)
 }

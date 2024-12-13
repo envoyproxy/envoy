@@ -71,9 +71,7 @@ void ProcessorState::handleHeaderGolangStatus(TcpUpstreamStatus status) {
     break;
 
   default:
-    ENVOY_LOG(error, "golng http1-tcp bridge handleHeaderGolangStatus unexpected go_tatus: {}", int(status));
-    PANIC("unreachable");
-    break;
+    PANIC(fmt::format("golng http1-tcp bridge handleHeaderGolangStatus unexpected go_tatus: {}", int(status)));
   }
 
   ENVOY_LOG(debug, "golng http1-tcp bridge handleHeaderGolangStatus after handle header status, state: {}, status: {}", stateStr(), int(status));
@@ -100,17 +98,13 @@ void ProcessorState::handleDataGolangStatus(const TcpUpstreamStatus status, bool
       // buffer further whole data, go side in encodeData get whole data one-off.
 
       if (end_stream) {
-        ENVOY_LOG(error, "golng http1-tcp bridge handleDataGolangStatus unexpected go_tatus when end_stream is true: {}", int(status));
-        PANIC("unreachable");
-        break;
+        PANIC(fmt::format("golng http1-tcp bridge handleDataGolangStatus unexpected go_tatus when end_stream is true: {}", int(status)));
       }
       setFilterState(FilterState::WaitingAllData);
       break;
 
     default:
-      ENVOY_LOG(error, "golng http1-tcp bridge handleDataGolangStatus unexpected go_tatus: {}", int(status));
-      PANIC("unreachable");
-      break;
+      PANIC(fmt::format("golng http1-tcp bridge handleDataGolangStatus unexpected go_tatus: {}", int(status)));
     }
 
     ENVOY_LOG(debug, "golng http1-tcp bridge handleDataGolangStatus handle data status, state: {}, status: {}", stateStr(), int(status));

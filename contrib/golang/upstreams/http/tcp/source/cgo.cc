@@ -102,10 +102,10 @@ CAPIStatus envoyGoTcpUpstreamGetStringValue(void* r, int id, uint64_t* value_dat
       });
 }
 
-CAPIStatus envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(void* r, int enabled) {
-  return envoyGoTcpUpstreamHandlerWrapper(
-      r, [enabled](TcpUpstream& t) {
-        return t.setSelfHalfCloseForUpstreamConn(enabled);
+CAPIStatus envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(void* s, int enabled) {
+  return envoyGoTcpUpstreamProcessStateHandlerWrapper(
+      s, [enabled](TcpUpstream& t, ProcessorState& state) -> CAPIStatus {
+        return t.setSelfHalfCloseForUpstreamConn(state, enabled);
       });
 }
 

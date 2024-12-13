@@ -34,7 +34,6 @@ import "C"
 import (
 	"fmt"
 	"runtime/debug"
-	"sync"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
@@ -49,10 +48,6 @@ type httpRequest struct {
 	req               *C.httpRequest
 	tcpUpstreamFilter api.TcpUpstreamFilter
 	pInfo             panicInfo
-
-	// protect multiple cases:
-	// 1. protect req_->strValue in the C++ side from being used concurrently.
-	mutex sync.Mutex
 
 	// decodingState and encodingState are part of httpRequest, not another GC object.
 	// So, no cycle reference, GC finalizer could work well.

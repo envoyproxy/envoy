@@ -9,7 +9,7 @@ toolchain go1.22.0
 require (
 	github.com/cncf/xds/go v0.0.0-20240905190251-b4127c9b8d78
 	github.com/envoyproxy/envoy v1.31.2
-	google.golang.org/protobuf v1.35.1
+	google.golang.org/protobuf v1.35.2
 )
 
 require (

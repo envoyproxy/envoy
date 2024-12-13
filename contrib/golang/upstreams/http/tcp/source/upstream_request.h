@@ -108,7 +108,6 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
-  std::string plugin_name_{};
   absl::optional<Envoy::Upstream::TcpPoolData> conn_pool_data_;
   Envoy::Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
@@ -170,7 +169,7 @@ public:
   CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
   CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
-  CAPIStatus setSelfHalfCloseForUpstreamConn(int enabled);
+  CAPIStatus setSelfHalfCloseForUpstreamConn(ProcessorState& state, int enabled);
 
   DecodingProcessorState* decodingState() { return decoding_state_; }
   EncodingProcessorState* encodingState() { return encoding_state_; }
@@ -189,11 +188,12 @@ private:
 
   Dso::TcpUpstreamDsoPtr dynamic_lib_;
 
-  BridgeConfigSharedPtr config_;
-
   bool upstream_conn_self_half_close_{false};
 
   bool already_send_resp_headers_{false};
+
+  // lock to avoid race between multi go threads (when calling back from go).
+  Thread::MutexBasicLockable mutex_{};
 };
 
 

@@ -10,6 +10,7 @@ namespace Tcp {
 namespace Golang {
 
 Router::GenericConnPoolPtr GolangGenericConnPoolFactory::createGenericConnPool(
+    Upstream::HostConstSharedPtr,
     Upstream::ThreadLocalCluster& thread_local_cluster,
     Router::GenericConnPoolFactory::UpstreamProtocol, Upstream::ResourcePriority priority,
     absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx, const Protobuf::Message& config) const {
