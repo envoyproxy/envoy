@@ -49,6 +49,8 @@ public:
    */
   explicit AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source,
                                  double fill_rate = 1.0, bool init_fill = true);
+  explicit AtomicTokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate,
+                                 uint64_t initial_tokens);
 
   // This reference https://github.com/facebook/folly/blob/main/folly/TokenBucket.h.
   template <class GetConsumedTokens> double consume(const GetConsumedTokens& cb) {
