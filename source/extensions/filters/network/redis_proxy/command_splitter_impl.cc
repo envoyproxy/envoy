@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
+#include "router.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 
@@ -482,10 +483,27 @@ SplitRequestPtr TransactionRequest::create(Router& router,
       return nullptr;
     }
     transaction.start();
-    // Respond to MULTI locally.
-    localResponse(callbacks, "OK");
-    return nullptr;
 
+    // If we already have a key set (from a previous WATCH command), we will send the actual MULTI
+    // upstream. Otherwise, we will respond locally with "OK".
+    if (transaction.key_.empty()) {
+      localResponse(callbacks, "OK");
+      return nullptr;
+    } else {
+      RouteSharedPtr route = router.upstreamPool(transaction.key_, stream_info);
+      Common::Redis::RespValueSharedPtr multi_request =
+          std::make_shared<Common::Redis::Client::MultiRequest>();
+      if (route) {
+        // We reserve a client for the main connection and for each mirror connection.
+        transaction.clients_.resize(1 + route->mirrorPolicies().size());
+        std::unique_ptr<TransactionRequest> request_ptr{
+            new TransactionRequest(callbacks, command_stats, time_source, delay_command_latency)};
+        makeSingleServerRequest(route, "MULTI", transaction.key_, multi_request, *request_ptr,
+                                callbacks.transaction());
+        transaction.connection_established_ = true;
+        return request_ptr;
+      }
+    }
   } else if (command_name == "exec" || command_name == "discard") {
     // Handle the case where we don't have an open transaction.
     if (transaction.active_ == false) {
@@ -510,20 +528,29 @@ SplitRequestPtr TransactionRequest::create(Router& router,
     transaction.should_close_ = true;
   }
 
+  // If we do a WATCH command without having started a transaction, we send it upstream and save the
+  // key, so we can support UNWATCH. We have to also set the connection details.
+  if (command_name == "watch" && !transaction.active_) {
+    transaction.key_ = incoming_request->asArray()[1].asString();
+  }
+
   // When we receive the first command with a key we will set this key as our transaction
   // key, and then send a MULTI command to the node that handles that key.
   // The response for the MULTI command will be discarded since we pass the null_pool_callbacks
   // to the handler.
-
   RouteSharedPtr route;
   if (transaction.key_.empty()) {
+    // If we do an UNWATCH and we don't have a key until now, this is a no-op.
     if (command_name == "unwatch") {
-      // Unwatch without any keys (meaning no previous WATCH) is a no-op.
       if (transaction.active_) {
+        // No-op during transaction -> QUEUED
         localResponse(callbacks, "QUEUED");
       } else {
+        // No-op outside transaction -> OK
         localResponse(callbacks, "OK");
       }
+
+      return nullptr;
     }
 
     transaction.key_ = incoming_request->asArray()[1].asString();
@@ -549,6 +576,11 @@ SplitRequestPtr TransactionRequest::create(Router& router,
     request_ptr->handle_ =
         makeSingleServerRequest(route, base_request->asArray()[0].asString(), transaction.key_,
                                 base_request, *request_ptr, callbacks.transaction());
+  }
+
+  // If we send an UNWATCH outside of a transaction, we clear the transaction key.
+  if (command_name == "unwatch" && !transaction.active_) {
+    transaction.key_.clear();
   }
 
   if (!request_ptr->handle_) {
