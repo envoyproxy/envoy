@@ -69,6 +69,10 @@ void InstanceImpl::init() {
   });
 }
 
+//
+//
+uint16_t InstanceImpl::shardSize() { return tls_->getTyped<ThreadLocalPool>().shardSize(); }
+
 // This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
 // failing due to InstanceImpl going away.
 Common::Redis::Client::PoolRequest*
@@ -85,6 +89,16 @@ InstanceImpl::makeRequestToHost(const std::string& host_address,
                                 const Common::Redis::RespValue& request,
                                 Common::Redis::Client::ClientCallbacks& callbacks) {
   return tls_->getTyped<ThreadLocalPool>().makeRequestToHost(host_address, request, callbacks);
+}
+
+// This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
+// failing due to InstanceImpl going away.
+Common::Redis::Client::PoolRequest*
+InstanceImpl::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
+                                 PoolCallbacks& callbacks,
+                                 Common::Redis::Client::Transaction& transaction) {
+  return tls_->getTyped<ThreadLocalPool>().makeRequestToShard(shard_index, std::move(request),
+                                                              callbacks, transaction);
 }
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
@@ -268,23 +282,37 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
   return client;
 }
 
+uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
+  if (cluster_ == nullptr) {
+    ASSERT(client_map_.empty());
+    ASSERT(host_set_member_update_cb_handle_ == nullptr);
+    return 1;
+  }
+
+  uint16_t size = 1;
+  Common::Redis::RespValue request;
+  for (;; size++) {
+    Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
+        size, request, Common::Redis::Client::ReadPolicy::Primary);
+    Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
+    if (!host) {
+      break;
+    }
+  }
+  return size;
+}
+
 Common::Redis::Client::PoolRequest*
-InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&& request,
-                                           PoolCallbacks& callbacks,
+InstanceImpl::ThreadLocalPool::makeRequest(Upstream::LoadBalancerContext* lb_context,
+                                           RespVariant&& request, PoolCallbacks& callbacks,
                                            Common::Redis::Client::Transaction& transaction) {
   if (cluster_ == nullptr) {
     ASSERT(client_map_.empty());
     ASSERT(host_set_member_update_cb_handle_ == nullptr);
     return nullptr;
   }
-
-  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
-      key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
-      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
-
-  Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
+  Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(lb_context);
   if (!host) {
-    ENVOY_LOG(debug, "host not found: '{}'", key);
     return nullptr;
   }
 
@@ -324,6 +352,37 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
     onRequestCompleted();
     return nullptr;
   }
+}
+
+Common::Redis::Client::PoolRequest*
+InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&& request,
+                                           PoolCallbacks& callbacks,
+                                           Common::Redis::Client::Transaction& transaction) {
+  Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
+      key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
+      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
+
+  auto result = makeRequest(&lb_context, getRequest(request), callbacks, transaction);
+  if (!result) {
+    ENVOY_LOG(debug, "host not found: '{}'", key);
+    return nullptr;
+  }
+  return result;
+}
+
+Common::Redis::Client::PoolRequest*
+InstanceImpl::ThreadLocalPool::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
+                                                  PoolCallbacks& callbacks,
+                                                  Common::Redis::Client::Transaction& transaction) {
+  Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
+      shard_index, getRequest(request),
+      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
+  auto result = makeRequest(&lb_context, getRequest(request), callbacks, transaction);
+  if (!result) {
+    ENVOY_LOG(debug, "host not found: '{}'", shard_index);
+    return nullptr;
+  }
+  return result;
 }
 
 Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestToHost(
