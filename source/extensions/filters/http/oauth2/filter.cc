@@ -211,7 +211,8 @@ bool validateCsrfTokenHmac(const std::string& hmac_secret, const std::string& cs
 std::string encodeState(const std::string& original_request_url, const std::string& nonce) {
   std::string buffer;
   absl::string_view sanitized_url = Json::sanitize(buffer, original_request_url);
-  std::string json = fmt::format(R"({{"url":"{}","nonce":"{}"}})", sanitized_url, nonce);
+  absl::string_view sanitized_nonce = Json::sanitize(buffer, nonce);
+  std::string json = fmt::format(R"({{"url":"{}","nonce":"{}"}})", sanitized_url, sanitized_nonce);
   return Base64Url::encode(json.data(), json.size());
 }
 
@@ -557,7 +558,6 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   }
 
   const std::string state = encodeState(original_url, csrf_token);
-
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
 
@@ -907,7 +907,7 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
   std::string nonce = filed_value_pair.at(stateParamsNonce).string_value();
   if (!validateCsrfToken(headers, nonce)) {
-    ENVOY_LOG(error, "nonce cookie does not match nonce in the state: \n{}", nonce);
+    ENVOY_LOG(error, "csrf token validation failed");
     return {false, "", ""};
   }
   const std::string original_request_url = filed_value_pair.at(stateParamsUrl).string_value();
