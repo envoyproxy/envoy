@@ -1000,6 +1000,33 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationMalformedState) {
 }
 
 /**
+ * Scenario: The OAuth filter receives a request with an invalid CSRF token cookie.
+ * This scenario simulates an attacker trying to forge a CSRF token.
+ *
+ * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
+ */
+TEST_F(OAuth2Test, RedirectToOAuthServerWithInvalidCSRFToken) {
+  static const std::string invalid_csrf_token = "00000000075bcd15.invalidhmac";
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + invalid_csrf_token},
+  };
+
+  // Explicitly fail the validation to trigger the OAuth flow.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Unauthorized response is expected instead of 302 redirect.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(1, config_->stats().oauth_failure_.value());
+}
+
+/**
  * Scenario: Protoc in opted-in to allow OPTIONS requests to pass-through. This is important as
  * POST requests initiate an OPTIONS request first in order to ensure POST is supported. During a
  * preflight request where the client Javascript initiates a remote call to a different endpoint,
