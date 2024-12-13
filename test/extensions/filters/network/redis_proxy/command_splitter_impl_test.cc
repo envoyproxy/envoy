@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "source/common/common/fmt.h"
@@ -591,6 +592,39 @@ public:
     handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   }
 
+  void makeRequestToShard(uint16_t shard_size, std::vector<std::string>& request_strings,
+                          bool mirrored) {
+    Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+    makeBulkStringArray(*request, request_strings);
+
+    pool_callbacks_.resize(shard_size);
+    mirror_pool_callbacks_.resize(shard_size);
+    std::vector<Common::Redis::Client::MockPoolRequest> tmp_pool_requests(shard_size);
+    pool_requests_.swap(tmp_pool_requests);
+    std::vector<Common::Redis::Client::MockPoolRequest> tmp_mirrored_pool_requests(shard_size);
+    mirror_pool_requests_.swap(tmp_mirrored_pool_requests);
+    EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+    std::vector<Common::Redis::Client::MockPoolRequest> dummy_requests(shard_size);
+
+    EXPECT_CALL(*conn_pool_, shardSize_()).WillRepeatedly(Return(shard_size));
+    if (mirrored) {
+      EXPECT_CALL(*mirror_conn_pool_, shardSize_()).WillRepeatedly(Return(shard_size));
+    }
+    ConnPool::RespVariant keys(*request);
+    for (uint32_t i = 0; i < shard_size; i++) {
+      Common::Redis::Client::PoolRequest* request_to_use = &pool_requests_[i];
+      Common::Redis::Client::PoolRequest* mirror_request_to_use = &dummy_requests[i];
+      EXPECT_CALL(*conn_pool_, makeRequestToShard_(i, keys, _))
+          .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_[i])), Return(request_to_use)));
+      if (mirrored) {
+        EXPECT_CALL(*mirror_conn_pool_, makeRequestToShard_(i, keys, _))
+            .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&mirror_pool_callbacks_[i])),
+                            Return(mirror_request_to_use)));
+      }
+    }
+    handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  }
+
   std::vector<std::vector<std::string>> expected_requests_;
   std::vector<ConnPool::PoolCallbacks*> pool_callbacks_;
   std::vector<Common::Redis::Client::MockPoolRequest> pool_requests_;
@@ -931,6 +965,100 @@ TEST_F(RedisMSETCommandHandlerTest, WrongNumberOfArgs) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.total").value());
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.mset.error").value());
 };
+
+class KeysHandlerTest : public FragmentedRequestCommandHandlerTest,
+                        public testing::WithParamInterface<std::string> {
+public:
+  void setup(uint16_t shard_size, bool mirrored = false) {
+    std::vector<std::string> request_strings = {"keys", "*"};
+    makeRequestToShard(shard_size, request_strings, mirrored);
+  }
+
+  Common::Redis::RespValuePtr response() {
+    Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
+    response->type(Common::Redis::RespType::Array);
+    return response;
+  }
+};
+
+TEST_P(KeysHandlerTest, Normal) {
+  InSequence s;
+
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Array);
+  pool_callbacks_[1]->onResponse(response());
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(response());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+};
+
+TEST_P(KeysHandlerTest, Mirrored) {
+  InSequence s;
+
+  setupMirrorPolicy();
+  setup(2, true);
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Array);
+
+  pool_callbacks_[1]->onResponse(response());
+  mirror_pool_callbacks_[1]->onResponse(response());
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(response());
+  mirror_pool_callbacks_[0]->onResponse(response());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+};
+
+TEST_P(KeysHandlerTest, NormalOneZero) {
+  InSequence s;
+
+  setup(2);
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Array);
+
+  pool_callbacks_[1]->onResponse(response());
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(response());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+};
+
+TEST_P(KeysHandlerTest, NoUpstreamHostForAll) {
+  // No InSequence to avoid making setup() more complicated.
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "no upstream host";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  setup(0);
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+};
+
+INSTANTIATE_TEST_SUITE_P(KeysHandlerTest, KeysHandlerTest, testing::Values("keys"));
 
 class RedisSplitKeysSumResultHandlerTest : public FragmentedRequestCommandHandlerTest,
                                            public testing::WithParamInterface<std::string> {

@@ -1,5 +1,7 @@
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
+#include <cstdint>
+
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 
@@ -69,6 +71,35 @@ makeFragmentedRequest(const RouteSharedPtr& route, const std::string& command,
       if (mirror_policy->shouldMirror(command)) {
         mirror_policy->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
                                                null_pool_callbacks, transaction);
+      }
+    }
+  }
+  return handler;
+}
+
+/**
+ * Make request and maybe mirror the request based on the mirror policies of the route.
+ * @param route supplies the route matched with the request.
+ * @param command supplies the command of the request.
+ * @param key supplies the key of the request.
+ * @param incoming_request supplies the request.
+ * @param callbacks supplies the request completion callbacks.
+ * @param transaction supplies the transaction info of the current connection.
+ * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
+ *         for some reason.
+ */
+Common::Redis::Client::PoolRequest*
+makeFragmentedRequestToShard(const RouteSharedPtr& route, const std::string& command,
+                             uint16_t shard_index, const Common::Redis::RespValue& incoming_request,
+                             ConnPool::PoolCallbacks& callbacks,
+                             Common::Redis::Client::Transaction& transaction) {
+  auto handler = route->upstream(command)->makeRequestToShard(
+      shard_index, ConnPool::RespVariant(incoming_request), callbacks, transaction);
+  if (handler) {
+    for (auto& mirror_policy : route->mirrorPolicies()) {
+      if (mirror_policy->shouldMirror(command)) {
+        mirror_policy->upstream()->makeRequestToShard(
+            shard_index, ConnPool::RespVariant(incoming_request), null_pool_callbacks, transaction);
       }
     }
   }
@@ -385,6 +416,80 @@ void MSETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
   }
 }
 
+SplitRequestPtr KeysRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                    SplitCallbacks& callbacks, CommandStats& command_stats,
+                                    TimeSource& time_source, bool delay_command_latency,
+                                    const StreamInfo::StreamInfo& stream_info) {
+  if (incoming_request->asArray().size() != 2) {
+    onWrongNumberOfArguments(callbacks, *incoming_request);
+    command_stats.error_.inc();
+    return nullptr;
+  }
+  const auto route = router.upstreamPool(incoming_request->asArray()[1].asString(), stream_info);
+  uint32_t shard_size =
+      route ? route->upstream(incoming_request->asArray()[0].asString())->shardSize() : 0;
+  if (shard_size == 0) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    return nullptr;
+  }
+
+  std::unique_ptr<KeysRequest> request_ptr{
+      new KeysRequest(callbacks, command_stats, time_source, delay_command_latency)};
+  request_ptr->num_pending_responses_ = shard_size;
+  request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
+
+  request_ptr->pending_response_ = std::make_unique<Common::Redis::RespValue>();
+  request_ptr->pending_response_->type(Common::Redis::RespType::Array);
+
+  Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+  for (uint32_t shard_index = 0; shard_index < shard_size; shard_index++) {
+    request_ptr->pending_requests_.emplace_back(*request_ptr, shard_index);
+    PendingRequest& pending_request = request_ptr->pending_requests_.back();
+
+    ENVOY_LOG(debug, "keys request shard index {}: {}", shard_index, base_request->toString());
+    pending_request.handle_ =
+        makeFragmentedRequestToShard(route, base_request->asArray()[0].asString(), shard_index,
+                                     *base_request, pending_request, callbacks.transaction());
+
+    if (!pending_request.handle_) {
+      pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    }
+  }
+
+  if (request_ptr->num_pending_responses_ > 0) {
+    return request_ptr;
+  }
+
+  return nullptr;
+}
+
+void KeysRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
+  pending_requests_[index].handle_ = nullptr;
+  switch (value->type()) {
+  case Common::Redis::RespType::Array: {
+    pending_response_->asArray().insert(pending_response_->asArray().end(),
+                                        value->asArray().begin(), value->asArray().end());
+    break;
+  }
+  default: {
+    error_count_++;
+    break;
+  }
+  }
+
+  ASSERT(num_pending_responses_ > 0);
+  if (--num_pending_responses_ == 0) {
+    updateStats(error_count_ == 0);
+    if (error_count_ == 0) {
+      callbacks_.onResponse(std::move(pending_response_));
+    } else {
+      callbacks_.onResponse(Common::Redis::Utility::makeError(
+          fmt::format("finished with {} error(s)", error_count_)));
+    }
+  }
+}
+
 SplitRequestPtr
 SplitKeysSumResultRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                   SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -593,7 +698,7 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
                            Common::Redis::FaultManagerPtr&& fault_manager)
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
-      split_keys_sum_result_handler_(*router_),
+      keys_handler_(*router_), split_keys_sum_result_handler_(*router_),
       transaction_handler_(*router_), stats_{ALL_COMMAND_SPLITTER_STATS(
                                           POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source), fault_manager_(std::move(fault_manager)) {
@@ -615,6 +720,9 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 
   addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mset(), latency_in_micros,
              mset_handler_);
+
+  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::keys(), latency_in_micros,
+             keys_handler_);
 
   for (const std::string& command : Common::Redis::SupportedCommands::transactionCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, transaction_handler_);
@@ -701,6 +809,16 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
 
     time_resp->asArray().swap(resp_array);
     callbacks.onResponse(std::move(time_resp));
+    return nullptr;
+  }
+
+  if (command_name == Common::Redis::SupportedCommands::select()) {
+    // Respond to OK locally.
+    if (request->asArray().size() != 2) {
+      onInvalidRequest(callbacks);
+      return nullptr;
+    }
+    localResponse(callbacks, "OK");
     return nullptr;
   }
 
