@@ -338,6 +338,11 @@ new_features:
 - area: grpc-json
   change: |
     Added a new http filter for :ref:`gRPC to JSON transcoding <config_http_filters_grpc_json_reverse_transcoder>`.
+- area: http
+  change: |
+    Added default false :ref:`ignore_http_11_upgrade
+    <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.ignore_http_11_upgrade>`. When set to true, Upgrade headers
+    will be removed rather than rejecting the request.
 
 deprecated:
 - area: rbac

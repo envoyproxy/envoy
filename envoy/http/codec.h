@@ -497,6 +497,8 @@ struct Http1Settings {
   // headers set. By default such messages are rejected, but if option is enabled - Envoy will
   // remove Content-Length header and process message.
   bool allow_chunked_length_{false};
+  // Remove HTTP/1.1 Upgrade header from message and process. By default such messages are rejected
+  bool ignore_http_11_upgrade_{false};
 
   enum class HeaderKeyFormat {
     // By default no formatting is performed, presenting all headers in lowercase (as Envoy
