@@ -1,6 +1,5 @@
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
-#include "router.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 
