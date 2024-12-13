@@ -180,8 +180,7 @@ std::string encodeHmac(const std::vector<uint8_t>& secret, absl::string_view dom
 }
 
 // Generates a CSRF token that can be used to prevent CSRF attacks.
-// The token is in the format of <nonce>.<hmac(nonce)> recommended by OWASP.
-// See
+// The token is in the format of <nonce>.<hmac(nonce)> recommended by
 // https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#signed-double-submit-cookie-recommended
 std::string generateCsrfToken(const std::string& hmac_secret, Random::RandomGenerator& random) {
   std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
