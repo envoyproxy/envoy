@@ -491,17 +491,9 @@ SplitRequestPtr TransactionRequest::create(Router& router,
       return nullptr;
     } else {
       RouteSharedPtr route = router.upstreamPool(transaction.key_, stream_info);
-      Common::Redis::RespValueSharedPtr multi_request =
-          std::make_shared<Common::Redis::Client::MultiRequest>();
       if (route) {
         // We reserve a client for the main connection and for each mirror connection.
         transaction.clients_.resize(1 + route->mirrorPolicies().size());
-        std::unique_ptr<TransactionRequest> request_ptr{
-            new TransactionRequest(callbacks, command_stats, time_source, delay_command_latency)};
-        makeSingleServerRequest(route, "MULTI", transaction.key_, multi_request, *request_ptr,
-                                callbacks.transaction());
-        transaction.connection_established_ = true;
-        return request_ptr;
       }
     }
   } else if (command_name == "exec" || command_name == "discard") {
@@ -587,6 +579,11 @@ SplitRequestPtr TransactionRequest::create(Router& router,
     command_stats.error_.inc();
     callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
     return nullptr;
+  }
+
+  // If we sent a MULTI command upstream, connection was established.
+  if (command_name == "multi") {
+    transaction.connection_established_ = true;
   }
 
   return request_ptr;
