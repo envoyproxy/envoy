@@ -1081,14 +1081,15 @@ TEST_F(ProxyProtocolTest, V2CustomTLVHostMetadataMissing) {
 filter_metadata:
   envoy.transport_socket_match:
     outbound-proxy-protocol: true
-)EOF", socket_match_metadata);
+)EOF",
+                            socket_match_metadata);
   ProtobufWkt::Any typed_metadata;
   typed_metadata.PackFrom(socket_match_metadata);
 
   auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-  metadata->mutable_typed_filter_metadata()->emplace(
-      "envoy.transport_socket_match", typed_metadata);
+  metadata->mutable_typed_filter_metadata()->emplace("envoy.transport_socket_match",
+                                                     typed_metadata);
   EXPECT_CALL(*host, metadata()).Times(testing::AnyNumber()).WillRepeatedly(Return(metadata));
   transport_callbacks_.connection().streamInfo().upstreamInfo()->setUpstreamHost(host);
 
