@@ -70,7 +70,6 @@ func envoyGoOnTcpUpstreamConfig(c *C.httpConfig) uint64 {
 		api.LogErrorf("failed to parse golang plugin config: %v", err)
 		return 0
 	}
-	api.LogErrorf("failed to parse golang plugin config: %v", err)
 	configCache.Store(configNum, parsedConfig)
 
 	return configNum
