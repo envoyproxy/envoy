@@ -102,6 +102,7 @@ type TcpUpstreamCAPI interface {
 	// Header related
 	CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
 	SetRespHeader(s unsafe.Pointer, key string, value string, add bool)
+	RemoveRespHeader(s unsafe.Pointer, key string)
 	// Buffer related
 	GetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte
 	DrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64)

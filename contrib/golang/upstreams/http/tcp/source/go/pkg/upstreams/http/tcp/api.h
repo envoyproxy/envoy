@@ -47,13 +47,15 @@ typedef enum { // NOLINT(modernize-use-using)
 // The return value of C Api that invoking from Go.
 typedef enum { // NOLINT(modernize-use-using)
   CAPIOK = 0,
-  CAPIInvalidPhase = -1,
+  CAPINotInGo = -3,
+  CAPIInvalidPhase = -4,
 } CAPIStatus;
 
 // tcp upstream
 CAPIStatus envoyGoTcpUpstreamGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data, int* value_len);
 CAPIStatus envoyGoTcpUpstreamCopyHeaders(void* s, void* strs, void* buf);
 CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len, void* value_data, int value_len, headerAction action);
+CAPIStatus envoyGoTcpUpstreamRemoveRespHeader(void* s, void* key_data, int key_len);
 CAPIStatus envoyGoTcpUpstreamGetBuffer(void* s, uint64_t buffer, void* value);
 CAPIStatus envoyGoTcpUpstreamDrainBuffer(void* s, uint64_t buffer, uint64_t length);
 CAPIStatus envoyGoTcpUpstreamSetBufferHelper(void* s, uint64_t buffer, void* data, int length, bufferAction action);

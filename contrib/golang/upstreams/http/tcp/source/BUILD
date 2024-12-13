@@ -54,7 +54,6 @@ envoy_cc_library(
         "//source/common/router:router_lib",
         "//source/extensions/load_balancing_policies/common:load_balancer_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
-        "//source/extensions/upstreams/http/tcp:upstream_request_lib",
     ],
 )
 
@@ -87,8 +86,5 @@ envoy_cc_contrib_extension(
         "//source/common/memory:utils_lib",
         "//source/common/network:connection_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
-        "//source/extensions/filters/network:well_known_names",
-        "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//contrib/envoy/extensions/filters/network/golang/v3alpha:pkg_cc_proto",
     ],
 )

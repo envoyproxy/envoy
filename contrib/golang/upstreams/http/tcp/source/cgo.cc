@@ -58,6 +58,14 @@ CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len,
       });
 }
 
+CAPIStatus envoyGoTcpUpstreamRemoveRespHeader(void* s, void* key_data, int key_len) {
+  return envoyGoTcpUpstreamProcessStateHandlerWrapper(
+      s, [key_data, key_len](TcpUpstream& t, ProcessorState& state) -> CAPIStatus {
+        auto key_str = stringViewFromGoPointer(key_data, key_len);
+        return t.removeRespHeader(state, key_str);
+      });
+}
+
 CAPIStatus envoyGoTcpUpstreamGetBuffer(void* s, uint64_t buffer_ptr, void* data) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
       s, [buffer_ptr, data](TcpUpstream& t, ProcessorState& state) -> CAPIStatus {

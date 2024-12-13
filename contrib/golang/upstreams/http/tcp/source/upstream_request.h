@@ -39,22 +39,20 @@ class EncodingProcessorState;
 
 class TcpUpstream;
 
-class FilterConfig;
+class BridgeConfig;
 
-class Filter;
-
-using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+using BridgeConfigSharedPtr = std::shared_ptr<BridgeConfig>;
 
 /**
- * Configuration for the Tcp Upstream golang extension filter.
+ * Configuration for the Golang HTTP1-TCP Bridge.
  */
-class FilterConfig : httpConfig,
-                     public std::enable_shared_from_this<FilterConfig>,
+class BridgeConfig : httpConfig,
+                     public std::enable_shared_from_this<BridgeConfig>,
                      Logger::Loggable<Logger::Id::golang> {
 public:
-  FilterConfig(const envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config proto_config,
+  BridgeConfig(const envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config proto_config,
    Dso::TcpUpstreamDsoPtr dso_lib);
-  ~FilterConfig();
+  ~BridgeConfig();
 
   const std::string& soId() const { return so_id_; }
   const std::string& soPath() const { return so_path_; }
@@ -117,10 +115,8 @@ private:
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
 
   Dso::TcpUpstreamDsoPtr dynamic_lib_;
-  FilterConfigSharedPtr config_;
+  BridgeConfigSharedPtr config_;
 };
-
-using FilterSharedPtr = std::shared_ptr<Filter>;
 
 class TcpUpstream : public Router::GenericUpstream,
                     public Envoy::Tcp::ConnectionPool::UpstreamCallbacks,
@@ -129,7 +125,7 @@ class TcpUpstream : public Router::GenericUpstream,
 public:
   TcpUpstream(Router::UpstreamToDownstream* upstream_request,
               Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream, Dso::TcpUpstreamDsoPtr dynamic_lib,
-              FilterConfigSharedPtr config);
+              BridgeConfigSharedPtr config);
   ~TcpUpstream() override;            
 
   enum class EndStreamType {
@@ -144,7 +140,6 @@ public:
     ClusterName,
   };
 
-  void initRequest();
   void initResponse();
 
   // GenericUpstream
@@ -170,6 +165,7 @@ public:
 
   CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
   CAPIStatus setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value, headerAction act);
+  CAPIStatus removeRespHeader(ProcessorState& state, absl::string_view key);
   CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
   CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
   CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
@@ -183,8 +179,6 @@ public:
   DecodingProcessorState* decoding_state_;
 
   const Router::RouteEntry* route_entry_;
-  // store response header for http
-  std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers_{nullptr};
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
   std::string strValue;
 
@@ -195,7 +189,7 @@ private:
 
   Dso::TcpUpstreamDsoPtr dynamic_lib_;
 
-  FilterConfigSharedPtr config_;
+  BridgeConfigSharedPtr config_;
 
   bool upstream_conn_self_half_close_{false};
 

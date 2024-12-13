@@ -25,30 +25,6 @@ namespace Golang {
 
 class TcpUpstream;
 
-class Filter;
-
-class BufferList : public NonCopyable {
-public:
-  BufferList() = default;
-
-  bool empty() const { return bytes_ == 0; }
-  // return a new buffer instance, it will existing until moveOut or drain.
-  Buffer::Instance& push(Buffer::Instance& data);
-  // move all buffer into data, the list is empty then.
-  void moveOut(Buffer::Instance& data);
-  // clear the latest push in buffer.
-  void clearLatest();
-  // clear all.
-  void clearAll();
-  // check the buffer instance if existing
-  bool checkExisting(Buffer::Instance* data);
-
-private:
-  std::deque<Buffer::InstancePtr> queue_;
-  // The total size of buffers in the list.
-  uint32_t bytes_{0};
-};
-
 /**
   * This describes the processor state.
 */
@@ -90,19 +66,18 @@ enum class TcpUpstreamStatus {
   * Here is the specific explanation in different funcs:
   * encodeHeaders: will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole data one-off.
   * encodeData: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot be used when end_stream=true)
-  * onUpstreamData: every data trigger will call go side, and go side get buffer data from start.
+  * onUpstreamData: every data trigger will call go side, and go side get whloe buffered data ever since at every time.
   */
   TcpUpstreamStopAndBuffer,
 
-  /** Area of status: encodeHeaders, onUpstreamData
+  /** Area of status: onUpstreamData
   *
-  * Used when you want to send data to upstream in encodeHeaders, or send data to downstream in onUpstreamData.
+  * Used when you want to endStream for sending data to downstream in onUpstreamData.
   *
   * Here is the specific explanation in different funcs:
-  * encodeHeaders: directly send data to upstream, and encodeData will not be called even when downstream_req has body.
-  * onUpstreamData: send data and headers to downstream which means the whole resp to http is finished.
+  * onUpstreamData: endStream to downstream which means the whole resp to http has finished.
   */
-  TcpUpstreamSendData,
+  TcpUpstreamEndStream,
 };
 
 class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
@@ -136,14 +111,19 @@ public:
   void drainBufferData();
 
   void handleHeaderGolangStatus(TcpUpstreamStatus status);
-  void handleDataGolangStatus(const TcpUpstreamStatus status, Buffer::Instance& data,bool end_stream);
-
-  const Envoy::Http::RequestOrResponseHeaderMap* headers{nullptr};
-  BufferList doDataList;
+  void handleDataGolangStatus(const TcpUpstreamStatus status, bool end_stream);
 
 protected:
   Buffer::InstancePtr data_buffer_{nullptr};
 
+};
+
+class EncodingProcessorState : public ProcessorState {
+public:
+  EncodingProcessorState(TcpUpstream& tcp_upstream);
+
+  // store request header for http
+  const Envoy::Http::RequestHeaderMap* req_headers{nullptr};
 };
 
 class DecodingProcessorState : public ProcessorState {
@@ -151,12 +131,7 @@ public:
   DecodingProcessorState(TcpUpstream& tcp_upstream);
   
   // store response header for http
-  Envoy::Http::RequestOrResponseHeaderMap* resp_headers{nullptr};
-};
-
-class EncodingProcessorState : public ProcessorState {
-public:
-  EncodingProcessorState(TcpUpstream& tcp_upstream);
+  std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers{nullptr};
 };
 
 } // namespace Golang

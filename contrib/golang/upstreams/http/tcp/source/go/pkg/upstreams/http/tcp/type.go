@@ -195,10 +195,10 @@ func (h *responseHeaderMapImpl) Set(key, value string) {
 	key = strings.ToLower(key)
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
-	if h.headers == nil {
-		h.headers = make(map[string][]string, 0)
+	h.initHeaders()
+	if h.headers != nil {
+		h.headers[key] = []string{value}
 	}
-	h.headers[key] = []string{value}
 
 	cAPI.SetRespHeader(unsafe.Pointer(h.state), key, value, false)
 }
@@ -207,16 +207,28 @@ func (h *responseHeaderMapImpl) Add(key, value string) {
 	key = strings.ToLower(key)
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
-	if h.headers == nil {
-		h.headers = make(map[string][]string, 0)
-	}
-	if hdrs, found := h.headers[key]; found {
-		h.headers[key] = append(hdrs, value)
-	} else {
-		h.headers[key] = []string{value}
+	h.initHeaders()
+	if h.headers != nil {
+		if hdrs, found := h.headers[key]; found {
+			h.headers[key] = append(hdrs, value)
+		} else {
+			h.headers[key] = []string{value}
+		}
 	}
 
 	cAPI.SetRespHeader(unsafe.Pointer(h.state), key, value, true)
+}
+
+func (h *responseHeaderMapImpl) Del(key string) {
+	key = strings.ToLower(key)
+	// Get all header values first before removing a key, since the del operation may not take affects immediately
+	// when it's invoked in a Go thread, instead, it will post a callback to run in the envoy worker thread.
+	// Otherwise, we may get outdated values in a following Get call.
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.initHeaders()
+	delete(h.headers, key)
+	cAPI.RemoveRespHeader(unsafe.Pointer(h.state), key)
 }
 
 // api.BufferInstance

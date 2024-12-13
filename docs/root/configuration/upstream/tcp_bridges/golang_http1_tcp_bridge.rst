@@ -1,23 +1,23 @@
-.. _config_tcp_filters_golang_tcp_upstream_filter:
+.. _config_tcp_bridges_golang_http1_tcp_bridge:
 
-Golang Tcp Upstream Filter
+Golang HTTP1-TCP Bridge
 ======
 
-This is a filter which can use Golang plugin to achieve **Protocol Convert** from HTTP1 client to any RPC(TCP) server in Envoy.
+This bridge enables an HTTP/1 client to connect to a TCP server via a Golang plugin, facilitating **Protocol Convert** from HTTP/1 to any RPC protocol in Envoy.
 
-The Golang Tcp Upstream Filter allows `Golang <https://go.dev/>`_ to be run during both the request
+The Bridge allows `Golang <https://go.dev/>`_ to be run during both the request
 and response flows of upstream.
 
-Go plugins used by this filter can be recompiled independently of Envoy.
+Go plugins used by this bridge can be recompiled independently of Envoy.
 
-See the `Envoy's Golang tcp upstream filter proposal 
+See the `Envoy's Golang HTTP1-TCP Bridge proposal 
 <https://github.com/envoyproxy/envoy/issues/35749>`_
 for more details on the filter's implementation.
 
-Developing a Go tcp upstream plugin
+Developing a Go plugin
 ----------------------
 
-Envoy's Go tcp upstream plugins must implement the :repo:`TcpUpstreamFilter API <contrib/golang/common/go/api/filter.go>`.
+Envoy's Golang HTTP1-TCP Bridge plugin must implement the :repo:`TcpUpstreamFilter API <contrib/golang/common/go/api/filter.go>`.
 
 Here is the introduction about the TcpUpstreamFilter API:
 * EncodeHeaders: get http1 request headers and decide whether to directly send rpc frame to tcp server.

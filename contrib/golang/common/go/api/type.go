@@ -514,15 +514,14 @@ const (
 	 */
 	TcpUpstreamStopAndBuffer TcpUpstreamStatus = 1
 
-	/** Area of status: encodeHeaders, onUpstreamData
+	/** Area of status: onUpstreamData
 	 *
-	 * Used when you do not want to send data to upstream in encodeHeaders, or send data to downstream in onUpstreamData.
+	 * Used when you want to endStream for sending data to downstream in onUpstreamData.
 	 *
 	 * Here is the specific explanation in different funcs:
-	 * encodeHeaders: directly send data to upstream, and encodeData will not be called even when downstream_req has body.
-	 * onUpstreamData: pass data and headers to downstream which means the whole resp to http is finished.
+	 * onUpstreamData: endStream to downstream which means the whole resp to http is finished.
 	 */
-	TcpUpstreamSendData TcpUpstreamStatus = 2
+	TcpUpstreamEndStream TcpUpstreamStatus = 2
 )
 
 func (s TcpUpstreamStatus) String() string {
@@ -531,8 +530,8 @@ func (s TcpUpstreamStatus) String() string {
 		return "TcpUpstreamContinue"
 	case TcpUpstreamStopAndBuffer:
 		return "TcpUpstreamStopAndBuffer"
-	case TcpUpstreamSendData:
-		return "TcpUpstreamSendData"
+	case TcpUpstreamEndStream:
+		return "TcpUpstreamEndStream"
 	}
 	return "unknown"
 }

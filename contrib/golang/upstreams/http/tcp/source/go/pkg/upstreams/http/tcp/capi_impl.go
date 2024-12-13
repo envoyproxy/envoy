@@ -68,7 +68,7 @@ type cgoApiImpl struct{}
 // panic here and it will be recover in the Go entry function.
 func handleCApiStatus(status C.CAPIStatus) {
 	switch status {
-	case C.CAPIInvalidPhase:
+	case C.CAPIInvalidPhase, C.CAPINotInGo:
 		panic(capiStatusToStr(status))
 	}
 }
@@ -77,6 +77,8 @@ func capiStatusToStr(status C.CAPIStatus) string {
 	switch status {
 	case C.CAPIInvalidPhase:
 		return errInvalidPhase
+	case C.CAPINotInGo:
+		return errNotInGo
 	}
 
 	return "unknown status"
@@ -126,6 +128,12 @@ func (c *cgoApiImpl) SetRespHeader(s unsafe.Pointer, key string, value string, a
 	}
 	res := C.envoyGoTcpUpstreamSetRespHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
 		unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), act)
+	handleCApiStatus(res)
+}
+
+func (c *cgoApiImpl) RemoveRespHeader(s unsafe.Pointer, key string) {
+	state := (*processState)(s)
+	res := C.envoyGoTcpUpstreamRemoveRespHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)))
 	handleCApiStatus(res)
 }
 

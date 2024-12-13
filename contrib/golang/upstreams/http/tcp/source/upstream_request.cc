@@ -24,19 +24,19 @@ namespace Http {
 namespace Tcp {
 namespace Golang {
 
-FilterConfig::FilterConfig(
+BridgeConfig::BridgeConfig(
     const envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config proto_config, Dso::TcpUpstreamDsoPtr dso_lib)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()), dso_lib_(dso_lib){};
 
-FilterConfig::~FilterConfig() {
+BridgeConfig::~BridgeConfig() {
   if (config_id_ > 0) {
     dso_lib_->envoyGoTcpUpstreamDestroyPluginConfig(config_id_);
   }
 }
 
-void FilterConfig::newGoPluginConfig() {
-  ENVOY_LOG(debug, "tcp upstream initializing golang filter config");
+void BridgeConfig::newGoPluginConfig() {
+  ENVOY_LOG(debug, "golng http1-tcp bridge initializing golang filter config");
   std::string buf;
   auto res = plugin_config_.SerializeToString(&buf);
   ASSERT(res, "SerializeToString should always successful");
@@ -52,10 +52,10 @@ void FilterConfig::newGoPluginConfig() {
 
   if (config_id_ == 0) {
     throw EnvoyException(
-        fmt::format("golang filter failed to parse plugin config: {} {}", so_id_, so_path_));
+        fmt::format("golng http1-tcp bridge failed to parse plugin config: {} {}", so_id_, so_path_));
   }
 
-  ENVOY_LOG(debug, "tcp upstream new plugin config, id: {}", config_id_);
+  ENVOY_LOG(debug, "golng http1-tcp bridge new plugin config, id: {}", config_id_);
 }
 
 TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, 
@@ -66,7 +66,7 @@ TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
     auto s = c.ParseFromString(config.SerializeAsString());
     ASSERT(s, "any.value() ParseFromString should always successful");
 
-    ENVOY_LOG(debug, "tcp upstream load tcp_upstream_golang library at parse config: {} {}", c.library_id(), c.library_path());
+    ENVOY_LOG(debug, "golng http1-tcp bridge load library at parse config: {} {}", c.library_id(), c.library_path());
 
     dynamic_lib_ = Dso::DsoManager<Dso::TcpUpstreamDsoImpl>::load(
       c.library_id(), c.library_path(), c.plugin_name());
@@ -74,7 +74,7 @@ TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
       throw EnvoyException(fmt::format("tcp upstream : load library failed: {} {}", c.library_id(), c.library_path()));
     };
 
-    FilterConfigSharedPtr conf = std::make_shared<FilterConfig>(c, dynamic_lib_);
+    BridgeConfigSharedPtr conf = std::make_shared<BridgeConfig>(c, dynamic_lib_);
     conf->newGoPluginConfig();
     config_ = conf;
     plugin_name_ = c.plugin_name();
@@ -87,18 +87,20 @@ void TcpConnPool::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& co
   auto upstream =
       std::make_unique<TcpUpstream>(&callbacks_->upstreamToDownstream(), std::move(conn_data), dynamic_lib_, config_);
 
-  ENVOY_LOG(debug, "tcp upstream get host info: {}", host->cluster().name());
+  ENVOY_LOG(debug, "golng http1-tcp bridge get host info: {}", host->cluster().name());
 
   callbacks_->onPoolReady(std::move(upstream), host, latched_conn.connectionInfoProvider(),latched_conn.streamInfo(), {});       
 }
 
 TcpUpstream::TcpUpstream(Router::UpstreamToDownstream* upstream_request,
                          Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream, Dso::TcpUpstreamDsoPtr dynamic_lib,
-                         FilterConfigSharedPtr config)
+                         BridgeConfigSharedPtr config)
     :encoding_state_(new EncodingProcessorState(*this)), decoding_state_(new DecodingProcessorState(*this)),
      route_entry_(upstream_request->route().routeEntry()), upstream_request_(upstream_request), upstream_conn_data_(std::move(upstream)), dynamic_lib_(dynamic_lib), config_(config) {
   
+  // configId in httpRequest
   configId = config->getConfigId();
+  // plugin_name in httpRequest
   plugin_name.data = config->pluginName().data();
   plugin_name.len = config->pluginName().length();
 
@@ -107,55 +109,41 @@ TcpUpstream::TcpUpstream(Router::UpstreamToDownstream* upstream_request,
 }
 
 TcpUpstream::~TcpUpstream() {
-  ENVOY_LOG(debug, "tcp upstream on destroy");
-
-  // initRequest haven't be called yet, which mean haven't called into Go.
-  if (configId == 0) {
-    return;
-  }
+  ENVOY_LOG(debug, "golng http1-tcp bridge on destroy");
 
   ASSERT(!decoding_state_->isProcessingInGo() && !encoding_state_->isProcessingInGo());
 
   dynamic_lib_->envoyGoOnTcpUpstreamDestroy(this);
 }
 
-void TcpUpstream::initRequest() {
-  if (configId == 0) {
-    configId = config_->getConfigId();
-  }
-};
-
 void TcpUpstream::initResponse() {
-  if (resp_headers_ == nullptr) {
+  if (decoding_state_->resp_headers == nullptr) {
     auto headers{Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>({})};
-    resp_headers_ = std::move(headers);
+    decoding_state_->resp_headers = std::move(headers);
   }
 }
 
 Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap& headers,
                                                bool end_stream) {
-  ENVOY_LOG(debug, "tcp upstream encodeHeaders, header size: {}, end_stream: {}", headers.size(), end_stream);
+  ENVOY_LOG(debug, "golng http1-tcp bridge encodeHeaders, header size: {}, end_stream: {}", headers.size(), end_stream);
 
-  initRequest();
-
-  ProcessorState* state = encoding_state_;
-  state->headers = &headers;
+  encoding_state_->req_headers = &headers;
   Buffer::OwnedImpl buffer;
-  auto s = dynamic_cast<processState*>(state);
-  state->setFilterState(FilterState::ProcessingHeader);
+  auto s = dynamic_cast<processState*>(encoding_state_);
+  encoding_state_->setFilterState(FilterState::ProcessingHeader);
 
   GoUint64 go_status = dynamic_lib_->envoyGoEncodeHeader(
     s, end_stream ? 1 : 0, headers.size(), headers.byteSize(), reinterpret_cast<uint64_t>(&buffer), buffer.length());
 
-  state->handleHeaderGolangStatus(static_cast<TcpUpstreamStatus>(go_status));
-  ENVOY_LOG(debug, "tcp upstream encodeHeaders, state: {}", state->stateStr());
+  encoding_state_->handleHeaderGolangStatus(static_cast<TcpUpstreamStatus>(go_status));
+  ENVOY_LOG(debug, "golng http1-tcp bridge encodeHeaders, state: {}", encoding_state_->stateStr());
 
-  bool send_data_to_upstream = (state->filterState() == FilterState::Done);
+  // if go side set data for buffer, then we send it to upstream 
+  bool send_data_to_upstream = (buffer.length() != 0);
 
   trySendProxyData(send_data_to_upstream, end_stream);
 
   if (send_data_to_upstream) {
-    // when go side decide to send data to upstream in encodeHeaders, here will directly send and encodeData will not send.
     upstream_conn_data_->connection().write(buffer, upstream_conn_self_half_close_);
   }
 
@@ -163,35 +151,29 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
 }
 
 void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "tcp upstream encodeData, data length: {}, end_stream: {}", data.length(), end_stream);
+  ENVOY_LOG(debug, "golng http1-tcp bridge encodeData, data length: {}, end_stream: {}", data.length(), end_stream);
 
-  ProcessorState* state = encoding_state_;
-
-  switch (state->filterState()) {
+  switch (encoding_state_->filterState()) {
   case FilterState::WaitingData:
-    encodeDataGo(state, data, end_stream);
+    encodeDataGo(encoding_state_, data, end_stream);
     break;
 
   case FilterState::WaitingAllData:
     if (end_stream) {
-      if (!state->isBufferDataEmpty()) {
+      if (!encoding_state_->isBufferDataEmpty()) {
         // NP: new data = data_buffer_ + data
-        state->addBufferData(data);
-        data.move(state->getBufferData());
+        encoding_state_->addBufferData(data);
+        data.move(encoding_state_->getBufferData());
       }
-      encodeDataGo(state, data, end_stream);
+      encodeDataGo(encoding_state_, data, end_stream);
     } else {
-      ENVOY_LOG(debug, "tcp upstream encodeData, appending data to buffer");
-      state->addBufferData(data);
+      ENVOY_LOG(debug, "golng http1-tcp bridge encodeData, appending data to buffer");
+      encoding_state_->addBufferData(data);
     }
     break;
 
-  case FilterState::Done:
-    ENVOY_LOG(debug, "tcp upstream encodeData, already send data to upstream");
-    return;
-
   default:
-    ENVOY_LOG(error, "tcp upstream encodeData, unexpected state: {}", state->stateStr());
+    ENVOY_LOG(error, "golng http1-tcp bridge encodeData, unexpected state: {}", encoding_state_->stateStr());
     PANIC("unreachable");
     break;
   }
@@ -216,45 +198,60 @@ void TcpUpstream::resetStream() {
 }
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "tcp upstream onUpstreamData, data length: {}, end_stream: {}", data.length(), end_stream);
+  ENVOY_LOG(debug, "golng http1-tcp bridge onUpstreamData, data length: {}, end_stream: {}", data.length(), end_stream);
 
   initResponse();
-
-  DecodingProcessorState* state = decoding_state_;
-  state->resp_headers = static_cast<Envoy::Http::RequestOrResponseHeaderMap*>(resp_headers_.get());
-  auto s = dynamic_cast<processState*>(state);
+  decoding_state_->setFilterState(FilterState::ProcessingData);
+  auto s = dynamic_cast<processState*>(decoding_state_);
 
   GoUint64 go_status = dynamic_lib_->envoyGoOnUpstreamData(
-    s, end_stream ? 1 : 0, (*resp_headers_).size(), (*resp_headers_).byteSize(), reinterpret_cast<uint64_t>(&data), data.length());
+    s, end_stream ? 1 : 0, (*decoding_state_->resp_headers).size(), (*decoding_state_->resp_headers).byteSize(), reinterpret_cast<uint64_t>(&data), data.length());
+  decoding_state_->setFilterState(FilterState::Done);
 
   switch (static_cast<TcpUpstreamStatus>(go_status)) {
   case TcpUpstreamStatus::TcpUpstreamContinue:
+    // go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
+    //
+    // NOTICE: when first receive TcpUpstreamContinue, resp headers will be send to http all at once; which means from then on, resp headers will never be sent to http.
+
     sendDataToDownstream(data, end_stream);
+    // clear buffer
     data.drain(data.length());
     break;
 
   case TcpUpstreamStatus::TcpUpstreamStopAndBuffer:
+    // every data trigger will call go side, and go side get whloe buffered data ever since at every time.
+    //
+    // if onUpstreamData is called streaming multiple times, data is gradually appended by default, so here do nothing.
+    // NOTE: when data is available on a TCP connection, Network::ConnectionImpl::onReadReady() invokes the TLS transport socket via SslSocket::doRead(connection_->read_buffer_),
+    // at here the data is appended to read_buffer_, then read_buffer_ is passed to onUpstreamData as data via Network::ReadFilter::onData.
+    // refer to: https://www.envoyproxy.io/docs/envoy/latest/intro/life_of_a_request#:~:text=socket%20via%20SslSocket%3A%3A-,doRead,-().%20The%20transport
+
     if (end_stream) {
-      // if conn is close by upstream, directly send data to downstream.
-      sendDataToDownstream(data, end_stream);
+        ENVOY_LOG(error, "golng http1-tcp bridge onUpstreamData unexpected go_tatus when end_stream is true: {}", int(go_status));
+        PANIC("unreachable");
     }
-    // if onUpstreamData is called multiple times, data is gradually appended by default, so here do nothing.
     break;
 
-  case TcpUpstreamStatus::TcpUpstreamSendData:
+  case TcpUpstreamStatus::TcpUpstreamEndStream:
+    // endStream to downstream which means the whole resp to http has finished.
+    //
+    // from now on, any further data from upstream tcp conn will not come to onUpstreamData.
+
     end_stream = true;
     sendDataToDownstream(data, end_stream);
+    data.drain(data.length());
     break;
 
   default:
-    ENVOY_LOG(error, "tcp upstream onUpstreamData, unexpected go_tatus: {}", go_status);
+    ENVOY_LOG(error, "golng http1-tcp bridge onUpstreamData, unexpected go_tatus: {}", go_status);
     PANIC("unreachable");
     break;
   }
 }
 
 void TcpUpstream::trySendProxyData(bool send_data_to_upstream, bool end_stream) {
-    // Headers should only happen once, so use this opportunity to add the proxy header, if configured.
+    // headers should only happen once, so use this opportunity to add the proxy header, if configured.
   ASSERT(route_entry_ != nullptr);
   if (route_entry_->connectConfig().has_value()) {
     Buffer::OwnedImpl data;
@@ -273,16 +270,15 @@ void TcpUpstream::trySendProxyData(bool send_data_to_upstream, bool end_stream) 
 }
 
 void TcpUpstream::encodeDataGo(ProcessorState* state, Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "tcp upstream encodeDataGo, passing data to golang, state: {}, end_stream: {}", state->stateStr(), end_stream);
+  ENVOY_LOG(debug, "golng http1-tcp bridge encodeDataGo, passing data to golang, state: {}, end_stream: {}", state->stateStr(), end_stream);
 
   state->processData();
 
-  Buffer::Instance& buffer = state->doDataList.push(data);
   auto s = dynamic_cast<processState*>(state);
   GoUint64 go_status = dynamic_lib_->envoyGoEncodeData(
-    s, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&buffer), buffer.length());
+    s, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&data), data.length());
     
-  state->handleDataGolangStatus(static_cast<TcpUpstreamStatus>(go_status), data, end_stream);
+  state->handleDataGolangStatus(static_cast<TcpUpstreamStatus>(go_status), end_stream);
 
   if (state->filterState() == FilterState::Done || state->filterState() == FilterState::WaitingData) {
     upstream_conn_data_->connection().write(data, upstream_conn_self_half_close_);
@@ -291,14 +287,18 @@ void TcpUpstream::encodeDataGo(ProcessorState* state, Buffer::Instance& data, bo
 
 void TcpUpstream::sendDataToDownstream(Buffer::Instance& data, bool end_stream) {
   if (!already_send_resp_headers_) {
+    ENVOY_LOG(debug, "golng http1-tcp bridge send resp headers to downstream. end_stream: {}", end_stream);
     // we can send resp headers only one time.
-    if (!resp_headers_->Status()) {
+    if (!decoding_state_->resp_headers->Status()) {
       // if go side not set status, c++ side set default status
-      resp_headers_->setStatus(static_cast<uint64_t>(HttpStatusCode::Success));
+      decoding_state_->resp_headers->setStatus(static_cast<uint64_t>(HttpStatusCode::Success));
     }
-    upstream_request_->decodeHeaders(std::move(resp_headers_), false);
+    upstream_request_->decodeHeaders(std::move(decoding_state_->resp_headers), false);
     already_send_resp_headers_ = true;
+  } else {
+    ENVOY_LOG(debug, "golng http1-tcp bridge already_send_resp_headers, we can send resp headers only one time, so ignore this time. end_stream: {}", end_stream);
   }
+
   upstream_request_->decodeData(data, end_stream);
 }
 
@@ -309,14 +309,14 @@ void TcpUpstream::onEvent(Network::ConnectionEvent event) {
 }
 
 void TcpUpstream::onAboveWriteBufferHighWatermark() {
-  ENVOY_LOG(debug, "tcp upstream onAboveWriteBufferHighWatermark");
+  ENVOY_LOG(debug, "golng http1-tcp bridge onAboveWriteBufferHighWatermark");
   if (upstream_request_) {
     upstream_request_->onAboveWriteBufferHighWatermark();
   }
 }
 
 void TcpUpstream::onBelowWriteBufferLowWatermark() {
-  ENVOY_LOG(debug, "tcp upstream onBelowWriteBufferLowWatermark");
+  ENVOY_LOG(debug, "golng http1-tcp bridge onBelowWriteBufferLowWatermark");
   if (upstream_request_) {
     upstream_request_->onBelowWriteBufferLowWatermark();
   }
@@ -354,38 +354,50 @@ void copyHeaderMapToGo(const Envoy::Http::HeaderMap& m, GoString* go_strs, char*
 }
 
 CAPIStatus TcpUpstream::copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf) {
-  auto headers = state.headers;
-  if (headers == nullptr) {
-    ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
-    return CAPIStatus::CAPIInvalidPhase;
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golng http1-tcp bridge is not processing Go");
+    return CAPIStatus::CAPINotInGo;
   }
-  copyHeaderMapToGo(*headers, go_strs, go_buf);
+
+  if (auto* encoding_state = dynamic_cast<EncodingProcessorState*>(&state)) {
+      copyHeaderMapToGo(*encoding_state->req_headers, go_strs, go_buf);
+  } else if (auto* decoding_state = dynamic_cast<DecodingProcessorState*>(&state)) {
+      if (already_send_resp_headers_) {
+        ENVOY_LOG(error, "golng http1-tcp bridge invoking cgo api copyHeaders while already_send_resp_headers_ : {}", __func__);
+        return CAPIStatus::CAPIInvalidPhase;
+      }  
+      copyHeaderMapToGo(*decoding_state_->resp_headers, go_strs, go_buf);
+  } else {
+      ENVOY_LOG(debug, "golang http1-tcp bridge invoking cgo api copyHeaders at invalid state: {}. Unable to dynamic_cast state.",  __func__);
+      return CAPIStatus::CAPIInvalidPhase;
+  }
+  
   return CAPIStatus::CAPIOK;
 }
 
-// It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
-// callback to run in the envoy worker thread.
 CAPIStatus TcpUpstream::setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value,
-                             headerAction act) {                          
+                             headerAction act) {                      
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golng http1-tcp bridge is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (already_send_resp_headers_) {
+    ENVOY_LOG(error, "golng http1-tcp bridge invoking cgo api setRespHeader while already_send_resp_headers_ : {}", __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }                                
   auto* s = dynamic_cast<DecodingProcessorState*>(&state);
   if (s == nullptr) {
-    ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {} when dynamic_cast state", __func__);
-    return CAPIStatus::CAPIInvalidPhase;
-  }
-
-  auto headers = s->resp_headers;
-  if (headers == nullptr) {
-    ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {} when get resp headers", __func__);
+    ENVOY_LOG(debug, "golng http1-tcp bridge invoking cgo api setRespHeader at invalid state: {} when dynamic_cast state", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
 
   switch (act) {
   case HeaderAdd:
-    headers->addCopy(Envoy::Http::LowerCaseString(key), value);
+    decoding_state_->resp_headers->addCopy(Envoy::Http::LowerCaseString(key), value);
     break;
 
   case HeaderSet:
-    headers->setCopy(Envoy::Http::LowerCaseString(key), value);
+    decoding_state_->resp_headers->setCopy(Envoy::Http::LowerCaseString(key), value);
     break;
 
   default:
@@ -394,10 +406,25 @@ CAPIStatus TcpUpstream::setRespHeader(ProcessorState& state, absl::string_view k
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data) {
-  if (state.filterState() == FilterState::ProcessingData && !state.doDataList.checkExisting(buffer)) {
-    ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
+CAPIStatus TcpUpstream::removeRespHeader(ProcessorState& state, absl::string_view key) {
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+    if (already_send_resp_headers_) {
+    ENVOY_LOG(error, "golng http1-tcp bridge invoking cgo api removeRespHeader while already_send_resp_headers_ : {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
+  } 
+
+  decoding_state_->resp_headers->remove(Envoy::Http::LowerCaseString(key));
+
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data) {
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golng http1-tcp bridge is not processing Go");
+    return CAPIStatus::CAPINotInGo;
   }
   for (const Buffer::RawSlice& slice : buffer->getRawSlices()) {
     // data is the heap memory of go, and the length is the total length of buffer. So use memcpy is
@@ -409,9 +436,9 @@ CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buff
 }
 
 CAPIStatus TcpUpstream::drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length) {
-  if (state.filterState() == FilterState::ProcessingData && !state.doDataList.checkExisting(buffer)) {
-    ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
-    return CAPIStatus::CAPIInvalidPhase;
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golng http1-tcp bridge is not processing Go");
+    return CAPIStatus::CAPINotInGo;
   }
 
   buffer->drain(length);
@@ -421,9 +448,9 @@ CAPIStatus TcpUpstream::drainBuffer(ProcessorState& state, Buffer::Instance* buf
 CAPIStatus TcpUpstream::setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
                                    absl::string_view& value, bufferAction action) {                 
 
-  if (state.filterState() == FilterState::ProcessingData && !state.doDataList.checkExisting(buffer)) {
-    ENVOY_LOG(debug, "tcp upstream invoking cgo api at invalid state: {}", __func__);
-    return CAPIStatus::CAPIInvalidPhase;
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golng http1-tcp bridge is not processing Go");
+    return CAPIStatus::CAPINotInGo;
   }
   if (action == bufferAction::Set) {
     buffer->drain(buffer->length());
@@ -449,7 +476,7 @@ CAPIStatus TcpUpstream::getStringValue(int id, uint64_t* value_data, int* value_
     break;
   }
   default:
-    RELEASE_ASSERT(false, absl::StrCat("tcp upstream invalid string value id: ", id));
+    RELEASE_ASSERT(false, absl::StrCat("golng http1-tcp bridge invalid string value id: ", id));
   }
 
   *value_data = reinterpret_cast<uint64_t>(strValue.data());

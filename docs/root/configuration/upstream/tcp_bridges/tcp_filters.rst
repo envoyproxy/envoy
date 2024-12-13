@@ -1,4 +1,4 @@
-.. _config_tcp_filters:
+.. _config_tcp_bridges:
 
 TCP filters
 ============
@@ -6,5 +6,5 @@ TCP filters
 .. toctree::
   :maxdepth: 2
 
-  golang_tcp_upstream_filter
+  golang_http1_tcp_bridge
 
