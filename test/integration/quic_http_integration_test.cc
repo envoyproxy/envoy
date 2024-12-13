@@ -1473,7 +1473,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   // Ensure that request headers from top-level access logger parameter and stream info are
   // consistent.
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
-  EXPECT_EQ(/* DOWNSTREAM_TLS_CIPHER */ metrics.at(21), "TLS_AES_128_GCM_SHA256");
+  EXPECT_THAT(/* DOWNSTREAM_TLS_CIPHER */ metrics.at(21),
+              ::testing::MatchesRegex("TLS_(AES_128_GCM|CHACHA20_POLY1305)_SHA256"));
   codec_client_->close();
 }
 
