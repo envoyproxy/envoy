@@ -195,6 +195,12 @@ bug_fixes:
   change: |
     Fixed a bug where the DNS refresh rate was the DNS TTL instead of the configured dns_refresh_rate/dns_failure_refresh_rate
     when we failed to resolve the DNS query after a successful resolution.
+- area: http
+  change: |
+    Fixed the async client implementation to set the :scheme pseudo header according to the upstream protocol ('http' or 'https').
+    Before the :scheme header was always 'http'.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.async_client_scheme_header_fix`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
