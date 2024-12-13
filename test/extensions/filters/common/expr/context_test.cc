@@ -966,6 +966,18 @@ TEST(Context, XDSAttributes) {
     EXPECT_EQ(&route->metadata_, value.value().MessageOrDie());
   }
   {
+    const auto value = wrapper[CelValue::CreateStringView(VirtualHostName)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ("fake_vhost", value.value().StringOrDie().value());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(VirtualHostMetadata)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMessage());
+    EXPECT_EQ(&route->virtual_host_.metadata_, value.value().MessageOrDie());
+  }
+  {
     const auto value = wrapper[CelValue::CreateStringView(UpstreamHostMetadata)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
@@ -1057,6 +1069,16 @@ TEST(Context, EmptyXdsWrapper) {
 
   {
     const auto value = wrapper[CelValue::CreateStringView(RouteMetadata)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(VirtualHostName)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(VirtualHostMetadata)];
     EXPECT_FALSE(value.has_value());
   }
 
