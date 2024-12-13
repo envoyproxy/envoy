@@ -197,6 +197,8 @@ following attributes:
    xds.listener_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Listener metadata
    xds.route_name, string, Route name
    xds.route_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Route metadata
+   xds.virtual_host_name, string, Virtual host name.
+   xds.virtual_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Virtual host metadata
    xds.upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata
    xds.filter_chain_name, string, Listener filter chain name
 
