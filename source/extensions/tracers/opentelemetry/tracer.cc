@@ -9,6 +9,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/tracing/common_values.h"
 #include "source/common/tracing/trace_context_impl.h"
+#include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
@@ -220,6 +221,11 @@ void Tracer::flushSpans() {
   }
 
   ::opentelemetry::proto::trace::v1::ScopeSpans* scope_span = resource_span->add_scope_spans();
+
+  // set the instrumentation scope name and version
+  *scope_span->mutable_scope()->mutable_name() = "envoy";
+  *scope_span->mutable_scope()->mutable_version() = Envoy::VersionInfo::version();
+
   for (const auto& pending_span : span_buffer_) {
     (*scope_span->add_spans()) = pending_span;
   }

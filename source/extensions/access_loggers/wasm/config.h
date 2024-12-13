@@ -25,7 +25,6 @@ public:
 
 private:
   absl::flat_hash_map<std::string, std::string> convertJsonFormatToMap(ProtobufWkt::Struct config);
-  RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
 } // namespace Wasm

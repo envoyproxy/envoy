@@ -93,7 +93,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithoutConfig) {
       ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
                                      ssl_context_manager_, std::move(outlier_event_logger_), false);
   auto cluster = create_result->first;
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[1]->healthyHosts().size());
   EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[1]->hosts()[0]->hostname());
@@ -137,7 +137,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
       ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
                                      ssl_context_manager_, std::move(outlier_event_logger_), false);
   auto cluster = create_result->first;
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[10]->healthyHosts().size());
   EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->hostname());
@@ -179,7 +179,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
       ClusterFactoryImplBase::create(cluster_config, server_context_, cm_, dns_resolver_fn_,
                                      ssl_context_manager_, std::move(outlier_event_logger_), false);
   auto cluster = create_result->first;
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[10]->healthyHosts().size());
   EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[10]->hosts()[0]->hostname());

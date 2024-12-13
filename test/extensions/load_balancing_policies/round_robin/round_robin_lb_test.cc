@@ -461,35 +461,9 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedSeed) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 }
 
-// Validate that the RNG seed influences pick order when weighted RR without
-// the envoy.reloadable_features.edf_lb_host_scheduler_init_fix.
-// This test should be removed once
-// envoy.reloadable_features.edf_lb_host_scheduler_init_fix is deprecated.
-TEST_P(RoundRobinLoadBalancerTest, WeightedSeedOldInit) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.edf_lb_host_scheduler_init_fix", "false"}});
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
-  hostSet().hosts_ = hostSet().healthy_hosts_;
-  EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
-  init(false);
-  // Initial weights respected.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-}
-
 // Validate that low weighted hosts will be chosen when the LB is created.
 TEST_P(RoundRobinLoadBalancerTest, WeightedInitializationPicksAllHosts) {
   TestScopedRuntime scoped_runtime;
-  // This test should be kept just the runtime override removed once the
-  // feature-flag is deprecated.
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.edf_lb_host_scheduler_init_fix", "true"}});
   // Add 3 hosts with weights {6, 3, 1}. Out of 10 refreshes with consecutive
   // random value, 6 times the first host will be chosen, 3 times the second
   // host will be chosen, and 1 time the third host will be chosen.

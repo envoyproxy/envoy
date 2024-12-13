@@ -13,12 +13,6 @@ static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
 static constexpr uint32_t RetryMaxDelayMilliseconds = 10 * 1000;
 static constexpr uint32_t RetryCount = 1;
 
-absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source) {
-  return source.specifier_case() == envoy::config::core::v3::DataSource::SpecifierCase::kFilename
-             ? absl::make_optional(source.filename())
-             : absl::nullopt;
-}
-
 RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     Upstream::ClusterManager& cm, Init::Manager& manager,
     const envoy::config::core::v3::RemoteDataSource& source, Event::Dispatcher& dispatcher,

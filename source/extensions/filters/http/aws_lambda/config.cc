@@ -59,8 +59,8 @@ AwsLambdaFilterFactory::getCredentialsProvider(
         server_context.api(), proto_config.credentials_profile());
   }
   return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-      server_context.api(), makeOptRef(server_context), region,
-      Extensions::Common::Aws::Utility::fetchMetadata);
+      server_context.api(), makeOptRef(server_context), server_context.singletonManager(), region,
+      nullptr);
 }
 
 absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
@@ -93,7 +93,7 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig& per_route_config,
     Server::Configuration::ServerFactoryContext& server_context,

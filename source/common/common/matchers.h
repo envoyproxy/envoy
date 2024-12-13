@@ -100,7 +100,9 @@ public:
       if (matcher.ignore_case()) {
         ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
       }
-      regex_ = Regex::Utility::parseRegex(matcher_.safe_regex(), context.regexEngine());
+      regex_ = THROW_OR_RETURN_VALUE(
+          Regex::Utility::parseRegex(matcher_.safe_regex(), context.regexEngine()),
+          Regex::CompiledMatcherPtr);
     } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kContains) {
       if (matcher_.ignore_case()) {
         // Cache the lowercase conversion of the Contains matcher for future use
@@ -109,6 +111,13 @@ public:
     } else if (matcher.has_custom()) {
       custom_ = getExtensionStringMatcher(matcher.custom(), context);
     }
+  }
+
+  // Helper to create an exact matcher in contexts where there is no factory context available.
+  // This is a static member instead of constructor so that it can be named for clarity of what it
+  // produces.
+  static StringMatcherImpl createExactMatcher(absl::string_view match) {
+    return StringMatcherImpl(match);
   }
 
   // StringMatcher
@@ -165,6 +174,13 @@ public:
   }
 
 private:
+  StringMatcherImpl(absl::string_view exact_match)
+      : matcher_([&]() -> StringMatcherType {
+          StringMatcherType cfg;
+          cfg.set_exact(exact_match);
+          return cfg;
+        }()) {}
+
   const StringMatcherType matcher_;
   Regex::CompiledMatcherPtr regex_;
   std::string lowercase_contains_match_;
@@ -188,8 +204,6 @@ public:
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
-  const envoy::type::matcher::v3::ListMatcher matcher_;
-
   ValueMatcherConstSharedPtr oneof_value_matcher_;
 };
 
@@ -255,9 +269,6 @@ public:
   static PathMatcherConstSharedPtr
   createPrefix(const std::string& prefix, bool ignore_case,
                Server::Configuration::CommonFactoryContext& context);
-  static PathMatcherConstSharedPtr
-  createPattern(const std::string& pattern, bool ignore_case,
-                Server::Configuration::CommonFactoryContext& context);
   static PathMatcherConstSharedPtr
   createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher,
                   Server::Configuration::CommonFactoryContext& context);

@@ -2,7 +2,7 @@ Credentials
 -----------
 
 The filter uses a number of different credentials providers to obtain an AWS access key ID, AWS secret access key, and AWS session token.
-It moves through the credentials providers in the order described below, stopping when one of them returns an access key ID and a
+By default, it moves through the credentials providers in the order described below, stopping when one of them returns an access key ID and a
 secret access key (the session token is optional).
 
 1. Environment variables. The environment variables ``AWS_ACCESS_KEY_ID``, ``AWS_SECRET_ACCESS_KEY``, and ``AWS_SESSION_TOKEN`` are used.
@@ -45,6 +45,9 @@ secret access key (the session token is optional).
    If these clusters are not provided in the bootstrap configuration then either of these will be added by default.
    The static internal cluster will still be added even if initially ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` is
    not set so that subsequently if the reloadable feature is set to ``true`` the cluster config is available to fetch the credentials.
+
+Alternatively, each AWS filter (either AWS Request Signing or AWS Lambda) has its own optional configuration to specify the source of the credentials. For example, AWS Request Signing filter
+has :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field.
 
 Statistics
 ----------

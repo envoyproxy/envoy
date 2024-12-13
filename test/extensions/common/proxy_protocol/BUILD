@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "proxy_protocol_header_test",
     srcs = ["proxy_protocol_header_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
@@ -23,7 +23,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "proxy_protocol_regression_test",
     srcs = ["proxy_protocol_regression_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",

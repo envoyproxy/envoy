@@ -282,8 +282,8 @@ class RepoNotifier(runner.Runner):
             await self.send_message(
                 channel='#envoy-ci',
                 text=(
-                    f"<@{oncall_handle}> please triage flakes per <{CI_TRIAGE_LINK} | instructions>"
-                ))
+                    f"<@{oncall_handle}> please triage flakes per <{CI_TRIAGE_LINK} | instructions>\n"
+                    f"See https://github.com/envoyproxy/envoy/commits/main/ for recent failures."))
         except SlackApiError as e:
             self.log.error(f"Unexpected error {e.response['error']}")
 

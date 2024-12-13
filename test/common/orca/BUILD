@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "orca_load_metrics_test",
     srcs = ["orca_load_metrics_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/orca:orca_load_metrics_lib",
         "//source/common/upstream:upstream_lib",
@@ -27,7 +27,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "orca_parser_test",
     srcs = ["orca_parser_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/common:base64_lib",
         "//source/common/orca:orca_parser",

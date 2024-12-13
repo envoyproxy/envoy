@@ -31,6 +31,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/config/xds_manager_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
@@ -124,6 +125,7 @@ InstanceBase::~InstanceBase() {
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
   dispatcher_->shutdown();
+  ENVOY_LOG(debug, "shut down dispatcher");
 
 #ifdef ENVOY_PERFETTO
   if (tracing_session_ != nullptr) {
@@ -361,7 +363,7 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
+    RETURN_IF_NOT_OK(MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api));
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
@@ -385,8 +387,10 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
                               ComponentFactory& component_factory) {
   std::function set_up_logger = [&] {
     TRY_ASSERT_MAIN_THREAD {
-      file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
-          options_.logPath(), access_log_manager_, Logger::Registry::getSink());
+      file_logger_ = THROW_OR_RETURN_VALUE(
+          Logger::FileSinkDelegate::create(options_.logPath(), access_log_manager_,
+                                           Logger::Registry::getSink()),
+          std::unique_ptr<Logger::FileSinkDelegate>);
     }
     END_TRY
     CATCH(const EnvoyException& e, {
@@ -758,6 +762,11 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // cluster_manager_factory_ is available.
   RETURN_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
 
+  // Create the xDS-Manager and pass the cluster manager that was created above.
+  ASSERT(config_.clusterManager());
+  xds_manager_ =
+      std::make_unique<Config::XdsManagerImpl>(*config_.clusterManager(), validation_context_);
+
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config() ||
@@ -831,16 +840,17 @@ void InstanceBase::onRuntimeReady() {
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
           *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
       THROW_IF_NOT_OK_REF(factory_or_error.status());
-      hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
-          serverFactoryContext(), *stats_store_.rootScope(),
-          factory_or_error.value()->createUncachedRawAsyncClient(), stats_store_,
-          *ssl_context_manager_, info_factory_);
+      hds_delegate_ =
+          maybeCreateHdsDelegate(serverFactoryContext(), *stats_store_.rootScope(),
+                                 factory_or_error.value()->createUncachedRawAsyncClient(),
+                                 stats_store_, *ssl_context_manager_);
     }
     END_TRY
-    CATCH(const EnvoyException& e, {
-      ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
+    CATCH(const EnvoyException& e,
+          { ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what()); });
+    if (!hds_delegate_) {
       shutdown();
-    });
+    }
   }
 
   // TODO (nezdolik): Fully deprecate this runtime key in the next release.
@@ -882,7 +892,7 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
       server.messageValidationContext().dynamicValidationVisitor(), server.api());
-  THROW_IF_NOT_OK(loader.status());
+  THROW_IF_NOT_OK_REF(loader.status());
   return std::move(loader.value());
 }
 

@@ -63,7 +63,7 @@ envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":admin_lib",
         ":api_lib",
@@ -77,6 +77,7 @@ envoy_cc_library(
         "//source/common/common:random_generator_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:utility_lib",
+        "//source/common/config:xds_manager_lib",
         "//source/common/grpc:common_lib",
         "//source/common/listener_manager:listener_info_lib",
         "//source/common/local_info:local_info_lib",

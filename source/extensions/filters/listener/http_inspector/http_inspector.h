@@ -1,14 +1,16 @@
 #pragma once
 
-#include <http_parser.h>
-
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/codec.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/http1/balsa_parser.h"
+#include "source/common/http/http1/legacy_parser_impl.h"
+#include "source/common/http/http1/parser.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -58,6 +60,41 @@ private:
   HttpInspectorStats stats_;
 };
 
+class NoOpParserCallbacks : public Http::Http1::ParserCallbacks {
+public:
+  Http::Http1::CallbackResult onMessageBegin() override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onUrl(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onStatus(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onHeaderField(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onHeaderValue(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onHeadersComplete() override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  void bufferBody(const char* /*data*/, size_t /*length*/) override {}
+
+  Http::Http1::CallbackResult onMessageComplete() override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  void onChunkHeader(bool /*is_final_chunk*/) override {}
+};
+
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
@@ -85,8 +122,11 @@ private:
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{nullptr};
   absl::string_view protocol_;
-  http_parser parser_;
-  static http_parser_settings settings_;
+
+  std::unique_ptr<Http::Http1::Parser> parser_;
+  NoOpParserCallbacks no_op_callbacks_;
+  ssize_t nread_ = 0;
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
 };
 
 } // namespace HttpInspector

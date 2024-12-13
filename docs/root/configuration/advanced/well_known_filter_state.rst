@@ -22,6 +22,10 @@ The following lists the filter state object keys used by the Envoy extensions:
   :ref:`TCP proxy <config_network_filters_tcp_proxy>` dynamic cluster name selection on a per-connection basis. Accepts
   a cluster name as a constructor.
 
+``envoy.udp_proxy.cluster``
+  :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>` dynamic cluster name selection on a per-session basis. Accepts
+  a cluster name as a constructor.
+
 ``envoy.network.transport_socket.original_dst_address``
   :ref:`Original destination cluster <arch_overview_load_balancing_types_original_destination>` dynamic address
   selection. Accepts an `IP:PORT` string as a constructor. Fields:

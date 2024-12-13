@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/ssl/context.h"
+#include "envoy/ssl/parsed_x509_name.h"
 
 #include "source/common/common/utility.h"
 
@@ -61,11 +62,9 @@ std::vector<std::string> mapX509Stack(stack_st_X509& stack,
  * Retrieves the subject alternate names of a certificate.
  * @param cert the certificate
  * @param type type of subject alternate name
- * @param skip_unsupported If true and a name is for an unsupported (on this host) IP version,
- *   omit that name from the return value. If false, an exception will be thrown in this situation.
  * @return std::vector returns the list of subject alternate names.
  */
-std::vector<std::string> getSubjectAltNames(X509& cert, int type, bool skip_unsupported = false);
+std::vector<std::string> getSubjectAltNames(X509& cert, int type);
 
 /**
  * Converts the Subject Alternate Name to string.
@@ -87,6 +86,20 @@ std::string getIssuerFromCertificate(X509& cert);
  * @return std::string the subject field for the certificate.
  */
 std::string getSubjectFromCertificate(X509& cert);
+
+/**
+ * Parse the well-known attribute values of issuer from certificate.
+ * @param cert the certificate
+ * @return Envoy::Ssl::ParsedX509NameConstSharedPtr the struct contains the parsed values.
+ */
+Envoy::Ssl::ParsedX509NamePtr parseIssuerFromCertificate(X509& cert);
+
+/**
+ * Parse the well-known attribute values of subject from certificate.
+ * @param cert the certificate
+ * @return Envoy::Ssl::ParsedX509NameConstSharedPtr the struct contains the parsed values.
+ */
+Envoy::Ssl::ParsedX509NamePtr parseSubjectFromCertificate(X509& cert);
 
 /**
  * Retrieves the extension OIDs from certificate.

@@ -79,7 +79,7 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 TEST_P(AdminInstanceTest, AdminAddress) {
   server_.options_.admin_address_path_ = TestEnvironment::temporaryPath("admin.address");
   AdminImpl admin_address_out_path(cpu_profile_path_, server_, false);
-  std::list<AccessLog::InstanceSharedPtr> access_logs;
+  AccessLog::InstanceSharedPtrVector access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       file_info, {}, *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
@@ -94,7 +94,7 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   server_.options_.admin_address_path_ =
       TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_, false);
-  std::list<AccessLog::InstanceSharedPtr> access_logs;
+  AccessLog::InstanceSharedPtrVector access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       file_info, {}, *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),

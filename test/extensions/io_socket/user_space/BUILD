@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "file_event_impl_test",
     srcs = ["file_event_impl_test.cc"],
     extension_names = ["envoy.io_socket.user_space"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/event:file_event_interface",
         "//source/common/event:dispatcher_includes",
@@ -32,7 +32,7 @@ envoy_extension_cc_test(
     name = "io_handle_impl_test",
     srcs = ["io_handle_impl_test.cc"],
     extension_names = ["envoy.io_socket.user_space"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
@@ -46,7 +46,7 @@ envoy_extension_cc_test(
     name = "connection_compatbility_test",
     srcs = ["connection_compatbility_test.cc"],
     extension_names = ["envoy.io_socket.user_space"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:utility_lib",

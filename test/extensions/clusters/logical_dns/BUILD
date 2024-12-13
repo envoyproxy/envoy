@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "logical_dns_cluster_test",
     srcs = ["logical_dns_cluster_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/common/event:dispatcher_lib",

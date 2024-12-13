@@ -14,7 +14,6 @@ envoy_package()
 
 exports_files([
     "gen_sh_test_runner.sh",
-    "generate_release_hash.sh",
     "sh_test_wrapper.sh",
     "test_for_benchmark_wrapper.sh",
     "repository_locations.bzl",

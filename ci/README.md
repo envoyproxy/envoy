@@ -221,7 +221,7 @@ Docker host.
 
 The base build image used in the CI flows here lives in the [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository. If you need to make and/or test changes to the build image, instructions to do so can be found in
-the [build_container](https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/README.md) folder.
+the [docker](https://github.com/envoyproxy/envoy-build-tools/blob/main/docker/README.md) folder.
 See the Dockerfiles and build scripts there for building a new image.
 
 # macOS Build Flow

@@ -207,6 +207,63 @@ INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
                          testing::Combine(testing::Bool(), testing::Bool()),
                          HttpFilterTestParam::ParamsToString);
 
+class ExtAuthzLoggingInfoTest
+    : public testing::TestWithParam<
+          std::tuple<std::string /* field_name */, absl::optional<uint64_t> /* value */>> {
+public:
+  ExtAuthzLoggingInfoTest() : logging_info_({}) {}
+
+  void SetUp() override {
+    std::string fieldName = std::get<0>(GetParam());
+    absl::optional<uint64_t> optional = std::get<1>(GetParam());
+    if (optional.has_value()) {
+      if (fieldName == "latency_us") {
+        logging_info_.setLatency(std::chrono::microseconds(optional.value()));
+      }
+      if (fieldName == "bytesSent") {
+        logging_info_.setBytesSent(optional.value());
+      }
+      if (fieldName == "bytesReceived") {
+        logging_info_.setBytesReceived(optional.value());
+      }
+    }
+  }
+
+  void test() {
+    ASSERT_TRUE(logging_info_.hasFieldSupport());
+    absl::optional<uint64_t> optional = std::get<1>(GetParam());
+    if (optional.has_value()) {
+      EXPECT_THAT(logging_info_.getField(std::get<0>(GetParam())),
+                  testing::VariantWith<int64_t>(optional.value()));
+    } else {
+      EXPECT_THAT(logging_info_.getField(std::get<0>(GetParam())),
+                  testing::VariantWith<absl::monostate>(absl::monostate{}));
+    }
+  }
+
+  static std::string ParamsToString(
+      const testing::TestParamInfo<std::tuple<std::string, absl::optional<uint64_t>>>& info) {
+    return absl::StrCat(std::get<1>(info.param).has_value() ? "" : "no_", std::get<0>(info.param),
+                        std::get<1>(info.param).has_value()
+                            ? absl::StrCat("_", std::to_string(std::get<1>(info.param).value()))
+                            : "");
+  }
+
+  ExtAuthzLoggingInfo logging_info_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    ExtAuthzLoggingInfoTestValid, ExtAuthzLoggingInfoTest,
+    testing::Combine(testing::Values("latency_us", "bytesSent", "bytesReceived"),
+                     testing::Values(absl::optional<uint64_t>{}, absl::optional<uint64_t>{0},
+                                     absl::optional<uint64_t>{1})),
+    ExtAuthzLoggingInfoTest::ParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(ExtAuthzLoggingInfoTestInvalid, ExtAuthzLoggingInfoTest,
+                         testing::Values(std::make_tuple("wrong_property_name",
+                                                         absl::optional<uint64_t>{})),
+                         ExtAuthzLoggingInfoTest::ParamsToString);
+
 class EmitFilterStateTest
     : public HttpFilterTestBase<testing::TestWithParam<
           std::tuple<bool /*http_client*/, bool /*emit_stats*/, bool /*emit_filter_metadata*/>>> {
@@ -4063,6 +4120,8 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateSameTypeMutable) {
 
   test(response);
 }
+
+TEST_P(ExtAuthzLoggingInfoTest, FieldTest) { test(); }
 
 } // namespace
 } // namespace ExtAuthz

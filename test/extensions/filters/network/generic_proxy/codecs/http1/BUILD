@@ -13,7 +13,7 @@ envoy_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
         "//test/extensions/filters/network/generic_proxy/mocks:codec_mocks",

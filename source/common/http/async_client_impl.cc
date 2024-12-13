@@ -124,12 +124,14 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                              StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()), local_reply_(*parent.local_reply_),
       retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_, creation_status)),
-      route_(std::make_shared<NullRouteImpl>(
-          parent_.cluster_->name(),
-          retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
-          parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy)),
       account_(options.account_), buffer_limit_(options.buffer_limit_), send_xff_(options.send_xff),
       send_internal_(options.send_internal) {
+  auto route_or_error = NullRouteImpl::create(
+      parent_.cluster_->name(),
+      retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
+      parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy);
+  SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
+  route_ = std::move(*route_or_error);
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
   stream_info_.setIsShadow(options.is_shadow);
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);

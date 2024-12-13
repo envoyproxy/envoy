@@ -50,7 +50,7 @@ ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-void AdminImpl::startHttpListener(std::list<AccessLog::InstanceSharedPtr> access_logs,
+void AdminImpl::startHttpListener(AccessLog::InstanceSharedPtrVector access_logs,
                                   Network::Address::InstanceConstSharedPtr address,
                                   Network::Socket::OptionsSharedPtr socket_options) {
   access_logs_ = std::move(access_logs);
@@ -304,7 +304,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool,
+bool AdminImpl::createFilterChain(Http::FilterChainManager& manager,
                                   const Http::FilterChainOptions&) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));

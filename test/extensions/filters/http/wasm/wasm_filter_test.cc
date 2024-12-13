@@ -474,19 +474,28 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBody) {
       .WillRepeatedly(Invoke([&bufferedBody](BufferFunction f) { f(bufferedBody); }));
 
   Buffer::OwnedImpl data1("hello");
-  bufferedBody.add(data1);
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data1, false));
+  // The first call to decodeData() will not result in the addDecodedData() callback being called
+  // because the filter doesn't yet know if the VM's onRequestBody() will return
+  // StopIterationAndBuffer or Continue. Add the data to the buffer manually for the test.
+  bufferedBody.add(data1);
+
+  // The second call to decodeData() will result in the addDecodedData() callback being called
+  // because the VM's onRequestBody() returned StopIterationAndBuffer.
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
+      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
 
   Buffer::OwnedImpl data2(" again ");
-  bufferedBody.add(data2);
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello again "))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data2, false));
 
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
+      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+
+  Buffer::OwnedImpl data3("hello");
   EXPECT_CALL(filter(),
               log_(spdlog::level::err, Eq(absl::string_view("onBody hello again hello"))));
-  Buffer::OwnedImpl data3("hello");
-  bufferedBody.add(data3);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data3, true));
 
   // Verify that the response still works even though we buffered the request.
@@ -499,6 +508,47 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBody) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data1, true));
 
   filter().onDestroy();
+}
+
+TEST_P(WasmHttpFilterTest, BodyRequestBufferBodyAndDestroyFilterInTheAddDecodedDataCallback) {
+  setupTest("body");
+  setupFilter();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
+                                                 {"x-test-operation", "BufferBody"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl bufferedBody;
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&bufferedBody));
+  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
+      .WillRepeatedly(Invoke([&bufferedBody](BufferFunction f) { f(bufferedBody); }));
+
+  Buffer::OwnedImpl data1("hello");
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data1, false));
+  // The first call to decodeData() will not result in the addDecodedData() callback being called
+  // because the filter doesn't yet know if the VM's onRequestBody() will return
+  // StopIterationAndBuffer or Continue. Add the data to the buffer manually for the test.
+  bufferedBody.add(data1);
+
+  // The second call to decodeData() will result in the addDecodedData() callback being called
+  // because the VM's onRequestBody() returned StopIterationAndBuffer.
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
+      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+
+  Buffer::OwnedImpl data2(" again ");
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello again "))));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data2, false));
+
+  // The addDecodedData() may result in buffer overflow and the local reply will be sent. It may
+  // destroy the filter. We mock the onDestroy() to ensure the filter will not call into the VM
+  // after it is destroyed.
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
+      .WillOnce(Invoke([this](Buffer::Instance&, bool) { filter().onDestroy(); }));
+
+  Buffer::OwnedImpl data3("hello");
+  EXPECT_CALL(filter(), log_(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data3, true));
 }
 
 // Script that prepends and appends to the buffered body.
@@ -633,16 +683,24 @@ TEST_P(WasmHttpFilterTest, BodyResponseBufferThenStreamBody) {
   Buffer::OwnedImpl data1("hello");
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().encodeData(data1, false));
+  // The first call to encodeData() will not result in the addEncodedData() callback being called
+  // because the filter doesn't yet know if the VM's onResponseBody() will return
+  // StopIterationAndBuffer or Continue. Add the data to the buffer manually for the test.
   bufferedBody.add(data1);
 
+  // The second call to encodeData() will result in the addEncodedData() callback being called
+  // because the VM's onResponseBody() returned StopIterationAndBuffer.
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
+      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+
   Buffer::OwnedImpl data2(", there, ");
-  bufferedBody.add(data2);
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, "))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().encodeData(data2, false));
 
-  // Previous callbacks returned "Buffer" so we have buffered so far
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
+      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+
   Buffer::OwnedImpl data3("world!");
-  bufferedBody.add(data3);
   EXPECT_CALL(filter(),
               log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, world!"))));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data3, false));
@@ -1835,8 +1893,6 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
   }
   setupTest("", "cluster_metadata");
   setupFilter();
-  EXPECT_CALL(filter(),
-              log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   auto cluster_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
       TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
@@ -1852,14 +1908,8 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
   EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(*cluster_metadata));
-  EXPECT_CALL(*host_description, cluster()).WillRepeatedly(ReturnRef(*cluster));
-  request_stream_info_.upstreamInfo()->setUpstreamHost(host_description);
   EXPECT_CALL(request_stream_info_, requestComplete)
       .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-  filter().log({&request_headers}, request_stream_info_);
-
-  // If upstream host is empty, fallback to upstream cluster info for cluster metadata.
-  request_stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
   EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Return(cluster));
   EXPECT_CALL(filter(),
               log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));

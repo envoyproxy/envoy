@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "base_header_validator_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -38,7 +38,7 @@ envoy_extension_cc_test(
         "http_common_validation_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -57,7 +57,7 @@ envoy_extension_cc_test(
         "http1_header_validator_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -74,7 +74,7 @@ envoy_extension_cc_test(
         "http2_header_validator_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":header_validator_utils_lib",
         "//envoy/http:header_validator_errors",
@@ -108,7 +108,7 @@ envoy_extension_cc_test(
         "header_validator_factory_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/network:utility_lib",
         "//source/extensions/http/header_validators/envoy_default:config",
@@ -125,7 +125,7 @@ envoy_extension_cc_test(
         "path_normalizer_test.cc",
     ],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/http/header_validators/envoy_default:path_normalizer",
         "//test/test_common:test_runtime_lib",
@@ -137,7 +137,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.http.header_validators.envoy_default"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//envoy/registry",
         "//source/extensions/http/header_validators/envoy_default:config",
@@ -159,7 +159,7 @@ envoy_cc_fuzz_test(
     name = "path_normalizer_fuzz_test",
     srcs = ["path_normalizer_fuzz_test.cc"],
     corpus = "path_normalizer_corpus",
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":path_normalizer_fuzz_proto_cc_proto",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",

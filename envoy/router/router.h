@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
-#include <list>
 #include <map>
 #include <memory>
 #include <string>
@@ -1333,7 +1332,7 @@ public:
    * Return a list of headers that will be cleaned from any requests that are not from an internal
    * (RFC1918) source.
    */
-  virtual const std::list<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
+  virtual const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const PURE;
 
   /**
    * @return const std::string the RouteConfiguration name.
@@ -1601,13 +1600,11 @@ public:
    * @param options for creating the transport socket
    * @return may be null
    */
-  virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                        GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-                        Upstream::ResourcePriority priority,
-                        absl::optional<Http::Protocol> downstream_protocol,
-                        Upstream::LoadBalancerContext* ctx,
-                        const Protobuf::Message& config) const PURE;
+  virtual GenericConnPoolPtr createGenericConnPool(
+      Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
+      GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
+      Upstream::ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
+      Upstream::LoadBalancerContext* ctx, const Protobuf::Message& config) const PURE;
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;

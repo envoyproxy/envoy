@@ -72,12 +72,11 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
 }
 
 ListMatcher::ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher,
-                         Server::Configuration::CommonFactoryContext& context)
-    : matcher_(matcher) {
-  ASSERT(matcher_.match_pattern_case() ==
+                         Server::Configuration::CommonFactoryContext& context) {
+  ASSERT(matcher.match_pattern_case() ==
          envoy::type::matcher::v3::ListMatcher::MatchPatternCase::kOneOf);
 
-  oneof_value_matcher_ = ValueMatcher::create(matcher_.one_of(), context);
+  oneof_value_matcher_ = ValueMatcher::create(matcher.one_of(), context);
 }
 
 bool ListMatcher::match(const ProtobufWkt::Value& value) const {
@@ -188,16 +187,6 @@ PathMatcher::createPrefix(const std::string& prefix, bool ignore_case,
     return slashPrefixPathMatcher;
   }
   return createPrefixPathMatcher(prefix, ignore_case, context);
-}
-
-PathMatcherConstSharedPtr
-PathMatcher::createPattern(const std::string& pattern, bool ignore_case,
-                           Server::Configuration::CommonFactoryContext& context) {
-  // TODO(silverstar194): implement pattern specific matcher
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_prefix(pattern);
-  matcher.set_ignore_case(ignore_case);
-  return std::make_shared<const PathMatcher>(matcher, context);
 }
 
 PathMatcherConstSharedPtr

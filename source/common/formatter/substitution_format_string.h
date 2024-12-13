@@ -95,11 +95,18 @@ public:
                       bool omit_empty_values, bool sort_properties,
                       const std::vector<CommandParserBasePtr<FormatterContext>>& commands = {}) {
 
+// TODO(alyssawilk, wbpcode) when deprecating logging_with_fast_json_formatter
+// remove LegacyJsonFormatterBaseImpl and StructFormatterBase
+#ifndef ENVOY_DISABLE_EXCEPTIONS
     if (!Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.logging_with_fast_json_formatter")) {
       return std::make_unique<LegacyJsonFormatterBaseImpl<FormatterContext>>(
           struct_format, preserve_types, omit_empty_values, sort_properties, commands);
     }
+#else
+    UNREFERENCED_PARAMETER(preserve_types);
+    UNREFERENCED_PARAMETER(sort_properties);
+#endif
 
     return std::make_unique<JsonFormatterImplBase<FormatterContext>>(struct_format,
                                                                      omit_empty_values, commands);

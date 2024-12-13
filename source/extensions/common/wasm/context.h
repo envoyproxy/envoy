@@ -374,6 +374,14 @@ protected:
   Http::HeaderMap* getMap(WasmHeaderMapType type);
   const Http::HeaderMap* getConstMap(WasmHeaderMapType type);
 
+  void onHeadersModified(WasmHeaderMapType type) {
+    if (type != WasmHeaderMapType::RequestHeaders ||
+        abi_version_ > proxy_wasm::AbiVersion::ProxyWasm_0_2_1) {
+      return;
+    }
+    clearRouteCache();
+  }
+
   const LocalInfo::LocalInfo* root_local_info_{nullptr}; // set only for root_context.
   PluginHandleSharedPtr plugin_handle_{nullptr};
 
@@ -431,7 +439,6 @@ protected:
   bool buffering_response_body_ = false;
   bool end_of_stream_ = false;
   bool local_reply_sent_ = false;
-  bool local_reply_hold_ = false;
   ProtobufWkt::Struct temporary_metadata_;
 
   // MB: must be a node-type map as we take persistent references to the entries.
@@ -450,6 +457,8 @@ protected:
   // Filter state prototype declaration.
   absl::flat_hash_map<std::string, Filters::Common::Expr::CelStatePrototypeConstPtr>
       state_prototypes_;
+
+  proxy_wasm::AbiVersion abi_version_{proxy_wasm::AbiVersion::Unknown};
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 

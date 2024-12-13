@@ -575,6 +575,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoFailoverUseAfterPrimaryResponse) {
 
 // Validate that once failover responds, and then disconnects, primary will be attempted.
 TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconnect) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.xds_failover_to_primary_enabled",
+                                    "true");
   // These tests are not executed with GoogleGrpc because they are flaky due to
   // the large timeout values for retries.
   SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
@@ -667,14 +669,14 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
   const absl::flat_hash_map<std::string, std::string> empty_initial_resource_versions_map;
   EXPECT_TRUE(compareDiscoveryRequest(CdsTypeUrl, "", {}, {}, {}, true,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get(),
-                                      OptRef(empty_initial_resource_versions_map)));
+                                      makeOptRef(empty_initial_resource_versions_map)));
   EXPECT_TRUE(compareDiscoveryRequest(EdsTypeUrl, "", {"failover_cluster_0"},
                                       {"failover_cluster_0"}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get(),
-                                      OptRef(empty_initial_resource_versions_map)));
+                                      makeOptRef(empty_initial_resource_versions_map)));
   EXPECT_TRUE(compareDiscoveryRequest(LdsTypeUrl, "", {}, {}, {}, false,
                                       Grpc::Status::WellKnownGrpcStatus::Ok, "", xds_stream_.get(),
-                                      OptRef(empty_initial_resource_versions_map)));
+                                      makeOptRef(empty_initial_resource_versions_map)));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       CdsTypeUrl, {ConfigHelper::buildCluster("primary_cluster_0")},
       {ConfigHelper::buildCluster("primary_cluster_0")}, {}, "primary1", {}, xds_stream_.get());
@@ -692,6 +694,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, PrimaryUseAfterFailoverResponseAndDisconne
 // still doesn't respond, failover will be attempted with the correct
 // initial_resource_versions.
 TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconnect) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.xds_failover_to_primary_enabled",
+                                    "true");
   // These tests are not executed with GoogleGrpc because they are flaky due to
   // the large timeout values for retries.
   SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
@@ -787,14 +791,14 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconn
   const absl::flat_hash_map<std::string, std::string> empty_initial_resource_versions_map;
   EXPECT_TRUE(compareDiscoveryRequest(
       CdsTypeUrl, "", {}, {}, {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "",
-      failover_xds_stream_.get(), OptRef(cds_eds_initial_resource_versions_map)));
+      failover_xds_stream_.get(), makeOptRef(cds_eds_initial_resource_versions_map)));
   EXPECT_TRUE(compareDiscoveryRequest(
       EdsTypeUrl, "", {"failover_cluster_0"}, {"failover_cluster_0"}, {}, false,
       Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get(),
-      OptRef(cds_eds_initial_resource_versions_map)));
+      makeOptRef(cds_eds_initial_resource_versions_map)));
   EXPECT_TRUE(compareDiscoveryRequest(
       LdsTypeUrl, "", {}, {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
-      failover_xds_stream_.get(), OptRef(empty_initial_resource_versions_map)));
+      failover_xds_stream_.get(), makeOptRef(empty_initial_resource_versions_map)));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       CdsTypeUrl, {ConfigHelper::buildCluster("failover_cluster_1")},
       {ConfigHelper::buildCluster("failover_cluster_1")}, {}, "failover2", {},
@@ -814,6 +818,8 @@ TEST_P(XdsFailoverAdsIntegrationTest, FailoverUseAfterFailoverResponseAndDisconn
 // both are not responding.
 TEST_P(XdsFailoverAdsIntegrationTest,
        PrimaryAndFailoverAttemptsAfterFailoverResponseAndDisconnect) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.xds_failover_to_primary_enabled",
+                                    "true");
   // These tests are not executed with GoogleGrpc because they are flaky due to
   // the large timeout values for retries.
   SKIP_IF_GRPC_CLIENT(Grpc::ClientType::GoogleGrpc);
@@ -1042,13 +1048,13 @@ TEST_P(XdsFailoverAdsIntegrationTest, NoPrimaryUseAfterFailoverResponse) {
   const absl::flat_hash_map<std::string, std::string> empty_initial_resource_versions_map;
   EXPECT_TRUE(compareDiscoveryRequest(
       CdsTypeUrl, "1", {}, {}, {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "",
-      failover_xds_stream_.get(), OptRef(cds_eds_initial_resource_versions_map)));
+      failover_xds_stream_.get(), makeOptRef(cds_eds_initial_resource_versions_map)));
   EXPECT_TRUE(compareDiscoveryRequest(
       EdsTypeUrl, "1", {"failover_cluster_0"}, {"failover_cluster_0"}, {}, false,
       Grpc::Status::WellKnownGrpcStatus::Ok, "", failover_xds_stream_.get(),
-      OptRef(cds_eds_initial_resource_versions_map)));
+      makeOptRef(cds_eds_initial_resource_versions_map)));
   EXPECT_TRUE(compareDiscoveryRequest(
       LdsTypeUrl, "", {}, {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
-      failover_xds_stream_.get(), OptRef(empty_initial_resource_versions_map)));
+      failover_xds_stream_.get(), makeOptRef(empty_initial_resource_versions_map)));
 }
 } // namespace Envoy

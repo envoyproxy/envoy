@@ -79,7 +79,7 @@ final class IdleTimeoutTests: XCTestCase {
     let callbackExpectation =
       self.expectation(description: "Stream idle timeout received by callbacks")
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)

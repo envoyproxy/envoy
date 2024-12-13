@@ -7,7 +7,7 @@
 // porting layer for QUICHE.
 
 #include <cstddef>
-#include <iostream>
+#include <iosfwd>
 #include <memory>
 
 #include "source/common/buffer/buffer_impl.h"

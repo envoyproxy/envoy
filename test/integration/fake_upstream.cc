@@ -1082,7 +1082,7 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
 }
 
 ABSL_MUST_USE_RESULT
-AssertionResult FakeHttpConnection::waitForInexactRawData(const char* data, std::string* out,
+AssertionResult FakeHttpConnection::waitForInexactRawData(absl::string_view data, std::string& out,
                                                           std::chrono::milliseconds timeout) {
   absl::MutexLock lock(&lock_);
   const auto reached = [this, data, &out]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -1096,12 +1096,13 @@ AssertionResult FakeHttpConnection::waitForInexactRawData(const char* data, std:
     }
     absl::string_view peek_data(peek_buf, result.return_value_);
     size_t index = peek_data.find(data);
+    const auto data_len = data.length();
     if (index != absl::string_view::npos) {
       Buffer::OwnedImpl buffer;
-      *out = std::string(peek_data.data(), index + 4);
+      out = std::string(peek_data.data(), index + data_len);
       auto result = dynamic_cast<Network::ConnectionImpl*>(&connection())
                         ->ioHandle()
-                        .recv(peek_buf, index + 4, 0);
+                        .recv(peek_buf, index + data_len, 0);
       return true;
     }
     return false;

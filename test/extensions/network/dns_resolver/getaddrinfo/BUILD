@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "getaddrinfo_test",
     srcs = ["getaddrinfo_test.cc"],
     extension_names = ["envoy.network.dns_resolver.getaddrinfo"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/mocks/api:api_mocks",

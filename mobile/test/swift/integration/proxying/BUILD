@@ -10,6 +10,26 @@ envoy_mobile_swift_test(
     srcs = [
         "HTTPRequestUsingProxyTest.swift",
     ],
+    data = [
+        "@envoy//test/config/integration/certs",
+    ],
+    exec_properties = {
+        "sandboxNetwork": "standard",
+    },
+    visibility = ["//visibility:public"],
+    deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
+        "//test/objective-c:envoy_test_api",
+        "//test/objective-c:envoy_test_server",
+        "//test/swift/integration:test_extensions",
+    ],
+)
+
+envoy_mobile_swift_test(
+    name = "http_request_using_pac_proxy_test",
+    srcs = [
+        "HTTPRequestUsingPacProxyTest.swift",
+    ],
     exec_properties = {
         "sandboxNetwork": "standard",
     },

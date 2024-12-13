@@ -161,7 +161,10 @@ struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {
         deferred_close_timeout(timeout) {}
 
   void deferredClose(Envoy::Event::Dispatcher& dispatcher);
-  void closeStreamOnTimer();
+  // After a timer timeouts, reset the stream, this essentially reset the
+  // underlying gRPC stream. Gives remote grpc server a CANCELED signal, and
+  // ignored any further messages/callbacks from the server.
+  void cleanupStreamOnTimer();
 
   ExternalProcessorStreamPtr stream_;
   ThreadLocalStreamManager& parent;
@@ -191,7 +194,6 @@ public:
     if (it == stream_manager_.end()) {
       return;
     }
-
     it->second->deferredClose(dispatcher);
   }
 
@@ -401,7 +403,7 @@ public:
                         config->untypedReceivingMetadataNamespaces()) {}
 
   const FilterConfig& config() const { return *config_; }
-  const envoy::config::core::v3::GrpcService& grpc_service_config() const {
+  const envoy::config::core::v3::GrpcService& grpcServiceConfig() const {
     return config_with_hash_key_.config();
   }
 
@@ -424,7 +426,7 @@ public:
 
   void encodeComplete() override {
     if (config_->observabilityMode()) {
-      logGrpcStreamInfo();
+      logStreamInfo();
     }
   }
 
@@ -433,7 +435,8 @@ public:
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
   void onGrpcError(Grpc::Status::GrpcStatus error) override;
   void onGrpcClose() override;
-  void logGrpcStreamInfo() override;
+  void logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info);
+  void logStreamInfo() override;
 
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
@@ -459,6 +462,11 @@ private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
   void closeStream();
+  // Erases the stream from the threadLocalStreamManager, and reset the
+  // stream_ pointer and the underlying gRPC stream.
+  // This is called when the stream needs to be cleaned up, due to remote close
+  // event, or local stream timeouts.
+  void cleanupStream();
 
   void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
   void clearAsyncState();
@@ -469,7 +477,19 @@ private:
 
   // Return a pair of whether to terminate returning the current result.
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
+
+  Http::FilterDataStatus handleDataBufferedMode(ProcessorState& state, Buffer::Instance& data,
+                                                bool end_stream);
+  Http::FilterDataStatus handleDataStreamedModeBase(ProcessorState& state, Buffer::Instance& data,
+                                                    bool end_stream);
+  Http::FilterDataStatus handleDataStreamedMode(ProcessorState& state, Buffer::Instance& data,
+                                                bool end_stream);
+  Http::FilterDataStatus handleDataFullDuplexStreamedMode(ProcessorState& state,
+                                                          Buffer::Instance& data, bool end_stream);
+  Http::FilterDataStatus handleDataBufferedPartialMode(ProcessorState& state,
+                                                       Buffer::Instance& data, bool end_stream);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
+
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
   void setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
                           const envoy::service::ext_proc::v3::ProcessingResponse& response);
@@ -484,7 +504,7 @@ private:
                                  bool end_stream);
   Http::FilterDataStatus sendDataInObservabilityMode(Buffer::Instance& data, ProcessorState& state,
                                                      bool end_stream);
-  void deferredCloseStream();
+  void deferredResetStream();
 
   envoy::service::ext_proc::v3::ProcessingRequest
   buildHeaderRequest(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,

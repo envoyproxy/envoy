@@ -409,6 +409,9 @@ TEST_F(GrpcMuxFailoverTest, PrimaryOnlyAttemptsAfterPrimaryAvailable) {
 // will try to reconnect to the primary (and then failover), and keep
 // alternating between the two.
 TEST_F(GrpcMuxFailoverTest, AlternatingPrimaryAndFailoverAttemptsAfterFailoverAvailable) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.xds_failover_to_primary_enabled", "true"}});
   connectToFailover();
 
   // Emulate a 5 times disconnects.

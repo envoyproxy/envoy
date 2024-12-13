@@ -36,6 +36,8 @@ type filter struct {
 	badapi      bool   // bad api call
 	newPath     string // set new path
 	clearRoute  bool   // clear route cache
+
+	refreshRoute bool // refresh route cache
 }
 
 func parseQuery(path string) url.Values {
@@ -82,6 +84,7 @@ func (f *filter) initRequest(header api.RequestHeaderMap) {
 	f.badapi = f.query_params.Get("badapi") != ""
 	f.newPath = f.query_params.Get("newPath")
 	f.clearRoute = f.query_params.Get("clearRoute") != ""
+	f.refreshRoute = f.query_params.Get("refreshRoute") != ""
 }
 
 func (f *filter) fail(callbacks api.FilterProcessCallbacks, msg string, a ...any) api.StatusType {
@@ -264,6 +267,12 @@ func (f *filter) decodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 	}
 	if f.clearRoute {
 		f.callbacks.ClearRouteCache()
+	}
+
+	if f.refreshRoute {
+		header.SetPath("/user/api/") // path used to match the new route
+		f.callbacks.RefreshRouteCache()
+		header.SetPath("/api/") // path used by the upstream
 	}
 	return api.Continue
 }

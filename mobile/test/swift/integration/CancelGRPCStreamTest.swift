@@ -53,7 +53,7 @@ final class CancelGRPCStreamTests: XCTestCase {
     let onCancelCallbackExpectation = self.expectation(description: "onCancel callback called")
     let filterExpectation = self.expectation(description: "Filter called with cancellation")
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)
