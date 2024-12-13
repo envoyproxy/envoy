@@ -927,6 +927,18 @@ matcher:
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+
+  // Push a new cluster again, we expect this to trigger active session removal.
+  {
+    NiceMock<Upstream::MockThreadLocalCluster> other_thread_local_cluster;
+    other_thread_local_cluster.cluster_.info_->name_ = "fake_cluster";
+    Upstream::ThreadLocalClusterCommand command =
+        [&other_thread_local_cluster]() -> Upstream::ThreadLocalCluster& {
+      return other_thread_local_cluster;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(other_thread_local_cluster.info()->name(),
+                                                    command);
+  }
 }
 
 // Hitting the maximum per-cluster connection/session circuit breaker.
