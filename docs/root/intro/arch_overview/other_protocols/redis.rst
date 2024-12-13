@@ -157,11 +157,13 @@ For details on each command's usage see the official
   EXISTS, Generic
   EXPIRE, Generic
   EXPIREAT, Generic
+  KEYS, String
   PERSIST, Generic
   PEXPIRE, Generic
   PEXPIREAT, Generic
   PTTL, Generic
   RESTORE, Generic
+  SELECT, Generic
   TOUCH, Generic
   TTL, Generic
   TYPE, Generic
