@@ -66,6 +66,12 @@ load("@envoy//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
 envoy_dependency_imports()
 
+##### rules_jvm_external setup for rules_android #####
+load("@rules_jvm_external//:repositories.bzl", "rules_jvm_external_deps")
+rules_jvm_external_deps()
+load("@rules_jvm_external//:setup.bzl", "rules_jvm_external_setup")
+rules_jvm_external_setup()
+
 load("@envoy_mobile//bazel:envoy_mobile_dependencies.bzl", "envoy_mobile_dependencies")
 
 envoy_mobile_dependencies()
@@ -73,6 +79,9 @@ envoy_mobile_dependencies()
 load("@envoy_mobile//bazel:envoy_mobile_toolchains.bzl", "envoy_mobile_toolchains")
 
 envoy_mobile_toolchains()
+
+load("@rules_android//:defs.bzl", "rules_android_workspace")
+rules_android_workspace()
 
 load("//bazel:android_configure.bzl", "android_configure")
 
@@ -86,6 +95,11 @@ android_configure(
 load("@local_config_android//:android_configure.bzl", "android_workspace")
 
 android_workspace()
+
+register_toolchains(
+    "@rules_android//toolchains/android:android_default_toolchain",
+    "@rules_android//toolchains/android_sdk:android_sdk_tools",
+)
 
 load("@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:repositories.bzl", "xcodeproj_rules_dependencies")
 
