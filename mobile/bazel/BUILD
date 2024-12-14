@@ -21,7 +21,7 @@ alias(
 
 alias(
     name = "jni",
-    actual = "@bazel_tools//tools/jdk:jni",
+    actual = "@rules_java//toolchains:jni",
     visibility = ["//library/jni:__pkg__"],
 )
 
