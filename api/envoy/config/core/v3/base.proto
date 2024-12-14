@@ -362,7 +362,7 @@ message KeyValueAppend {
   KeyValuePair record = 3;
 
   // Key/value pair entry that this option to append or overwrite. This field is deprecated
-  // and please use :ref:`content <envoy_v3_api_field_config.core.v3.KeyValueAppend.content>`
+  // and please use :ref:`record <envoy_v3_api_field_config.core.v3.KeyValueAppend.record>`
   // as replacement.
   // [#not-implemented-hide:]
   KeyValue entry = 1 [
@@ -378,10 +378,12 @@ message KeyValueAppend {
 
 // Key/value pair to append or remove.
 message KeyValueMutation {
-  // Key/value pair to append or overwrite. Only one of ``append`` or ``remove`` can be set.
+  // Key/value pair to append or overwrite. Only one of ``append`` or ``remove`` can be set or
+  // the configuration will be rejected.
   KeyValueAppend append = 1;
 
-  // Key to remove. Only one of ``append`` or ``remove`` can be set.
+  // Key to remove. Only one of ``append`` or ``remove`` can be set or the configuration will be
+  // rejected.
   string remove = 2 [(validate.rules).string = {max_bytes: 16384}];
 }
 

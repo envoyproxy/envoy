@@ -79,7 +79,27 @@ TEST(FactoryTest, FactoryTest) {
     auto cb_or_error =
         factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
     EXPECT_FALSE(cb_or_error.status().ok());
-    EXPECT_EQ("No mutation specified.", cb_or_error.status().message());
+    EXPECT_EQ("One of 'append'/'remove' must be specified.", cb_or_error.status().message());
+  }
+
+  {
+    const std::string config = R"EOF(
+  mutations:
+    query_parameter_mutations:
+    - remove: "another-key"
+      append:
+        record:
+          key: "key"
+          value: "value"
+  )EOF";
+
+    ProtoConfig proto_config;
+    TestUtility::loadFromYaml(config, proto_config);
+
+    auto cb_or_error =
+        factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
+    EXPECT_FALSE(cb_or_error.status().ok());
+    EXPECT_EQ("Only one of 'append'/'remove can be specified.", cb_or_error.status().message());
   }
 
   {
@@ -95,7 +115,7 @@ TEST(FactoryTest, FactoryTest) {
     auto cb_or_error =
         factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
     EXPECT_FALSE(cb_or_error.status().ok());
-    EXPECT_EQ("No record specified for parameter mutation.", cb_or_error.status().message());
+    EXPECT_EQ("No record specified for append mutation.", cb_or_error.status().message());
   }
   {
     const std::string config = R"EOF(
@@ -113,7 +133,24 @@ TEST(FactoryTest, FactoryTest) {
     auto cb_or_error =
         factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
     EXPECT_FALSE(cb_or_error.status().ok());
-    EXPECT_EQ("Only string value is allowed for parameter.", cb_or_error.status().message());
+    EXPECT_EQ("Only string value is allowed for record value.", cb_or_error.status().message());
+  }
+  {
+    const std::string config = R"EOF(
+  mutations:
+    query_parameter_mutations:
+    - append:
+        record:
+          key: "key"
+  )EOF";
+
+    ProtoConfig proto_config;
+    TestUtility::loadFromYaml(config, proto_config);
+
+    auto cb_or_error =
+        factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
+    EXPECT_FALSE(cb_or_error.status().ok());
+    EXPECT_EQ("Only string value is allowed for record value.", cb_or_error.status().message());
   }
 }
 

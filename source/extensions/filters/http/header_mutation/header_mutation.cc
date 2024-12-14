@@ -16,29 +16,27 @@ void QueryParameterMutationAppend::mutateQueryParameter(
     Http::Utility::QueryParamsMulti& params, const Formatter::HttpFormatterContext& context,
     const StreamInfo::StreamInfo& stream_info) const {
 
-  const std::string value = formatter_->formatWithContext(context, stream_info);
-
   switch (action_) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case ParameterAppendProto::APPEND_IF_EXISTS_OR_ADD:
-    params.add(key_, value);
+    params.add(key_, formatter_->formatWithContext(context, stream_info));
     return;
   case ParameterAppendProto::ADD_IF_ABSENT: {
     auto iter = params.data().find(key_);
     if (iter == params.data().end()) {
-      params.add(key_, value);
+      params.add(key_, formatter_->formatWithContext(context, stream_info));
     }
     break;
   }
   case ParameterAppendProto::OVERWRITE_IF_EXISTS: {
     auto iter = params.data().find(key_);
     if (iter != params.data().end()) {
-      params.overwrite(key_, value);
+      params.overwrite(key_, formatter_->formatWithContext(context, stream_info));
     }
     break;
   }
   case ParameterAppendProto::OVERWRITE_IF_EXISTS_OR_ADD:
-    params.overwrite(key_, value);
+    params.overwrite(key_, formatter_->formatWithContext(context, stream_info));
     break;
   }
 }
@@ -52,14 +50,22 @@ Mutations::Mutations(const MutationsProto& config, absl::Status& creation_status
   SET_AND_RETURN_IF_NOT_OK(response_mutations_or_error.status(), creation_status);
   response_mutations_ = std::move(response_mutations_or_error.value());
 
+  query_query_parameter_mutations_.reserve(config.query_parameter_mutations_size());
   for (const auto& mutation : config.query_parameter_mutations()) {
     if (mutation.has_append()) {
+      if (!mutation.remove().empty()) {
+        creation_status =
+            absl::InvalidArgumentError("Only one of 'append'/'remove can be specified.");
+        return;
+      }
+
       if (!mutation.append().has_record()) {
-        creation_status = absl::InvalidArgumentError("No record specified for parameter mutation.");
+        creation_status = absl::InvalidArgumentError("No record specified for append mutation.");
         return;
       }
       if (!mutation.append().record().value().has_string_value()) {
-        creation_status = absl::InvalidArgumentError("Only string value is allowed for parameter.");
+        creation_status =
+            absl::InvalidArgumentError("Only string value is allowed for record value.");
         return;
       }
 
@@ -74,7 +80,7 @@ Mutations::Mutations(const MutationsProto& config, absl::Status& creation_status
       query_query_parameter_mutations_.emplace_back(
           std::make_unique<QueryParameterMutationRemove>(mutation.remove()));
     } else {
-      creation_status = absl::InvalidArgumentError("No mutation specified.");
+      creation_status = absl::InvalidArgumentError("One of 'append'/'remove' must be specified.");
       return;
     }
   }
@@ -113,6 +119,10 @@ HeaderMutationConfig::HeaderMutationConfig(const ProtoConfig& config, absl::Stat
       most_specific_header_mutations_wins_(config.most_specific_header_mutations_wins()) {}
 
 void HeaderMutation::maybeInitializeRouteConfigs(Http::StreamFilterCallbacks* callbacks) {
+  // Ensure that route configs are initialized only once and the same route configs are used
+  // for both decoding and encoding paths.
+  // An independent flag is used to ensure even at the case where the route configs is empty,
+  // we still won't try to initialize it again.
   if (route_configs_initialized_) {
     return;
   }
