@@ -302,6 +302,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Initiate a call to the authorization server since we are not disabled.
+  ENVOY_STREAM_LOG(info, "initiateCall() is being invoked", *decoder_callbacks_);
   initiateCall(headers);
   return filter_return_ == FilterReturn::StopDecoding
              ? Http::FilterHeadersStatus::StopAllIterationAndWatermark
@@ -471,6 +472,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
+
+  // Log the response status
+  ENVOY_STREAM_LOG(info, "ext_authz response status: {}", *decoder_callbacks_, static_cast<int>(response->status));
+
+  // Log the x-verkada-auth header if it exists
+  const auto auth_header = request_headers_->get(Http::LowerCaseString("x-verkada-auth"));
+  if (!auth_header.empty()) {
+    ENVOY_STREAM_LOG(info, "Caught response that includes header: {}", *decoder_callbacks_, auth_header[0]->value().getStringView());
+  }
 
   updateLoggingInfo();
 
