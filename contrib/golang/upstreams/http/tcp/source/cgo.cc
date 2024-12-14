@@ -102,10 +102,21 @@ CAPIStatus envoyGoTcpUpstreamGetStringValue(void* r, int id, uint64_t* value_dat
       });
 }
 
-CAPIStatus envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(void* s, int enabled) {
+CAPIStatus envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(void* r, int enabled) {
+  return envoyGoTcpUpstreamHandlerWrapper(
+      r, [enabled](TcpUpstream& t) -> CAPIStatus {
+        return t.setSelfHalfCloseForUpstreamConn(enabled);
+      });
+}
+
+CAPIStatus envoyGoTcpUpstreamSendPanicReply(void* s, void* details_data, int details_len) {
   return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s, [enabled](TcpUpstream& t, ProcessorState& state) -> CAPIStatus {
-        return t.setSelfHalfCloseForUpstreamConn(state, enabled);
+      s,
+      [details_data, details_len](TcpUpstream& t,
+                                  ProcessorState& state) -> CAPIStatus {
+        // Since this is only used for logs we don't need to deep copy.
+        auto details = stringViewFromGoPointer(details_data, details_len);
+        return t.sendPanicReply(state, details);
       });
 }
 

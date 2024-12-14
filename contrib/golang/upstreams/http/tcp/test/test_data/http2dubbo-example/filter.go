@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 
 	"dubbo.apache.org/dubbo-go/v3/common/constant"
 	"dubbo.apache.org/dubbo-go/v3/filter/generic/generalizer"
@@ -58,6 +59,18 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, dataTo
 	// =========== step 1: get dubbo method and interface from http header =========== //
 	dubboMethod, _ := headerMap.Get("dubbo_method")
 	dubboInterface, _ := headerMap.Get("dubbo_interface")
+	// panic("qqq")
+
+	go func() {
+		_, _ = headerMap.Get("dubbo_interface")
+	}()
+	go func() {
+		_, _ = headerMap.Get("dubbo_interface")
+	}()
+	go func() {
+		_, _ = headerMap.Get("dubbo_interface")
+	}()
+	time.Sleep(100 * time.Millisecond)
 
 	// =========== step 2: if body is empty, or get unexpected header, directly send data to upstream =========== //
 	if endOfStream || (dubboMethod == "" || dubboInterface == "") {
@@ -120,9 +133,39 @@ func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bo
 		f.dubboInterface = GrayInterfaceName
 	}
 
+	go func() {
+		_ = f.callbacks.GetRouteName()
+	}()
+	go func() {
+		_ = f.callbacks.GetRouteName()
+	}()
+	go func() {
+		_ = f.callbacks.GetVirtualClusterName()
+	}()
+	go func() {
+		_ = f.callbacks.GetVirtualClusterName()
+	}()
+	go func() {
+		f.callbacks.SetSelfHalfCloseForUpstreamConn(false)
+	}()
+	go func() {
+		f.callbacks.SetSelfHalfCloseForUpstreamConn(false)
+	}()
+
 	// =========== step 3: construct dubbo frame with dubboMethod, dubboInterface, dubboArgs for upstream req =========== //
 	buf := transformToDubboFrame(f.dubboMethod, f.dubboInterface, dubboArgs)
 	_ = buffer.Set(buf.Bytes())
+
+	go func() {
+		_ = buffer.Set(buf.Bytes())
+	}()
+	go func() {
+		_ = buffer.Set(buf.Bytes())
+	}()
+	go func() {
+		_ = buffer.Set(buf.Bytes())
+	}()
+	time.Sleep(100 * time.Millisecond)
 
 	// =========== step 4: set self half close for upstream conn =========== //
 	if !f.config.enableTunneling {
@@ -213,6 +256,17 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 	bodyBytes := []byte(fmt.Sprintf("%s", rsp))
 	_ = buffer.Set(bodyBytes)
 
+	go func() {
+		_ = buffer.Set(bodyBytes)
+	}()
+	go func() {
+		_ = buffer.Set(bodyBytes)
+	}()
+	go func() {
+		_ = buffer.Set(bodyBytes)
+	}()
+	time.Sleep(100 * time.Millisecond)
+
 	// =========== step 4: construct http response header =========== //
 	responseHeaderForSet.Set(":status", "200")
 	responseHeaderForSet.Set("content-type", "application/json; charset=utf-8")
@@ -223,6 +277,17 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 		responseHeaderForSet.Set("lable-for-special-cluster", f.config.clusterNameForSpecialLabel)
 	}
 	responseHeaderForSet.Del("a")
+
+	go func() {
+		responseHeaderForSet.Set("c", "1")
+	}()
+	go func() {
+		responseHeaderForSet.Set("c", "2")
+	}()
+	go func() {
+		responseHeaderForSet.Set("c", "3")
+	}()
+	time.Sleep(100 * time.Millisecond)
 
 	return api.TcpUpstreamEndStream
 }

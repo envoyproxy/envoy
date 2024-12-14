@@ -133,6 +133,7 @@ public:
   };
   enum class HttpStatusCode : uint64_t {
     Success = 200,
+    InternalError = 500,
   };
   enum class EnvoyValue {
     RouteName = 1,
@@ -169,7 +170,8 @@ public:
   CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
   CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
-  CAPIStatus setSelfHalfCloseForUpstreamConn(ProcessorState& state, int enabled);
+  CAPIStatus setSelfHalfCloseForUpstreamConn(int enabled);
+  CAPIStatus sendPanicReply(ProcessorState& state, absl::string_view details);
 
   DecodingProcessorState* decodingState() { return decoding_state_; }
   EncodingProcessorState* encodingState() { return encoding_state_; }
@@ -178,8 +180,10 @@ public:
   DecodingProcessorState* decoding_state_;
 
   const Router::RouteEntry* route_entry_;
-  // anchor a string temporarily, make sure it won't be freed before copied to Go.
-  std::string strValue;
+
+  // cache routeName for getStringValue,
+  // since upstream_request_->route().virtualHost().routeConfig().name() is not concurrent safe when c thread and go thread running at same time.
+  std::string route_name_;
 
 private:
   Router::UpstreamToDownstream* upstream_request_;
@@ -188,12 +192,19 @@ private:
 
   Dso::TcpUpstreamDsoPtr dynamic_lib_;
 
-  bool upstream_conn_self_half_close_{false};
-
   bool already_send_resp_headers_{false};
 
-  // lock to avoid race between multi go threads (when calling back from go).
-  Thread::MutexBasicLockable mutex_{};
+  // lock to avoid race between c thread and multi go threads (when c is running and calling back from go).
+  Thread::MutexBasicLockable mutex_for_c_and_go_{};
+
+  // anchor a string temporarily, make sure it won't be freed before copied to Go.
+  std::string str_value_ ABSL_GUARDED_BY(mutex_for_c_and_go_);
+  bool upstream_conn_self_half_close_ ABSL_GUARDED_BY(mutex_for_c_and_go_){false};
+
+  // lock to avoid race between multi go threads (when c thread blocked and calling back from go).
+  Thread::MutexBasicLockable mutex_for_go_{};
+
+  bool has_panic_{false};
 };
 
 

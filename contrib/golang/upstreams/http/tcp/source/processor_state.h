@@ -41,6 +41,8 @@ enum class FilterState {
   ProcessingData,
   // All done
   Done,
+  // PANIC
+  Panic,
 };
 /**
   * An enum specific for Golang status.

@@ -353,13 +353,20 @@ type TcpUpstreamCallbackHandler interface {
 }
 
 type TcpUpstreamFilter interface {
+
 	// Invoked when header is delivered from the downstream.
+	// Notice: headerMap and dataToUpstream cannot be invoked after the func return.
 	EncodeHeaders(headerMap RequestHeaderMap, dataToUpstream BufferInstance, endOfStream bool) TcpUpstreamStatus
+
 	// Streaming, Invoked when data is delivered from the downstream.
+	// Notice: buffer cannot be invoked after the func return.
 	EncodeData(buffer BufferInstance, endOfStream bool) TcpUpstreamStatus
+
 	// Streaming, Called when data is read on from tcp upstream.
-	// Be careful: when return TcpUpstreamContinue, resp headers will be send to http all at once; from then on, you MUST NOT invoke responseHeaderForSet at any time(or you will get panic).
+	// Notice-1: when return TcpUpstreamContinue, resp headers will be send to http all at once; from then on, you MUST NOT invoke responseHeaderForSet at any time(or you will get panic).
+	// Notice-2: responseHeaderForSet and buffer cannot be invoked after the func return.
 	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) TcpUpstreamStatus
+
 	// destroy filter
 	OnDestroy()
 }

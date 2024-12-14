@@ -48,10 +48,10 @@ var NullParser api.TcpUpstreamConfigParser = &nullParser{}
 // Use the NullParser if the plugin does not care about config.
 func RegisterTcpUpstreamFactoryAndConfigParser(name string, factory api.TcpUpstreamFactory, parser api.TcpUpstreamConfigParser) {
 	if factory == nil {
-		panic("tcp upstream factory should not be nil")
+		panic("go side: golang http1-tcp bridge: factory should not be nil")
 	}
 	if parser == nil {
-		panic("config parser should not be nil")
+		panic("go side: golang http1-tcp bridge: config parser should not be nil")
 	}
 	httpFilterFactoryAndParser.Store(name, &filterFactoryAndParser{factory, parser})
 }
@@ -59,14 +59,14 @@ func RegisterTcpUpstreamFactoryAndConfigParser(name string, factory api.TcpUpstr
 func getTcpUpstreamFactoryAndConfig(name string, configId uint64) (api.TcpUpstreamFactory, interface{}) {
 	config, ok := configCache.Load(configId)
 	if !ok {
-		panic(fmt.Sprintf("tcp upstream config not found, plugin: %s, configId: %d", name, configId))
+		panic(fmt.Sprintf("go side: golang http1-tcp bridge: config not found, plugin: %s, configId: %d", name, configId))
 	}
 
 	if v, ok := httpFilterFactoryAndParser.Load(name); ok {
 		return (v.(*filterFactoryAndParser)).filterFactory, config
 	}
 
-	api.LogErrorf("tcp upstream plugin %s not found, pass through by default", name)
+	api.LogErrorf("go side: golang http1-tcp bridge: plugin %s not found, pass through by default", name)
 
 	// return PassThroughFactory when no factory found
 	return PassThroughFactory, config
@@ -76,7 +76,7 @@ func getTcpUpstreamConfigParser(name string) api.TcpUpstreamConfigParser {
 	if v, ok := httpFilterFactoryAndParser.Load(name); ok {
 		parser := (v.(*filterFactoryAndParser)).configParser
 		if parser == nil {
-			panic(fmt.Sprintf("tcp upstream config parser not found, plugin: %s", name))
+			panic(fmt.Sprintf("go side: golang http1-tcp bridge: config parser not found, plugin: %s", name))
 		}
 		return parser
 	}

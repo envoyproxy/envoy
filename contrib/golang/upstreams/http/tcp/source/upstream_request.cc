@@ -106,6 +106,8 @@ TcpUpstream::TcpUpstream(Router::UpstreamToDownstream* upstream_request,
   plugin_name.data = config->pluginName().data();
   plugin_name.len = config->pluginName().length();
 
+  route_name_ = upstream_request_->route().virtualHost().routeConfig().name();
+
   upstream_conn_data_->connection().enableHalfClose(true);
   upstream_conn_data_->addUpstreamCallbacks(*this);
 }
@@ -129,6 +131,8 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
                                                bool end_stream) {
   ENVOY_LOG(debug, "golng http1-tcp bridge encodeHeaders, header size: {}, end_stream: {}", headers.size(), end_stream);
 
+  initResponse();
+
   encoding_state_->req_headers = &headers;
   encoding_state_->setFilterState(FilterState::ProcessingHeader);
   Buffer::OwnedImpl buffer;
@@ -136,6 +140,11 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
 
   GoUint64 go_status = dynamic_lib_->envoyGoEncodeHeader(
     s, end_stream ? 1 : 0, headers.size(), headers.byteSize(), reinterpret_cast<uint64_t>(&buffer), buffer.length());
+
+  // this means sendPanicReply in envoyGoEncodeHeader, so return
+  if (has_panic_) {
+    return Envoy::Http::okStatus();
+  }
 
   encoding_state_->handleHeaderGolangStatus(static_cast<TcpUpstreamStatus>(go_status));
   ENVOY_LOG(debug, "golng http1-tcp bridge encodeHeaders, state: {}", encoding_state_->stateStr());
@@ -146,7 +155,10 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
   trySendProxyData(send_data_to_upstream, end_stream);
 
   if (send_data_to_upstream) {
-    upstream_conn_data_->connection().write(buffer, upstream_conn_self_half_close_);
+    {
+        Thread::LockGuard lock(mutex_for_c_and_go_);
+        upstream_conn_data_->connection().write(buffer, upstream_conn_self_half_close_);
+    }
   }
 
   return Envoy::Http::okStatus();
@@ -154,6 +166,10 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
 
 void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "golng http1-tcp bridge encodeData, data length: {}, end_stream: {}", data.length(), end_stream);
+  if (has_panic_) {
+    ENVOY_LOG(debug, "golng http1-tcp bridge encodeData: may have got panic, so return");
+    return;
+  }
 
   switch (encoding_state_->filterState()) {
   case FilterState::WaitingData:
@@ -199,8 +215,11 @@ void TcpUpstream::resetStream() {
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "golng http1-tcp bridge onUpstreamData, data length: {}, end_stream: {}", data.length(), end_stream);
+  if (has_panic_) {
+    ENVOY_LOG(debug, "golng http1-tcp bridge onUpstreamData: may have got panic, so return");
+    return;
+  }
 
-  initResponse();
   decoding_state_->setFilterState(FilterState::ProcessingData);
   auto s = dynamic_cast<processState*>(decoding_state_);
 
@@ -260,8 +279,11 @@ void TcpUpstream::trySendProxyData(bool send_data_to_upstream, bool end_stream) 
     }
 
     if (data.length() != 0 || end_stream) {
-      bool self_half_close_connection = end_stream && !send_data_to_upstream ? upstream_conn_self_half_close_ : false;
-      upstream_conn_data_->connection().write(data, self_half_close_connection);
+      {
+        Thread::LockGuard lock(mutex_for_c_and_go_);
+        bool self_half_close_connection = end_stream && !send_data_to_upstream ? upstream_conn_self_half_close_ : false;
+        upstream_conn_data_->connection().write(data, self_half_close_connection);
+      }
     }
   }
 }
@@ -278,7 +300,10 @@ void TcpUpstream::encodeDataGo(ProcessorState* state, Buffer::Instance& data, bo
   state->handleDataGolangStatus(static_cast<TcpUpstreamStatus>(go_status), end_stream);
 
   if (state->filterState() == FilterState::Done || state->filterState() == FilterState::WaitingData) {
-    upstream_conn_data_->connection().write(data, upstream_conn_self_half_close_);
+    {
+        Thread::LockGuard lock(mutex_for_c_and_go_);
+        upstream_conn_data_->connection().write(data, upstream_conn_self_half_close_);
+    }
   }
 }
 
@@ -351,7 +376,8 @@ void copyHeaderMapToGo(const Envoy::Http::HeaderMap& m, GoString* go_strs, char*
 }
 
 CAPIStatus TcpUpstream::copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf) {
-  Thread::LockGuard lock(mutex_);
+  // lock until this function return since the same headers may be copied by multi Goroutines.
+  Thread::LockGuard lock(mutex_for_go_);
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golng http1-tcp bridge copyHeaders is not processing Go");
     return CAPIStatus::CAPINotInGo;
@@ -375,7 +401,8 @@ CAPIStatus TcpUpstream::copyHeaders(ProcessorState& state, GoString* go_strs, ch
 
 CAPIStatus TcpUpstream::setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value,
                              headerAction act) {             
-  Thread::LockGuard lock(mutex_);         
+  // lock until this function return since the resp header may be set by multi Goroutines.
+  Thread::LockGuard lock(mutex_for_go_);         
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golng http1-tcp bridge setRespHeader is not processing Go");
     return CAPIStatus::CAPINotInGo;
@@ -406,7 +433,8 @@ CAPIStatus TcpUpstream::setRespHeader(ProcessorState& state, absl::string_view k
 }
 
 CAPIStatus TcpUpstream::removeRespHeader(ProcessorState& state, absl::string_view key) {
-  Thread::LockGuard lock(mutex_);
+  // lock until this function return since the resp header may be removed by multi Goroutines.
+  Thread::LockGuard lock(mutex_for_go_);
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang http1-tcp bridge removeRespHeader is not processing Go");
     return CAPIStatus::CAPINotInGo;
@@ -427,7 +455,8 @@ CAPIStatus TcpUpstream::removeRespHeader(ProcessorState& state, absl::string_vie
 }
 
 CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data) {
-  Thread::LockGuard lock(mutex_);
+  // lock until this function return since the same buffer may be copied by multi Goroutines.
+  Thread::LockGuard lock(mutex_for_go_);
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golng http1-tcp bridge copyBuffer is not processing Go");
     return CAPIStatus::CAPINotInGo;
@@ -442,7 +471,8 @@ CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buff
 }
 
 CAPIStatus TcpUpstream::drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length) {
-  Thread::LockGuard lock(mutex_);
+  // lock until this function return since the same buffer may be drained by multi Goroutines.
+  Thread::LockGuard lock(mutex_for_go_);
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golng http1-tcp bridge drainBuffer is not processing Go");
     return CAPIStatus::CAPINotInGo;
@@ -453,8 +483,9 @@ CAPIStatus TcpUpstream::drainBuffer(ProcessorState& state, Buffer::Instance* buf
 }
 
 CAPIStatus TcpUpstream::setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
-                                   absl::string_view& value, bufferAction action) {    
-  Thread::LockGuard lock(mutex_);             
+                                   absl::string_view& value, bufferAction action) {
+  // lock until this function return since the same buffer may be set by multi Goroutines.
+  Thread::LockGuard lock(mutex_for_go_);             
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golng http1-tcp bridge setBufferHelper is not processing Go");
     return CAPIStatus::CAPINotInGo;
@@ -471,37 +502,51 @@ CAPIStatus TcpUpstream::setBufferHelper(ProcessorState& state, Buffer::Instance*
 }
 
 CAPIStatus TcpUpstream::getStringValue(int id, uint64_t* value_data, int* value_len) {
-  Thread::LockGuard lock(mutex_);
-  // refer the string to strValue, not deep clone, make sure it won't be freed while reading
+  // lock until this function return since it be called by multi Goroutines.
+  Thread::LockGuard lock(mutex_for_c_and_go_);
+  // refer the string to str_value_, not deep clone, make sure it won't be freed while reading
   // it on the Go side.
   switch (static_cast<EnvoyValue>(id)) {
   case EnvoyValue::RouteName:
-    strValue = upstream_request_->route().virtualHost().routeConfig().name();
+    str_value_ = route_name_;
     break;
   case EnvoyValue::ClusterName: {
-    strValue = route_entry_->clusterName();
+    str_value_ = route_entry_->clusterName();
     break;
   }
   default:
     PANIC(fmt::format("golng http1-tcp bridge getStringValue invalid string value id: {}", id));
   }
 
-  *value_data = reinterpret_cast<uint64_t>(strValue.data());
-  *value_len = strValue.length();
+  *value_data = reinterpret_cast<uint64_t>(str_value_.data());
+  *value_len = str_value_.length();
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus TcpUpstream::setSelfHalfCloseForUpstreamConn(ProcessorState& state, int enabled) {          
-  Thread::LockGuard lock(mutex_);
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge setSelfHalfCloseForUpstreamConn is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
+CAPIStatus TcpUpstream::setSelfHalfCloseForUpstreamConn(int enabled) {
+  // lock until this function return since upstream_conn_self_half_close_ may be set by multi Goroutines.     
+  Thread::LockGuard lock(mutex_for_c_and_go_);
   if (enabled == 1) {
     upstream_conn_self_half_close_ = true;
   } else {
     upstream_conn_self_half_close_ = false;
   }
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus TcpUpstream::sendPanicReply(ProcessorState& state, absl::string_view details) {
+  Thread::LockGuard lock(mutex_for_go_);             
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golng http1-tcp bridge sendPanicReply is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  has_panic_ = true;
+  Buffer::OwnedImpl buffer;
+  buffer.add(details);
+
+  sendDataToDownstream(buffer, true);
+
   return CAPIStatus::CAPIOK;
 }
 

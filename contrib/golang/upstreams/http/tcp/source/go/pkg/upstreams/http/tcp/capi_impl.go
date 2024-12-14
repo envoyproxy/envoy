@@ -187,8 +187,14 @@ func (c *cgoApiImpl) GetStringValue(r unsafe.Pointer, id int) (string, bool) {
 	return strings.Clone(value), true
 }
 
-func (c *cgoApiImpl) SetSelfHalfCloseForUpstreamConn(s unsafe.Pointer, enabled int) {
+func (c *cgoApiImpl) SetSelfHalfCloseForUpstreamConn(r unsafe.Pointer, enabled int) {
+	req := (*httpRequest)(r)
+	res := C.envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(unsafe.Pointer(req.req), C.int(enabled))
+	handleCApiStatus(res)
+}
+
+func (c *cgoApiImpl) SendPanicReply(s unsafe.Pointer, details string) {
 	state := (*processState)(s)
-	res := C.envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(unsafe.Pointer(state.processState), C.int(enabled))
+	res := C.envoyGoTcpUpstreamSendPanicReply(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(details)), C.int(len(details)))
 	handleCApiStatus(res)
 }

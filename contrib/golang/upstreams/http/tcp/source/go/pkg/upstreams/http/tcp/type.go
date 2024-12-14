@@ -28,10 +28,8 @@ import (
 
 // panic error messages when C API return not ok
 const (
-	errRequestFinished = "request has been finished"
-	errFilterDestroyed = "tcp upstreeam filter has been destroyed"
-	errNotInGo         = "not proccessing Go"
-	errInvalidPhase    = "invalid phase, maybe headers/buffer already continued"
+	errNotInGo      = "not proccessing Go"
+	errInvalidPhase = "invalid phase, maybe headers/buffer already continued"
 )
 
 // api.HeaderMap

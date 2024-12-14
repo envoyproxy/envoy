@@ -155,7 +155,8 @@ CAPIStatus envoyGoTcpUpstreamGetBuffer(void* s, uint64_t buffer, void* value);
 CAPIStatus envoyGoTcpUpstreamDrainBuffer(void* s, uint64_t buffer, uint64_t length);
 CAPIStatus envoyGoTcpUpstreamSetBufferHelper(void* s, uint64_t buffer, void* data, int length, bufferAction action);
 CAPIStatus envoyGoTcpUpstreamGetStringValue(void* r, int id, uint64_t* value_data, int* value_len);
-CAPIStatus envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(void* s, int enabled);
+CAPIStatus envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(void* r, int enabled);
+CAPIStatus envoyGoTcpUpstreamSendPanicReply(void* s, void* details_data, int details_len);
 
 #ifdef __cplusplus
 } // extern "C"

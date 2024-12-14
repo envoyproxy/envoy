@@ -67,7 +67,7 @@ func envoyGoOnTcpUpstreamConfig(c *C.httpConfig) uint64 {
 	parsedConfig, err = configParser.Parse(&any)
 
 	if err != nil {
-		api.LogErrorf("failed to parse golang plugin config: %v", err)
+		api.LogErrorf("go side: golang http1-tcp bridge: failed to parse golang plugin config: %v", err)
 		return 0
 	}
 	configCache.Store(configNum, parsedConfig)

@@ -39,15 +39,9 @@ import (
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
-type panicInfo struct {
-	paniced bool
-	details string
-}
-
 type httpRequest struct {
 	req               *C.httpRequest
 	tcpUpstreamFilter api.TcpUpstreamFilter
-	pInfo             panicInfo
 
 	// decodingState and encodingState are part of httpRequest, not another GC object.
 	// So, no cycle reference, GC finalizer could work well.
@@ -64,28 +58,8 @@ type processState struct {
 func (s *processState) RecoverPanic() {
 	if e := recover(); e != nil {
 		buf := debug.Stack()
-
-		if e == errRequestFinished || e == errFilterDestroyed {
-			api.LogInfof("http: panic serving: %v (Client may cancel the request prematurely)\n%s", e, buf)
-		} else {
-			api.LogErrorf("http: panic serving: %v\n%s", e, buf)
-		}
-
-		switch e {
-		case errRequestFinished, errFilterDestroyed:
-			// do nothing
-
-		case errNotInGo:
-			// We can not send local reply now, since not in go now,
-			// will delay to the next time entering Go.
-			s.request.pInfo = panicInfo{
-				paniced: true,
-				details: fmt.Sprint(e),
-			}
-
-		default:
-			// do nothing
-		}
+		api.LogErrorf("go side: golang http1-tcp bridge: processState: panic serving: %v\n%s", e, buf)
+		cAPI.SendPanicReply(unsafe.Pointer(s), fmt.Sprintf("%+v", e))
 	}
 }
 
@@ -97,12 +71,7 @@ func (r *httpRequest) pluginName() string {
 func (r *httpRequest) recoverPanic() {
 	if e := recover(); e != nil {
 		buf := debug.Stack()
-
-		if e == errRequestFinished || e == errFilterDestroyed {
-			api.LogInfof("tcp upstream: panic serving: %v (Client may cancel the request prematurely)\n%s", e, buf)
-		} else {
-			api.LogErrorf("tcp upstream: panic serving: %v\n%s", e, buf)
-		}
+		api.LogErrorf("o side: golang http1-tcp bridge: httpRequest: panic serving: %v\n%s", e, buf)
 	}
 }
 

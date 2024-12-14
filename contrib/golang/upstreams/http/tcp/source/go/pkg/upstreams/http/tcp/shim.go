@@ -128,10 +128,6 @@ func envoyGoEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, b
 		envoyBufferInstance: buffer,
 		length:              length,
 	}
-	if req.pInfo.paniced {
-		buf.SetString(req.pInfo.details)
-		return uint64(api.TcpUpstreamEndStream)
-	}
 
 	filter := req.tcpUpstreamFilter
 	header := &requestHeaderMapImpl{
@@ -157,10 +153,6 @@ func envoyGoEncodeData(s *C.processState, endStream, buffer, length uint64) uint
 		envoyBufferInstance: buffer,
 		length:              length,
 	}
-	if req.pInfo.paniced {
-		buf.SetString(req.pInfo.details)
-		return uint64(api.TcpUpstreamContinue)
-	}
 
 	filter := req.tcpUpstreamFilter
 
@@ -178,10 +170,6 @@ func envoyGoOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes,
 		state:               state,
 		envoyBufferInstance: buffer,
 		length:              length,
-	}
-	if req.pInfo.paniced {
-		buf.SetString(req.pInfo.details)
-		return uint64(api.TcpUpstreamEndStream)
 	}
 
 	filter := req.tcpUpstreamFilter
