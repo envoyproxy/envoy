@@ -26,6 +26,13 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 
+// For response cache
+#include "source/extensions/filters/http/ext_authz/ttl_cache.h"
+#include "source/extensions/filters/http/ext_authz/caches/cache.hpp"
+#include "source/extensions/filters/http/ext_authz/caches/cache_policy.hpp"
+#include "source/extensions/filters/http/ext_authz/caches/lru_cache_policy.hpp"
+using ttl_cache_t = TTLCache<std::string, int, caches::LRUCachePolicy>;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -130,6 +137,9 @@ public:
   bool packAsBytes() const { return pack_as_bytes_; }
 
   bool headersAsBytes() const { return encode_raw_headers_; }
+
+  ttl_cache_t& resp_cache() { return cache_; }
+  //const ttl_cache_t& resp_cache() const { return cache_; }
 
   Filters::Common::MutationRules::CheckResult
   checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
@@ -270,6 +280,9 @@ private:
 
   Filters::Common::ExtAuthz::MatcherSharedPtr allowed_headers_matcher_;
   Filters::Common::ExtAuthz::MatcherSharedPtr disallowed_headers_matcher_;
+
+  // Response cache
+  ttl_cache_t cache_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
