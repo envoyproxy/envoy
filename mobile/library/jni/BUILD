@@ -36,10 +36,9 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = select({
-        "@envoy//bazel:linux": ["//bazel:jni"],
-        "@envoy//bazel:apple": ["//bazel:jni"],
         # On Android, we should use the JNI provided by the system.
-        "//conditions:default": [],
+        "@envoy//bazel:android": [],
+        "//conditions:default": ["//bazel:jni"],
     }) + [
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
