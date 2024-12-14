@@ -3,6 +3,7 @@ load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependenci
 load("@build_bazel_rules_swift//swift:repositories.bzl", "swift_rules_dependencies")
 load("@io_bazel_rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
+load("@rules_android//:prereqs.bzl", "rules_android_prereqs")
 load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
 load("@rules_java//java:repositories.bzl", "rules_java_dependencies")
 load("@rules_jvm_external//:defs.bzl", "maven_install")
@@ -50,6 +51,7 @@ def envoy_mobile_dependencies(extra_maven_dependencies = []):
 
     swift_dependencies()
     kotlin_dependencies(extra_maven_dependencies)
+    rules_android_prereqs()
 
 def swift_dependencies():
     apple_support_dependencies()

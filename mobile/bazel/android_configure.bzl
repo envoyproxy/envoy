@@ -20,12 +20,13 @@ def _android_autoconf_impl(repository_ctx):
     sdk_rule = ""
     if sdk_home:
         sdk_rule = """
-    native.android_sdk_repository(
+    android_sdk_repository(
         name="androidsdk",
         path="{}",
         api_level={},
         build_tools_version="{}",
     )
+    native.register_toolchains("@androidsdk//:sdk-toolchain", "@androidsdk//:all")
 """.format(sdk_home, sdk_api_level, build_tools_version)
 
     ndk_rule = ""
@@ -46,9 +47,12 @@ def _android_autoconf_impl(repository_ctx):
     repository_ctx.file("BUILD.bazel", "")
     repository_ctx.file("android_configure.bzl", """
 load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
+load("@rules_android//rules:rules.bzl", "android_sdk_repository")
 
 def android_workspace():
+    print("SDK SETUP")
     {}
+    print("NDK SETUP")
     {}
     """.format(sdk_rule, ndk_rule))
 
