@@ -338,9 +338,16 @@ new_features:
     <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.query_parameter_mutations>`
     to :ref:`Header Mutation Filter <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
     for adding/removing query parameters on a request.
+- area: filters
+  change: |
+    Updatd the ``set_filter_state`` :ref:`filter <config_http_filters_set_filter_state>` to support per-route overrides.
 - area: grpc-json
   change: |
     Added a new http filter for :ref:`gRPC to JSON transcoding <config_http_filters_grpc_json_reverse_transcoder>`.
+- area: attributes
+  change: |
+    added new ``xds.virtual_host_name`` and ``xds.virtual_host_metadata`` attributes support. See
+    :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
 
 deprecated:
 - area: rbac

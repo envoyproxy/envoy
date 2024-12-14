@@ -190,16 +190,6 @@ PathMatcher::createPrefix(const std::string& prefix, bool ignore_case,
 }
 
 PathMatcherConstSharedPtr
-PathMatcher::createPattern(const std::string& pattern, bool ignore_case,
-                           Server::Configuration::CommonFactoryContext& context) {
-  // TODO(silverstar194): implement pattern specific matcher
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_prefix(pattern);
-  matcher.set_ignore_case(ignore_case);
-  return std::make_shared<const PathMatcher>(matcher, context);
-}
-
-PathMatcherConstSharedPtr
 PathMatcher::createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher,
                              Server::Configuration::CommonFactoryContext& context) {
   envoy::type::matcher::v3::StringMatcher matcher;

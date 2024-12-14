@@ -1417,13 +1417,21 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
                                     "true");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_"
+                                    "quic_notify_stream_soon_to_destroy",
+                                    "true");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_"
+                                    "quic_notify_ack_listener_earlier",
+                                    "true");
+
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
       "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
       "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
       "METADATA("
-      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
+      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%,%DOWNSTREAM_TLS_"
+      "CIPHER%");
   initialize();
 
   // Make a header-only request and delay the response by 1ms to ensure that the ROUNDTRIP_DURATION
@@ -1455,7 +1463,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   std::string log = entries[0];
 
   std::vector<std::string> metrics = absl::StrSplit(log, ',');
-  ASSERT_EQ(metrics.size(), 21);
+  ASSERT_EQ(metrics.size(), 22);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
   EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
@@ -1465,7 +1473,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   // Ensure that request headers from top-level access logger parameter and stream info are
   // consistent.
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
-
+  EXPECT_THAT(/* DOWNSTREAM_TLS_CIPHER */ metrics.at(21),
+              ::testing::MatchesRegex("TLS_(AES_128_GCM|CHACHA20_POLY1305)_SHA256"));
   codec_client_->close();
 }
 
