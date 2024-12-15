@@ -28,7 +28,8 @@ const Http::LowerCaseString DefaultResponseFilterDelayTrailer =
 } // namespace
 
 FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
-                           Runtime::Loader& runtime, TimeSource& time_source, bool per_route)
+                           Runtime::Loader& runtime, TimeSource& time_source,
+                           absl::Status& creation_status, bool per_route)
     : runtime_(runtime), time_source_(time_source), enable_mode_(config.enable_mode()),
       limit_kbps_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, limit_kbps, 0)),
       fill_interval_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
@@ -57,7 +58,8 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
                                                    DefaultResponseFilterDelayTrailer.get()))),
       enable_response_trailers_(config.enable_response_trailers()) {
   if (per_route && !config.has_limit_kbps()) {
-    throw EnvoyException("bandwidthlimitfilter: limit must be set for per route filter config");
+    creation_status = absl::InvalidArgumentError("limit must be set for per route filter config");
+    return;
   }
 
   // The token bucket is configured with a max token count of the number of
