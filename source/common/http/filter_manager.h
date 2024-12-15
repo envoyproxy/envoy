@@ -959,40 +959,38 @@ private:
     void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
       manager_.filters_.push_back(filter.get());
 
-      // Note: configured decoder filters are appended to decoder_filters_.
-      // This means that if filters are configured in the following order (assume all three filters
+      // If filters are configured in the following order (assume all three filters
       // are both decoder/encoder filters):
       //   http_filters:
       //     - A
       //     - B
       //     - C
       // The decoder filter chain will iterate through filters A, B, C.
-      manager_.decoder_filters_.emplace_back(manager_, std::move(filter), context_,
-                                             manager_.decoder_filters_.size());
+      manager_.decoder_filters_.emplace_back(
+          std::make_unique<ActiveStreamDecoderFilter>(manager_, std::move(filter), context_));
     }
 
     void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
       manager_.filters_.push_back(filter.get());
 
-      // Note: configured encoder filters are appended to encoder_filters_.
-      // This means that if filters are configured in the following order (assume all three filters
+      // If filters are configured in the following order (assume all three filters
       // are both decoder/encoder filters):
       //   http_filters:
       //     - A
       //     - B
       //     - C
       // The encoder filter chain will iterate through filters C, B, A.
-      manager_.encoder_filters_.emplace_back(manager_, std::move(filter), context_,
-                                             manager_.encoder_filters_.size());
+      manager_.encoder_filters_.emplace_back(
+          std::make_unique<ActiveStreamEncoderFilter>(manager_, std::move(filter), context_));
     }
 
     void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
       manager_.filters_.push_back(filter.get());
 
-      manager_.decoder_filters_.emplace_back(manager_, filter, context_,
-                                             manager_.decoder_filters_.size());
-      manager_.encoder_filters_.emplace_back(manager_, std::move(filter), context_,
-                                             manager_.encoder_filters_.size());
+      manager_.decoder_filters_.emplace_back(
+          std::make_unique<ActiveStreamDecoderFilter>(manager_, filter, context_));
+      manager_.encoder_filters_.emplace_back(
+          std::make_unique<ActiveStreamEncoderFilter>(manager_, std::move(filter), context_));
     }
 
     void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {

@@ -1681,7 +1681,7 @@ FilterManager::createFilterChain(const FilterChainFactory& filter_chain_factory)
   }
 
   // After the filter chain creation is completed, the filter chain containers will not be
-  // modified. So, we can safely set the callbacks for each filter.
+  // modified. So, we can safely complete the initialization of the filter chain now.
   Cleanup initialize_filter_chain([this]() {
     for (auto iter = decoder_filters_.begin(); iter != decoder_filters_.end(); ++iter) {
       (*iter)->entry_ = iter;
