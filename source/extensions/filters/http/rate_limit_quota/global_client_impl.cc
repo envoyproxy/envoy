@@ -234,7 +234,8 @@ bool protoTokenBucketsEq(const ::envoy::type::v3::TokenBucket& new_tb,
 }
 
 std::shared_ptr<AtomicTokenBucketImpl>
-createTokenBucketFromAction(const RateLimitStrategy& strategy, TimeSource& time_source) {
+createTokenBucketFromAction(const RateLimitStrategy& strategy, TimeSource& time_source,
+                            const AtomicTokenBucketImpl* existing_token_bucket) {
   const auto& token_bucket = strategy.token_bucket();
   const auto& interval_proto = token_bucket.fill_interval();
   // Convert absl::duration to int64_t seconds
@@ -243,8 +244,16 @@ createTokenBucketFromAction(const RateLimitStrategy& strategy, TimeSource& time_
   double fill_rate_per_sec =
       static_cast<double>(token_bucket.tokens_per_fill().value()) / fill_interval_sec;
 
-  return std::make_shared<AtomicTokenBucketImpl>(token_bucket.max_tokens(), time_source,
-                                                 fill_rate_per_sec);
+  uint64_t max_tokens = token_bucket.max_tokens();
+  // Start the new token bucket with the same ratio of remaining tokens to max
+  // tokens as the existing token bucket (best effort).
+  uint64_t initial_tokens = (existing_token_bucket)
+                                ? max_tokens * (existing_token_bucket->remainingTokens() /
+                                                existing_token_bucket->maxTokens())
+                                : max_tokens;
+
+  return std::make_shared<AtomicTokenBucketImpl>(max_tokens, time_source, fill_rate_per_sec,
+                                                 initial_tokens);
 }
 
 void GlobalRateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
@@ -314,8 +323,8 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
         // Only create a new TokenBucket if the configuration is new or
         // different from the cache.)
         if (shouldReplaceTokenBucket(cached_bucket.get(), rate_limit_strategy)) {
-          bucket->token_bucket_limiter =
-              createTokenBucketFromAction(rate_limit_strategy, time_source_);
+          bucket->token_bucket_limiter = createTokenBucketFromAction(
+              rate_limit_strategy, time_source_, cached_bucket->token_bucket_limiter.get());
           ENVOY_LOG(info,
                     "A new TokenBucket has been configured by the RLQS "
                     "filter for id: {}",
@@ -468,7 +477,8 @@ void GlobalRateLimitClientImpl::onActionExpirationTimer(CachedBucket* bucket, si
               "The cached token bucket at bucket id {} has been replaced by "
               "the configured fallback token bucket.",
               id);
-    new_token_bucket = createTokenBucketFromAction(fallback_action, time_source_);
+    new_token_bucket = createTokenBucketFromAction(fallback_action, time_source_,
+                                                   cached_bucket->token_bucket_limiter.get());
   } else if (fallback_action.has_token_bucket()) {
     ENVOY_LOG(debug,
               "The cached token bucket at bucket id {} is carrying over during "

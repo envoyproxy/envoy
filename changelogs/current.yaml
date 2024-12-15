@@ -336,9 +336,16 @@ new_features:
   change: |
     Added per descriptor custom hits addend support for local rate limit filter. See :ref:`hits_addend
     <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` for more details.
+- area: filters
+  change: |
+    Updatd the ``set_filter_state`` :ref:`filter <config_http_filters_set_filter_state>` to support per-route overrides.
 - area: grpc-json
   change: |
     Added a new http filter for :ref:`gRPC to JSON transcoding <config_http_filters_grpc_json_reverse_transcoder>`.
+- area: attributes
+  change: |
+    added new ``xds.virtual_host_name`` and ``xds.virtual_host_metadata`` attributes support. See
+    :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
 
 deprecated:
 - area: rbac

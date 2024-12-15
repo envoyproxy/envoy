@@ -641,6 +641,11 @@ public:
   virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
+   * @return const std::string& the name of the virtual host.
+   */
+  virtual const std::string& name() const PURE;
+
+  /**
    * @return the stat-name of the virtual host.
    */
   virtual Stats::StatName statName() const PURE;

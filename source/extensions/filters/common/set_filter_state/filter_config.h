@@ -28,7 +28,8 @@ struct Value {
   Formatter::FormatterConstSharedPtr value_;
 };
 
-class Config : public Logger::Loggable<Logger::Id::config> {
+class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
+               public Logger::Loggable<Logger::Id::config> {
 public:
   Config(const Protobuf::RepeatedPtrField<FilterStateValueProto>& proto_values, LifeSpan life_span,
          Server::Configuration::GenericFactoryContext& context)
