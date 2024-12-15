@@ -14,12 +14,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ApiKeyAuth {
 
-RouteConfig::RouteConfig(const ApiKeyAuthPerRouteProto& proto)
-    : override_config_(proto),
+RouteConfig::RouteConfig(const ApiKeyAuthPerRouteProto& proto, absl::Status& status)
+    : override_config_(proto, status),
       allowed_clients_(proto.allowed_clients().begin(), proto.allowed_clients().end()) {}
 
 KeySources::Source::Source(absl::string_view header, absl::string_view query,
-                           absl::string_view cookie) {
+                           absl::string_view cookie, absl::Status& status) {
   if (!header.empty()) {
     source_ = Http::LowerCaseString(header);
   } else if (!query.empty()) {
@@ -28,14 +28,19 @@ KeySources::Source::Source(absl::string_view header, absl::string_view query,
   } else if (!cookie.empty()) {
     source_ = std::string(cookie);
   } else {
-    throw EnvoyException("One of 'header'/'query'/'cookie' must be set.");
+    status = absl::InvalidArgumentError("One of 'header'/'query'/'cookie' must be set.");
+    return;
   }
 }
 
-KeySources::KeySources(const Protobuf::RepeatedPtrField<KeySourceProto>& proto_config) {
+KeySources::KeySources(const Protobuf::RepeatedPtrField<KeySourceProto>& proto_config,
+                       absl::Status& status) {
   key_sources_.reserve(proto_config.size());
   for (const auto& source : proto_config) {
-    key_sources_.emplace_back(source.header(), source.query(), source.cookie());
+    key_sources_.emplace_back(source.header(), source.query(), source.cookie(), status);
+    if (!status.ok()) {
+      return;
+    }
   }
 }
 
@@ -79,8 +84,9 @@ absl::string_view KeySources::getKey(const Http::RequestHeaderMap& headers,
 }
 
 FilterConfig::FilterConfig(const ApiKeyAuthProto& proto_config, Stats::Scope& scope,
-                           const std::string& stats_prefix)
-    : default_config_(proto_config), stats_(generateStats(scope, stats_prefix + "api_key_auth.")) {}
+                           const std::string& stats_prefix, absl::Status& status)
+    : default_config_(proto_config, status),
+      stats_(generateStats(scope, stats_prefix + "api_key_auth.")) {}
 
 ApiKeyAuthFilter::ApiKeyAuthFilter(FilterConfigSharedPtr config) : config_(std::move(config)) {}
 

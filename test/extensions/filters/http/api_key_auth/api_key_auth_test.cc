@@ -18,12 +18,15 @@ public:
   void setup(const std::string& config_yaml, const std::string& route_config_yaml) {
     ApiKeyAuthProto proto_config;
     TestUtility::loadFromYaml(config_yaml, proto_config);
-    config_ = std::make_shared<FilterConfig>(proto_config, *stats_.rootScope(), "stats.");
+    absl::Status status;
+    config_ = std::make_shared<FilterConfig>(proto_config, *stats_.rootScope(), "stats.", status);
+    ASSERT_TRUE(status.ok());
 
     if (!route_config_yaml.empty()) {
       ApiKeyAuthPerRouteProto route_config_proto;
       TestUtility::loadFromYaml(route_config_yaml, route_config_proto);
-      route_config_ = std::make_shared<RouteConfig>(route_config_proto);
+      route_config_ = std::make_shared<RouteConfig>(route_config_proto, status);
+      ASSERT_TRUE(status.ok());
     }
 
     filter_ = std::make_shared<ApiKeyAuthFilter>(config_);

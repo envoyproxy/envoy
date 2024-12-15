@@ -43,12 +43,11 @@ DEFINE_PROTO_FUZZER(const ApiKeyAuthFuzzInput& input) {
   }));
 
   std::shared_ptr<FilterConfig> filter_config;
-
-  try {
-    filter_config =
-        std::make_shared<FilterConfig>(input.filter_config(), mock_factory_ctx.scope_, "stats.");
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException during filter config construction: {}", e.what());
+  absl::Status status;
+  filter_config = std::make_shared<FilterConfig>(input.filter_config(), mock_factory_ctx.scope_,
+                                                 "stats.", status);
+  if (!status.ok()) {
+    ENVOY_LOG_MISC(debug, "FilterConfig construction failed: {}", status.message());
     return;
   }
 

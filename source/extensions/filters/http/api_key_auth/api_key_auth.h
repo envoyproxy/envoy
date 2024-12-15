@@ -43,7 +43,7 @@ using Credentials = absl::flat_hash_map<std::string, std::string>;
  */
 class KeySources {
 public:
-  KeySources(const Protobuf::RepeatedPtrField<KeySourceProto>& proto_config);
+  KeySources(const Protobuf::RepeatedPtrField<KeySourceProto>& proto_config, absl::Status& status);
 
   /**
    * To get the API key from the incoming request.
@@ -63,7 +63,8 @@ public:
 private:
   class Source {
   public:
-    Source(absl::string_view header, absl::string_view query, absl::string_view cookie);
+    Source(absl::string_view header, absl::string_view query, absl::string_view cookie,
+           absl::Status& status);
     absl::string_view getKey(const Http::RequestHeaderMap& headers, std::string& buffer) const;
 
   private:
@@ -81,12 +82,17 @@ private:
 struct ApiKeyAuthConfig {
 public:
   template <class ProtoType>
-  ApiKeyAuthConfig(const ProtoType& proto_config) : key_sources_(proto_config.key_sources()) {
+  ApiKeyAuthConfig(const ProtoType& proto_config, absl::Status& status)
+      : key_sources_(proto_config.key_sources(), status) {
+    if (!status.ok()) {
+      return;
+    }
     credentials_.reserve(proto_config.credentials().size());
 
     for (const auto& credential : proto_config.credentials()) {
       if (credentials_.contains(credential.key())) {
-        throw EnvoyException("Duplicate API key.");
+        status = absl::InvalidArgumentError("Duplicate API key.");
+        return;
       }
       credentials_[credential.key()] = credential.client();
     }
@@ -114,7 +120,7 @@ private:
 
 class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
-  RouteConfig(const ApiKeyAuthPerRouteProto& proto_config);
+  RouteConfig(const ApiKeyAuthPerRouteProto& proto_config, absl::Status& status);
 
   /**
    * To get the optional reference of the credentials. If this returns an valid reference, then
@@ -151,7 +157,7 @@ struct AuthResult {
 class FilterConfig {
 public:
   FilterConfig(const ApiKeyAuthProto& proto_config, Stats::Scope& scope,
-               const std::string& stats_prefix);
+               const std::string& stats_prefix, absl::Status& status);
 
   /**
    * To get the optional reference of the default credentials.
