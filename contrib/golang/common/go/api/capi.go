@@ -113,8 +113,6 @@ type TcpUpstreamCAPI interface {
 	GetStringValue(r unsafe.Pointer, id int) (string, bool)
 
 	SetSelfHalfCloseForUpstreamConn(r unsafe.Pointer, enabled int)
-
-	SendPanicReply(s unsafe.Pointer, details string)
 }
 
 type CommonCAPI interface {

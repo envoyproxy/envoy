@@ -192,9 +192,3 @@ func (c *cgoApiImpl) SetSelfHalfCloseForUpstreamConn(r unsafe.Pointer, enabled i
 	res := C.envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(unsafe.Pointer(req.req), C.int(enabled))
 	handleCApiStatus(res)
 }
-
-func (c *cgoApiImpl) SendPanicReply(s unsafe.Pointer, details string) {
-	state := (*processState)(s)
-	res := C.envoyGoTcpUpstreamSendPanicReply(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(details)), C.int(len(details)))
-	handleCApiStatus(res)
-}

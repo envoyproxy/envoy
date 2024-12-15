@@ -32,7 +32,6 @@ package tcp
 */
 import "C"
 import (
-	"fmt"
 	"runtime/debug"
 	"unsafe"
 
@@ -59,7 +58,7 @@ func (s *processState) RecoverPanic() {
 	if e := recover(); e != nil {
 		buf := debug.Stack()
 		api.LogErrorf("go side: golang http1-tcp bridge: processState: panic serving: %v\n%s", e, buf)
-		cAPI.SendPanicReply(unsafe.Pointer(s), fmt.Sprintf("%+v", e))
+		// do nothing to retrun default value in origin func to continue normat status in c side, to avoid data race when upstream full-multiplex.
 	}
 }
 

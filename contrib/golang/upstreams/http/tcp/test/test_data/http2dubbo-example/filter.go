@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
-	"time"
 
 	"dubbo.apache.org/dubbo-go/v3/common/constant"
 	"dubbo.apache.org/dubbo-go/v3/filter/generic/generalizer"
@@ -61,16 +60,16 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, dataTo
 	dubboInterface, _ := headerMap.Get("dubbo_interface")
 	// panic("qqq")
 
-	go func() {
-		_, _ = headerMap.Get("dubbo_interface")
-	}()
-	go func() {
-		_, _ = headerMap.Get("dubbo_interface")
-	}()
-	go func() {
-		_, _ = headerMap.Get("dubbo_interface")
-	}()
-	time.Sleep(100 * time.Millisecond)
+	// go func() {
+	// 	_, _ = headerMap.Get("dubbo_interface")
+	// }()
+	// go func() {
+	// 	_, _ = headerMap.Get("dubbo_interface")
+	// }()
+	// go func() {
+	// 	_, _ = headerMap.Get("dubbo_interface")
+	// }()
+	// time.Sleep(100 * time.Millisecond)
 
 	// =========== step 2: if body is empty, or get unexpected header, directly send data to upstream =========== //
 	if endOfStream || (dubboMethod == "" || dubboInterface == "") {
@@ -86,12 +85,16 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, dataTo
 			return true
 		})
 
+		// panic("hhh")
+
 		f.alreadySendDataInEncodeHeaders = true
 		return api.TcpUpstreamContinue
 	}
 
 	f.dubboMethod = dubboMethod
 	f.dubboInterface = dubboInterface
+
+	// panic("ggg")
 
 	// for full-buffer
 	return api.TcpUpstreamStopAndBuffer
@@ -120,6 +123,7 @@ func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bo
 	if f.alreadySendDataInEncodeHeaders {
 		return api.TcpUpstreamContinue
 	}
+	// panic("www")
 	api.LogInfof("[EncodeData] come, buf: %s, len: %d, endStream: %v", buffer, buffer.Len(), endOfStream)
 	// =========== step 1: get dubboArgs from http body =========== //
 	dubboArgs := make(map[string]string, 0)
@@ -133,44 +137,46 @@ func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bo
 		f.dubboInterface = GrayInterfaceName
 	}
 
-	go func() {
-		_ = f.callbacks.GetRouteName()
-	}()
-	go func() {
-		_ = f.callbacks.GetRouteName()
-	}()
-	go func() {
-		_ = f.callbacks.GetVirtualClusterName()
-	}()
-	go func() {
-		_ = f.callbacks.GetVirtualClusterName()
-	}()
-	go func() {
-		f.callbacks.SetSelfHalfCloseForUpstreamConn(false)
-	}()
-	go func() {
-		f.callbacks.SetSelfHalfCloseForUpstreamConn(false)
-	}()
+	// go func() {
+	// 	_ = f.callbacks.GetRouteName()
+	// }()
+	// go func() {
+	// 	_ = f.callbacks.GetRouteName()
+	// }()
+	// go func() {
+	// 	_ = f.callbacks.GetVirtualClusterName()
+	// }()
+	// go func() {
+	// 	_ = f.callbacks.GetVirtualClusterName()
+	// }()
+	// go func() {
+	// 	f.callbacks.SetSelfHalfCloseForUpstreamConn(false)
+	// }()
+	// go func() {
+	// 	f.callbacks.SetSelfHalfCloseForUpstreamConn(false)
+	// }()
 
 	// =========== step 3: construct dubbo frame with dubboMethod, dubboInterface, dubboArgs for upstream req =========== //
 	buf := transformToDubboFrame(f.dubboMethod, f.dubboInterface, dubboArgs)
 	_ = buffer.Set(buf.Bytes())
 
-	go func() {
-		_ = buffer.Set(buf.Bytes())
-	}()
-	go func() {
-		_ = buffer.Set(buf.Bytes())
-	}()
-	go func() {
-		_ = buffer.Set(buf.Bytes())
-	}()
-	time.Sleep(100 * time.Millisecond)
+	// go func() {
+	// 	_ = buffer.Set(buf.Bytes())
+	// }()
+	// go func() {
+	// 	_ = buffer.Set(buf.Bytes())
+	// }()
+	// go func() {
+	// 	_ = buffer.Set(buf.Bytes())
+	// }()
+	// time.Sleep(100 * time.Millisecond)
 
 	// =========== step 4: set self half close for upstream conn =========== //
 	if !f.config.enableTunneling {
 		f.callbacks.SetSelfHalfCloseForUpstreamConn(true)
 	}
+
+	// panic("eee")
 
 	// for full-buffer from encodeHeaders TcpUpstreamStopAndBuffer
 	return api.TcpUpstreamContinue
@@ -213,6 +219,9 @@ const (
 */
 func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHeaderMap, buffer api.BufferInstance, endOfStream bool) api.TcpUpstreamStatus {
 	api.LogInfof("[OnUpstreamData] receive body, len: %d", buffer.Len())
+
+	// panic("rrr")
+
 	responseHeaderForSet.Set("a", "1")
 	responseHeaderForSet.Set("b", "1")
 	responseHeaderForSet.Set(strconv.Itoa(rand.Intn(100)), "a")
@@ -256,16 +265,16 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 	bodyBytes := []byte(fmt.Sprintf("%s", rsp))
 	_ = buffer.Set(bodyBytes)
 
-	go func() {
-		_ = buffer.Set(bodyBytes)
-	}()
-	go func() {
-		_ = buffer.Set(bodyBytes)
-	}()
-	go func() {
-		_ = buffer.Set(bodyBytes)
-	}()
-	time.Sleep(100 * time.Millisecond)
+	// go func() {
+	// 	_ = buffer.Set(bodyBytes)
+	// }()
+	// go func() {
+	// 	_ = buffer.Set(bodyBytes)
+	// }()
+	// go func() {
+	// 	_ = buffer.Set(bodyBytes)
+	// }()
+	// time.Sleep(100 * time.Millisecond)
 
 	// =========== step 4: construct http response header =========== //
 	responseHeaderForSet.Set(":status", "200")
@@ -278,16 +287,18 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 	}
 	responseHeaderForSet.Del("a")
 
-	go func() {
-		responseHeaderForSet.Set("c", "1")
-	}()
-	go func() {
-		responseHeaderForSet.Set("c", "2")
-	}()
-	go func() {
-		responseHeaderForSet.Set("c", "3")
-	}()
-	time.Sleep(100 * time.Millisecond)
+	// go func() {
+	// 	responseHeaderForSet.Set("c", "1")
+	// }()
+	// go func() {
+	// 	responseHeaderForSet.Set("c", "2")
+	// }()
+	// go func() {
+	// 	responseHeaderForSet.Set("c", "3")
+	// }()
+	// time.Sleep(100 * time.Millisecond)
+
+	// panic("fff")
 
 	return api.TcpUpstreamEndStream
 }
@@ -301,6 +312,7 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 *
 */
 func (*tcpUpstreamFilter) OnDestroy() {
+	// panic("iii")
 	api.LogInfof("[OnDestroy] , tcpUpstreamFilter destroy")
 }
 

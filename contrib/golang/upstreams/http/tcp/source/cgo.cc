@@ -109,17 +109,6 @@ CAPIStatus envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(void* r, int enable
       });
 }
 
-CAPIStatus envoyGoTcpUpstreamSendPanicReply(void* s, void* details_data, int details_len) {
-  return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s,
-      [details_data, details_len](TcpUpstream& t,
-                                  ProcessorState& state) -> CAPIStatus {
-        // Since this is only used for logs we don't need to deep copy.
-        auto details = stringViewFromGoPointer(details_data, details_len);
-        return t.sendPanicReply(state, details);
-      });
-}
-
 } // extern "C"
 } // namespace Golang
 } // namespace Tcp

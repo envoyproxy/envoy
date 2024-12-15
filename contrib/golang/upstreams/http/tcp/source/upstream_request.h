@@ -171,7 +171,6 @@ public:
   CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
   CAPIStatus setSelfHalfCloseForUpstreamConn(int enabled);
-  CAPIStatus sendPanicReply(ProcessorState& state, absl::string_view details);
 
   DecodingProcessorState* decodingState() { return decoding_state_; }
   EncodingProcessorState* encodingState() { return encoding_state_; }
@@ -203,8 +202,6 @@ private:
 
   // lock to avoid race between multi go threads (when c thread blocked and calling back from go).
   Thread::MutexBasicLockable mutex_for_go_{};
-
-  bool has_panic_{false};
 };
 
 

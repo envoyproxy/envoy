@@ -131,8 +131,6 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
                                                bool end_stream) {
   ENVOY_LOG(debug, "golng http1-tcp bridge encodeHeaders, header size: {}, end_stream: {}", headers.size(), end_stream);
 
-  initResponse();
-
   encoding_state_->req_headers = &headers;
   encoding_state_->setFilterState(FilterState::ProcessingHeader);
   Buffer::OwnedImpl buffer;
@@ -140,11 +138,6 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
 
   GoUint64 go_status = dynamic_lib_->envoyGoEncodeHeader(
     s, end_stream ? 1 : 0, headers.size(), headers.byteSize(), reinterpret_cast<uint64_t>(&buffer), buffer.length());
-
-  // this means sendPanicReply in envoyGoEncodeHeader, so return
-  if (has_panic_) {
-    return Envoy::Http::okStatus();
-  }
 
   encoding_state_->handleHeaderGolangStatus(static_cast<TcpUpstreamStatus>(go_status));
   ENVOY_LOG(debug, "golng http1-tcp bridge encodeHeaders, state: {}", encoding_state_->stateStr());
@@ -166,10 +159,6 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
 
 void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "golng http1-tcp bridge encodeData, data length: {}, end_stream: {}", data.length(), end_stream);
-  if (has_panic_) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge encodeData: may have got panic, so return");
-    return;
-  }
 
   switch (encoding_state_->filterState()) {
   case FilterState::WaitingData:
@@ -215,10 +204,8 @@ void TcpUpstream::resetStream() {
 
 void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "golng http1-tcp bridge onUpstreamData, data length: {}, end_stream: {}", data.length(), end_stream);
-  if (has_panic_) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge onUpstreamData: may have got panic, so return");
-    return;
-  }
+
+  initResponse();
 
   decoding_state_->setFilterState(FilterState::ProcessingData);
   auto s = dynamic_cast<processState*>(decoding_state_);
@@ -531,22 +518,6 @@ CAPIStatus TcpUpstream::setSelfHalfCloseForUpstreamConn(int enabled) {
   } else {
     upstream_conn_self_half_close_ = false;
   }
-  return CAPIStatus::CAPIOK;
-}
-
-CAPIStatus TcpUpstream::sendPanicReply(ProcessorState& state, absl::string_view details) {
-  Thread::LockGuard lock(mutex_for_go_);             
-  if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge sendPanicReply is not processing Go");
-    return CAPIStatus::CAPINotInGo;
-  }
-
-  has_panic_ = true;
-  Buffer::OwnedImpl buffer;
-  buffer.add(details);
-
-  sendDataToDownstream(buffer, true);
-
   return CAPIStatus::CAPIOK;
 }
 
