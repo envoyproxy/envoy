@@ -27,7 +27,7 @@ ApiKeyAuthFilterFactory::createRouteSpecificFilterConfigTyped(
     ProtobufMessage::ValidationVisitor&) {
   absl::Status status;
   auto config = std::make_shared<RouteConfig>(proto_config, status);
-  RETURN_IF_ERROR(status);
+  RETURN_IF_NOT_OK_REF(status);
   return config;
 }
 
