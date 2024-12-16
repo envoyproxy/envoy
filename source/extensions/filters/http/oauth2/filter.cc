@@ -52,7 +52,7 @@ constexpr absl::string_view queryParamsState = "state";
 constexpr absl::string_view queryParamsRedirectUri = "redirect_uri";
 
 constexpr absl::string_view stateParamsUrl = "url";
-constexpr absl::string_view stateParamsNonce = "nonce";
+constexpr absl::string_view stateParamsCsrfToken = "csrf_token";
 
 constexpr absl::string_view REDIRECT_RACE = "oauth.race_redirect";
 constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
@@ -213,7 +213,7 @@ std::string encodeState(const std::string& original_request_url, const std::stri
   absl::string_view sanitized_url = Json::sanitize(buffer, original_request_url);
   absl::string_view sanitized_csrf_token = Json::sanitize(buffer, csrf_token);
   std::string json =
-      fmt::format(R"({{"url":"{}","nonce":"{}"}})", sanitized_url, sanitized_csrf_token);
+      fmt::format(R"({{"url":"{}","csrf_token":"{}"}})", sanitized_url, sanitized_csrf_token);
   return Base64Url::encode(json.data(), json.size());
 }
 
@@ -557,7 +557,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 
   // Validate the CSRF token HMAC if the CSRF token cookie exists.
   if (csrf_token_cookie_exists && !validateCsrfTokenHmac(config_->hmacSecret(), csrf_token)) {
-    ENVOY_LOG(error, "Invalid CSRF token HMAC: {}", csrf_token);
+    ENVOY_LOG(error, "csrf token validation failed");
     sendUnauthorizedResponse();
     return;
   }
@@ -899,7 +899,8 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   }
 
   const auto& filed_value_pair = message.fields();
-  if (!filed_value_pair.contains(stateParamsUrl) || !filed_value_pair.contains(stateParamsNonce)) {
+  if (!filed_value_pair.contains(stateParamsUrl) ||
+      !filed_value_pair.contains(stateParamsCsrfToken)) {
     ENVOY_LOG(error, "state query param does not contain url or CSRF token: \n{}", state);
     return {false, "", ""};
   }
@@ -910,7 +911,7 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   // sessions via CSRF attack. The attack can result in victims saving their sensitive data
   // in the attacker's account.
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
-  std::string csrf_token = filed_value_pair.at(stateParamsNonce).string_value();
+  std::string csrf_token = filed_value_pair.at(stateParamsCsrfToken).string_value();
   if (!validateCsrfToken(headers, csrf_token)) {
     ENVOY_LOG(error, "csrf token validation failed");
     return {false, "", ""};
