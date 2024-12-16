@@ -78,6 +78,10 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
 
     configureComponentLogLevels();
 
+    // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a
+    // try/catch block or not.
+    std::set_new_handler([]() { PANIC("out of memory"); });
+
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
     server_ = create_instance(*init_manager_, options_, time_system, listener_hooks, *restarter_,
