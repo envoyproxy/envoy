@@ -881,6 +881,10 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   listener_manager->mutable_typed_config()->PackFrom(api);
   listener_manager->set_name("envoy.listener_manager_impl.api");
 
+  // Envoy Mobile should not be responsible for setting the new-handler; the application using
+  // Envoy Mobile should decide what should be done when memory allocation fails.
+  bootstrap->set_disable_new_handler(true);
+
   return bootstrap;
 }
 

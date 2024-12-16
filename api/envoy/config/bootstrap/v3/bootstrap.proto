@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 42]
+// [#next-free-field: 43]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -415,6 +415,11 @@ message Bootstrap {
   // Optional configuration for memory allocation manager.
   // Memory releasing is only supported for `tcmalloc allocator <https://github.com/google/tcmalloc>`_.
   MemoryAllocatorManager memory_allocator_manager = 41;
+
+  // If `true`, disable the new-handler function set by Envoy. Set to `true` when Envoy's
+  // new-handler function should not be used; e.g. when used as a library in an application that
+  // sets its own new-handler or prefers not to override the system defaults.
+  bool disable_new_handler = 42;
 }
 
 // Administration interface :ref:`operations documentation
