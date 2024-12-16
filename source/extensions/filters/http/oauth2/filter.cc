@@ -206,13 +206,14 @@ bool validateCsrfTokenHmac(const std::string& hmac_secret, const std::string& cs
 /**
  * Encodes the state parameter for the OAuth2 flow.
  * The state parameter is a base64Url encoded JSON object containing the original request URL and a
- * nonce for CSRF protection.
+ * CSRF token for CSRF protection.
  */
-std::string encodeState(const std::string& original_request_url, const std::string& nonce) {
+std::string encodeState(const std::string& original_request_url, const std::string& csrf_token) {
   std::string buffer;
   absl::string_view sanitized_url = Json::sanitize(buffer, original_request_url);
-  absl::string_view sanitized_nonce = Json::sanitize(buffer, nonce);
-  std::string json = fmt::format(R"({{"url":"{}","nonce":"{}"}})", sanitized_url, sanitized_nonce);
+  absl::string_view sanitized_csrf_token = Json::sanitize(buffer, csrf_token);
+  std::string json =
+      fmt::format(R"({{"url":"{}","nonce":"{}"}})", sanitized_url, sanitized_csrf_token);
   return Base64Url::encode(json.data(), json.size());
 }
 
@@ -521,23 +522,27 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   const std::string base_path = absl::StrCat(scheme, "://", host_);
   const std::string original_url = absl::StrCat(base_path, headers.Path()->value().getStringView());
 
-  // Encode the original request URL and the nonce to the state parameter.
-  // Generate a nonce to prevent CSRF attacks.
+  // First, check if the CSRF token cookie exists.
+  // The CSRF token cookie contains the CSRF token that is used to prevent CSRF attacks for the
+  // OAuth flow. It was named "oauth_nonce" because the CSRF token contains a generated nonce.
+  // "oauth_csrf_token" would be a more accurate name for the cookie.
   std::string csrf_token;
-  bool nonce_cookie_exists = false;
-  const auto nonce_cookie = Http::Utility::parseCookies(headers, [this](absl::string_view key) {
-    return key == config_->cookieNames().oauth_nonce_;
-  });
-  if (nonce_cookie.find(config_->cookieNames().oauth_nonce_) != nonce_cookie.end()) {
-    csrf_token = nonce_cookie.at(config_->cookieNames().oauth_nonce_);
-    nonce_cookie_exists = true;
+  bool csrf_token_cookie_exists = false;
+  const auto csrf_token_cookie =
+      Http::Utility::parseCookies(headers, [this](absl::string_view key) {
+        return key == config_->cookieNames().oauth_nonce_;
+      });
+  if (csrf_token_cookie.find(config_->cookieNames().oauth_nonce_) != csrf_token_cookie.end()) {
+    csrf_token = csrf_token_cookie.at(config_->cookieNames().oauth_nonce_);
+    csrf_token_cookie_exists = true;
   } else {
+    // Generate a CSRF token to prevent CSRF attacks.
     csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
   }
 
-  // Set the nonce cookie if it does not exist.
-  if (!nonce_cookie_exists) {
-    // Expire the nonce cookie in 10 minutes.
+  // Set the CSRF token cookie if it does not exist.
+  if (!csrf_token_cookie_exists) {
+    // Expire the CSRF token cookie in 10 minutes.
     // This should be enough time for the user to complete the OAuth flow.
     std::string expire_in = std::to_string(10 * 60);
     std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
@@ -550,8 +555,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
         absl::StrCat(config_->cookieNames().oauth_nonce_, "=", csrf_token, cookie_tail_http_only));
   }
 
-  // Validate the CSRF token HMAC if the nonce cookie exists.
-  if (nonce_cookie_exists && !validateCsrfTokenHmac(config_->hmacSecret(), csrf_token)) {
+  // Validate the CSRF token HMAC if the CSRF token cookie exists.
+  if (csrf_token_cookie_exists && !validateCsrfTokenHmac(config_->hmacSecret(), csrf_token)) {
     ENVOY_LOG(error, "Invalid CSRF token HMAC: {}", csrf_token);
     sendUnauthorizedResponse();
     return;
@@ -861,8 +866,8 @@ void OAuth2Filter::sendUnauthorizedResponse() {
 // Validates the OAuth callback request.
 // * Does the query parameters contain an error response?
 // * Does the query parameters contain the code and state?
-// * Does the state contain the original request URL and nonce?
-// * Does the nonce in the state match the nonce in the cookie?
+// * Does the state contain the original request URL and the CSRF token?
+// * Does the CSRF token in the state match the one in the cookie?
 CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                              const absl::string_view path_str) {
   // Return 401 unauthorized if the query parameters contain an error response.
@@ -881,8 +886,8 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   }
 
   // Return 401 unauthorized if the state query parameter does not contain the original request URL
-  // or nonce.
-  // Decode the state parameter to get the original request URL and nonce.
+  // or the CSRF token.
+  // Decode the state parameter to get the original request URL and the CSRF token.
   const std::string state = Base64Url::decode(stateVal.value());
   bool has_unknown_field;
   ProtobufWkt::Struct message;
@@ -895,18 +900,18 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
 
   const auto& filed_value_pair = message.fields();
   if (!filed_value_pair.contains(stateParamsUrl) || !filed_value_pair.contains(stateParamsNonce)) {
-    ENVOY_LOG(error, "state query param does not contain url or nonce: \n{}", state);
+    ENVOY_LOG(error, "state query param does not contain url or CSRF token: \n{}", state);
     return {false, "", ""};
   }
 
-  // Return 401 unauthorized if the nonce cookie does not match the nonce in the state.
+  // Return 401 unauthorized if the CSRF token cookie does not match the CSRF token in the state.
   //
   // This is to prevent attackers from injecting their own access token into a victim's
   // sessions via CSRF attack. The attack can result in victims saving their sensitive data
   // in the attacker's account.
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
-  std::string nonce = filed_value_pair.at(stateParamsNonce).string_value();
-  if (!validateCsrfToken(headers, nonce)) {
+  std::string csrf_token = filed_value_pair.at(stateParamsNonce).string_value();
+  if (!validateCsrfToken(headers, csrf_token)) {
     ENVOY_LOG(error, "csrf token validation failed");
     return {false, "", ""};
   }
@@ -922,7 +927,7 @@ CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::Request
   return {true, codeVal.value(), original_request_url};
 }
 
-// Validates the nonce in the state parameter against the nonce in the cookie.
+// Validates the csrf_token in the state parameter against the one in the cookie.
 bool OAuth2Filter::validateCsrfToken(const Http::RequestHeaderMap& headers,
                                      const std::string& csrf_token) const {
   const auto csrf_token_cookie =
