@@ -159,6 +159,9 @@ bug_fixes:
 - area: csrf
   change: |
     Handle requests that have a "privacy sensitive" / opaque origin (``Origin: null``) as if the request had no origin information.
+- area: udp_proxy
+  change: |
+    Fix a bug that cause Envoy to crash due to segmentation fault when onBelowWriteBufferLowWatermark callback is called.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

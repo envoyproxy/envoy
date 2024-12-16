@@ -279,12 +279,12 @@ UdpProxyFilter::createSession(Network::UdpRecvData::LocalPeerAddresses&& address
 UdpProxyFilter::ActiveSession*
 UdpProxyFilter::createSessionWithOptionalHost(Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                               const Upstream::HostConstSharedPtr& host) {
-  ActiveSessionPtr new_session;
+  ActiveSessionSharedPtr new_session;
   if (config_->tunnelingConfig()) {
     ASSERT(!host);
-    new_session = std::make_unique<TunnelingActiveSession>(*this, std::move(addresses));
+    new_session = std::make_shared<TunnelingActiveSession>(*this, std::move(addresses));
   } else {
-    new_session = std::make_unique<UdpActiveSession>(*this, std::move(addresses), host);
+    new_session = std::make_shared<UdpActiveSession>(*this, std::move(addresses), host);
   }
 
   if (!new_session->createFilterChain()) {
@@ -1109,17 +1109,23 @@ void UdpProxyFilter::TunnelingActiveSession::onAboveWriteBufferHighWatermark() {
 }
 
 void UdpProxyFilter::TunnelingActiveSession::onBelowWriteBufferLowWatermark() {
-  can_send_upstream_ = true;
-  flushBuffer();
+  filter_.read_callbacks_->udpListener().dispatcher().post(
+      [session = shared_from_this()]() { session->flushBuffer(); });
 }
 
 void UdpProxyFilter::TunnelingActiveSession::flushBuffer() {
+  if (!upstream_) {
+    return;
+  }
+
   while (!datagrams_buffer_.empty()) {
     BufferedDatagramPtr buffered_datagram = std::move(datagrams_buffer_.front());
     datagrams_buffer_.pop();
     buffered_bytes_ -= buffered_datagram->buffer_->length();
     upstream_->encodeData(*buffered_datagram->buffer_);
   }
+
+  can_send_upstream_ = true;
 }
 
 void UdpProxyFilter::TunnelingActiveSession::maybeBufferDatagram(Network::UdpRecvData& data) {
