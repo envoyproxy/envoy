@@ -332,6 +332,9 @@ new_features:
   change: |
     Added new health check filter stats including total requests, successful/failed checks, cached responses, and
     cluster health status counters. These stats help track health check behavior and cluster health state.
+- area: filters
+  change: |
+    Updatd the ``set_filter_state`` :ref:`filter <config_http_filters_set_filter_state>` to support per-route overrides.
 - area: grpc-json
   change: |
     Added a new http filter for :ref:`gRPC to JSON transcoding <config_http_filters_grpc_json_reverse_transcoder>`.
@@ -340,8 +343,12 @@ new_features:
     Added support for injecting custom Type-Length-Value (TLV) entries into the Proxy Protocol v2 header for upstream
     transport sockets. Custom TLVs can be defined both in the endpoint host's typed metadata under the
     ``envoy.transport_sockets.proxy_protocol`` namespace and at the configuration level via the `ProxyProtocolConfig`'s
-    `entries` field. Host-level TLV definitions override config-level entries when the same type is specified, allowing
+    ``entries`` field. Host-level TLV definitions override config-level entries when the same type is specified, allowing
     default TLVs to be set globally, while enabling further per-endpoint customizations.
+- area: attributes
+  change: |
+    added new ``xds.virtual_host_name`` and ``xds.virtual_host_metadata`` attributes support. See
+    :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
 
 deprecated:
 - area: rbac
