@@ -70,11 +70,12 @@ private:
 
 class PerHostHttpConnPool : public Extensions::Upstreams::Http::Http::HttpConnPool {
 public:
-  PerHostHttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+  PerHostHttpConnPool(Upstream::HostConstSharedPtr host,
+                      Upstream::ThreadLocalCluster& thread_local_cluster,
                       Upstream::ResourcePriority priority,
                       absl::optional<Envoy::Http::Protocol> downstream_protocol,
                       Upstream::LoadBalancerContext* ctx)
-      : HttpConnPool(thread_local_cluster, priority, downstream_protocol, ctx) {}
+      : HttpConnPool(host, thread_local_cluster, priority, downstream_protocol, ctx) {}
 
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
@@ -95,7 +96,8 @@ public:
   std::string name() const override { return "envoy.filters.connection_pools.http.per_host"; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+  createGenericConnPool(Upstream::HostConstSharedPtr host,
+                        Upstream::ThreadLocalCluster& thread_local_cluster,
                         Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
                         Upstream::ResourcePriority priority,
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,
@@ -105,7 +107,7 @@ public:
       return nullptr;
     }
     auto upstream_http_conn_pool = std::make_unique<PerHostHttpConnPool>(
-        thread_local_cluster, priority, downstream_protocol, ctx);
+        host, thread_local_cluster, priority, downstream_protocol, ctx);
     return (upstream_http_conn_pool->valid() ? std::move(upstream_http_conn_pool) : nullptr);
   }
 

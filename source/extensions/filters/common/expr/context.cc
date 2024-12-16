@@ -367,6 +367,21 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
              return CelValue::CreateStringView(
                  wrapper.info_.upstreamInfo().value().get().upstreamTransportFailureReason());
            }},
+          {UpstreamConnectionPoolReadyDuration,
+           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (!wrapper.info_.upstreamInfo().has_value()) {
+               return {};
+             }
+
+             const StreamInfo::UpstreamInfo& upstream_info = wrapper.info_.upstreamInfo().value();
+             const absl::optional<std::chrono::nanoseconds> connection_pool_callback_latency =
+                 upstream_info.upstreamTiming().connectionPoolCallbackLatency();
+             if (connection_pool_callback_latency.has_value()) {
+               return CelValue::CreateDuration(
+                   absl::FromChrono(connection_pool_callback_latency.value()));
+             }
+             return {};
+           }},
           {UpstreamRequestAttemptCount,
            [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
              return CelValue::CreateUint64(wrapper.info_.attemptCount().value_or(0));
@@ -422,6 +437,21 @@ const XDSLookupValues& XDSLookupValues::get() {
              }
              return CelProtoWrapper::CreateMessage(&wrapper.info_->route()->metadata(),
                                                    &wrapper.arena_);
+           }},
+          {VirtualHostName,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr || !wrapper.info_->route()) {
+               return {};
+             }
+             return CelValue::CreateString(&wrapper.info_->route()->virtualHost().name());
+           }},
+          {VirtualHostMetadata,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr || !wrapper.info_->route()) {
+               return {};
+             }
+             return CelProtoWrapper::CreateMessage(
+                 &wrapper.info_->route()->virtualHost().metadata(), &wrapper.arena_);
            }},
           {UpstreamHostMetadata,
            [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {

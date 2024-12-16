@@ -125,6 +125,7 @@ InstanceBase::~InstanceBase() {
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
   dispatcher_->shutdown();
+  ENVOY_LOG(debug, "shut down dispatcher");
 
 #ifdef ENVOY_PERFETTO
   if (tracing_session_ != nullptr) {
@@ -891,7 +892,7 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
       server.messageValidationContext().dynamicValidationVisitor(), server.api());
-  THROW_IF_NOT_OK(loader.status());
+  THROW_IF_NOT_OK_REF(loader.status());
   return std::move(loader.value());
 }
 

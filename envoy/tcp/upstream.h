@@ -169,6 +169,7 @@ public:
   ~GenericConnPoolFactory() override = default;
 
   /*
+   * @param host the host to connect to
    * @param thread_local_cluster the thread local cluster to use for conn pool creation.
    * @param config the tunneling config, if doing connect tunneling.
    * @param context the load balancing context for this connection.
@@ -176,13 +177,12 @@ public:
    * @param downstream_info is the downstream connection stream info.
    * @return may be null if there is no cluster with the given name.
    */
-  virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                        TunnelingConfigHelperOptConstRef config,
-                        Upstream::LoadBalancerContext* context,
-                        Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
-                        Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
-                        StreamInfo::StreamInfo& downstream_info) const PURE;
+  virtual GenericConnPoolPtr createGenericConnPool(
+      Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
+      TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
+      Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+      Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
+      StreamInfo::StreamInfo& downstream_info) const PURE;
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;

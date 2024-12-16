@@ -35,20 +35,21 @@ pep8-naming
 ply
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
 # `MessageFactory class is deprecated. Please use GetMessageClass() instead of MessageFactory.GetPrototype`
-protobuf<5.29.0
+protobuf<5.30.0
 pygithub
 pyopenssl>=24.2.1
 pyreadline
 pyyaml
 setuptools
 slack_sdk
-sphinx>=7,<7.5
+sphinx>=8.1.3
 sphinxcontrib-applehelp>=1.0.8
 sphinxcontrib-devhelp>=1.0.6
 sphinxcontrib.googleanalytics
 sphinxcontrib-htmlhelp>=2.0.5
 sphinxcontrib-qthelp>=1.0.7
 sphinxcontrib-serializinghtml>=1.1.10
+sphinx-rtd-theme>=3.0.2
 thrift
 verboselogs
 yapf

@@ -56,8 +56,8 @@ OptionsImplBase createTestOptionsImpl(
 class TestComponentFactory : public ComponentFactory {
 public:
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    return Server::DrainManagerPtr{new Server::DrainManagerImpl(
-        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher())};
+    return Server::DrainManagerPtr{
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY)};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
@@ -538,8 +538,8 @@ public:
 
   // Server::ComponentFactory
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    drain_manager_ = new Server::DrainManagerImpl(
-        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher());
+    drain_manager_ =
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
     return Server::DrainManagerPtr{drain_manager_};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,

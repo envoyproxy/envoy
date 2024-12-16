@@ -217,12 +217,14 @@ void HttpUpstream::doneWriting() {
   }
 }
 
-TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+TcpConnPool::TcpConnPool(Upstream::HostConstSharedPtr host,
+                         Upstream::ThreadLocalCluster& thread_local_cluster,
                          Upstream::LoadBalancerContext* context,
                          Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
                          StreamInfo::StreamInfo& downstream_info)
     : upstream_callbacks_(upstream_callbacks), downstream_info_(downstream_info) {
-  conn_pool_data_ = thread_local_cluster.tcpConnPool(Upstream::ResourcePriority::Default, context);
+  conn_pool_data_ =
+      thread_local_cluster.tcpConnPool(host, Upstream::ResourcePriority::Default, context);
 }
 
 TcpConnPool::~TcpConnPool() {
@@ -271,7 +273,8 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
       latched_data->connection().streamInfo().downstreamAddressProvider().sslConnection());
 }
 
-HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+HttpConnPool::HttpConnPool(Upstream::HostConstSharedPtr host,
+                           Upstream::ThreadLocalCluster& thread_local_cluster,
                            Upstream::LoadBalancerContext* context,
                            const TunnelingConfigHelper& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
@@ -288,17 +291,16 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
   if (Runtime::runtimeFeatureEnabled(
           "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
     absl::optional<Envoy::Http::Protocol> upstream_protocol = protocol;
-    generic_conn_pool_ = createConnPool(thread_local_cluster, context, upstream_protocol);
+    generic_conn_pool_ = createConnPool(host, thread_local_cluster, context, upstream_protocol);
     return;
   }
-  conn_pool_data_ =
-      thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, protocol, context);
+  conn_pool_data_ = thread_local_cluster.httpConnPool(host, Upstream::ResourcePriority::Default,
+                                                      protocol, context);
 }
 
-std::unique_ptr<Router::GenericConnPool>
-HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
-                             Upstream::LoadBalancerContext* context,
-                             absl::optional<Http::Protocol> protocol) {
+std::unique_ptr<Router::GenericConnPool> HttpConnPool::createConnPool(
+    Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& cluster,
+    Upstream::LoadBalancerContext* context, absl::optional<Http::Protocol> protocol) {
   Router::GenericConnPoolFactory* factory = nullptr;
   factory = Envoy::Config::Utility::getFactoryByName<Router::GenericConnPoolFactory>(
       "envoy.filters.connection_pools.http.generic");
@@ -307,7 +309,7 @@ HttpConnPool::createConnPool(Upstream::ThreadLocalCluster& cluster,
   }
 
   return factory->createGenericConnPool(
-      cluster, Envoy::Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
+      host, cluster, Envoy::Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
       decoder_filter_callbacks_->route()->routeEntry()->priority(), protocol, context);
 }
 

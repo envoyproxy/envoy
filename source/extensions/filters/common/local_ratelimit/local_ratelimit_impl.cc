@@ -83,6 +83,7 @@ TimerTokenBucket::TimerTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill
       // Calculate the fill rate in tokens per second.
       fill_rate_(tokens_per_fill /
                  std::chrono::duration_cast<std::chrono::duration<double>>(fill_interval).count()) {
+  ASSERT(multiplier_ != 0);
   tokens_ = max_tokens;
   fill_time_ = parent_.time_source_.monotonicTime();
 }
@@ -129,6 +130,7 @@ void TimerTokenBucket::onFillTimer(uint64_t refill_counter, double factor) {
   // descriptor refill interval over the global refill interval. For example,
   // if the descriptor refill interval is 150ms and the global refill
   // interval is 50ms, this descriptor is refilled every 3rd call.
+  ASSERT(multiplier_ != 0);
   if (refill_counter % multiplier_ != 0) {
     return;
   }
@@ -209,6 +211,12 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(descriptor.token_bucket(), tokens_per_fill, 1);
     const auto per_descriptor_fill_interval = std::chrono::milliseconds(
         PROTOBUF_GET_MS_OR_DEFAULT(descriptor.token_bucket(), fill_interval, 0));
+
+    // Validate that the descriptor's fill interval is logically correct (same
+    // constraint of >=50msec as for fill_interval).
+    if (per_descriptor_fill_interval < std::chrono::milliseconds(50)) {
+      throw EnvoyException("local rate limit descriptor token bucket fill timer must be >= 50ms");
+    }
 
     if (per_descriptor_fill_interval.count() % fill_interval.count() != 0) {
       throw EnvoyException(

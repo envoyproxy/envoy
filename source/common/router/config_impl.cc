@@ -1819,7 +1819,8 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
     const CommonConfigSharedPtr& global_route_config,
     Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
+    : name_(virtual_host.name()),
+      stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
       global_route_config_(global_route_config),
       per_filter_configs_(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),
@@ -2443,7 +2444,10 @@ PerFilterConfigs::createRouteSpecificFilterConfig(
   ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
   RETURN_IF_NOT_OK(
       Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config));
-  auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
+  auto object_status_or_error =
+      factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
+  RETURN_IF_NOT_OK(object_status_or_error.status());
+  auto object = std::move(*object_status_or_error);
   if (object == nullptr) {
     if (is_optional) {
       ENVOY_LOG(

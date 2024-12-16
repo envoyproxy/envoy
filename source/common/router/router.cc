@@ -66,10 +66,22 @@ constexpr uint64_t TimeoutPrecisionFactor = 100;
 
 } // namespace
 
+absl::StatusOr<std::unique_ptr<FilterConfig>>
+FilterConfig::create(Stats::StatName stat_prefix, Server::Configuration::FactoryContext& context,
+                     ShadowWriterPtr&& shadow_writer,
+                     const envoy::extensions::filters::http::router::v3::Router& config) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<FilterConfig>(
+      new FilterConfig(stat_prefix, context, std::move(shadow_writer), config, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            Server::Configuration::FactoryContext& context,
                            ShadowWriterPtr&& shadow_writer,
-                           const envoy::extensions::filters::http::router::v3::Router& config)
+                           const envoy::extensions::filters::http::router::v3::Router& config,
+                           absl::Status& creation_status)
     : FilterConfig(
           context.serverFactoryContext(), stat_prefix, context.serverFactoryContext().localInfo(),
           context.scope(), context.serverFactoryContext().clusterManager(),
@@ -94,10 +106,10 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
         config.upstream_log_options().upstream_log_flush_interval()));
   }
 
-  if (config.upstream_http_filters_size() > 0) {
-    auto& server_factory_ctx = context.serverFactoryContext();
-    const Http::FilterChainUtility::FiltersList& upstream_http_filters =
-        config.upstream_http_filters();
+  if (!config.upstream_http_filters().empty()) {
+    // TODO(wbpcode): To validate the terminal filter is upstream codec filter by the proto.
+    Server::Configuration::ServerFactoryContext& server_factory_ctx =
+        context.serverFactoryContext();
     std::shared_ptr<Http::UpstreamFilterConfigProviderManager> filter_config_provider_manager =
         Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
             server_factory_ctx);
@@ -108,8 +120,10 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
         helper(*filter_config_provider_manager, server_factory_ctx,
                context.serverFactoryContext().clusterManager(), *upstream_ctx_, prefix);
-    THROW_IF_NOT_OK(helper.processFilters(upstream_http_filters, "router upstream http",
-                                          "router upstream http", upstream_http_filter_factories_));
+    SET_AND_RETURN_IF_NOT_OK(helper.processFilters(config.upstream_http_filters(),
+                                                   "router upstream http", "router upstream http",
+                                                   upstream_http_filter_factories_),
+                             creation_status);
   }
 }
 
@@ -850,7 +864,13 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
       upstream_protocol = UpstreamProtocol::TCP;
     }
   }
-  return factory->createGenericConnPool(thread_local_cluster, upstream_protocol,
+
+  Upstream::HostConstSharedPtr host = thread_local_cluster.chooseHost(this);
+  if (!host) {
+    return nullptr;
+  }
+
+  return factory->createGenericConnPool(host, thread_local_cluster, upstream_protocol,
                                         route_entry_->priority(),
                                         callbacks_->streamInfo().protocol(), this);
 }

@@ -34,9 +34,8 @@ message UpstreamTlsContext {
   //
   // .. attention::
   //
-  //   Server certificate verification is not enabled by default. Configure
-  //   :ref:`trusted_ca<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>` to enable
-  //   verification.
+  //   Server certificate verification is not enabled by default. To enable verification, configure
+  //   :ref:`trusted_ca<envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
   CommonTlsContext common_tls_context = 1;
 
   // SNI string to use when creating TLS backend connections.
@@ -51,14 +50,13 @@ message UpstreamTlsContext {
   // interacts with other validation options.
   bool auto_host_sni = 6;
 
-  // If true, replace any Subject Alternative Name validations with a validation for a DNS SAN matching
-  // the SNI value sent. Note that the validation will be against the actual requested SNI, regardless of how it
-  // is configured.
+  // If true, replaces any Subject Alternative Name (SAN) validations with a validation for a DNS SAN matching
+  // the SNI value sent. The validation uses the actual requested SNI, regardless of how the SNI is configured.
   //
-  // For the common case where an SNI value is sent and it is expected that the server certificate contains a SAN
-  // matching that SNI value, this option will do the correct SAN validation.
+  // For common cases where an SNI value is present and the server certificate should include a corresponding SAN,
+  // this option ensures the SAN is properly validated.
   //
-  // See :ref:`validation configuration <start_quick_start_securing_validation>` for how this interacts with
+  // See the :ref:`validation configuration <start_quick_start_securing_validation>` for how this interacts with
   // other validation options.
   bool auto_sni_san_validation = 7;
 
@@ -70,16 +68,19 @@ message UpstreamTlsContext {
   bool allow_renegotiation = 3;
 
   // Maximum number of session keys (Pre-Shared Keys for TLSv1.3+, Session IDs and Session Tickets
-  // for TLSv1.2 and older) to store for the purpose of session resumption.
+  // for TLSv1.2 and older) to be stored for session resumption.
   //
   // Defaults to 1, setting this to 0 disables session resumption.
   google.protobuf.UInt32Value max_session_keys = 4;
 
-  // This field is used to control the enforcement, whereby the handshake will fail if the keyUsage extension
-  // is present and incompatible with the TLS usage. Currently, the default value is false (i.e., enforcement off)
-  // but it is expected to be changed to true by default in a future release.
-  // ``ssl.was_key_usage_invalid`` in :ref:`listener metrics <config_listener_stats>` will be set for certificate
-  // configurations that would fail if this option were set to true.
+  // Controls enforcement of the ``keyUsage`` extension in peer certificates. If set to ``true``, the handshake will fail if
+  // the ``keyUsage`` is incompatible with TLS usage.
+  //
+  // .. note::
+  //   The default value is ``false`` (i.e., enforcement off). It is expected to change to ``true`` in a future release.
+  //
+  // The ``ssl.was_key_usage_invalid`` in :ref:`listener metrics <config_listener_stats>` metric will be incremented
+  // for configurations that would fail if this option were enabled.
   google.protobuf.BoolValue enforce_rsa_key_usage = 5;
 }
 
@@ -89,24 +90,16 @@ message DownstreamTlsContext {
       "envoy.api.v2.auth.DownstreamTlsContext";
 
   enum OcspStaplePolicy {
-    // OCSP responses are optional. If an OCSP response is absent
-    // or expired, the associated certificate will be used for
-    // connections without an OCSP staple.
+    // OCSP responses are optional. If absent or expired, the certificate is used without stapling.
     LENIENT_STAPLING = 0;
 
-    // OCSP responses are optional. If an OCSP response is absent,
-    // the associated certificate will be used without an
-    // OCSP staple. If a response is provided but is expired,
-    // the associated certificate will not be used for
-    // subsequent connections. If no suitable certificate is found,
-    // the connection is rejected.
+    // OCSP responses are optional. If absent, the certificate is used without stapling. If present but expired,
+    // the certificate is not used for subsequent connections. Connections are rejected if no suitable certificate
+    // is found.
     STRICT_STAPLING = 1;
 
-    // OCSP responses are required. Configuration will fail if
-    // a certificate is provided without an OCSP response. If a
-    // response expires, the associated certificate will not be
-    // used connections. If no suitable certificate is found, the
-    // connection is rejected.
+    // OCSP responses are required. Connections fail if a certificate lacks a valid OCSP response. Expired responses
+    // prevent certificate use in new connections, and connections are rejected if no suitable certificate is available.
     MUST_STAPLE = 2;
   }
 
@@ -139,46 +132,54 @@ message DownstreamTlsContext {
     bool disable_stateless_session_resumption = 7;
   }
 
-  // If set to true, the TLS server will not maintain a session cache of TLS sessions. (This is
-  // relevant only for TLSv1.2 and earlier.)
+  // If ``true``, the TLS server will not maintain a session cache of TLS sessions.
+  //
+  // .. note::
+  //   This applies only to TLSv1.2 and earlier.
+  //
   bool disable_stateful_session_resumption = 10;
 
-  // If specified, ``session_timeout`` will change the maximum lifetime (in seconds) of the TLS session.
-  // Currently this value is used as a hint for the `TLS session ticket lifetime (for TLSv1.2) <https://tools.ietf.org/html/rfc5077#section-5.6>`_.
-  // Only seconds can be specified (fractional seconds are ignored).
+  // Maximum lifetime of TLS sessions. If specified, ``session_timeout`` will change the maximum lifetime
+  // of the TLS session.
+  //
+  // This serves as a hint for the `TLS session ticket lifetime (for TLSv1.2) <https://tools.ietf.org/html/rfc5077#section-5.6>`_.
+  // Only whole seconds are considered; fractional seconds are ignored.
   google.protobuf.Duration session_timeout = 6 [(validate.rules).duration = {
     lt {seconds: 4294967296}
     gte {}
   }];
 
-  // Config for whether to use certificates if they do not have
-  // an accompanying OCSP response or if the response expires at runtime.
-  // Defaults to LENIENT_STAPLING
+  // Configuration for handling certificates without an OCSP response or with expired responses.
+  //
+  // Defaults to ``LENIENT_STAPLING``
   OcspStaplePolicy ocsp_staple_policy = 8 [(validate.rules).enum = {defined_only: true}];
 
   // Multiple certificates are allowed in Downstream transport socket to serve different SNI.
-  // If the client provides SNI but no such cert matched, it will decide to full scan certificates or not based on this config.
-  // Defaults to false. See more details in :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>`.
+  // This option controls the behavior when no matching certificate is found for the received SNI value,
+  // or no SNI value was sent. If enabled, all certificates will be evaluated for a match for non-SNI criteria
+  // such as key type and OCSP settings. If disabled, the first provided certificate will be used.
+  // Defaults to ``false``. See more details in :ref:`Multiple TLS certificates <arch_overview_ssl_cert_select>`.
   google.protobuf.BoolValue full_scan_certs_on_sni_mismatch = 9;
 
-  // By default, Envoy as a server uses its preferred cipher during the handshake.
-  // Setting this to true would allow the downstream client's preferred cipher to be used instead.
-  // Has no effect when using TLSv1_3.
+  // If ``true``, the downstream client's preferred cipher is used during the handshake. If ``false``, Envoy
+  // uses its preferred cipher.
+  //
+  // .. note::
+  //   This has no effect when using TLSv1_3.
+  //
   bool prefer_client_ciphers = 11;
 }
 
 // TLS key log configuration.
 // The key log file format is "format used by NSS for its SSLKEYLOGFILE debugging output" (text taken from openssl man page)
 message TlsKeyLog {
-  // The path to save the TLS key log.
+  // Path to save the TLS key log.
   string path = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The local IP address that will be used to filter the connection which should save the TLS key log
-  // If it is not set, any local IP address  will be matched.
+  // Local IP address ranges to filter connections for TLS key logging. If not set, matches any local IP address.
   repeated config.core.v3.CidrRange local_address_range = 2;
 
-  // The remote IP address that will be used to filter the connection which should save the TLS key log
-  // If it is not set, any remote IP address will be matched.
+  // Remote IP address ranges to filter connections for TLS key logging. If not set, matches any remote IP address.
   repeated config.core.v3.CidrRange remote_address_range = 3;
 }
 
@@ -187,8 +188,8 @@ message TlsKeyLog {
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
-  // Config for Certificate provider to get certificates. This provider should allow certificates to be
-  // fetched/refreshed over the network asynchronously with respect to the TLS handshake.
+  // Config for the Certificate Provider to fetch certificates. Certificates are fetched/refreshed asynchronously over
+  // the network relative to the TLS handshake.
   //
   // DEPRECATED: This message is not currently used, but if we ever do need it, we will want to
   // move it out of CommonTlsContext and into common.proto, similar to the existing
@@ -281,7 +282,7 @@ message CommonTlsContext {
   // fetched/refreshed over the network asynchronously with respect to the TLS handshake.
   //
   // The same number and types of certificates as :ref:`tls_certificates <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_certificates>`
-  // are valid in the the certificates fetched through this setting.
+  // are valid in the certificates fetched through this setting.
   //
   // If ``tls_certificates`` or ``tls_certificate_provider_instance`` are set, this field
   // is ignored.
@@ -319,13 +320,17 @@ message CommonTlsContext {
     // fetched/refreshed over the network asynchronously with respect to the TLS handshake.
     SdsSecretConfig validation_context_sds_secret_config = 7;
 
-    // Combined certificate validation context holds a default CertificateValidationContext
-    // and SDS config. When SDS server returns dynamic CertificateValidationContext, both dynamic
-    // and default CertificateValidationContext are merged into a new CertificateValidationContext
-    // for validation. This merge is done by Message::MergeFrom(), so dynamic
-    // CertificateValidationContext overwrites singular fields in default
-    // CertificateValidationContext, and concatenates repeated fields to default
-    // CertificateValidationContext, and logical OR is applied to boolean fields.
+    // Combines the default ``CertificateValidationContext`` with the SDS-provided dynamic context for certificate
+    // validation.
+    //
+    // When the SDS server returns a dynamic ``CertificateValidationContext``, it is merged
+    // with the default context using ``Message::MergeFrom()``. The merging rules are as follows:
+    //
+    // * **Singular Fields:** Dynamic fields override the default singular fields.
+    // * **Repeated Fields:** Dynamic repeated fields are concatenated with the default repeated fields.
+    // * **Boolean Fields:** Boolean fields are combined using a logical OR operation.
+    //
+    // The resulting ``CertificateValidationContext`` is used to perform certificate validation.
     CombinedCertificateValidationContext combined_validation_context = 8;
 
     // Certificate provider for fetching validation context.

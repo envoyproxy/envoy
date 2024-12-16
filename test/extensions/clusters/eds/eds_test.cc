@@ -141,7 +141,10 @@ public:
   void initialize() {
     EXPECT_CALL(server_context_, timeSource()).WillRepeatedly(testing::ReturnRef(simTime()));
     EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
-    cluster_->initialize([this] { initialized_ = true; });
+    cluster_->initialize([this] {
+      initialized_ = true;
+      return absl::OkStatus();
+    });
   }
 
   void doOnConfigUpdateVerifyNoThrow(
@@ -2938,7 +2941,10 @@ public:
 
   void initialize() {
     EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
-    cluster_pre_->initialize([this] { initialized_ = true; });
+    cluster_pre_->initialize([this] {
+      initialized_ = true;
+      return absl::OkStatus();
+    });
   }
 
   void doOnConfigUpdateVerifyNoThrowPre(
@@ -2974,7 +2980,10 @@ public:
     eds_callbacks_post_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
 
     EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
-    cluster_post_->initialize([this] { initialized_post_ = true; });
+    cluster_post_->initialize([this] {
+      initialized_post_ = true;
+      return absl::OkStatus();
+    });
   }
 
   // Used for timeout emulation.
