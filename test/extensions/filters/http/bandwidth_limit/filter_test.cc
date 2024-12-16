@@ -25,7 +25,7 @@ public:
   void setup(const std::string& yaml) {
     envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit config;
     TestUtility::loadFromYaml(yaml, config);
-    absl::Status status;
+    absl::Status status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(config, *stats_.rootScope(), runtime_, time_system_,
                                              status, true);
     EXPECT_TRUE(status.ok());

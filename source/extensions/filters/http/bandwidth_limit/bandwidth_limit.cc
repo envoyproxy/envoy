@@ -57,6 +57,8 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
               : Http::LowerCaseString(absl::StrCat(config.response_trailer_prefix(), "-",
                                                    DefaultResponseFilterDelayTrailer.get()))),
       enable_response_trailers_(config.enable_response_trailers()) {
+  creation_status = absl::OkStatus();
+
   if (per_route && !config.has_limit_kbps()) {
     creation_status = absl::InvalidArgumentError("limit must be set for per route filter config");
     return;
