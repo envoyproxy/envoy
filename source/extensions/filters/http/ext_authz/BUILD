@@ -14,7 +14,7 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "ext_authz",
-    srcs = ["ext_authz.cc", "ttl_cache.cc"],
+    srcs = ["ext_authz.cc"],
     hdrs = ["ext_authz.h", "ttl_cache.h", "caches/cache.hpp", "caches/cache_policy.hpp", "caches/lru_cache_policy.hpp",],
     deps = [
         "//envoy/http:codes_interface",

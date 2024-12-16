@@ -69,7 +69,6 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
       clear_route_cache_(config.clear_route_cache()),
       max_request_bytes_(config.with_request_body().max_request_bytes()),
-
       // `pack_as_bytes_` should be true when configured with the HTTP service because there is no
       // difference to where the body is written in http requests, and a value of false here will
       // cause non UTF-8 body content to be changed when it doesn't need to.
@@ -119,6 +118,9 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       charge_cluster_response_stats_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
+
+      cache_(100, std::chrono::seconds(5)), // response cache
+
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
       ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
       ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),

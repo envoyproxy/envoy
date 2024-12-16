@@ -26,6 +26,13 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 
+// For response cache
+#include "source/extensions/filters/http/ext_authz/ttl_cache.h"
+#include "source/extensions/filters/http/ext_authz/caches/cache.hpp"
+#include "source/extensions/filters/http/ext_authz/caches/cache_policy.hpp"
+#include "source/extensions/filters/http/ext_authz/caches/lru_cache_policy.hpp"
+using ttl_cache_t = TTLCache<std::string, int, caches::LRUCachePolicy>;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -267,6 +274,10 @@ private:
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
+
+  // Response cache
+  ttl_cache_t cache_;
+
 
   Filters::Common::ExtAuthz::MatcherSharedPtr allowed_headers_matcher_;
   Filters::Common::ExtAuthz::MatcherSharedPtr disallowed_headers_matcher_;
