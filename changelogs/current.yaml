@@ -337,9 +337,11 @@ new_features:
     Added a new http filter for :ref:`gRPC to JSON transcoding <config_http_filters_grpc_json_reverse_transcoder>`.
 - area: proxy_protocol
   change: |
-    Added support for injecting custom TLVs into the Proxy Protocol v2 (PP2) header for upstream transport sockets.
-    This feature allows dynamic customization of PP2 headersby defining TLV key-value pairs in an endpoint host's
-    typed metadata under the ``envoy.transport_sockets.proxy_protocol`` namespace.
+    Added support for injecting custom Type-Length-Value (TLV) entries into the Proxy Protocol v2 header for upstream
+    transport sockets. Custom TLVs can be defined both in the endpoint host's typed metadata under the
+    ``envoy.transport_sockets.proxy_protocol`` namespace and at the configuration level via the `ProxyProtocolConfig`'s
+    `entries` field. Host-level TLV definitions override config-level entries when the same type is specified, allowing
+    default TLVs to be set globally, while enabling further per-endpoint customizations.
 
 deprecated:
 - area: rbac
