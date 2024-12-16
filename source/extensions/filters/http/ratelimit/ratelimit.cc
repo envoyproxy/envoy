@@ -55,6 +55,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     return;
   }
 
+  // Initialize route config if not already done.
+  maybeInitializeRouteConfig(callbacks_);
+
   Router::RouteConstSharedPtr route = callbacks_->route();
   if (!route || !route->routeEntry()) {
     return;
@@ -67,23 +70,29 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
-  const Router::RouteEntry* route_entry = route->routeEntry();
-  // Get all applicable rate limit policy entries for the route.
-  populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, headers);
+  if (route_config_ != nullptr && route_config_->hasRateLimitConfigs()) {
+    // TODO(wbpcode): may support merge the rate limit descriptors from the virtual host level
+    // configuration.
+    route_config_->populateDescriptors(headers, callbacks_->streamInfo(), descriptors);
+  } else {
+    const Router::RouteEntry* route_entry = route->routeEntry();
+    // Get all applicable rate limit policy entries for the route.
+    populateRateLimitDescriptors(route_entry->rateLimitPolicy(), descriptors, headers);
 
-  VhRateLimitOptions vh_rate_limit_option = getVirtualHostRateLimitOption(route);
+    VhRateLimitOptions vh_rate_limit_option = getVirtualHostRateLimitOption(route);
 
-  switch (vh_rate_limit_option) {
-  case VhRateLimitOptions::Ignore:
-    break;
-  case VhRateLimitOptions::Include:
-    populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
-    break;
-  case VhRateLimitOptions::Override:
-    if (route_entry->rateLimitPolicy().empty()) {
+    switch (vh_rate_limit_option) {
+    case VhRateLimitOptions::Ignore:
+      break;
+    case VhRateLimitOptions::Include:
       populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
+      break;
+    case VhRateLimitOptions::Override:
+      if (route_entry->rateLimitPolicy().empty()) {
+        populateRateLimitDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
+      }
+      break;
     }
-    break;
   }
 
   const StreamInfo::UInt32Accessor* hits_addend_filter_state =
@@ -300,10 +309,8 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
   if (route->routeEntry()->includeVirtualHostRateLimits()) {
     vh_rate_limits_ = VhRateLimitOptions::Include;
   } else {
-    const auto* specific_per_route_config =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
-    if (specific_per_route_config != nullptr) {
-      switch (specific_per_route_config->virtualHostRateLimits()) {
+    if (route_config_ != nullptr) {
+      switch (route_config_->virtualHostRateLimits()) {
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE:
         vh_rate_limits_ = VhRateLimitOptions::Include;
         break;
@@ -322,12 +329,19 @@ VhRateLimitOptions Filter::getVirtualHostRateLimitOption(const Router::RouteCons
 }
 
 std::string Filter::getDomain() {
-  const auto* specific_per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
-  if (specific_per_route_config != nullptr && !specific_per_route_config->domain().empty()) {
-    return specific_per_route_config->domain();
+  if (route_config_ != nullptr && !route_config_->domain().empty()) {
+    return route_config_->domain();
   }
   return config_->domain();
+}
+
+void Filter::maybeInitializeRouteConfig(Http::StreamFilterCallbacks* callbacks) {
+  if (route_config_initialized_) {
+    return;
+  }
+  route_config_initialized_ = true;
+  route_config_ =
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks);
 }
 
 } // namespace RateLimitFilter
