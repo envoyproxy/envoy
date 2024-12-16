@@ -135,12 +135,12 @@ filterStateObjectMatcherFromProto(const envoy::type::matcher::v3::FilterStateMat
         std::make_unique<const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
             matcher.string_match(), context));
     break;
-  case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kIpRange: {
-    auto ip_range = Network::Address::CidrRange::create(matcher.ip_range());
-    if (!ip_range.ok()) {
-      return ip_range.status();
+  case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kAddressMatch: {
+    auto ip_list = Network::Address::IpList::create(matcher.address_match().range());
+    if (!ip_list.ok()) {
+      return ip_list.status();
     }
-    return std::make_unique<FilterStateIpRangeMatcher>(*ip_range);
+    return std::make_unique<FilterStateIpRangeMatcher>(std::move(*ip_list));
     break;
   }
   default:

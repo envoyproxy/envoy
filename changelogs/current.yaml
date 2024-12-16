@@ -337,9 +337,9 @@ new_features:
     Added a new http filter for :ref:`gRPC to JSON transcoding <config_http_filters_grpc_json_reverse_transcoder>`.
 - area: matchers
   change: |
-    Added new filter state matcher `ip_range` to
+    Added new filter state matcher ip_range to
     :ref:`FilterStateMatcher <envoy_api_msg_type.matcher.FilterStateMatcher>` which attempts to
-    cast the filter state object to an IP and match it against a CIDR range.
+    cast the filter state object to an IP and match it against a list of CidrRanges
 
 deprecated:
 - area: rbac

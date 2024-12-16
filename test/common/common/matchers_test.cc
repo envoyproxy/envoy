@@ -603,13 +603,17 @@ TEST_F(FilterStateMatcher, MatchFilterState) {
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
 }
 
-TEST_F(FilterStateMatcher, MatchFilterStateIpRangeIpv4) {
+TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv4) {
   const std::string key = "test.key";
   const std::string value = "exact_value";
   envoy::type::matcher::v3::FilterStateMatcher matcher;
   matcher.set_key(key);
-  matcher.mutable_ip_range()->set_address_prefix("4.5.6.7");
-  matcher.mutable_ip_range()->mutable_prefix_len()->set_value(32);
+  auto* cidrv4 = matcher.mutable_address_match()->add_range();
+  cidrv4->set_address_prefix("4.5.6.7");
+  cidrv4->mutable_prefix_len()->set_value(32);
+  auto* cidrv6 = matcher.mutable_address_match()->add_range();
+  cidrv6->set_address_prefix("2001:db8::");
+  cidrv6->mutable_prefix_len()->set_value(32);
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
@@ -623,13 +627,17 @@ TEST_F(FilterStateMatcher, MatchFilterStateIpRangeIpv4) {
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
 }
 
-TEST_F(FilterStateMatcher, NoMatchFilterStateIpRangeIpv4) {
+TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv4) {
   const std::string key = "test.key";
   const std::string value = "exact_value";
   envoy::type::matcher::v3::FilterStateMatcher matcher;
   matcher.set_key(key);
-  matcher.mutable_ip_range()->set_address_prefix("4.5.6.7");
-  matcher.mutable_ip_range()->mutable_prefix_len()->set_value(32);
+  auto* cidrv4 = matcher.mutable_address_match()->add_range();
+  cidrv4->set_address_prefix("4.5.6.7");
+  cidrv4->mutable_prefix_len()->set_value(32);
+  auto* cidrv6 = matcher.mutable_address_match()->add_range();
+  cidrv6->set_address_prefix("2001:db8::");
+  cidrv6->mutable_prefix_len()->set_value(32);
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
@@ -643,13 +651,17 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateIpRangeIpv4) {
   EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
-TEST_F(FilterStateMatcher, MatchFilterStateIpRangeIpv6) {
+TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv6) {
   const std::string key = "test.key";
   const std::string value = "exact_value";
   envoy::type::matcher::v3::FilterStateMatcher matcher;
   matcher.set_key(key);
-  matcher.mutable_ip_range()->set_address_prefix("2001:db8::");
-  matcher.mutable_ip_range()->mutable_prefix_len()->set_value(32);
+  auto* cidrv4 = matcher.mutable_address_match()->add_range();
+  cidrv4->set_address_prefix("4.5.6.7");
+  cidrv4->mutable_prefix_len()->set_value(32);
+  auto* cidrv6 = matcher.mutable_address_match()->add_range();
+  cidrv6->set_address_prefix("2001:db8::");
+  cidrv6->mutable_prefix_len()->set_value(32);
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
@@ -663,13 +675,17 @@ TEST_F(FilterStateMatcher, MatchFilterStateIpRangeIpv6) {
   EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
 }
 
-TEST_F(FilterStateMatcher, NoMatchFilterStateIpRangeIpv6) {
+TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
   const std::string key = "test.key";
   const std::string value = "exact_value";
   envoy::type::matcher::v3::FilterStateMatcher matcher;
   matcher.set_key(key);
-  matcher.mutable_ip_range()->set_address_prefix("2001:db8::");
-  matcher.mutable_ip_range()->mutable_prefix_len()->set_value(32);
+  auto* cidrv4 = matcher.mutable_address_match()->add_range();
+  cidrv4->set_address_prefix("4.5.6.7");
+  cidrv4->mutable_prefix_len()->set_value(32);
+  auto* cidrv6 = matcher.mutable_address_match()->add_range();
+  cidrv6->set_address_prefix("2001:db8::");
+  cidrv6->mutable_prefix_len()->set_value(32);
 
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(

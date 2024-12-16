@@ -28,7 +28,11 @@ message FilterStateMatcher {
     // Matches the filter state object as a string value.
     StringMatcher string_match = 2;
 
-    // Matchers the filter state object as a ip Instance.
-    xds.core.v3.CidrRange ip_range = 3;
+    // Matches the filter state object as a ip Instance.
+    RepeatedCidrRange address_match = 3;
   }
+}
+
+message RepeatedCidrRange {
+  repeated xds.core.v3.CidrRange range = 1;
 }

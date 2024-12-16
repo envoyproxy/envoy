@@ -12,8 +12,8 @@
 namespace Envoy {
 namespace Matchers {
 
-FilterStateIpRangeMatcher::FilterStateIpRangeMatcher(const Network::Address::CidrRange& cidr_range)
-    : cidr_range_(cidr_range) {}
+FilterStateIpRangeMatcher::FilterStateIpRangeMatcher(std::unique_ptr<Network::Address::IpList>&& ip_list)
+    : ip_list_(std::move(ip_list)) {}
 
 bool FilterStateIpRangeMatcher::match(const StreamInfo::FilterState::Object& object) const {
   const Network::Address::InstanceConstSharedPtrAccessor* ip =
@@ -21,7 +21,7 @@ bool FilterStateIpRangeMatcher::match(const StreamInfo::FilterState::Object& obj
   if (ip == nullptr) {
     return false;
   }
-  return cidr_range_.isInRange(*ip->getIp());
+  return ip_list_->contains(*ip->getIp());
 }
 
 FilterStateStringMatcher::FilterStateStringMatcher(StringMatcherPtr&& string_matcher)
