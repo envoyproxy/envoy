@@ -108,7 +108,10 @@ protected:
             membership_updated_.ready();
             return absl::OkStatus();
           });
-      cluster_->initialize([&]() -> void { initialized_.ready(); });
+      cluster_->initialize([&]() -> void {
+        initialized_.ready();
+        return absl::OkStatus();
+      });
     } else {
       // the Event::MockTimer constructor creates EXPECT_CALL for the dispatcher.
       // If we want cluster creation to fail, there won't be a cluster to create the timer,
