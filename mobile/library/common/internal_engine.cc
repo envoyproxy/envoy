@@ -156,6 +156,9 @@ envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> opti
         Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
           ASSERT(Thread::MainThread::isMainOrTestThread());
 
+          // StrippedMainBase sets the `new` handler but in Envoy Mobile, the application using it
+          // should control malloc failure behavior, so it's set to nullptr.
+          std::set_new_handler(nullptr);
           Envoy::Server::GenericFactoryContextImpl generic_context(
               server_->serverFactoryContext(),
               server_->serverFactoryContext().messageValidationVisitor());
