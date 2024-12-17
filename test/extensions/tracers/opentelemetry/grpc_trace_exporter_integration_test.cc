@@ -123,6 +123,7 @@ TEST_P(OpenTelemetryTraceExporterIntegrationTest, GrpcExporter) {
   ASSERT_TRUE(grpc_receiver_upstream_->waitForHttpConnection(*dispatcher_, connection, timeout));
 
   std::map<std::string, int> name_counts;
+  std::vector<FakeStreamPtr> streams;
   for (auto i = 0; i < num_expected_exports; i++) {
     FakeStreamPtr stream;
     ASSERT_TRUE(connection->waitForNewStream(*dispatcher_, stream, timeout))
@@ -141,6 +142,7 @@ TEST_P(OpenTelemetryTraceExporterIntegrationTest, GrpcExporter) {
       ++name_counts[req.resource_spans(0).scope_spans(0).spans().at(j).name()];
     }
     ASSERT_TRUE(stream->waitForEndStream(*dispatcher_, timeout));
+    streams.push_back(std::move(stream));
   }
 
   ASSERT_TRUE(connection->close(timeout));
