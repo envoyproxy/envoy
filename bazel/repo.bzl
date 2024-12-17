@@ -1,7 +1,5 @@
 # `@envoy_repo` repository rule for managing the repo and querying its metadata.
 
-# ARB CHANGE
-
 def _envoy_repo_impl(repository_ctx):
     """This provides information about the Envoy repository
 
