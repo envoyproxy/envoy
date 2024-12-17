@@ -22,8 +22,8 @@ namespace {
 
 // Shared helper for recording the latest filter used.
 template <class Filters>
-void recordLatestDataFilter(typename Filters::Iterator current_filter, Filters& filters,
-                            typename Filters::Element*& latest_filter) {
+void recordLatestDataFilter(typename Filters::Iterator current_filter,
+                            typename Filters::Element*& latest_filter, Filters& filters) {
   // If this is the first time we're calling onData, just record the current filter.
   if (latest_filter == nullptr) {
     latest_filter = current_filter->get();
@@ -699,7 +699,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
 
-    recordLatestDataFilter(entry, decoder_filters_, state_.latest_data_decoding_filter_);
+    recordLatestDataFilter(entry, state_.latest_data_decoding_filter_, decoder_filters_);
 
     state_.filter_call_state_ |= FilterCallState::DecodeData;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.requestTrailers();
@@ -1426,7 +1426,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
 
-    recordLatestDataFilter(entry, encoder_filters_, state_.latest_data_encoding_filter_);
+    recordLatestDataFilter(entry, state_.latest_data_encoding_filter_, encoder_filters_);
 
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.responseTrailers();
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
