@@ -1,7 +1,7 @@
 load("@build_bazel_apple_support//lib:repositories.bzl", "apple_support_dependencies")
 load("@build_bazel_rules_apple//apple:repositories.bzl", "apple_rules_dependencies")
 load("@build_bazel_rules_swift//swift:repositories.bzl", "swift_rules_dependencies")
-load("@io_bazel_rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
+load("@rules_kotlin//kotlin:repositories.bzl", "kotlin_repositories")
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
 load("@rules_detekt//detekt:dependencies.bzl", "rules_detekt_dependencies")
 load("@rules_java//java:repositories.bzl", "rules_java_dependencies")
