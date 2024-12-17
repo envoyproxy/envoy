@@ -608,10 +608,10 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv4) {
   const std::string value = "exact_value";
   envoy::type::matcher::v3::FilterStateMatcher matcher;
   matcher.set_key(key);
-  auto* cidrv4 = matcher.mutable_address_match()->add_range();
+  auto* cidrv4 = matcher.mutable_address_match()->add_ranges();
   cidrv4->set_address_prefix("4.5.6.7");
   cidrv4->mutable_prefix_len()->set_value(32);
-  auto* cidrv6 = matcher.mutable_address_match()->add_range();
+  auto* cidrv6 = matcher.mutable_address_match()->add_ranges();
   cidrv6->set_address_prefix("2001:db8::");
   cidrv6->mutable_prefix_len()->set_value(32);
 
@@ -632,10 +632,10 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv4) {
   const std::string value = "exact_value";
   envoy::type::matcher::v3::FilterStateMatcher matcher;
   matcher.set_key(key);
-  auto* cidrv4 = matcher.mutable_address_match()->add_range();
+  auto* cidrv4 = matcher.mutable_address_match()->add_ranges();
   cidrv4->set_address_prefix("4.5.6.7");
   cidrv4->mutable_prefix_len()->set_value(32);
-  auto* cidrv6 = matcher.mutable_address_match()->add_range();
+  auto* cidrv6 = matcher.mutable_address_match()->add_ranges();
   cidrv6->set_address_prefix("2001:db8::");
   cidrv6->mutable_prefix_len()->set_value(32);
 
@@ -656,10 +656,10 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv6) {
   const std::string value = "exact_value";
   envoy::type::matcher::v3::FilterStateMatcher matcher;
   matcher.set_key(key);
-  auto* cidrv4 = matcher.mutable_address_match()->add_range();
+  auto* cidrv4 = matcher.mutable_address_match()->add_ranges();
   cidrv4->set_address_prefix("4.5.6.7");
   cidrv4->mutable_prefix_len()->set_value(32);
-  auto* cidrv6 = matcher.mutable_address_match()->add_range();
+  auto* cidrv6 = matcher.mutable_address_match()->add_ranges();
   cidrv6->set_address_prefix("2001:db8::");
   cidrv6->mutable_prefix_len()->set_value(32);
 
@@ -680,10 +680,10 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
   const std::string value = "exact_value";
   envoy::type::matcher::v3::FilterStateMatcher matcher;
   matcher.set_key(key);
-  auto* cidrv4 = matcher.mutable_address_match()->add_range();
+  auto* cidrv4 = matcher.mutable_address_match()->add_ranges();
   cidrv4->set_address_prefix("4.5.6.7");
   cidrv4->mutable_prefix_len()->set_value(32);
-  auto* cidrv6 = matcher.mutable_address_match()->add_range();
+  auto* cidrv6 = matcher.mutable_address_match()->add_ranges();
   cidrv6->set_address_prefix("2001:db8::");
   cidrv6->mutable_prefix_len()->set_value(32);
 

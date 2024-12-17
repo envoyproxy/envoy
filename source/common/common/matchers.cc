@@ -136,7 +136,7 @@ filterStateObjectMatcherFromProto(const envoy::type::matcher::v3::FilterStateMat
             matcher.string_match(), context));
     break;
   case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kAddressMatch: {
-    auto ip_list = Network::Address::IpList::create(matcher.address_match().range());
+    auto ip_list = Network::Address::IpList::create(matcher.address_match().ranges());
     if (!ip_list.ok()) {
       return ip_list.status();
     }
