@@ -452,6 +452,12 @@ def _net_zlib():
         actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
+    # Bind for protobuf.
+    native.bind(
+        name = "zlib",
+        actual = "@envoy//bazel/foreign_cc:zlib",
+    )
+
 def _com_github_zlib_ng_zlib_ng():
     external_http_archive(
         name = "com_github_zlib_ng_zlib_ng",
