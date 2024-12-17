@@ -946,9 +946,6 @@ protected:
 
   State& state() { return state_; }
 
-  void recordLatestDataFilter(ActiveStreamEncoderFilter* current_filter);
-  void recordLatestDataFilter(ActiveStreamDecoderFilter* current_filter);
-
 private:
   friend class DownstreamFilterManager;
   class FilterChainFactoryCallbacksImpl : public Http::FilterChainFactoryCallbacks {
@@ -979,7 +976,8 @@ private:
       //     - A
       //     - B
       //     - C
-      // The encoder filter chain will iterate through filters C, B, A.
+      // Different with decoder filter, the encoder filter chain will iterate with the
+      // reverse order of the configured filters, i.e., C, B, A.
       manager_.encoder_filters_.emplace_back(
           std::make_unique<ActiveStreamEncoderFilter>(manager_, std::move(filter), context_));
     }

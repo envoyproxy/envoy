@@ -18,12 +18,15 @@
 namespace Envoy {
 namespace Http {
 
-void FilterManager::recordLatestDataFilter(ActiveStreamDecoderFilter* current_filter) {
-  ASSERT(current_filter != nullptr);
+namespace {
 
+// Shared helper for recording the latest filter used.
+template <class Iterator, class Filter>
+void recordLatestDataFilter(const Iterator current_filter, const Iterator begin_filter,
+                            Filter*& latest_filter) {
   // If this is the first time we're calling onData, just record the current filter.
-  if (state_.latest_data_decoding_filter_ == nullptr) {
-    state_.latest_data_decoding_filter_ = current_filter;
+  if (latest_filter == nullptr) {
+    latest_filter = current_filter->get();
     return;
   }
 
@@ -37,36 +40,12 @@ void FilterManager::recordLatestDataFilter(ActiveStreamDecoderFilter* current_fi
   // correctly iterate over the filters and set latest, but on subsequent onData iterations
   // we'd start from the beginning again, potentially allowing filter N to modify the buffer even
   // though filter M > N was the filter that inserted data into the buffer.
-  if (std::distance(decoder_filters_.begin(), current_filter->entry()) >
-      std::distance(decoder_filters_.begin(), state_.latest_data_decoding_filter_->entry())) {
-    state_.latest_data_decoding_filter_ = current_filter;
+  if (current_filter != begin_filter && latest_filter == std::prev(current_filter)->get()) {
+    latest_filter = current_filter->get();
   }
 }
 
-void FilterManager::recordLatestDataFilter(ActiveStreamEncoderFilter* current_filter) {
-  ASSERT(current_filter != nullptr);
-
-  // If this is the first time we're calling onData, just record the current filter.
-  if (state_.latest_data_encoding_filter_ == nullptr) {
-    state_.latest_data_encoding_filter_ = current_filter;
-    return;
-  }
-
-  // We want to keep this pointing at the latest filter in the filter list that has received the
-  // onData callback. To do so, we compare the current latest with the *previous* filter. If they
-  // match, then we must be processing a new filter for the first time. We omit this check if we're
-  // the first filter, since the above check handles that case.
-  //
-  // We compare against the previous filter to avoid multiple filter iterations from resetting the
-  // pointer: If we just set latest to current, then the first onData filter iteration would
-  // correctly iterate over the filters and set latest, but on subsequent onData iterations
-  // we'd start from the beginning again, potentially allowing filter N to modify the buffer even
-  // though filter M > N was the filter that inserted data into the buffer.
-  if (std::distance(encoder_filters_.rbegin(), current_filter->entry()) >
-      std::distance(encoder_filters_.rbegin(), state_.latest_data_encoding_filter_->entry())) {
-    state_.latest_data_encoding_filter_ = current_filter;
-  }
-}
+} // namespace
 
 void ActiveStreamFilterBase::commonContinue() {
   if (!canContinue()) {
@@ -720,7 +699,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
 
-    recordLatestDataFilter(entry->get());
+    recordLatestDataFilter(entry, decoder_filters_.begin(), state_.latest_data_decoding_filter_);
 
     state_.filter_call_state_ |= FilterCallState::DecodeData;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.requestTrailers();
@@ -1447,7 +1426,7 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
 
-    recordLatestDataFilter(entry->get());
+    recordLatestDataFilter(entry, encoder_filters_.rbegin(), state_.latest_data_encoding_filter_);
 
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.responseTrailers();
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
