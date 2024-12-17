@@ -14,7 +14,7 @@ import (
 const Name = "http2dubbo-by-golang-extension"
 
 func init() {
-	tcp.RegisterTcpUpstreamFactoryAndConfigParser(Name, filterFactory, &parser{})
+	tcp.RegisterHttpTcpBridgeFactoryAndConfigParser(Name, filterFactory, &parser{})
 }
 
 type config struct {
@@ -74,12 +74,12 @@ func (p *parser) Merge(parentConfig interface{}, childConfig interface{}) interf
 	return childConfig
 }
 
-func filterFactory(c interface{}, callbacks api.TcpUpstreamCallbackHandler) api.TcpUpstreamFilter {
+func filterFactory(c interface{}, callbacks api.HttpTcpBridgeCallbackHandler) api.HttpTcpBridge {
 	conf, ok := c.(*config)
 	if !ok {
 		panic("unexpected config type")
 	}
-	return &tcpUpstreamFilter{
+	return &httpTcpBridge{
 		callbacks: callbacks,
 		config:    conf,
 	}

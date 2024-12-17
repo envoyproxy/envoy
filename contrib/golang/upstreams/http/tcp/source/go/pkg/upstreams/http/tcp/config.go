@@ -34,7 +34,6 @@ import "C"
 import (
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -46,13 +45,10 @@ import (
 var (
 	configNumGenerator uint64
 	configCache        = &sync.Map{} // uint64 -> config(interface{})
-	// From get a cached merged_config_id_ in getMergedConfigId on the C++ side,
-	// to get the merged config by the id on the Go side, 2 seconds should be long enough.
-	delayDeleteTime = time.Second * 2 // 2s
 )
 
-//export envoyGoOnTcpUpstreamConfig
-func envoyGoOnTcpUpstreamConfig(c *C.httpConfig) uint64 {
+//export envoyGoHttpTcpBridgeOnConfig
+func envoyGoHttpTcpBridgeOnConfig(c *C.httpConfig) uint64 {
 	buf := utils.BytesToSlice(uint64(c.config_ptr), uint64(c.config_len))
 	var any anypb.Any
 	proto.Unmarshal(buf, &any)
@@ -60,14 +56,14 @@ func envoyGoOnTcpUpstreamConfig(c *C.httpConfig) uint64 {
 	configNum := atomic.AddUint64(&configNumGenerator, 1)
 
 	name := utils.BytesToString(uint64(c.plugin_name_ptr), uint64(c.plugin_name_len))
-	configParser := getTcpUpstreamConfigParser(name)
+	configParser := getHttpTcpBridgeConfigParser(name)
 
 	var parsedConfig interface{}
 	var err error
 	parsedConfig, err = configParser.Parse(&any)
 
 	if err != nil {
-		api.LogErrorf("go side: golang http1-tcp bridge: failed to parse golang plugin config: %v", err)
+		api.LogErrorf("go side: golang http-tcp bridge: failed to parse golang plugin config: %v", err)
 		return 0
 	}
 	configCache.Store(configNum, parsedConfig)
@@ -75,7 +71,7 @@ func envoyGoOnTcpUpstreamConfig(c *C.httpConfig) uint64 {
 	return configNum
 }
 
-//export envoyGoTcpUpstreamDestroyPluginConfig
-func envoyGoTcpUpstreamDestroyPluginConfig(id uint64) {
+//export envoyGoHttpTcpBridgeDestroyPluginConfig
+func envoyGoHttpTcpBridgeDestroyPluginConfig(id uint64) {
 	configCache.Delete(id)
 }

@@ -23,7 +23,7 @@ namespace Http {
 namespace Tcp {
 namespace Golang {
 
-class TcpUpstream;
+class HttpTcpBridge;
 
 /**
   * This describes the processor state.
@@ -41,13 +41,11 @@ enum class FilterState {
   ProcessingData,
   // All done
   Done,
-  // PANIC
-  Panic,
 };
 /**
   * An enum specific for Golang status.
 */
-enum class TcpUpstreamStatus {
+enum class HttpTcpBridgeStatus {
   /** 
   * Area of status: encodeHeaders, encodeData, onUpstreamData
   *
@@ -58,7 +56,7 @@ enum class TcpUpstreamStatus {
   * encodeData: streaming send data to upstream, go side get each_data_piece, may be called multipled times.
   * onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
   */
-  TcpUpstreamContinue,
+  HttpTcpBridgeContinue,
 
   /** 
   * Area of status: encodeHeaders, encodeData, onUpstreamData
@@ -70,7 +68,7 @@ enum class TcpUpstreamStatus {
   * encodeData: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot be used when end_stream=true)
   * onUpstreamData: every data trigger will call go side, and go side get whloe buffered data ever since at every time.
   */
-  TcpUpstreamStopAndBuffer,
+  HttpTcpBridgeStopAndBuffer,
 
   /** Area of status: onUpstreamData
   *
@@ -79,7 +77,7 @@ enum class TcpUpstreamStatus {
   * Here is the specific explanation in different funcs:
   * onUpstreamData: endStream to downstream which means the whole resp to http has finished.
   */
-  TcpUpstreamEndStream,
+  HttpTcpBridgeEndStream,
 };
 
 class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
@@ -110,10 +108,9 @@ public:
   // get state buffer
   Buffer::Instance& getBufferData() { return *data_buffer_.get(); };
   bool isBufferDataEmpty() { return data_buffer_ == nullptr || data_buffer_->length() == 0; };
-  void drainBufferData();
 
-  void handleHeaderGolangStatus(TcpUpstreamStatus status);
-  void handleDataGolangStatus(const TcpUpstreamStatus status, bool end_stream);
+  void handleHeaderGolangStatus(HttpTcpBridgeStatus status);
+  void handleDataGolangStatus(const HttpTcpBridgeStatus status, bool end_stream);
 
 protected:
   Buffer::InstancePtr data_buffer_{nullptr};
@@ -122,7 +119,7 @@ protected:
 
 class EncodingProcessorState : public ProcessorState {
 public:
-  EncodingProcessorState(TcpUpstream& tcp_upstream);
+  EncodingProcessorState(HttpTcpBridge& http_tcp_bridge);
 
   // store request header for http
   const Envoy::Http::RequestHeaderMap* req_headers{nullptr};
@@ -130,7 +127,7 @@ public:
 
 class DecodingProcessorState : public ProcessorState {
 public:
-  DecodingProcessorState(TcpUpstream& tcp_upstream);
+  DecodingProcessorState(HttpTcpBridge& http_tcp_bridge);
   
   // store response header for http
   std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers{nullptr};

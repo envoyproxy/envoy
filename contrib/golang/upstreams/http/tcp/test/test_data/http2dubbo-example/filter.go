@@ -26,10 +26,10 @@ const (
 	GrayInterfaceName    = "com.alibaba.nacos.example.dubbo.service.DemoService"
 )
 
-type tcpUpstreamFilter struct {
-	api.EmptyTcpUpstreamFilter
+type httpTcpBridge struct {
+	api.PassThroughHttpTcpBridge
 
-	callbacks api.TcpUpstreamCallbackHandler
+	callbacks api.HttpTcpBridgeCallbackHandler
 	config    *config
 
 	dubboMethod    string
@@ -48,13 +48,13 @@ type tcpUpstreamFilter struct {
   - @param bufferForUpstreamData supplies data to be set for sending to upstream.
   - @param endOfStream if end of stream.
   - @return api.SendDataStatus tell c++ side next action:
-    1.TcpUpstreamContinue: will go to encodeData, encodeData will streaming get each_data_piece.
-    2.TcpUpstreamStopAndBuffer: will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole data one-off.
-    3.TcpUpstreamSendData: directly send data to upstream, and encodeData will not be called even when downstream_req has body.
+    1.HttpTcpBridgeContinue: will go to encodeData, encodeData will streaming get each_data_piece.
+    2.HttpTcpBridgeStopAndBuffer: will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole data one-off.
+    3.HttpTcpBridgeSendData: directly send data to upstream, and encodeData will not be called even when downstream_req has body.
 
 *
 */
-func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, dataToUpstream api.BufferInstance, endOfStream bool) api.TcpUpstreamStatus {
+func (f *httpTcpBridge) EncodeHeaders(headerMap api.RequestHeaderMap, dataToUpstream api.BufferInstance, endOfStream bool) api.HttpTcpBridgeStatus {
 	// =========== step 1: get dubbo method and interface from http header =========== //
 	dubboMethod, _ := headerMap.Get("dubbo_method")
 	dubboInterface, _ := headerMap.Get("dubbo_interface")
@@ -88,7 +88,7 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, dataTo
 		// panic("hhh")
 
 		f.alreadySendDataInEncodeHeaders = true
-		return api.TcpUpstreamContinue
+		return api.HttpTcpBridgeContinue
 	}
 
 	f.dubboMethod = dubboMethod
@@ -97,10 +97,10 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, dataTo
 	// panic("ggg")
 
 	// for full-buffer
-	return api.TcpUpstreamStopAndBuffer
+	return api.HttpTcpBridgeStopAndBuffer
 
 	// for streaming
-	// return api.TcpUpstreamContinue
+	// return api.HttpTcpBridgeContinue
 }
 
 /*
@@ -114,14 +114,14 @@ func (f *tcpUpstreamFilter) EncodeHeaders(headerMap api.RequestHeaderMap, dataTo
   - @param bufferForUpstreamData supplies data to be set for sending to upstream.
   - @param endOfStream if end of stream.
   - @return api.SendDataStatus tell c++ side next action:
-    1.TcpUpstreamContinue: streaming send data to upstream, go side get each_data_piece, may be called multipled times.
-    2.TcpUpstreamStopAndBuffer: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot be used when end_stream=true).
+    1.HttpTcpBridgeContinue: streaming send data to upstream, go side get each_data_piece, may be called multipled times.
+    2.HttpTcpBridgeStopAndBuffer: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot be used when end_stream=true).
 
 *
 */
-func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bool) api.TcpUpstreamStatus {
+func (f *httpTcpBridge) EncodeData(buffer api.BufferInstance, endOfStream bool) api.HttpTcpBridgeStatus {
 	if f.alreadySendDataInEncodeHeaders {
-		return api.TcpUpstreamContinue
+		return api.HttpTcpBridgeContinue
 	}
 	// panic("www")
 	api.LogInfof("[EncodeData] come, buf: %s, len: %d, endStream: %v", buffer, buffer.Len(), endOfStream)
@@ -178,14 +178,14 @@ func (f *tcpUpstreamFilter) EncodeData(buffer api.BufferInstance, endOfStream bo
 
 	// panic("eee")
 
-	// for full-buffer from encodeHeaders TcpUpstreamStopAndBuffer
-	return api.TcpUpstreamContinue
+	// for full-buffer from encodeHeaders HttpTcpBridgeStopAndBuffer
+	return api.HttpTcpBridgeContinue
 
-	// for streaming from encodeHeaders TcpUpstreamContinue
+	// for streaming from encodeHeaders HttpTcpBridgeContinue
 	// if endOfStream {
-	// 	return api.TcpUpstreamContinue
+	// 	return api.HttpTcpBridgeContinue
 	// } else {
-	// 	return api.TcpUpstreamStopAndBuffer
+	// 	return api.HttpTcpBridgeStopAndBuffer
 	// }
 }
 
@@ -211,13 +211,13 @@ const (
   - @param buffer supplies data to be set for sending to downstream.
   - @param endOfStream if end of stream.
   - @return api.ReceiveDataStatus tell c++ side next action:
-    1.TcpUpstreamContinue: go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
-    2.TcpUpstreamStopAndBuffer: every data trigger will call go side, and go side get buffer data from start.
-    3.TcpUpstreamSendData: send data and headers to downstream which means the whole resp to http is finished.
+    1.HttpTcpBridgeContinue: go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
+    2.HttpTcpBridgeStopAndBuffer: every data trigger will call go side, and go side get buffer data from start.
+    3.HttpTcpBridgeSendData: send data and headers to downstream which means the whole resp to http is finished.
 
 *
 */
-func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHeaderMap, buffer api.BufferInstance, endOfStream bool) api.TcpUpstreamStatus {
+func (f *httpTcpBridge) OnUpstreamData(responseHeaderForSet api.ResponseHeaderMap, buffer api.BufferInstance, endOfStream bool) api.HttpTcpBridgeStatus {
 	api.LogInfof("[OnUpstreamData] receive body, len: %d", buffer.Len())
 
 	// panic("rrr")
@@ -235,13 +235,13 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 		api.LogErrorf("[OnUpstreamData] Protocol Magic error, %s", buffer.Bytes())
 		responseHeaderForSet.Set(":status", "500")
 		buffer.SetString(DUBBO_PROTOCOL_UPSTREAM_MAGIN_ERROR)
-		return api.TcpUpstreamEndStream
+		return api.HttpTcpBridgeEndStream
 	}
 	if buffer.Len() < hessian.HEADER_LENGTH {
 		api.LogErrorf("[OnUpstreamData] Protocol Header length error")
 		responseHeaderForSet.Set(":status", "500")
 		buffer.SetString(DUBBO_PROTOCOL_HEADER_LENGTH_ERROR)
-		return api.TcpUpstreamEndStream
+		return api.HttpTcpBridgeEndStream
 	}
 	bodyLength := binary.BigEndian.Uint32(buffer.Bytes()[DUBBO_LENGTH_OFFSET:])
 
@@ -251,9 +251,9 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 		if endOfStream {
 			api.LogErrorf("[OnUpstreamData] upstream bad endOfStream")
 			buffer.SetString("bad endOfStream")
-			return api.TcpUpstreamEndStream
+			return api.HttpTcpBridgeEndStream
 		}
-		return api.TcpUpstreamStopAndBuffer
+		return api.HttpTcpBridgeStopAndBuffer
 	}
 	api.LogInfof("[OnUpstreamData] finish Aggregation for Body")
 
@@ -300,7 +300,7 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 
 	// panic("fff")
 
-	return api.TcpUpstreamEndStream
+	return api.HttpTcpBridgeEndStream
 }
 
 /*
@@ -311,9 +311,9 @@ func (f *tcpUpstreamFilter) OnUpstreamData(responseHeaderForSet api.ResponseHead
 
 *
 */
-func (*tcpUpstreamFilter) OnDestroy() {
+func (*httpTcpBridge) OnDestroy() {
 	// panic("iii")
-	api.LogInfof("[OnDestroy] , tcpUpstreamFilter destroy")
+	api.LogInfof("[OnDestroy] , httpTcpBridge destroy")
 }
 
 func transformToDubboFrame(methodName, interfaceName string, dubboArgsFromHttp map[string]string) *bytes.Buffer {

@@ -39,8 +39,8 @@ import (
 )
 
 type httpRequest struct {
-	req               *C.httpRequest
-	tcpUpstreamFilter api.TcpUpstreamFilter
+	req           *C.httpRequest
+	httpTcpBridge api.HttpTcpBridge
 
 	// decodingState and encodingState are part of httpRequest, not another GC object.
 	// So, no cycle reference, GC finalizer could work well.
@@ -57,7 +57,7 @@ type processState struct {
 func (s *processState) RecoverPanic() {
 	if e := recover(); e != nil {
 		buf := debug.Stack()
-		api.LogErrorf("go side: golang http1-tcp bridge: processState: panic serving: %v\n%s", e, buf)
+		api.LogErrorf("go side: golang http-tcp bridge: processState: panic serving: %v\n%s", e, buf)
 		// do nothing to retrun default value in origin func to continue normat status in c side, to avoid data race when upstream full-multiplex.
 	}
 }
@@ -70,16 +70,17 @@ func (r *httpRequest) pluginName() string {
 func (r *httpRequest) recoverPanic() {
 	if e := recover(); e != nil {
 		buf := debug.Stack()
-		api.LogErrorf("o side: golang http1-tcp bridge: httpRequest: panic serving: %v\n%s", e, buf)
+		api.LogErrorf("o side: golang http-tcp bridge: httpRequest: panic serving: %v\n%s", e, buf)
 	}
 }
 
 func (r *httpRequest) GetRouteName() string {
+	// in upstream stage, route has been determined, so ignore error.
 	name, _ := cAPI.GetStringValue(unsafe.Pointer(r), ValueRouteName)
 	return name
 }
 func (r *httpRequest) GetVirtualClusterName() string {
-	// in upstream stage, cluster has been determined.
+	// in upstream stage, cluster has been determined, so ignore error.
 	name, _ := cAPI.GetStringValue(unsafe.Pointer(r), ValueClusterName)
 	return name
 }

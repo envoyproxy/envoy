@@ -33,7 +33,7 @@ public:
   }
 };
 
-DECLARE_FACTORY(DubboTcpGenericConnPoolFactory);
+DECLARE_FACTORY(GolangGenericConnPoolFactory);
 
 } // namespace Golang
 } // namespace DubboTcp

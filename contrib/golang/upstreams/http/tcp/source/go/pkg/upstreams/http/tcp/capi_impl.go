@@ -100,7 +100,7 @@ func (c *cgoApiImpl) CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map
 	// we have to make sure the all strings is not using before reusing,
 	// but strings may be alive beyond the request life.
 	buf := make([]byte, bytes)
-	res := C.envoyGoTcpUpstreamCopyHeaders(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
+	res := C.envoyGoHttpTcpBridgeCopyHeaders(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
 	handleCApiStatus(res)
 
 	m := make(map[string][]string, num)
@@ -126,28 +126,28 @@ func (c *cgoApiImpl) SetRespHeader(s unsafe.Pointer, key string, value string, a
 	} else {
 		act = C.HeaderSet
 	}
-	res := C.envoyGoTcpUpstreamSetRespHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
+	res := C.envoyGoHttpTcpBridgeSetRespHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)),
 		unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), act)
 	handleCApiStatus(res)
 }
 
 func (c *cgoApiImpl) RemoveRespHeader(s unsafe.Pointer, key string) {
 	state := (*processState)(s)
-	res := C.envoyGoTcpUpstreamRemoveRespHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)))
+	res := C.envoyGoHttpTcpBridgeRemoveRespHeader(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)))
 	handleCApiStatus(res)
 }
 
 func (c *cgoApiImpl) GetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte {
 	state := (*processState)(s)
 	buf := make([]byte, length)
-	res := C.envoyGoTcpUpstreamGetBuffer(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), unsafe.Pointer(unsafe.SliceData(buf)))
+	res := C.envoyGoHttpTcpBridgeGetBuffer(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), unsafe.Pointer(unsafe.SliceData(buf)))
 	handleCApiStatus(res)
 	return unsafe.Slice(unsafe.SliceData(buf), length)
 }
 
 func (c *cgoApiImpl) DrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) {
 	state := (*processState)(s)
-	res := C.envoyGoTcpUpstreamDrainBuffer(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), C.uint64_t(length))
+	res := C.envoyGoHttpTcpBridgeDrainBuffer(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), C.uint64_t(length))
 	handleCApiStatus(res)
 }
 
@@ -171,7 +171,7 @@ func (c *cgoApiImpl) setBufferHelper(state *processState, bufferPtr uint64, data
 	case api.PrependBuffer:
 		act = C.Prepend
 	}
-	res := C.envoyGoTcpUpstreamSetBufferHelper(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), data, length, act)
+	res := C.envoyGoHttpTcpBridgeSetBufferHelper(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), data, length, act)
 	handleCApiStatus(res)
 }
 
@@ -180,7 +180,7 @@ func (c *cgoApiImpl) GetStringValue(r unsafe.Pointer, id int) (string, bool) {
 
 	var valueData C.uint64_t
 	var valueLen C.int
-	res := C.envoyGoTcpUpstreamGetStringValue(unsafe.Pointer(req.req), C.int(id), &valueData, &valueLen)
+	res := C.envoyGoHttpTcpBridgeGetStringValue(unsafe.Pointer(req.req), C.int(id), &valueData, &valueLen)
 	handleCApiStatus(res)
 	value := unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))
 	// copy the memory from c to Go.
@@ -189,6 +189,6 @@ func (c *cgoApiImpl) GetStringValue(r unsafe.Pointer, id int) (string, bool) {
 
 func (c *cgoApiImpl) SetSelfHalfCloseForUpstreamConn(r unsafe.Pointer, enabled int) {
 	req := (*httpRequest)(r)
-	res := C.envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(unsafe.Pointer(req.req), C.int(enabled))
+	res := C.envoyGoHttpTcpBridgeSetSelfHalfCloseForUpstreamConn(unsafe.Pointer(req.req), C.int(enabled))
 	handleCApiStatus(res)
 }

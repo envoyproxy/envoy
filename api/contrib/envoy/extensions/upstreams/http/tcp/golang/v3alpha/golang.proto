@@ -13,10 +13,10 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Tcp Connection Pool]
+// [#protodoc-title: Http-Tcp Bridge]
 
-// A connection pool which forwards downstream HTTP as TCP to upstream,
-// [#extension: envoy.upstreams.http.tcp]
+// A bridge which forwards downstream HTTP as TCP to upstream,
+// [#extension: envoy.upstreams.http.tcp.golang]
 message Config {
   // Globally unique ID for a dynamic library file.
   string library_id = 1 [(validate.rules).string = {min_len: 1}];
@@ -24,12 +24,11 @@ message Config {
   // Path to a dynamic library implementing the
   // :repo:`DownstreamFilter API <contrib/golang/common/go/api.DownstreamFilter>`
   // interface.
-  // [#comment:TODO(wangfakang): Support for downloading libraries from remote repositories.]
   string library_path = 2 [(validate.rules).string = {min_len: 1}];
 
   // Globally unique name of the Go plugin.
   //
-  // This name **must** be consistent with the name registered in ``tcp::RegisterTcpUpstreamFactoryAndConfigParser``
+  // This name **must** be consistent with the name registered in ``tcp::RegisterHttpTcpBridgeFactoryAndConfigParser``
   //
   string plugin_name = 3 [(validate.rules).string = {min_len: 1}];
 
@@ -39,7 +38,7 @@ message Config {
   //     This configuration is only parsed in the go plugin, and is therefore not validated
   //     by Envoy.
   //
-  //     See the :repo:`DownstreamFilter API <contrib/golang/common/go/api/filter.go>`
+  //     See the :repo:`TcpUpstreamFilter API <contrib/golang/common/go/api/filter.go>`
   //     for more information about how the plugin's configuration data can be accessed.
   //
   google.protobuf.Any plugin_config = 4;

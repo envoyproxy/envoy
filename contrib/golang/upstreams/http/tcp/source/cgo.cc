@@ -24,33 +24,33 @@ absl::string_view stringViewFromGoPointer(void* p, int len) {
 
 extern "C" {
 
-CAPIStatus envoyGoTcpUpstreamProcessStateHandlerWrapper(
-    void* s, std::function<CAPIStatus(TcpUpstream&, ProcessorState&)> f) {
+CAPIStatus envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
+    void* s, std::function<CAPIStatus(HttpTcpBridge&, ProcessorState&)> f) {
   auto state = static_cast<ProcessorState*>(reinterpret_cast<processState*>(s));
-  auto req = static_cast<TcpUpstream*>(state->req);
+  auto req = static_cast<HttpTcpBridge*>(state->req);
   return f(*req, *state);
 }
 
-CAPIStatus envoyGoTcpUpstreamHandlerWrapper(void* r,
-                                       std::function<CAPIStatus(TcpUpstream&)> f) {
-  auto req = static_cast<TcpUpstream*>(reinterpret_cast<httpRequest*>(r));
+CAPIStatus envoyGoHttpTcpBridgeHandlerWrapper(void* r,
+                                       std::function<CAPIStatus(HttpTcpBridge&)> f) {
+  auto req = static_cast<HttpTcpBridge*>(reinterpret_cast<httpRequest*>(r));
   return f(*req);
 }
 
-CAPIStatus envoyGoTcpUpstreamCopyHeaders(void* s, void* strs, void* buf) {
-  return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s, [strs, buf](TcpUpstream& t, ProcessorState& state) -> CAPIStatus {
+CAPIStatus envoyGoHttpTcpBridgeCopyHeaders(void* s, void* strs, void* buf) {
+  return envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
+      s, [strs, buf](HttpTcpBridge& t, ProcessorState& state) -> CAPIStatus {
         auto go_strs = reinterpret_cast<GoString*>(strs);
         auto go_buf = reinterpret_cast<char*>(buf);
         return t.copyHeaders(state, go_strs, go_buf);
       });
 }
 
-CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len, void* value_data,
+CAPIStatus envoyGoHttpTcpBridgeSetRespHeader(void* s, void* key_data, int key_len, void* value_data,
                                             int value_len, headerAction act) {
-  return envoyGoTcpUpstreamProcessStateHandlerWrapper(
+  return envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
       s,
-      [key_data, key_len, value_data, value_len, act](TcpUpstream& t,
+      [key_data, key_len, value_data, value_len, act](HttpTcpBridge& t,
                                                       ProcessorState& state) -> CAPIStatus {
         auto key_str = stringViewFromGoPointer(key_data, key_len);
         auto value_str = stringViewFromGoPointer(value_data, value_len);
@@ -58,36 +58,36 @@ CAPIStatus envoyGoTcpUpstreamSetRespHeader(void* s, void* key_data, int key_len,
       });
 }
 
-CAPIStatus envoyGoTcpUpstreamRemoveRespHeader(void* s, void* key_data, int key_len) {
-  return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s, [key_data, key_len](TcpUpstream& t, ProcessorState& state) -> CAPIStatus {
+CAPIStatus envoyGoHttpTcpBridgeRemoveRespHeader(void* s, void* key_data, int key_len) {
+  return envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
+      s, [key_data, key_len](HttpTcpBridge& t, ProcessorState& state) -> CAPIStatus {
         auto key_str = stringViewFromGoPointer(key_data, key_len);
         return t.removeRespHeader(state, key_str);
       });
 }
 
-CAPIStatus envoyGoTcpUpstreamGetBuffer(void* s, uint64_t buffer_ptr, void* data) {
-  return envoyGoTcpUpstreamProcessStateHandlerWrapper(
-      s, [buffer_ptr, data](TcpUpstream& t, ProcessorState& state) -> CAPIStatus {
+CAPIStatus envoyGoHttpTcpBridgeGetBuffer(void* s, uint64_t buffer_ptr, void* data) {
+  return envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
+      s, [buffer_ptr, data](HttpTcpBridge& t, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         return t.copyBuffer(state, buffer, reinterpret_cast<char*>(data));
       });
 }
 
-CAPIStatus envoyGoTcpUpstreamDrainBuffer(void* s, uint64_t buffer_ptr, uint64_t length) {
-  return envoyGoTcpUpstreamProcessStateHandlerWrapper(
+CAPIStatus envoyGoHttpTcpBridgeDrainBuffer(void* s, uint64_t buffer_ptr, uint64_t length) {
+  return envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
       s,
-      [buffer_ptr, length](TcpUpstream& t, ProcessorState& state) -> CAPIStatus {
+      [buffer_ptr, length](HttpTcpBridge& t, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         return t.drainBuffer(state, buffer, length);
       });
 }
 
-CAPIStatus envoyGoTcpUpstreamSetBufferHelper(void* s, uint64_t buffer_ptr, void* data, int length,
+CAPIStatus envoyGoHttpTcpBridgeSetBufferHelper(void* s, uint64_t buffer_ptr, void* data, int length,
                                             bufferAction action) {
-  return envoyGoTcpUpstreamProcessStateHandlerWrapper(
+  return envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
       s,
-      [buffer_ptr, data, length, action](TcpUpstream& t,
+      [buffer_ptr, data, length, action](HttpTcpBridge& t,
                                          ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         auto value = stringViewFromGoPointer(data, length);
@@ -95,16 +95,16 @@ CAPIStatus envoyGoTcpUpstreamSetBufferHelper(void* s, uint64_t buffer_ptr, void*
       });
 }
 
-CAPIStatus envoyGoTcpUpstreamGetStringValue(void* r, int id, uint64_t* value_data, int* value_len) {
-  return envoyGoTcpUpstreamHandlerWrapper(
-      r, [id, value_data, value_len](TcpUpstream& t) -> CAPIStatus {
+CAPIStatus envoyGoHttpTcpBridgeGetStringValue(void* r, int id, uint64_t* value_data, int* value_len) {
+  return envoyGoHttpTcpBridgeHandlerWrapper(
+      r, [id, value_data, value_len](HttpTcpBridge& t) -> CAPIStatus {
         return t.getStringValue(id, value_data, value_len);
       });
 }
 
-CAPIStatus envoyGoTcpUpstreamSetSelfHalfCloseForUpstreamConn(void* r, int enabled) {
-  return envoyGoTcpUpstreamHandlerWrapper(
-      r, [enabled](TcpUpstream& t) -> CAPIStatus {
+CAPIStatus envoyGoHttpTcpBridgeSetSelfHalfCloseForUpstreamConn(void* r, int enabled) {
+  return envoyGoHttpTcpBridgeHandlerWrapper(
+      r, [enabled](HttpTcpBridge& t) -> CAPIStatus {
         return t.setSelfHalfCloseForUpstreamConn(enabled);
       });
 }

@@ -106,9 +106,9 @@ func createRequest(r *C.httpRequest) *httpRequest {
 
 	configId := uint64(r.configId)
 
-	filterFactory, config := getTcpUpstreamFactoryAndConfig(req.pluginName(), configId)
+	filterFactory, config := getHttpTcpBridgeFactoryAndConfig(req.pluginName(), configId)
 	f := filterFactory(config, req)
-	req.tcpUpstreamFilter = f
+	req.httpTcpBridge = f
 
 	return req
 }
@@ -117,8 +117,8 @@ func getRequest(r *C.httpRequest) *httpRequest {
 	return Requests.GetReq(r)
 }
 
-//export envoyGoEncodeHeader
-func envoyGoEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, buffer, length uint64) uint64 {
+//export envoyGoHttpTcpBridgeOnEncodeHeader
+func envoyGoHttpTcpBridgeOnEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, buffer, length uint64) uint64 {
 	state := getOrCreateState(s)
 	defer state.RecoverPanic()
 
@@ -129,7 +129,7 @@ func envoyGoEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, b
 		length:              length,
 	}
 
-	filter := req.tcpUpstreamFilter
+	filter := req.httpTcpBridge
 	header := &requestHeaderMapImpl{
 		requestOrResponseHeaderMapImpl{
 			headerMapImpl{
@@ -142,8 +142,8 @@ func envoyGoEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, b
 	return uint64(filter.EncodeHeaders(header, buf, endStream == uint64(api.EndStream)))
 }
 
-//export envoyGoEncodeData
-func envoyGoEncodeData(s *C.processState, endStream, buffer, length uint64) uint64 {
+//export envoyGoHttpTcpBridgeOnEncodeData
+func envoyGoHttpTcpBridgeOnEncodeData(s *C.processState, endStream, buffer, length uint64) uint64 {
 	state := getOrCreateState(s)
 	defer state.RecoverPanic()
 
@@ -154,13 +154,13 @@ func envoyGoEncodeData(s *C.processState, endStream, buffer, length uint64) uint
 		length:              length,
 	}
 
-	filter := req.tcpUpstreamFilter
+	filter := req.httpTcpBridge
 
 	return uint64(filter.EncodeData(buf, endStream == uint64(api.EndStream)))
 }
 
-//export envoyGoOnUpstreamData
-func envoyGoOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes, buffer, length uint64) uint64 {
+//export envoyGoHttpTcpBridgeOnUpstreamData
+func envoyGoHttpTcpBridgeOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes, buffer, length uint64) uint64 {
 
 	state := getOrCreateState(s)
 	defer state.RecoverPanic()
@@ -172,7 +172,7 @@ func envoyGoOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes,
 		length:              length,
 	}
 
-	filter := req.tcpUpstreamFilter
+	filter := req.httpTcpBridge
 	header := &responseHeaderMapImpl{
 		requestOrResponseHeaderMapImpl{
 			headerMapImpl{
@@ -186,19 +186,19 @@ func envoyGoOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes,
 	return uint64(filter.OnUpstreamData(header, buf, endStream == uint64(api.EndStream)))
 }
 
-//export envoyGoOnTcpUpstreamDestroy
-func envoyGoOnTcpUpstreamDestroy(r *C.httpRequest) {
+//export envoyGoHttpTcpBridgeOnDestroy
+func envoyGoHttpTcpBridgeOnDestroy(r *C.httpRequest) {
 	req := getRequest(r)
 	// do nothing even when req.panic is true, since filter is already destroying.
 	defer req.recoverPanic()
 
-	f := req.tcpUpstreamFilter
+	f := req.httpTcpBridge
 	f.OnDestroy()
 
-	// Break circular references between httpRequest and StreamFilter,
+	// Break circular references between httpRequest and HttpTcpBridge,
 	// since Finalizers don't work with circular references,
 	// otherwise, it will leads to memory leaking.
-	req.tcpUpstreamFilter = nil
+	req.httpTcpBridge = nil
 
 	Requests.DeleteReq(r)
 }

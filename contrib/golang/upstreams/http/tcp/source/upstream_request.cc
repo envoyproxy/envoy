@@ -25,21 +25,21 @@ namespace Tcp {
 namespace Golang {
 
 BridgeConfig::BridgeConfig(
-    const envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config proto_config, Dso::TcpUpstreamDsoPtr dso_lib)
+    const envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config proto_config, Dso::HttpTcpBridgeDsoPtr dso_lib)
     : plugin_name_(proto_config.plugin_name()), so_id_(proto_config.library_id()),
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()), dso_lib_(dso_lib){};
 
 BridgeConfig::~BridgeConfig() {
   if (config_id_ > 0) {
-    dso_lib_->envoyGoTcpUpstreamDestroyPluginConfig(config_id_);
+    dso_lib_->envoyGoHttpTcpBridgeDestroyPluginConfig(config_id_);
   }
 }
 
 void BridgeConfig::newGoPluginConfig() {
-  ENVOY_LOG(debug, "golng http1-tcp bridge initializing golang filter config");
+  ENVOY_LOG(debug, "golang http-tcp bridge initializing golang filter config");
   std::string buf;
   auto res = plugin_config_.SerializeToString(&buf);
-  ASSERT(res, "SerializeToString should always successful");
+  ASSERT(res, "SerializeToString should always success");
   auto buf_ptr = reinterpret_cast<unsigned long long>(buf.data());
   auto name_ptr = reinterpret_cast<unsigned long long>(plugin_name_.data());
 
@@ -52,13 +52,13 @@ void BridgeConfig::newGoPluginConfig() {
   // config_len in httpConfig
   config_len = buf.length();
 
-  config_id_ = dso_lib_->envoyGoOnTcpUpstreamConfig(this);
+  config_id_ = dso_lib_->envoyGoHttpTcpBridgeOnConfig(this);
 
   if (config_id_ == 0) {
-    PANIC(fmt::format("golng http1-tcp bridge failed to parse plugin config: {} {}", so_id_, so_path_));
+    PANIC(fmt::format("golang http-tcp bridge failed to parse plugin config: {} {}", so_id_, so_path_));
   }
 
-  ENVOY_LOG(debug, "golng http1-tcp bridge new plugin config, id: {}", config_id_);
+  ENVOY_LOG(debug, "golang http-tcp bridge new plugin config, id: {}", config_id_);
 }
 
 TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, 
@@ -67,11 +67,11 @@ TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
 
     envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config c;
     auto s = c.ParseFromString(config.SerializeAsString());
-    ASSERT(s, "any.value() ParseFromString should always successful");
+    ASSERT(s, "any.value() ParseFromString should always success");
 
-    ENVOY_LOG(debug, "golng http1-tcp bridge load library at parse config: {} {}", c.library_id(), c.library_path());
+    ENVOY_LOG(debug, "golang http-tcp bridge load library at parse config: {} {}", c.library_id(), c.library_path());
 
-    dynamic_lib_ = Dso::DsoManager<Dso::TcpUpstreamDsoImpl>::load(
+    dynamic_lib_ = Dso::DsoManager<Dso::HttpTcpBridgeDsoImpl>::load(
       c.library_id(), c.library_path(), c.plugin_name());
     if (dynamic_lib_ == nullptr) {
       PANIC(fmt::format("tcp upstream : load library failed: {} {}", c.library_id(), c.library_path()));
@@ -87,15 +87,15 @@ void TcpConnPool::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& co
   upstream_handle_ = nullptr;
   Network::Connection& latched_conn = conn_data->connection();
   auto upstream =
-      std::make_unique<TcpUpstream>(&callbacks_->upstreamToDownstream(), std::move(conn_data), dynamic_lib_, config_);
+      std::make_unique<HttpTcpBridge>(&callbacks_->upstreamToDownstream(), std::move(conn_data), dynamic_lib_, config_);
 
-  ENVOY_LOG(debug, "golng http1-tcp bridge get host info: {}", host->cluster().name());
+  ENVOY_LOG(debug, "golang http-tcp bridge get host info: {}", host->cluster().name());
 
   callbacks_->onPoolReady(std::move(upstream), host, latched_conn.connectionInfoProvider(),latched_conn.streamInfo(), {});       
 }
 
-TcpUpstream::TcpUpstream(Router::UpstreamToDownstream* upstream_request,
-                         Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream, Dso::TcpUpstreamDsoPtr dynamic_lib,
+HttpTcpBridge::HttpTcpBridge(Router::UpstreamToDownstream* upstream_request,
+                         Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream, Dso::HttpTcpBridgeDsoPtr dynamic_lib,
                          BridgeConfigSharedPtr config)
     :encoding_state_(new EncodingProcessorState(*this)), decoding_state_(new DecodingProcessorState(*this)),
      route_entry_(upstream_request->route().routeEntry()), upstream_request_(upstream_request), upstream_conn_data_(std::move(upstream)), dynamic_lib_(dynamic_lib) {
@@ -112,35 +112,35 @@ TcpUpstream::TcpUpstream(Router::UpstreamToDownstream* upstream_request,
   upstream_conn_data_->addUpstreamCallbacks(*this);
 }
 
-TcpUpstream::~TcpUpstream() {
-  ENVOY_LOG(debug, "golng http1-tcp bridge on destroy");
+HttpTcpBridge::~HttpTcpBridge() {
+  ENVOY_LOG(debug, "golang http-tcp bridge on destroy");
 
   ASSERT(!decoding_state_->isProcessingInGo() && !encoding_state_->isProcessingInGo());
 
-  dynamic_lib_->envoyGoOnTcpUpstreamDestroy(this);
+  dynamic_lib_->envoyGoHttpTcpBridgeOnDestroy(this);
 }
 
-void TcpUpstream::initResponse() {
+void HttpTcpBridge::initResponse() {
   if (decoding_state_->resp_headers == nullptr) {
     auto headers{Envoy::Http::createHeaderMap<Envoy::Http::ResponseHeaderMapImpl>({})};
     decoding_state_->resp_headers = std::move(headers);
   }
 }
 
-Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderMap& headers,
+Envoy::Http::Status HttpTcpBridge::encodeHeaders(const Envoy::Http::RequestHeaderMap& headers,
                                                bool end_stream) {
-  ENVOY_LOG(debug, "golng http1-tcp bridge encodeHeaders, header size: {}, end_stream: {}", headers.size(), end_stream);
+  ENVOY_LOG(debug, "golang http-tcp bridge encodeHeaders, header size: {}, end_stream: {}", headers.size(), end_stream);
 
   encoding_state_->req_headers = &headers;
   encoding_state_->setFilterState(FilterState::ProcessingHeader);
   Buffer::OwnedImpl buffer;
   auto s = dynamic_cast<processState*>(encoding_state_);
 
-  GoUint64 go_status = dynamic_lib_->envoyGoEncodeHeader(
+  GoUint64 go_status = dynamic_lib_->envoyGoHttpTcpBridgeOnEncodeHeader(
     s, end_stream ? 1 : 0, headers.size(), headers.byteSize(), reinterpret_cast<uint64_t>(&buffer), buffer.length());
 
-  encoding_state_->handleHeaderGolangStatus(static_cast<TcpUpstreamStatus>(go_status));
-  ENVOY_LOG(debug, "golng http1-tcp bridge encodeHeaders, state: {}", encoding_state_->stateStr());
+  encoding_state_->handleHeaderGolangStatus(static_cast<HttpTcpBridgeStatus>(go_status));
+  ENVOY_LOG(debug, "golang http-tcp bridge encodeHeaders, state: {}", encoding_state_->stateStr());
 
   // if go side set data for buffer, then we send it to upstream 
   bool send_data_to_upstream = (buffer.length() != 0);
@@ -148,17 +148,15 @@ Envoy::Http::Status TcpUpstream::encodeHeaders(const Envoy::Http::RequestHeaderM
   trySendProxyData(send_data_to_upstream, end_stream);
 
   if (send_data_to_upstream) {
-    {
-        Thread::LockGuard lock(mutex_for_c_and_go_);
-        upstream_conn_data_->connection().write(buffer, upstream_conn_self_half_close_);
-    }
+    Thread::LockGuard lock(mutex_for_c_and_go_);
+    upstream_conn_data_->connection().write(buffer, upstream_conn_self_half_close_);
   }
 
   return Envoy::Http::okStatus();
 }
 
-void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "golng http1-tcp bridge encodeData, data length: {}, end_stream: {}", data.length(), end_stream);
+void HttpTcpBridge::encodeData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_LOG(debug, "golang http-tcp bridge encodeData, data length: {}, end_stream: {}", data.length(), end_stream);
 
   switch (encoding_state_->filterState()) {
   case FilterState::WaitingData:
@@ -174,48 +172,48 @@ void TcpUpstream::encodeData(Buffer::Instance& data, bool end_stream) {
       }
       encodeDataGo(encoding_state_, data, end_stream);
     } else {
-      ENVOY_LOG(debug, "golng http1-tcp bridge encodeData, appending data to buffer");
+      ENVOY_LOG(debug, "golang http-tcp bridge encodeData, appending data to buffer");
       encoding_state_->addBufferData(data);
     }
     break;
 
   default:
-    PANIC(fmt::format("golng http1-tcp bridge encodeData, unexpected state: {}", encoding_state_->stateStr()));
+    PANIC(fmt::format("golang http-tcp bridge encodeData, unexpected state: {}", encoding_state_->stateStr()));
   }
 }
 
 // TODO(duxin40): use golang to convert trailers to data buffer.
-void TcpUpstream::encodeTrailers(const Envoy::Http::RequestTrailerMap&) {
+void HttpTcpBridge::encodeTrailers(const Envoy::Http::RequestTrailerMap&) {
   Buffer::OwnedImpl data;
   upstream_conn_data_->connection().write(data, true);
 }
 
-void TcpUpstream::readDisable(bool disable) {
+void HttpTcpBridge::readDisable(bool disable) {
   if (upstream_conn_data_->connection().state() != Network::Connection::State::Open) {
     return;
   }
   upstream_conn_data_->connection().readDisable(disable);
 }
 
-void TcpUpstream::resetStream() {
+void HttpTcpBridge::resetStream() {
   upstream_request_ = nullptr;
   upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
-void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "golng http1-tcp bridge onUpstreamData, data length: {}, end_stream: {}", data.length(), end_stream);
+void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+  ENVOY_LOG(debug, "golang http-tcp bridge onUpstreamData, data length: {}, end_stream: {}", data.length(), end_stream);
 
   initResponse();
 
   decoding_state_->setFilterState(FilterState::ProcessingData);
   auto s = dynamic_cast<processState*>(decoding_state_);
 
-  GoUint64 go_status = dynamic_lib_->envoyGoOnUpstreamData(
+  GoUint64 go_status = dynamic_lib_->envoyGoHttpTcpBridgeOnUpstreamData(
     s, end_stream ? 1 : 0, (*decoding_state_->resp_headers).size(), (*decoding_state_->resp_headers).byteSize(), reinterpret_cast<uint64_t>(&data), data.length());
   decoding_state_->setFilterState(FilterState::Done);
 
-  switch (static_cast<TcpUpstreamStatus>(go_status)) {
-  case TcpUpstreamStatus::TcpUpstreamContinue:
+  switch (static_cast<HttpTcpBridgeStatus>(go_status)) {
+  case HttpTcpBridgeStatus::HttpTcpBridgeContinue:
     // go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
     //
     // NOTICE: when first receive TcpUpstreamContinue, resp headers will be send to http all at once; which means from then on, resp headers will never be sent to http.
@@ -225,7 +223,7 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     data.drain(data.length());
     break;
 
-  case TcpUpstreamStatus::TcpUpstreamStopAndBuffer:
+  case HttpTcpBridgeStatus::HttpTcpBridgeStopAndBuffer:
     // every data trigger will call go side, and go side get whloe buffered data ever since at every time.
     //
     // if onUpstreamData is called streaming multiple times, data is gradually appended by default, so here do nothing.
@@ -234,26 +232,29 @@ void TcpUpstream::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     // refer to: https://www.envoyproxy.io/docs/envoy/latest/intro/life_of_a_request#:~:text=socket%20via%20SslSocket%3A%3A-,doRead,-().%20The%20transport
 
     if (end_stream) {
-        PANIC(fmt::format("golng http1-tcp bridge onUpstreamData unexpected go_tatus when end_stream is true: {}", int(go_status)));
+      PANIC(fmt::format("golang http-tcp bridge onUpstreamData unexpected go_tatus when end_stream is true: {}", int(go_status)));
     }
     break;
 
-  case TcpUpstreamStatus::TcpUpstreamEndStream:
+  case HttpTcpBridgeStatus::HttpTcpBridgeEndStream:
     // endStream to downstream which means the whole resp to http has finished.
     //
     // from now on, any further data from upstream tcp conn will not come to onUpstreamData.
 
     end_stream = true;
     sendDataToDownstream(data, end_stream);
+
+    // TODO(duxin40): support use golang to set trailers and send it to downstream.(upstream_request_->decodeTrailers())
+
     data.drain(data.length());
     break;
 
   default:
-    PANIC(fmt::format("golng http1-tcp bridge onUpstreamData, unexpected go_tatus: {}", go_status));
+    PANIC(fmt::format("golang http-tcp bridge onUpstreamData, unexpected go_tatus: {}", go_status));
   }
 }
 
-void TcpUpstream::trySendProxyData(bool send_data_to_upstream, bool end_stream) {
+void HttpTcpBridge::trySendProxyData(bool send_data_to_upstream, bool end_stream) {
   // headers should only happen once, so use this opportunity to add the proxy header, if configured.
   ASSERT(route_entry_ != nullptr);
   if (route_entry_->connectConfig().has_value()) {
@@ -266,37 +267,33 @@ void TcpUpstream::trySendProxyData(bool send_data_to_upstream, bool end_stream) 
     }
 
     if (data.length() != 0 || end_stream) {
-      {
-        Thread::LockGuard lock(mutex_for_c_and_go_);
-        bool self_half_close_connection = end_stream && !send_data_to_upstream ? upstream_conn_self_half_close_ : false;
-        upstream_conn_data_->connection().write(data, self_half_close_connection);
-      }
+      Thread::LockGuard lock(mutex_for_c_and_go_);
+      bool self_half_close_connection = end_stream && !send_data_to_upstream ? upstream_conn_self_half_close_ : false;
+      upstream_conn_data_->connection().write(data, self_half_close_connection);
     }
   }
 }
 
-void TcpUpstream::encodeDataGo(ProcessorState* state, Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "golng http1-tcp bridge encodeDataGo, passing data to golang, state: {}, end_stream: {}", state->stateStr(), end_stream);
+void HttpTcpBridge::encodeDataGo(ProcessorState* state, Buffer::Instance& data, bool end_stream) {
+  ENVOY_LOG(debug, "golang http-tcp bridge encodeDataGo, passing data to golang, state: {}, end_stream: {}", state->stateStr(), end_stream);
 
   state->processData();
 
   auto s = dynamic_cast<processState*>(state);
-  GoUint64 go_status = dynamic_lib_->envoyGoEncodeData(
+  GoUint64 go_status = dynamic_lib_->envoyGoHttpTcpBridgeOnEncodeData(
     s, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&data), data.length());
     
-  state->handleDataGolangStatus(static_cast<TcpUpstreamStatus>(go_status), end_stream);
+  state->handleDataGolangStatus(static_cast<HttpTcpBridgeStatus>(go_status), end_stream);
 
   if (state->filterState() == FilterState::Done || state->filterState() == FilterState::WaitingData) {
-    {
-        Thread::LockGuard lock(mutex_for_c_and_go_);
-        upstream_conn_data_->connection().write(data, upstream_conn_self_half_close_);
-    }
-  }
+    Thread::LockGuard lock(mutex_for_c_and_go_);
+    upstream_conn_data_->connection().write(data, upstream_conn_self_half_close_);
+}
 }
 
-void TcpUpstream::sendDataToDownstream(Buffer::Instance& data, bool end_stream) {
+void HttpTcpBridge::sendDataToDownstream(Buffer::Instance& data, bool end_stream) {
   if (!already_send_resp_headers_) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge send resp headers to downstream. end_stream: {}", end_stream);
+    ENVOY_LOG(debug, "golang http-tcp bridge send resp headers to downstream. end_stream: {}", end_stream);
     // we can send resp headers only one time.
     if (!decoding_state_->resp_headers->Status()) {
       // if go side not set status, c++ side set default status
@@ -305,27 +302,27 @@ void TcpUpstream::sendDataToDownstream(Buffer::Instance& data, bool end_stream) 
     upstream_request_->decodeHeaders(std::move(decoding_state_->resp_headers), false);
     already_send_resp_headers_ = true;
   } else {
-    ENVOY_LOG(debug, "golng http1-tcp bridge already_send_resp_headers, we can send resp headers only one time, so ignore this time. end_stream: {}", end_stream);
+    ENVOY_LOG(debug, "golang http-tcp bridge already_send_resp_headers, we can send resp headers only one time, so ignore this time. end_stream: {}", end_stream);
   }
 
   upstream_request_->decodeData(data, end_stream);
 }
 
-void TcpUpstream::onEvent(Network::ConnectionEvent event) {
+void HttpTcpBridge::onEvent(Network::ConnectionEvent event) {
   if (event != Network::ConnectionEvent::Connected && upstream_request_) {
     upstream_request_->onResetStream(Envoy::Http::StreamResetReason::ConnectionTermination, "");
   }
 }
 
-void TcpUpstream::onAboveWriteBufferHighWatermark() {
-  ENVOY_LOG(debug, "golng http1-tcp bridge onAboveWriteBufferHighWatermark");
+void HttpTcpBridge::onAboveWriteBufferHighWatermark() {
+  ENVOY_LOG(debug, "golang http-tcp bridge onAboveWriteBufferHighWatermark");
   if (upstream_request_) {
     upstream_request_->onAboveWriteBufferHighWatermark();
   }
 }
 
-void TcpUpstream::onBelowWriteBufferLowWatermark() {
-  ENVOY_LOG(debug, "golng http1-tcp bridge onBelowWriteBufferLowWatermark");
+void HttpTcpBridge::onBelowWriteBufferLowWatermark() {
+  ENVOY_LOG(debug, "golang http-tcp bridge onBelowWriteBufferLowWatermark");
   if (upstream_request_) {
     upstream_request_->onBelowWriteBufferLowWatermark();
   }
@@ -362,11 +359,11 @@ void copyHeaderMapToGo(const Envoy::Http::HeaderMap& m, GoString* go_strs, char*
   });
 }
 
-CAPIStatus TcpUpstream::copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf) {
+CAPIStatus HttpTcpBridge::copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf) {
   // lock until this function return since the same headers may be copied by multi Goroutines.
   Thread::LockGuard lock(mutex_for_go_);
   if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge copyHeaders is not processing Go");
+    ENVOY_LOG(debug, "golang http-tcp bridge copyHeaders is not processing Go");
     return CAPIStatus::CAPINotInGo;
   }
 
@@ -374,33 +371,32 @@ CAPIStatus TcpUpstream::copyHeaders(ProcessorState& state, GoString* go_strs, ch
       copyHeaderMapToGo(*encoding_state->req_headers, go_strs, go_buf);
   } else if (auto* decoding_state = dynamic_cast<DecodingProcessorState*>(&state)) {
       if (already_send_resp_headers_) {
-        ENVOY_LOG(error, "golng http1-tcp bridge invoking cgo api copyHeaders while already_send_resp_headers_ : {}", __func__);
+        ENVOY_LOG(error, "golang http-tcp bridge invoking cgo api copyHeaders while already_send_resp_headers_ : {}", __func__);
         return CAPIStatus::CAPIInvalidPhase;
       }  
       copyHeaderMapToGo(*decoding_state->resp_headers, go_strs, go_buf);
   } else {
-      ENVOY_LOG(debug, "golang http1-tcp bridge invoking cgo api copyHeaders at invalid state: {}. Unable to dynamic_cast state.",  __func__);
-      return CAPIStatus::CAPIInvalidPhase;
+      PANIC(fmt::format("unexpected process state type: {}", std::type_index(typeid(state)).name()));
   }
   
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus TcpUpstream::setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value,
+CAPIStatus HttpTcpBridge::setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value,
                              headerAction act) {             
   // lock until this function return since the resp header may be set by multi Goroutines.
   Thread::LockGuard lock(mutex_for_go_);         
   if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge setRespHeader is not processing Go");
+    ENVOY_LOG(debug, "golang http-tcp bridge setRespHeader is not processing Go");
     return CAPIStatus::CAPINotInGo;
   }
   if (already_send_resp_headers_) {
-    ENVOY_LOG(error, "golng http1-tcp bridge invoking cgo api setRespHeader while already_send_resp_headers_ : {}", __func__);
+    ENVOY_LOG(error, "golang http-tcp bridge invoking cgo api setRespHeader while already_send_resp_headers_ : {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }                                
   auto* s = dynamic_cast<DecodingProcessorState*>(&state);
   if (s == nullptr) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge invoking cgo api setRespHeader at invalid state: {} when dynamic_cast state", __func__);
+    ENVOY_LOG(debug, "golang http-tcp bridge invoking cgo api setRespHeader at invalid state: {} when dynamic_cast state", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
 
@@ -419,20 +415,20 @@ CAPIStatus TcpUpstream::setRespHeader(ProcessorState& state, absl::string_view k
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus TcpUpstream::removeRespHeader(ProcessorState& state, absl::string_view key) {
+CAPIStatus HttpTcpBridge::removeRespHeader(ProcessorState& state, absl::string_view key) {
   // lock until this function return since the resp header may be removed by multi Goroutines.
   Thread::LockGuard lock(mutex_for_go_);
   if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golang http1-tcp bridge removeRespHeader is not processing Go");
+    ENVOY_LOG(debug, "golang http-tcp bridge removeRespHeader is not processing Go");
     return CAPIStatus::CAPINotInGo;
   }
   if (already_send_resp_headers_) {
-    ENVOY_LOG(error, "golng http1-tcp bridge invoking cgo api removeRespHeader while already_send_resp_headers_ : {}", __func__);
+    ENVOY_LOG(error, "golang http-tcp bridge invoking cgo api removeRespHeader while already_send_resp_headers_ : {}", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   } 
   auto* s = dynamic_cast<DecodingProcessorState*>(&state);
   if (s == nullptr) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge invoking cgo api removeRespHeader at invalid state: {} when dynamic_cast state", __func__);
+    ENVOY_LOG(debug, "golang http-tcp bridge invoking cgo api removeRespHeader at invalid state: {} when dynamic_cast state", __func__);
     return CAPIStatus::CAPIInvalidPhase;
   }
 
@@ -441,11 +437,11 @@ CAPIStatus TcpUpstream::removeRespHeader(ProcessorState& state, absl::string_vie
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data) {
+CAPIStatus HttpTcpBridge::copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data) {
   // lock until this function return since the same buffer may be copied by multi Goroutines.
   Thread::LockGuard lock(mutex_for_go_);
   if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge copyBuffer is not processing Go");
+    ENVOY_LOG(debug, "golang http-tcp bridge copyBuffer is not processing Go");
     return CAPIStatus::CAPINotInGo;
   }
   for (const Buffer::RawSlice& slice : buffer->getRawSlices()) {
@@ -457,11 +453,11 @@ CAPIStatus TcpUpstream::copyBuffer(ProcessorState& state, Buffer::Instance* buff
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus TcpUpstream::drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length) {
+CAPIStatus HttpTcpBridge::drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length) {
   // lock until this function return since the same buffer may be drained by multi Goroutines.
   Thread::LockGuard lock(mutex_for_go_);
   if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge drainBuffer is not processing Go");
+    ENVOY_LOG(debug, "golang http-tcp bridge drainBuffer is not processing Go");
     return CAPIStatus::CAPINotInGo;
   }
 
@@ -469,12 +465,12 @@ CAPIStatus TcpUpstream::drainBuffer(ProcessorState& state, Buffer::Instance* buf
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus TcpUpstream::setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
+CAPIStatus HttpTcpBridge::setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
                                    absl::string_view& value, bufferAction action) {
   // lock until this function return since the same buffer may be set by multi Goroutines.
   Thread::LockGuard lock(mutex_for_go_);             
   if (!state.isProcessingInGo()) {
-    ENVOY_LOG(debug, "golng http1-tcp bridge setBufferHelper is not processing Go");
+    ENVOY_LOG(debug, "golang http-tcp bridge setBufferHelper is not processing Go");
     return CAPIStatus::CAPINotInGo;
   }
   if (action == bufferAction::Set) {
@@ -488,7 +484,7 @@ CAPIStatus TcpUpstream::setBufferHelper(ProcessorState& state, Buffer::Instance*
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus TcpUpstream::getStringValue(int id, uint64_t* value_data, int* value_len) {
+CAPIStatus HttpTcpBridge::getStringValue(int id, uint64_t* value_data, int* value_len) {
   // lock until this function return since it be called by multi Goroutines.
   Thread::LockGuard lock(mutex_for_c_and_go_);
   // refer the string to str_value_, not deep clone, make sure it won't be freed while reading
@@ -502,7 +498,7 @@ CAPIStatus TcpUpstream::getStringValue(int id, uint64_t* value_data, int* value_
     break;
   }
   default:
-    PANIC(fmt::format("golng http1-tcp bridge getStringValue invalid string value id: {}", id));
+    PANIC(fmt::format("golang http-tcp bridge getStringValue invalid string value id: {}", id));
   }
 
   *value_data = reinterpret_cast<uint64_t>(str_value_.data());
@@ -510,7 +506,7 @@ CAPIStatus TcpUpstream::getStringValue(int id, uint64_t* value_data, int* value_
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus TcpUpstream::setSelfHalfCloseForUpstreamConn(int enabled) {
+CAPIStatus HttpTcpBridge::setSelfHalfCloseForUpstreamConn(int enabled) {
   // lock until this function return since upstream_conn_self_half_close_ may be set by multi Goroutines.     
   Thread::LockGuard lock(mutex_for_c_and_go_);
   if (enabled == 1) {

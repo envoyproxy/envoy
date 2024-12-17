@@ -34,12 +34,9 @@ type (
 	EmptyDownstreamFilter struct{}
 	// EmptyUpstreamFilter provides the no-op implementation of the UpstreamFilter interface
 	EmptyUpstreamFilter struct{}
-	// EmptyTcpUpstreamFilter provides the no-op implementation of the EmptyTcpUpstreamFilter interface
-	EmptyTcpUpstreamFilter struct{}
 
-	PassThroughTcpUpstream struct {
-		EmptyTcpUpstreamFilter
-	}
+	// PassThroughHttpTcpBridge provides the no-op implementation of the HttpTcpBridge interface
+	PassThroughHttpTcpBridge struct{}
 )
 
 // request
@@ -343,7 +340,7 @@ type GaugeMetric interface {
 type HistogramMetric interface {
 }
 
-type TcpUpstreamCallbackHandler interface {
+type HttpTcpBridgeCallbackHandler interface {
 	// GetRouteName returns the name of the route which got matched
 	GetRouteName() string
 	// GetVirtualClusterName returns the name of the virtual cluster which got matched
@@ -352,42 +349,42 @@ type TcpUpstreamCallbackHandler interface {
 	SetSelfHalfCloseForUpstreamConn(enabled bool)
 }
 
-type TcpUpstreamFilter interface {
+type HttpTcpBridge interface {
 
 	// Invoked when header is delivered from the downstream.
 	// Notice: headerMap and dataToUpstream cannot be invoked after the func return.
-	EncodeHeaders(headerMap RequestHeaderMap, dataToUpstream BufferInstance, endOfStream bool) TcpUpstreamStatus
+	EncodeHeaders(headerMap RequestHeaderMap, dataToUpstream BufferInstance, endOfStream bool) HttpTcpBridgeStatus
 
 	// Streaming, Invoked when data is delivered from the downstream.
 	// Notice: buffer cannot be invoked after the func return.
-	EncodeData(buffer BufferInstance, endOfStream bool) TcpUpstreamStatus
+	EncodeData(buffer BufferInstance, endOfStream bool) HttpTcpBridgeStatus
 
 	// Streaming, Called when data is read on from tcp upstream.
-	// Notice-1: when return TcpUpstreamContinue, resp headers will be send to http all at once; from then on, you MUST NOT invoke responseHeaderForSet at any time(or you will get panic).
+	// Notice-1: when return HttpTcpBridgeContinue, resp headers will be send to http all at once; from then on, you MUST NOT invoke responseHeaderForSet at any time(or you will get panic).
 	// Notice-2: responseHeaderForSet and buffer cannot be invoked after the func return.
-	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) TcpUpstreamStatus
+	OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) HttpTcpBridgeStatus
 
 	// destroy filter
 	OnDestroy()
 }
 
-func (*EmptyTcpUpstreamFilter) EncodeHeaders(headerMap RequestHeaderMap, dataToUpstream BufferInstance, endOfStream bool) TcpUpstreamStatus {
-	return TcpUpstreamContinue
+func (*PassThroughHttpTcpBridge) EncodeHeaders(headerMap RequestHeaderMap, dataToUpstream BufferInstance, endOfStream bool) HttpTcpBridgeStatus {
+	return HttpTcpBridgeContinue
 }
 
-func (*EmptyTcpUpstreamFilter) EncodeData(buffer BufferInstance, endOfStream bool) TcpUpstreamStatus {
-	return TcpUpstreamContinue
+func (*PassThroughHttpTcpBridge) EncodeData(buffer BufferInstance, endOfStream bool) HttpTcpBridgeStatus {
+	return HttpTcpBridgeContinue
 }
 
-func (*EmptyTcpUpstreamFilter) OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) TcpUpstreamStatus {
-	return TcpUpstreamContinue
+func (*PassThroughHttpTcpBridge) OnUpstreamData(responseHeaderForSet ResponseHeaderMap, buffer BufferInstance, endOfStream bool) HttpTcpBridgeStatus {
+	return HttpTcpBridgeContinue
 }
 
-func (*EmptyTcpUpstreamFilter) OnDestroy() {
+func (*PassThroughHttpTcpBridge) OnDestroy() {
 }
 
-type TcpUpstreamFactory func(config interface{}, callbacks TcpUpstreamCallbackHandler) TcpUpstreamFilter
+type HttpTcpBridgeFactory func(config interface{}, callbacks HttpTcpBridgeCallbackHandler) HttpTcpBridge
 
-type TcpUpstreamConfigParser interface {
+type HttpTcpBridgeConfigParser interface {
 	Parse(any *anypb.Any) (interface{}, error)
 }

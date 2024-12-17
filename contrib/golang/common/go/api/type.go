@@ -451,20 +451,20 @@ var (
 
 // *************** errors end **************//
 
-// Info types called by tcp upstream that can get the corresponding info from c++ side.
-type TcpUpstreamInfoType int
+// Info types called by http-tcp bridge that can get the corresponding info from c++ side.
+type HttpTcpBridgeInfoType int
 
 const (
-	TcpUpstreamInfoRouterName  TcpUpstreamInfoType = 0
-	TcpUpstreamInfoClusterName TcpUpstreamInfoType = 1
+	HttpTcpBridgeInfoRouterName  HttpTcpBridgeInfoType = 0
+	HttpTcpBridgeInfoClusterName HttpTcpBridgeInfoType = 1
 )
 
-func (t TcpUpstreamInfoType) String() string {
+func (t HttpTcpBridgeInfoType) String() string {
 	switch t {
-	case TcpUpstreamInfoRouterName:
-		return "TcpUpstreamInfoRouterName"
-	case TcpUpstreamInfoClusterName:
-		return "TcpUpstreamInfoClusterName"
+	case HttpTcpBridgeInfoRouterName:
+		return "HttpTcpBridgeInfoRouterName"
+	case HttpTcpBridgeInfoClusterName:
+		return "HttpTcpBridgeInfoClusterName"
 	}
 	return "unknown"
 }
@@ -487,7 +487,7 @@ func (t EndStreamType) String() string {
 }
 
 // Status codes returned by tcp upstream extension.
-type TcpUpstreamStatus int
+type HttpTcpBridgeStatus int
 
 const (
 	/**
@@ -500,7 +500,7 @@ const (
 	* encodeData: streaming send data to upstream, go side get each_data_piece, may be called multipled times.
 	* onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
 	 */
-	TcpUpstreamContinue TcpUpstreamStatus = 0
+	HttpTcpBridgeContinue HttpTcpBridgeStatus = 0
 
 	/**
 	 * Area of status: encodeHeaders, encodeData, onUpstreamData
@@ -512,7 +512,7 @@ const (
 	 * encodeData: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot bed used when end_stream=true)
 	 * onUpstreamData: every data trigger will call go side, and go side get buffer data from start.
 	 */
-	TcpUpstreamStopAndBuffer TcpUpstreamStatus = 1
+	HttpTcpBridgeStopAndBuffer HttpTcpBridgeStatus = 1
 
 	/** Area of status: onUpstreamData
 	 *
@@ -521,17 +521,17 @@ const (
 	 * Here is the specific explanation in different funcs:
 	 * onUpstreamData: endStream to downstream which means the whole resp to http is finished.
 	 */
-	TcpUpstreamEndStream TcpUpstreamStatus = 2
+	HttpTcpBridgeEndStream HttpTcpBridgeStatus = 2
 )
 
-func (s TcpUpstreamStatus) String() string {
+func (s HttpTcpBridgeStatus) String() string {
 	switch s {
-	case TcpUpstreamContinue:
-		return "TcpUpstreamContinue"
-	case TcpUpstreamStopAndBuffer:
-		return "TcpUpstreamStopAndBuffer"
-	case TcpUpstreamEndStream:
-		return "TcpUpstreamEndStream"
+	case HttpTcpBridgeContinue:
+		return "HttpTcpBridgeContinue"
+	case HttpTcpBridgeStopAndBuffer:
+		return "HttpTcpBridgeStopAndBuffer"
+	case HttpTcpBridgeEndStream:
+		return "HttpTcpBridgeEndStream"
 	}
 	return "unknown"
 }

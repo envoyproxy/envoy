@@ -21,13 +21,13 @@ import (
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 )
 
-type passThroughFilter struct {
-	api.PassThroughTcpUpstream
-	callbacks api.TcpUpstreamCallbackHandler
+type passThroughBridge struct {
+	api.PassThroughHttpTcpBridge
+	callbacks api.HttpTcpBridgeCallbackHandler
 }
 
-func PassThroughFactory(config interface{}, callbacks api.TcpUpstreamCallbackHandler) api.TcpUpstreamFilter {
-	return &passThroughFilter{
+func PassThroughFactory(config interface{}, callbacks api.HttpTcpBridgeCallbackHandler) api.HttpTcpBridge {
+	return &passThroughBridge{
 		callbacks: callbacks,
 	}
 }

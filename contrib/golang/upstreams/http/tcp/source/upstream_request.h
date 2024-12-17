@@ -37,21 +37,21 @@ class ProcessorState;
 class DecodingProcessorState;
 class EncodingProcessorState;
 
-class TcpUpstream;
+class HttpTcpBridge;
 
 class BridgeConfig;
 
 using BridgeConfigSharedPtr = std::shared_ptr<BridgeConfig>;
 
 /**
- * Configuration for the Golang HTTP1-TCP Bridge.
+ * Configuration for the Golang HTTP-TCP Bridge.
  */
 class BridgeConfig : httpConfig,
                      public std::enable_shared_from_this<BridgeConfig>,
                      Logger::Loggable<Logger::Id::golang> {
 public:
   BridgeConfig(const envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config proto_config,
-   Dso::TcpUpstreamDsoPtr dso_lib);
+   Dso::HttpTcpBridgeDsoPtr dso_lib);
   ~BridgeConfig();
 
   const std::string& soId() const { return so_id_; }
@@ -67,7 +67,7 @@ private:
   const std::string so_path_;
   const ProtobufWkt::Any plugin_config_;
 
-  Dso::TcpUpstreamDsoPtr dso_lib_;
+  Dso::HttpTcpBridgeDsoPtr dso_lib_;
   uint64_t config_id_{0};
 };
 
@@ -113,19 +113,19 @@ private:
   Router::GenericConnectionPoolCallbacks* callbacks_{};
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
 
-  Dso::TcpUpstreamDsoPtr dynamic_lib_;
+  Dso::HttpTcpBridgeDsoPtr dynamic_lib_;
   BridgeConfigSharedPtr config_;
 };
 
-class TcpUpstream : public Router::GenericUpstream,
+class HttpTcpBridge : public Router::GenericUpstream,
                     public Envoy::Tcp::ConnectionPool::UpstreamCallbacks,
                     public httpRequest,
                     Logger::Loggable<Logger::Id::golang>  {
 public:
-  TcpUpstream(Router::UpstreamToDownstream* upstream_request,
-              Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream, Dso::TcpUpstreamDsoPtr dynamic_lib,
+  HttpTcpBridge(Router::UpstreamToDownstream* upstream_request,
+              Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream, Dso::HttpTcpBridgeDsoPtr dynamic_lib,
               BridgeConfigSharedPtr config);
-  ~TcpUpstream() override;            
+  ~HttpTcpBridge() override;            
 
   enum class EndStreamType {
     NotEndStream,
@@ -189,15 +189,16 @@ private:
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 
-  Dso::TcpUpstreamDsoPtr dynamic_lib_;
+  Dso::HttpTcpBridgeDsoPtr dynamic_lib_;
 
   bool already_send_resp_headers_{false};
 
-  // lock to avoid race between c thread and multi go threads (when c is running and calling back from go).
+  // lock to avoid race in c thread (when calling back from go).
   Thread::MutexBasicLockable mutex_for_c_and_go_{};
 
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
   std::string str_value_ ABSL_GUARDED_BY(mutex_for_c_and_go_);
+
   bool upstream_conn_self_half_close_ ABSL_GUARDED_BY(mutex_for_c_and_go_){false};
 
   // lock to avoid race between multi go threads (when c thread blocked and calling back from go).
