@@ -29,7 +29,7 @@ def tcmalloc_external_deps(repository):
             _repo("//bazel:debug_tcmalloc"),
             _repo("//bazel:gperftools_tcmalloc"),
         ): [_repo("//bazel/foreign_cc:gperftools")],
-        "//conditions:default": [_repo("//bazel:tcmalloc_libs")],
+        "//conditions:default": [_repo("//bazel:tcmalloc_all_libs")],
     })
 
 # Envoy C++ library targets that need no transformations or additional dependencies before being

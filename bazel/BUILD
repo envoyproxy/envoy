@@ -950,7 +950,7 @@ updater(
 )
 
 cc_library(
-    name = "tcmalloc_libs",
+    name = "tcmalloc_all_libs",
     visibility = ["//visibility:public"],
     deps = selects.with_or({
         ("//bazel:linux_x86_64", "//bazel:linux_aarch64"): [
