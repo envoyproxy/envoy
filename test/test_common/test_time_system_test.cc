@@ -14,6 +14,8 @@ class TestTimeSystemTest : public testing::Test {
 protected:
 };
 
+using TestTimeSystemDeathTest = TestTimeSystemTest;
+
 TEST_F(TestTimeSystemTest, TwoSimsSameReference) {
   SimulatedTimeSystem t1, t2;
   EXPECT_EQ(&t1.timeSystem(), &t2.timeSystem());
@@ -24,7 +26,7 @@ TEST_F(TestTimeSystemTest, TwoRealsSameReference) {
   EXPECT_EQ(&t1.timeSystem(), &t2.timeSystem());
 }
 
-TEST_F(TestTimeSystemTest, SimThenRealConflict) {
+TEST_F(TestTimeSystemDeathTest, SimThenRealConflict) {
   SimulatedTimeSystem t1;
   EXPECT_DEATH({ DangerousDeprecatedTestTime t2; },
                ".*Two different types of time-systems allocated.*");
@@ -35,7 +37,7 @@ TEST_F(TestTimeSystemTest, SimThenRealSerial) {
   { DangerousDeprecatedTestTime t2; }
 }
 
-TEST_F(TestTimeSystemTest, RealThenSim) {
+TEST_F(TestTimeSystemDeathTest, RealThenSim) {
   DangerousDeprecatedTestTime t1;
   EXPECT_DEATH({ SimulatedTimeSystem t2; }, ".*Two different types of time-systems allocated.*");
 }

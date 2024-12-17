@@ -66,6 +66,8 @@ protected:
   TestQuicFilterManagerConnectionImpl impl_;
 };
 
+using QuicFilterManagerConnectionImplDeathTest = QuicFilterManagerConnectionImplTest;
+
 TEST_F(QuicFilterManagerConnectionImplTest, ConnectionInfoProviderSharedPtr) {
   EXPECT_TRUE(impl_.connectionInfoProviderSharedPtr() != nullptr);
   impl_.closeNow();
@@ -113,7 +115,7 @@ TEST_F(QuicFilterManagerConnectionImplTest, RawWrite) {
   EXPECT_ENVOY_BUG(impl_.rawWrite(data, true), "unexpected call to rawWrite");
 }
 
-TEST_F(QuicFilterManagerConnectionImplTest, BufferLimit) {
+TEST_F(QuicFilterManagerConnectionImplDeathTest, BufferLimit) {
   EXPECT_DEATH(impl_.bufferLimit(), "not implemented");
 }
 
@@ -121,11 +123,11 @@ TEST_F(QuicFilterManagerConnectionImplTest, SetBufferLimits) {
   EXPECT_ENVOY_BUG(impl_.setBufferLimits(1), "unexpected call to setBufferLimits");
 }
 
-TEST_F(QuicFilterManagerConnectionImplTest, GetWriteBuffer) {
+TEST_F(QuicFilterManagerConnectionImplDeathTest, GetWriteBuffer) {
   EXPECT_DEATH(impl_.getWriteBuffer(), "not implemented");
 }
 
-TEST_F(QuicFilterManagerConnectionImplTest, EnableHalfClose) {
+TEST_F(QuicFilterManagerConnectionImplDeathTest, EnableHalfClose) {
   impl_.enableHalfClose(false); // No-op
   EXPECT_DEATH(impl_.enableHalfClose(true), "Quic connection doesn't support half close.");
 }

@@ -91,7 +91,9 @@ protected:
   GuardDogDeathTest()
       : config_kill_(1000, 1000, 100, 1000, 0, std::vector<std::string>{}),
         config_multikill_(1000, 1000, 1000, 500, 0, std::vector<std::string>{}),
-        config_multikill_threshold_(1000, 1000, 1000, 500, 60, std::vector<std::string>{}) {}
+        config_multikill_threshold_(1000, 1000, 1000, 500, 60, std::vector<std::string>{}) {
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
+  }
 
   /**
    * This does everything but the final forceCheckForTest() that should cause
@@ -591,6 +593,11 @@ protected:
 INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogActionsTest,
                          testing::ValuesIn({TimeSystemType::Real, TimeSystemType::Simulated}));
 
+using GuardDogActionsDeathTest = GuardDogActionsTest;
+
+INSTANTIATE_TEST_SUITE_P(TimeSystemType, GuardDogActionsDeathTest,
+                         testing::ValuesIn({TimeSystemType::Real, TimeSystemType::Simulated}));
+
 TEST_P(GuardDogActionsTest, MissShouldOnlyReportRelevantThreads) {
   const NiceMock<Configuration::MockWatchdog> config(100, DISABLE_MEGAMISS, DISABLE_KILL,
                                                      DISABLE_MULTIKILL, 0, getActionsConfig());
@@ -742,7 +749,7 @@ TEST_P(GuardDogActionsTest, MegaMissShouldSaturateOnMegaMissEvent) {
 
 // Disabled for coverage per #18229
 #if !defined(ENVOY_CONFIG_COVERAGE)
-TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
+TEST_P(GuardDogActionsDeathTest, ShouldRespectEventPriority) {
   // Priority of events are KILL, MULTIKILL, MEGAMISS and MISS
 
   // Kill event should fire before the others
@@ -787,7 +794,7 @@ TEST_P(GuardDogActionsTest, ShouldRespectEventPriority) {
 }
 #endif
 
-TEST_P(GuardDogActionsTest, KillShouldTriggerGuardDogActions) {
+TEST_P(GuardDogActionsDeathTest, KillShouldTriggerGuardDogActions) {
   auto die_function = [&]() -> void {
     const NiceMock<Configuration::MockWatchdog> config(DISABLE_MISS, DISABLE_MEGAMISS, 100, 0, 0,
                                                        getActionsConfig());
@@ -801,7 +808,7 @@ TEST_P(GuardDogActionsTest, KillShouldTriggerGuardDogActions) {
 
 // Disabled for coverage per #18229
 #if !defined(ENVOY_CONFIG_COVERAGE)
-TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
+TEST_P(GuardDogActionsDeathTest, MultikillShouldTriggerGuardDogActions) {
   auto die_function = [&]() -> void {
     const NiceMock<Configuration::MockWatchdog> config(DISABLE_MISS, DISABLE_MEGAMISS, DISABLE_KILL,
                                                        100, 0, getActionsConfig());
