@@ -1,8 +1,9 @@
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
 
-#include "otlp_utils.h"
 #include "source/common/common/logger.h"
 #include "source/common/grpc/status.h"
+
+#include "otlp_utils.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,11 +1,12 @@
+#include <cstddef>
+
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "google/protobuf/duration.pb.h"
-#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
+
 #include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
-#include <cstddef>
+#include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
 namespace Envoy {
 
@@ -90,6 +91,9 @@ public:
 
   FakeUpstream* grpc_receiver_upstream_{};
   ProtobufWkt::Struct otel_runtime_config_;
+
+  FakeHttpConnectionPtr connection_;
+  std::vector<FakeStreamPtr> streams_;
 };
 
 struct TestCase {};
@@ -119,18 +123,16 @@ TEST_P(OpenTelemetryTraceExporterIntegrationTest, GrpcExporter) {
   // verify that we receive the correct number of export requests, each with the correct number
   // of spans (there should be no unexported spans remaining)
   auto num_expected_exports = (num_requests * 2) / min_flush_spans;
-  FakeHttpConnectionPtr connection;
-  ASSERT_TRUE(grpc_receiver_upstream_->waitForHttpConnection(*dispatcher_, connection, timeout));
+  ASSERT_TRUE(grpc_receiver_upstream_->waitForHttpConnection(*dispatcher_, connection_));
 
   std::map<std::string, int> name_counts;
-  std::vector<FakeStreamPtr> streams;
   for (auto i = 0; i < num_expected_exports; i++) {
     FakeStreamPtr stream;
-    ASSERT_TRUE(connection->waitForNewStream(*dispatcher_, stream, timeout))
+    ASSERT_TRUE(connection_->waitForNewStream(*dispatcher_, stream, timeout))
         << "Expected to receive " << num_expected_exports << " export requests, but got " << i;
     ExportTraceServiceRequest req;
     ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, req, timeout));
-    stream->startGrpcStream(true);
+    stream->startGrpcStream();
     ExportTraceServiceResponse resp;
     stream->sendGrpcMessage(resp);
     stream->finishGrpcStream(Grpc::Status::WellKnownGrpcStatus::Ok);
@@ -142,11 +144,11 @@ TEST_P(OpenTelemetryTraceExporterIntegrationTest, GrpcExporter) {
       ++name_counts[req.resource_spans(0).scope_spans(0).spans().at(j).name()];
     }
     ASSERT_TRUE(stream->waitForEndStream(*dispatcher_, timeout));
-    streams.push_back(std::move(stream));
+    streams_.push_back(std::move(stream));
   }
 
-  ASSERT_TRUE(connection->close(timeout));
-  ASSERT_TRUE(connection->waitForDisconnect(timeout));
+  ASSERT_TRUE(connection_->close(timeout));
+  ASSERT_TRUE(connection_->waitForDisconnect(timeout));
   // the number of upstream and downstream spans received should be equal
   ASSERT_EQ(2, name_counts.size());
   ASSERT_THAT(name_counts,

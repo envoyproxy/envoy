@@ -135,5 +135,7 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
