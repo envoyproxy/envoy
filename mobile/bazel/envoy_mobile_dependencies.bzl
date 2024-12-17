@@ -61,6 +61,7 @@ def kotlin_dependencies(extra_maven_dependencies = []):
     maven_install(
         artifacts = [
             "com.google.code.findbugs:jsr305:3.0.2",
+            "androidx.annotation:annotation:1.5.0",
             # Java Proto Lite
             "com.google.protobuf:protobuf-javalite:3.24.4",
             # Kotlin
@@ -73,21 +74,21 @@ def kotlin_dependencies(extra_maven_dependencies = []):
             "org.jetbrains.dokka:dokka-cli:1.5.31",
             "org.jetbrains.dokka:javadoc-plugin:1.5.31",
             # Test artifacts
-            "com.google.truth:truth:1.4.0",
-            "junit:junit:4.13",
-            "org.mockito:mockito-inline:4.8.0",
-            "org.mockito:mockito-core:4.8.0",
-            "com.squareup.okhttp3:okhttp:4.10.0",
-            "com.squareup.okhttp3:mockwebserver:4.10.0",
-            "io.netty:netty-all:4.1.82.Final",
+            "com.google.truth:truth:1.4.4",
+            "junit:junit:4.13.2",
+            "org.mockito:mockito-inline:5.2.0",
+            "org.mockito:mockito-core:5.14.2",
+            "com.squareup.okhttp3:okhttp:4.12.0",
+            "com.squareup.okhttp3:mockwebserver:4.12.0",
+            "io.netty:netty-all:4.1.115.Final",
             # Android test artifacts
-            "androidx.test:core:1.4.0",
-            "androidx.test:rules:1.4.0",
-            "androidx.test:runner:1.4.0",
+            "androidx.test:core:1.5.0",
+            "androidx.test:rules:1.5.0",
+            "androidx.test:runner:1.5.0",
             "androidx.test:monitor:1.5.0",
-            "androidx.test.ext:junit:1.1.3",
+            "androidx.test.ext:junit:1.1.5",
             "org.robolectric:robolectric:4.8.2",
-            "org.hamcrest:hamcrest:2.2",
+            "org.hamcrest:hamcrest:3.0",
         ] + extra_maven_dependencies,
         version_conflict_policy = "pinned",
         repositories = [
