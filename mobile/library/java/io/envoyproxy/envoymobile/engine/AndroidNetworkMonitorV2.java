@@ -92,6 +92,7 @@ class NetworkState {
       return EnvoyConnectionType.CONNECTION_UNKNOWN;
     }
   }
+
   public NetworkState(boolean connected, int type, int subtype, boolean isMetered,
                       String networkIdentifier, boolean isPrivateDnsActive,
                       String privateDnsServerName) {
@@ -139,8 +140,20 @@ class NetworkState {
  * <li>When the internet is not available: call the
  * <code>InternalEngine::onDefaultNetworkUnavailable</code> callback.</li>
  *
- * <li>When the network is changed: call the
+ * <li>When the default network is changed: call the
  * <code>EnvoyEngine::onDefaultNetworkChangedV2</code>.</li>
+ *
+ * <li>When any network is available: call the
+ * <code>EnvoyEngine::onNetworkConnect</code>.</li>
+ *
+ * <li>When any network is unavailable: call the
+ * <code>EnvoyEngine::onNetworkDisconnect</code>.</li>
+ *
+ * <li>When VPN network is available: call the
+ * <code>EnvoyEngine::purgeActiveNetworkList</code>.</li>
+ *
+ * <li>When VPN network is unavailable: call the
+ * <code>EnvoyEngine::onNetworkConnected</code> with all the rest of the connected networks.</li>
  * </ul>
  */
 public class AndroidNetworkMonitorV2 {
@@ -150,16 +163,17 @@ public class AndroidNetworkMonitorV2 {
   private static volatile AndroidNetworkMonitorV2 mInstance = null;
   private ConnectivityManager mConnectivityManager;
   private EnvoyEngine mEnvoyEngine;
-  // {@link Looper} for the thread this object lives on.
+  // Looper for the thread this object lives on.
   private Looper mLooper;
   // Used to post to the thread this object lives on.
   private Handler mHandler;
-  // Starting with Android O, used to detect changes in default network.
+  // Starting with Android O, used to detect changes on default network.
   private NetworkCallback mDefaultNetworkCallback;
   // Will be null if ConnectivityManager.registerNetworkCallback() ever fails.
   private MyNetworkCallback mNetworkCallback;
   private NetworkRequest mNetworkRequest;
   private NetworkState mNetworkState;
+  private boolean mRegistered = false;
 
   public static void load(Context context, EnvoyEngine envoyEngine) {
     if (mInstance != null) {
@@ -180,6 +194,7 @@ public class AndroidNetworkMonitorV2 {
    */
   @VisibleForTesting
   public static void shutdown() {
+    mInstance.unregisterNetworkCallbacks();
     mInstance = null;
   }
 
@@ -213,7 +228,11 @@ public class AndroidNetworkMonitorV2 {
     } else {
       // Once execution begins on the correct thread, make sure unregister() hasn't
       // been called in the mean time.
-      mHandler.post(() -> { r.run(); });
+      mHandler.post(() -> {
+        if (mRegistered) {
+          r.run();
+        }
+      });
     }
   }
 
@@ -429,7 +448,7 @@ public class AndroidNetworkMonitorV2 {
   /** Fetches NetworkInfo for |network|. */
   private NetworkInfo getNetworkInfo(Network network) {
     NetworkInfo networkInfo = getRawNetworkInfo(network);
-    if (networkInfo != null && networkInfo.getType() == TYPE_VPN) {
+    if (networkInfo != null && networkInfo.getType() == ConnectivityManager.TYPE_VPN) {
       // When a VPN is in place the underlying network type can be queried via
       // getActiveNetworkInfo() thanks to
       // https://android.googlesource.com/platform/frameworks/base/+/d6a7980d
@@ -462,23 +481,27 @@ public class AndroidNetworkMonitorV2 {
       // LinkProperties and NetworkCapabilities.
       mLinkProperties = null;
       mNetworkCapabilities = null;
-      mEnvoyEngine.onDefaultNetworkAvailable();
+      if (mRegistered) {
+        mEnvoyEngine.onDefaultNetworkAvailable();
+      }
     }
 
     @Override
     public void onLost(@NonNull Network network) {
       mLinkProperties = null;
       mNetworkCapabilities = null;
-      onNetworkStateChangedTo(new NetworkState(false, -1, -1, false, null, false, ""));
-      mEnvoyEngine.onDefaultNetworkUnavailable();
+      if (mRegistered) {
+        onNetworkStateChangedTo(new NetworkState(false, -1, -1, false, null, false, ""), -1);
+        mEnvoyEngine.onDefaultNetworkUnavailable();
+      }
     }
 
     // LinkProperties changes include enabling/disabling DNS-over-TLS.
     @Override
     public void onLinkPropertiesChanged(Network network, LinkProperties linkProperties) {
       mLinkProperties = linkProperties;
-      if (mLinkProperties != null && mNetworkCapabilities != null) {
-        onNetworkStateChangedTo(createNetworkState(network));
+      if (mRegistered && mLinkProperties != null && mNetworkCapabilities != null) {
+        onNetworkStateChangedTo(createNetworkState(network), network.getNetworkHandle());
       }
     }
 
@@ -491,8 +514,8 @@ public class AndroidNetworkMonitorV2 {
       // onCapabilities is guaranteed to be called immediately after `onAvailable`
       // starting with Android O, so this logic may not work on older Android versions.
       // https://developer.android.com/reference/android/net/ConnectivityManager.NetworkCallback#onCapabilitiesChanged(android.net.Network,%20android.net.NetworkCapabilities)
-      if (mLinkProperties != null && mNetworkCapabilities != null) {
-        onNetworkStateChangedTo(createNetworkState(network));
+      if (mRegistered && mLinkProperties != null && mNetworkCapabilities != null) {
+        onNetworkStateChangedTo(createNetworkState(network), network.getNetworkHandle());
       }
     }
 
@@ -608,6 +631,7 @@ public class AndroidNetworkMonitorV2 {
     @Override
     public void onAvailable(Network network) {
       final NetworkCapabilities capabilities = mConnectivityManager.getNetworkCapabilities(network);
+      assert capabilities != null;
       if (ignoreConnectedNetwork(network, capabilities)) {
         return;
       }
@@ -641,6 +665,7 @@ public class AndroidNetworkMonitorV2 {
       }
       // A capabilities change may indicate the ConnectionType has changed,
       // so forward the new ConnectionType along to observer.
+      // This maybe a duplicated signal, the native code should de-dup it.
       final long netId = network.getNetworkHandle();
       final EnvoyConnectionType connectionType = getEnvoyConnectionType(network);
       runOnThread(new Runnable() {
@@ -672,11 +697,11 @@ public class AndroidNetworkMonitorV2 {
           onAvailable(newNetwork);
         }
 
-        mNetworkState = getNetworkStateOfDefaultNetwork();
-        final EnvoyConnectionType newConnectionType = mNetworkState.getEnvoyConnectionType();
         runOnThread(new Runnable() {
           @Override
           public void run() {
+            mNetworkState = getNetworkStateOfDefaultNetwork();
+            final EnvoyConnectionType newConnectionType = mNetworkState.getEnvoyConnectionType();
             mEnvoyEngine.onDefaultNetworkChangedV2(newConnectionType, getDefaultNetId());
           }
         });
@@ -684,13 +709,13 @@ public class AndroidNetworkMonitorV2 {
     }
   }
 
-  private void onNetworkStateChangedTo(NetworkState networkState) {
+  private void onNetworkStateChangedTo(NetworkState networkState, long netId) {
+    assert mNetworkState != null;
     if (networkState.getEnvoyConnectionType() != mNetworkState.getEnvoyConnectionType() ||
         !networkState.getNetworkIdentifier().equals(mNetworkState.getNetworkIdentifier()) ||
         networkState.isPrivateDnsActive() != mNetworkState.isPrivateDnsActive() ||
         !networkState.getPrivateDnsServerName().equals(mNetworkState.getPrivateDnsServerName())) {
-      mEnvoyEngine.onDefaultNetworkChangedV2(networkState.getEnvoyConnectionType(),
-                                             getDefaultNetId());
+      mEnvoyEngine.onDefaultNetworkChangedV2(networkState.getEnvoyConnectionType(), netId);
     }
     mNetworkState = networkState;
   }
@@ -712,44 +737,73 @@ public class AndroidNetworkMonitorV2 {
         (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
     mLooper = Looper.myLooper();
     mHandler = new Handler(mLooper);
-    onNetworkStateChangedTo(getNetworkStateOfDefaultNetwork());
-    try {
-      mDefaultNetworkCallback = new DefaultNetworkCallback();
-      mConnectivityManager.registerDefaultNetworkCallback(mDefaultNetworkCallback, mHandler);
-    } catch (RuntimeException e) {
-      mDefaultNetworkCallback = null;
-    }
-
+    mDefaultNetworkCallback = new DefaultNetworkCallback();
     mNetworkCallback = new MyNetworkCallback();
     mNetworkRequest = new NetworkRequest.Builder()
                           .addCapability(NET_CAPABILITY_INTERNET)
                           // Need to hear about VPNs too.
                           .removeCapability(NET_CAPABILITY_NOT_VPN)
                           .build();
-    mNetworkCallback.initializeVpnInPlace();
-    try {
-      mConnectivityManager.registerNetworkCallback(mNetworkRequest, mNetworkCallback, mHandler);
-    } catch (RuntimeException e) {
-      // If Android thinks this app has used up all available NetworkRequests, don't
-      // bother trying to register any more callbacks as Android will still think
-      // all available NetworkRequests are used up and fail again needlessly.
-      // Also don't bother unregistering as this call didn't actually register.
-      // See crbug.com/791025 for more info.
-      mNetworkCallback = null;
+    mNetworkState = getNetworkStateOfDefaultNetwork();
+    registerNetworkCallbacks(false);
+  }
+
+  public void registerNetworkCallbacks(boolean shouldSignalDefaultNetworkChange) {
+    // Currently only register during construction.
+    assert !mRegistered;
+
+    if (shouldSignalDefaultNetworkChange) {
+      onNetworkStateChangedTo(getNetworkStateOfDefaultNetwork(), getDefaultNetId());
     }
-    if (mNetworkCallback != null) {
-      // registerNetworkCallback() will rematch the NetworkRequest
-      // against active networks, so a cached list of active networks
-      // will be repopulated immediately after this. However we need to
-      // purge any cached networks as they may have been disconnected
-      // while mNetworkCallback was unregistered.
-      final Network[] networks = getAllNetworksFiltered(null);
-      // Convert Networks to NetIDs.
-      final long[] netIds = new long[networks.length];
-      for (int i = 0; i < networks.length; i++) {
-        netIds[i] = networks[i].getNetworkHandle();
+
+    if (mDefaultNetworkCallback != null) {
+      try {
+        mConnectivityManager.registerDefaultNetworkCallback(mDefaultNetworkCallback);
+      } catch (RuntimeException e) {
+        mDefaultNetworkCallback = null;
       }
-      mEnvoyEngine.purgeActiveNetworkList(netIds);
+    }
+    mRegistered = true;
+
+    if (mNetworkCallback != null) {
+      mNetworkCallback.initializeVpnInPlace();
+      try {
+        mConnectivityManager.registerNetworkCallback(mNetworkRequest, mNetworkCallback, mHandler);
+      } catch (RuntimeException e) {
+        // If Android thinks this app has used up all available NetworkRequests, don't
+        // bother trying to register any more callbacks as Android will still think
+        // all available NetworkRequests are used up and fail again needlessly.
+        // Also don't bother unregistering as this call didn't actually register.
+        // See crbug.com/791025 for more info.
+        mNetworkCallback = null;
+      }
+      if (mNetworkCallback != null && shouldSignalDefaultNetworkChange) {
+        // registerNetworkCallback() will rematch the NetworkRequest
+        // against active networks, so a cached list of active networks
+        // will be repopulated immediately after this. However we need to
+        // purge any cached networks as they may have been disconnected
+        // while mNetworkCallback was unregistered.
+        final Network[] networks = getAllNetworksFiltered(null);
+        // Convert Networks to NetIDs.
+        final long[] netIds = new long[networks.length];
+        for (int i = 0; i < networks.length; i++) {
+          netIds[i] = networks[i].getNetworkHandle();
+        }
+        mEnvoyEngine.purgeActiveNetworkList(netIds);
+      }
+    }
+  }
+
+  public void unregisterNetworkCallbacks() {
+    assert onThread();
+    if (!mRegistered)
+      return;
+    mRegistered = false;
+    if (mNetworkCallback != null) {
+      mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
+    }
+    if (mDefaultNetworkCallback != null) {
+      mConnectivityManager.unregisterNetworkCallback(mDefaultNetworkCallback);
     }
   }
 }
