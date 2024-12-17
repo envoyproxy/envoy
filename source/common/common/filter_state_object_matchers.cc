@@ -12,7 +12,8 @@
 namespace Envoy {
 namespace Matchers {
 
-FilterStateIpRangeMatcher::FilterStateIpRangeMatcher(std::unique_ptr<Network::Address::IpList>&& ip_list)
+FilterStateIpRangeMatcher::FilterStateIpRangeMatcher(
+    std::unique_ptr<Network::Address::IpList>&& ip_list)
     : ip_list_(std::move(ip_list)) {}
 
 bool FilterStateIpRangeMatcher::match(const StreamInfo::FilterState::Object& object) const {
