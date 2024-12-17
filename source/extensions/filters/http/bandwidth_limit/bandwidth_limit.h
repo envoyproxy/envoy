@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -62,10 +63,11 @@ class FilterConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
   using EnableMode =
       envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit_EnableMode;
+  static absl::StatusOr<std::shared_ptr<FilterConfig>>
+  create(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
+         Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
+         bool per_route = false);
 
-  FilterConfig(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
-               Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
-               absl::Status& creation_status, bool per_route = false);
   ~FilterConfig() override = default;
   Runtime::Loader& runtime() { return runtime_; }
   BandwidthLimitStats& stats() const { return stats_; }
@@ -88,6 +90,10 @@ public:
 
 private:
   friend class FilterTest;
+
+  FilterConfig(const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& config,
+               Stats::Scope& scope, Runtime::Loader& runtime, TimeSource& time_source,
+               bool per_route, absl::Status& creation_status);
 
   static BandwidthLimitStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
