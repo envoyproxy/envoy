@@ -73,6 +73,10 @@ minor_behavior_changes:
   change: |
     The ``state`` parameter in the OAuth2 authorization request has been changed to a base64url-encoded JSON object.
     The JSON object contains the original request URL and a nonce for CSRF prevention.
+- area: oauth2
+  change: |
+    Implement the Signed Double-Submit Cookie pattern, as recommended by OWASP, by using the HMAC secret to sign and verify
+    the nonce.
 - area: quic
   change: |
     Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
@@ -332,9 +336,16 @@ new_features:
   change: |
     Added new health check filter stats including total requests, successful/failed checks, cached responses, and
     cluster health status counters. These stats help track health check behavior and cluster health state.
+- area: filters
+  change: |
+    Updatd the ``set_filter_state`` :ref:`filter <config_http_filters_set_filter_state>` to support per-route overrides.
 - area: grpc-json
   change: |
     Added a new http filter for :ref:`gRPC to JSON transcoding <config_http_filters_grpc_json_reverse_transcoder>`.
+- area: attributes
+  change: |
+    added new ``xds.virtual_host_name`` and ``xds.virtual_host_metadata`` attributes support. See
+    :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
 - area: redis
   change: |
     Added support for UNWATCH command.

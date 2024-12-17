@@ -1819,7 +1819,8 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
     const CommonConfigSharedPtr& global_route_config,
     Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
-    : stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
+    : name_(virtual_host.name()),
+      stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
       global_route_config_(global_route_config),
       per_filter_configs_(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),

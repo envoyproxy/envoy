@@ -648,8 +648,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_constants_lib",
-    srcs = ["quiche/http2/http2_constants.cc"],
-    hdrs = ["quiche/http2/http2_constants.h"],
+    srcs = ["quiche/http2/core/http2_constants.cc"],
+    hdrs = ["quiche/http2/core/http2_constants.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
@@ -660,8 +660,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_structures_lib",
-    srcs = ["quiche/http2/http2_structures.cc"],
-    hdrs = ["quiche/http2/http2_structures.h"],
+    srcs = ["quiche/http2/core/http2_structures.cc"],
+    hdrs = ["quiche/http2/core/http2_structures.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [

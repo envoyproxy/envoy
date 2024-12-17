@@ -39,11 +39,13 @@ static const std::string TEST_CLIENT_SECRET_ID = "MyClientSecretKnoxID";
 static const std::string TEST_TOKEN_SECRET_ID = "MyTokenSecretKnoxID";
 static const std::string TEST_DEFAULT_SCOPE = "user";
 static const std::string TEST_ENCODED_AUTH_SCOPES = "user%20openid%20email";
-static const std::string TEST_STATE_NONCE = "00000000075bcd15";
-// {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"00000000075bcd15"}
+static const std::string TEST_STATE_CSRF_TOKEN =
+    "00000000075bcd15.na6kru4x1pHgocSIeU/mdtHYn58Gh1bqweS4XXoiqVg=";
+// {"url":"https://traffic.example.com/original_path?var1=1&var2=2","csrf_token":"${extracted}"}
 static const std::string TEST_ENCODED_STATE =
-    "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwibm9uY2"
-    "UiOiIwMDAwMDAwMDA3NWJjZDE1In0";
+    "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwiY3NyZl"
+    "90b2tlbiI6IjAwMDAwMDAwMDc1YmNkMTUubmE2a3J1NHgxcEhnb2NTSWVVL21kdEhZbjU4R2gxYnF3ZVM0WFhvaXFWZz0i"
+    "fQ";
 
 namespace {
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
@@ -382,7 +384,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
 
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
@@ -444,7 +446,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -499,7 +501,7 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -693,7 +695,7 @@ TEST_F(OAuth2Test, SetBearerToken) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -762,7 +764,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -791,7 +793,7 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -884,7 +886,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -903,20 +905,20 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
 }
 
 /**
- * Scenario: The OAuth filter receives a callback request from the OAuth server that lacks a nonce.
- * This scenario simulates a CSRF attack where the original OAuth request was inserted to the user's
- * browser by a malicious actor, and the user was tricked into clicking on the link.
+ * Scenario: The OAuth filter receives a callback request from the OAuth server that lacks a CSRF
+ * token. This scenario simulates a CSRF attack where the original OAuth request was inserted to the
+ * user's browser by a malicious actor, and the user was tricked into clicking on the link.
  *
  * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
  */
-TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoNonce) {
+TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoCsrfToken) {
   // {"url":"https://traffic.example.com/original_path?var1=1&var2=2"}
-  static const std::string state_without_nonce =
+  static const std::string state_without_csrf_token =
       "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIn0";
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_without_nonce},
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_without_csrf_token},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -934,20 +936,20 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoNonce) {
 
 /**
  * Scenario: The OAuth filter receives a callback request from the OAuth server that has an invalid
- * nonce. This scenario simulates a CSRF attack where the original OAuth request was inserted to the
- * user's browser by a malicious actor, and the user was tricked into clicking on the link.
+ * CSRF token. This scenario simulates a CSRF attack where the original OAuth request was inserted
+ * to the user's browser by a malicious actor, and the user was tricked into clicking on the link.
  *
  * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
  */
-TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidNonce) {
-  // {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"0"}
-  static const std::string state_with_invalid_nonce =
-      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwibm9u"
-      "Y2UiOiIwIn0";
+TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidCsrfTkoen) {
+  // {"url":"https://traffic.example.com/original_path?var1=1&var2=2","csrf_token":"0"}
+  static const std::string state_with_invalid_csrf_token =
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwiY3Ny"
+      "Zl90b2tlbiI6IjAifQ";
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_with_invalid_nonce},
+      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_with_invalid_csrf_token},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -974,15 +976,16 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationMalformedState) {
   // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
 
-  // {"url":"https://traffic.example.com/original_path?var1=1&var2=2","nonce":"}
-  static const std::string state_with_invalid_nonce_json =
-      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwibm9u"
-      "Y2UiOiJ9";
+  // {"url":"https://traffic.example.com/original_path?var1=1&var2=2","csrf_token":"}
+  static const std::string state_with_invalid_csrf_token_json =
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD92YXIxPTEmdmFyMj0yIiwiY3Ny"
+      "Zl90b2tlbiI6In0";
 
   Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_with_invalid_nonce_json},
+      {Http::Headers::get().Path.get(),
+       "/_oauth?code=123&state=" + state_with_invalid_csrf_token_json},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -996,6 +999,33 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationMalformedState) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: The OAuth filter receives a request with an invalid CSRF token cookie.
+ * This scenario simulates an attacker trying to forge a CSRF token.
+ *
+ * Expected behavior: the filter should fail the request and return a 401 Unauthorized response.
+ */
+TEST_F(OAuth2Test, RedirectToOAuthServerWithInvalidCSRFToken) {
+  static const std::string invalid_csrf_token = "00000000075bcd15.invalidhmac";
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + invalid_csrf_token},
+  };
+
+  // Explicitly fail the validation to trigger the OAuth flow.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+
+  // Unauthorized response is expected instead of 302 redirect.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::Unauthorized, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(1, config_->stats().oauth_failure_.value());
 }
 
 /**
@@ -1206,9 +1236,9 @@ TEST_F(OAuth2Test, CookieValidatorCanUpdateToken) {
 
 // Verify that we 401 the request if the state query param doesn't contain a valid URL.
 TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
-  // {"url":"blah","nonce":"00000000075bcd15"}
+  // {"url":"blah","csrf_token":"${extracted}"}
   static const std::string state_with_invalid_url =
-      "eyJ1cmwiOiJibGFoIiwibm9uY2UiOiIwMDAwMDAwMDA3NWJjZDE1In0";
+      "eyJ1cmwiOiJibGFoIiwiY3NyZl90b2tlbiI6IjAwMDAwMDAwMDc1YmNkMTUifQ";
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1221,7 +1251,7 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
-      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_CSRF_TOKEN},
   };
 
   Http::TestRequestHeaderMapImpl expected_headers{
@@ -1245,10 +1275,10 @@ TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
 
 // Verify that we 401 the request if the state query param contains the callback URL.
 TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
-  // {"url":"https://traffic.example.com/_oauth","nonce":"00000000075bcd15"}
+  // {"url":"https://traffic.example.com/_oauth","csrf_token":"${extracted}"}
   static const std::string state_with_callback_url =
-      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vX29hdXRoIiwibm9uY2UiOiIwMDAwMDAwMDA3NWJjZDE1"
-      "In0";
+      "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vX29hdXRoIiwiY3NyZl90b2tlbiI6IjAwMDAwMDAwMDc1"
+      "YmNkMTUifQ";
 
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -1263,7 +1293,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
-      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_CSRF_TOKEN},
   };
 
   Http::TestRequestHeaderMapImpl expected_response_headers{
@@ -1296,7 +1326,7 @@ TEST_F(OAuth2Test, OAuthTestCallbackUrlInStateQueryParam) {
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
-      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_CSRF_TOKEN},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
@@ -1318,7 +1348,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
-      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_CSRF_TOKEN},
   };
 
   Http::TestRequestHeaderMapImpl expected_response_headers{
@@ -1351,7 +1381,7 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
        "OauthHMAC="
        "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMj"
        "RlNjMxZTJmNTZkYzRmZTM0ZQ===="},
-      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_NONCE},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_STATE_CSRF_TOKEN},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
@@ -1380,7 +1410,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN +
+           ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -1408,7 +1439,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithCookieDomain) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN +
+           ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1470,8 +1502,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
       R"(/original_path?query="value"&key=val\ue#frag<ment>{data}[info]|test\^space)";
   const std::string test_encoded_state_with_special_characters =
       "eyJ1cmwiOiJodHRwczovL3RyYWZmaWMuZXhhbXBsZS5jb20vb3JpZ2luYWxfcGF0aD9xdWVyeT1cInZhbHVlXCIma2V5"
-      "PXZhbFxcdWUjZnJhZzxtZW50PntkYXRhfVtpbmZvXXx0ZXN0XFxec3BhY2UiLCJub25jZSI6IjAwMDAwMDAwMDc1YmNk"
-      "MTUifQ";
+      "PXZhbFxcdWUjZnJhZzxtZW50PntkYXRhfVtpbmZvXXx0ZXN0XFxec3BhY2UiLCJjc3JmX3Rva2VuIjoiMDAwMDAwMDAw"
+      "NzViY2QxNS5uYTZrcnU0eDFwSGdvY1NJZVUvbWR0SFluNThHaDFicXdlUzRYWG9pcVZnPSJ9";
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
       {Http::Headers::get().Path.get(), url_with_special_characters},
@@ -1484,7 +1516,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -1514,7 +1546,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=123&state=" + test_encoded_state_with_special_characters},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -2260,7 +2292,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -2290,7 +2322,8 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN +
+           ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -2442,7 +2475,7 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
   Http::TestResponseHeaderMapImpl redirect_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_STATE_NONCE + ";path=/;Max-Age=600;secure;HttpOnly"},
+       "OauthNonce=" + TEST_STATE_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
