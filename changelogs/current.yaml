@@ -350,7 +350,7 @@ new_features:
 - area: udp_proxy
   change: |
     Added support for :ref:`backoff_options
-    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxy.UdpTunnelingConfig.RetryOptions.backoff_options>`
+    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions.backoff_options>`
     to configure the backoff strategy for UDP proxy retries when tunneling over HTTP.
 
 deprecated:
