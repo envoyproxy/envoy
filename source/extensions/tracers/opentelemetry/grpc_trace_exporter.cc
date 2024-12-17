@@ -20,7 +20,7 @@ void OpenTelemetryGrpcTraceExporter::onCreateInitialMetadata(Http::RequestHeader
 }
 
 void OpenTelemetryGrpcTraceExporter::onSuccess(
-    Grpc::ResponsePtr<ExportTraceServiceResponse>&& response, Tracing::Span& _) {
+    Grpc::ResponsePtr<ExportTraceServiceResponse>&& response, Tracing::Span&) {
   if (response->has_partial_success()) {
     auto msg = response->partial_success().error_message();
     auto rejected_spans = response->partial_success().rejected_spans();
@@ -34,7 +34,7 @@ void OpenTelemetryGrpcTraceExporter::onSuccess(
 }
 
 void OpenTelemetryGrpcTraceExporter::onFailure(Grpc::Status::GrpcStatus status,
-                                               const std::string& message, Tracing::Span& _) {
+                                               const std::string& message, Tracing::Span&) {
   ENVOY_LOG(error, "OTLP trace export failed with status: {}, message: {}",
             Grpc::Utility::grpcStatusToString(status), message);
 }

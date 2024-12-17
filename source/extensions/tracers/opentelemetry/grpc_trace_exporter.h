@@ -20,11 +20,10 @@ public:
 
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
 
-  void onSuccess(Grpc::ResponsePtr<ExportTraceServiceResponse>&& response,
-                 Tracing::Span& _) override;
+  void onSuccess(Grpc::ResponsePtr<ExportTraceServiceResponse>&& response, Tracing::Span&) override;
 
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
-                 Tracing::Span& _) override;
+                 Tracing::Span&) override;
 
   bool log(const ExportTraceServiceRequest& request) override;
 
