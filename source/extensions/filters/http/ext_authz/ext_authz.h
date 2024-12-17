@@ -138,6 +138,9 @@ public:
 
   bool headersAsBytes() const { return encode_raw_headers_; }
 
+  ttl_cache_t& resp_cache() { return cache_; }
+  //const ttl_cache_t& resp_cache() const { return cache_; }
+
   Filters::Common::MutationRules::CheckResult
   checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
                              const Http::LowerCaseString& key, absl::string_view value) const {
@@ -275,12 +278,11 @@ private:
   // The stats for the filter.
   ExtAuthzFilterStats stats_;
 
-  // Response cache
-  ttl_cache_t cache_;
-
-
   Filters::Common::ExtAuthz::MatcherSharedPtr allowed_headers_matcher_;
   Filters::Common::ExtAuthz::MatcherSharedPtr disallowed_headers_matcher_;
+
+  // Response cache
+  ttl_cache_t cache_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
