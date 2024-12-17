@@ -30,11 +30,6 @@ public:
       const envoy::extensions::filters::http::composite::v3::Composite& proto_config,
       const std::string& stats_prefix, DualInfo dual_info,
       Server::Configuration::ServerFactoryContext& context) override;
-
-  Server::Configuration::MatchingRequirementsPtr matchingRequirements() override {
-    return std::make_unique<
-        envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
-  }
 };
 
 using UpstreamCompositeFilterFactory = CompositeFilterFactory;
