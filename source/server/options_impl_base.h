@@ -88,6 +88,9 @@ public:
   void setIgnoreUnknownFieldsDynamic(bool ignore_unknown_dynamic_fields) {
     ignore_unknown_dynamic_fields_ = ignore_unknown_dynamic_fields;
   }
+  void setSupressingDeprecatedWarningLog(bool suppress_deprecated_warning_logs) {
+    suppress_deprecated_warning_logs_ = suppress_deprecated_warning_logs;
+  }
 
   void setSocketPath(const std::string& socket_path) { socket_path_ = socket_path; }
 
@@ -110,6 +113,7 @@ public:
   bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
   bool rejectUnknownDynamicFields() const override { return reject_unknown_dynamic_fields_; }
   bool ignoreUnknownDynamicFields() const override { return ignore_unknown_dynamic_fields_; }
+  bool suppressDeprecatedWarningLogs() const override { return suppress_deprecated_warning_logs_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -182,6 +186,7 @@ private:
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};
   bool ignore_unknown_dynamic_fields_{false};
+  bool suppress_deprecated_warning_logs_{false};
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_{Network::Address::IpVersion::v4};
   spdlog::level::level_enum log_level_{spdlog::level::info};
