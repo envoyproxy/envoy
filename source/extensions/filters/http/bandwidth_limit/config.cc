@@ -29,10 +29,8 @@ absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 BandwidthLimitFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit& proto_config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  auto config = FilterConfig::create(proto_config, context.scope(), context.runtime(),
-                                     context.timeSource(), true);
-  RETURN_IF_NOT_OK_REF(config.status());
-  return config;
+  return FilterConfig::create(proto_config, context.scope(), context.runtime(),
+                              context.timeSource(), true);
 }
 
 /**
