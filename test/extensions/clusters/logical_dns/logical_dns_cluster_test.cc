@@ -108,7 +108,7 @@ protected:
             membership_updated_.ready();
             return absl::OkStatus();
           });
-      cluster_->initialize([&]() -> void {
+      cluster_->initialize([&]() {
         initialized_.ready();
         return absl::OkStatus();
       });
