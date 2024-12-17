@@ -70,6 +70,32 @@ public class AndroidNetworkMonitorV2Test {
     AndroidNetworkMonitorV2.shutdown();
   }
 
+  // Setup ShadowConnectivityManager with a new Network with given types and manually trigger a
+  // series of network callbacks: onAvailable => onLinkPropertiesChanged => onCapabilitiesChanged
+  // for on this network. Android platform guarantees to call onAvaialbe() before the other two.
+  private Network triggerDefaultNetworkChange(int newTransportType, int newNetworkType,
+                                              int newSubType) {
+    // Setup the new network.
+    NetworkInfo networkInfo =
+        ShadowNetworkInfo.newInstance(NetworkInfo.DetailedState.CONNECTED, newNetworkType,
+                                      newSubType, true, NetworkInfo.State.CONNECTED);
+    shadowOf(connectivityManager).setActiveNetworkInfo(networkInfo);
+    Network newNetwork = connectivityManager.getActiveNetwork();
+    NetworkCapabilities capabilities = ShadowNetworkCapabilities.newInstance();
+    shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+    shadowOf(capabilities).addTransportType(newTransportType);
+    shadowOf(connectivityManager).setNetworkCapabilities(newNetwork, capabilities);
+
+    shadowOf(connectivityManager).getNetworkCallbacks().forEach(callback -> {
+      callback.onAvailable(newNetwork);
+      LinkProperties link = new LinkProperties();
+      callback.onLinkPropertiesChanged(newNetwork, link);
+      callback.onCapabilitiesChanged(newNetwork, capabilities);
+    });
+    return newNetwork;
+  }
+
   /**
    * Tests that isOnline() returns the correct result.
    */
@@ -116,79 +142,59 @@ public class AndroidNetworkMonitorV2Test {
     verify(mockEnvoyEngine).onNetworkDisconnect(network.getNetworkHandle());
   }
 
-  private Network triggerDefaultNetworkChange(int newTransportType, int newNetworkType,
-                                              int newSubType) {
-    // Setup the new network.
-    NetworkInfo networkInfo =
-        ShadowNetworkInfo.newInstance(NetworkInfo.DetailedState.CONNECTED, newNetworkType,
-                                      newSubType, true, NetworkInfo.State.CONNECTED);
-    shadowOf(connectivityManager).setActiveNetworkInfo(networkInfo);
-    Network newNetwork = connectivityManager.getActiveNetwork();
-    NetworkCapabilities capabilities = ShadowNetworkCapabilities.newInstance();
-    shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
-    shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
-    shadowOf(capabilities).addTransportType(newTransportType);
-    shadowOf(connectivityManager).setNetworkCapabilities(newNetwork, capabilities);
-
-    // Manually trigger a series of network callbacks: onAvailable => onLinkPropertiesChanged =>
-    // onCapabilitiesChanged. Android platform guarantees to call onAvaialbe() before the other two.
-    shadowOf(connectivityManager).getNetworkCallbacks().forEach(callback -> {
-      callback.onAvailable(newNetwork);
-      LinkProperties link = new LinkProperties();
-      callback.onLinkPropertiesChanged(newNetwork, link);
-      callback.onCapabilitiesChanged(newNetwork, capabilities);
-    });
-    return newNetwork;
-  }
-
-  /*
   @Test
   public void testOnDefaultNetworkChangedWifi() {
     Network network = triggerDefaultNetworkChange(NetworkCapabilities.TRANSPORT_WIFI,
-  ConnectivityManager.TYPE_WIFI, 0);
-    verify(mockEnvoyEngine).onDefaultNetworkChangedV2(EnvoyConnectionType.CONNECTION_WIFI,
-  network.getNetworkHandle()); verify(mockEnvoyEngine,
-  times(2)).onNetworkConnect(EnvoyConnectionType.CONNECTION_WIFI, network.getNetworkHandle());
+                                                  ConnectivityManager.TYPE_WIFI, 0);
+    verify(mockEnvoyEngine)
+        .onDefaultNetworkChangedV2(EnvoyConnectionType.CONNECTION_WIFI, network.getNetworkHandle());
+    verify(mockEnvoyEngine, times(2))
+        .onNetworkConnect(EnvoyConnectionType.CONNECTION_WIFI, network.getNetworkHandle());
     verify(mockEnvoyEngine).onDefaultNetworkAvailable();
   }
 
   @Test
   public void testOnDefaultNetworkChangedCell() {
     Network network = triggerDefaultNetworkChange(NetworkCapabilities.TRANSPORT_CELLULAR,
-  ConnectivityManager.TYPE_MOBILE, TelephonyManager.NETWORK_TYPE_LTE);
-    verify(mockEnvoyEngine).onDefaultNetworkChangedV2(EnvoyConnectionType.CONNECTION_4G,
-  network.getNetworkHandle()); verify(mockEnvoyEngine,
-  times(2)).onNetworkConnect(EnvoyConnectionType.CONNECTION_4G, network.getNetworkHandle());
+                                                  ConnectivityManager.TYPE_MOBILE,
+                                                  TelephonyManager.NETWORK_TYPE_LTE);
+    verify(mockEnvoyEngine)
+        .onDefaultNetworkChangedV2(EnvoyConnectionType.CONNECTION_4G, network.getNetworkHandle());
+    verify(mockEnvoyEngine, times(2))
+        .onNetworkConnect(EnvoyConnectionType.CONNECTION_4G, network.getNetworkHandle());
     verify(mockEnvoyEngine).onDefaultNetworkAvailable();
   }
 
   @Test
   public void testOnDefaultNetworkChangedEthernet() {
-   Network network = triggerDefaultNetworkChange(NetworkCapabilities.TRANSPORT_ETHERNET,
-  ConnectivityManager.TYPE_ETHERNET, 0);
-    verify(mockEnvoyEngine).onDefaultNetworkChangedV2(EnvoyConnectionType.CONNECTION_ETHERNET,
-  network.getNetworkHandle()); verify(mockEnvoyEngine,
-  times(2)).onNetworkConnect(EnvoyConnectionType.CONNECTION_ETHERNET, network.getNetworkHandle());
+    Network network = triggerDefaultNetworkChange(NetworkCapabilities.TRANSPORT_ETHERNET,
+                                                  ConnectivityManager.TYPE_ETHERNET, 0);
+    verify(mockEnvoyEngine)
+        .onDefaultNetworkChangedV2(EnvoyConnectionType.CONNECTION_ETHERNET,
+                                   network.getNetworkHandle());
+    verify(mockEnvoyEngine, times(2))
+        .onNetworkConnect(EnvoyConnectionType.CONNECTION_ETHERNET, network.getNetworkHandle());
     verify(mockEnvoyEngine).onDefaultNetworkAvailable();
   }
 
   @Test
   public void testOnCostChangedCallbackIsNotCalled() {
-      Network activeNetwork = triggerDefaultNetworkChange(NetworkCapabilities.TRANSPORT_WIFI,
-  ConnectivityManager.TYPE_WIFI, 0);
-    verify(mockEnvoyEngine).onDefaultNetworkChangedV2(EnvoyConnectionType.CONNECTION_WIFI,
-  activeNetwork.getNetworkHandle());
+    Network activeNetwork = triggerDefaultNetworkChange(NetworkCapabilities.TRANSPORT_WIFI,
+                                                        ConnectivityManager.TYPE_WIFI, 0);
+    verify(mockEnvoyEngine)
+        .onDefaultNetworkChangedV2(EnvoyConnectionType.CONNECTION_WIFI,
+                                   activeNetwork.getNetworkHandle());
 
     shadowOf(connectivityManager).getNetworkCallbacks().forEach(callback -> {
-    NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(activeNetwork);
-    // Only change the cost of the default network.
-    shadowOf(capabilities).removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
-    callback.onCapabilitiesChanged(activeNetwork, capabilities);
-     });
+      NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(activeNetwork);
+      // Only change the cost of the default network.
+      shadowOf(capabilities).removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED);
+      callback.onCapabilitiesChanged(activeNetwork, capabilities);
+    });
 
     verify(mockEnvoyEngine, never()).onDefaultNetworkChanged(anyInt());
   }
-*/
+
   @Test
   public void testOnDefaultNetworkChangedVPN() {
     // Setup the active network.
