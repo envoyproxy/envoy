@@ -479,7 +479,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
       dns_refresh_rate: 4s
-      logical: true
+      all_addresses_in_single_endpoint: true
       dns_lookup_family: V4_ONLY
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
@@ -545,7 +545,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
         dns_refresh_rate: 4s
-        logical: true
+        all_addresses_in_single_endpoint: true
     connect_timeout: 0.25s
     lb_policy: ROUND_ROBIN
     dns_lookup_family: V4_ONLY
@@ -614,7 +614,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
         "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
         dns_lookup_family: V4_ONLY
         dns_refresh_rate: 4s
-        logical: true
+        all_addresses_in_single_endpoint: true
     connect_timeout: 0.25s
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -674,7 +674,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
         "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
         dns_lookup_family: V4_ONLY
         dns_refresh_rate: 4s
-        logical: true
+        all_addresses_in_single_endpoint: true
     connect_timeout: 0.25s
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -705,7 +705,7 @@ TEST_F(LogicalDnsClusterTest, UseDnsExtension) {
       "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
       dns_refresh_rate: 4s
       dns_lookup_family: V4_ONLY
-      logical: true
+      all_addresses_in_single_endpoint: true
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
   # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set

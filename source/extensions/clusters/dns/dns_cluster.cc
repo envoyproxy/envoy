@@ -35,7 +35,7 @@ DnsClusterFactory::createClusterWithConfig(
   }
   RETURN_IF_NOT_OK(dns_resolver_or_error.status());
   absl::StatusOr<std::unique_ptr<ClusterImplBase>> cluster_or_error;
-  if (proto_config.logical()) {
+  if (proto_config.all_addresses_in_single_endpoint()) {
     cluster_or_error = LogicalDnsCluster::create(cluster, proto_config, context,
                                                  std::move(*dns_resolver_or_error));
   } else {

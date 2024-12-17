@@ -86,5 +86,5 @@ message DnsCluster {
 
   // If true, perform :ref:`logical DNS discovery <arch_overview_service_discovery_types_logical_dns>`.
   // Otherwise, :ref:`strict DNS discovery <arch_overview_service_discovery_types_strict_dns>`
-  bool logical = 9;
+  bool all_addresses_in_single_endpoint = 9;
 }
