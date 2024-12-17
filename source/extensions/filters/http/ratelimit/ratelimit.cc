@@ -173,9 +173,8 @@ void Filter::onDestroy() {
       // Since this filter is being destroyed, we need to keep the client alive until the request
       // is complete.
       auto callback = new OnStreamDoneCallBack(std::move(client_));
-      auto& ref = *callback;
-      callback->client()->limit(ref, getDomain(), descriptors_apply_on_stream_done_,
-                                Tracing::NullSpan::instance(), absl::nullopt, getHitAddend());
+      callback->client().limit(*callback, getDomain(), descriptors_apply_on_stream_done_,
+                               Tracing::NullSpan::instance(), absl::nullopt, getHitAddend());
     }
   }
 }

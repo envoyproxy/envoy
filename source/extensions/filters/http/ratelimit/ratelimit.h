@@ -227,7 +227,7 @@ public:
                 Http::RequestHeaderMapPtr&&, const std::string&,
                 Filters::Common::RateLimit::DynamicMetadataPtr&&) override;
 
-  Filters::Common::RateLimit::ClientPtr& client() { return client_; }
+  Filters::Common::RateLimit::Client& client() { return *client_; }
 
 private:
   Filters::Common::RateLimit::ClientPtr client_;

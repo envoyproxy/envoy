@@ -68,8 +68,8 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
   createRequest(request, domain, descriptors, hits_addend);
 
   auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout_);
-  if (stream_info) {
-    options.setParentContext(Http::AsyncClient::ParentContext{&*stream_info});
+  if (stream_info.has_value()) {
+    options.setParentContext(Http::AsyncClient::ParentContext{stream_info.ptr()});
   }
   request_ = async_client_->send(service_method_, request, *this, parent_span, options);
 }
