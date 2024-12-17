@@ -233,6 +233,142 @@ typed_config:
   verifyStaticFilePerTap(fmt::format(filter_config, getTempPathPrefix()));
 }
 
+// Define UDP server.
+class TapUdpServer {
+public:
+  bool initUDPServer(void);
+  void startUDPServer(void);
+  void stopUDPServer(void) { isExitUDPServerThread_ = true; }
+  bool isUDPServerStopped(void) { return isExitUDPServerThread_; }
+  bool isUDPServerRcvMatchedUDPMsg(void) { return isRcvMatchedUDPMsg_; }
+
+private:
+  bool isExitUDPServerThread_ = false;
+  const int UDP_PORT_ = 8089;
+  const char* UDP_SERVER_IP_ = "127.0.0.1";
+  const char* MATCHED_TAP_REQ_STR_ = "tap";
+  const char* MATCHED_TAP_RESP_STR_ = "200";
+  bool isRcvMatchedUDPMsg_ = false;
+  const int UDP_SERVER_WAIT_INTERVAL_ = 100;
+  static const int UDP_RCV_BUFFER_SIZE_ = 3072;
+  int server_socket_ = -1;
+};
+bool TapUdpServer::initUDPServer() {
+  server_socket_ = socket(AF_INET, SOCK_DGRAM, 0);
+  if (server_socket_ < 0) {
+    return false;
+  }
+  int flags = fcntl(server_socket_, F_GETFL, 0);
+  if (flags < 0 || fcntl(server_socket_, F_SETFL, flags | O_NONBLOCK) < 0) {
+    close(server_socket_);
+    return false;
+  }
+  sockaddr_in server_addr;
+  memset(&server_addr, 0, sizeof(server_addr));
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_addr.s_addr = INADDR_ANY;
+  if (inet_pton(AF_INET, UDP_SERVER_IP_, &server_addr.sin_addr) <= 0) {
+    close(server_socket_);
+    return false;
+  }
+  server_addr.sin_port = htons(UDP_PORT_);
+  if (bind(server_socket_, reinterpret_cast<struct sockaddr*>(&server_addr), sizeof(server_addr)) <
+      0) {
+    close(server_socket_);
+    return false;
+  }
+  return true;
+}
+void TapUdpServer::startUDPServer() {
+  char buffer[UDP_RCV_BUFFER_SIZE_] = {0};
+  sockaddr_in client_addr;
+  socklen_t client_len = sizeof(client_addr);
+  while (true) {
+    memset(buffer, 0, UDP_RCV_BUFFER_SIZE_);
+    ssize_t bytes_received =
+        recvfrom(server_socket_, buffer, UDP_RCV_BUFFER_SIZE_, 0,
+                 reinterpret_cast<struct sockaddr*>(&client_addr), &client_len);
+    if (bytes_received <= 0) {
+      // Expected return value in non-block mode.
+      if (errno == EWOULDBLOCK || errno == EAGAIN) {
+        // Check whether stopping UDP server before continue loop.
+        if (isExitUDPServerThread_) {
+          break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(UDP_SERVER_WAIT_INTERVAL_));
+        continue;
+      } else {
+        // Exit because of other error.
+        break;
+      }
+    }
+    std::string rcv_msg{buffer};
+    if (rcv_msg.find(MATCHED_TAP_REQ_STR_) != std::string::npos &&
+        rcv_msg.find(MATCHED_TAP_RESP_STR_) != std::string::npos) {
+      isRcvMatchedUDPMsg_ = true;
+    }
+    // Only expect one UDP message and exit.
+    isExitUDPServerThread_ = true;
+    break;
+  }
+  close(server_socket_);
+  server_socket_ = -1;
+}
+
+TEST_P(TapIntegrationTest, StaticExtTapSinkUdp) {
+  constexpr absl::string_view filter_config =
+      R"EOF(
+name: tap
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+  common_config:
+    static_config:
+      match:
+        any_match: true
+      output_config:
+        sinks:
+          - format: JSON_BODY_AS_STRING
+            custom_sink:
+              name: cfx_custom_sink
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.tap_sinks.udp_sink.v3.UdpSink
+                udp_address:
+                  protocol: UDP
+                  address: 127.0.0.1
+                  port_value: 8089
+)EOF";
+
+  // Start UDP server firstly.
+  TapUdpServer tap_server;
+  // Init UDP server to create UDP socket and set socket to non-block mode.
+  EXPECT_TRUE(tap_server.initUDPServer());
+  std::thread client_handler([&tap_server]() { tap_server.startUDPServer(); });
+
+  // Start HTTP test.
+  initializeFilter(fmt::format(filter_config, getTempPathPrefix()));
+  // Initial request/response with tap.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  const Http::TestRequestHeaderMapImpl request_headers_tap_{{":method", "GET"},
+                                                            {":path", "/tap"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "host"},
+                                                            {"foo", "bar"}};
+
+  makeRequest(request_headers_tap_, {}, nullptr, response_headers_no_tap_, {}, nullptr);
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+
+  // Stop UDP server if there is doesn't get any UDP message
+  if (!tap_server.isUDPServerStopped()) {
+    tap_server.stopUDPServer();
+  }
+  client_handler.join();
+
+  // Verify whether get the expect message
+
+  EXPECT_TRUE(tap_server.isUDPServerRcvMatchedUDPMsg());
+}
+
 // Verify the match field takes precedence over the deprecated match_config field.
 TEST_P(TapIntegrationTest, DEPRECATED_FEATURE_TEST(StaticFilePerTapWithMatchConfigAndMatch)) {
   constexpr absl::string_view filter_config =
