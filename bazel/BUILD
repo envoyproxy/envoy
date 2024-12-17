@@ -249,56 +249,6 @@ config_setting(
     values = {"define": "tcmalloc=gperftools"},
 )
 
-# As select() can't be nested we need these specialized settings to avoid ambiguity when choosing
-# tcmalloc's flavor for x86_64 and aarch64 builds.
-config_setting(
-    name = "disable_tcmalloc_on_linux_x86_64",
-    values = {
-        "define": "tcmalloc=disabled",
-        "cpu": "k8",
-    },
-)
-
-config_setting(
-    name = "gperftools_tcmalloc_on_linux_x86_64",
-    values = {
-        "define": "tcmalloc=gperftools",
-        "cpu": "k8",
-    },
-)
-
-config_setting(
-    name = "debug_tcmalloc_on_linux_x86_64",
-    values = {
-        "define": "tcmalloc=debug",
-        "cpu": "k8",
-    },
-)
-
-config_setting(
-    name = "disable_tcmalloc_on_linux_aarch64",
-    values = {
-        "define": "tcmalloc=disabled",
-        "cpu": "aarch64",
-    },
-)
-
-config_setting(
-    name = "gperftools_tcmalloc_on_linux_aarch64",
-    values = {
-        "define": "tcmalloc=gperftools",
-        "cpu": "aarch64",
-    },
-)
-
-config_setting(
-    name = "debug_tcmalloc_on_linux_aarch64",
-    values = {
-        "define": "tcmalloc=debug",
-        "cpu": "aarch64",
-    },
-)
-
 config_setting(
     name = "disable_signal_trace",
     values = {"define": "signal_trace=disabled"},
@@ -611,27 +561,49 @@ alias(
 
 config_setting(
     name = "linux_x86_64",
-    values = {"cpu": "k8"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
 )
 
 config_setting(
     name = "linux_aarch64",
-    values = {"cpu": "aarch64"},
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
 )
 
 config_setting(
     name = "linux_ppc",
-    values = {"cpu": "ppc"},
+    constraint_values = [
+        "@platforms//cpu:ppc",
+        "@platforms//os:linux",
+    ],
 )
 
 config_setting(
     name = "linux_s390x",
-    values = {"cpu": "s390x"},
+    constraint_values = [
+        "@platforms//cpu:s390x",
+        "@platforms//os:linux",
+    ],
 )
 
 config_setting(
     name = "linux_mips64",
-    values = {"cpu": "mips64"},
+    constraint_values = [
+        "@platforms//cpu:mips64",
+        "@platforms//os:linux",
+    ],
+)
+
+config_setting(
+    name = "linux",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
 )
 
 config_setting(
@@ -811,17 +783,6 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
-    name = "linux",
-    match_any = [
-        ":linux_aarch64",
-        ":linux_mips64",
-        ":linux_ppc",
-        ":linux_s390x",
-        ":linux_x86_64",
-    ],
-)
-
-selects.config_setting_group(
     name = "x86",
     match_any = [
         ":darwin_x86_64",
@@ -986,4 +947,29 @@ updater(
     tags = ["skip_on_windows"],
     version_file = "@envoy_api//bazel:repository_locations.bzl",
     version_path_replace = "external/envoy_api:api",
+)
+
+cc_library(
+    name = "tcmalloc_all_libs",
+    visibility = ["//visibility:public"],
+    deps = selects.with_or({
+        ("//bazel:linux_x86_64", "//bazel:linux_aarch64"): [
+            "@com_github_google_tcmalloc//tcmalloc",
+            "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
+            "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
+        ],
+        "//conditions:default": ["//bazel/foreign_cc:gperftools"],
+    }),
+)
+
+cc_library(
+    name = "tcmalloc_lib",
+    visibility = ["//visibility:public"],
+    deps = selects.with_or({
+        (
+            "//bazel:linux_x86_64",
+            "//bazel:linux_aarch64",
+        ): ["@com_github_google_tcmalloc//tcmalloc"],
+        "//conditions:default": ["//bazel/foreign_cc:gperftools"],
+    }),
 )
