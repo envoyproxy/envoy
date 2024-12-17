@@ -117,26 +117,26 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportPartialSuccess) {
   auto response = std::make_unique<ExportTraceServiceResponse>();
   response->mutable_partial_success()->set_error_message("test error");
 
-  EXPECT_LOG_CONTAINS("warn", "OTLP partial success: test error (0 spans rejected)",
+  EXPECT_LOG_CONTAINS("debug", "OTLP partial success: test error (0 spans rejected)",
                       exporter.onSuccess(std::move(response), null_span));
 
   response = std::make_unique<ExportTraceServiceResponse>();
   response->mutable_partial_success()->set_error_message("test error 2");
   response->mutable_partial_success()->set_rejected_spans(10);
 
-  EXPECT_LOG_CONTAINS("warn", "OTLP partial success: test error 2 (10 spans rejected)",
+  EXPECT_LOG_CONTAINS("debug", "OTLP partial success: test error 2 (10 spans rejected)",
                       exporter.onSuccess(std::move(response), null_span));
 
   response = std::make_unique<ExportTraceServiceResponse>();
   response->mutable_partial_success()->set_rejected_spans(5);
 
-  EXPECT_LOG_CONTAINS("warn", "OTLP partial success: empty message (5 spans rejected)",
+  EXPECT_LOG_CONTAINS("debug", "OTLP partial success: empty message (5 spans rejected)",
                       exporter.onSuccess(std::move(response), null_span));
 
   response = std::make_unique<ExportTraceServiceResponse>();
   response->mutable_partial_success();
 
-  EXPECT_LOG_NOT_CONTAINS("warn", "OTLP partial success",
+  EXPECT_LOG_NOT_CONTAINS("debug", "OTLP partial success",
                           exporter.onSuccess(std::move(response), null_span));
 }
 

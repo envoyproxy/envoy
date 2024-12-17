@@ -29,14 +29,14 @@ void OpenTelemetryGrpcTraceExporter::onSuccess(
       if (msg.empty()) {
         msg = "empty message";
       }
-      ENVOY_LOG(warn, "OTLP partial success: {} ({} spans rejected)", msg, rejected_spans);
+      ENVOY_LOG(debug, "OTLP partial success: {} ({} spans rejected)", msg, rejected_spans);
     }
   }
 }
 
 void OpenTelemetryGrpcTraceExporter::onFailure(Grpc::Status::GrpcStatus status,
                                                const std::string& message, Tracing::Span&) {
-  ENVOY_LOG(error, "OTLP trace export failed with status: {}, message: {}",
+  ENVOY_LOG(debug, "OTLP trace export failed with status: {}, message: {}",
             Grpc::Utility::grpcStatusToString(status), message);
 }
 
