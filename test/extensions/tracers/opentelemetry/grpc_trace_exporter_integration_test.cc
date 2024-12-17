@@ -14,6 +14,8 @@ using envoy::extensions::filters::network::http_connection_manager::v3::HttpConn
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse;
 
+constexpr auto timeout = std::chrono::milliseconds(500);
+
 class OpenTelemetryTraceExporterIntegrationTest
     : public testing::TestWithParam<std::tuple<int, int>>,
       public HttpIntegrationTest {
@@ -79,11 +81,11 @@ public:
   void doHttpRequest() {
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
-    auto response =
-        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    auto response = sendRequestAndWaitForResponse(default_request_headers_, 0,
+                                                  default_response_headers_, 0, 0, timeout);
 
     codec_client_->close();
-    auto _ = codec_client_->waitForDisconnect();
+    auto _ = codec_client_->waitForDisconnect(timeout);
   }
 
   FakeUpstream* grpc_receiver_upstream_{};
@@ -107,7 +109,7 @@ TEST_P(OpenTelemetryTraceExporterIntegrationTest, GrpcExporter) {
 
   initialize();
 
-  dispatcher_->post([this, num_requests]() {
+  dispatcher_->post([this, num_requests = num_requests]() {
     // each request will create two spans, one upstream and one downstream
     for (auto i = 0; i < num_requests; i++) {
       doHttpRequest();
@@ -118,15 +120,15 @@ TEST_P(OpenTelemetryTraceExporterIntegrationTest, GrpcExporter) {
   // of spans (there should be no unexported spans remaining)
   auto num_expected_exports = (num_requests * 2) / min_flush_spans;
   FakeHttpConnectionPtr connection;
-  ASSERT_TRUE(grpc_receiver_upstream_->waitForHttpConnection(*dispatcher_, connection));
+  ASSERT_TRUE(grpc_receiver_upstream_->waitForHttpConnection(*dispatcher_, connection, timeout));
 
   std::map<std::string, int> name_counts;
   for (auto i = 0; i < num_expected_exports; i++) {
     FakeStreamPtr stream;
-    ASSERT_TRUE(connection->waitForNewStream(*dispatcher_, stream))
+    ASSERT_TRUE(connection->waitForNewStream(*dispatcher_, stream, timeout))
         << "Expected to receive " << num_expected_exports << " export requests, but got " << i;
     ExportTraceServiceRequest req;
-    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, req));
+    ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, req, timeout));
     stream->startGrpcStream(true);
     ExportTraceServiceResponse resp;
     stream->sendGrpcMessage(resp);
@@ -138,11 +140,11 @@ TEST_P(OpenTelemetryTraceExporterIntegrationTest, GrpcExporter) {
     for (auto j = 0; j < min_flush_spans; j++) {
       ++name_counts[req.resource_spans(0).scope_spans(0).spans().at(j).name()];
     }
-    ASSERT_TRUE(stream->waitForEndStream(*dispatcher_));
+    ASSERT_TRUE(stream->waitForEndStream(*dispatcher_, timeout));
   }
 
-  ASSERT_TRUE(connection->close());
-  ASSERT_TRUE(connection->waitForDisconnect());
+  ASSERT_TRUE(connection->close(timeout));
+  ASSERT_TRUE(connection->waitForDisconnect(timeout));
   // the number of upstream and downstream spans received should be equal
   ASSERT_EQ(2, name_counts.size());
   ASSERT_THAT(name_counts,
