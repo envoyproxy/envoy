@@ -62,23 +62,41 @@ private:
 // TODO(wbpcode): Rather than allocating every filter with an unique pointer, we may could
 // construct the filter in place in the vector. This should reduce the heap allocation and
 // memory fragmentation.
+
+// HTTP decoder filters. If filters are configured in the following order (assume all three
+// filters are both decoder/encoder filters):
+//   http_filters:
+//     - A
+//     - B
+//     - C
+// The decoder filter chain will iterate through filters A, B, C.
 struct StreamDecoderFilters {
   using Element = ActiveStreamDecoderFilter;
   using Iterator = std::vector<ActiveStreamDecoderFilterPtr>::iterator;
 
-  Iterator begin() { return entries.begin(); }
-  Iterator end() { return entries.end(); }
+  Iterator begin() { return entries_.begin(); }
+  Iterator end() { return entries_.end(); }
 
-  std::vector<ActiveStreamDecoderFilterPtr> entries;
+  std::vector<ActiveStreamDecoderFilterPtr> entries_;
 };
+
+// HTTP encoder filters. If filters are configured in the following order (assume all three
+// filters are both decoder/encoder filters):
+//   http_filters:
+//     - A
+//     - B
+//     - C
+// Different with decoder filter, the encoder filter chain will iterate with the
+// reverse order of the configured filters, i.e., C, B, A. This is why we use reverse_iterator
+// here.
 struct StreamEncoderFilters {
   using Element = ActiveStreamEncoderFilter;
   using Iterator = std::vector<ActiveStreamEncoderFilterPtr>::reverse_iterator;
 
-  Iterator begin() { return entries.rbegin(); }
-  Iterator end() { return entries.rend(); }
+  Iterator begin() { return entries_.rbegin(); }
+  Iterator end() { return entries_.rend(); }
 
-  std::vector<ActiveStreamEncoderFilterPtr> entries;
+  std::vector<ActiveStreamEncoderFilterPtr> entries_;
 };
 
 /**
@@ -970,38 +988,23 @@ private:
     void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
       manager_.filters_.push_back(filter.get());
 
-      // If filters are configured in the following order (assume all three filters
-      // are both decoder/encoder filters):
-      //   http_filters:
-      //     - A
-      //     - B
-      //     - C
-      // The decoder filter chain will iterate through filters A, B, C.
-      manager_.decoder_filters_.entries.emplace_back(
+      manager_.decoder_filters_.entries_.emplace_back(
           std::make_unique<ActiveStreamDecoderFilter>(manager_, std::move(filter), context_));
     }
 
     void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
       manager_.filters_.push_back(filter.get());
 
-      // If filters are configured in the following order (assume all three filters
-      // are both decoder/encoder filters):
-      //   http_filters:
-      //     - A
-      //     - B
-      //     - C
-      // Different with decoder filter, the encoder filter chain will iterate with the
-      // reverse order of the configured filters, i.e., C, B, A.
-      manager_.encoder_filters_.entries.emplace_back(
+      manager_.encoder_filters_.entries_.emplace_back(
           std::make_unique<ActiveStreamEncoderFilter>(manager_, std::move(filter), context_));
     }
 
     void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
       manager_.filters_.push_back(filter.get());
 
-      manager_.decoder_filters_.entries.emplace_back(
+      manager_.decoder_filters_.entries_.emplace_back(
           std::make_unique<ActiveStreamDecoderFilter>(manager_, filter, context_));
-      manager_.encoder_filters_.entries.emplace_back(
+      manager_.encoder_filters_.entries_.emplace_back(
           std::make_unique<ActiveStreamEncoderFilter>(manager_, std::move(filter), context_));
     }
 

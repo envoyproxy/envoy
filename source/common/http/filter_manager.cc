@@ -1926,7 +1926,7 @@ void FilterManager::resetStream(StreamResetReason reason,
 }
 
 bool FilterManager::isTerminalDecoderFilter(const ActiveStreamDecoderFilter& filter) const {
-  return !decoder_filters_.entries.empty() && decoder_filters_.entries.back().get() == &filter;
+  return !decoder_filters_.entries_.empty() && decoder_filters_.entries_.back().get() == &filter;
 }
 
 void ActiveStreamFilterBase::resetStream(Http::StreamResetReason reset_reason,
