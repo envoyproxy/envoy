@@ -866,7 +866,6 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
 
   bool body_delivered = state.completeBodyAvailable();
   state.setCompleteBodyAvailable(true);
-  state.setTrailersAvailable(true);
   state.setTrailers(&trailers);
 
   if ((state.callbackState() != ProcessorState::CallbackState::Idle) &&

@@ -400,6 +400,7 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
         error_message = kFractionError;
       }
     }
+    break;
   default:
     break;
   }
