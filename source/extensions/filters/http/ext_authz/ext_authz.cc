@@ -292,7 +292,19 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       ENVOY_STREAM_LOG(info, "Cache HIT for token {}: HTTP status {}", 
                        *decoder_callbacks_, auth_header_str, *cached_status_code);
 
-      return Http::FilterHeadersStatus::Continue;  // Continue to the next filter (e.g., router).
+      if (*cached_status_code >= 200 && *cached_status_code < 300) {
+        // Any 2xx response is a success: let the request proceed
+        return Http::FilterHeadersStatus::Continue;
+      } else {
+        // Non-2xx response: reject the request
+        decoder_callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
+        decoder_callbacks_->sendLocalReply(
+          static_cast<Http::Code>(*cached_status_code), "Unauthorized", nullptr, absl::nullopt,
+          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
+
+        return Http::FilterHeadersStatus::StopIteration;
+      }
     }
   } else {
     ENVOY_STREAM_LOG(info, "Cannot check cache because auth_header is empty", *decoder_callbacks_);
