@@ -405,6 +405,13 @@ envoy.filters.http.grpc_http1_reverse_bridge:
   type_urls:
   - envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig
   - envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfigPerRoute
+envoy.filters.http.grpc_json_reverse_transcoder:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.grpc_json_reverse_transcoder.v3.GrpcJsonReverseTranscoder
 envoy.filters.http.grpc_json_transcoder:
   categories:
   - envoy.filters.http
@@ -791,7 +798,7 @@ envoy.filters.udp.dns_filter:
   categories:
   - envoy.filters.udp_listener
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig
 envoy.filters.udp_listener.udp_proxy:

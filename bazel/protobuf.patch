@@ -1,8 +1,8 @@
 diff --git a/BUILD.bazel b/BUILD.bazel
-index 42175b5ed..8b313e0f6 100644
+index 32b26cbdc..e28b8e387 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
-@@ -222,14 +222,79 @@ alias(
+@@ -229,14 +229,79 @@ alias(
      visibility = ["//visibility:public"],
  )
  
@@ -84,7 +84,7 @@ index 42175b5ed..8b313e0f6 100644
      name = "protoc_static",
      copts = COPTS,
 diff --git a/protobuf.bzl b/protobuf.bzl
-index 9a0589789..ee6b93ba3 100644
+index c8d32a604..5bd22e021 100644
 --- a/protobuf.bzl
 +++ b/protobuf.bzl
 @@ -99,6 +99,10 @@ def _proto_gen_impl(ctx):
@@ -99,13 +99,13 @@ index 9a0589789..ee6b93ba3 100644
  
      import_flags = depset(direct = import_flags)
 diff --git a/python/google/protobuf/__init__.py b/python/google/protobuf/__init__.py
-index 022974824..418779fd2 100755
+index fb6c5ae63..fc4b2523b 100755
 --- a/python/google/protobuf/__init__.py
 +++ b/python/google/protobuf/__init__.py
 @@ -8,3 +8,10 @@
  # Copyright 2007 Google Inc. All Rights Reserved.
  
- __version__ = '5.28.3'
+ __version__ = '5.29.1'
 +
 +
 +if __name__ != '__main__':
@@ -114,10 +114,10 @@ index 022974824..418779fd2 100755
 +    except ImportError:
 +        __path__ = __import__('pkgutil').extend_path(__path__, __name__)
 diff --git a/src/google/protobuf/compiler/BUILD.bazel b/src/google/protobuf/compiler/BUILD.bazel
-index 3f5624d5f..e194b172f 100644
+index 5012ee793..edf9adc5f 100644
 --- a/src/google/protobuf/compiler/BUILD.bazel
 +++ b/src/google/protobuf/compiler/BUILD.bazel
-@@ -517,7 +517,7 @@ cc_library(
+@@ -547,7 +547,7 @@ cc_library(
      srcs = ["retention.cc"],
      hdrs = ["retention.h"],
      strip_include_prefix = "/src",
@@ -126,181 +126,11 @@ index 3f5624d5f..e194b172f 100644
      deps = [
          "//src/google/protobuf",
          "//src/google/protobuf:port",
-diff --git a/src/google/protobuf/generated_message_tctable_lite.cc b/src/google/protobuf/generated_message_tctable_lite.cc
-index 155efbbbc..591f91596 100644
---- a/src/google/protobuf/generated_message_tctable_lite.cc
-+++ b/src/google/protobuf/generated_message_tctable_lite.cc
-@@ -518,7 +518,7 @@ PROTOBUF_NOINLINE const char* TcParser::FastGtR2(PROTOBUF_TC_PARAM_DECL) {
- //////////////////////////////////////////////////////////////////////////////
- 
- template <typename LayoutType, typename TagType>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularFixed(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularFixed(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -548,7 +548,7 @@ PROTOBUF_NOINLINE const char* TcParser::FastF64S2(PROTOBUF_TC_PARAM_DECL) {
- }
- 
- template <typename LayoutType, typename TagType>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::RepeatedFixed(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::RepeatedFixed(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -583,7 +583,7 @@ PROTOBUF_NOINLINE const char* TcParser::FastF64R2(PROTOBUF_TC_PARAM_DECL) {
- }
- 
- template <typename LayoutType, typename TagType>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::PackedFixed(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::PackedFixed(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -714,8 +714,8 @@ inline int64_t ZigZagDecodeHelper<int64_t, true>(int64_t value) {
- 
- // Prefetch the enum data, if necessary.
- // We can issue the prefetch before we start parsing the ints.
--PROTOBUF_ALWAYS_INLINE void PrefetchEnumData(uint16_t xform_val,
--                                             TcParseTableBase::FieldAux aux) {
-+inline PROTOBUF_ALWAYS_INLINE void PrefetchEnumData(
-+    uint16_t xform_val, TcParseTableBase::FieldAux aux) {
- }
- 
- // When `xform_val` is a constant, we want to inline `ValidateEnum` because it
-@@ -726,8 +726,8 @@ PROTOBUF_ALWAYS_INLINE void PrefetchEnumData(uint16_t xform_val,
- // way more common than the kTvEnum cases. It is also called from places that
- // already have out-of-line functions (like MpVarint) so an extra out-of-line
- // call to `ValidateEnum` does not affect much.
--PROTOBUF_ALWAYS_INLINE bool EnumIsValidAux(int32_t val, uint16_t xform_val,
--                                           TcParseTableBase::FieldAux aux) {
-+inline PROTOBUF_ALWAYS_INLINE bool EnumIsValidAux(
-+    int32_t val, uint16_t xform_val, TcParseTableBase::FieldAux aux) {
-   if (xform_val == field_layout::kTvRange) {
-     auto lo = aux.enum_range.start;
-     return lo <= val && val < (lo + aux.enum_range.length);
-@@ -742,7 +742,7 @@ PROTOBUF_ALWAYS_INLINE bool EnumIsValidAux(int32_t val, uint16_t xform_val,
- }  // namespace
- 
- template <typename FieldType, typename TagType, bool zigzag>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularVarint(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularVarint(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -803,7 +803,7 @@ PROTOBUF_NOINLINE const char* TcParser::SingularVarBigint(
- }
- 
- template <typename FieldType>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::FastVarintS1(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::FastVarintS1(
-     PROTOBUF_TC_PARAM_DECL) {
-   using TagType = uint8_t;
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-@@ -886,7 +886,7 @@ PROTOBUF_NOINLINE const char* TcParser::FastZ64S2(PROTOBUF_TC_PARAM_DECL) {
- }
- 
- template <typename FieldType, typename TagType, bool zigzag>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::RepeatedVarint(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::RepeatedVarint(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -951,7 +951,7 @@ PROTOBUF_NOINLINE const char* TcParser::FastZ64R2(PROTOBUF_TC_PARAM_DECL) {
- }
- 
- template <typename FieldType, typename TagType, bool zigzag>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::PackedVarint(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::PackedVarint(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -1053,7 +1053,7 @@ PROTOBUF_NOINLINE const char* TcParser::MpUnknownEnumFallback(
- }
- 
- template <typename TagType, uint16_t xform_val>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularEnum(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularEnum(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -1095,7 +1095,7 @@ PROTOBUF_NOINLINE const char* TcParser::FastEvS2(PROTOBUF_TC_PARAM_DECL) {
- }
- 
- template <typename TagType, uint16_t xform_val>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::RepeatedEnum(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::RepeatedEnum(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -1147,7 +1147,7 @@ PROTOBUF_NOINLINE void TcParser::AddUnknownEnum(MessageLite* msg,
- }
- 
- template <typename TagType, uint16_t xform_val>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::PackedEnum(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::PackedEnum(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -1204,7 +1204,7 @@ PROTOBUF_NOINLINE const char* TcParser::FastEvP2(PROTOBUF_TC_PARAM_DECL) {
- }
- 
- template <typename TagType, uint8_t min>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularEnumSmallRange(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularEnumSmallRange(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -1242,7 +1242,7 @@ PROTOBUF_NOINLINE const char* TcParser::FastEr1S2(PROTOBUF_TC_PARAM_DECL) {
- }
- 
- template <typename TagType, uint8_t min>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::RepeatedEnumSmallRange(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::RepeatedEnumSmallRange(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -1284,7 +1284,7 @@ PROTOBUF_NOINLINE const char* TcParser::FastEr1R2(PROTOBUF_TC_PARAM_DECL) {
- }
- 
- template <typename TagType, uint8_t min>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::PackedEnumSmallRange(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::PackedEnumSmallRange(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -1399,7 +1399,7 @@ PROTOBUF_ALWAYS_INLINE inline bool IsValidUTF8(ArenaStringPtr& field) {
- }  // namespace
- 
- template <typename TagType, typename FieldType, TcParser::Utf8Type utf8>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularString(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::SingularString(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -1507,7 +1507,7 @@ const char* TcParser::FastUcS2(PROTOBUF_TC_PARAM_DECL) {
- }
- 
- template <typename TagType, typename FieldType, TcParser::Utf8Type utf8>
--PROTOBUF_ALWAYS_INLINE const char* TcParser::RepeatedString(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::RepeatedString(
-     PROTOBUF_TC_PARAM_DECL) {
-   if (PROTOBUF_PREDICT_FALSE(data.coded_tag<TagType>() != 0)) {
-     PROTOBUF_MUSTTAIL return MiniParse(PROTOBUF_TC_PARAM_NO_DATA_PASS);
-@@ -2207,7 +2207,7 @@ PROTOBUF_NOINLINE const char* TcParser::MpString(PROTOBUF_TC_PARAM_DECL) {
-   PROTOBUF_MUSTTAIL return ToTagDispatch(PROTOBUF_TC_PARAM_NO_DATA_PASS);
- }
- 
--PROTOBUF_ALWAYS_INLINE const char* TcParser::ParseRepeatedStringOnce(
-+inline PROTOBUF_ALWAYS_INLINE const char* TcParser::ParseRepeatedStringOnce(
-     const char* ptr, SerialArena* serial_arena, ParseContext* ctx,
-     RepeatedPtrField<std::string>& field) {
-   int size = ReadSize(&ptr);
 diff --git a/src/google/protobuf/io/BUILD.bazel b/src/google/protobuf/io/BUILD.bazel
-index 66819966b..446d75420 100644
+index 192fec3ab..5d12630eb 100644
 --- a/src/google/protobuf/io/BUILD.bazel
 +++ b/src/google/protobuf/io/BUILD.bazel
-@@ -158,7 +158,7 @@ cc_library(
+@@ -159,7 +159,7 @@ cc_library(
          "@com_google_absl//absl/log:absl_log",
      ] + select({
          "//build_defs:config_msvc": [],
@@ -310,10 +140,10 @@ index 66819966b..446d75420 100644
  )
  
 diff --git a/src/google/protobuf/map.cc b/src/google/protobuf/map.cc
-index 97cf262ea..df6b413d8 100644
+index 570b61bec..da6ceb99d 100644
 --- a/src/google/protobuf/map.cc
 +++ b/src/google/protobuf/map.cc
-@@ -120,7 +120,7 @@ void UntypedMapBase::ClearTable(const ClearInput input) {
+@@ -116,7 +116,7 @@ void UntypedMapBase::ClearTable(const ClearInput input) {
    ABSL_DCHECK_NE(num_buckets_, kGlobalEmptyTableSize);
  
    if (alloc_.arena() == nullptr) {
@@ -323,10 +153,10 @@ index 97cf262ea..df6b413d8 100644
        for (map_index_t b = index_of_first_non_null_, end = num_buckets_;
             b < end; ++b) {
 diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
-index 37d80e591..c17f61a76 100644
+index 56f995e45..123f936ac 100644
 --- a/src/google/protobuf/port_def.inc
 +++ b/src/google/protobuf/port_def.inc
-@@ -856,7 +856,7 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
+@@ -835,7 +835,7 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
  #pragma clang diagnostic ignored "-Wshorten-64-to-32"
  // Turn on -Wdeprecated-enum-enum-conversion. This deprecation comes in C++20
  // via http://wg21.link/p1120r0.
@@ -335,7 +165,7 @@ index 37d80e591..c17f61a76 100644
  // This error has been generally flaky, but we need to disable it specifically
  // to fix https://github.com/protocolbuffers/protobuf/issues/12313
  #pragma clang diagnostic ignored "-Wunused-parameter"
-@@ -925,7 +925,8 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
+@@ -904,7 +904,8 @@ static_assert(PROTOBUF_ABSL_MIN(20230125, 3),
  #pragma warning(disable: 4125)
  #endif
  
@@ -345,36 +175,8 @@ index 37d80e591..c17f61a76 100644
  #define PROTOBUF_DEBUG true
  #else
  #define PROTOBUF_DEBUG false
-diff --git a/src/google/protobuf/wire_format_lite.cc b/src/google/protobuf/wire_format_lite.cc
-index f6d97df6c..eeaaa8318 100644
---- a/src/google/protobuf/wire_format_lite.cc
-+++ b/src/google/protobuf/wire_format_lite.cc
-@@ -664,9 +664,11 @@ static size_t VarintSize(const T* data, const int n) {
-     if (x > 0x1FFFFF) sum++;
-     if (x > 0xFFFFFFF) sum++;
-   }
-+#ifdef __clang__
- // Clang is not smart enough to see that this loop doesn't run many times
- // NOLINTNEXTLINE(google3-runtime-pragma-loop-hint): b/315043579
- #pragma clang loop vectorize(disable) unroll(disable) interleave(disable)
-+#endif
-   for (; i < n; i++) {
-     uint32_t x = data[i];
-     if (ZigZag) {
-@@ -706,9 +708,11 @@ static size_t VarintSize64(const T* data, const int n) {
-     if (x > 0x1FFFFF) sum++;
-     if (x > 0xFFFFFFF) sum++;
-   }
-+#ifdef __clang__
- // Clang is not smart enough to see that this loop doesn't run many times
- // NOLINTNEXTLINE(google3-runtime-pragma-loop-hint): b/315043579
- #pragma clang loop vectorize(disable) unroll(disable) interleave(disable)
-+#endif
-   for (; i < n; i++) {
-     uint64_t x = data[i];
-     if (ZigZag) {
 diff --git a/upb/message/internal/accessors.h b/upb/message/internal/accessors.h
-index 5bbfb1e0b..6c6da17fd 100644
+index aae0fdc0a..01a874e4c 100644
 --- a/upb/message/internal/accessors.h
 +++ b/upb/message/internal/accessors.h
 @@ -163,7 +163,7 @@ UPB_INLINE void UPB_PRIVATE(_upb_Message_SetPresence)(
@@ -396,10 +198,10 @@ index 5bbfb1e0b..6c6da17fd 100644
    switch (UPB_PRIVATE(_upb_MiniTableField_GetRep)(f)) {
      case kUpb_FieldRep_1Byte:
 diff --git a/upb/port/def.inc b/upb/port/def.inc
-index 6aa1835f4..9a2545bd0 100644
+index 4c073b32f..cc63a28b5 100644
 --- a/upb/port/def.inc
 +++ b/upb/port/def.inc
-@@ -81,6 +81,12 @@ Error, UINTPTR_MAX is undefined
+@@ -82,6 +82,12 @@ Error, UINTPTR_MAX is undefined
  #define UPB_INLINE static
  #endif
  
@@ -413,7 +215,7 @@ index 6aa1835f4..9a2545bd0 100644
  #define UPB_API UPB_EXPORT
  #define UPB_API_INLINE UPB_EXPORT
 diff --git a/upb/port/undef.inc b/upb/port/undef.inc
-index d8453ffec..4240e5923 100644
+index f94e2764e..5e02a3627 100644
 --- a/upb/port/undef.inc
 +++ b/upb/port/undef.inc
 @@ -12,6 +12,7 @@
@@ -422,5 +224,5 @@ index d8453ffec..4240e5923 100644
  #undef UPB_INLINE
 +#undef UPB_INLINE_IF_NOT_GCC
  #undef UPB_API
+ #undef UPBC_API
  #undef UPB_API_INLINE
- #undef UPB_ALIGN_UP

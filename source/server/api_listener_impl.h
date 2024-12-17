@@ -228,7 +228,7 @@ public:
 private:
   HttpApiListener(Network::Address::InstanceConstSharedPtr&& address,
                   const envoy::config::listener::v3::Listener& config, Server::Instance& server,
-                  const std::string& name);
+                  const std::string& name, absl::Status& creation_status);
 
   // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,
   // route config manager, scoped route config manager.

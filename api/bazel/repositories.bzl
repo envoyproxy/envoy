@@ -103,89 +103,288 @@ go_proto_library(
 )
 """
 
+# Aligned target names with https://github.com/bazelbuild/bazel-central-registry/tree/main/modules/opentelemetry-proto
 OPENTELEMETRY_BUILD_CONTENT = """
-load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library", "py_grpc_library")
+load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library", "go_grpc_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
 
-api_cc_py_proto_library(
-    name = "common",
+package(default_visibility = ["//visibility:public"])
+
+proto_library(
+    name = "common_proto",
     srcs = [
         "opentelemetry/proto/common/v1/common.proto",
     ],
-    visibility = ["//visibility:public"],
 )
 
-api_cc_py_proto_library(
-    name = "resource",
+cc_proto_library(
+    name = "common_proto_cc",
+    deps = [":common_proto"],
+)
+
+py_proto_library(
+    name = "common_proto_py",
+    deps = [":common_proto"],
+)
+
+go_proto_library(
+    name = "common_proto_go",
+    importpath = "go.opentelemetry.io/proto/otlp/common/v1",
+    protos = [":common_proto"],
+)
+
+proto_library(
+    name = "logs_proto",
+    srcs = [
+        "opentelemetry/proto/logs/v1/logs.proto",
+    ],
+    deps = [
+        ":common_proto",
+        ":resource_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "logs_proto_cc",
+    deps = [":logs_proto"],
+)
+
+py_proto_library(
+    name = "logs_proto_py",
+    deps = [":logs_proto"],
+)
+
+go_proto_library(
+    name = "logs_proto_go",
+    importpath = "go.opentelemetry.io/proto/otlp/logs/v1",
+    protos = [":logs_proto"],
+    deps = [
+        ":common_proto_go",
+        ":resource_proto_go",
+    ],
+)
+
+proto_library(
+    name = "logs_service_proto",
+    srcs = [
+        "opentelemetry/proto/collector/logs/v1/logs_service.proto",
+    ],
+    deps = [
+        ":logs_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "logs_service_proto_cc",
+    deps = [":logs_service_proto"],
+)
+
+cc_grpc_library(
+    name = "logs_service_grpc_cc",
+    srcs = [":logs_service_proto"],
+    generate_mocks = True,
+    grpc_only = True,
+    deps = [":logs_service_proto_cc"],
+)
+
+py_proto_library(
+    name = "logs_service_proto_py",
+    deps = [":logs_service_proto"],
+)
+
+py_grpc_library(
+    name = "logs_service_grpc_py",
+    srcs = [":logs_service_proto"],
+    deps = [":logs_service_proto_py"],
+)
+
+go_grpc_library(
+    name = "logs_service_grpc_go",
+    protos = [":logs_service_proto"],
+    importpath = "go.opentelemetry.io/proto/otlp/logs/v1",
+    embed = [
+        ":logs_proto_go",
+    ],
+)
+
+proto_library(
+    name = "metrics_proto",
+    srcs = [
+        "opentelemetry/proto/metrics/v1/metrics.proto",
+    ],
+    deps = [
+        ":common_proto",
+        ":resource_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "metrics_proto_cc",
+    deps = [":metrics_proto"],
+)
+
+py_proto_library(
+    name = "metrics_proto_py",
+    deps = [":metrics_proto"],
+)
+
+go_proto_library(
+    name = "metrics_proto_go",
+    importpath = "go.opentelemetry.io/proto/otlp/metrics/v1",
+    protos = [":metrics_proto"],
+    deps = [
+        ":common_proto_go",
+        ":resource_proto_go",
+    ],
+)
+
+proto_library(
+    name = "metrics_service_proto",
+    srcs = [
+        "opentelemetry/proto/collector/metrics/v1/metrics_service.proto",
+    ],
+    deps = [
+        ":metrics_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "metrics_service_proto_cc",
+    deps = [":metrics_service_proto"],
+)
+
+cc_grpc_library(
+    name = "metrics_service_grpc_cc",
+    srcs = [":metrics_service_proto"],
+    generate_mocks = True,
+    grpc_only = True,
+    deps = [":metrics_service_proto_cc"],
+)
+
+py_proto_library(
+    name = "metrics_service_proto_py",
+    deps = [":metrics_service_proto"],
+)
+
+py_grpc_library(
+    name = "metrics_service_grpc_py",
+    srcs = [":metrics_service_proto"],
+    deps = [":metrics_service_proto_py"],
+)
+
+go_grpc_library(
+    name = "metrics_service_grpc_go",
+    protos = [":metrics_service_proto"],
+    importpath = "go.opentelemetry.io/proto/otlp/metrics/v1",
+    embed = [
+        ":metrics_proto_go",
+    ],
+)
+
+proto_library(
+    name = "resource_proto",
     srcs = [
         "opentelemetry/proto/resource/v1/resource.proto",
     ],
     deps = [
-        "//:common",
+        ":common_proto",
     ],
-    visibility = ["//visibility:public"],
+)
+
+cc_proto_library(
+    name = "resource_proto_cc",
+    deps = [":resource_proto"],
+)
+
+py_proto_library(
+    name = "resource_proto_py",
+    deps = [":resource_proto"],
 )
 
 go_proto_library(
-    name = "common_go_proto",
-    importpath = "go.opentelemetry.io/proto/otlp/common/v1",
-    proto = ":common",
-    visibility = ["//visibility:public"],
-)
-
-# TODO(snowp): Generating one Go package from all of these protos could cause problems in the future,
-# but nothing references symbols from collector or resource so we're fine for now.
-api_cc_py_proto_library(
-    name = "logs",
-    srcs = [
-        "opentelemetry/proto/collector/logs/v1/logs_service.proto",
-        "opentelemetry/proto/logs/v1/logs.proto",
-    ],
+    name = "resource_proto_go",
+    importpath = "go.opentelemetry.io/proto/otlp/resource/v1",
+    protos = [":resource_proto"],
     deps = [
-        "//:common",
-        "//:resource",
+        ":common_proto_go",
     ],
-    visibility = ["//visibility:public"],
 )
 
-go_proto_library(
-    name = "logs_go_proto",
-    importpath = "go.opentelemetry.io/proto/otlp/logs/v1",
-    proto = ":logs",
-    visibility = ["//visibility:public"],
-)
-
-api_cc_py_proto_library(
-    name = "metrics",
+proto_library(
+    name = "trace_proto",
     srcs = [
-        "opentelemetry/proto/collector/metrics/v1/metrics_service.proto",
-        "opentelemetry/proto/metrics/v1/metrics.proto",
-    ],
-    deps = [
-        "//:common",
-        "//:resource",
-    ],
-    visibility = ["//visibility:public"],
-)
-
-go_proto_library(
-    name = "metrics_go_proto",
-    importpath = "go.opentelemetry.io/proto/otlp/metrics/v1",
-    proto = ":metrics",
-    visibility = ["//visibility:public"],
-)
-
-api_cc_py_proto_library(
-    name = "trace",
-    srcs = [
-        "opentelemetry/proto/collector/trace/v1/trace_service.proto",
         "opentelemetry/proto/trace/v1/trace.proto",
     ],
     deps = [
-        "//:common",
-        "//:resource",
+        ":common_proto",
+        ":resource_proto",
     ],
-    visibility = ["//visibility:public"],
+)
+
+cc_proto_library(
+    name = "trace_proto_cc",
+    deps = [":trace_proto"],
+)
+
+py_proto_library(
+    name = "trace_proto_py",
+    deps = [":trace_proto"],
+)
+
+go_proto_library(
+    name = "trace_proto_go",
+    importpath = "go.opentelemetry.io/proto/otlp/trace/v1",
+    protos = [":trace_proto"],
+    deps = [
+        ":common_proto_go",
+        ":resource_proto_go",
+    ],
+)
+
+proto_library(
+    name = "trace_service_proto",
+    srcs = [
+        "opentelemetry/proto/collector/trace/v1/trace_service.proto",
+    ],
+    deps = [
+        ":trace_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "trace_service_proto_cc",
+    deps = [":trace_service_proto"],
+)
+
+cc_grpc_library(
+    name = "trace_service_grpc_cc",
+    srcs = [":trace_service_proto"],
+    generate_mocks = True,
+    grpc_only = True,
+    deps = [":trace_service_proto_cc"],
+)
+
+py_proto_library(
+    name = "trace_service_proto_py",
+    deps = [":trace_service_proto"],
+)
+
+py_grpc_library(
+    name = "trace_service_grpc_py",
+    srcs = [":trace_service_proto"],
+    deps = [":trace_service_proto_py"],
+)
+
+go_grpc_library(
+    name = "trace_service_grpc_go",
+    protos = [":trace_service_proto"],
+    importpath = "go.opentelemetry.io/proto/otlp/trace/v1",
+    embed = [
+        ":trace_proto_go",
+    ],
 )
 """
 
