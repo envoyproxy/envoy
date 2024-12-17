@@ -65,7 +65,6 @@ public:
   bool allow_unknown_static_fields_{};
   bool reject_unknown_dynamic_fields_{};
   bool ignore_unknown_dynamic_fields_{};
-  bool suppress_deprecated_warning_logs_{};
   std::string admin_address_path_;
   std::string service_cluster_name_;
   std::string service_node_name_;
