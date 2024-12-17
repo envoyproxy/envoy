@@ -800,7 +800,8 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   if (handler == nullptr) {
     stats_.unsupported_command_.inc();
     callbacks.onResponse(Common::Redis::Utility::makeError(
-        fmt::format("unsupported command '{}'", request->asArray()[0].asString())));
+        fmt::format("ERR unknown command '{}', with args beginning with: {}",
+                    request->asArray()[0].asString(), request->asArray()[1].asString())));
     return nullptr;
   }
 
