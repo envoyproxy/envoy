@@ -110,6 +110,36 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportWithNoopCallbacks) {
       null_span);
 }
 
+TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportPartialSuccess) {
+  OpenTelemetryGrpcTraceExporter exporter(Grpc::RawAsyncClientPtr{async_client_});
+  auto null_span = Tracing::NullSpan();
+
+  auto response = std::make_unique<ExportTraceServiceResponse>();
+  response->mutable_partial_success()->set_error_message("test error");
+
+  EXPECT_LOG_CONTAINS("warn", "OTLP partial success: test error (0 spans rejected)",
+                      exporter.onSuccess(std::move(response), null_span));
+
+  response = std::make_unique<ExportTraceServiceResponse>();
+  response->mutable_partial_success()->set_error_message("test error 2");
+  response->mutable_partial_success()->set_rejected_spans(10);
+
+  EXPECT_LOG_CONTAINS("warn", "OTLP partial success: test error 2 (10 spans rejected)",
+                      exporter.onSuccess(std::move(response), null_span));
+
+  response = std::make_unique<ExportTraceServiceResponse>();
+  response->mutable_partial_success()->set_rejected_spans(5);
+
+  EXPECT_LOG_CONTAINS("warn", "OTLP partial success: empty message (5 spans rejected)",
+                      exporter.onSuccess(std::move(response), null_span));
+
+  response = std::make_unique<ExportTraceServiceResponse>();
+  response->mutable_partial_success();
+
+  EXPECT_LOG_NOT_CONTAINS("warn", "OTLP partial success",
+                          exporter.onSuccess(std::move(response), null_span));
+}
+
 } // namespace OpenTelemetry
 } // namespace Tracers
 } // namespace Extensions

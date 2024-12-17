@@ -23,6 +23,16 @@ class OpenTelemetryTraceExporterIntegrationTest
 public:
   OpenTelemetryTraceExporterIntegrationTest();
 
+  ~OpenTelemetryTraceExporterIntegrationTest() override {
+    if (connection_) {
+      AssertionResult result = connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+      connection_.reset();
+    }
+  }
+
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
     addFakeUpstream(Http::CodecType::HTTP2);
@@ -74,10 +84,7 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  void cleanup() {
-    grpc_receiver_upstream_->cleanUp();
-    cleanupUpstreamAndDownstream();
-  }
+  void cleanup() { cleanupUpstreamAndDownstream(); }
 
   void doHttpRequest() {
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -147,8 +154,6 @@ TEST_P(OpenTelemetryTraceExporterIntegrationTest, GrpcExporter) {
     streams_.push_back(std::move(stream));
   }
 
-  ASSERT_TRUE(connection_->close(timeout));
-  ASSERT_TRUE(connection_->waitForDisconnect(timeout));
   // the number of upstream and downstream spans received should be equal
   ASSERT_EQ(2, name_counts.size());
   ASSERT_THAT(name_counts,
