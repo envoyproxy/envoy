@@ -83,6 +83,7 @@ build:mobile-dbg-ios --config=ios
 
 # Default flags for Android tests
 build:mobile-test-android --define=static_extension_registration=disabled
+build:mobile-android --android_crosstool_top=@androidndk//:toolchain
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -110,6 +111,7 @@ build:mobile-remote-release-clang --config=remote
 build:mobile-remote-release-clang-android --config=mobile-remote-release-clang
 build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
 build:mobile-remote-release-clang-android --linkopt=-fuse-ld=lld
+build:mobile-remote-release-clang-android --config=mobile-android
 
 build:mobile-remote-release-clang-android-publish --config=mobile-remote-release-clang
 build:mobile-remote-release-clang-android-publish --config=mobile-release-android
@@ -134,6 +136,7 @@ build:mobile-release-ios --compilation_mode=opt
 # Release does not use the option --define=logger=android
 build:mobile-release-android --config=mobile-release-common
 build:mobile-release-android --compilation_mode=opt
+build:mobile-release-android --config=mobile-android
 
 # Instrument Envoy Mobile's C++ code for coverage
 coverage --instrumentation_filter="//library/common[/:]"
@@ -241,6 +244,7 @@ build:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --build_tests_only
 test:mobile-remote-ci-android --config=mobile-remote-ci
 test:mobile-remote-ci-android --config=mobile-test-android
+test:mobile-remote-ci-android --config=mobile-android
 
 build:mobile-remote-ci-cc --config=mobile-remote-ci
 test:mobile-remote-ci-cc --action_env=LD_LIBRARY_PATH
