@@ -73,6 +73,10 @@ minor_behavior_changes:
   change: |
     The ``state`` parameter in the OAuth2 authorization request has been changed to a base64url-encoded JSON object.
     The JSON object contains the original request URL and a nonce for CSRF prevention.
+- area: oauth2
+  change: |
+    Implement the Signed Double-Submit Cookie pattern, as recommended by OWASP, by using the HMAC secret to sign and verify
+    the nonce.
 - area: quic
   change: |
     Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
