@@ -211,7 +211,7 @@ private:
   // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.cc;l=21-22;drc=6849bf6b37e96bd1c38a5f77f7deaa28b53779c4;bpv=1;bpt=1
   const uint32_t initial_stream_window_size_ = 6 * 1024 * 1024;      // 6MB
   const uint32_t initial_connection_window_size_ = 15 * 1024 * 1024; // 15MB
-  int quic_connection_idle_timeout_seconds_ = 30;
+  int quic_connection_idle_timeout_seconds_ = 60;
 
   int keepalive_initial_interval_ms_ = 0;
 };
