@@ -1521,7 +1521,7 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig2) {
         dns_refresh_rate: 4s
         dns_jitter: 0s
         respect_dns_ttl: true
-        logical: false
+        all_addresses_in_single_endpoint: false
     lb_policy: ROUND_ROBIN
     load_assignment:
         endpoints:
@@ -1565,7 +1565,7 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfigTypedDnsResolverConfig) {
         dns_refresh_rate: 4s
         dns_jitter: 0s
         respect_dns_ttl: true
-        logical: false
+        all_addresses_in_single_endpoint: false
         typed_dns_resolver_config:
           name: envoy.network.dns_resolver.cares
           typed_config:
