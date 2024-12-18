@@ -27,6 +27,11 @@ behavior_changes:
     rather than waiting for the original request to complete. This allows shadowing requests larger than the buffer limit,
     but also means shadowing may take place for requests which are canceled mid-stream. This behavior change can be
     temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
+- area: orca
+  change: |
+    The previous ORCA parser will use ``:`` as the delimiter of key/value pair in the native HTTP report. This is wrong
+    based on the design document. The correct delimiter should be ``=``. This change fixes the delimiter to ``=``.
+    See https://github.com/envoyproxy/envoy/issues/6614 and related documents for more details.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -159,6 +164,11 @@ bug_fixes:
 - area: csrf
   change: |
     Handle requests that have a "privacy sensitive" / opaque origin (``Origin: null``) as if the request had no origin information.
+- area: orca
+  change: |
+    The previous ORCA parser will use ``:`` as the delimiter of key/value pair in the native HTTP report. This is wrong
+    based on the design document. The correct delimiter should be ``=``. This change fixes the delimiter to ``=``.
+    See https://github.com/envoyproxy/envoy/issues/6614 and related documents for more details.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
