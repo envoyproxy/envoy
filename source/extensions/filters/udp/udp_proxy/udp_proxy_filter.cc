@@ -1109,6 +1109,12 @@ void UdpProxyFilter::TunnelingActiveSession::onAboveWriteBufferHighWatermark() {
 }
 
 void UdpProxyFilter::TunnelingActiveSession::onBelowWriteBufferLowWatermark() {
+  // In cases where onBelowWriteBufferLowWatermark is called during an active
+  // write process to the upstream, flushBuffer will cause another write operation
+  // on the upstream connection, which causes nghttp2 based codec to seg fault, and
+  // oghttp2 based codec to drop the new written data. To avoid this, posting the
+  // flush operation on the dispatcher, so it can be done after current write operation
+  // had finished.
   filter_.read_callbacks_->udpListener().dispatcher().post(
       [session = shared_from_this()]() { session->flushBuffer(); });
 }
