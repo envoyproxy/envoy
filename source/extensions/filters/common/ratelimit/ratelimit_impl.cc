@@ -119,8 +119,11 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), debug,
                       "rate limit fail, status={} msg={}", status, msg);
-  callbacks_->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
+  // The rate limit requests applied on stream-done will destroy the client inside the complete
+  // callback, so we release the callback here to make the destructor happy.
+  auto call_backs = callbacks_;
   callbacks_ = nullptr;
+  call_backs->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
 }
 
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,

@@ -263,7 +263,7 @@ private:
   uint64_t stage_;
   std::vector<RateLimit::DescriptorProducerPtr> actions_;
   absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
-  bool apply_on_stream_done_;
+  const bool apply_on_stream_done_ = false;
 };
 
 /**

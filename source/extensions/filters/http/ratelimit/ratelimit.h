@@ -210,7 +210,6 @@ private:
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};
-  bool has_apply_on_stream_done_policy_ = false;
 };
 
 /**
