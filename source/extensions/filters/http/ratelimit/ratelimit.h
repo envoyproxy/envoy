@@ -194,7 +194,7 @@ private:
   void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
   double getHitAddend();
-  VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
+  void initializeVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
   std::string getDomain();
 
   Http::Context& httpContext() { return config_->httpContext(); }
@@ -207,6 +207,7 @@ private:
   State state_{State::NotStarted};
   VhRateLimitOptions vh_rate_limits_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
+  Router::RouteConstSharedPtr route_ = nullptr;
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};

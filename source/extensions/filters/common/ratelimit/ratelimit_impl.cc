@@ -108,10 +108,13 @@ void GrpcClientImpl::onSuccess(
       response->has_dynamic_metadata()
           ? std::make_unique<ProtobufWkt::Struct>(response->dynamic_metadata())
           : nullptr;
-  callbacks_->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
+  // The rate limit requests applied on stream-done will destroy the client inside the complete
+  // callback, so we release the callback here to make the destructor happy.
+  auto call_backs = callbacks_;
+  callbacks_ = nullptr;
+  call_backs->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
                        std::move(request_headers_to_add), response->raw_body(),
                        std::move(dynamic_metadata));
-  callbacks_ = nullptr;
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string& msg,
