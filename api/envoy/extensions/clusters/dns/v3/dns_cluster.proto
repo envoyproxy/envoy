@@ -84,7 +84,9 @@ message DnsCluster {
   // :ref:`AUTO<envoy_v3_api_enum_value_extensions.clusters.common.dns.v3.DnsLookupFamily.AUTO>`.
   common.dns.v3.DnsLookupFamily dns_lookup_family = 8;
 
-  // If true, perform :ref:`logical DNS discovery <arch_overview_service_discovery_types_logical_dns>`.
-  // Otherwise, :ref:`strict DNS discovery <arch_overview_service_discovery_types_strict_dns>`
+  // If true, all returned addresses are considered to be associated with a single endpoint,
+  // which maps to :ref:`logical DNS discovery <arch_overview_service_discovery_types_logical_dns>`
+  // semantics. Otherwise, each address is considered to be a separate endpoint, which maps to
+  // :ref:`strict DNS discovery <arch_overview_service_discovery_types_strict_dns>` semantics.
   bool all_addresses_in_single_endpoint = 9;
 }
