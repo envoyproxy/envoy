@@ -49,6 +49,7 @@ void LibeventScheduler::run(Dispatcher::RunType mode) {
   switch (mode) {
   case Dispatcher::RunType::NonBlock:
     flag = LibeventScheduler::flagsBasedOnEventType();
+    break;
   case Dispatcher::RunType::Block:
     // The default flags have 'block' behavior. See
     // http://www.wangafu.net/~nickm/libevent-book/Ref3_eventloop.html

@@ -90,6 +90,8 @@ gperf
 HEXDIG
 HEXDIGIT
 HPE
+KID
+KIDs
 Kwasi
 LRU
 Mensah
@@ -256,6 +258,7 @@ JSON
 JSONs
 JWKS
 JWKs
+JWKS's
 JWS
 JWT
 JWTs
@@ -1196,6 +1199,7 @@ refcount
 referencee
 referer
 refetch
+refetches
 reframed
 refvec
 regex

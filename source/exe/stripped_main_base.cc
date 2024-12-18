@@ -47,7 +47,7 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
                                    std::unique_ptr<Server::Platform> platform_impl,
                                    std::unique_ptr<Random::RandomGenerator>&& random_generator,
                                    std::unique_ptr<ProcessContext> process_context,
-                                   CreateInstanceFunction create_instance)
+                                   CreateInstanceFunction create_instance, bool set_new_handler)
     : platform_impl_(std::move(platform_impl)), options_(options),
       component_factory_(component_factory), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
@@ -78,9 +78,11 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
 
     configureComponentLogLevels();
 
-    // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a
-    // try/catch block or not.
-    std::set_new_handler([]() { PANIC("out of memory"); });
+    if (set_new_handler) {
+      // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a
+      // try/catch block or not.
+      std::set_new_handler([]() { PANIC("out of memory"); });
+    }
 
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
