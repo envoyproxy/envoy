@@ -271,15 +271,6 @@ jobs:
         key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch || 'x64' }}
         path: ${{ runner.temp }}/bazel_root
 
-diff --git a/.github/workflows/_run.yml b/.github/workflows/_run.yml
-index 02f5f2c060..64bd0db931 100644
---- a/.github/workflows/_run.yml
-+++ b/.github/workflows/_run.yml
-@@ -269,7 +269,17 @@ jobs:
-         gcs-bucket: ${{ inputs.gcs-cache-bucket }}
-         key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch || 'x64' }}
-         path: ${{ runner.temp }}/bazel_root
-
     # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
     - if: ${{ inputs.cache-build-image }}
       id: cache-lookup
