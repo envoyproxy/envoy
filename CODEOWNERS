@@ -259,10 +259,9 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/rbac @yangminzhu @yanavlasov
 /*/extensions/filters/common/rbac @yangminzhu @yanavlasov
 # tap
-/*/extensions/filters/http/tap @mattklein123 @coolg92003 @xu1zhou
-/*/extensions/common/tap @mattklein123 @coolg92003 @xu1zhou
-/*/extensions/transport_sockets/tap @mattklein123 @coolg92003 @xu1zhou
-/*/extensions/tap_sinks/udp_sink @wbpcode @coolg92003 @yiyibaoguo
+/*/extensions/filters/http/tap @mattklein123 @xu1zhou
+/*/extensions/common/tap @mattklein123 @xu1zhou
+/*/extensions/transport_sockets/tap @mattklein123 @xu1zhou
 # local rate limit
 /*/extensions/filters/network/local_ratelimit @mattklein123 @wbpcode
 /*/extensions/filters/listener/local_ratelimit @mattklein123 @JuniorHsu
@@ -414,3 +413,4 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /contrib/dlb @mattklein123 @daixiang0
 /contrib/qat/ @giantcroc @soulxu
 /contrib/generic_proxy/ @wbpcode @UNOWNED
+/contrib/tap_sinks/ @coolg92003 @yiyibaoguo

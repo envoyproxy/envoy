@@ -3,7 +3,6 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
-#include "envoy/extensions/tap_sinks/udp_sink/v3/udp_sink.pb.validate.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "source/common/common/assert.h"

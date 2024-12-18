@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/extensions/tap_sinks/udp_sink/v3/udp_sink.pb.h"
-
 #include "source/extensions/common/tap/tap.h"
+
+#include "contrib/tap_sinks/udp_sink/source/udp_sink_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +17,7 @@ public:
   std::string category() const override { return "envoy.tap.sinks.udp"; }
   std::string name() const override { return "envoy.tap.sinks.udp"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::tap_sinks::udp_sink::v3::UdpSink>();
+    return std::make_unique<envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink>();
   }
   TapCommon::SinkPtr
   createHttpSinkPtr(const Protobuf::Message& config,

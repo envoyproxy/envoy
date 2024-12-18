@@ -61,7 +61,6 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/tap:config",
-        "//source/extensions/tap_sinks/udp_sink:config",
         "//test/extensions/common/tap:common",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
