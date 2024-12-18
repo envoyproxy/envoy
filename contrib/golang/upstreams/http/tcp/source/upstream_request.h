@@ -44,7 +44,7 @@ class BridgeConfig;
 using BridgeConfigSharedPtr = std::shared_ptr<BridgeConfig>;
 
 /**
- * Configuration for the Golang HTTP-TCP Bridge.
+ * Configuration for HttpTcpBridge.
  */
 class BridgeConfig : httpConfig,
                      public std::enable_shared_from_this<BridgeConfig>,
@@ -71,6 +71,9 @@ private:
   uint64_t config_id_{0};
 };
 
+/**
+ * Manage connection pool for tcp upstream, and create HttpTcpBridge for http request stream.
+ */
 class TcpConnPool : public Router::GenericConnPool,
                     public Envoy::Tcp::ConnectionPool::Callbacks,
                     Logger::Loggable<Logger::Id::golang> {
@@ -117,6 +120,13 @@ private:
   BridgeConfigSharedPtr config_;
 };
 
+
+/**
+ *  The bridge enables an HTTP client to connect to a TCP server via a Golang plugin, facilitating Protocol Convert from HTTP to any RPC protocol in Envoy. 
+ *
+ *  Notice: the bridge is designed for sync data flow between go and c, so DO NOT use goroutine in go side.
+ *
+ */
 class HttpTcpBridge : public Router::GenericUpstream,
                     public Envoy::Tcp::ConnectionPool::UpstreamCallbacks,
                     public httpRequest,
@@ -160,7 +170,7 @@ public:
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
   void trySendProxyData(bool send_data_to_upstream, bool end_stream);
-  void encodeDataGo(ProcessorState* state, Buffer::Instance& data, bool end_stream);
+  void encodeDataGo(Buffer::Instance& data, bool end_stream);
   void sendDataToDownstream(Buffer::Instance& data, bool end_stream);
 
   CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
@@ -180,8 +190,7 @@ public:
 
   const Router::RouteEntry* route_entry_;
 
-  // cache routeName for getStringValue,
-  // since upstream_request_->route().virtualHost().routeConfig().name() is not concurrent safe when c thread and go thread running at same time.
+  // cache routeName for getStringValue, since upstream_request_->route().virtualHost().routeConfig().name() is not concurrent safe.
   std::string route_name_;
 
 private:
@@ -193,15 +202,13 @@ private:
 
   bool already_send_resp_headers_{false};
 
-  // lock to avoid race in c thread (when calling back from go).
+  // lock to avoid race in c thread between multi go code calls(go call c) and native c code.
   Thread::MutexBasicLockable mutex_for_c_and_go_{};
-
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
   std::string str_value_ ABSL_GUARDED_BY(mutex_for_c_and_go_);
-
   bool upstream_conn_self_half_close_ ABSL_GUARDED_BY(mutex_for_c_and_go_){false};
 
-  // lock to avoid race between multi go threads (when c thread blocked and calling back from go).
+  // lock to avoid race in c thread between multi go code calls(go call c).
   Thread::MutexBasicLockable mutex_for_go_{};
 };
 

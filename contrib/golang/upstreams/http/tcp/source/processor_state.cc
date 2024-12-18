@@ -41,8 +41,12 @@ void ProcessorState::processData() {
   setFilterState(FilterState::ProcessingData);
 }
 
+EncodingProcessorState::EncodingProcessorState(HttpTcpBridge& http_tpc_bridge) : ProcessorState(dynamic_cast<httpRequest*>(&http_tpc_bridge)) {
+    is_encoding = 1;
+}
+
 // headers_ should set to nullptr when return true.
-void ProcessorState::handleHeaderGolangStatus(HttpTcpBridgeStatus status) {
+void EncodingProcessorState::handleHeaderGolangStatus(HttpTcpBridgeStatus status) {
   ENVOY_LOG(debug, "golang http-tcp bridge handleHeaderGolangStatus handle header status, state: {}, status: {}", stateStr(),
             int(status));
 
@@ -68,7 +72,7 @@ void ProcessorState::handleHeaderGolangStatus(HttpTcpBridgeStatus status) {
   ENVOY_LOG(debug, "golang http-tcp bridge handleHeaderGolangStatus after handle header status, state: {}, status: {}", stateStr(), int(status));
 };
 
-void ProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus status, bool end_stream) {
+void EncodingProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus status, bool end_stream) {
   ENVOY_LOG(debug, "golang http-tcp bridge handleDataGolangStatus handle data status, state: {}, status: {}", stateStr(),
             int(status));
 
@@ -77,8 +81,11 @@ void ProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus status, bo
   switch (status) {
     case HttpTcpBridgeStatus::HttpTcpBridgeContinue:
       // streaming send data to upstream, go side get each_data_piece, may be called multipled times.
+
       if (end_stream) {
         setFilterState(FilterState::Done);
+        // http req is end, reset data buffer
+        resetBufferData();
         break;
       }
 
@@ -104,10 +111,6 @@ void ProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus status, bo
 
 DecodingProcessorState::DecodingProcessorState(HttpTcpBridge& http_tpc_bridge) : ProcessorState(dynamic_cast<httpRequest*>(&http_tpc_bridge)) {
     is_encoding = 0;
-}
-
-EncodingProcessorState::EncodingProcessorState(HttpTcpBridge& http_tpc_bridge) : ProcessorState(dynamic_cast<httpRequest*>(&http_tpc_bridge)) {
-    is_encoding = 1;
 }
 
 } // namespace Golang

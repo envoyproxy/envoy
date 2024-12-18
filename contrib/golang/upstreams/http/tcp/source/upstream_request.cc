@@ -160,7 +160,7 @@ void HttpTcpBridge::encodeData(Buffer::Instance& data, bool end_stream) {
 
   switch (encoding_state_->filterState()) {
   case FilterState::WaitingData:
-    encodeDataGo(encoding_state_, data, end_stream);
+    encodeDataGo(data, end_stream);
     break;
 
   case FilterState::WaitingAllData:
@@ -170,7 +170,7 @@ void HttpTcpBridge::encodeData(Buffer::Instance& data, bool end_stream) {
         encoding_state_->addBufferData(data);
         data.move(encoding_state_->getBufferData());
       }
-      encodeDataGo(encoding_state_, data, end_stream);
+      encodeDataGo(data, end_stream);
     } else {
       ENVOY_LOG(debug, "golang http-tcp bridge encodeData, appending data to buffer");
       encoding_state_->addBufferData(data);
@@ -246,6 +246,7 @@ void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
     // TODO(duxin40): support use golang to set trailers and send it to downstream.(upstream_request_->decodeTrailers())
 
+    // http resp is end, clear data buffer
     data.drain(data.length());
     break;
 
@@ -274,21 +275,21 @@ void HttpTcpBridge::trySendProxyData(bool send_data_to_upstream, bool end_stream
   }
 }
 
-void HttpTcpBridge::encodeDataGo(ProcessorState* state, Buffer::Instance& data, bool end_stream) {
-  ENVOY_LOG(debug, "golang http-tcp bridge encodeDataGo, passing data to golang, state: {}, end_stream: {}", state->stateStr(), end_stream);
+void HttpTcpBridge::encodeDataGo(Buffer::Instance& data, bool end_stream) {
+  ENVOY_LOG(debug, "golang http-tcp bridge encodeDataGo, passing data to golang, state: {}, end_stream: {}", encoding_state_->stateStr(), end_stream);
 
-  state->processData();
+  encoding_state_->processData();
 
-  auto s = dynamic_cast<processState*>(state);
+  auto s = dynamic_cast<processState*>(encoding_state_);
   GoUint64 go_status = dynamic_lib_->envoyGoHttpTcpBridgeOnEncodeData(
     s, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&data), data.length());
     
-  state->handleDataGolangStatus(static_cast<HttpTcpBridgeStatus>(go_status), end_stream);
+  encoding_state_->handleDataGolangStatus(static_cast<HttpTcpBridgeStatus>(go_status), end_stream);
 
-  if (state->filterState() == FilterState::Done || state->filterState() == FilterState::WaitingData) {
+  if (encoding_state_->filterState() == FilterState::Done || encoding_state_->filterState() == FilterState::WaitingData) {
     Thread::LockGuard lock(mutex_for_c_and_go_);
     upstream_conn_data_->connection().write(data, upstream_conn_self_half_close_);
-}
+  }
 }
 
 void HttpTcpBridge::sendDataToDownstream(Buffer::Instance& data, bool end_stream) {

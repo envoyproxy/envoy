@@ -97,6 +97,12 @@ public:
     return filterState() == FilterState::ProcessingHeader || filterState() == FilterState::ProcessingData;
   }
 
+};
+
+class EncodingProcessorState : public ProcessorState {
+public:
+  EncodingProcessorState(HttpTcpBridge& http_tcp_bridge);
+
   /* data buffer */
   // add data to state buffer
   virtual void addBufferData(Buffer::Instance& data) {
@@ -108,21 +114,20 @@ public:
   // get state buffer
   Buffer::Instance& getBufferData() { return *data_buffer_.get(); };
   bool isBufferDataEmpty() { return data_buffer_ == nullptr || data_buffer_->length() == 0; };
+  void resetBufferData() {
+    if (data_buffer_ != nullptr) {
+      data_buffer_.reset();
+    }
+  }
 
   void handleHeaderGolangStatus(HttpTcpBridgeStatus status);
   void handleDataGolangStatus(const HttpTcpBridgeStatus status, bool end_stream);
 
-protected:
-  Buffer::InstancePtr data_buffer_{nullptr};
-
-};
-
-class EncodingProcessorState : public ProcessorState {
-public:
-  EncodingProcessorState(HttpTcpBridge& http_tcp_bridge);
-
   // store request header for http
   const Envoy::Http::RequestHeaderMap* req_headers{nullptr};
+
+protected:
+  Buffer::InstancePtr data_buffer_{nullptr};
 };
 
 class DecodingProcessorState : public ProcessorState {
