@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "28.3"
+PROTOBUF_VERSION = "29.1"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,11 +8,11 @@ PROTOBUF_VERSION = "28.3"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "1de522032a8b194002fe35cab86d747848238b5e4de4f99648372079f5b46f9a",
-    linux_x86_64 = "0ad949f04a6a174da83cdcbdb36dee0a4925272a5b6d83f79a6bf9852076d53f",
-    osx_aarch_64 = "92ceefda6a7293ec014e6ecac82d64719357145cb6fc2865badadeb5e62c0431",
-    osx_x86_64 = "97fe5d442090b4dbc23cd1384fb9b444fa1dc6e67d15bb5e1fe4de0da7638b20",
-    win64 = "ce64f49bdeddef49ce4bd313a8f59bcf92fcf67b5831efbf66170386d2e66948",
+    linux_aarch_64 = "1f74a3f3355de7c0666bc125611c13532c2598f853521d0d3e621a5b09f24799",
+    linux_x86_64 = "00c83fe9722d85e96c81b941b29f17a744b33b4ce66e0f18009fd8937de22c60",
+    osx_aarch_64 = "b8fd5976926198a7c4ea5c6eb4bf78959d5faed27bfc618254caa1043f770445",
+    osx_x86_64 = "db02b4b86de4d4cced3ea9934347da28dc95e7f38863ffc4ce3cc26283028da6",
+    win64 = "7ea48225857ffc1224588c335c2b1af9d78a18af9d57c0528cca3193e336e9ce",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -936,11 +936,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "7c3ebd7aaedd86fa5dc479a0fda803f602caaf78d8aff7ce83b89e1b8ae7442a",
+        sha256 = "3d32940e975c4ad9b8ba69640e78f5527075bae33ca2890275bf26b853c0962c",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2024-10-22",
+        release_date = "2024-12-04",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1235,12 +1235,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "bf33a4a6f99dff0ff5bc05da8ef4cd0ccf16e210",
-        sha256 = "17b894393fc0e5e167ffbbfb8d67943cf37ebe9b986a72ed666330008e749ca0",
+        version = "f18d5205756e4d92f2711c617cbd106644469980",
+        sha256 = "a39e718b49c61a5c2c319c76df61ab29ad6da587b34bf70ffd0f648e08636186",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2024-12-11",
+        release_date = "2024-12-16",
         cpe = "N/A",
         license = "BSD-3-Clause",
         license_url = "https://github.com/google/quiche/blob/{version}/LICENSE",
@@ -1485,19 +1485,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel rust rules",
         project_desc = "Bazel rust rules (used by Wasm)",
         project_url = "https://github.com/bazelbuild/rules_rust",
-        version = "0.54.1",
-        sha256 = "af4f56caae50a99a68bfce39b141b509dd68548c8204b98ab7a1cafc94d5bb02",
+        version = "0.56.0",
+        sha256 = "f1306aac0b258b790df01ad9abc6abb0df0b65416c74b4ef27f4aab298780a64",
         # Note: rules_rust should point to the releases, not archive to avoid the hassle of bootstrapping in crate_universe.
         # This is described in https://bazelbuild.github.io/rules_rust/crate_universe.html#setup, otherwise bootstrap
         # is required which in turn requires a system CC toolchains, not the bazel controlled ones.
-        urls = ["https://github.com/bazelbuild/rules_rust/releases/download/{version}/rules_rust-v{version}.tar.gz"],
+        urls = ["https://github.com/bazelbuild/rules_rust/releases/download/{version}/rules_rust-{version}.tar.gz"],
         use_category = [
             "controlplane",
             "dataplane_core",
             "dataplane_ext",
         ],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        release_date = "2024-11-07",
+        release_date = "2024-12-16",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_rust/blob/{version}/LICENSE.txt",
@@ -1607,7 +1607,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2024-10-22",
+            release_date = "2024-12-04",
             cpe = "N/A",
             license = "Protocol Buffers",
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",

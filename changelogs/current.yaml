@@ -73,6 +73,10 @@ minor_behavior_changes:
   change: |
     The ``state`` parameter in the OAuth2 authorization request has been changed to a base64url-encoded JSON object.
     The JSON object contains the original request URL and a nonce for CSRF prevention.
+- area: oauth2
+  change: |
+    Implement the Signed Double-Submit Cookie pattern, as recommended by OWASP, by using the HMAC secret to sign and verify
+    the nonce.
 - area: quic
   change: |
     Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
@@ -328,6 +332,11 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.cx_pool_ready_duration``
     to get the duration from when the upstream request was created to when the upstream connection pool is ready.
+- area: jwt_authn
+  change: |
+    Added  :ref:`refetch_jwks_on_kid_mismatch
+    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.RemoteJwks.refetch_jwks_on_kid_mismatch>`
+    to allow filter to refetch JWKS when extracted JWT's KID does not match cached JWKS's KID.
 - area: health_check
   change: |
     Added new health check filter stats including total requests, successful/failed checks, cached responses, and
@@ -342,6 +351,9 @@ new_features:
   change: |
     added new ``xds.virtual_host_name`` and ``xds.virtual_host_metadata`` attributes support. See
     :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
+- area: redis
+  change: |
+    Added support for UNWATCH command.
 
 deprecated:
 - area: rbac

@@ -322,7 +322,7 @@ private:
   // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
   bool canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const;
-  void redirectToOAuthServer(Http::RequestHeaderMap& headers) const;
+  void redirectToOAuthServer(Http::RequestHeaderMap& headers);
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
@@ -335,7 +335,8 @@ private:
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                  const absl::string_view path_str);
-  bool validateNonce(const Http::RequestHeaderMap& headers, const std::string& nonce) const;
+  bool validateCsrfToken(const Http::RequestHeaderMap& headers,
+                         const std::string& csrf_token) const;
 };
 
 } // namespace Oauth2
