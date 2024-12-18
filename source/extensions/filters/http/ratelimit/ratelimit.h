@@ -152,9 +152,11 @@ public:
 
   void populateDescriptors(const Http::RequestHeaderMap& headers,
                            const StreamInfo::StreamInfo& info,
-                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors) const {
+                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
+                           bool on_stream_done) const {
     ASSERT(rate_limit_config_ != nullptr);
-    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors);
+    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors,
+                                            on_stream_done);
   }
 
   std::string domain() const { return domain_; }
@@ -206,7 +208,6 @@ public:
                 Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) override;
 
 private:
-  void maybeInitializeRouteConfig(Http::StreamFilterCallbacks* callbacks);
   void initiateCall(const Http::RequestHeaderMap& headers);
   void populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                     const Http::RequestHeaderMap& headers, bool on_stream_done);
@@ -225,14 +226,13 @@ private:
   enum class State { NotStarted, Calling, Complete, Responded };
 
   FilterConfigSharedPtr config_;
-  const FilterConfigPerRoute* route_config_{};
-  bool route_config_initialized_{};
   Filters::Common::RateLimit::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};
-  VhRateLimitOptions vh_rate_limits_;
+  VhRateLimitOptions vh_rate_limits_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Router::RouteConstSharedPtr route_ = nullptr;
+  const FilterConfigPerRoute* route_config_ = nullptr;
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};

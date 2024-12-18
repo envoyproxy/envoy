@@ -14,7 +14,8 @@ constexpr double MAX_HITS_ADDEND = 1000000000;
 
 RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
                                  Server::Configuration::CommonFactoryContext& context,
-                                 absl::Status& creation_status, bool no_limit) {
+                                 absl::Status& creation_status, bool no_limit)
+    : apply_on_stream_done_(config.apply_on_stream_done()) {
   if (config.has_hits_addend()) {
     if (!config.hits_addend().format().empty()) {
       // Ensure only format or number is set.
@@ -181,22 +182,23 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
 RateLimitConfig::RateLimitConfig(const Protobuf::RepeatedPtrField<ProtoRateLimit>& configs,
                                  Server::Configuration::CommonFactoryContext& context,
                                  absl::Status& creation_status, bool no_limit) {
+  rate_limit_policies_.reserve(configs.size());
   for (const ProtoRateLimit& config : configs) {
-    auto descriptor_generator =
-        std::make_unique<RateLimitPolicy>(config, context, creation_status, no_limit);
-    if (!creation_status.ok()) {
-      return;
-    }
-    rate_limit_policies_.emplace_back(std::move(descriptor_generator));
+    rate_limit_policies_.emplace_back(config, context, creation_status, no_limit);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   }
 }
 
 void RateLimitConfig::populateDescriptors(const Http::RequestHeaderMap& headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           const std::string& local_service_cluster,
-                                          RateLimitDescriptors& descriptors) const {
-  for (const auto& generator : rate_limit_policies_) {
-    generator->populateDescriptors(headers, stream_info, local_service_cluster, descriptors);
+                                          RateLimitDescriptors& descriptors,
+                                          bool on_stream_done) const {
+  for (const RateLimitPolicy& generator : rate_limit_policies_) {
+    if (generator.applyOnStreamDone() != on_stream_done) {
+      continue;
+    }
+    generator.populateDescriptors(headers, stream_info, local_service_cluster, descriptors);
   }
 }
 

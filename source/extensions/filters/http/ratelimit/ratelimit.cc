@@ -78,14 +78,24 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   if (!route_ || !cluster_) {
     return;
   }
-
   const Router::RouteEntry* route_entry = route_->routeEntry();
   if (!route_entry) {
     return;
   }
   if (!on_stream_done) {
+    route_config_ =
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
     initializeVirtualHostRateLimitOption(route_entry);
   }
+
+  // The the embedded rate limits is set in the typed_per_filter_config, use it and ignore the
+  // rate limits of route.
+  if (route_config_ != nullptr && route_config_->hasRateLimitConfigs()) {
+    route_config_->populateDescriptors(headers, callbacks_->streamInfo(), descriptors,
+                                       on_stream_done);
+    return;
+  }
+
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptorsForPolicy(route_entry->rateLimitPolicy(), descriptors, headers,
                                         on_stream_done);
