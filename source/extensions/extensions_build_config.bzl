@@ -538,6 +538,25 @@ EXTENSIONS = {
     "envoy.generic_proxy.codecs.http1":                         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
 }
 
+def _update_extensions_impl(ctx):
+    additional_extensions = ctx.attr.additional_extensions
+    if additional_extensions:
+        EXTENSIONS.update(
+            dict(
+                [(key, value) for pair in additional_extensions.split(",")
+                 for key, value in [pair.split("=")]]
+            )
+        )
+
+    return [EXTENSIONS]
+
+update_extensions = rule(
+    implementation = _update_extensions_impl,
+    attrs = {
+        "additional_extensions": attr.string(),
+    },
+)
+
 # These can be changed to ["//visibility:public"], for  downstream builds which
 # need to directly reference Envoy extensions.
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config", "//:contrib_library", "//:mobile_library"]
