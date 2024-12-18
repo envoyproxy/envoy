@@ -80,6 +80,17 @@ TEST(OrcaParserUtilTest, NativeHttpEncodedHeader) {
               StatusHelpers::IsOkAndHolds(ProtoEq(exampleOrcaLoadReport())));
 }
 
+TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderWithColon) {
+  Http::TestRequestHeaderMapImpl headers{
+      {std::string(kEndpointLoadMetricsHeader),
+       absl::StrCat(kHeaderFormatPrefixText,
+                    "cpu_utilization:0.7,application_utilization:0.8,mem_utilization:0.9,"
+                    "rps_fractional:1000,eps:2,"
+                    "named_metrics.foo:123,named_metrics.bar:0.2,utilization.total:0.5")}};
+  EXPECT_THAT(parseOrcaLoadReportHeaders(headers),
+              StatusHelpers::IsOkAndHolds(ProtoEq(exampleOrcaLoadReport())));
+}
+
 TEST(OrcaParserUtilTest, NativeHttpEncodedHeaderIncorrectFieldType) {
   Http::TestRequestHeaderMapImpl headers{
       {std::string(kEndpointLoadMetricsHeader),
