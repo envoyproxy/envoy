@@ -173,6 +173,7 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override;
   Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override;
+  void encodeComplete() override {}
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // RateLimit::RequestCallbacks
@@ -185,9 +186,12 @@ public:
 
 private:
   void initiateCall(const Http::RequestHeaderMap& headers);
-  void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
-                                    std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                                    const Http::RequestHeaderMap& headers);
+  void populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                                    const Http::RequestHeaderMap& headers, bool on_stream_done);
+  void populateRateLimitDescriptorsForPolicy(const Router::RateLimitPolicy& rate_limit_policy,
+                                             std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                                             const Http::RequestHeaderMap& headers,
+                                             bool on_stream_done);
   void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
   double getHitAddend();
@@ -207,9 +211,7 @@ private:
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};
-  // Holds the descriptors that should be applied on stream done which will be populated during
-  // decodeHeaders.
-  std::vector<Envoy::RateLimit::Descriptor> descriptors_apply_on_stream_done_{};
+  bool has_apply_on_stream_done_policy_ = false;
 };
 
 /**

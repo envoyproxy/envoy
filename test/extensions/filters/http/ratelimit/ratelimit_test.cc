@@ -271,14 +271,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
-              getApplicableRateLimit(0));
-
-  // Make sure that descriptor_two_ will be applied on stream done.
-  EXPECT_CALL(vh_rate_limit_, applyOnStreamDone()).WillOnce(Return(true));
-  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
-      .WillOnce(SetArgReferee<0>(descriptor_two_));
-
+  EXPECT_CALL(vh_rate_limit_, applyOnStreamDone()).WillRepeatedly(Return(true));
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
                                   {{{"descriptor_key", "descriptor_value"}}}}),
@@ -310,18 +303,28 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   EXPECT_EQ(
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
 
-  // Test the behavior when apply_on_stream_done is true.
+  // Test the behavior for the apply_on_stream_done flag.
   testing::Mock::VerifyAndClearExpectations(client_);
+  testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);
+  testing::Mock::VerifyAndClearExpectations(
+      &filter_callbacks_.route_->route_entry_.rate_limit_policy_);
+  testing::Mock::VerifyAndClearExpectations(&route_rate_limit_);
+  testing::Mock::VerifyAndClearExpectations(&vh_rate_limit_);
   filter_callbacks_.stream_info_.filter_state_->setData(
       // Ensures that addend can be set differently than the request path.
       "envoy.ratelimit.hits_addend", std::make_unique<StreamInfo::UInt32AccessorImpl>(100),
       StreamInfo::FilterState::StateType::Mutable);
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  EXPECT_CALL(vh_rate_limit_, applyOnStreamDone()).WillRepeatedly(Return(true));
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_two_));
   EXPECT_CALL(*client_, cancel());
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptor_two_), _, _, 100))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
+
   filter_->onDestroy();
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
                                nullptr, "", nullptr);
