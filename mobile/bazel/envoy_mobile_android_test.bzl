@@ -1,5 +1,5 @@
-load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_local_test")
 load("@rules_android//android:rules.bzl", "android_local_test")
+load("@rules_kotlin//kotlin:android.bzl", "kt_android_local_test")
 load("//bazel:envoy_mobile_android_jni.bzl", "native_lib_name")
 
 # A simple macro to define the JVM flags.

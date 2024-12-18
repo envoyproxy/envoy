@@ -25,6 +25,12 @@ alias(
     visibility = ["//library/jni:__pkg__"],
 )
 
+alias(
+    name = "objc_dummy",
+    actual = "@bazel_tools//tools/objc:dummy.c",
+    visibility = ["//library/jni:__pkg__"],
+)
+
 # autoformat requires that there be no @bazel_tools references outside of //bazel,
 # so we alias all of the relevant platforms for determining wheel packaging here
 alias(
