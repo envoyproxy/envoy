@@ -1,20 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: December 18, 2024
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: http/1
   change: |
     Fixes sending overload crashes when HTTP/1 request is reset.
-
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-new_features:
-
-deprecated:
