@@ -41,6 +41,7 @@ Bencoded
 CIO
 cbegin
 cend
+constness
 deadcode
 DFP
 Dynatrace
@@ -89,6 +90,8 @@ gperf
 HEXDIG
 HEXDIGIT
 HPE
+KID
+KIDs
 Kwasi
 LRU
 Mensah
@@ -255,6 +258,7 @@ JSON
 JSONs
 JWKS
 JWKs
+JWKS's
 JWS
 JWT
 JWTs
@@ -332,6 +336,7 @@ ODCDS
 middlewildcard
 monostate
 mpd
+msan
 mutators
 mybucket
 myobject
@@ -1194,6 +1199,7 @@ refcount
 referencee
 referer
 refetch
+refetches
 reframed
 refvec
 regex

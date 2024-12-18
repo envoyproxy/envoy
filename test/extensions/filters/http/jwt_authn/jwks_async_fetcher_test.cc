@@ -64,11 +64,16 @@ public:
         [this](Upstream::ClusterManager&, const RemoteJwks&) {
           return std::make_unique<MockJwksFetcher>(
               [this](Common::JwksFetcher::JwksReceiver& receiver) {
-                fetch_receiver_array_.push_back(&receiver);
+                if (fetch_allowed) {
+                  fetch_receiver_array_.push_back(&receiver);
+                }
               });
         },
         stats_,
-        [this](google::jwt_verify::JwksPtr&& jwks) { out_jwks_array_.push_back(std::move(jwks)); });
+        [this](google::jwt_verify::JwksPtr&& jwks) { out_jwks_array_.push_back(std::move(jwks)); },
+        // Simulating the isRemoteJwksFetchAllowed and allowRemoteJwksFetch callbacks.
+        [this]() -> bool { return fetch_allowed; },
+        [this](absl::optional<bool>, bool fetch_allowed_) { fetch_allowed = fetch_allowed_; });
 
     if (initManagerUsed()) {
       init_target_handle_->initialize(init_watcher_);
@@ -85,6 +90,7 @@ public:
   Init::TargetHandlePtr init_target_handle_;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
   Event::MockTimer* timer_{};
+  bool fetch_allowed{true};
 };
 
 INSTANTIATE_TEST_SUITE_P(JwksAsyncFetcherTest, JwksAsyncFetcherTest,
@@ -205,6 +211,44 @@ TEST_P(JwksAsyncFetcherTest, TestGoodFetchAndRefresh) {
   EXPECT_EQ(out_jwks_array_.size(), 2);
   EXPECT_EQ(2U, stats_.jwks_fetch_success_.value());
   EXPECT_EQ(0U, stats_.jwks_fetch_failed_.value());
+}
+
+TEST_P(JwksAsyncFetcherTest, TestBackoffDuringAsyncFetch) {
+  const char config[] = R"(
+      http_uri:
+        uri: https://pubkey_server/pubkey_path
+        cluster: pubkey_cluster
+      async_fetch: {}
+      refetch_jwks_on_kid_mismatch: true
+)";
+
+  setupAsyncFetcher(config);
+
+  // Initial fetch is successful.
+  EXPECT_EQ(fetch_receiver_array_.size(), 1);
+  auto jwks = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
+  fetch_receiver_array_[0]->onJwksSuccess(std::move(jwks));
+
+  // Output 1 jwks.
+  EXPECT_EQ(out_jwks_array_.size(), 1);
+
+  // Disallow fetch.
+  fetch_allowed = false;
+  timer_->invokeCallback();
+
+  // No fetch is done since fetch is disallowed.
+  EXPECT_EQ(fetch_receiver_array_.size(), 1);
+  EXPECT_EQ(out_jwks_array_.size(), 1);
+
+  // Re-allow fetch.
+  fetch_allowed = true;
+  timer_->invokeCallback();
+
+  // New fetch is successful since fetch is now allowed.
+  EXPECT_EQ(fetch_receiver_array_.size(), 2);
+  jwks = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
+  fetch_receiver_array_[1]->onJwksSuccess(std::move(jwks));
+  EXPECT_EQ(out_jwks_array_.size(), 2);
 }
 
 TEST_P(JwksAsyncFetcherTest, TestNetworkFailureFetchWithDefaultRefetch) {

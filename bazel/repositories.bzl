@@ -124,6 +124,12 @@ def envoy_dependencies(skip_targets = []):
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
 
+    # Setup Bazel shell rules
+    external_http_archive(name = "rules_shell")
+
+    # Setup Bazel C++ rules
+    external_http_archive("rules_cc")
+
     # Setup external Bazel rules
     _foreign_cc_dependencies()
 
@@ -217,7 +223,11 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_features")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive(name = "envoy_examples")
+    external_http_archive(
+        name = "envoy_examples",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:envoy_examples.patch"],
+    )
 
     _com_github_maxmind_libmaxminddb()
 
@@ -446,6 +456,12 @@ def _net_zlib():
         actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
+    # Bind for protobuf.
+    native.bind(
+        name = "zlib",
+        actual = "@envoy//bazel/foreign_cc:zlib",
+    )
+
 def _com_github_zlib_ng_zlib_ng():
     external_http_archive(
         name = "com_github_zlib_ng_zlib_ng",
@@ -551,9 +567,13 @@ def _com_github_datadog_dd_trace_cpp():
 def _com_github_skyapm_cpp2sky():
     external_http_archive(
         name = "com_github_skyapm_cpp2sky",
+        patches = ["@envoy//bazel:com_github_skyapm_cpp2sky.patch"],
+        patch_args = ["-p1"],
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
+        patches = ["@envoy//bazel:skywalking_data_collect_protocol.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_nlohmann_json():
@@ -609,6 +629,11 @@ def _com_google_absl():
 def _com_google_protobuf():
     external_http_archive(
         name = "rules_python",
+    )
+    external_http_archive(
+        name = "rules_java",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_java.patch"],
     )
 
     for platform in PROTOC_VERSIONS:
@@ -969,7 +994,11 @@ def _rules_ruby():
     external_http_archive("rules_ruby")
 
 def _foreign_cc_dependencies():
-    external_http_archive(name = "rules_foreign_cc")
+    external_http_archive(
+        name = "rules_foreign_cc",
+        patches = ["@envoy//bazel:rules_foreign_cc.patch"],
+        patch_args = ["-p1"],
+    )
 
 def _com_github_maxmind_libmaxminddb():
     external_http_archive(

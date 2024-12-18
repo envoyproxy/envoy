@@ -473,7 +473,7 @@ local_cluster_rate_limit: {}
   EXPECT_TRUE(factory
                   .createRouteSpecificFilterConfig(*proto_config, context,
                                                    ProtobufMessage::getNullValidationVisitor())
-                  .value());
+                  .ok());
 }
 
 } // namespace LocalRateLimitFilter

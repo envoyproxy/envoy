@@ -8,6 +8,20 @@ namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
 
+using OnHttpConfigDestoryType = decltype(&envoy_dynamic_module_on_http_filter_config_destroy);
+using OnHttpFilterNewType = decltype(&envoy_dynamic_module_on_http_filter_new);
+using OnHttpFilterRequestHeadersType =
+    decltype(&envoy_dynamic_module_on_http_filter_request_headers);
+using OnHttpFilterRequestBodyType = decltype(&envoy_dynamic_module_on_http_filter_request_body);
+using OnHttpFilterRequestTrailersType =
+    decltype(&envoy_dynamic_module_on_http_filter_request_trailers);
+using OnHttpFilterResponseHeadersType =
+    decltype(&envoy_dynamic_module_on_http_filter_response_headers);
+using OnHttpFilterResponseBodyType = decltype(&envoy_dynamic_module_on_http_filter_response_body);
+using OnHttpFilterResponseTrailersType =
+    decltype(&envoy_dynamic_module_on_http_filter_response_trailers);
+using OnHttpFilterDestroyType = decltype(&envoy_dynamic_module_on_http_filter_destroy);
+
 /**
  * A config to create http filters based on a dynamic module. This will be owned by multiple
  * filter instances. This resolves and holds the symbols used for the HTTP filters.
@@ -22,15 +36,25 @@ public:
    */
   DynamicModuleHttpFilterConfig(const absl::string_view filter_name,
                                 const absl::string_view filter_config,
-                                Extensions::DynamicModules::DynamicModulePtr dynamic_module);
+                                DynamicModulePtr dynamic_module);
 
   ~DynamicModuleHttpFilterConfig();
 
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_http_filter_config_module_ptr in_module_config_ = nullptr;
 
-  // The function pointer to the module's destroy function, resolved in the constructor.
-  decltype(&envoy_dynamic_module_on_http_filter_config_destroy) in_module_config_destroy_ = nullptr;
+  // The function pointers for the module related to the HTTP filter. All of them are resolved
+  // during the construction of the config and made sure they are not nullptr after that.
+
+  OnHttpConfigDestoryType on_http_filter_config_destroy_ = nullptr;
+  OnHttpFilterNewType on_http_filter_new_ = nullptr;
+  OnHttpFilterRequestHeadersType on_http_filter_request_headers_ = nullptr;
+  OnHttpFilterRequestBodyType on_http_filter_request_body_ = nullptr;
+  OnHttpFilterRequestTrailersType on_http_filter_request_trailers_ = nullptr;
+  OnHttpFilterResponseHeadersType on_http_filter_response_headers_ = nullptr;
+  OnHttpFilterResponseBodyType on_http_filter_response_body_ = nullptr;
+  OnHttpFilterResponseTrailersType on_http_filter_response_trailers_ = nullptr;
+  OnHttpFilterDestroyType on_http_filter_destroy_ = nullptr;
 
 private:
   // The name of the filter passed in the constructor.

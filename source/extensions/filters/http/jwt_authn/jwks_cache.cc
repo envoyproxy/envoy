@@ -29,12 +29,27 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
+static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
+static constexpr uint32_t RetryMaxDelayMilliseconds = 30000;
+
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
   JwksDataImpl(const JwtProvider& jwt_provider, Server::Configuration::FactoryContext& context,
                CreateJwksFetcherCb fetcher_cb, JwtAuthnFilterStats& stats)
       : jwt_provider_(jwt_provider), time_source_(context.serverFactoryContext().timeSource()),
-        tls_(context.serverFactoryContext().threadLocal()) {
+        tls_(context.serverFactoryContext().threadLocal()),
+        random_(context.serverFactoryContext().api().randomGenerator()),
+        dispatcher_(context.serverFactoryContext().mainThreadDispatcher()) {
+
+    remote_fetch_backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+        RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds, random_);
+
+    remote_fetch_disallow_timer_ =
+        context.serverFactoryContext().mainThreadDispatcher().createTimer([this]() -> void {
+          tls_.runOnAllThreads(
+              [](OptRef<ThreadLocalCache> obj) { obj->is_backoff_enabled_ = false; });
+          ENVOY_LOG(debug, "JWKS fetch backoff completed. Fetching can resume.");
+        });
 
     if (jwt_provider_.has_remote_jwks()) {
       // remote_jwks.retry_policy has an invalid case that could not be validated by the
@@ -79,7 +94,8 @@ public:
     bool enable_jwt_cache = jwt_provider_.has_jwt_cache_config();
     const auto& config = jwt_provider_.jwt_cache_config();
     tls_.set([enable_jwt_cache, config](Envoy::Event::Dispatcher& dispatcher) {
-      return std::make_shared<ThreadLocalCache>(enable_jwt_cache, config, dispatcher.timeSource());
+      return std::make_shared<ThreadLocalCache>(enable_jwt_cache, config, dispatcher.timeSource(),
+                                                false, false);
     });
 
     const auto inline_jwks =
@@ -100,7 +116,11 @@ public:
       if (jwt_provider_.has_remote_jwks()) {
         async_fetcher_ = std::make_unique<JwksAsyncFetcher>(
             jwt_provider_.remote_jwks(), context, fetcher_cb, stats,
-            [this](google::jwt_verify::JwksPtr&& jwks) { setJwksToAllThreads(std::move(jwks)); });
+            [this](google::jwt_verify::JwksPtr&& jwks) { setJwksToAllThreads(std::move(jwks)); },
+            [this]() -> bool { return isRemoteJwksFetchAllowed(); },
+            [this](absl::optional<bool> stop_backoff, bool fetch_in_flight) {
+              allowRemoteJwksFetch(stop_backoff, fetch_in_flight);
+            });
       }
     }
   }
@@ -144,23 +164,60 @@ public:
 
   bool isExpired() const override { return time_source_.monotonicTime() >= tls_->expire_; }
 
-  const ::google::jwt_verify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) override {
-    // convert unique_ptr to shared_ptr
+  const ::google::jwt_verify::Jwks* setRemoteJwks(JwksConstPtr&& jwks,
+                                                  bool update_all_threads) override {
     JwksConstSharedPtr shared_jwks = std::move(jwks);
     tls_->jwks_ = shared_jwks;
     tls_->expire_ = time_source_.monotonicTime() +
                     JwksAsyncFetcher::getCacheDuration(jwt_provider_.remote_jwks());
+
+    if (update_all_threads) {
+      dispatcher_.post([this, jwks = shared_jwks]() mutable { setJwksToAllThreads(jwks); });
+    }
+
     return shared_jwks.get();
   }
 
   JwtCache& getJwtCache() override { return *tls_->jwt_cache_; }
 
+  bool isRemoteJwksFetchAllowed() override {
+    if (!jwt_provider_.has_remote_jwks() &&
+        !jwt_provider_.remote_jwks().refetch_jwks_on_kid_mismatch()) {
+      return true;
+    }
+    return !(tls_->fetch_in_flight_ || tls_->is_backoff_enabled_);
+  }
+
+  void allowRemoteJwksFetch(absl::optional<bool> stop_backoff, bool fetch_in_flight) override {
+    ASSERT(dispatcher_.isThreadSafe());
+
+    if (stop_backoff.has_value()) {
+      tls_.runOnAllThreads([stop_backoff, fetch_in_flight](OptRef<ThreadLocalCache> obj) {
+        obj->is_backoff_enabled_ = stop_backoff.value();
+        obj->fetch_in_flight_ = fetch_in_flight;
+      });
+      if (stop_backoff.value()) {
+        remote_fetch_disallow_timer_->disableTimer();
+        remote_fetch_backoff_strategy_->reset();
+      } else {
+        remote_fetch_disallow_timer_->enableTimer(
+            std::chrono::milliseconds(remote_fetch_backoff_strategy_->nextBackOffMs()));
+        ENVOY_LOG(debug, "JWKS fetch backoff triggered due to fetch/verification failure.");
+      }
+    } else {
+      tls_.runOnAllThreads([fetch_in_flight](OptRef<ThreadLocalCache> obj) {
+        obj->fetch_in_flight_ = fetch_in_flight;
+      });
+    }
+  }
+
 private:
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
     ThreadLocalCache(bool enable_jwt_cache,
                      const envoy::extensions::filters::http::jwt_authn::v3::JwtCacheConfig& config,
-                     TimeSource& time_source)
-        : jwt_cache_(JwtCache::create(enable_jwt_cache, config, time_source)) {}
+                     TimeSource& time_source, bool fetch_in_flight, bool backoff_enabled)
+        : jwt_cache_(JwtCache::create(enable_jwt_cache, config, time_source)),
+          fetch_in_flight_(fetch_in_flight), is_backoff_enabled_(backoff_enabled) {}
 
     // The jwks object.
     JwksConstSharedPtr jwks_;
@@ -168,11 +225,13 @@ private:
     const JwtCachePtr jwt_cache_;
     // The pubkey expiration time.
     MonotonicTime expire_;
+
+    bool fetch_in_flight_;
+    bool is_backoff_enabled_;
   };
 
   // Set jwks shared_ptr to all threads.
-  void setJwksToAllThreads(JwksConstPtr&& jwks) {
-    JwksConstSharedPtr shared_jwks = std::move(jwks);
+  void setJwksToAllThreads(JwksConstSharedPtr shared_jwks) {
     tls_.runOnAllThreads([shared_jwks](OptRef<ThreadLocalCache> obj) {
       obj->jwks_ = shared_jwks;
       obj->expire_ = std::chrono::steady_clock::time_point::max();
@@ -191,6 +250,13 @@ private:
   JwksAsyncFetcherPtr async_fetcher_;
   absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>> sub_matcher_;
   absl::optional<absl::Duration> max_exp_;
+
+  // For exponential backoff, when fetch/verify fails on KID mismatch.
+  Random::RandomGenerator& random_;
+  JitteredExponentialBackOffStrategyPtr remote_fetch_backoff_strategy_;
+  Event::TimerPtr remote_fetch_disallow_timer_;
+
+  Event::Dispatcher& dispatcher_;
 };
 
 using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;

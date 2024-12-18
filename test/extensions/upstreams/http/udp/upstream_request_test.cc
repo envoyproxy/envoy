@@ -194,7 +194,7 @@ public:
     ON_CALL(*mock_thread_local_cluster_.lb_.host_, address)
         .WillByDefault(
             Return(Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:80", false)));
-    udp_conn_pool_ = std::make_unique<UdpConnPool>(mock_thread_local_cluster_, nullptr);
+    udp_conn_pool_ = std::make_unique<UdpConnPool>(mock_thread_local_cluster_.lb_.host_);
     EXPECT_CALL(*mock_thread_local_cluster_.lb_.host_, address).Times(2);
     EXPECT_CALL(*mock_thread_local_cluster_.lb_.host_, cluster);
     mock_thread_local_cluster_.lb_.host_->cluster_.source_address_ =
