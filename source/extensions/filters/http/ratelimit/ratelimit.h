@@ -194,7 +194,7 @@ private:
   void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
   double getHitAddend();
-  void initializeVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
+  void initializeVirtualHostRateLimitOption(const Router::RouteEntry* route_entry);
   std::string getDomain();
 
   Http::Context& httpContext() { return config_->httpContext(); }

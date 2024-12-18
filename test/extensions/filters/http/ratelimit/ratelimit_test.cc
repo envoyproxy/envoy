@@ -318,7 +318,6 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
   EXPECT_CALL(vh_rate_limit_, applyOnStreamDone()).WillRepeatedly(Return(true));
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_two_));
-  EXPECT_CALL(*client_, cancel());
   EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptor_two_), _, _, 100))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
