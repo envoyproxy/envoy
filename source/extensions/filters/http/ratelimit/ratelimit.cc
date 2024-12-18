@@ -69,18 +69,18 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
 void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                           const Http::RequestHeaderMap& headers,
                                           bool on_stream_done) {
+  // To use the exact same context for both request and on_stream_done rate limiting descriptors,
+  // we save the route and per-route configuration here and use it later.
   if (!on_stream_done) {
     route_ = callbacks_->route();
     if (!route_) {
       return;
     }
-  }
-
-  if (!on_stream_done) {
     cluster_ = callbacks_->clusterInfo();
     if (!cluster_) {
       return;
     }
+    initializeVirtualHostRateLimitOption(route_);
   }
 
   const Router::RouteEntry* route_entry = route_->routeEntry();
@@ -90,10 +90,6 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptorsForPolicy(route_entry->rateLimitPolicy(), descriptors, headers,
                                         on_stream_done);
-
-  if (!on_stream_done) {
-    initializeVirtualHostRateLimitOption(route_);
-  }
 
   switch (vh_rate_limits_) {
   case VhRateLimitOptions::Ignore:
