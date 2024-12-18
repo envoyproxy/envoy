@@ -376,14 +376,13 @@ FilterUtility::StrictHeaderChecker::checkHeader(Http::RequestHeaderMap& headers,
   PANIC("unexpectedly reached");
 }
 
-Stats::StatName Filter::upstreamZone(OptRef<const Upstream::HostDescription> upstream_host) {
+Stats::StatName Filter::upstreamZone(Upstream::HostDescriptionOptConstRef upstream_host) {
   return upstream_host ? upstream_host->localityZoneStatName() : config_->empty_stat_name_;
 }
 
 void Filter::chargeUpstreamCode(uint64_t response_status_code,
                                 const Http::ResponseHeaderMap& response_headers,
-                                OptRef<const Upstream::HostDescription> upstream_host,
-                                bool dropped) {
+                                Upstream::HostDescriptionOptConstRef upstream_host, bool dropped) {
   // Passing the response_status_code explicitly is an optimization to avoid
   // multiple calls to slow Http::Utility::getResponseStatus.
   ASSERT(response_status_code == Http::Utility::getResponseStatus(response_headers));
@@ -435,8 +434,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
   }
 }
 
-void Filter::chargeUpstreamCode(Http::Code code,
-                                OptRef<const Upstream::HostDescription> upstream_host,
+void Filter::chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionOptConstRef upstream_host,
                                 bool dropped) {
   const uint64_t response_status_code = enumToInt(code);
   const auto fake_response_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
@@ -1286,7 +1284,7 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
       stats_.rq_reset_after_downstream_response_started_.inc();
     }
   } else {
-    OptRef<const Upstream::HostDescription> upstream_host = upstream_request.upstreamHost();
+    Upstream::HostDescriptionOptConstRef upstream_host = upstream_request.upstreamHost();
 
     chargeUpstreamCode(code, upstream_host, dropped);
     // If we had non-5xx but still have been reset by backend or timeout before
@@ -2135,14 +2133,21 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   }
   // Check whether we need to send the load report to the LRS or invoke the ORCA
   // callbacks.
-  OptRef<const Upstream::HostDescription> upstream_host = upstream_request.upstreamHost();
+  Upstream::HostDescriptionOptConstRef upstream_host = upstream_request.upstreamHost();
   if (!upstream_host.has_value()) {
+    ENVOY_BUG(false, "upstream host is not available for upstream request");
     return;
   }
 
   OptRef<Upstream::HostLbPolicyData> host_lb_policy_data = upstream_host->lbPolicyData();
 
   if (!cluster_->lrsReportMetricNames().has_value() && !host_lb_policy_data.has_value()) {
+    // If the cluster doesn't have LRS metric names configured then there is no need to
+    // extract the stats for LRS.
+    // If the host doesn't have LB policy data then that means the LB policy doesn't care
+    // about the ORCA load report.
+    // Return early here to avoid parsing the ORCA load report because no one is interested
+    // in it.
     return;
   }
 

@@ -89,6 +89,8 @@ public:
 
 /**
  * Base interface for attaching LbPolicy-specific data to individual hosts.
+ * This allows LbPolicy implementations to store per-host data that is used
+ * to make load balancing decisions.
  */
 class HostLbPolicyData {
 public:
@@ -97,6 +99,9 @@ public:
   /**
    * Invoked when a new orca report is received for this upstream host to
    * update the host lb policy data.
+   * NOTE: this method may be called concurrently from multiple threads.
+   * Please ensure that the implementation is thread-safe.
+   *
    * @param report supplies the ORCA load report of this upstream host.
    */
   virtual absl::Status onOrcaLoadReport(const OrcaLoadReport& /*report*/) {
@@ -277,6 +282,9 @@ public:
   /**
    * Get the load balancing policy related data of the host.
    * @return the optional reference to the load balancing policy related data of the host.
+   * Non-const reference is returned to allow the caller to modify the data if needed.
+   * NOTE: the update to the data may be done at multiple threads concurrently and the caller
+   * should ensure the thread safety of the data.
    */
   virtual OptRef<HostLbPolicyData> lbPolicyData() const PURE;
 
@@ -290,6 +298,7 @@ public:
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
+using HostDescriptionOptConstRef = OptRef<const Upstream::HostDescription>;
 
 #define ALL_TRANSPORT_SOCKET_MATCH_STATS(COUNTER) COUNTER(total_match_count)
 

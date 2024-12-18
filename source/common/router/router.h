@@ -504,11 +504,11 @@ private:
 
   void onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Counter& error_counter,
                              const std::string& response_code_details);
-  Stats::StatName upstreamZone(OptRef<const Upstream::HostDescription> upstream_host);
+  Stats::StatName upstreamZone(Upstream::HostDescriptionOptConstRef upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code,
                           const Http::ResponseHeaderMap& response_headers,
-                          OptRef<const Upstream::HostDescription> upstream_host, bool dropped);
-  void chargeUpstreamCode(Http::Code code, OptRef<const Upstream::HostDescription> upstream_host,
+                          Upstream::HostDescriptionOptConstRef upstream_host, bool dropped);
+  void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionOptConstRef upstream_host,
                           bool dropped);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
