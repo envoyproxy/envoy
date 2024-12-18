@@ -106,6 +106,4 @@ def android_repos():
         urls = ["https://github.com/bazelbuild/rules_android_ndk/archive/v0.1.2.tar.gz"],
         sha256 = "65aedff0cd728bee394f6fb8e65ba39c4c5efb11b29b766356922d4a74c623f5",
         strip_prefix = "rules_android_ndk-0.1.2",
-        patch_args = ["-p1"],
-        patches = ["//bazel:rules_android_ndk.patch"],
     )
