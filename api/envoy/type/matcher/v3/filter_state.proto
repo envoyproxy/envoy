@@ -2,9 +2,8 @@ syntax = "proto3";
 
 package envoy.type.matcher.v3;
 
+import "envoy/type/matcher/v3/address.proto";
 import "envoy/type/matcher/v3/string.proto";
-
-import "xds/core/v3/cidr.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -31,8 +30,4 @@ message FilterStateMatcher {
     // Matches the filter state object as a ip Instance.
     AddressMatcher address_match = 3;
   }
-}
-
-message AddressMatcher {
-  repeated xds.core.v3.CidrRange ranges = 1;
 }

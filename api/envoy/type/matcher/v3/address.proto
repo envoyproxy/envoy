@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package envoy.type.matcher.v3;
+
+import "xds/core/v3/cidr.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.type.matcher.v3";
+option java_outer_classname = "AddressProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3;matcherv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+message AddressMatcher {
+  repeated xds.core.v3.CidrRange ranges = 1;
+}
