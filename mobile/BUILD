@@ -7,8 +7,8 @@ load(
     "xcodeproj",
 )
 load("@envoy//tools/python:namespace.bzl", "envoy_py_namespace")
-load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load("@rules_android//android:rules.bzl", "aar_import")
+load("@rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2

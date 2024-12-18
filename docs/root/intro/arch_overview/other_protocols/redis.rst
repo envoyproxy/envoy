@@ -215,6 +215,7 @@ For details on each command's usage see the official
   SREM, Set
   SSCAN, Set
   WATCH, String
+  UNWATCH, String
   ZADD, Sorted Set
   ZCARD, Sorted Set
   ZCOUNT, Sorted Set

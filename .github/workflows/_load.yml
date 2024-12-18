@@ -14,7 +14,7 @@ on:
     inputs:
       agent-ubuntu:
         type: string
-        default: ubuntu-22.04
+        default: ubuntu-24.04
       check-name:
         type: string
         required: true
@@ -70,7 +70,7 @@ env:
 jobs:
   request:
     if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read

@@ -691,6 +691,9 @@ void RedisProxyIntegrationTest::roundtripToUpstreamStep(
     IntegrationTcpClientPtr& redis_client, FakeRawConnectionPtr& fake_upstream_connection,
     const std::string& auth_username, const std::string& auth_password) {
   redis_client->clearData();
+  if (fake_upstream_connection.get() != nullptr) {
+    fake_upstream_connection->clearData();
+  }
   ASSERT_TRUE(redis_client->write(request));
 
   expectUpstreamRequestResponse(upstream, request, response, fake_upstream_connection,
@@ -713,6 +716,7 @@ void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
     expect_auth_command = (!auth_password.empty());
     EXPECT_TRUE(upstream->waitForRawConnection(fake_upstream_connection));
   }
+
   if (expect_auth_command) {
     std::string auth_command = (auth_username.empty())
                                    ? makeBulkStringArray({"auth", auth_password})
@@ -1466,6 +1470,80 @@ TEST_P(RedisProxyIntegrationTest, ExecuteEmptyTransaction) {
   redis_client->close();
 }
 
+TEST_P(RedisProxyIntegrationTest, UnwatchNoTransactionNoOp) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"unwatch"}), "+OK\r\n");
+}
+
+TEST_P(RedisProxyIntegrationTest, UnwatchWithTransactionNoOp) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"unwatch"}), "+QUEUED\r\n", redis_client);
+
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, WatchUnwatchNoTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  EXPECT_TRUE(fake_upstream_conn->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, WatchUnwatchUnrelatedTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"discard"}), "+OK\r\n", redis_client);
+
+  EXPECT_TRUE(fake_upstream_conn->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, WatchUnwatchInTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  // MULTI will create a new connection, for the transaction.
+  FakeRawConnectionPtr fake_upstream_conn2;
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"multi"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn2, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+QUEUED\r\n", redis_client,
+                          fake_upstream_conn2, "", "");
+
+  EXPECT_TRUE(fake_upstream_conn->close());
+  EXPECT_TRUE(fake_upstream_conn2->close());
+  redis_client->close();
+}
 // This test discards an empty transaction. The proxy responds
 // with an OK.
 
