@@ -208,12 +208,16 @@ public:
 private:
   void maybeInitializeRouteConfig(Http::StreamFilterCallbacks* callbacks);
   void initiateCall(const Http::RequestHeaderMap& headers);
-  void populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
-                                    std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                                    const Http::RequestHeaderMap& headers) const;
+  void populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                                    const Http::RequestHeaderMap& headers, bool on_stream_done);
+  void populateRateLimitDescriptorsForPolicy(const Router::RateLimitPolicy& rate_limit_policy,
+                                             std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                                             const Http::RequestHeaderMap& headers,
+                                             bool on_stream_done);
   void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
-  VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
+  double getHitAddend();
+  void initializeVirtualHostRateLimitOption(const Router::RouteEntry* route_entry);
   std::string getDomain();
 
   Http::Context& httpContext() { return config_->httpContext(); }
@@ -228,9 +232,31 @@ private:
   State state_{State::NotStarted};
   VhRateLimitOptions vh_rate_limits_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
+  Router::RouteConstSharedPtr route_ = nullptr;
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};
+};
+
+/**
+ * This implements the rate limit callback that outlives the filter holding the client.
+ * On completion, it deletes itself.
+ */
+class OnStreamDoneCallBack : public Filters::Common::RateLimit::RequestCallbacks {
+public:
+  OnStreamDoneCallBack(Filters::Common::RateLimit::ClientPtr client) : client_(std::move(client)) {}
+  ~OnStreamDoneCallBack() override = default;
+
+  // RateLimit::RequestCallbacks
+  void complete(Filters::Common::RateLimit::LimitStatus,
+                Filters::Common::RateLimit::DescriptorStatusListPtr&&, Http::ResponseHeaderMapPtr&&,
+                Http::RequestHeaderMapPtr&&, const std::string&,
+                Filters::Common::RateLimit::DynamicMetadataPtr&&) override;
+
+  Filters::Common::RateLimit::Client& client() { return *client_; }
+
+private:
+  Filters::Common::RateLimit::ClientPtr client_;
 };
 
 } // namespace RateLimitFilter
