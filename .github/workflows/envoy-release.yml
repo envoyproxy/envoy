@@ -53,7 +53,7 @@ jobs:
 
   # Create a release commit, when landed this will publish.
   create_release:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'create-release'
     name: Create release
     steps:
@@ -134,7 +134,7 @@ jobs:
         GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
 
   sync_version_histories:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'sync-version-histories'
     name: Sync version histories
     steps:
@@ -180,7 +180,7 @@ jobs:
           repo: Sync version histories
 
   deprecate_guards:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: >-
       ${{ (github.event_name == 'workflow_dispatch'
            && inputs.task == 'deprecate-guards')
@@ -220,7 +220,7 @@ jobs:
   # - remove anything unwanted
   # - push branch
   create_release_branch:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.event_name == 'release' && endsWith(github.ref, '.0')
     name: Create release branch
     steps:

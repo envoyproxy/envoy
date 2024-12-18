@@ -1,5 +1,6 @@
 # DO NOT LOAD THIS FILE. Targets from this file should be considered private
 # and not used outside of the @envoy//bazel package.
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load(":envoy_select.bzl", "envoy_select_admin_html", "envoy_select_disable_exceptions", "envoy_select_disable_logging", "envoy_select_google_grpc", "envoy_select_hot_restart", "envoy_select_nghttp2", "envoy_select_signal_trace", "envoy_select_static_extension_registration")
 
 # Compute the final copts based on various options.
@@ -17,6 +18,7 @@ def envoy_copts(repository, test = False):
         "-Wno-deprecated-declarations",
         "-Wreturn-type",
     ]
+    _repo = repo_label(repository)
 
     # Windows options for cleanest service compilation;
     #   General MSVC C++ options for Envoy current expectations.
@@ -44,31 +46,31 @@ def envoy_copts(repository, test = False):
     ]
 
     return select({
-               repository + "//bazel:windows_x86_64": msvc_options,
+               _repo("//bazel:windows_x86_64"): msvc_options,
                "//conditions:default": posix_options,
            }) + select({
                # Simplify the amount of symbolic debug info for test binaries, since
                # debugging info detailing some 1600 test binaries would be wasteful.
                # targets listed in order from generic to increasing specificity.
                # Bazel adds an implicit -DNDEBUG for opt targets.
-               repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
-               repository + "//bazel:fastbuild_build": [],
-               repository + "//bazel:dbg_build": ["-ggdb3"],
-               repository + "//bazel:windows_opt_build": [] if test else ["-Z7"],
-               repository + "//bazel:windows_fastbuild_build": [],
-               repository + "//bazel:windows_dbg_build": [],
-               repository + "//bazel:clang_cl_opt_build": [] if test else ["-Z7", "-fstandalone-debug"],
-               repository + "//bazel:clang_cl_fastbuild_build": ["-fno-standalone-debug"],
-               repository + "//bazel:clang_cl_dbg_build": ["-fstandalone-debug"],
+               _repo("//bazel:opt_build"): [] if test else ["-ggdb3"],
+               _repo("//bazel:fastbuild_build"): [],
+               _repo("//bazel:dbg_build"): ["-ggdb3"],
+               _repo("//bazel:windows_opt_build"): [] if test else ["-Z7"],
+               _repo("//bazel:windows_fastbuild_build"): [],
+               _repo("//bazel:windows_dbg_build"): [],
+               _repo("//bazel:clang_cl_opt_build"): [] if test else ["-Z7", "-fstandalone-debug"],
+               _repo("//bazel:clang_cl_fastbuild_build"): ["-fno-standalone-debug"],
+               _repo("//bazel:clang_cl_dbg_build"): ["-fstandalone-debug"],
            }) + select({
                # Toggle expected features and warnings by compiler
-               repository + "//bazel:clang_build": [
+               _repo("//bazel:clang_build"): [
                    "-fno-limit-debug-info",
                    "-Wgnu-conditional-omitted-operand",
                    "-Wc++2a-extensions",
                    "-Wrange-loop-analysis",
                ],
-               repository + "//bazel:gcc_build": [
+               _repo("//bazel:gcc_build"): [
                    "-Wno-maybe-uninitialized",
                    # GCC implementation of this warning is too noisy.
                    #
@@ -87,50 +89,46 @@ def envoy_copts(repository, test = False):
                # TODO(envoyproxy/windows-dev): Replace /Zc:preprocessor with /experimental:preprocessor
                # for msvc versions between 15.8 through 16.4.x. see
                # https://docs.microsoft.com/en-us/cpp/build/reference/zc-preprocessor
-               repository + "//bazel:windows_x86_64": ["-wd4834", "-Zc:preprocessor", "-Wv:19.4"] if test else ["-Zc:preprocessor", "-Wv:19.4"],
-               repository + "//bazel:clang_cl_build": ["-Wno-unused-result"] if test else [],
+               _repo("//bazel:windows_x86_64"): ["-wd4834", "-Zc:preprocessor", "-Wv:19.4"] if test else ["-Zc:preprocessor", "-Wv:19.4"],
+               _repo("//bazel:clang_cl_build"): ["-Wno-unused-result"] if test else [],
                "//conditions:default": [],
            }) + select({
                # TODO: Remove once https://reviews.llvm.org/D73007 is in the lowest supported Xcode version
-               repository + "//bazel:apple": ["-Wno-range-loop-analysis"],
+               _repo("//bazel:apple"): ["-Wno-range-loop-analysis"],
                "//conditions:default": [],
            }) + select({
-               repository + "//bazel:no_debug_info": ["-g0"],
+               _repo("//bazel:no_debug_info"): ["-g0"],
                "//conditions:default": [],
-           }) + select({
-               repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
-               repository + "//bazel:disable_tcmalloc_on_linux_x86_64": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
-               repository + "//bazel:disable_tcmalloc_on_linux_aarch64": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
-               repository + "//bazel:gperftools_tcmalloc": ["-DGPERFTOOLS_TCMALLOC"],
-               repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": ["-DGPERFTOOLS_TCMALLOC"],
-               repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": ["-DGPERFTOOLS_TCMALLOC"],
-               repository + "//bazel:debug_tcmalloc": ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
-               repository + "//bazel:debug_tcmalloc_on_linux_x86_64": ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
-               repository + "//bazel:debug_tcmalloc_on_linux_aarch64": ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
-               repository + "//bazel:linux_x86_64": ["-DTCMALLOC"],
-               repository + "//bazel:linux_aarch64": ["-DTCMALLOC"],
+           }) + selects.with_or({
+               _repo("//bazel:disable_tcmalloc"): ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
+               _repo("//bazel:debug_tcmalloc"): ["-DENVOY_MEMORY_DEBUG_ENABLED=1", "-DGPERFTOOLS_TCMALLOC"],
+               _repo("//bazel:gperftools_tcmalloc"): ["-DGPERFTOOLS_TCMALLOC"],
+               (
+                   "@platforms//cpu:x86_64",
+                   "@platforms//cpu:aarch64",
+               ): ["-DTCMALLOC"],
                "//conditions:default": ["-DGPERFTOOLS_TCMALLOC"],
            }) + select({
-               repository + "//bazel:disable_object_dump_on_signal_trace": [],
+               _repo("//bazel:disable_object_dump_on_signal_trace"): [],
                "//conditions:default": ["-DENVOY_OBJECT_TRACE_ON_DUMP"],
            }) + select({
-               repository + "//bazel:disable_deprecated_features": ["-DENVOY_DISABLE_DEPRECATED_FEATURES"],
+               _repo("//bazel:disable_deprecated_features"): ["-DENVOY_DISABLE_DEPRECATED_FEATURES"],
                "//conditions:default": [],
            }) + select({
-               repository + "//bazel:enable_log_debug_assert_in_release": ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
+               _repo("//bazel:enable_log_debug_assert_in_release"): ["-DENVOY_LOG_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
            }) + select({
-               repository + "//bazel:enable_log_fast_debug_assert_in_release": ["-DENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE"],
+               _repo("//bazel:enable_log_fast_debug_assert_in_release"): ["-DENVOY_LOG_FAST_DEBUG_ASSERT_IN_RELEASE"],
                "//conditions:default": [],
            }) + select({
-               repository + "//bazel:disable_known_issue_asserts": ["-DENVOY_DISABLE_KNOWN_ISSUE_ASSERTS"],
+               _repo("//bazel:disable_known_issue_asserts"): ["-DENVOY_DISABLE_KNOWN_ISSUE_ASSERTS"],
                "//conditions:default": [],
            }) + select({
                # APPLE_USE_RFC_3542 is needed to support IPV6_PKTINFO in MAC OS.
-               repository + "//bazel:apple": ["-D__APPLE_USE_RFC_3542"],
+               _repo("//bazel:apple"): ["-D__APPLE_USE_RFC_3542"],
                "//conditions:default": [],
            }) + select({
-               repository + "//bazel:uhv_enabled": ["-DENVOY_ENABLE_UHV"],
+               _repo("//bazel:uhv_enabled"): ["-DENVOY_ENABLE_UHV"],
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_nghttp2(["-DENVOY_NGHTTP2"], repository) + \
@@ -177,19 +175,14 @@ def envoy_dbg_linkopts():
 
 # Dependencies on tcmalloc_and_profiler should be wrapped with this function.
 def tcmalloc_external_dep(repository):
-    return select({
-        repository + "//bazel:disable_tcmalloc": None,
-        repository + "//bazel:disable_tcmalloc_on_linux_x86_64": None,
-        repository + "//bazel:disable_tcmalloc_on_linux_aarch64": None,
-        repository + "//bazel:debug_tcmalloc": repository + "//bazel/foreign_cc:gperftools",
-        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": repository + "//bazel/foreign_cc:gperftools",
-        repository + "//bazel:debug_tcmalloc_on_linux_aarch64": repository + "//bazel/foreign_cc:gperftools",
-        repository + "//bazel:gperftools_tcmalloc": repository + "//bazel/foreign_cc:gperftools",
-        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": repository + "//bazel/foreign_cc:gperftools",
-        repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": repository + "//bazel/foreign_cc:gperftools",
-        repository + "//bazel:linux_x86_64": "@com_github_google_tcmalloc//tcmalloc",
-        repository + "//bazel:linux_aarch64": "@com_github_google_tcmalloc//tcmalloc",
-        "//conditions:default": repository + "//bazel/foreign_cc:gperftools",
+    _repo = repo_label(repository)
+    return selects.with_or({
+        (_repo("//bazel:disable_tcmalloc")): None,
+        (
+            _repo("//bazel:debug_tcmalloc"),
+            _repo("//bazel:gperftools_tcmalloc"),
+        ): _repo("//bazel/foreign_cc:gperftools"),
+        "//conditions:default": _repo("//bazel:tcmalloc_lib"),
     })
 
 # Select the given values if default path normalization is on in the current build.
@@ -236,3 +229,9 @@ def envoy_select_exported_symbols(xs):
         "@envoy//bazel:enable_exported_symbols": xs,
         "//conditions:default": [],
     }) + _envoy_default_exported_symbols()
+
+def repo_label(repository):
+    def _repo_label(label):
+        return "%s%s" % (repository, label)
+
+    return _repo_label

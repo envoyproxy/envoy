@@ -30,7 +30,7 @@ struct SupportedCommands {
         "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist", "pexpire", "pexpireat",
         "pfadd", "pfcount", "psetex", "pttl", "publish", "restore", "rpop", "rpush", "rpushx",
         "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange", "sismember", "smembers",
-        "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "watch", "xack", "xadd",
+        "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "xack", "xadd",
         "xautoclaim", "xclaim", "xdel", "xlen", "xpending", "xrange", "xrevrange", "xtrim", "zadd",
         "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex",
         "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
@@ -55,7 +55,8 @@ struct SupportedCommands {
    * @return commands which handle Redis transactions.
    */
   static const absl::flat_hash_set<std::string>& transactionCommands() {
-    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "multi", "exec", "discard");
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "multi", "exec", "discard", "watch",
+                           "unwatch");
   }
 
   /**
@@ -64,7 +65,7 @@ struct SupportedCommands {
   static const std::string& auth() { CONSTRUCT_ON_FIRST_USE(std::string, "auth"); }
 
   /**
-   * @return auth command
+   * @return echo command
    */
   static const std::string& echo() { CONSTRUCT_ON_FIRST_USE(std::string, "echo"); }
 
