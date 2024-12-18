@@ -279,7 +279,7 @@ jobs:
         lookup-only: true
         path: /tmp/cache
         key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
-   - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
+    - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
       uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.14
       with:
