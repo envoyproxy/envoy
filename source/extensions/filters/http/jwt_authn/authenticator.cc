@@ -51,11 +51,12 @@ public:
                     const absl::optional<std::string>& provider, bool allow_failed,
                     bool allow_missing, JwksCache& jwks_cache,
                     Upstream::ClusterManager& cluster_manager,
-                    CreateJwksFetcherCb create_jwks_fetcher_cb, TimeSource& time_source)
+                    CreateJwksFetcherCb create_jwks_fetcher_cb, TimeSource& time_source,
+                    Event::Dispatcher& dispatcher)
       : jwks_cache_(jwks_cache), cm_(cluster_manager),
         create_jwks_fetcher_cb_(create_jwks_fetcher_cb), check_audience_(check_audience),
         provider_(provider), is_allow_failed_(allow_failed), is_allow_missing_(allow_missing),
-        time_source_(time_source) {}
+        time_source_(time_source), dispatcher_(dispatcher) {}
   // Following functions are for JwksFetcher::JwksReceiver interface
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
   void onJwksError(Failure reason) override;
@@ -130,6 +131,9 @@ private:
   const bool is_allow_missing_;
   TimeSource& time_source_;
   ::google::jwt_verify::Jwt* jwt_{};
+  Event::Dispatcher& dispatcher_;
+  // Set to true if the JWT in this request caused a KID mismatch.
+  bool kid_mismatch_request_{false};
 };
 
 std::string AuthenticatorImpl::name() const {
@@ -268,16 +272,24 @@ void AuthenticatorImpl::startVerify() {
 
   auto jwks_obj = jwks_data_->getJwksObj();
   if (jwks_obj != nullptr && !jwks_data_->isExpired()) {
-    // TODO(qiwzhang): It would seem there's a window of error whereby if the JWT issuer
-    // has started signing with a new key that's not in our cache, then the
-    // verification will fail even though the JWT is valid. A simple fix
-    // would be to check the JWS kid header field; if present check we have
-    // the key cached, if we do proceed to verify else try a new JWKS retrieval.
-    // JWTs without a kid header field in the JWS we might be best to get each
-    // time? This all only matters for remote JWKS.
-
-    verifyKey();
-    return;
+    // If KID mismatch fetching is set and fetch is disallowed, trigger the
+    // verification process.
+    if (jwks_data_->getJwtProvider().remote_jwks().refetch_jwks_on_kid_mismatch() &&
+        jwks_data_->isRemoteJwksFetchAllowed()) {
+      if (!jwt_->kid_.empty()) {
+        for (const auto& jwk : jwks_obj->keys()) {
+          if (jwk->kid_ == jwt_->kid_) {
+            verifyKey();
+            return;
+          }
+        }
+      }
+      ENVOY_LOG(info, "Triggering refetch of JWKS due to KID mismatch");
+      kid_mismatch_request_ = true;
+    } else {
+      verifyKey();
+      return;
+    }
   }
 
   // TODO(potatop): potential optimization.
@@ -290,6 +302,10 @@ void AuthenticatorImpl::startVerify() {
       fetcher_ = create_jwks_fetcher_cb_(cm_, jwks_data_->getJwtProvider().remote_jwks());
     }
     fetcher_->fetch(*parent_span_, *this);
+    // Disallow fetches across other worker threads due to in-flight fetch.
+    if (kid_mismatch_request_) {
+      dispatcher_.post([this]() { jwks_data_->allowRemoteJwksFetch(absl::nullopt, true); });
+    }
     return;
   }
   // No valid keys for this issuer. This may happen as a result of incorrect local
@@ -299,7 +315,14 @@ void AuthenticatorImpl::startVerify() {
 
 void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   jwks_cache_.stats().jwks_fetch_success_.inc();
-  const Status status = jwks_data_->setRemoteJwks(std::move(jwks))->getStatus();
+
+  const Status status =
+      jwks_data_
+          ->setRemoteJwks(std::move(jwks),
+                          jwks_data_->getJwtProvider().remote_jwks().has_async_fetch() &&
+                              kid_mismatch_request_)
+          ->getStatus();
+
   if (status != Status::Ok) {
     doneWithStatus(status);
   } else {
@@ -419,6 +442,15 @@ void AuthenticatorImpl::handleGoodJwt(bool cache_hit) {
     // move the ownership of "owned_jwt_" into the function.
     jwks_data_->getJwtCache().insert(curr_token_->token(), std::move(owned_jwt_));
   }
+
+  // On successful retrieval & verification of JWKS due to KID mismatch,
+  //  - If retrieved due to KID being empty, trigger backoff.
+  //  - Else, shut down backoff.
+  if (kid_mismatch_request_ && !jwks_data_->isRemoteJwksFetchAllowed()) {
+    dispatcher_.post([this]() { jwks_data_->allowRemoteJwksFetch(!jwt_->kid_.empty(), false); });
+    kid_mismatch_request_ = false;
+  }
+
   doneWithStatus(Status::Ok);
 }
 
@@ -450,6 +482,13 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
   if (Status::Ok != status) {
     // Forward the failed status to dynamic metadata
     ENVOY_LOG(debug, "status is: {}", ::google::jwt_verify::getStatusString(status));
+
+    // Trigger backoff to disallow further fetches when retrieval & verification is due to KID
+    // mismatch and fails.
+    if (kid_mismatch_request_ && !jwks_data_->isRemoteJwksFetchAllowed()) {
+      dispatcher_.post([this]() { jwks_data_->allowRemoteJwksFetch(false, false); });
+      kid_mismatch_request_ = false;
+    }
 
     std::string failed_status_in_metadata;
 
@@ -507,10 +546,10 @@ AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
                                        bool allow_failed, bool allow_missing, JwksCache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager,
                                        CreateJwksFetcherCb create_jwks_fetcher_cb,
-                                       TimeSource& time_source) {
+                                       TimeSource& time_source, Event::Dispatcher& dispatcher) {
   return std::make_unique<AuthenticatorImpl>(check_audience, provider, allow_failed, allow_missing,
                                              jwks_cache, cluster_manager, create_jwks_fetcher_cb,
-                                             time_source);
+                                             time_source, dispatcher);
 }
 
 } // namespace JwtAuthn

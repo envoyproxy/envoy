@@ -4,9 +4,11 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
+#include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
+#include "source/common/config/utility.h"
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
 #include "source/extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
 #include "source/extensions/filters/http/jwt_authn/jwt_cache.h"
@@ -73,10 +75,18 @@ public:
     virtual bool isExpired() const PURE;
 
     // Set a remote Jwks.
-    virtual const ::google::jwt_verify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) PURE;
+    virtual const ::google::jwt_verify::Jwks* setRemoteJwks(JwksConstPtr&& jwks,
+                                                            bool update_all_threads) PURE;
 
     // Get Token Cache.
     virtual JwtCache& getJwtCache() PURE;
+
+    // Return true if fetch is allowed.
+    virtual bool isRemoteJwksFetchAllowed() PURE;
+
+    // Update to allow fetches.
+    virtual void allowRemoteJwksFetch(absl::optional<bool> fetch_succeeded,
+                                      bool fetch_in_flight) PURE;
   };
 
   // If there is only one provider in the config, return the data for that provider.
