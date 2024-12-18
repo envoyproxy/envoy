@@ -341,7 +341,7 @@ new_features:
 - area: matchers
   change: |
     Added new filter state matcher ip_range to
-    :ref:`FilterStateMatcher <envoy_api_msg_type.matcher.FilterStateMatcher>` which attempts to
+    :ref:`FilterStateMatcher <envoy_api_msg_type.matcher.v3.FilterStateMatcher>` which attempts to
     cast the filter state object to an IP and match it against a list of CidrRanges.
 - area: attributes
   change: |
