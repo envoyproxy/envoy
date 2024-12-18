@@ -173,7 +173,7 @@ void Filter::onDestroy() {
     client_->cancel();
   } else {
     // If the filter doesn't have an outstanding limit request (made during decodeHeaders) and has
-    // at least one policiy with apply_on_stream_done=true, then we apply the rate limit here.
+    // at least one policy with apply_on_stream_done=true, then we apply the rate limit here.
     if (has_apply_on_stream_done_policy_) {
       std::vector<Envoy::RateLimit::Descriptor> descriptors;
       populateRateLimitDescriptors(descriptors, *request_headers_, true);
