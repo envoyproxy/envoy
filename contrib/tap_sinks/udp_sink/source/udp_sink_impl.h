@@ -1,13 +1,14 @@
 #pragma once
 
 #include "envoy/config/tap/v3/common.pb.h"
-#include "envoy/extensions/tap_sinks/udp_sink/v3/udp_sink.pb.h"
 
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/common/tap/tap.h"
+
+#include "contrib/envoy/extensions/tap_sinks/udp_sink/v3alpha/udp_sink.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,10 +17,9 @@ namespace UDP {
 
 namespace TapCommon = Extensions::Common::Tap;
 
-// class UdpTapSink : public ExtCommonTap::Sink {
 class UdpTapSink : public TapCommon::Sink {
 public:
-  UdpTapSink(const envoy::extensions::tap_sinks::udp_sink::v3::UdpSink& config);
+  UdpTapSink(const envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink& config);
   // below one is only for UT because
   // it can't control return value of writePacket if not add below function.
   UdpTapSink(Network::UdpPacketWriterPtr&& utUdpPacketWriter)
@@ -51,12 +51,12 @@ private:
     const uint64_t trace_id_;
   };
 
-  const envoy::extensions::tap_sinks::udp_sink::v3::UdpSink config_;
-  // Store the configured UDP address and port
+  const envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink config_;
+  // Store the configured UDP address and port.
   Network::Address::InstanceConstSharedPtr udp_server_address_ = nullptr;
-  // UDP client socket
+  // UDP client socket.
   Network::SocketPtr udp_socket_ = nullptr;
-  // UDP client writer created with client socket
+  // UDP client writer created with client socket.
   Network::UdpPacketWriterPtr udp_packet_writer_ = nullptr;
 };
 

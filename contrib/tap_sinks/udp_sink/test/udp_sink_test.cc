@@ -8,9 +8,10 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/tap_sinks/udp_sink/udp_sink_impl.h"
 
 #include "test/mocks/network/mocks.h"
+
+#include "contrib/tap_sinks/udp_sink/source/udp_sink_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,7 +33,7 @@ public:
 };
 
 TEST_F(UdpTapSinkTest, TestConstructNotSupportTCPprotocol) {
-  envoy::extensions::tap_sinks::udp_sink::v3::UdpSink loc_udp_sink;
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
   socket_address->set_port_value(8080);
@@ -42,7 +43,7 @@ TEST_F(UdpTapSinkTest, TestConstructNotSupportTCPprotocol) {
 }
 
 TEST_F(UdpTapSinkTest, TestConstructBadUDPAddress) {
-  envoy::extensions::tap_sinks::udp_sink::v3::UdpSink loc_udp_sink;
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   socket_address->set_port_value(65539);
@@ -52,7 +53,7 @@ TEST_F(UdpTapSinkTest, TestConstructBadUDPAddress) {
 }
 
 TEST_F(UdpTapSinkTest, TestConstructGoodUDPAddress) {
-  envoy::extensions::tap_sinks::udp_sink::v3::UdpSink loc_udp_sink;
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   socket_address->set_port_value(8080);
@@ -62,7 +63,7 @@ TEST_F(UdpTapSinkTest, TestConstructGoodUDPAddress) {
 }
 
 TEST_F(UdpTapSinkTest, TestSubmitTraceNotUdpPacketWriter) {
-  envoy::extensions::tap_sinks::udp_sink::v3::UdpSink loc_udp_sink;
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
   UdpTapSink loc_udp_tap_sink(loc_udp_sink);
@@ -79,7 +80,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceNotUdpPacketWriter) {
 
 TEST_F(UdpTapSinkTest, TestSubmitTraceForNotSUpportedFormat) {
   // Construct UdpTapSink object
-  envoy::extensions::tap_sinks::udp_sink::v3::UdpSink loc_udp_sink;
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   socket_address->set_port_value(8080);
