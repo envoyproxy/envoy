@@ -10,6 +10,8 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/network/reverse_connection_handler.h"
+#include "envoy/network/reverse_connection_manager.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/ssl/context.h"
@@ -18,6 +20,26 @@
 
 namespace Envoy {
 namespace Network {
+
+// The thread local registry.
+class LocalRevConnRegistry {
+public:
+  virtual ~LocalRevConnRegistry() = default;
+
+  virtual Network::ReverseConnectionManager& getRCManager() PURE;
+  virtual Network::ReverseConnectionHandler& getRCHandler() PURE;
+};
+
+// The central reverse conn registry interface providing the thread local accessor.
+class RevConnRegistry {
+public:
+  virtual ~RevConnRegistry() = default;
+
+  /**
+   * @return The thread local registry.
+   */
+  virtual LocalRevConnRegistry* getLocalRegistry() PURE;
+};
 
 // This interface allows for a listener to perform an alternative behavior when a
 // packet can't be routed correctly during draining; for example QUIC packets that
@@ -126,6 +148,26 @@ public:
    * @return the stat prefix used for per-handler stats.
    */
   virtual const std::string& statPrefix() const PURE;
+
+  /**
+   * Pass the reverse connection socket to the listener that initiated it.
+   * @param upstream_socket the socket to be passed.
+   * @param listener_tag the tag of the listener that initiated the reverse
+   * connection.
+   */
+  virtual void saveUpstreamConnection(Network::ConnectionSocketPtr&& upstream_socket,
+                                      uint64_t listener_tag) PURE;
+
+  /**
+   * Enable reverse connection entities on the current worker.
+   * @param reverse_conn_registry the thread local registry that holds the reverse connection
+   * entities.
+   */
+  virtual void enableReverseConnections(Network::RevConnRegistry& reverse_conn_registry) PURE;
+  /**
+   * @return the thread local registry.
+   */
+  virtual Network::LocalRevConnRegistry& reverseConnRegistry() const PURE;
 
   /**
    * Used by ConnectionHandler to manage listeners.

@@ -133,6 +133,11 @@ public:
   void hashKey(std::vector<uint8_t>& hash_key) const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
+  const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
+  void setConnectionReused(bool) override { PANIC("not implemented"); }
+  void setActiveConnectionReused(bool) override { PANIC("not implemented"); }
+  bool isActiveConnectionReused() override { PANIC("not implemented"); }
+
 private:
   // ConnectionCallbacks which will be set on an ClientConnection which
   // sends connection events back to the MultiConnectionBaseImpl.
