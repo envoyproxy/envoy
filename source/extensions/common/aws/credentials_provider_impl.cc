@@ -148,18 +148,23 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
         ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))});
     stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
 
-    init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void {
-      tls_slot_ =
-          ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
-      tls_slot_->set(
-          [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(*this); });
+    // If credential provider is being created during Envoy initialization, use init manager to delay cluster creation
+    // If we are here during normal processing, such as xDS update, then create clusters and initialize TLS immediately
+    if(context_->initManager().state() == Envoy::Init::Manager::State::Initialized)
+    {
+        initializeTlsAndCluster();
+    }
+    else
+    {
+      init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void {
 
-      createCluster(true);
+        initializeTlsAndCluster();
 
-      init_target_->ready();
-      init_target_.reset();
-    });
-    context_->initManager().add(*init_target_);
+        init_target_->ready();
+        init_target_.reset();
+      });
+      context_->initManager().add(*init_target_);
+    }
   }
 };
 
@@ -169,6 +174,15 @@ MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::~ThreadLocalCreden
       cluster->cancel();
     }
   }
+}
+
+void MetadataCredentialsProviderBase::initializeTlsAndCluster() {
+          tls_slot_ =
+            ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
+  
+        tls_slot_->set(
+            [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(*this); });
+        createCluster(true);
 }
 
 void MetadataCredentialsProviderBase::createCluster(bool new_timer) {
