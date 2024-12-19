@@ -119,6 +119,81 @@ TEST(ABIImpl, get_header_value) {
   }
 }
 
+TEST(ABIImpl, set_header_value) {
+  std::vector<bool (*)(envoy_dynamic_module_type_http_filter_envoy_ptr,
+                       envoy_dynamic_module_type_buffer_module_ptr, size_t,
+                       envoy_dynamic_module_type_buffer_module_ptr, size_t)>
+      callbacks = {envoy_dynamic_module_callback_http_set_request_header,
+                   envoy_dynamic_module_callback_http_set_request_trailer,
+                   envoy_dynamic_module_callback_http_set_response_header,
+                   envoy_dynamic_module_callback_http_set_response_trailer};
+
+  DynamicModuleHttpFilter filter{nullptr};
+
+  // Test with nullptr accessors.
+  for (auto callback : callbacks) {
+    const std::string key = "key";
+    const std::string value = "value";
+    envoy_dynamic_module_type_buffer_envoy_ptr key_ptr = const_cast<char*>(key.data());
+    size_t key_length = key.size();
+    envoy_dynamic_module_type_buffer_envoy_ptr value_ptr = const_cast<char*>(value.data());
+    size_t value_length = value.size();
+    EXPECT_FALSE(callback(&filter, key_ptr, key_length, value_ptr, value_length));
+  }
+
+  std::initializer_list<std::pair<std::string, std::string>> headers = {
+      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
+  Http::TestRequestHeaderMapImpl request_headers{headers};
+  filter.request_headers_ = &request_headers;
+  Http::TestRequestTrailerMapImpl request_trailers{headers};
+  filter.request_trailers_ = &request_trailers;
+  Http::TestResponseHeaderMapImpl response_headers{headers};
+  filter.response_headers_ = &response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers{headers};
+  filter.response_trailers_ = &response_trailers;
+
+  for (auto callback : callbacks) {
+    // Non existing key.
+    const std::string key = "new_one";
+    const std::string value = "value";
+    envoy_dynamic_module_type_buffer_envoy_ptr key_ptr = const_cast<char*>(key.data());
+    size_t key_length = key.size();
+    envoy_dynamic_module_type_buffer_envoy_ptr value_ptr = const_cast<char*>(value.data());
+    size_t value_length = value.size();
+    EXPECT_TRUE(callback(&filter, key_ptr, key_length, value_ptr, value_length));
+
+    auto values = request_headers.get(Envoy::Http::LowerCaseString(key));
+    EXPECT_EQ(values.size(), 1);
+    EXPECT_EQ(values[0]->value().getStringView(), value);
+
+    // Existing non-multi key.
+    const std::string key2 = "single";
+    const std::string value2 = "new_value";
+    envoy_dynamic_module_type_buffer_envoy_ptr key_ptr2 = const_cast<char*>(key2.data());
+    size_t key_length2 = key2.size();
+    envoy_dynamic_module_type_buffer_envoy_ptr value_ptr2 = const_cast<char*>(value2.data());
+    size_t value_length2 = value2.size();
+    EXPECT_TRUE(callback(&filter, key_ptr2, key_length2, value_ptr2, value_length2));
+
+    auto values2 = request_headers.get(Envoy::Http::LowerCaseString(key2));
+    EXPECT_EQ(values2.size(), 1);
+    EXPECT_EQ(values2[0]->value().getStringView(), value2);
+
+    // Existing multi key must be replaced by a single value.
+    const std::string key3 = "multi";
+    const std::string value3 = "new_value";
+    envoy_dynamic_module_type_buffer_envoy_ptr key_ptr3 = const_cast<char*>(key3.data());
+    size_t key_length3 = key3.size();
+    envoy_dynamic_module_type_buffer_envoy_ptr value_ptr3 = const_cast<char*>(value3.data());
+    size_t value_length3 = value3.size();
+    EXPECT_TRUE(callback(&filter, key_ptr3, key_length3, value_ptr3, value_length3));
+
+    auto values3 = request_headers.get(Envoy::Http::LowerCaseString(key3));
+    EXPECT_EQ(values3.size(), 1);
+    EXPECT_EQ(values3[0]->value().getStringView(), value3);
+  }
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions

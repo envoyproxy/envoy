@@ -237,6 +237,29 @@ impl EnvoyHttpFilter {
     )
   }
 
+  /// Set the request header with the given key and value.
+  ///
+  /// This will overwrite the existing value if the header is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and set
+  /// the new value.
+  ///
+  /// Returns true if the header is set successfully.
+  pub fn set_request_header(&self, key: &[u8], value: &[u8]) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let value_ptr = value.as_ptr();
+    let value_size = value.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_request_header(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        value_ptr as *const _ as *mut _,
+        value_size,
+      )
+    }
+  }
+
   /// Get the value of the request trailer with the given key.
   /// If the trailer is not found, this returns `None`.
   ///
@@ -256,6 +279,29 @@ impl EnvoyHttpFilter {
       key,
       abi::envoy_dynamic_module_callback_http_get_request_trailer_value,
     )
+  }
+
+  /// Set the request trailer with the given key and value.
+  ///
+  /// This will overwrite the existing value if the trailer is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and set
+  /// the new value.
+  ///
+  /// Returns true if the trailer is set successfully.
+  pub fn set_request_trailer(&self, key: &[u8], value: &[u8]) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let value_ptr = value.as_ptr();
+    let value_size = value.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_request_trailer(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        value_ptr as *const _ as *mut _,
+        value_size,
+      )
+    }
   }
 
   /// Get the value of the response header with the given key.
@@ -279,6 +325,30 @@ impl EnvoyHttpFilter {
     )
   }
 
+  /// Set the response header with the given key and value.
+  ///
+  /// This will overwrite the existing value if the header is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and set
+  /// the new value.
+  ///
+  /// Returns true if the header is set successfully.
+  pub fn set_response_header(&self, key: &[u8], value: &[u8]) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let value_ptr = value.as_ptr();
+    let value_size = value.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_response_header(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        value_ptr as *const _ as *mut _,
+        value_size,
+      )
+    }
+  }
+
+
   /// Get the value of the response trailer with the given key.
   /// If the trailer is not found, this returns `None`.
   ///
@@ -298,6 +368,29 @@ impl EnvoyHttpFilter {
       key,
       abi::envoy_dynamic_module_callback_http_get_response_trailer_value,
     )
+  }
+
+  /// Set the response trailer with the given key and value.
+  ///
+  /// This will overwrite the existing value if the trailer is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and set
+  /// the new value.
+  ///
+  /// Returns true if the operation is successful.
+  pub fn set_response_trailer(&self, key: &[u8], value: &[u8]) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let value_ptr = value.as_ptr();
+    let value_size = value.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_response_trailer(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        value_ptr as *const _ as *mut _,
+        value_size,
+      )
+    }
   }
 
   /// This implements the common logic for getting the header/trailer values.
