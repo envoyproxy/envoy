@@ -15,6 +15,7 @@ envoy_cc_library(
         "abi.h",
         "dynamic_modules.h",
     ],
+    linkopts = ["-Wl,--export-dynamic-symbol=envoy_dynamic_module_*"],
     deps = [
         ":abi_version_lib",
         "//envoy/common:exception_lib",

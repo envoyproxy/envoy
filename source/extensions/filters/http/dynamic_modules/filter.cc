@@ -18,7 +18,9 @@ void DynamicModuleHttpFilter::onDestroy() {
   dynamic_module_->on_http_filter_destroy_(in_module_filter_);
 };
 
-FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap&, bool end_of_stream) {
+FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap& headers,
+                                                           bool end_of_stream) {
+  request_headers_ = &headers;
   const envoy_dynamic_module_type_on_http_filter_request_headers_status status =
       dynamic_module_->on_http_filter_request_headers_(thisAsVoidPtr(), in_module_filter_,
                                                        end_of_stream);
@@ -32,7 +34,8 @@ FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance&, bool end
   return static_cast<FilterDataStatus>(status);
 };
 
-FilterTrailersStatus DynamicModuleHttpFilter::decodeTrailers(RequestTrailerMap&) {
+FilterTrailersStatus DynamicModuleHttpFilter::decodeTrailers(RequestTrailerMap& trailers) {
+  request_trailers_ = &trailers;
   const envoy_dynamic_module_type_on_http_filter_request_trailers_status status =
       dynamic_module_->on_http_filter_request_trailers_(thisAsVoidPtr(), in_module_filter_);
   return static_cast<FilterTrailersStatus>(status);
@@ -48,7 +51,9 @@ Filter1xxHeadersStatus DynamicModuleHttpFilter::encode1xxHeaders(ResponseHeaderM
   return Filter1xxHeadersStatus::Continue;
 }
 
-FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap&, bool end_of_stream) {
+FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap& headers,
+                                                           bool end_of_stream) {
+  response_headers_ = &headers;
   const envoy_dynamic_module_type_on_http_filter_response_headers_status status =
       dynamic_module_->on_http_filter_response_headers_(thisAsVoidPtr(), in_module_filter_,
                                                         end_of_stream);
@@ -62,7 +67,8 @@ FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance&, bool end
   return static_cast<FilterDataStatus>(status);
 };
 
-FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap&) {
+FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap& trailers) {
+  response_trailers_ = &trailers;
   const envoy_dynamic_module_type_on_http_filter_response_trailers_status status =
       dynamic_module_->on_http_filter_response_trailers_(thisAsVoidPtr(), in_module_filter_);
   return static_cast<FilterTrailersStatus>(status);

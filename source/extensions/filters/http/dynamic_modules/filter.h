@@ -55,6 +55,11 @@ public:
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
 
+  RequestHeaderMap* request_headers_ = nullptr;
+  RequestTrailerMap* request_trailers_ = nullptr;
+  ResponseHeaderMap* response_headers_ = nullptr;
+  ResponseTrailerMap* response_trailers_ = nullptr;
+
 private:
   /**
    * This is a helper function to get the `this` pointer as a void pointer which is passed to the

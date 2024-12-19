@@ -216,7 +216,185 @@ pub struct EnvoyHttpFilter {
 }
 
 impl EnvoyHttpFilter {
-  // TODO: add methods like getters for headers, etc.
+  /// Get the value of the request header with the given key.
+  /// If the header is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use [`Self::get_request_header_values`] variant.
+  pub fn get_request_header_value(&self, key: &[u8]) -> Option<&[u8]> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_request_header_value,
+    )
+  }
+
+  /// Get the values of the request header with the given key.
+  ///
+  /// If the header is not found, this returns an empty vector.
+  pub fn get_request_header_values(&self, key: &[u8]) -> Vec<&[u8]> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_request_header_value,
+    )
+  }
+
+  /// Get the value of the request trailer with the given key.
+  /// If the trailer is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use [``Self::get_request_trailer_values`] variant.
+  pub fn get_request_trailer_value(&self, key: &[u8]) -> Option<&[u8]> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_request_trailer_value,
+    )
+  }
+
+  /// Get the values of the request trailer with the given key.
+  ///
+  /// If the trailer is not found, this returns an empty vector.
+  pub fn get_request_trailer_values(&self, key: &[u8]) -> Vec<&[u8]> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_request_trailer_value,
+    )
+  }
+
+  /// Get the value of the response header with the given key.
+  /// If the header is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use [``Self::get_response_header_values`] variant.
+  pub fn get_response_header_value(&self, key: &[u8]) -> Option<&[u8]> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_response_header_value,
+    )
+  }
+
+  /// Get the values of the response header with the given key.
+  ///
+  /// If the header is not found, this returns an empty vector.
+  pub fn get_response_header_values(&self, key: &[u8]) -> Vec<&[u8]> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_response_header_value,
+    )
+  }
+
+  /// Get the value of the response trailer with the given key.
+  /// If the trailer is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use [`Self::get_response_trailer_values`] variant.
+  pub fn get_response_trailer_value(&self, key: &[u8]) -> Option<&[u8]> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_response_trailer_value,
+    )
+  }
+
+  /// Get the values of the response trailer with the given key.
+  ///
+  /// If the trailer is not found, this returns an empty vector.
+  pub fn get_response_trailer_values(&self, key: &[u8]) -> Vec<&[u8]> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_response_trailer_value,
+    )
+  }
+
+  /// This implements the common logic for getting the header/trailer values.
+  fn get_header_value_impl(
+    &self,
+    key: &[u8],
+    callback: unsafe extern "C" fn(
+      filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+      key: abi::envoy_dynamic_module_type_buffer_module_ptr,
+      key_length: usize,
+      result_buffer_ptr: *mut abi::envoy_dynamic_module_type_buffer_envoy_ptr,
+      result_buffer_length_ptr: *mut usize,
+      index: usize,
+    ) -> usize,
+  ) -> Option<&[u8]> {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+
+    let mut result_ptr: *const u8 = std::ptr::null();
+    let mut result_size: usize = 0;
+
+    unsafe {
+      callback(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        &mut result_ptr as *mut _ as *mut _,
+        &mut result_size as *mut _ as *mut _,
+        0, // Only the first value is needed.
+      )
+    };
+
+    if result_ptr.is_null() {
+      None
+    } else {
+      Some(unsafe { std::slice::from_raw_parts(result_ptr, result_size) })
+    }
+  }
+
+  /// This implements the common logic for getting the header/trailer values.
+  ///
+  /// TODO: use smallvec or similar to avoid the heap allocations for majority of the cases.
+  fn get_header_values_impl(
+    &self,
+    key: &[u8],
+    callback: unsafe extern "C" fn(
+      filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+      key: abi::envoy_dynamic_module_type_buffer_module_ptr,
+      key_length: usize,
+      result_buffer_ptr: *mut abi::envoy_dynamic_module_type_buffer_envoy_ptr,
+      result_buffer_length_ptr: *mut usize,
+      index: usize,
+    ) -> usize,
+  ) -> Vec<&[u8]> {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let mut result_ptr: *const u8 = std::ptr::null();
+    let mut result_size: usize = 0;
+
+    // Get the first value to get the count.
+    let counts = unsafe {
+      callback(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        &mut result_ptr as *mut _ as *mut _,
+        &mut result_size as *mut _ as *mut _,
+        0,
+      )
+    };
+
+    let mut results = Vec::new();
+    if counts == 0 {
+      return results;
+    }
+
+    // At this point, we assume at least one value is present.
+    results.push(unsafe { std::slice::from_raw_parts(result_ptr, result_size) });
+    // So, we iterate from 1 to counts - 1.
+    for i in 1 .. counts {
+      let mut result_ptr: *const u8 = std::ptr::null();
+      let mut result_size: usize = 0;
+      unsafe {
+        callback(
+          self.raw_ptr,
+          key_ptr as *const _ as *mut _,
+          key_size,
+          &mut result_ptr as *mut _ as *mut _,
+          &mut result_size as *mut _ as *mut _,
+          i,
+        )
+      };
+      // Within the range, all results are guaranteed to be non-null by Envoy.
+      results.push(unsafe { std::slice::from_raw_parts(result_ptr, result_size) });
+    }
+    results
+  }
 }
 
 #[no_mangle]
