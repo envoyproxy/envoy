@@ -41,6 +41,8 @@ jobs:
       # bazel-extra: '--config=remote-envoy-engflow'
       cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
       concurrency-suffix: -${{ matrix.target }}
+      diskspace-hack: ${{ matrix.diskspace-hack && true || false }}
+      diskspace-hack-paths: ${{ matrix.diskspace-hack-paths }}
       error-match: |
         ERROR
         error:
@@ -72,5 +74,8 @@ jobs:
         include:
         - target: coverage
           name: Coverage
+          diskspace-hack: true
+          diskspace-hack-paths: |
+            /opt/hostedtoolcache
         - target: fuzz_coverage
           name: Fuzz coverage
