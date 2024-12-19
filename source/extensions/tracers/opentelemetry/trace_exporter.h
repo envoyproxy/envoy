@@ -5,6 +5,7 @@
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 
 using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
+using opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse;
 
 namespace Envoy {
 namespace Extensions {
