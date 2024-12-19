@@ -62,11 +62,6 @@ ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::WorkerLocalLb(
   }
 }
 
-HostConstSharedPtr
-ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::chooseHost(LoadBalancerContext* context) {
-  return RoundRobinLoadBalancer::chooseHost(context);
-}
-
 ClientSideWeightedRoundRobinLoadBalancer::OrcaLoadReportHandler::OrcaLoadReportHandler(
     const ClientSideWeightedRoundRobinLbConfig& lb_config, TimeSource& time_source)
     : metric_names_for_computing_utilization_(lb_config.metric_names_for_computing_utilization),

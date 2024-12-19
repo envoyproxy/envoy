@@ -113,8 +113,8 @@ public:
     OrcaLoadReportHandler(const ClientSideWeightedRoundRobinLbConfig& lb_config,
                           TimeSource& time_source);
 
-    // Update client side data from `orca_load_report`. Invoked from `onOrcaLoadReport` callback on
-    // the worker thread.
+    // Update client side data from `orca_load_report`. Invoked from `onOrcaLoadReport` callback of
+    // ClientSideHostLbPolicyData.
     absl::Status
     updateClientSideDataFromOrcaLoadReport(const OrcaLoadReportProto& orca_load_report,
                                            ClientSideHostLbPolicyData& client_side_data);
@@ -153,9 +153,6 @@ public:
 
   private:
     friend class ClientSideWeightedRoundRobinLoadBalancerFriend;
-
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
-
     Common::CallbackHandlePtr apply_weights_cb_handle_;
   };
 
