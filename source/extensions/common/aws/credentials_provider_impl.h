@@ -16,6 +16,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/init/target_impl.h"
+#include "envoy/init/manager.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/aws/credentials_provider.h"
@@ -145,6 +146,7 @@ public:
 
 private:
   void createCluster(bool new_timer);
+  void initializeTlsAndCluster();
 
 protected:
   struct LoadClusterEntryHandleImpl
