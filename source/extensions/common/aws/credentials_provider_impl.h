@@ -11,6 +11,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/http/message.h"
+#include "envoy/init/manager.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/common/lock_guard.h"
@@ -18,7 +19,6 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/datasource.h"
 #include "source/common/init/target_impl.h"
-#include "envoy/init/manager.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/aws/credentials_provider.h"

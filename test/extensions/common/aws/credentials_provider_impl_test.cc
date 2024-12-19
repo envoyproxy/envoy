@@ -1506,6 +1506,17 @@ public:
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
 };
 
+TEST_F(ContainerCredentialsProviderTest, CreationAfterInitCompleted) {
+  // Handle the case where we've already completed init. This validates that clusters create
+  // successfully but init manager is not used
+  NiceMock<Init::MockManager> initManager;
+  ON_CALL(context_, initManager()).WillByDefault(ReturnRef(initManager));
+  ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+  EXPECT_CALL(cluster_manager_, addOrUpdateCluster(_, _, _));
+  EXPECT_CALL(initManager, add(_)).Times(0);
+  setupProvider();
+}
+
 TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
 
   // Setup timer.
