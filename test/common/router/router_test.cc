@@ -214,6 +214,15 @@ public:
   }
 };
 
+TEST_F(RouterTest, SenselessTestForCoverage) {
+  config_->timeSource();
+  Http::MockFilterChainManager mock_manager;
+  config_->createUpgradeFilterChain("", nullptr, mock_manager, Http::EmptyFilterChainOptions{});
+
+  router_->route();
+  router_->timeSource();
+}
+
 TEST_F(RouterTest, UpdateServerNameFilterStateWithoutHeaderOverride) {
   auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
