@@ -863,7 +863,7 @@ TEST_F(DnsCacheImplTest, ResolveFailureAfterResolveSuccess) {
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
   simTime().advanceTimeWait(std::chrono::milliseconds(600001));
-  // Because resolution successed for the host in the first attempt, onDnsHostAddOrUpdate was
+  // Because resolution succeed for the host in the first attempt, onDnsHostAddOrUpdate was
   // called. Therefore, onDnsHostRemove should be called also.
   EXPECT_CALL(update_callbacks_, onDnsHostRemove("foo.com:80"));
   resolve_timer->invokeCallback();
@@ -996,7 +996,7 @@ TEST_F(DnsCacheImplTest, ResolveFailureAfterResolveSuccessWithFailureRefreshRate
   // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
   // during this period but it's good enough for the test.
   simTime().advanceTimeWait(std::chrono::milliseconds(600001));
-  // Because resolution successed for the host in the first attempt, onDnsHostAddOrUpdate was
+  // Because resolution succeed for the host in the first attempt, onDnsHostAddOrUpdate was
   // called. Therefore, onDnsHostRemove should be called also.
   EXPECT_CALL(update_callbacks_, onDnsHostRemove("foo.com:80"));
   resolve_timer->invokeCallback();
