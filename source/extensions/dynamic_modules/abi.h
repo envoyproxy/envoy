@@ -386,8 +386,8 @@ void envoy_dynamic_module_on_http_filter_destroy(
 /**
  * envoy_dynamic_module_callback_http_get_request_header_value is called by the module to get the
  * value of the request header with the given key. Since a header can have multiple values, the
- * index is used to get the n-th value. This returns the number of values for the given key, so it
- * can be used to iterate over all values by starting from 0 and incrementing the index until the
+ * index is used to get the specific value. This returns the number of values for the given key, so
+ * it can be used to iterate over all values by starting from 0 and incrementing the index until the
  * return value or the desired value is found.
  *
  * PRECONDITIONS: Envoy does not check the validity of the key as well as the result_buffer_ptr
