@@ -168,6 +168,16 @@ bug_fixes:
     The previous ORCA parser will use ``:`` as the delimiter of key/value pair in the native HTTP report. This is wrong
     based on the design document. The correct delimiter should be ``=``. This change add the ``=`` delimiter support to
     match the design document and keep the ``:`` delimiter for backward compatibility.
+- area: http/1
+  change: |
+    Fixes sending overload crashes when HTTP/1 request is reset.
+- area: happy_eyeballs
+  change: |
+    Validate that ``additional_address`` are IP addresses instead of crashing when sorting.
+- area: balsa
+  change: |
+    Fix incorrect handling of non-101 1xx responses. This fix can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
