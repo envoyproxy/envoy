@@ -1,0 +1,6 @@
+  "trust_domains": {
+    "example.com": {
+      "sequence_number": 12035488,
+      "keys": []
+  }
+}
