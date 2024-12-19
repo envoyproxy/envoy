@@ -28,7 +28,10 @@ public:
                            const std::string& local_service_cluster,
                            RateLimitDescriptors& descriptors) const;
 
+  bool applyOnStreamDone() const { return apply_on_stream_done_; }
+
 private:
+  const bool apply_on_stream_done_ = false;
   Formatter::FormatterProviderPtr hits_addend_provider_;
   absl::optional<uint64_t> hits_addend_;
   std::vector<Envoy::RateLimit::DescriptorProducerPtr> actions_;
@@ -47,10 +50,10 @@ public:
   void populateDescriptors(const Http::RequestHeaderMap& headers,
                            const StreamInfo::StreamInfo& info,
                            const std::string& local_service_cluster,
-                           RateLimitDescriptors& descriptors) const;
+                           RateLimitDescriptors& descriptors, bool on_stream_done = false) const;
 
 private:
-  std::vector<std::unique_ptr<RateLimitPolicy>> rate_limit_policies_;
+  std::vector<RateLimitPolicy> rate_limit_policies_;
 };
 
 } // namespace RateLimit
