@@ -364,6 +364,12 @@ new_features:
   change: |
     Added new health check filter stats including total requests, successful/failed checks, cached responses, and
     cluster health status counters. These stats help track health check behavior and cluster health state.
+- area: http
+  change: |
+    Add :ref:`query parameter mutations
+    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.query_parameter_mutations>`
+    to :ref:`Header Mutation Filter <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
+    for adding/removing query parameters on a request.
 - area: local_ratelimit
   change: |
     Added per descriptor custom hits addend support for local rate limit filter. See :ref:`hits_addend
