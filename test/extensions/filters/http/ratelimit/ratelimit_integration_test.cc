@@ -67,15 +67,22 @@ public:
       ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ratelimit_filter));
     });
+    const auto ip_version = ipVersion();
     config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        [ip_version](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
-          auto* rate_limit = hcm.mutable_route_config()
-                                 ->mutable_virtual_hosts(0)
-                                 ->mutable_routes(0)
-                                 ->mutable_route()
-                                 ->add_rate_limits();
+          auto* route = hcm.mutable_route_config()
+                            ->mutable_virtual_hosts(0)
+                            ->mutable_routes(0)
+                            ->mutable_route();
+          auto* rate_limit = route->add_rate_limits();
           rate_limit->add_actions()->mutable_destination_cluster();
+          // Tests with apply_on_stream_done set to true for v6 to cover the paths including error handlings.
+          if (ip_version == Network::Address::IpVersion::v6) {
+            auto* rate_limit_apply_on_stream_done = route->add_rate_limits();
+            rate_limit_apply_on_stream_done->set_apply_on_stream_done(true);
+            rate_limit_apply_on_stream_done->add_actions()->mutable_destination_cluster();
+          }
         });
     HttpIntegrationTest::initialize();
   }
