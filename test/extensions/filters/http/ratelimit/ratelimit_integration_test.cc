@@ -69,15 +69,17 @@ public:
     });
     const auto ip_version = ipVersion();
     config_helper_.addConfigModifier(
-        [ip_version](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) {
+        [ip_version](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
           auto* route = hcm.mutable_route_config()
                             ->mutable_virtual_hosts(0)
                             ->mutable_routes(0)
                             ->mutable_route();
           auto* rate_limit = route->add_rate_limits();
           rate_limit->add_actions()->mutable_destination_cluster();
-          // Tests with apply_on_stream_done set to true for v6 to cover the paths including error handlings.
+          // Tests with apply_on_stream_done set to true for v6 to cover the paths including error
+          // handlings.
           if (ip_version == Network::Address::IpVersion::v6) {
             auto* rate_limit_apply_on_stream_done = route->add_rate_limits();
             rate_limit_apply_on_stream_done->set_apply_on_stream_done(true);
