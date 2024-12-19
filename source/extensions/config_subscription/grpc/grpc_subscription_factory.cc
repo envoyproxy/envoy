@@ -33,7 +33,9 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
       Utility::parseRateLimitSettings(api_config_source);
   THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
   GrpcMuxContext grpc_mux_context{
-      /*async_client_=*/factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+      /*async_client_=*/THROW_OR_RETURN_VALUE(
+          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+          Grpc::RawAsyncClientPtr),
       /*failover_async_client_=*/nullptr, // Failover is only supported for ADS.
       /*dispatcher_=*/data.dispatcher_,
       /*service_method_=*/sotwGrpcMethod(data.type_url_),
@@ -82,7 +84,9 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
       Utility::parseRateLimitSettings(api_config_source);
   THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
   GrpcMuxContext grpc_mux_context{
-      /*async_client_=*/factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+      /*async_client_=*/THROW_OR_RETURN_VALUE(
+          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+          Grpc::RawAsyncClientPtr),
       /*failover_async_client_=*/nullptr, // Failover is only supported for ADS.
       /*dispatcher_=*/data.dispatcher_,
       /*service_method_=*/deltaGrpcMethod(data.type_url_),

@@ -22,9 +22,9 @@ public:
    * exclusively. For example, some filters pass *this reference to raw client. In this case, the
    * client must be destroyed before the filter instance. In this case, the grpc client must be
    * owned by the filter instance exclusively.
-   * @return RawAsyncClientPtr async client.
+   * @return RawAsyncClientPtr async client or an error status.
    */
-  virtual RawAsyncClientPtr createUncachedRawAsyncClient() PURE;
+  virtual absl::StatusOr<RawAsyncClientPtr> createUncachedRawAsyncClient() PURE;
 
 private:
   friend class AsyncClientFactoryImpl;
