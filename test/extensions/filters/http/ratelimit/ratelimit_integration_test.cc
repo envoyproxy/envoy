@@ -79,7 +79,7 @@ public:
           auto* rate_limit = route->add_rate_limits();
           rate_limit->add_actions()->mutable_destination_cluster();
           // Tests with apply_on_stream_done set to true for v6 to cover the paths including error
-          // handlings.
+          // handling.
           if (ip_version == Network::Address::IpVersion::v6) {
             auto* rate_limit_apply_on_stream_done = route->add_rate_limits();
             rate_limit_apply_on_stream_done->set_apply_on_stream_done(true);
