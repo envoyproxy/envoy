@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.udp.udp_proxy.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
+import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/udp_socket_config.proto";
@@ -91,6 +92,9 @@ message UdpProxyConfig {
       // The maximum number of unsuccessful connection attempts that will be made before giving up.
       // If the parameter is not specified, 1 connection attempt will be made.
       google.protobuf.UInt32Value max_connect_attempts = 1;
+
+      // Sets the backoff strategy. If not set, the retries are performed without backoff.
+      config.core.v3.BackoffStrategy backoff_options = 2;
     }
 
     // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
