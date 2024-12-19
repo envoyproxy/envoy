@@ -167,7 +167,7 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
     if (success) {
       descriptor.hits_addend_ = static_cast<uint64_t>(hits_addend);
     } else {
-      ENVOY_LOG(debug, "Invalid hits_addend: {}", hits_addend_value.DebugString());
+      ENVOY_LOG_EVERY_POW_2(warn, "Invalid hits_addend: {}", hits_addend_value.DebugString());
       return;
     }
 
