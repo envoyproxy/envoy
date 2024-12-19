@@ -31,7 +31,7 @@ env:
 
 jobs:
   complete:
-    runs-on: ubuntu-22.04
+    runs-on: ${{ fromJSON(fromJSON(inputs.needs).load.outputs.request).config.ci.agent-ubuntu }}
     permissions:
       actions: read
       contents: read

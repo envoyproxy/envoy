@@ -50,7 +50,7 @@ jobs:
       rbe: true
       rbe-google: true
       request: ${{ inputs.request }}
-      runs-on: ubuntu-24.04
+      runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
       steps-post: |
         - uses: envoyproxy/toolshed/gh-actions/gcs/artefact/sync@actions-v0.3.13
           with:
