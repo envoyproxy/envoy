@@ -92,6 +92,14 @@ public:
   MOCK_METHOD(void, onUpstreamData, (Buffer::Instance & data, bool end_stream));
 };
 
+class MockHttpUpstream : public HttpUpstream {
+public:
+  ~MockHttpUpstream() override;
+
+  MOCK_METHOD(void, encodeData, (Buffer::Instance & data));
+  MOCK_METHOD(void, onDownstreamEvent, (Network::ConnectionEvent event));
+};
+
 class MockHttpStreamCallbacks : public HttpStreamCallbacks {
 public:
   ~MockHttpStreamCallbacks() override;
