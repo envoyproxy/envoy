@@ -168,9 +168,7 @@ paths:
     - source/extensions/compression/zstd/common/dictionary_manager.h
     - source/extensions/filters/http/adaptive_concurrency/controller
     - source/extensions/filters/http/admission_control
-    - source/extensions/filters/http/api_key_auth
     - source/extensions/filters/http/aws_lambda
-    - source/extensions/filters/http/bandwidth_limit
     - source/extensions/filters/http/basic_auth
     - source/extensions/filters/http/cache
     - source/extensions/filters/http/cdn_loop
@@ -463,6 +461,7 @@ visibility_excludes:
 - source/extensions/clusters/static/
 - source/extensions/clusters/original_dst/
 - source/extensions/clusters/logical_dns/
+- source/extensions/clusters/dns/
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD

@@ -31,9 +31,10 @@ TEST(ApiKeyAuthFilterFactoryTest, DuplicateApiKey) {
   ApiKeyAuthFilterFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      { auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context); },
-      EnvoyException, "Duplicate API key.");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_EQ("Duplicated credential key: 'key1'", status_or.status().message());
 }
 
 TEST(ApiKeyAuthFilterFactoryTest, EmptyKeySource) {
@@ -53,9 +54,10 @@ TEST(ApiKeyAuthFilterFactoryTest, EmptyKeySource) {
   ApiKeyAuthFilterFactory factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW_WITH_MESSAGE(
-      { auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context); },
-      EnvoyException, "One of 'header'/'query'/'cookie' must be set.");
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_EQ("One of 'header'/'query'/'cookie' must be set.", status_or.status().message());
 }
 
 TEST(ApiKeyAuthFilterFactoryTest, NormalFactory) {

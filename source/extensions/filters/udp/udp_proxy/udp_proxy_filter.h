@@ -673,7 +673,7 @@ protected:
     bool on_session_complete_called_{false};
   };
 
-  using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
+  using ActiveSessionSharedPtr = std::shared_ptr<ActiveSession>;
 
   class UdpActiveSession : public Network::UdpPacketProcessor, public ActiveSession {
   public:
@@ -732,7 +732,8 @@ protected:
    */
   class TunnelingActiveSession : public ActiveSession,
                                  public UpstreamTunnelCallbacks,
-                                 public HttpStreamCallbacks {
+                                 public HttpStreamCallbacks,
+                                 public std::enable_shared_from_this<TunnelingActiveSession> {
   public:
     TunnelingActiveSession(UdpProxyFilter& filter,
                            Network::UdpRecvData::LocalPeerAddresses&& addresses);
@@ -810,7 +811,9 @@ protected:
       LocalPeerHostAddresses key{value->addresses(), value->host()};
       return this->operator()(key);
     }
-    size_t operator()(const ActiveSessionPtr& value) const { return this->operator()(value.get()); }
+    size_t operator()(const ActiveSessionSharedPtr& value) const {
+      return this->operator()(value.get());
+    }
 
   private:
     const bool consider_host_;
@@ -822,19 +825,19 @@ protected:
 
     HeterogeneousActiveSessionEqual(const bool consider_host) : consider_host_(consider_host) {}
 
-    bool operator()(const ActiveSessionPtr& lhs,
+    bool operator()(const ActiveSessionSharedPtr& lhs,
                     const Network::UdpRecvData::LocalPeerAddresses& rhs) const {
       return lhs->addresses() == rhs;
     }
-    bool operator()(const ActiveSessionPtr& lhs, const LocalPeerHostAddresses& rhs) const {
+    bool operator()(const ActiveSessionSharedPtr& lhs, const LocalPeerHostAddresses& rhs) const {
       return this->operator()(lhs, rhs.local_peer_addresses_) &&
              (consider_host_ ? &lhs->host().value().get() == &rhs.host_.value().get() : true);
     }
-    bool operator()(const ActiveSessionPtr& lhs, const ActiveSession* rhs) const {
+    bool operator()(const ActiveSessionSharedPtr& lhs, const ActiveSession* rhs) const {
       LocalPeerHostAddresses key{rhs->addresses(), rhs->host()};
       return this->operator()(lhs, key);
     }
-    bool operator()(const ActiveSessionPtr& lhs, const ActiveSessionPtr& rhs) const {
+    bool operator()(const ActiveSessionSharedPtr& lhs, const ActiveSessionSharedPtr& rhs) const {
       return this->operator()(lhs, rhs.get());
     }
 
@@ -878,8 +881,9 @@ protected:
   };
 
   using ClusterInfoPtr = std::unique_ptr<ClusterInfo>;
-  using SessionStorageType = absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
-                                                 HeterogeneousActiveSessionEqual>;
+  using SessionStorageType =
+      absl::flat_hash_set<ActiveSessionSharedPtr, HeterogeneousActiveSessionHash,
+                          HeterogeneousActiveSessionEqual>;
 
   const UdpProxyFilterConfigSharedPtr config_;
   SessionStorageType sessions_;

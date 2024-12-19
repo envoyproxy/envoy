@@ -50,7 +50,8 @@ envoy_cc_library(
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@io_opentelemetry_cpp//api",
-        "@opentelemetry_proto//:trace_cc_proto",
+        "@opentelemetry_proto//:trace_proto_cc",
+        "@opentelemetry_proto//:trace_service_proto_cc",
     ],
 )
 
@@ -80,6 +81,7 @@ envoy_cc_library(
         "//source/common/version:version_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@io_opentelemetry_cpp//api",
-        "@opentelemetry_proto//:trace_cc_proto",
+        "@opentelemetry_proto//:trace_proto_cc",
+        "@opentelemetry_proto//:trace_service_proto_cc",
     ],
 )
