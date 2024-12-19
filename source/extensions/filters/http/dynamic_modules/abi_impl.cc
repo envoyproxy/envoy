@@ -1,12 +1,11 @@
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
-extern "C" {
-
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
+extern "C" {
 
 size_t getHeaderValueImpl(const Http::HeaderMap* map,
                           envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
@@ -74,9 +73,8 @@ size_t envoy_dynamic_module_callback_http_get_response_trailer_value(
                             result_buffer_length_ptr, index);
 }
 
+} // extern "C"
 } // namespace HttpFilters
-
 } // namespace DynamicModules
 } // namespace Extensions
-} // namespace Envoy
 } // namespace Envoy
