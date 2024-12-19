@@ -797,7 +797,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         continue;
       }
       auto shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_);
-      auto sampled = shadow_policy.traceSampled() ? absl::nullopt : false;
+      auto sampled = shadow_policy.traceSampled() ? absl::nullopt : absl::optional<bool>(false);
       auto options =
           Http::AsyncClient::RequestOptions()
               .setTimeout(timeout_.global_timeout_)
