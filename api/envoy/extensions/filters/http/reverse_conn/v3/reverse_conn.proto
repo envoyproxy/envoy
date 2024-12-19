@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.reverse_conn.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.reverse_conn.v3";
+option java_outer_classname = "ReverseConnProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/reverse_conn/v3;reverse_connv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: ReverseConn]
+// ReverseConn :ref:`configuration overview <config_http_filters_reverse_conn>`.
+// [#extension: envoy.filters.http.reverse_conn]
+
+message ReverseConn {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.reverse_conn.v2.ReverseConn";
+
+  google.protobuf.UInt32Value ping_interval = 1;
+}
+
+// Config sent by the local cluster as part of the Initiation workflow.
+// This message combined with message 'ReverseConnHandshakeRet' which is
+// sent as a response can be used to transfer/negotiate parameter between the
+// two envoys.
+message ReverseConnHandshakeArg {
+  // Tenant UUID of the local cluster.
+  string tenant_uuid = 1;
+
+  // Cluster UUID of the local cluster.
+  string cluster_uuid = 2;
+
+  // Node UUID of the local cluster.
+  string node_uuid = 3;
+}
+
+// Config used by the remote cluser in response to the above 'ReverseConnHandshakeArg'.
+message ReverseConnHandshakeRet {
+  enum ConnectionStatus {
+    ACCEPTED = 0;
+    REJECTED = 1;
+  }
+
+  // Tracks the status of the reverse connection initiation workflow.
+  ConnectionStatus status = 1;
+
+  // This field can be used to transmit success/warning/error messages
+  // describing the status of the reverse connection, if needed.
+  string status_message = 2;
+}
