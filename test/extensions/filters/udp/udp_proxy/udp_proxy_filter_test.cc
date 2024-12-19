@@ -1877,6 +1877,7 @@ tunneling_config:
         true);
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_connection_info_provider_->setConnectionID(0);
   Upstream::HostDescriptionConstSharedPtr upstream_host;
   Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
 
@@ -1926,6 +1927,7 @@ tunneling_config:
         true);
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_connection_info_provider_->setConnectionID(0);
   Upstream::HostDescriptionConstSharedPtr upstream_host;
   Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
 
