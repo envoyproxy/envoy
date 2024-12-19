@@ -28,6 +28,7 @@ behavior_changes:
     but also means shadowing may take place for requests which are canceled mid-stream. This behavior change can be
     temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
 
+
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: access_log
@@ -89,6 +90,15 @@ minor_behavior_changes:
   change: |
     Local replies now traverse the filter chain if 1xx headers have been sent to the client. This change can be reverted
     by setting the runtime guard ``envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx`` to false.
+- area: cluster
+  change: |
+      Clusters can no longer use unregistered extension types in
+      :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`.
+- area: cluster
+  change: |
+      Clusters factories are registered by configuration type for
+      :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`
+      and will use configuration type to lookup the corresponding factory when available.
 - area: dns
   change: |
     Patched c-ares to address CVE-2024-25629.
@@ -374,6 +384,12 @@ deprecated:
   change: |
     metadata :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>` is now deprecated in the
     favor of :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>`.
+- area: cluster
+  change: |
+    `DNS-related fields in :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster> are deprecated when using
+    strict and logical dns clusters. Instead, use the :ref:`cluster_type <envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type`
+    extension point with :ref:`typed_config<envoy_v3_api_field_config.cluster.v3.Cluster.CustomClusterType.typed_config>` of type
+    :ref:`DnsCluster <envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
 - area: aws_iam
   change: |
     The :ref:`aws_iam extension <envoy_v3_api_msg_config.grpc_credential.v3.AwsIamConfig>` is deprecated and will be
