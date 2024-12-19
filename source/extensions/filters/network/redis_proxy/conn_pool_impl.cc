@@ -69,8 +69,6 @@ void InstanceImpl::init() {
   });
 }
 
-//
-//
 uint16_t InstanceImpl::shardSize() { return tls_->getTyped<ThreadLocalPool>().shardSize(); }
 
 // This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
