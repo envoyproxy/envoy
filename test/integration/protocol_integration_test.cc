@@ -45,6 +45,10 @@
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/client_connection_factory_impl.h"
+#endif
+
 using testing::HasSubstr;
 using testing::Not;
 
@@ -4852,7 +4856,25 @@ TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketCreationFail) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&fail_socket_n_};
 
   initialize();
+
+#ifdef ENVOY_ENABLE_QUIC
+  // It turns out on some builds, the ENVOY_BUG expected below slows the server
+  // long enough to trigger QUIC blackhole detection, which results in the
+  // client killing the connection before the 503 is delivered. Turn off QUIC
+  // blackhole detection to avoid flaky tsan builds.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    quic::QuicTagVector connection_options{quic::kNBHD};
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetConnectionOptionsToSend(connection_options);
+  }
+#endif
+
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  if (version_ == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterGe("listener.127.0.0.1_0.downstream_cx_total", 1);
+  } else {
+    test_server_->waitForCounterGe("listener.[__1]_0.downstream_cx_total", 1);
+  }
 
   EXPECT_ENVOY_BUG(
       {
