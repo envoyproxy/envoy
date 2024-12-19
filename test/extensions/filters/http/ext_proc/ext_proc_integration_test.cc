@@ -719,13 +719,20 @@ protected:
   }
 
   IntegrationStreamDecoderPtr initAndSendDataDuplexStreamedMode(absl::string_view body_sent,
-                                                                bool end_of_stream) {
+                                                                bool end_of_stream,
+                                                                bool both_direction = false) {
     config_helper_.setBufferLimits(1024, 1024);
     auto* processing_mode = proto_config_.mutable_processing_mode();
     processing_mode->set_request_header_mode(ProcessingMode::SEND);
     processing_mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
     processing_mode->set_request_trailer_mode(ProcessingMode::SEND);
-    processing_mode->set_response_header_mode(ProcessingMode::SKIP);
+    if (!both_direction) {
+      processing_mode->set_response_header_mode(ProcessingMode::SKIP);
+    } else {
+      processing_mode->set_response_header_mode(ProcessingMode::SEND);
+      processing_mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+      processing_mode->set_response_trailer_mode(ProcessingMode::SEND);
+    }
 
     initializeConfig();
     HttpIntegrationTest::initialize();
@@ -741,23 +748,59 @@ protected:
     return response;
   }
 
-  void serverReceiveHeaderDuplexStreamed(ProcessingRequest& header_request) {
-    EXPECT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
-    EXPECT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header_request));
-    EXPECT_TRUE(header_request.has_request_headers());
+  void serverReceiveHeaderDuplexStreamed(ProcessingRequest& header, bool first_message = true,
+                                         bool response = false) {
+    if (first_message) {
+      EXPECT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+      EXPECT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+    }
+    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header));
+    if (!response) {
+      EXPECT_TRUE(header.has_request_headers());
+    } else {
+      EXPECT_TRUE(header.has_response_headers());
+    }
   }
 
-  void serverSendHeaderRespDuplexStreamed() {
-    processor_stream_->startGrpcStream();
+  void serverSendHeaderRespDuplexStreamed(bool first_message = true, bool response = false) {
+    if (first_message) {
+      processor_stream_->startGrpcStream();
+    }
     ProcessingResponse response_header;
-    auto* header_resp = response_header.mutable_request_headers();
+    HeadersResponse* header_resp;
+    if (!response) {
+      header_resp = response_header.mutable_request_headers();
+    } else {
+      header_resp = response_header.mutable_response_headers();
+    }
     auto* header_mutation = header_resp->mutable_response()->mutable_header_mutation();
     auto* header = header_mutation->add_set_headers()->mutable_header();
     header->set_key("x-new-header");
     header->set_raw_value("new");
     processor_stream_->sendGrpcMessage(response_header);
   }
+
+  void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true, bool response = false) {
+    for (uint32_t i = 0; i < total_resp_body_msg; i++) {
+      ProcessingResponse response_body;
+      BodyResponse* body_resp;
+      if (!response) {
+        body_resp = response_body.mutable_request_body();
+      } else {
+        body_resp = response_body.mutable_response_body();
+      }
+
+      auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
+      auto* streamed_response = body_mut->mutable_streamed_response();
+      streamed_response->set_body("r");
+      if (end_of_stream) {
+        const bool end_of_stream = (i == total_resp_body_msg - 1) ? true : false;
+        streamed_response->set_end_of_stream(end_of_stream);
+      }
+      processor_stream_->sendGrpcMessage(response_body);
+    }
+  }
+
 
   void serverSendTrailerRespDuplexStreamed() {
     ProcessingResponse response_trailer;
@@ -4967,16 +5010,7 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespDuplexStrea
   // The ext_proc server sends back the body response.
   uint32_t total_resp_body_msg = 2 * total_req_body_msg;
   const std::string body_upstream(total_resp_body_msg, 'r');
-  for (uint32_t i = 0; i < total_resp_body_msg; i++) {
-    ProcessingResponse response_body;
-    auto* body_resp = response_body.mutable_request_body();
-    auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
-    auto* streamed_response = body_mut->mutable_streamed_response();
-    streamed_response->set_body("r");
-    const bool end_of_stream = (i == total_resp_body_msg - 1) ? true : false;
-    streamed_response->set_end_of_stream(end_of_stream);
-    processor_stream_->sendGrpcMessage(response_body);
-  }
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg);
 
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
@@ -5021,15 +5055,7 @@ TEST_P(ExtProcIntegrationTest,
   // The ext_proc server sends back the body response.
   uint32_t total_resp_body_msg = total_req_body_msg / 2;
   const std::string body_upstream(total_resp_body_msg, 'r');
-  for (uint32_t i = 0; i < total_resp_body_msg; i++) {
-    ProcessingResponse response_body;
-    auto* streamed_response = response_body.mutable_request_body()
-                                  ->mutable_response()
-                                  ->mutable_body_mutation()
-                                  ->mutable_streamed_response();
-    streamed_response->set_body("r");
-    processor_stream_->sendGrpcMessage(response_body);
-  }
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg, false);
 
   // The ext_proc server sends back the trailer response.
   serverSendTrailerRespDuplexStreamed();
@@ -5117,6 +5143,63 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyDuplexStrea
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
   EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, DuplexStreamedInBothDirection) {
+  const std::string body_sent(8 * 1024, 's');
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true, true);
+
+  // The ext_proc server receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderDuplexStreamed(header_request);
+
+  std::string body_received;
+  bool end_stream = false;
+  uint32_t total_req_body_msg = 0;
+  while (!end_stream) {
+    ProcessingRequest body_request;
+    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+    EXPECT_TRUE(body_request.has_request_body());
+    body_received = absl::StrCat(body_received, body_request.request_body().body());
+    end_stream = body_request.request_body().end_of_stream();
+    total_req_body_msg++;
+  }
+  EXPECT_TRUE(end_stream);
+  EXPECT_EQ(body_received, body_sent);
+
+  // The ext_proc server sends back the request header response.
+  serverSendHeaderRespDuplexStreamed();
+
+  // The ext_proc server sends back the request body response.
+  uint32_t total_resp_body_msg = 2 * total_req_body_msg;
+  const std::string body_upstream(total_resp_body_msg, 'r');
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg);
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+
+  // The ext_proc server receives the response headers.
+  ProcessingRequest header_response;
+  serverReceiveHeaderDuplexStreamed(header_response, false, true);
+
+  // The ext_proc server receives the response body.
+  end_stream = false;
+  while (!end_stream) {
+    ProcessingRequest body_request;
+    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+    EXPECT_TRUE(body_request.has_response_body());
+    end_stream = body_request.response_body().end_of_stream();
+  }
+  EXPECT_TRUE(end_stream);
+
+  // The ext_proc server sends back the response header response.
+  serverSendHeaderRespDuplexStreamed(false, true);
+
+  // The ext_proc server sends back the response body response.
+  serverSendBodyRespDuplexStreamed(3, true, true);
+
   verifyDownstreamResponse(*response, 200);
 }
 
