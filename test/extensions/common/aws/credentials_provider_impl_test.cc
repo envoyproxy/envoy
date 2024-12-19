@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <ios>
+#include <memory>
 #include <string>
 
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
@@ -2460,6 +2461,7 @@ public:
     MOCK_METHOD(CredentialsProviderSharedPtr, createEnvironmentCredentialsProvider, (), (const));
     MOCK_METHOD(CredentialsProviderSharedPtr, createCredentialsFileCredentialsProvider, (Api::Api&),
                 (const));
+
     MOCK_METHOD(CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
                 (Api::Api&, ServerFactoryContextOptRef,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
@@ -2474,6 +2476,17 @@ public:
                  MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
                  absl::string_view),
                 (const));
+
+    MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
+                (Api::Api&, ServerFactoryContextOptRef, CreateMetadataFetcherCb,
+                 MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
+                 absl::string_view, absl::string_view, absl::string_view, absl::string_view,
+                 absl::optional<uint16_t>, absl::string_view, absl::string_view,
+                 const ::envoy::config::core::v3::DataSource&,
+                 const ::envoy::config::core::v3::DataSource&,
+                 absl::optional<const ::envoy::config::core::v3::DataSource>),
+                (const));
+
     MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
                 (Api::Api&, ServerFactoryContextOptRef, Singleton::Manager&,
                  const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
