@@ -173,7 +173,7 @@ TEST_F(RedisCommandSplitterImplTest, InvalidRequestArrayNotStrings) {
 TEST_F(RedisCommandSplitterImplTest, UnsupportedCommand) {
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
-  response.asString() = "unsupported command 'newcommand'";
+  response.asString() = "ERR unknown command 'newcommand', with args beginning with: hello";
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
