@@ -745,6 +745,15 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   }
 
   std::string command_name = absl::AsciiStrToLower(request->asArray()[0].asString());
+  // Compatible with redis behavior, if there is an unsupported command, return immediately,
+  // this action must be performed before verifying auth, some redis clients rely on this behavior.
+  if (!Common::Redis::SupportedCommands::isSupportedCommand(command_name)) {
+    stats_.unsupported_command_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(fmt::format(
+        "ERR unknown command '{}', with args beginning with: {}", request->asArray()[0].asString(),
+        request->asArray().size() > 1 ? request->asArray()[1].asString() : "")));
+    return nullptr;
+  }
 
   if (command_name == Common::Redis::SupportedCommands::auth()) {
     if (request->asArray().size() < 2) {
@@ -836,12 +845,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
 
   // Get the handler for the downstream request
   auto handler = handler_lookup_table_.find(command_name.c_str());
-  if (handler == nullptr) {
-    stats_.unsupported_command_.inc();
-    callbacks.onResponse(Common::Redis::Utility::makeError(
-        fmt::format("unsupported command '{}'", request->asArray()[0].asString())));
-    return nullptr;
-  }
+  ASSERT(handler != nullptr);
 
   // If we are within a transaction, forward all requests to the transaction handler (i.e. handler
   // of "multi" command).
