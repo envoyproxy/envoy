@@ -146,7 +146,9 @@ public:
   void encodeBodyAndTrailers();
 
   // Getters and setters
-  Upstream::HostDescriptionConstSharedPtr& upstreamHost() { return upstream_host_; }
+  Upstream::HostDescriptionOptConstRef upstreamHost() {
+    return makeOptRefFromPtr(upstream_host_.get());
+  }
   void outlierDetectionTimeoutRecorded(bool recorded) {
     outlier_detection_timeout_recorded_ = recorded;
   }
