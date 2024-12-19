@@ -466,6 +466,11 @@ size_t envoy_dynamic_module_callback_http_get_response_trailer_value(
  * @param value is the value of the header.
  * @param value_length is the length of the value.
  * @return true if the operation is successful, false otherwise.
+ *
+ * Note that this only sets the header to the underlying Envoy object. Whether or not the header is
+ * actually sent to the upstream depends on the phase of the execution and subsequent
+ * filters. In other words, returning true from this function does not guarantee that the header
+ * will be sent to the upstream.
  */
 bool envoy_dynamic_module_callback_http_set_request_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
