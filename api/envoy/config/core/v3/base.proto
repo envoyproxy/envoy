@@ -303,12 +303,31 @@ message RuntimeFeatureFlag {
   string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
 }
 
+// Please use :ref:`KeyValuePair <envoy_api_msg_config.core.v3.KeyValuePair>` instead.
+// [#not-implemented-hide:]
 message KeyValue {
+  // The key of the key/value pair.
+  string key = 1 [
+    deprecated = true,
+    (validate.rules).string = {min_len: 1 max_bytes: 16384},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
+
+  // The value of the key/value pair.
+  //
+  // The ``bytes`` type is used. This means if JSON or YAML is used to to represent the
+  // configuration, the value must be base64 encoded. This is unfriendly for users in most
+  // use scenarios of this message.
+  //
+  bytes value = 2 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+}
+
+message KeyValuePair {
   // The key of the key/value pair.
   string key = 1 [(validate.rules).string = {min_len: 1 max_bytes: 16384}];
 
   // The value of the key/value pair.
-  bytes value = 2;
+  google.protobuf.Value value = 2;
 }
 
 // Key/value pair plus option to control append behavior. This is used to specify
@@ -339,8 +358,18 @@ message KeyValueAppend {
     OVERWRITE_IF_EXISTS = 3;
   }
 
-  // Key/value pair entry that this option to append or overwrite.
-  KeyValue entry = 1 [(validate.rules).message = {required: true}];
+  // The single key/value pair record to be appended or overridden. This field must be set.
+  KeyValuePair record = 3;
+
+  // Key/value pair entry that this option to append or overwrite. This field is deprecated
+  // and please use :ref:`record <envoy_v3_api_field_config.core.v3.KeyValueAppend.record>`
+  // as replacement.
+  // [#not-implemented-hide:]
+  KeyValue entry = 1 [
+    deprecated = true,
+    (validate.rules).message = {skip: true},
+    (envoy.annotations.deprecated_at_minor_version) = "3.0"
+  ];
 
   // Describes the action taken to append/overwrite the given value for an existing
   // key or to only add this key if it's absent.
@@ -349,10 +378,12 @@ message KeyValueAppend {
 
 // Key/value pair to append or remove.
 message KeyValueMutation {
-  // Key/value pair to append or overwrite. Only one of ``append`` or ``remove`` can be set.
+  // Key/value pair to append or overwrite. Only one of ``append`` or ``remove`` can be set or
+  // the configuration will be rejected.
   KeyValueAppend append = 1;
 
-  // Key to remove. Only one of ``append`` or ``remove`` can be set.
+  // Key to remove. Only one of ``append`` or ``remove`` can be set or the configuration will be
+  // rejected.
   string remove = 2 [(validate.rules).string = {max_bytes: 16384}];
 }
 
