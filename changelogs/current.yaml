@@ -166,6 +166,11 @@ bug_fixes:
 - area: udp_proxy
   change: |
     Fix a bug that cause Envoy to crash due to segmentation fault when onBelowWriteBufferLowWatermark callback is called.
+- area: orca
+  change: |
+    The previous ORCA parser will use ``:`` as the delimiter of key/value pair in the native HTTP report. This is wrong
+    based on the design document. The correct delimiter should be ``=``. This change add the ``=`` delimiter support to
+    match the design document and keep the ``:`` delimiter for backward compatibility.
 - area: http/1
   change: |
     Fixes sending overload crashes when HTTP/1 request is reset.
@@ -345,11 +350,6 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.cx_pool_ready_duration``
     to get the duration from when the upstream request was created to when the upstream connection pool is ready.
-- area: jwt_authn
-  change: |
-    Added  :ref:`refetch_jwks_on_kid_mismatch
-    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.RemoteJwks.refetch_jwks_on_kid_mismatch>`
-    to allow filter to refetch JWKS when extracted JWT's KID does not match cached JWKS's KID.
 - area: health_check
   change: |
     Added new health check filter stats including total requests, successful/failed checks, cached responses, and

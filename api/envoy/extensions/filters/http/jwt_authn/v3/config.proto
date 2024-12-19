@@ -383,7 +383,6 @@ message JwtCacheConfig {
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.
-// [#next-free-field: 6]
 message RemoteJwks {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.RemoteJwks";
@@ -453,24 +452,6 @@ message RemoteJwks {
   //
   //
   config.core.v3.RetryPolicy retry_policy = 4;
-
-  // Refetch JWKS if extracted JWT has no KID or a KID that does not match any cached JWKS's KID.
-  //
-  //
-  // In envoy, if :ref:`async JWKS fetching <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.RemoteJwks.async_fetch>`
-  // is enabled along with this field, then KID mismatch will trigger a new async fetch after appropriate backoff delay.
-  //
-  //
-  // If async fetching is disabled, new JWKS is fetched on demand and the cache is isolated to the fetched worker thread.
-  //
-  // There is exponential backoff built into this retrieval system for two cases to avoid DoS on JWKS Server:
-  //
-  // * If there is a request containing a JWT with no KID, a new fetch will be made for this request. Upon retrieval,
-  //   a backoff will be triggered.
-  // * If there is a fetch due to KID mismatch, which results in a failed fetch or verification, a backoff will be triggered.
-  //
-  // During a backoff, no further fetches will be made due to KID mismatch.
-  bool refetch_jwks_on_kid_mismatch = 5;
 }
 
 // Fetch Jwks asynchronously in the main thread when the filter config is parsed.
