@@ -415,7 +415,7 @@ TEST_F(EnvoyQuicServerStreamTest, ResetStreamByHCM) {
 TEST_F(EnvoyQuicServerStreamTest, ReceiveStopSending) {
   size_t payload_offset = receiveRequest(request_body_, false, request_body_.size() * 2);
   // Receiving STOP_SENDING alone should trigger upstream reset.
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteResetNoError, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   quic_stream_->OnStopSending(quic::QuicResetStreamError::FromInternal(quic::QUIC_STREAM_NO_ERROR));
   EXPECT_FALSE(quic_stream_->read_side_closed());

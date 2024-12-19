@@ -509,7 +509,7 @@ TEST_F(EnvoyQuicClientStreamTest, ResetStream) {
 TEST_F(EnvoyQuicClientStreamTest, ReceiveResetStreamWriteClosed) {
   auto result = quic_stream_->encodeHeaders(request_headers_, true);
   EXPECT_TRUE(result.ok());
-  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteResetNoError, _));
   quic_stream_->OnStreamReset(quic::QuicRstStreamFrame(
       quic::kInvalidControlFrameId, quic_stream_->id(), quic::QUIC_STREAM_NO_ERROR, 0));
   EXPECT_TRUE(quic_stream_->rst_received());
