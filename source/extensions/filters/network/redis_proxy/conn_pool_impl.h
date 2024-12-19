@@ -66,10 +66,14 @@ public:
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
       Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
       const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache);
+  uint16_t shardSize() override;
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks,
               Common::Redis::Client::Transaction& transaction) override;
+  Common::Redis::Client::PoolRequest*
+  makeRequestToShard(uint16_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
+                     Common::Redis::Client::Transaction& transaction) override;
   /**
    * Makes a redis request based on IP address and TCP port of the upstream host (e.g.,
    * moved/ask cluster redirection). This is now only kept mostly for testing.
@@ -83,7 +87,6 @@ public:
   Common::Redis::Client::PoolRequest*
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                     Common::Redis::Client::ClientCallbacks& callbacks);
-
   void init();
 
   // Allow the unit test to have access to private members.
@@ -152,13 +155,19 @@ private:
                     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache);
     ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
+    uint16_t shardSize();
     Common::Redis::Client::PoolRequest*
     makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks,
                 Common::Redis::Client::Transaction& transaction);
     Common::Redis::Client::PoolRequest*
+    makeRequestToHost(Upstream::HostConstSharedPtr& host, RespVariant&& request,
+                      PoolCallbacks& callbacks, Common::Redis::Client::Transaction& transaction);
+    Common::Redis::Client::PoolRequest*
     makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                       Common::Redis::Client::ClientCallbacks& callbacks);
-
+    Common::Redis::Client::PoolRequest*
+    makeRequestToShard(uint16_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
+                       Common::Redis::Client::Transaction& transaction);
     void onClusterAddOrUpdateNonVirtual(absl::string_view cluster_name,
                                         Upstream::ThreadLocalClusterCommand& get_cluster);
     void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
