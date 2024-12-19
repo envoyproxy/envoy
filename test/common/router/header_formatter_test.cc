@@ -1103,16 +1103,31 @@ response_headers_to_remove: ["x-baz-header"]
           .value();
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-  auto transforms =
-      response_header_parser->getHeaderTransforms(stream_info, /*do_formatting=*/false);
-  EXPECT_THAT(transforms.headers_to_append_or_add,
-              ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
-  EXPECT_THAT(transforms.headers_to_overwrite_or_add,
-              ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar")));
-  EXPECT_THAT(transforms.headers_to_add_if_absent,
-              ElementsAre(Pair(Http::LowerCaseString("x-per-header"), "per")));
+  {
+    auto transforms =
+        response_header_parser->getHeaderTransforms(stream_info, /*do_formatting=*/false);
+    EXPECT_THAT(transforms.headers_to_append_or_add,
+                ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
+    EXPECT_THAT(transforms.headers_to_overwrite_or_add,
+                ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar")));
+    EXPECT_THAT(transforms.headers_to_add_if_absent,
+                ElementsAre(Pair(Http::LowerCaseString("x-per-header"), "per")));
 
-  EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
+    EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
+  }
+
+  {
+    auto transforms =
+        response_header_parser->getHeaderTransforms(stream_info, /*do_formatting=*/true);
+    EXPECT_THAT(transforms.headers_to_append_or_add,
+                ElementsAre(Pair(Http::LowerCaseString("x-foo-header"), "foo")));
+    EXPECT_THAT(transforms.headers_to_overwrite_or_add,
+                ElementsAre(Pair(Http::LowerCaseString("x-bar-header"), "bar")));
+    EXPECT_THAT(transforms.headers_to_add_if_absent,
+                ElementsAre(Pair(Http::LowerCaseString("x-per-header"), "per")));
+
+    EXPECT_THAT(transforms.headers_to_remove, ElementsAre(Http::LowerCaseString("x-baz-header")));
+  }
 }
 
 } // namespace
