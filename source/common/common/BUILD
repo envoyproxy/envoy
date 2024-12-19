@@ -109,6 +109,7 @@ envoy_cc_library(
         "//envoy/network:dns_interface",
         "//source/common/network:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/dns/v3:pkg_cc_proto",
     ],
 )
 

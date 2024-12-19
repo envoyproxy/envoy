@@ -31,6 +31,27 @@ getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily 
   return Network::DnsLookupFamily::All;
 }
 
+Network::DnsLookupFamily
+getDnsLookupFamilyFromEnum(envoy::extensions::clusters::common::dns::v3::DnsLookupFamily family) {
+  switch (family) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::extensions::clusters::common::dns::v3::V6_ONLY:
+    return Network::DnsLookupFamily::V6Only;
+  case envoy::extensions::clusters::common::dns::v3::V4_ONLY:
+    return Network::DnsLookupFamily::V4Only;
+  case envoy::extensions::clusters::common::dns::v3::AUTO:
+  case envoy::extensions::clusters::common::dns::v3::UNSPECIFIED:
+    return Network::DnsLookupFamily::Auto;
+  case envoy::extensions::clusters::common::dns::v3::V4_PREFERRED:
+    return Network::DnsLookupFamily::V4Preferred;
+  case envoy::extensions::clusters::common::dns::v3::ALL:
+    return Network::DnsLookupFamily::All;
+    break;
+  }
+  IS_ENVOY_BUG("unexpected dns lookup family enum");
+  return Network::DnsLookupFamily::All;
+}
+
 std::vector<Network::Address::InstanceConstSharedPtr>
 generateAddressList(const std::list<Network::DnsResponse>& responses, uint32_t port) {
   std::vector<Network::Address::InstanceConstSharedPtr> addresses;
