@@ -780,7 +780,8 @@ protected:
     processor_stream_->sendGrpcMessage(response_header);
   }
 
-  void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true, bool response = false) {
+  void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true,
+                                        bool response = false) {
     for (uint32_t i = 0; i < total_resp_body_msg; i++) {
       ProcessingResponse response_body;
       BodyResponse* body_resp;
@@ -800,7 +801,6 @@ protected:
       processor_stream_->sendGrpcMessage(response_body);
     }
   }
-
 
   void serverSendTrailerRespDuplexStreamed() {
     ProcessingResponse response_trailer;
