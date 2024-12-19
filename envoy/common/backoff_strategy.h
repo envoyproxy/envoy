@@ -24,12 +24,6 @@ public:
   virtual void reset() PURE;
 
   /**
-   * Resets the interval with a (potentially) new starting point.
-   * @param base_interval the new base interval for the backoff strategy.
-   */
-  virtual void reset(uint64_t base_interval) PURE;
-
-  /**
    * @return if the time interval exceeds any configured cap on next backoff value.
    */
   virtual bool isOverTimeLimit(uint64_t interval_ms) const PURE;

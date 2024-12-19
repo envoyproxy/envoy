@@ -191,6 +191,10 @@ bug_fixes:
   change: |
     Fix incorrect handling of non-101 1xx responses. This fix can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`` to false.
+- area: dns_cache
+  change: |
+    Fixed a bug where the DNS refresh rate was the DNS TTL instead of the configured dns_refresh_rate/dns_failure_refresh_rate
+    when we failed to resolve the DNS query after a successful resolution.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
