@@ -130,6 +130,7 @@ public:
                                 const envoy::config::core::v3::Metadata* metadata) const override {
     return logical_host_->resolveTransportSocketFactory(dest_address, metadata);
   }
+  OptRef<HostLbPolicyData> lbPolicyData() const override { return logical_host_->lbPolicyData(); }
 
   // Upstream:HostDescription mutators are all no-ops, because logical_host_ is
   // const. These should never be called except during coverage tests.
@@ -145,6 +146,7 @@ public:
   void canary(bool) override {}
   void setLastHcPassTime(MonotonicTime) override {}
   void priority(uint32_t) override {}
+  void setLbPolicyData(HostLbPolicyDataPtr) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;
