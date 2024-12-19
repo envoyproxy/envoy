@@ -133,7 +133,7 @@ absl::Status tryParseNativeHttpEncoded(const absl::string_view header,
   absl::flat_hash_set<absl::string_view> metric_names;
   for (const auto value : values) {
     std::pair<absl::string_view, absl::string_view> entry =
-        absl::StrSplit(value, absl::MaxSplits(':', 1), absl::SkipWhitespace());
+        absl::StrSplit(value, absl::MaxSplits(absl::ByAnyChar("=:"), 1), absl::SkipWhitespace());
     if (metric_names.contains(entry.first)) {
       return absl::AlreadyExistsError(
           absl::StrCat(kEndpointLoadMetricsHeader, " contains duplicate metric: ", entry.first));

@@ -163,6 +163,11 @@ bug_fixes:
 - area: csrf
   change: |
     Handle requests that have a "privacy sensitive" / opaque origin (``Origin: null``) as if the request had no origin information.
+- area: orca
+  change: |
+    The previous ORCA parser will use ``:`` as the delimiter of key/value pair in the native HTTP report. This is wrong
+    based on the design document. The correct delimiter should be ``=``. This change add the ``=`` delimiter support to
+    match the design document and keep the ``:`` delimiter for backward compatibility.
 - area: http/1
   change: |
     Fixes sending overload crashes when HTTP/1 request is reset.
