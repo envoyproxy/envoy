@@ -29,6 +29,7 @@ envoy_cc_library(
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:stat_names_lib",
+        "//source/extensions/filters/common/ratelimit_config:ratelimit_config_lib",
         "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
     ],
 )

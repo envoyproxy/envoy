@@ -78,14 +78,24 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   if (!route_ || !cluster_) {
     return;
   }
-
   const Router::RouteEntry* route_entry = route_->routeEntry();
   if (!route_entry) {
     return;
   }
   if (!on_stream_done) {
+    route_config_ =
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
     initializeVirtualHostRateLimitOption(route_entry);
   }
+
+  // The the embedded rate limits is set in the typed_per_filter_config, use it and ignore the
+  // rate limits of route.
+  if (route_config_ != nullptr && route_config_->hasRateLimitConfigs()) {
+    route_config_->populateDescriptors(headers, callbacks_->streamInfo(), descriptors,
+                                       on_stream_done);
+    return;
+  }
+
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptorsForPolicy(route_entry->rateLimitPolicy(), descriptors, headers,
                                         on_stream_done);
@@ -102,7 +112,6 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
       populateRateLimitDescriptorsForPolicy(route_->virtualHost().rateLimitPolicy(), descriptors,
                                             headers, on_stream_done);
     }
-    break;
   }
 }
 
@@ -328,10 +337,8 @@ void Filter::initializeVirtualHostRateLimitOption(const Router::RouteEntry* rout
   if (route_entry->includeVirtualHostRateLimits()) {
     vh_rate_limits_ = VhRateLimitOptions::Include;
   } else {
-    const auto* specific_per_route_config =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
-    if (specific_per_route_config != nullptr) {
-      switch (specific_per_route_config->virtualHostRateLimits()) {
+    if (route_config_ != nullptr) {
+      switch (route_config_->virtualHostRateLimits()) {
       case envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::INCLUDE:
         vh_rate_limits_ = VhRateLimitOptions::Include;
         break;
@@ -349,10 +356,8 @@ void Filter::initializeVirtualHostRateLimitOption(const Router::RouteEntry* rout
 }
 
 std::string Filter::getDomain() {
-  const auto* specific_per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks_);
-  if (specific_per_route_config != nullptr && !specific_per_route_config->domain().empty()) {
-    return specific_per_route_config->domain();
+  if (route_config_ != nullptr && !route_config_->domain().empty()) {
+    return route_config_->domain();
   }
   return config_->domain();
 }

@@ -223,6 +223,81 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActions) {
               testing::ContainerEq(descriptors));
 }
 
+TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndOneForStreamDone) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - remote_address: {}
+    - destination_cluster: {}
+  - actions:
+    - destination_cluster: {}
+    apply_on_stream_done: true
+  )EOF";
+
+  setupTest(yaml);
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+    config_->populateDescriptors(headers_, stream_info_, "", descriptors, false);
+
+    EXPECT_EQ(1, descriptors.size());
+
+    EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({Envoy::RateLimit::Descriptor{
+                    {{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}}}),
+                testing::ContainerEq(descriptors));
+  }
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+    config_->populateDescriptors(headers_, stream_info_, "", descriptors, true);
+
+    EXPECT_EQ(1, descriptors.size());
+
+    EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                    {Envoy::RateLimit::Descriptor{{{"destination_cluster", "fake_cluster"}}}}),
+                testing::ContainerEq(descriptors));
+  }
+}
+
+TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndBothForStreamDone) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - remote_address: {}
+    - destination_cluster: {}
+    apply_on_stream_done: true
+  - actions:
+    - destination_cluster: {}
+    apply_on_stream_done: true
+  )EOF";
+
+  setupTest(yaml);
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+    config_->populateDescriptors(headers_, stream_info_, "", descriptors, false);
+
+    EXPECT_EQ(0, descriptors.size());
+  }
+
+  {
+    std::vector<Envoy::RateLimit::Descriptor> descriptors;
+
+    config_->populateDescriptors(headers_, stream_info_, "", descriptors, true);
+
+    EXPECT_EQ(2, descriptors.size());
+
+    EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
+                    {Envoy::RateLimit::Descriptor{
+                         {{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}},
+                     Envoy::RateLimit::Descriptor{{{"destination_cluster", "fake_cluster"}}}}),
+                testing::ContainerEq(descriptors));
+  }
+}
+
 TEST_F(RateLimitConfigTest, HasHitsAddendButEmtpy) {
   const std::string yaml = R"EOF(
     actions:
@@ -310,7 +385,7 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndHitsAddend) {
   EXPECT_EQ(3, descriptors[1].hits_addend_.value());
 }
 
-TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndStringHitsAddend) {
+TEST_F(RateLimitConfigTest, MultipleActionsAndStringHitsAddend) {
   const std::string yaml = R"EOF(
   rate_limits:
   - actions:
