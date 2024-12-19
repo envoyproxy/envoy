@@ -1090,6 +1090,10 @@ response_headers_to_add:
       key: "x-per-header"
       value: "per"
     append_action: ADD_IF_ABSENT
+  - header:
+      key: "x-baz-header"
+      value: "baz"
+    append_action: OVERWRITE_IF_EXISTS # Unsupported action for getHeaderTransforms
 response_headers_to_remove: ["x-baz-header"]
 )EOF";
 
