@@ -470,6 +470,53 @@ TEST(UtilityTest, GetGovCloudSTSEndpoints) {
   EXPECT_EQ("sts.us-gov-west-1.amazonaws.com", Utility::getSTSEndpoint("us-gov-west-1"));
 }
 
+TEST(UtilityTest, GetNormalAndFipsRolesAnywhereEndpoints) {
+  EXPECT_EQ("rolesanywhere.ap-south-1.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("ap-south-1"));
+  EXPECT_EQ("rolesanywhere.some-new-region.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("some-new-region"));
+#ifdef ENVOY_SSL_FIPS
+  // Under FIPS mode the Envoy should fetch the credentials from FIPS the dedicated endpoints.
+  EXPECT_EQ("rolesanywhere-fips.us-east-1.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("us-east-1"));
+  EXPECT_EQ("rolesanywhere-fips.us-east-2.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("us-east-2"));
+  EXPECT_EQ("rolesanywhere-fips.us-west-1.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("us-west-1"));
+  EXPECT_EQ("rolesanywhere-fips.us-west-2.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("us-west-2"));
+  // Even if FIPS mode is enabled ca-central-1 doesn't have a dedicated fips endpoint yet.
+  EXPECT_EQ("rolesanywhere.ca-central-1.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("ca-central-1"));
+#else
+  EXPECT_EQ("rolesanywhere.us-east-1.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("us-east-1"));
+  EXPECT_EQ("rolesanywhere.us-east-2.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("us-east-2"));
+  EXPECT_EQ("rolesanywhere.us-west-1.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("us-west-1"));
+  EXPECT_EQ("rolesanywhere.us-west-2.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("us-west-2"));
+  EXPECT_EQ("rolesanywhere.ca-central-1.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("ca-central-1"));
+#endif
+}
+
+TEST(UtilityTest, GetChinaRolesAnywhereEndpoints) {
+  EXPECT_EQ("rolesanywhere.cn-north-1.amazonaws.com.cn",
+            Utility::getRolesAnywhereEndpoint("cn-north-1"));
+  EXPECT_EQ("rolesanywhere.cn-northwest-1.amazonaws.com.cn",
+            Utility::getRolesAnywhereEndpoint("cn-northwest-1"));
+}
+
+TEST(UtilityTest, GetGovCloudRolesAnywhereEndpoints) {
+  // No difference between fips vs non-fips endpoints in GovCloud.
+  EXPECT_EQ("rolesanywhere.us-gov-east-1.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("us-gov-east-1"));
+  EXPECT_EQ("rolesanywhere.us-gov-west-1.amazonaws.com",
+            Utility::getRolesAnywhereEndpoint("us-gov-west-1"));
+}
+
 // Test edge case where a SigV4a region set is provided and also web identity provider is in use
 TEST(UtilityTest, CorrectlyConvertRegionSet) {
 #ifdef ENVOY_SSL_FIPS
