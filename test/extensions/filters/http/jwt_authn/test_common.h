@@ -66,37 +66,6 @@ const char PublicKey[] = R"(
 }
 )";
 
-// Split the above public key into two keys
-const char PublicKey1[] = R"(
-{
-  "keys": [
-    {
-      "kty": "RSA",
-      "alg": "RS256",
-      "use": "sig",
-      "kid": "62a93512c9ee4c7f8067b5a216dade2763d32a47",
-      "n": "up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1qmUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrkU7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaEWopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_ZdboY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw",
-      "e": "AQAB"
-    },
-  ]
-}
-)";
-
-const char PublicKey2[] = R"(
-{
-  "keys": [
-    {
-      "kty": "RSA",
-      "alg": "RS256",
-      "use": "sig",
-      "kid": "b3319a147514df7ee5e4bcdee51350cc890cc89e",
-      "n": "up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1qmUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrkU7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaEWopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_ZdboY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw",
-      "e": "AQAB"
-    },
-  ]
-}
-)";
-
 // Provider config with various subject constraints
 const char SubjectConfig[] = R"(
 providers:
@@ -185,9 +154,6 @@ providers:
     - example_service
     - http://example_service1
     - https://example_service2/
-    - example_service_with_kid1
-    - example_service_with_kid2
-    - example_service_with_kid3
     remote_jwks:
       http_uri:
         uri: https://www.pubkey-server.com/pubkey-path
@@ -413,43 +379,6 @@ const char OtherGoodToken[] =
     "buwXk5M6d-"
     "drRvLcvlT5gB4adOIOlmhm8xtXgYpvqrXfmMJCHbP9no7JATFaTEAkmA3OOxDsaOju4BFgMtRZtDM8p12QQG0rFl_FE-"
     "2FqYX9qA4q41HJ4vxTSxgObeLGA";
-
-// { "iss": "https://example.com", "sub": "kid1@example.com",
-// "kid": "62a93512c9ee4c7f8067b5a216dade2763d32a47", "exp": 2001001001,
-// "aud": "example_service_with_kid1" }
-const char GoodTokenWithKid1[] =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjYyYTkzNTEyYzllZTRjN2Y4MDY3YjVhMjE2ZGFkZTI3NjNkMz"
-    "JhNDcifQ.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoia2lkMUBleGFtcGxlLmNvbSIsImV4cCI6MjAwM"
-    "TAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2aWNlX3dpdGhfa2lkMSJ9.m_ZdaiIep0LoWkWKDluwCsJK_MwqGWR24tkaSG"
-    "PbCVWLzO_tfDXDSPQrtpMbNKmopgqKXQcqEHfwy44dKzIaMfRnK4ICmxPmXXcqWFHfxJM1YO8UmPwwzKXssijGnQvrJ43y"
-    "Z0050NTWhmhGhkx7RYLfgk1qMsSWNVls5CYllke8MWF55Ns-4vFr2WdTmz06iMBMuPZI3E0v932tYqSMrBjbhmbT0WS-"
-    "a0dgqfpMDgQThBHK0MXFvDWjMqQ1YBiLT8Utdkswc0Mu2FPtjVUAXU5DfyselEe3isgPTnbNTPvGkGYJ-JvJTJRfUF5-"
-    "IMGxEBJX9yQ0EuA16HCH13eQKA";
-
-// { "iss": "https://example.com", "sub": "kid2@example.com",
-// "kid": "b3319a147514df7ee5e4bcdee51350cc890cc89e", "exp": 2001001001,
-// "aud": "example_service_with_kid2" }
-const char GoodTokenWithKid2[] =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImIzMzE5YTE0NzUxNGRmN2VlNWU0YmNkZWU1MTM1MGNjODkwY2"
-    "M4OWUifQ.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoia2lkMkBleGFtcGxlLmNvbSIsImV4cCI6MjAwM"
-    "TAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2aWNlX3dpdGhfa2lkMiJ9.PpYWGuuxdTWdLAznYvA4DHBxa7BkgGMKvwp_"
-    "neb7mW9cKIRPz6hSVkSyI7hdgafeOIayGCEGWYYcs_UAS068Bd8oDI8p5iITGv0XyAer-zh-"
-    "jqNcNmNrdgUr3WkBSxWyeEPC9RYxaHamm115U0HA6DbvMJu3nm1ir3oKHVgq"
-    "-uSfhZQjtpXXKJU0v6ZEjJSaqyVt84ZDIwtpkDIHS7fjAT1U6pteVNdKyJy8MH7IMHzohY0b563kxI3PHubgPn8nJPRjzX"
-    "YnUBp3rc6N"
-    "iNhvYYQjXep_JFarh0aivlXrjtkhzoNb10raaIkboICp88KyH-seXc59we1naCMgRp_fag";
-
-// { "iss": "https://example.com", "sub": "kid3@example.com",
-// "kid": "6465fc44cf92ae01027d89ebb0e18e02aeb6dfff", "exp": 2001001001, "aud":
-// "example_service_with_kid3" }
-const char GoodTokenWithKid3[] =
-    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjY0NjVmYzQ0Y2Y5MmFlMDEwMjdkODllYmIwZTE4ZTAyYWViNm"
-    "RmZmYifQ.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoia2lkM0BleGFtcGxlLmNvbSIsImV4cCI6MjAwM"
-    "TAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2aWNlX3dpdGhfa2lkMyJ9.p3Pwx6kMYn46jXExHZyt5vnD-"
-    "NlIeA9XW3W8rJykUuPg5yQLMamm24PItH64PZUZgun7rhKxzsgZgAmUpmxB2b4pb5lhPJLHRQoJouzdU9Usr5H9GOt4a1p"
-    "77-6D7ocSX4iGMT4dqis4sncbMGgb5kVR_48iwD17kGDwCimH5mAdcoMyeuvR7c2xRaremyvqzS24CqyxrcxdRppyS-I5W"
-    "vNG4WtFaalNWUFVZNFtOjVuNlouo9IudLMtv7WFoJNOPRN-R-34Kj50Yk2"
-    "hXOQResUZwxsV6W83VleiWiOE2uNTWHTfJLVK1BtqVrSrxj7zv1NxVCW5M_X97Uq3ht6_JQ";
 
 //{
 //  "iss": "https://example.com",
