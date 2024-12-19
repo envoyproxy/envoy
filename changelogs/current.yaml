@@ -163,6 +163,16 @@ bug_fixes:
 - area: csrf
   change: |
     Handle requests that have a "privacy sensitive" / opaque origin (``Origin: null``) as if the request had no origin information.
+- area: http/1
+  change: |
+    Fixes sending overload crashes when HTTP/1 request is reset.
+- area: happy_eyeballs
+  change: |
+    Validate that ``additional_address`` are IP addresses instead of crashing when sorting.
+- area: balsa
+  change: |
+    Fix incorrect handling of non-101 1xx responses. This fix can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -341,6 +351,10 @@ new_features:
   change: |
     Added new health check filter stats including total requests, successful/failed checks, cached responses, and
     cluster health status counters. These stats help track health check behavior and cluster health state.
+- area: local_ratelimit
+  change: |
+    Added per descriptor custom hits addend support for local rate limit filter. See :ref:`hits_addend
+    <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` for more details.
 - area: filters
   change: |
     Updatd the ``set_filter_state`` :ref:`filter <config_http_filters_set_filter_state>` to support per-route overrides.
