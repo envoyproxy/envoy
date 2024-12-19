@@ -82,6 +82,8 @@ TEST(DynamiModulesTest, HeaderCallbacks) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
+
+  filter->onDestroy();
 }
 
 } // namespace HttpFilters
