@@ -59,7 +59,7 @@ private:
   const std::string filter_config_name_;
 };
 
-// TODO(wbpcode): Rather than allocating every filter with an unique pointer, we may could
+// TODO(wbpcode): Rather than allocating every filter with an unique pointer, we could
 // construct the filter in place in the vector. This should reduce the heap allocation and
 // memory fragmentation.
 
@@ -86,7 +86,7 @@ struct StreamDecoderFilters {
 //     - A
 //     - B
 //     - C
-// Different with decoder filter, the encoder filter chain will iterate with the
+// Unlike the decoder filter, the encoder filter chain will iterate with the
 // reverse order of the configured filters, i.e., C, B, A. This is why we use reverse_iterator
 // here.
 struct StreamEncoderFilters {
