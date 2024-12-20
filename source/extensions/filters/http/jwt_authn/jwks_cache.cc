@@ -248,7 +248,7 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCache> tls_;
   // async fetcher
   JwksAsyncFetcherPtr async_fetcher_;
-  absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>> sub_matcher_;
+  absl::optional<Matchers::StringMatcherImpl> sub_matcher_;
   absl::optional<absl::Duration> max_exp_;
 
   // For exponential backoff, when fetch/verify fails on KID mismatch.

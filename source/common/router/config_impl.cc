@@ -1660,7 +1660,10 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive(),
-                                                        factory_context)) {}
+                                                        factory_context)) {
+  // The createPrefix function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
+}
 
 void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                              bool insert_envoy_original_path) const {
@@ -1689,7 +1692,10 @@ PathRouteEntryImpl::PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                        absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive(),
-                                                       factory_context)) {}
+                                                       factory_context)) {
+  // The createExact function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
+}
 
 void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                            bool insert_envoy_original_path) const {
@@ -1721,6 +1727,8 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
           Matchers::PathMatcher::createSafeRegex(route.match().safe_regex(), factory_context)) {
   ASSERT(route.match().path_specifier_case() ==
          envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
+  // The createSafeRegex function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
 }
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1784,7 +1792,10 @@ PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().path_separated_prefix(),
-                                                        !case_sensitive(), factory_context)) {}
+                                                        !case_sensitive(), factory_context)) {
+  // The createPrefix function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
+}
 
 void PathSeparatedPrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                           bool insert_envoy_original_path) const {
