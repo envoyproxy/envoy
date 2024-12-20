@@ -54,6 +54,7 @@ public:
   MOCK_METHOD(const std::string&, postPath, (), (const));
   MOCK_METHOD(Http::HeaderEvaluator&, headerEvaluator, (), (const));
   MOCK_METHOD(uint32_t, maxConnectAttempts, (), (const));
+  MOCK_METHOD(const BackOffStrategyPtr&, backoffStrategy, (), (const));
   MOCK_METHOD(bool, bufferEnabled, (), (const));
   MOCK_METHOD(uint32_t, maxBufferedDatagrams, (), (const));
   MOCK_METHOD(uint64_t, maxBufferedBytes, (), (const));

@@ -2560,6 +2560,22 @@ TEST(TunnelingConfigImplTest, BufferingState) {
   }
 }
 
+TEST(TunnelingConfigImplTest, InvalidBackoffConfig) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  TunnelingConfig proto_config;
+  proto_config.mutable_retry_options()
+      ->mutable_backoff_options()
+      ->mutable_base_interval()
+      ->set_seconds(5);
+  proto_config.mutable_retry_options()
+      ->mutable_backoff_options()
+      ->mutable_max_interval()
+      ->set_seconds(1);
+  EXPECT_THROW_WITH_MESSAGE(
+      TunnelingConfigImpl(proto_config, context), EnvoyException,
+      "max_backoff_interval must be greater or equal to base_backoff_interval");
+}
+
 } // namespace
 } // namespace UdpProxy
 } // namespace UdpFilters
