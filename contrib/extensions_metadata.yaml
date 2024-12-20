@@ -23,6 +23,13 @@ envoy.compression.qatzstd.compressor:
   - envoy.compression.compressor
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: alpha
+envoy.filters.http.reverse_conn:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.reverse_conn.v3alpha.ReverseConn
 envoy.filters.http.squash:
   categories:
   - envoy.filters.http
