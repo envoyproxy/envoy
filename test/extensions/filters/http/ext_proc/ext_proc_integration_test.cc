@@ -772,15 +772,11 @@ protected:
       EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
       if (response) {
         EXPECT_TRUE(body_request.has_response_body()) << "Response does not have response_body \n";
-        if (compare_body) {
-          body_received = absl::StrCat(body_received, body_request.response_body().body());
-        }
+        body_received = absl::StrCat(body_received, body_request.response_body().body());
         end_stream = body_request.response_body().end_of_stream();
       } else {
         EXPECT_TRUE(body_request.has_request_body()) << "Request does not have request_body \n";
-        if (compare_body) {
-          body_received = absl::StrCat(body_received, body_request.request_body().body());
-        }
+        body_received = absl::StrCat(body_received, body_request.request_body().body());
         end_stream = body_request.request_body().end_of_stream();
       }
       total_req_body_msg++;
