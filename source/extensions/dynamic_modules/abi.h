@@ -128,13 +128,13 @@ typedef char* envoy_dynamic_module_type_buffer_module_ptr;
 typedef char* envoy_dynamic_module_type_buffer_envoy_ptr;
 
 /**
- * envoy_dynamic_module_type_Header represents a key-value pair of an HTTP header. The key and value
- * are represented as a pair of pointers to the buffer and the length of the buffer.
+ * envoy_dynamic_module_type_Header represents a key-value pair of an HTTP header owned by Envoy's
+ * HeaderMap.
  */
 typedef struct {
-  envoy_dynamic_module_type_buffer_module_ptr key_ptr;
+  envoy_dynamic_module_type_buffer_envoy_ptr key_ptr;
   size_t key_length;
-  envoy_dynamic_module_type_buffer_module_ptr value_ptr;
+  envoy_dynamic_module_type_buffer_envoy_ptr value_ptr;
   size_t value_length;
 } envoy_dynamic_module_type_http_header;
 
@@ -424,7 +424,8 @@ void envoy_dynamic_module_on_http_filter_destroy(
  * when interpreting the value as a string in the language of the module.
  *
  * The buffer pointed by the pointer stored in result_buffer_ptr is owned by Envoy, and they are
- * guaranteed to be valid until the end of the current event hook.
+ * guaranteed to be valid until the end of the current event hook unless the setter callback is
+ * called.
  */
 size_t envoy_dynamic_module_callback_http_get_request_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
@@ -516,7 +517,8 @@ size_t envoy_dynamic_module_callback_http_get_response_trailers_count(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param result_headers is the pointer to the array of envoy_dynamic_module_type_http_header where
- * the headers will be stored.
+ * the headers will be stored. The lifetime of the buffer of key and value of each header is
+ * guaranteed until the end of the current event hook unless the setter callback are called.
  * @return true if the operation is successful, false otherwise.
  */
 bool envoy_dynamic_module_callback_http_get_request_headers(
