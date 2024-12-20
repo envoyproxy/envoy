@@ -265,9 +265,14 @@ bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::Req
   return matcher_.match(info.dynamicMetadata());
 }
 
+FilterStateMatcher::FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
+                                       Server::Configuration::CommonFactoryContext& context)
+    : matcher_(THROW_OR_RETURN_VALUE(Envoy::Matchers::FilterStateMatcher::create(matcher, context),
+                                     Envoy::Matchers::FilterStateMatcherPtr)) {}
+
 bool FilterStateMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                                  const StreamInfo::StreamInfo& info) const {
-  return matcher_.match(info.filterState());
+  return matcher_->match(info.filterState());
 }
 
 bool PolicyMatcher::matches(const Network::Connection& connection,
