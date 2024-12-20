@@ -153,6 +153,7 @@ message TraceableFilter {
 }
 
 // Filters for random sampling of requests.
+// [#next-free-field: 6]
 message RuntimeFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.RuntimeFilter";
@@ -182,6 +183,23 @@ message RuntimeFilter {
   // cause the filter to behave like an independent random variable when
   // composed within logical operator filters).
   bool use_independent_randomness = 3;
+
+  // Controls whether the sampling decision is stored in the dynamic metadata to be reference later for auditing
+  // purposes. If not specified, defaults to false.
+  //
+  // When enabled, the following metadata will be emitted under the key "envoy.access_log.runtime_filter":
+  //   - "sampling_decision": bool - whether the request was sampled (true) or not (false)
+  //   - "numerator": number - the numerator of the sampling rate
+  //   - "denominator": number - the denominator of the sampling rate (100, 10000, or 1000000)
+  //   - "runtime_key": string - the runtime key used for sampling
+  //
+  // This metadata can be accessed later by other filters or loggers using dynamic metadata accessors.
+  bool emit_metadata = 4;
+
+  // Optional suffix to append to the metadata key. When specified, metadata will be emitted under
+  // "envoy.access_log.runtime_filter.<metadata_key_suffix>" instead of "envoy.access_log.runtime_filter".
+  // This allows multiple runtime filters to store their metadata under different keys.
+  string metadata_key_suffix = 5;
 }
 
 // Performs a logical “and” operation on the result of each filter in filters.

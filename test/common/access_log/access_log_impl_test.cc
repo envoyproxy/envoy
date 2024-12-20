@@ -463,6 +463,155 @@ typed_config:
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
 
+TEST_F(AccessLogImplTest, RuntimeFilterWithMetadata) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  runtime_filter:
+    runtime_key: access_log.test_key
+    percent_sampled:
+      numerator: 5
+      denominator: HUNDRED
+    emit_metadata: true
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  // First test - sampling enabled
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, testing::_, 100))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*file_, write(_));
+
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  // Verify metadata when sampled
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata();
+  EXPECT_EQ(metadata.count(RuntimeFilter::RuntimeFilterMetadataKeyPrefix), 1);
+  const auto& runtime_metadata =
+      metadata.at(RuntimeFilter::RuntimeFilterMetadataKeyPrefix).fields();
+  EXPECT_EQ(runtime_metadata.at(RuntimeFilter::SamplingDecisionKey).bool_value(), true);
+  EXPECT_EQ(runtime_metadata.at(RuntimeFilter::NumeratorKey).number_value(), 5);
+  EXPECT_EQ(runtime_metadata.at(RuntimeFilter::DenominatorKey).number_value(), 100);
+  EXPECT_EQ(runtime_metadata.at(RuntimeFilter::RuntimeKeyFieldName).string_value(),
+            "access_log.test_key");
+
+  // Second test - sampling disabled
+  TestStreamInfo new_stream_info(time_source_);
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, testing::_, 100))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*file_, write(_)).Times(0);
+
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, new_stream_info);
+
+  // Verify metadata still gets written when not sampled
+  const auto& new_metadata = new_stream_info.dynamicMetadata().filter_metadata();
+  EXPECT_EQ(new_metadata.count(RuntimeFilter::RuntimeFilterMetadataKeyPrefix), 1);
+  const auto& new_runtime_metadata =
+      new_metadata.at(RuntimeFilter::RuntimeFilterMetadataKeyPrefix).fields();
+  EXPECT_EQ(new_runtime_metadata.at(RuntimeFilter::SamplingDecisionKey).bool_value(), false);
+  EXPECT_EQ(new_runtime_metadata.at(RuntimeFilter::NumeratorKey).number_value(), 5);
+  EXPECT_EQ(new_runtime_metadata.at(RuntimeFilter::DenominatorKey).number_value(), 100);
+  EXPECT_EQ(new_runtime_metadata.at(RuntimeFilter::RuntimeKeyFieldName).string_value(),
+            "access_log.test_key");
+}
+
+TEST_F(AccessLogImplTest, RuntimeFilterWithMetadataSuffix) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  runtime_filter:
+    runtime_key: access_log.test_key
+    percent_sampled:
+      numerator: 5
+      denominator: HUNDRED
+    emit_metadata: true
+    metadata_key_suffix: filter1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  {
+    // Test with sampling enabled
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, testing::_, 100))
+        .WillOnce(Return(true));
+    EXPECT_CALL(*file_, write(_));
+
+    log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+    // Verify metadata is stored with suffix
+    const auto& metadata = stream_info_.dynamicMetadata().filter_metadata();
+    const std::string expected_key = "envoy.access_log.runtime_filter.filter1";
+    EXPECT_EQ(metadata.count(expected_key), 1);
+    const auto& runtime_metadata = metadata.at(expected_key).fields();
+    EXPECT_EQ(runtime_metadata.at(RuntimeFilter::SamplingDecisionKey).bool_value(), true);
+    EXPECT_EQ(runtime_metadata.at(RuntimeFilter::NumeratorKey).number_value(), 5);
+    EXPECT_EQ(runtime_metadata.at(RuntimeFilter::DenominatorKey).number_value(), 100);
+    EXPECT_EQ(runtime_metadata.at(RuntimeFilter::RuntimeKeyFieldName).string_value(),
+              "access_log.test_key");
+  }
+}
+
+TEST_F(AccessLogImplTest, RuntimeFilterNoMetadata) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  runtime_filter:
+    runtime_key: access_log.test_key
+    percent_sampled:
+      numerator: 5
+      denominator: HUNDRED
+    emit_metadata: false
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(context_.server_factory_context_.api_.random_, random()).WillOnce(Return(4));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 4, 100))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*file_, write(_));
+
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata();
+  EXPECT_EQ(metadata.count(RuntimeFilter::RuntimeFilterMetadataKeyPrefix), 0);
+}
+
+TEST_F(AccessLogImplTest, RuntimeFilterMetadataDefaultOff) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  runtime_filter:
+    runtime_key: access_log.test_key
+    percent_sampled:
+      numerator: 5
+      denominator: HUNDRED
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(context_.server_factory_context_.api_.random_, random()).WillOnce(Return(4));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("access_log.test_key", 5, 4, 100))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*file_, write(_));
+
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  const auto& metadata = stream_info_.dynamicMetadata().filter_metadata();
+  EXPECT_EQ(metadata.count(RuntimeFilter::RuntimeFilterMetadataKeyPrefix), 0);
+}
+
 TEST_F(AccessLogImplTest, PathRewrite) {
   request_headers_ = {{":method", "GET"}, {":path", "/foo"}, {"x-envoy-original-path", "/bar"}};
 
