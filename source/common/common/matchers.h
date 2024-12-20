@@ -235,7 +235,7 @@ public:
     // Implementing polymorphism for match(absl::string_value) on the different
     // types that can be in the matcher_ variant.
     auto call_match = [value](const auto& obj) -> bool { return obj.match(value); };
-    return std::visit(call_match, matcher_);
+    return absl::visit(call_match, matcher_);
   }
 
   // ValueMatcher
@@ -255,7 +255,7 @@ public:
    * @return true if the matcher is a case-sensitive prefix-match.
    */
   bool getCaseSensitivePrefixMatch(std::string& prefix) const {
-    if (const PrefixStringMatcher* prefix_matcher = std::get_if<PrefixStringMatcher>(&matcher_)) {
+    if (const PrefixStringMatcher* prefix_matcher = absl::get_if<PrefixStringMatcher>(&matcher_)) {
       if (!prefix_matcher->ignore_case_) {
         prefix = prefix_matcher->prefix_;
         return true;
@@ -274,7 +274,7 @@ public:
     auto call_func = [](const auto& obj) -> const std::string& {
       return obj.stringRepresentation();
     };
-    return std::visit(call_func, matcher_);
+    return absl::visit(call_func, matcher_);
   }
 
 private:
@@ -282,8 +282,8 @@ private:
       : matcher_(std::move(exact_matcher)) {}
 
   using StringMatcherVariant =
-      std::variant<ExactStringMatcher, PrefixStringMatcher, SuffixStringMatcher, RegexStringMatcher,
-                   ContainsStringMatcher, CustomStringMatcher>;
+      absl::variant<ExactStringMatcher, PrefixStringMatcher, SuffixStringMatcher,
+                   RegexStringMatcher, ContainsStringMatcher, CustomStringMatcher>;
 
   template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
   static StringMatcherVariant createVariant(const StringMatcherType& matcher,
