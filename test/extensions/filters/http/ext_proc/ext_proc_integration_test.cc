@@ -762,6 +762,36 @@ protected:
     }
   }
 
+  uint32_t serverReceiveBodyDuplexStreamed(absl::string_view body_sent, bool response = false,
+                                           bool compare_body = true) {
+    std::string body_received;
+    bool end_stream = false;
+    uint32_t total_req_body_msg = 0;
+    while (!end_stream) {
+      ProcessingRequest body_request;
+      EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+      if (response) {
+        EXPECT_TRUE(body_request.has_response_body()) << "Response does not have response_body \n";
+        if (compare_body) {
+          body_received = absl::StrCat(body_received, body_request.response_body().body());
+        }
+        end_stream = body_request.response_body().end_of_stream();
+      } else {
+        EXPECT_TRUE(body_request.has_request_body()) << "Request does not have request_body \n";
+        if (compare_body) {
+          body_received = absl::StrCat(body_received, body_request.request_body().body());
+        }
+        end_stream = body_request.request_body().end_of_stream();
+      }
+      total_req_body_msg++;
+    }
+    EXPECT_TRUE(end_stream);
+    if (compare_body) {
+      EXPECT_EQ(body_received, body_sent);
+    }
+    return total_req_body_msg;
+  }
+
   void serverSendHeaderRespDuplexStreamed(bool first_message = true, bool response = false) {
     if (first_message) {
       processor_stream_->startGrpcStream();
@@ -4989,24 +5019,11 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespDuplexStrea
   // The ext_proc server receives the headers.
   ProcessingRequest header_request;
   serverReceiveHeaderDuplexStreamed(header_request);
-
-  std::string body_received;
-  bool end_stream = false;
-  uint32_t total_req_body_msg = 0;
-  while (!end_stream) {
-    ProcessingRequest body_request;
-    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
-    EXPECT_TRUE(body_request.has_request_body());
-    body_received = absl::StrCat(body_received, body_request.request_body().body());
-    end_stream = body_request.request_body().end_of_stream();
-    total_req_body_msg++;
-  }
-  EXPECT_TRUE(end_stream);
-  EXPECT_EQ(body_received, body_sent);
+  // The ext_proc server receives the body.
+  uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent);
 
   // The ext_proc server sends back the header response.
   serverSendHeaderRespDuplexStreamed();
-
   // The ext_proc server sends back the body response.
   uint32_t total_resp_body_msg = 2 * total_req_body_msg;
   const std::string body_upstream(total_resp_body_msg, 'r');
@@ -5150,28 +5167,13 @@ TEST_P(ExtProcIntegrationTest, DuplexStreamedInBothDirection) {
   const std::string body_sent(8 * 1024, 's');
   IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true, true);
 
-  // The ext_proc server receives the headers.
+  // The ext_proc server receives the headers/body.
   ProcessingRequest header_request;
   serverReceiveHeaderDuplexStreamed(header_request);
+  uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent);
 
-  std::string body_received;
-  bool end_stream = false;
-  uint32_t total_req_body_msg = 0;
-  while (!end_stream) {
-    ProcessingRequest body_request;
-    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
-    EXPECT_TRUE(body_request.has_request_body());
-    body_received = absl::StrCat(body_received, body_request.request_body().body());
-    end_stream = body_request.request_body().end_of_stream();
-    total_req_body_msg++;
-  }
-  EXPECT_TRUE(end_stream);
-  EXPECT_EQ(body_received, body_sent);
-
-  // The ext_proc server sends back the request header response.
+  // The ext_proc server sends back the response.
   serverSendHeaderRespDuplexStreamed();
-
-  // The ext_proc server sends back the request body response.
   uint32_t total_resp_body_msg = 2 * total_req_body_msg;
   const std::string body_upstream(total_resp_body_msg, 'r');
   serverSendBodyRespDuplexStreamed(total_resp_body_msg);
@@ -5180,25 +5182,14 @@ TEST_P(ExtProcIntegrationTest, DuplexStreamedInBothDirection) {
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
   EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
 
-  // The ext_proc server receives the response headers.
+  // The ext_proc server receives the responses from backend server.
   ProcessingRequest header_response;
   serverReceiveHeaderDuplexStreamed(header_response, false, true);
+  uint32_t total_rsp_body_msg = serverReceiveBodyDuplexStreamed("", true, false);
 
-  // The ext_proc server receives the response body.
-  end_stream = false;
-  while (!end_stream) {
-    ProcessingRequest body_request;
-    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
-    EXPECT_TRUE(body_request.has_response_body());
-    end_stream = body_request.response_body().end_of_stream();
-  }
-  EXPECT_TRUE(end_stream);
-
-  // The ext_proc server sends back the response header response.
+  // The ext_proc server sends back the response.
   serverSendHeaderRespDuplexStreamed(false, true);
-
-  // The ext_proc server sends back the response body response.
-  serverSendBodyRespDuplexStreamed(3, true, true);
+  serverSendBodyRespDuplexStreamed(total_rsp_body_msg * 3, true, true);
 
   verifyDownstreamResponse(*response, 200);
 }
