@@ -189,15 +189,12 @@ func envoyGoHttpTcpBridgeOnUpstreamData(s *C.processState, endStream, headerNum,
 //export envoyGoHttpTcpBridgeOnDestroy
 func envoyGoHttpTcpBridgeOnDestroy(r *C.httpRequest) {
 	req := getRequest(r)
-	// do nothing even when req.panic is true, since filter is already destroying.
+	// do nothing even when get panic, since filter is already destroying.
 	defer req.recoverPanic()
 
 	f := req.httpTcpBridge
 	f.OnDestroy()
 
-	// Break circular references between httpRequest and HttpTcpBridge,
-	// since Finalizers don't work with circular references,
-	// otherwise, it will leads to memory leaking.
 	req.httpTcpBridge = nil
 
 	Requests.DeleteReq(r)

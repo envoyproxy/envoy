@@ -1,6 +1,7 @@
 #include "upstream_request.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <utility>
 
@@ -118,6 +119,9 @@ HttpTcpBridge::~HttpTcpBridge() {
   ASSERT(!decoding_state_->isProcessingInGo() && !encoding_state_->isProcessingInGo());
 
   dynamic_lib_->envoyGoHttpTcpBridgeOnDestroy(this);
+
+  delete encoding_state_;
+  delete decoding_state_;
 }
 
 void HttpTcpBridge::initResponse() {

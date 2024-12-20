@@ -84,8 +84,8 @@ void EncodingProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus st
 
       if (end_stream) {
         setFilterState(FilterState::Done);
-        // http req is end, reset data buffer
-        resetBufferData();
+        // http req is end, drain data buffer
+        drainBufferData();
         break;
       }
 

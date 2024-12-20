@@ -114,9 +114,13 @@ public:
   // get state buffer
   Buffer::Instance& getBufferData() { return *data_buffer_.get(); };
   bool isBufferDataEmpty() { return data_buffer_ == nullptr || data_buffer_->length() == 0; };
-  void resetBufferData() {
+  void drainBufferData() {
     if (data_buffer_ != nullptr) {
-      data_buffer_.reset();
+      auto len = data_buffer_->length();
+      if (len > 0) {
+        ENVOY_LOG(debug, "golang http-tcp bridge drain buffer data");
+        data_buffer_->drain(len);
+      }
     }
   }
 

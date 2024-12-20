@@ -42,8 +42,6 @@ type httpRequest struct {
 	req           *C.httpRequest
 	httpTcpBridge api.HttpTcpBridge
 
-	// decodingState and encodingState are part of httpRequest, not another GC object.
-	// So, no cycle reference, GC finalizer could work well.
 	decodingState processState
 	encodingState processState
 }
@@ -58,7 +56,8 @@ func (s *processState) RecoverPanic() {
 	if e := recover(); e != nil {
 		buf := debug.Stack()
 		api.LogErrorf("go side: golang http-tcp bridge: processState: panic serving: %v\n%s", e, buf)
-		// do nothing to retrun default value in origin func to continue normat status in c side, to avoid data race when upstream full-multiplex.
+		// do nothing to retrun default value in origin func to continue normal status in c side.
+		// we DO NOT send local reply(panic) to c in order to avoid data race when upstream full-duplex.
 	}
 }
 
