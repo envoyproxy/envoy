@@ -399,6 +399,13 @@ new_features:
   change: |
     Add the option to reduce the rate limit budget based on request/response contexts on stream done.
     See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
+- area: access_log
+  change: |
+    Added ability to emit sampling metadata from runtime filters. When enabled via ``emit_metadata``, the runtime filter
+    will store its sampling decision and parameters in dynamic metadata under "envoy.access_log.runtime_filter" or
+    under "envoy.access_log.runtime_filter.<metadata_key_suffix>" if ``metadata_key_suffix`` is specified. This emitted
+    metadata includes the sampling decision, numerator, denominator, and runtime key used. This can be used for auditing
+    and debugging the sampling behavior later.
 
 deprecated:
 - area: rbac

@@ -152,12 +152,27 @@ public:
   bool evaluate(const Formatter::HttpFormatterContext& context,
                 const StreamInfo::StreamInfo& info) const override;
 
+  std::string getMetadataKey() const {
+    if (metadata_key_suffix_.empty()) {
+      return RuntimeFilterMetadataKeyPrefix;
+    }
+    return absl::StrCat(RuntimeFilterMetadataKeyPrefix, ".", metadata_key_suffix_);
+  }
+
+  static constexpr const char* RuntimeFilterMetadataKeyPrefix = "envoy.access_log.runtime_filter";
+  static constexpr const char* SamplingDecisionKey = "sampling_decision";
+  static constexpr const char* NumeratorKey = "numerator";
+  static constexpr const char* DenominatorKey = "denominator";
+  static constexpr const char* RuntimeKeyFieldName = "runtime_key";
+
 private:
   Runtime::Loader& runtime_;
   Random::RandomGenerator& random_;
   const std::string runtime_key_;
   const envoy::type::v3::FractionalPercent percent_;
   const bool use_independent_randomness_;
+  const bool emit_metadata_;
+  const std::string metadata_key_suffix_;
 };
 
 /**
