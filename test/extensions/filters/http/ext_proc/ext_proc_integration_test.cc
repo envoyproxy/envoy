@@ -756,9 +756,9 @@ protected:
     }
     EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header));
     if (response) {
-      EXPECT_TRUE(header.has_response_headers()) << "Response does not have response_headers \n";
+      EXPECT_TRUE(header.has_response_headers());
     } else {
-      EXPECT_TRUE(header.has_request_headers()) << "Request does not have request_headers \n";
+      EXPECT_TRUE(header.has_request_headers());
     }
   }
 
@@ -771,11 +771,11 @@ protected:
       ProcessingRequest body_request;
       EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
       if (response) {
-        EXPECT_TRUE(body_request.has_response_body()) << "Response does not have response_body \n";
+        EXPECT_TRUE(body_request.has_response_body());
         body_received = absl::StrCat(body_received, body_request.response_body().body());
         end_stream = body_request.response_body().end_of_stream();
       } else {
-        EXPECT_TRUE(body_request.has_request_body()) << "Request does not have request_body \n";
+        EXPECT_TRUE(body_request.has_request_body());
         body_received = absl::StrCat(body_received, body_request.request_body().body());
         end_stream = body_request.request_body().end_of_stream();
       }
