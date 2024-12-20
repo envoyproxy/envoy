@@ -10,8 +10,6 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
-#include "envoy/network/reverse_connection_handler.h"
-#include "envoy/network/reverse_connection_manager.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/ssl/context.h"
@@ -21,25 +19,7 @@
 namespace Envoy {
 namespace Network {
 
-// The thread local registry.
-class LocalRevConnRegistry {
-public:
-  virtual ~LocalRevConnRegistry() = default;
-
-  virtual Network::ReverseConnectionManager& getRCManager() PURE;
-  virtual Network::ReverseConnectionHandler& getRCHandler() PURE;
-};
-
-// The central reverse conn registry interface providing the thread local accessor.
-class RevConnRegistry {
-public:
-  virtual ~RevConnRegistry() = default;
-
-  /**
-   * @return The thread local registry.
-   */
-  virtual LocalRevConnRegistry* getLocalRegistry() PURE;
-};
+class LocalRevConnRegistry;
 
 // This interface allows for a listener to perform an alternative behavior when a
 // packet can't be routed correctly during draining; for example QUIC packets that
@@ -346,6 +326,16 @@ using InternalListenerPtr = std::unique_ptr<InternalListener>;
 using InternalListenerOptRef = OptRef<InternalListener>;
 
 /**
+ * Reverse connection listener callbacks.
+ */
+class ReverseConnectionListener : public virtual ConnectionHandler::ActiveListener {
+public:
+  virtual void startRCWorkflow(Event::Dispatcher& dispatcher, Network::ListenerConfig& config) PURE;
+  virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
+};
+using ReverseConnectionListenerPtr = std::unique_ptr<ReverseConnectionListener>;
+
+/**
  * The query interface of the registered internal listener callbacks.
  */
 class InternalListenerManager {
@@ -391,6 +381,35 @@ public:
    * @return The thread local registry.
    */
   virtual LocalInternalListenerRegistry* getLocalRegistry() PURE;
+};
+
+// The thread local registry.
+class LocalRevConnRegistry {
+public:
+  virtual ~LocalRevConnRegistry() = default;
+
+  virtual Network::ReverseConnectionListenerPtr createActiveReverseConnectionListener(Network::ConnectionHandler& conn_handler,
+                                                      Event::Dispatcher& dispatcher,
+                                                      Network::ListenerConfig& config) PURE;
+};
+
+// The central reverse conn registry interface providing the thread local accessor.
+class RevConnRegistry {
+public:
+  virtual ~RevConnRegistry() = default;
+
+  /**
+   * @return The thread local registry.
+   */
+  virtual LocalRevConnRegistry* getLocalRegistry() PURE;
+
+  /** 
+   * Helper function to create a ReverseConnectionListenerConfig from a google.protobuf.Any.
+   * @param config is the reverse connection listener config.
+   * @return the ReverseConnectionListenerConfig object.
+   */
+  virtual absl::StatusOr<Network::ReverseConnectionListenerConfigPtr> fromAnyConfig(
+      const google::protobuf::Any& config) PURE;
 };
 
 } // namespace Network

@@ -44,7 +44,6 @@
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
-#include "source/extensions/bootstrap/reverse_connection/conn_pool.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/http/conn_pool_grid.h"
@@ -2378,13 +2377,19 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     if (host->cluster().type() == envoy::config::cluster::v3::Cluster_DiscoveryType::
                                       Cluster_DiscoveryType_REVERSE_CONNECTION) {
       ENVOY_LOG_MISC(debug, "Allocating reverse connection conn pool");
-      return Envoy::Extensions::Bootstrap::ReverseConnection::allocateConnPool(
-          dispatcher, context_.api().randomGenerator(), host, priority, options,
-          transport_socket_options, state, origin, alternate_protocols_cache);
-    } else
-      return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                           priority, options, transport_socket_options, state,
-                                           origin, alternate_protocols_cache);
+      auto* factory = Config::Utility::getFactoryByName<Http::Http2::ReverseConnPoolFactory>(
+          "envoy.http.reverse_conn.default");
+      if (factory) {
+        return factory->allocateConnPool(dispatcher, context_.api().randomGenerator(),
+                                        server_.singletonManager(), host,
+                                        priority, options, transport_socket_options, state,
+                                        origin, alternate_protocols_cache);
+      }
+      ENVOY_LOG_MISC(error, "Unable to find envoy.http.reverse_conn.default factory");
+    }
+    return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                          priority, options, transport_socket_options, state,
+                                          origin, alternate_protocols_cache);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {

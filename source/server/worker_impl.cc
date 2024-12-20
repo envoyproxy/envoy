@@ -87,8 +87,6 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
   const uint64_t listener_tag = listener.listenerTag();
   ENVOY_LOG(debug, "worker:{} Removing listener name:{} tag:{} ", dispatcher_->name(),
             listener.name(), listener.listenerTag());
-  dispatcher_->connectionHandler()->reverseConnRegistry().getRCManager().unregisterRCInitiator(
-      listener);
   dispatcher_->post([this, listener_tag, completion]() -> void {
     handler_->removeListeners(listener_tag);
     completion();

@@ -6,7 +6,6 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
-#include "envoy/extensions/reverse_connection/reverse_connection_listener_config/v3/reverse_connection_listener_config.pb.h"
 #include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/registry/registry.h"
@@ -31,7 +30,6 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/reverse_connection/reverse_connection_listener_config_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -610,51 +608,24 @@ absl::Status ListenerImpl::buildReverseConnectionListener(
                     "missing",
                     config.name()));
   }
-
   // Reverse connection listener should not bind to port.
   bind_to_port_ = false;
 
   ENVOY_LOG(debug, "Building reverse connection config for listener: {} tag: {}", config.name(),
             listener_tag_);
-  envoy::extensions::reverse_connection::reverse_connection_listener_config::v3::
-      ReverseConnectionListenerConfig reverse_conn_config;
-  bool success = config.reverse_connection_listener_config().UnpackTo(&reverse_conn_config);
-
-  if (!success) {
+  std::shared_ptr<Network::RevConnRegistry> reverse_conn_registry =
+    listener_factory_context_->serverFactoryContext().singletonManager().getTyped<Network::RevConnRegistry>("reverse_conn_registry_singleton");
+  if (reverse_conn_registry == nullptr) {
+    return absl::InternalError("Cannot build reverse conn listener. Reverse connection registry not found");
+  }
+  auto config_or_error = reverse_conn_registry->fromAnyConfig(config.reverse_connection_listener_config());
+  if (!config_or_error.ok() || *config_or_error == nullptr) {
     return absl::InvalidArgumentError(
-        fmt::format("error adding listener named '{}': failed to unpack reverse connection "
+        fmt::format("Cannot build reverse conn listener name: {} tag: {} Error {} : failed to unpack reverse connection "
                     "config",
-                    config.name()));
+                    config.name(), listener_tag_, config_or_error.status()));
   }
-
-  if (reverse_conn_config.src_node_id().empty()) {
-    return absl::InvalidArgumentError(
-        fmt::format("error adding listener named '{}': source node ID is missing",
-                    config.name()));
-  } else if (reverse_conn_config.remote_cluster_to_conn_count().empty()) {
-    return absl::InvalidArgumentError(
-        fmt::format("error adding listener named '{}': remote cluster list is missing",
-                    config.name()));
-  }
-  Network::ReverseConnectionListenerConfig::ReverseConnParamsPtr rc_params =
-      std::make_unique<Network::ReverseConnectionListenerConfig::ReverseConnParams>(
-          Network::ReverseConnectionListenerConfig::ReverseConnParams{
-              reverse_conn_config.src_node_id(),              // src_node_id_
-              reverse_conn_config.src_cluster_id(),           // src_cluster_id_
-              reverse_conn_config.src_tenant_id(),            // src_tenant_id_
-              absl::flat_hash_map<std::string, uint32_t>()}); // remote_cluster_to_conn_count_map_
-  ENVOY_LOG(debug, "src_node_id_: {} src_cluster_id_: {} src_tenant_id_: {}",
-            rc_params->src_node_id_, rc_params->src_cluster_id_, rc_params->src_tenant_id_);
-  for (const auto& remote_cluster_conn_pair : reverse_conn_config.remote_cluster_to_conn_count()) {
-    ENVOY_LOG(debug, "Remote cluster: {}, conn count: {}", remote_cluster_conn_pair.cluster_name(),
-              remote_cluster_conn_pair.reverse_connection_count().value());
-    rc_params->remote_cluster_to_conn_count_map_.emplace(
-        remote_cluster_conn_pair.cluster_name(),
-        remote_cluster_conn_pair.reverse_connection_count().value());
-  }
-  reverse_connection_listener_config_ =
-      std::make_unique<Extensions::ReverseConnection::ReverseConnectionListenerConfigImpl>(
-          std::move(rc_params));
+  reverse_connection_listener_config_ = std::move(*config_or_error);
   return absl::OkStatus();
 }
 

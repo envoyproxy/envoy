@@ -52,8 +52,6 @@ envoy_cc_library(
         ":connection_balancer_interface",
         ":listen_socket_interface",
         ":listener_interface",
-        ":reverse_connection_handler_interface",
-        ":reverse_connection_manager_interface",
         "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/ssl:context_interface",
@@ -260,20 +258,3 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "reverse_connection_manager_interface",
-    hdrs = ["reverse_connection_manager.h"],
-    deps = [
-        "//envoy/network:connection_interface",
-        "//envoy/network:listener_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "reverse_connection_handler_interface",
-    hdrs = ["reverse_connection_handler.h"],
-    deps = [
-        ":listen_socket_interface",
-        "//envoy/event:timer_interface",
-    ],
-)

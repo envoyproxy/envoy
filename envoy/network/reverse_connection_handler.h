@@ -89,7 +89,7 @@ public:
    */
   virtual void rebalanceGetConnectionSocket(
       const std::string& key, bool rebalanced,
-      std::shared_ptr<std::promise<Network::RCSocketPair>> socket_promise) PURE;
+      std::shared_ptr<std::promise<RCSocketPair>> socket_promise) PURE;
 
   /**
    * @return the number of reverse connections across all workers

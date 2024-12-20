@@ -83,9 +83,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   } else if (config.reverseConnectionListenerConfig().has_value()) {
     ENVOY_LOG_MISC(debug, "adding reverse connection listener with name: {} tag: {}", config.name(),
                    config.listenerTag());
-    auto rc_listener =
-        std::make_unique<Extensions::ReverseConnection::ActiveReverseConnectionListener>(
-            *this, dispatcher(), config);
+    ASSERT(local_reverse_conn_registry_ != nullptr, "Reverse connection local registry is not set.");
+    auto rc_listener = local_reverse_conn_registry_->createActiveReverseConnectionListener(*this, dispatcher(), config);
     details->addActiveListener(
         config, config.listenSocketFactories()[0]->localAddress(), listener_reject_fraction_,
         disable_listeners_, std::move(rc_listener),
@@ -380,11 +379,11 @@ ConnectionHandlerImpl::PerAddressActiveListenerDetails::internalListener() {
   return (val != nullptr) ? makeOptRef(val->get()) : absl::nullopt;
 }
 
-OptRef<Extensions::ReverseConnection::ActiveReverseConnectionListener>
+OptRef<Network::ReverseConnectionListener>
 ConnectionHandlerImpl::PerAddressActiveListenerDetails::reverseConnectionListener() {
   ENVOY_LOG(debug, "reverseConnectionListener");
   auto* val = absl::get_if<
-      std::reference_wrapper<Extensions::ReverseConnection::ActiveReverseConnectionListener>>(
+      std::reference_wrapper<Network::ReverseConnectionListener>>(
       &typed_listener_);
   return (val != nullptr) ? makeOptRef(val->get()) : absl::nullopt;
 }

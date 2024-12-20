@@ -159,8 +159,9 @@ public:
   virtual ReverseConnParamsPtr& getReverseConnParams() PURE;
 };
 
-using ReverseConnectionListenerConfigPtr = std::unique_ptr<ReverseConnectionListenerConfig>;
 using ReverseConnectionListenerConfigOptRef = OptRef<ReverseConnectionListenerConfig>;
+using ReverseConnectionListenerConfigPtr = std::unique_ptr<ReverseConnectionListenerConfig>;
+using ReverseConnParamsPtr = Network::ReverseConnectionListenerConfig::ReverseConnParamsPtr;
 
 /**
  * Description of the listener.
