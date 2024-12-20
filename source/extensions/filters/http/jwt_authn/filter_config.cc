@@ -18,8 +18,7 @@ FilterConfigImpl::FilterConfigImpl(
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
     : proto_config_(std::move(proto_config)), stats_(generateStats(stats_prefix, context.scope())),
       cm_(context.serverFactoryContext().clusterManager()),
-      time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()),
-      dispatcher_(context.serverFactoryContext().mainThreadDispatcher()) {
+      time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {
 
   ENVOY_LOG(debug, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
 

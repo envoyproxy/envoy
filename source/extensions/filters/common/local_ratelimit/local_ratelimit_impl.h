@@ -62,14 +62,14 @@ class TokenBucketContext {
 public:
   virtual ~TokenBucketContext() = default;
 
-  virtual uint32_t maxTokens() const PURE;
-  virtual uint32_t remainingTokens() const PURE;
+  virtual uint64_t maxTokens() const PURE;
+  virtual uint64_t remainingTokens() const PURE;
   virtual absl::optional<int64_t> remainingFillInterval() const PURE;
 };
 
 class RateLimitTokenBucket : public TokenBucketContext {
 public:
-  virtual bool consume(double factor = 1.0) PURE;
+  virtual bool consume(double factor = 1.0, uint64_t tokens = 1) PURE;
   virtual void onFillTimer(uint64_t refill_counter, double factor = 1.0) PURE;
   virtual std::chrono::milliseconds fillInterval() const PURE;
   virtual double fillRate() const PURE;
@@ -81,17 +81,17 @@ class LocalRateLimiterImpl;
 // Token bucket that implements based on the periodic timer.
 class TimerTokenBucket : public RateLimitTokenBucket {
 public:
-  TimerTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill,
+  TimerTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                    std::chrono::milliseconds fill_interval, uint64_t multiplier,
                    LocalRateLimiterImpl& parent);
 
   // RateLimitTokenBucket
-  bool consume(double factor) override;
+  bool consume(double factor = 1.0, uint64_t tokens = 1) override;
   void onFillTimer(uint64_t refill_counter, double factor) override;
   std::chrono::milliseconds fillInterval() const override { return fill_interval_; }
   double fillRate() const override { return fill_rate_; }
-  uint32_t maxTokens() const override { return max_tokens_; }
-  uint32_t remainingTokens() const override { return tokens_.load(); }
+  uint64_t maxTokens() const override { return max_tokens_; }
+  uint64_t remainingTokens() const override { return tokens_.load(); }
   absl::optional<int64_t> remainingFillInterval() const override;
 
   // Descriptor refill interval is a multiple of the timer refill interval.
@@ -100,28 +100,28 @@ public:
   // the global timer, the descriptor is refilled.
   const uint64_t multiplier_{};
   LocalRateLimiterImpl& parent_;
-  std::atomic<uint32_t> tokens_{};
+  std::atomic<uint64_t> tokens_{};
   std::atomic<MonotonicTime> fill_time_{};
 
-  const uint32_t max_tokens_{};
-  const uint32_t tokens_per_fill_{};
+  const uint64_t max_tokens_{};
+  const uint64_t tokens_per_fill_{};
   const std::chrono::milliseconds fill_interval_{};
   const double fill_rate_{};
 };
 
 class AtomicTokenBucket : public RateLimitTokenBucket {
 public:
-  AtomicTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill,
+  AtomicTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                     std::chrono::milliseconds fill_interval, TimeSource& time_source);
 
   // RateLimitTokenBucket
-  bool consume(double factor) override;
+  bool consume(double factor = 1.0, uint64_t tokens = 1) override;
   void onFillTimer(uint64_t, double) override {}
   std::chrono::milliseconds fillInterval() const override { return {}; }
   double fillRate() const override { return token_bucket_.fillRate(); }
-  uint32_t maxTokens() const override { return static_cast<uint32_t>(token_bucket_.maxTokens()); }
-  uint32_t remainingTokens() const override {
-    return static_cast<uint32_t>(token_bucket_.remainingTokens());
+  uint64_t maxTokens() const override { return static_cast<uint64_t>(token_bucket_.maxTokens()); }
+  uint64_t remainingTokens() const override {
+    return static_cast<uint64_t>(token_bucket_.remainingTokens());
   }
   absl::optional<int64_t> remainingFillInterval() const override { return {}; }
 
@@ -137,15 +137,15 @@ public:
   };
 
   LocalRateLimiterImpl(
-      const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
-      const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
+      const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
+      const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
       bool always_consume_default_token_bucket = true,
       ShareProviderSharedPtr shared_provider = nullptr);
   ~LocalRateLimiterImpl();
 
-  Result requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  Result requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) const;
 
 private:
   void onFillTimer();
