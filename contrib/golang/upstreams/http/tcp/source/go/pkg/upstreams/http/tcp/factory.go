@@ -43,7 +43,7 @@ func (p *nullParser) Parse(any *anypb.Any) (interface{}, error) {
 
 var NullParser api.HttpTcpBridgeConfigParser = &nullParser{}
 
-// RegisterHttpTcpBridgeFactoryAndConfigParser registers the http filter factory and config parser for the specified plugin.
+// RegisterHttpTcpBridgeFactoryAndConfigParser registers the http tcp bridge factory and config parser for the specified plugin.
 // The factory and parser should not be nil.
 // Use the NullParser if the plugin does not care about config.
 func RegisterHttpTcpBridgeFactoryAndConfigParser(name string, factory api.HttpTcpBridgeFactory, parser api.HttpTcpBridgeConfigParser) {
