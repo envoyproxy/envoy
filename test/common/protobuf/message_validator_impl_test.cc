@@ -45,6 +45,15 @@ TEST(WarningValidationVisitorImpl, UnknownField) {
   EXPECT_LOG_CONTAINS("warn", "Unknown field: baz",
                       EXPECT_TRUE(warning_validation_visitor.onUnknownField("baz").ok()));
   EXPECT_EQ(3, unknown_counter.value());
+
+  // Test LOG messages for onDeprecated field.
+  EXPECT_LOG_CONTAINS("warn", "Deprecated field: ",
+                      EXPECT_TRUE(warning_validation_visitor.onDeprecatedField("foo", true).ok()));
+  // Enable suppressing of warning log messages for deprecated fields.
+  warning_validation_visitor.setSuppressDeprecatedWarningLogs(true);
+  EXPECT_LOG_NOT_CONTAINS(
+      "warn", "Deprecated field: ",
+      EXPECT_TRUE(warning_validation_visitor.onDeprecatedField("foo", true).ok()));
 }
 
 // The strict validation visitor throws on unknown fields.
@@ -53,6 +62,13 @@ TEST(StrictValidationVisitorImpl, UnknownField) {
   EXPECT_FALSE(strict_validation_visitor.skipValidation());
   EXPECT_EQ(strict_validation_visitor.onUnknownField("foo").message(),
             "Protobuf message (foo) has unknown fields");
+
+  EXPECT_LOG_CONTAINS("warn", "Deprecated field: ",
+                      EXPECT_TRUE(strict_validation_visitor.onDeprecatedField("foo", true).ok()));
+  strict_validation_visitor.setSuppressDeprecatedWarningLogs(true);
+  EXPECT_LOG_NOT_CONTAINS(
+      "warn", "Deprecated field: ",
+      EXPECT_TRUE(strict_validation_visitor.onDeprecatedField("foo", true).ok()));
 }
 
 } // namespace
