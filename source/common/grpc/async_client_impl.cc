@@ -14,25 +14,37 @@
 namespace Envoy {
 namespace Grpc {
 
+absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
+AsyncClientImpl::create(Upstream::ClusterManager& cm,
+                        const envoy::config::core::v3::GrpcService& config,
+                        TimeSource& time_source) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<AsyncClientImpl>(
+      new AsyncClientImpl(cm, config, time_source, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  const envoy::config::core::v3::GrpcService& config,
-                                 TimeSource& time_source)
+                                 TimeSource& time_source, absl::Status& creation_status)
     : max_recv_message_length_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),
       skip_envoy_headers_(config.envoy_grpc().skip_envoy_headers()), cm_(cm),
       remote_cluster_name_(config.envoy_grpc().cluster_name()),
       host_name_(config.envoy_grpc().authority()), time_source_(time_source),
-      metadata_parser_(THROW_OR_RETURN_VALUE(
-          Router::HeaderParser::configure(
-              config.initial_metadata(),
-              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
-          Router::HeaderParserPtr)),
       retry_policy_(
           config.has_retry_policy()
               ? absl::optional<envoy::config::route::v3::
                                    RetryPolicy>{Http::Utility::convertCoreToRouteRetryPolicy(
                     config.retry_policy(), "")}
-              : absl::nullopt) {}
+              : absl::nullopt) {
+  auto parser_or_error = Router::HeaderParser::configure(
+      config.initial_metadata(),
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  SET_AND_RETURN_IF_NOT_OK(parser_or_error.status(), creation_status);
+  metadata_parser_ = std::move(*parser_or_error);
+}
 
 AsyncClientImpl::~AsyncClientImpl() {
   ASSERT(isThreadSafe());
