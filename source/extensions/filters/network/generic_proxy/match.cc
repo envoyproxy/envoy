@@ -21,7 +21,7 @@ RequestMatchInputMatcher::RequestMatchInputMatcher(
     const RequestMatcherProto& proto_config, Server::Configuration::CommonFactoryContext& context) {
 
   if (proto_config.has_host()) {
-    host_ = std::make_unique<Matcher::StringMatcherImpl>(proto_config.host(), context);
+    host_ = std::make_unique<Matchers::StringMatcherImpl>(proto_config.host(), context);
   }
   if (proto_config.has_path()) {
     path_ = std::make_unique<Matchers::StringMatcherImpl>(proto_config.path(), context);

@@ -283,7 +283,7 @@ private:
 
   using StringMatcherVariant =
       absl::variant<ExactStringMatcher, PrefixStringMatcher, SuffixStringMatcher,
-                   RegexStringMatcher, ContainsStringMatcher, CustomStringMatcher>;
+                    RegexStringMatcher, ContainsStringMatcher, CustomStringMatcher>;
 
   template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
   static StringMatcherVariant createVariant(const StringMatcherType& matcher,
