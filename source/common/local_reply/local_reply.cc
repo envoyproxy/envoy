@@ -100,8 +100,6 @@ public:
 
     if (status_code_.has_value() && code != status_code_.value()) {
       code = status_code_.value();
-      response_headers.setStatus(std::to_string(enumToInt(code)));
-      stream_info.setResponseCode(static_cast<uint32_t>(code));
     }
 
     if (body_formatter_) {
@@ -151,10 +149,11 @@ public:
     }
 
     BodyFormatter* final_formatter{};
+    Http::Code new_code = code;
     for (const auto& mapper : mappers_) {
       if (mapper->matchAndRewrite(*request_headers, response_headers,
                                   *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                                  code, body, final_formatter)) {
+                                  new_code, body, final_formatter)) {
         break;
       }
     }
@@ -162,9 +161,14 @@ public:
     if (!final_formatter) {
       final_formatter = body_formatter_.get();
     }
-    return final_formatter->format(*request_headers, response_headers,
-                                   *Http::StaticEmptyHeaders::get().response_trailers, stream_info,
-                                   body, content_type);
+    final_formatter->format(*request_headers, response_headers,
+                            *Http::StaticEmptyHeaders::get().response_trailers, stream_info, body,
+                            content_type);
+    if (code != new_code) {
+      response_headers.setStatus(std::to_string(enumToInt(new_code)));
+      stream_info.setResponseCode(static_cast<uint32_t>(new_code));
+      code = new_code;
+    }
   }
 
 private:
