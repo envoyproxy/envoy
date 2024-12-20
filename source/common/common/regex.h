@@ -38,6 +38,9 @@ public:
     return result;
   }
 
+  // CompiledMatcher
+  const std::string& stringRepresentation() const override { return regex_.pattern(); }
+
 protected:
   explicit CompiledGoogleReMatcher(const std::string& regex) : regex_(regex, re2::RE2::Quiet) {
     ENVOY_BUG(regex_.ok(), "Invalid regex");
