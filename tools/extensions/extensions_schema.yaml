@@ -140,6 +140,7 @@ categories:
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
 - envoy.router.cluster_specifier_plugin
+- envoy.tap_sinks.udp_sink
 - envoy.tracers.opentelemetry.resource_detectors
 - envoy.tracers.opentelemetry.samplers
 
