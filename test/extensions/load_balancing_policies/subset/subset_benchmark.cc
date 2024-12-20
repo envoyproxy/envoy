@@ -46,8 +46,10 @@ public:
     child_lb->mutable_typed_extension_config()->mutable_typed_config()->PackFrom(random_lb_config);
     NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
 
-    subset_config_ =
-        std::make_unique<Upstream::SubsetLoadBalancerConfig>(factory_context, subset_config_proto);
+    absl::Status status = absl::OkStatus();
+    subset_config_ = std::make_unique<Upstream::SubsetLoadBalancerConfig>(
+        factory_context, subset_config_proto, status);
+    ASSERT(status.ok());
 
     lb_ = std::make_unique<Upstream::SubsetLoadBalancer>(*subset_config_, *info_, priority_set_,
                                                          &local_priority_set_, stats_, stats_scope_,

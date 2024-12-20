@@ -29,7 +29,7 @@ TEST(ClientSideWeightedRoundRobinConfigTest, ValidateFail) {
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   EXPECT_EQ("envoy.load_balancing_policies.client_side_weighted_round_robin", factory.name());
 
-  auto lb_config = factory.loadConfig(context, *factory.createEmptyConfigProto());
+  auto lb_config = factory.loadConfig(context, *factory.createEmptyConfigProto()).value();
 
   auto thread_aware_lb =
       factory.create(*lb_config, cluster_info, main_thread_priority_set, context.runtime_loader_,
