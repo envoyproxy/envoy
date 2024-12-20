@@ -65,6 +65,18 @@ impl HttpFilter for HeaderCallbacksFilter {
       .expect("header new not found");
     assert_eq!(std::str::from_utf8(&new_value).unwrap(), "value");
 
+    // Test all getter API.
+    let all_headers = envoy_filter.get_request_headers();
+    assert_eq!(all_headers.len(), 4);
+    assert_eq!(std::str::from_utf8(&all_headers[0].0).unwrap(), "single");
+    assert_eq!(std::str::from_utf8(&all_headers[0].1).unwrap(), "value");
+    assert_eq!(std::str::from_utf8(&all_headers[1].0).unwrap(), "multi");
+    assert_eq!(std::str::from_utf8(&all_headers[1].1).unwrap(), "value1");
+    assert_eq!(std::str::from_utf8(&all_headers[2].0).unwrap(), "multi");
+    assert_eq!(std::str::from_utf8(&all_headers[2].1).unwrap(), "value2");
+    assert_eq!(std::str::from_utf8(&all_headers[3].0).unwrap(), "new");
+    assert_eq!(std::str::from_utf8(&all_headers[3].1).unwrap(), "value");
+
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
@@ -103,6 +115,18 @@ impl HttpFilter for HeaderCallbacksFilter {
       .expect("trailer new not found");
     assert_eq!(std::str::from_utf8(&new_value).unwrap(), "value");
 
+    // Test all getter API.
+    let all_trailers = envoy_filter.get_request_trailers();
+    assert_eq!(all_trailers.len(), 4);
+    assert_eq!(std::str::from_utf8(&all_trailers[0].0).unwrap(), "single");
+    assert_eq!(std::str::from_utf8(&all_trailers[0].1).unwrap(), "value");
+    assert_eq!(std::str::from_utf8(&all_trailers[1].0).unwrap(), "multi");
+    assert_eq!(std::str::from_utf8(&all_trailers[1].1).unwrap(), "value1");
+    assert_eq!(std::str::from_utf8(&all_trailers[2].0).unwrap(), "multi");
+    assert_eq!(std::str::from_utf8(&all_trailers[2].1).unwrap(), "value2");
+    assert_eq!(std::str::from_utf8(&all_trailers[3].0).unwrap(), "new");
+    assert_eq!(std::str::from_utf8(&all_trailers[3].1).unwrap(), "value");
+
     abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
   }
 
@@ -133,6 +157,18 @@ impl HttpFilter for HeaderCallbacksFilter {
       .get_response_header_value(b"new")
       .expect("header new not found");
     assert_eq!(std::str::from_utf8(&new_value).unwrap(), "value");
+
+    // Test all getter API.
+    let all_headers = envoy_filter.get_response_headers();
+    assert_eq!(all_headers.len(), 4);
+    assert_eq!(std::str::from_utf8(&all_headers[0].0).unwrap(), "single");
+    assert_eq!(std::str::from_utf8(&all_headers[0].1).unwrap(), "value");
+    assert_eq!(std::str::from_utf8(&all_headers[1].0).unwrap(), "multi");
+    assert_eq!(std::str::from_utf8(&all_headers[1].1).unwrap(), "value1");
+    assert_eq!(std::str::from_utf8(&all_headers[2].0).unwrap(), "multi");
+    assert_eq!(std::str::from_utf8(&all_headers[2].1).unwrap(), "value2");
+    assert_eq!(std::str::from_utf8(&all_headers[3].0).unwrap(), "new");
+    assert_eq!(std::str::from_utf8(&all_headers[3].1).unwrap(), "value");
 
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
@@ -171,6 +207,18 @@ impl HttpFilter for HeaderCallbacksFilter {
       .get_response_trailer_value(b"new")
       .expect("trailer new not found");
     assert_eq!(std::str::from_utf8(&new_value).unwrap(), "value");
+
+    // Test all getter API.
+    let all_trailers = envoy_filter.get_response_trailers();
+    assert_eq!(all_trailers.len(), 4);
+    assert_eq!(std::str::from_utf8(&all_trailers[0].0).unwrap(), "single");
+    assert_eq!(std::str::from_utf8(&all_trailers[0].1).unwrap(), "value");
+    assert_eq!(std::str::from_utf8(&all_trailers[1].0).unwrap(), "multi");
+    assert_eq!(std::str::from_utf8(&all_trailers[1].1).unwrap(), "value1");
+    assert_eq!(std::str::from_utf8(&all_trailers[2].0).unwrap(), "multi");
+    assert_eq!(std::str::from_utf8(&all_trailers[2].1).unwrap(), "value2");
+    assert_eq!(std::str::from_utf8(&all_trailers[3].0).unwrap(), "new");
+    assert_eq!(std::str::from_utf8(&all_trailers[3].1).unwrap(), "value");
 
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }

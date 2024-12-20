@@ -17,8 +17,7 @@ using namespace Envoy::Http;
 class DynamicModuleHttpFilter : public Http::StreamFilter,
                                 public std::enable_shared_from_this<DynamicModuleHttpFilter> {
 public:
-  DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr dynamic_module)
-      : config_(dynamic_module) {}
+  DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config) : config_(config) {}
   ~DynamicModuleHttpFilter() override = default;
 
   /**

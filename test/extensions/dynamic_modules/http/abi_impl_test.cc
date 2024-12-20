@@ -194,6 +194,84 @@ TEST(ABIImpl, set_header_value) {
   }
 }
 
+TEST(ABIImpl, get_headers_count) {
+  std::vector<size_t (*)(envoy_dynamic_module_type_http_filter_envoy_ptr)> callbacks = {
+      envoy_dynamic_module_callback_http_get_request_headers_count,
+      envoy_dynamic_module_callback_http_get_request_trailers_count,
+      envoy_dynamic_module_callback_http_get_response_headers_count,
+      envoy_dynamic_module_callback_http_get_response_trailers_count};
+
+  DynamicModuleHttpFilter filter{nullptr};
+
+  // Test with nullptr accessors.
+  for (auto callback : callbacks) {
+    EXPECT_EQ(callback(&filter), 0);
+  }
+
+  std::initializer_list<std::pair<std::string, std::string>> headers = {
+      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
+  Http::TestRequestHeaderMapImpl request_headers{headers};
+  filter.request_headers_ = &request_headers;
+  Http::TestRequestTrailerMapImpl request_trailers{headers};
+  filter.request_trailers_ = &request_trailers;
+  Http::TestResponseHeaderMapImpl response_headers{headers};
+  filter.response_headers_ = &response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers{headers};
+  filter.response_trailers_ = &response_trailers;
+
+  for (auto callback : callbacks) {
+    EXPECT_EQ(callback(&filter), 3);
+  }
+}
+
+TEST(ABIImpl, get_headers) {
+  std::vector<bool (*)(envoy_dynamic_module_type_http_filter_envoy_ptr,
+                       envoy_dynamic_module_type_http_header*)>
+      callbacks = {envoy_dynamic_module_callback_http_get_request_headers,
+                   envoy_dynamic_module_callback_http_get_request_trailers,
+                   envoy_dynamic_module_callback_http_get_response_headers,
+                   envoy_dynamic_module_callback_http_get_response_trailers};
+
+  DynamicModuleHttpFilter filter{nullptr};
+
+  // Test with nullptr accessors.
+  for (auto callback : callbacks) {
+    envoy_dynamic_module_type_http_header result_headers[3];
+    EXPECT_FALSE(callback(&filter, result_headers));
+  }
+
+  std::initializer_list<std::pair<std::string, std::string>> headers = {
+      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
+  Http::TestRequestHeaderMapImpl request_headers{headers};
+  filter.request_headers_ = &request_headers;
+  Http::TestRequestTrailerMapImpl request_trailers{headers};
+  filter.request_trailers_ = &request_trailers;
+  Http::TestResponseHeaderMapImpl response_headers{headers};
+  filter.response_headers_ = &response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers{headers};
+  filter.response_trailers_ = &response_trailers;
+
+  for (auto callback : callbacks) {
+    envoy_dynamic_module_type_http_header result_headers[3];
+    EXPECT_TRUE(callback(&filter, result_headers));
+
+    EXPECT_EQ(result_headers[0].key_length, 6);
+    EXPECT_EQ(std::string(result_headers[0].key_ptr, result_headers[0].key_length), "single");
+    EXPECT_EQ(result_headers[0].value_length, 5);
+    EXPECT_EQ(std::string(result_headers[0].value_ptr, result_headers[0].value_length), "value");
+
+    EXPECT_EQ(result_headers[1].key_length, 5);
+    EXPECT_EQ(std::string(result_headers[1].key_ptr, result_headers[1].key_length), "multi");
+    EXPECT_EQ(result_headers[1].value_length, 6);
+    EXPECT_EQ(std::string(result_headers[1].value_ptr, result_headers[1].value_length), "value1");
+
+    EXPECT_EQ(result_headers[2].key_length, 5);
+    EXPECT_EQ(std::string(result_headers[2].key_ptr, result_headers[2].key_length), "multi");
+    EXPECT_EQ(result_headers[2].value_length, 6);
+    EXPECT_EQ(std::string(result_headers[2].value_ptr, result_headers[2].value_length), "value2");
+  }
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions

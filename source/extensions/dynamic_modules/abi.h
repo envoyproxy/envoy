@@ -128,6 +128,17 @@ typedef char* envoy_dynamic_module_type_buffer_module_ptr;
 typedef char* envoy_dynamic_module_type_buffer_envoy_ptr;
 
 /**
+ * envoy_dynamic_module_type_Header represents a key-value pair of an HTTP header. The key and value
+ * are represented as a pair of pointers to the buffer and the length of the buffer.
+ */
+typedef struct {
+  envoy_dynamic_module_type_buffer_module_ptr key_ptr;
+  size_t key_length;
+  envoy_dynamic_module_type_buffer_module_ptr value_ptr;
+  size_t value_length;
+} envoy_dynamic_module_type_http_header;
+
+/**
  * envoy_dynamic_module_type_on_http_filter_request_headers_status represents the status of the
  * filter after processing the HTTP request headers. This corresponds to `FilterHeadersStatus` in
  * envoy/http/filter.h.
@@ -453,6 +464,91 @@ size_t envoy_dynamic_module_callback_http_get_response_trailer(
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
     size_t index);
+
+/**
+ * envoy_dynamic_module_callback_http_get_request_headers_count is called by the module to get the
+ * number of request headers. Combined with envoy_dynamic_module_callback_http_get_request_headers,
+ * this can be used to iterate over all request headers.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return the number of request headers. Returns zero if the headers are not available.
+ */
+size_t envoy_dynamic_module_callback_http_get_request_headers_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_get_request_trailers_count is exactly the same as the
+ * envoy_dynamic_module_callback_http_get_request_headers_count, but for the request trailers.
+ * See the comments on envoy_dynamic_module_callback_http_get_request_headers_count for more
+ * details.
+ */
+size_t envoy_dynamic_module_callback_http_get_request_trailers_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_get_response_headers_count is exactly the same as the
+ * envoy_dynamic_module_callback_http_get_request_headers_count, but for the response headers.
+ * See the comments on envoy_dynamic_module_callback_http_get_request_headers_count for more
+ * details.
+ */
+size_t envoy_dynamic_module_callback_http_get_response_headers_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_get_response_trailers_count is exactly the same as the
+ * envoy_dynamic_module_callback_http_get_request_headers_count, but for the response trailers.
+ * See the comments on envoy_dynamic_module_callback_http_get_request_headers_count for more
+ * details.
+ */
+size_t envoy_dynamic_module_callback_http_get_response_trailers_count(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_get_request_headers is called by the module to get all the
+ * request headers. The headers are returned as an array of envoy_dynamic_module_type_http_header.
+ *
+ * PRECONDITION: The module must ensure that the result_headers is valid and has enough length to
+ * store all the headers. The module can use
+ * envoy_dynamic_module_callback_http_get_request_headers_count to get the number of headers before
+ * calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param result_headers is the pointer to the array of envoy_dynamic_module_type_http_header where
+ * the headers will be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_request_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_http_get_request_trailers is exactly the same as the
+ * envoy_dynamic_module_callback_http_get_request_headers, but for the request trailers.
+ * See the comments on envoy_dynamic_module_callback_http_get_request_headers for more details.
+ */
+bool envoy_dynamic_module_callback_http_get_request_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_http_get_response_headers is exactly the same as the
+ * envoy_dynamic_module_callback_http_get_request_headers, but for the response headers.
+ * See the comments on envoy_dynamic_module_callback_http_get_request_headers for more details.
+ */
+bool envoy_dynamic_module_callback_http_get_response_headers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header* result_headers);
+
+/**
+ * envoy_dynamic_module_callback_http_get_response_trailers is exactly the same as the
+ * envoy_dynamic_module_callback_http_get_request_headers, but for the response trailers.
+ * See the comments on envoy_dynamic_module_callback_http_get_request_headers for more details.
+ */
+bool envoy_dynamic_module_callback_http_get_response_trailers(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_header* result_headers);
 
 /**
  * envoy_dynamic_module_callback_http_set_request_header is called by the module to set
