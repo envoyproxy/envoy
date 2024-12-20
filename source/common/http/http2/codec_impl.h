@@ -404,6 +404,11 @@ protected:
         codec_callbacks_->onCodecEncodeComplete();
       }
     }
+    void onResetEncoded(uint32_t error_code) {
+      if (codec_callbacks_ && error_code != 0) {
+        codec_callbacks_->onCodecLowLevelReset();
+      }
+    }
 
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
