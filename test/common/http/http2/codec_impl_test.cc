@@ -975,7 +975,7 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   EXPECT_CALL(server_stream_callbacks_,
               onResetStream(StreamResetReason::LocalRefusedStreamReset, _));
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset, _));
-  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
   driveToCompletion();
 }
@@ -2011,7 +2011,7 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
         server_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
         server_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
       }));
-  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
   driveToCompletion();
 
@@ -2763,6 +2763,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersInvokeResetStream) {
   std::string long_string = std::string(63 * 1024, 'q');
   request_headers.addCopy("big", long_string);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
 }
@@ -2810,6 +2811,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejected) {
   request_headers.addCopy("bad_header", "something");
 
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
   EXPECT_EQ(
@@ -2864,6 +2866,7 @@ TEST_P(Http2CodecImplTest, ManyRequestHeadersInvokeResetStream) {
     request_headers.addCopy(std::to_string(i), "");
   }
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
 }
@@ -3717,7 +3720,7 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
 
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectError, _));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ConnectError, _));
-  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
   response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
   driveToCompletion();
 }
