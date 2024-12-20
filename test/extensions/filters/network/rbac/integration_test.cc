@@ -7,7 +7,6 @@
 
 #include "test/integration/integration.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/simulated_time_system.h"
 
 #include "fmt/printf.h"
 
@@ -23,7 +22,6 @@ std::string rbac_config;
 
 class RoleBasedAccessControlNetworkFilterIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
-      public Event::TestUsingSimulatedTime,
       public BaseIntegrationTest {
 public:
   RoleBasedAccessControlNetworkFilterIntegrationTest()
