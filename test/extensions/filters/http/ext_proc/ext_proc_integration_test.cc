@@ -755,10 +755,10 @@ protected:
       EXPECT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
     }
     EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header));
-    if (!response) {
-      EXPECT_TRUE(header.has_request_headers());
+    if (response) {
+      EXPECT_TRUE(header.has_response_headers()) << "Response does not have response_headers \n";
     } else {
-      EXPECT_TRUE(header.has_response_headers());
+      EXPECT_TRUE(header.has_request_headers()) << "Request does not have request_headers \n";
     }
   }
 
@@ -768,10 +768,10 @@ protected:
     }
     ProcessingResponse response_header;
     HeadersResponse* header_resp;
-    if (!response) {
-      header_resp = response_header.mutable_request_headers();
-    } else {
+    if (response) {
       header_resp = response_header.mutable_response_headers();
+    } else {
+      header_resp = response_header.mutable_request_headers();
     }
     auto* header_mutation = header_resp->mutable_response()->mutable_header_mutation();
     auto* header = header_mutation->add_set_headers()->mutable_header();
@@ -785,10 +785,10 @@ protected:
     for (uint32_t i = 0; i < total_resp_body_msg; i++) {
       ProcessingResponse response_body;
       BodyResponse* body_resp;
-      if (!response) {
-        body_resp = response_body.mutable_request_body();
-      } else {
+      if (response) {
         body_resp = response_body.mutable_response_body();
+      } else {
+        body_resp = response_body.mutable_request_body();
       }
 
       auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
