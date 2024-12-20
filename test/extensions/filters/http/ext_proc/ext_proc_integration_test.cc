@@ -5120,6 +5120,49 @@ TEST_P(ExtProcIntegrationTest, ServerSendBodyRespWithouRecvEntireBodyDuplexStrea
   verifyDownstreamResponse(*response, 200);
 }
 
+// The ext_proc server send out-of-order response causing Envoy shutdown the external processing.
+TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamed) {
+  const std::string body_sent(8 * 1024, 's');
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true);
+
+  // The ext_proc server receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderDuplexStreamed(header_request);
+
+  std::string body_received;
+  bool end_stream = false;
+  uint32_t total_req_body_msg = 0;
+  while (!end_stream) {
+    ProcessingRequest body_request;
+    EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+    EXPECT_TRUE(body_request.has_request_body());
+    body_received = absl::StrCat(body_received, body_request.request_body().body());
+    end_stream = body_request.request_body().end_of_stream();
+    total_req_body_msg++;
+  }
+  EXPECT_TRUE(end_stream);
+  EXPECT_EQ(body_received, body_sent);
+
+  // The ext_proc server should send header response, but it sends back the body response,
+  // which is out-of-order. This cause Envoy to shut down the external processing.
+  processor_stream_->startGrpcStream();
+  for (uint32_t i = 0; i < 3; i++) {
+    ProcessingResponse response_body;
+    auto* body_resp = response_body.mutable_request_body();
+    auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
+    auto* streamed_response = body_mut->mutable_streamed_response();
+    streamed_response->set_body("r");
+    const bool end_of_stream = (i == 2)  ? true : false;
+    streamed_response->set_end_of_stream(end_of_stream);
+    processor_stream_->sendGrpcMessage(response_body);
+  }
+
+  handleUpstreamRequest();
+  // The body received by upstream server is expected to be empty.
+  EXPECT_EQ(upstream_request_->body().toString(), "");
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, ModeOverrideAllowed) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   proto_config_.set_allow_mode_override(true);
