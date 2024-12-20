@@ -345,6 +345,15 @@ TEST_F(StringMatcher, ExactMatchIgnoreCase) {
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("other"));
 }
 
+TEST_F(StringMatcher, ExactMatchIgnoreCaseStringRepresentation) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("eXaCt");
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "eXaCt");
+
+  matcher.set_ignore_case(true);
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "eXaCt");
+}
+
 TEST_F(StringMatcher, PrefixMatchIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_prefix("prefix");
@@ -358,6 +367,15 @@ TEST_F(StringMatcher, PrefixMatchIgnoreCase) {
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("PREFIX-ABC"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("prefiz-abc"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("other"));
+}
+
+TEST_F(StringMatcher, PrefixMatchIgnoreCaseStringRepresentation) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_prefix("pReFix");
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "pReFix");
+
+  matcher.set_ignore_case(true);
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "pReFix");
 }
 
 TEST_F(StringMatcher, SuffixMatchIgnoreCase) {
@@ -375,6 +393,15 @@ TEST_F(StringMatcher, SuffixMatchIgnoreCase) {
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("other"));
 }
 
+TEST_F(StringMatcher, SuffixMatchIgnoreCaseStringRepresentation) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_suffix("sUfFix");
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "sUfFix");
+
+  matcher.set_ignore_case(true);
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "sUfFix");
+}
+
 TEST_F(StringMatcher, ContainsMatchIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_contains("contained-str");
@@ -389,6 +416,15 @@ TEST_F(StringMatcher, ContainsMatchIgnoreCase) {
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("abc-cOnTaInEd-str-def"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("abc-ContAineR-str-def"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("other"));
+}
+
+TEST_F(StringMatcher, ContainsMatchIgnoreCaseStringRepresentation) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_contains("ConTained-STR");
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "ConTained-STR");
+
+  matcher.set_ignore_case(true);
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "contained-str");
 }
 
 TEST_F(StringMatcher, SafeRegexValue) {
