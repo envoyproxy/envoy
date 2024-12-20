@@ -10,6 +10,11 @@ load(
 
 licenses(["notice"])  # Apache 2
 
+filegroup(
+    name = "trust_bundles",
+    srcs = glob(["trust_bundles*.json*"]),
+)
+
 envoy_package()
 
 envoy_extension_cc_test(
@@ -19,6 +24,7 @@ envoy_extension_cc_test(
     ],
     data = [
         "//test/common/tls/test_data:certs",
+        "//test/extensions/transport_sockets/tls/cert_validator/spiffe:trust_bundles",
     ],
     extension_names = ["envoy.tls.cert_validator.spiffe"],
     rbe_pool = "6gig",

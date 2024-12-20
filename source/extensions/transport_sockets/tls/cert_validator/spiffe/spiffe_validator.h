@@ -33,15 +33,8 @@ namespace Tls {
 using X509StorePtr = CSmartPtr<X509_STORE, X509_STORE_free>;
 
 struct SpiffeData {
-  absl::flat_hash_map<std::string, CSmartPtr<X509_STORE, X509_STORE_free>> trust_bundle_stores;
-  std::vector<bssl::UniquePtr<X509>> ca_certs;
-
-  int64_t spiffe_refresh_hint;
-  int64_t spiffe_sequence;
-
-  SpiffeData() = default;
-  SpiffeData(const SpiffeData& other) = delete;
-  SpiffeData(SpiffeData&& other) = default;
+  absl::flat_hash_map<std::string, CSmartPtr<X509_STORE, X509_STORE_free>> trust_bundle_stores_;
+  std::vector<bssl::UniquePtr<X509>> ca_certs_;
 };
 
 class SPIFFEValidator : public CertValidator, Logger::Loggable<Logger::Id::secret> {
@@ -92,7 +85,8 @@ private:
                                             std::string& error_details);
 
   void initializeCertificateRefresh(Server::Configuration::CommonFactoryContext& context);
-  std::shared_ptr<SpiffeData> parseTrustBundles(const std::string& trust_bundles_str);
+  absl::StatusOr<std::shared_ptr<SpiffeData>>
+  parseTrustBundles(const std::string& trust_bundles_str);
 
   class ThreadLocalSpiffeState : public Envoy::ThreadLocal::ThreadLocalObject {
   public:
