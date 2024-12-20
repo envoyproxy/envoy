@@ -223,7 +223,7 @@ impl EnvoyHttpFilter {
   pub fn get_request_header_value(&self, key: &[u8]) -> Option<&[u8]> {
     self.get_header_value_impl(
       key,
-      abi::envoy_dynamic_module_callback_http_get_request_header_value,
+      abi::envoy_dynamic_module_callback_http_get_request_header,
     )
   }
 
@@ -233,7 +233,7 @@ impl EnvoyHttpFilter {
   pub fn get_request_header_values(&self, key: &[u8]) -> Vec<&[u8]> {
     self.get_header_values_impl(
       key,
-      abi::envoy_dynamic_module_callback_http_get_request_header_value,
+      abi::envoy_dynamic_module_callback_http_get_request_header,
     )
   }
 
@@ -267,7 +267,7 @@ impl EnvoyHttpFilter {
   pub fn get_request_trailer_value(&self, key: &[u8]) -> Option<&[u8]> {
     self.get_header_value_impl(
       key,
-      abi::envoy_dynamic_module_callback_http_get_request_trailer_value,
+      abi::envoy_dynamic_module_callback_http_get_request_trailer,
     )
   }
 
@@ -277,7 +277,7 @@ impl EnvoyHttpFilter {
   pub fn get_request_trailer_values(&self, key: &[u8]) -> Vec<&[u8]> {
     self.get_header_values_impl(
       key,
-      abi::envoy_dynamic_module_callback_http_get_request_trailer_value,
+      abi::envoy_dynamic_module_callback_http_get_request_trailer,
     )
   }
 
@@ -311,7 +311,7 @@ impl EnvoyHttpFilter {
   pub fn get_response_header_value(&self, key: &[u8]) -> Option<&[u8]> {
     self.get_header_value_impl(
       key,
-      abi::envoy_dynamic_module_callback_http_get_response_header_value,
+      abi::envoy_dynamic_module_callback_http_get_response_header,
     )
   }
 
@@ -321,7 +321,7 @@ impl EnvoyHttpFilter {
   pub fn get_response_header_values(&self, key: &[u8]) -> Vec<&[u8]> {
     self.get_header_values_impl(
       key,
-      abi::envoy_dynamic_module_callback_http_get_response_header_value,
+      abi::envoy_dynamic_module_callback_http_get_response_header,
     )
   }
 
@@ -356,7 +356,7 @@ impl EnvoyHttpFilter {
   pub fn get_response_trailer_value(&self, key: &[u8]) -> Option<&[u8]> {
     self.get_header_value_impl(
       key,
-      abi::envoy_dynamic_module_callback_http_get_response_trailer_value,
+      abi::envoy_dynamic_module_callback_http_get_response_trailer,
     )
   }
 
@@ -366,7 +366,7 @@ impl EnvoyHttpFilter {
   pub fn get_response_trailer_values(&self, key: &[u8]) -> Vec<&[u8]> {
     self.get_header_values_impl(
       key,
-      abi::envoy_dynamic_module_callback_http_get_response_trailer_value,
+      abi::envoy_dynamic_module_callback_http_get_response_trailer,
     )
   }
 

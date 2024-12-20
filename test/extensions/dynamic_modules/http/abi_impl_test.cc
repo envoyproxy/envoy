@@ -13,10 +13,10 @@ TEST(ABIImpl, get_header_value) {
   std::vector<size_t (*)(envoy_dynamic_module_type_http_filter_envoy_ptr,
                          envoy_dynamic_module_type_buffer_module_ptr, size_t,
                          envoy_dynamic_module_type_buffer_envoy_ptr*, size_t*, size_t)>
-      callbacks = {envoy_dynamic_module_callback_http_get_request_header_value,
-                   envoy_dynamic_module_callback_http_get_request_trailer_value,
-                   envoy_dynamic_module_callback_http_get_response_header_value,
-                   envoy_dynamic_module_callback_http_get_response_trailer_value};
+      callbacks = {envoy_dynamic_module_callback_http_get_request_header,
+                   envoy_dynamic_module_callback_http_get_request_trailer,
+                   envoy_dynamic_module_callback_http_get_response_header,
+                   envoy_dynamic_module_callback_http_get_response_trailer};
 
   DynamicModuleHttpFilter filter{nullptr};
 

@@ -30,7 +30,7 @@ size_t getHeaderValueImpl(const Http::HeaderMap* map,
   return values.size();
 }
 
-size_t envoy_dynamic_module_callback_http_get_request_header_value(
+size_t envoy_dynamic_module_callback_http_get_request_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
@@ -40,7 +40,7 @@ size_t envoy_dynamic_module_callback_http_get_request_header_value(
                             result_buffer_length_ptr, index);
 }
 
-size_t envoy_dynamic_module_callback_http_get_request_trailer_value(
+size_t envoy_dynamic_module_callback_http_get_request_trailer(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
@@ -50,7 +50,7 @@ size_t envoy_dynamic_module_callback_http_get_request_trailer_value(
                             result_buffer_length_ptr, index);
 }
 
-size_t envoy_dynamic_module_callback_http_get_response_header_value(
+size_t envoy_dynamic_module_callback_http_get_response_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
@@ -60,7 +60,7 @@ size_t envoy_dynamic_module_callback_http_get_response_header_value(
                             result_buffer_length_ptr, index);
 }
 
-size_t envoy_dynamic_module_callback_http_get_response_trailer_value(
+size_t envoy_dynamic_module_callback_http_get_response_trailer(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,

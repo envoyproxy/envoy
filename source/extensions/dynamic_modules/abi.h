@@ -113,8 +113,8 @@ typedef const void* envoy_dynamic_module_type_http_filter_module_ptr;
  * envoy_dynamic_module_type_buffer_module_ptr is a pointer to a buffer in the module. A buffer
  * represents a contiguous block of memory in bytes.
  *
- * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
- * released when envoy_dynamic_module_on_buffer_destroy is called for the same pointer.
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. It depends on the
+ * context where the buffer is used. See for the specific event hook or callback for more details.
  */
 typedef char* envoy_dynamic_module_type_buffer_module_ptr;
 
@@ -122,7 +122,8 @@ typedef char* envoy_dynamic_module_type_buffer_module_ptr;
  * envoy_dynamic_module_type_buffer_envoy_ptr is a pointer to a buffer in Envoy. A buffer represents
  * a contiguous block of memory in bytes.
  *
- * OWNERSHIP: Envoy owns the pointer.
+ * OWNERSHIP: Envoy owns the pointer. The lifetime depends on the context where the buffer is used.
+ * See for the specific event hook or callback for more details.
  */
 typedef char* envoy_dynamic_module_type_buffer_envoy_ptr;
 
@@ -386,7 +387,7 @@ void envoy_dynamic_module_on_http_filter_destroy(
 // Envoy. The name of a callback must be prefixed with "envoy_dynamic_module_callback_".
 
 /**
- * envoy_dynamic_module_callback_http_get_request_header_value is called by the module to get the
+ * envoy_dynamic_module_callback_http_get_request_header is called by the module to get the
  * value of the request header with the given key. Since a header can have multiple values, the
  * index is used to get the specific value. This returns the number of values for the given key, so
  * it can be used to iterate over all values by starting from 0 and incrementing the index until the
@@ -414,40 +415,40 @@ void envoy_dynamic_module_on_http_filter_destroy(
  * The buffer pointed by the pointer stored in result_buffer_ptr is owned by Envoy, and they are
  * guaranteed to be valid until the end of the current event hook.
  */
-size_t envoy_dynamic_module_callback_http_get_request_header_value(
+size_t envoy_dynamic_module_callback_http_get_request_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
     size_t index);
 
 /**
- * envoy_dynamic_module_callback_http_get_request_trailer_value is exactly the same as the
- * envoy_dynamic_module_callback_http_get_request_header_value, but for the request trailers.
+ * envoy_dynamic_module_callback_http_get_request_trailer is exactly the same as the
+ * envoy_dynamic_module_callback_http_get_request_header, but for the request trailers.
  * See the comments on envoy_dynamic_module_http_get_request_header_value for more details.
  */
-size_t envoy_dynamic_module_callback_http_get_request_trailer_value(
+size_t envoy_dynamic_module_callback_http_get_request_trailer(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
     size_t index);
 
 /**
- * envoy_dynamic_module_callback_http_get_response_header_value is exactly the same as the
- * envoy_dynamic_module_callback_http_get_request_header_value, but for the response headers.
- * See the comments on envoy_dynamic_module_callback_http_get_request_header_value for more details.
+ * envoy_dynamic_module_callback_http_get_response_header is exactly the same as the
+ * envoy_dynamic_module_callback_http_get_request_header, but for the response headers.
+ * See the comments on envoy_dynamic_module_callback_http_get_request_header for more details.
  */
-size_t envoy_dynamic_module_callback_http_get_response_header_value(
+size_t envoy_dynamic_module_callback_http_get_response_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
     size_t index);
 
 /**
- * envoy_dynamic_module_callback_http_get_response_trailer_value is exactly the same as the
- * envoy_dynamic_module_callback_http_get_request_header_value, but for the response trailers.
- * See the comments on envoy_dynamic_module_callback_http_get_request_header_value for more details.
+ * envoy_dynamic_module_callback_http_get_response_trailer is exactly the same as the
+ * envoy_dynamic_module_callback_http_get_request_header, but for the response trailers.
+ * See the comments on envoy_dynamic_module_callback_http_get_request_header for more details.
  */
-size_t envoy_dynamic_module_callback_http_get_response_trailer_value(
+size_t envoy_dynamic_module_callback_http_get_response_trailer(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr, size_t* result_buffer_length_ptr,
