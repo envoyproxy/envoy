@@ -60,7 +60,6 @@ public:
   const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
   void saveUpstreamConnection(Network::ConnectionSocketPtr&& upstream_socket,
                               uint64_t listener_tag) override;
-  void enableReverseConnections(Network::RevConnRegistry& reverse_conn_registry) override;
   Network::LocalRevConnRegistry& reverseConnRegistry() const override {
     return *local_reverse_conn_registry_;
   }

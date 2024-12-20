@@ -139,12 +139,6 @@ public:
                                       uint64_t listener_tag) PURE;
 
   /**
-   * Enable reverse connection entities on the current worker.
-   * @param reverse_conn_registry the thread local registry that holds the reverse connection
-   * entities.
-   */
-  virtual void enableReverseConnections(Network::RevConnRegistry& reverse_conn_registry) PURE;
-  /**
    * @return the thread local registry.
    */
   virtual Network::LocalRevConnRegistry& reverseConnRegistry() const PURE;
@@ -330,7 +324,7 @@ using InternalListenerOptRef = OptRef<InternalListener>;
  */
 class ReverseConnectionListener : public virtual ConnectionHandler::ActiveListener {
 public:
-  virtual void startRCWorkflow(Event::Dispatcher& dispatcher, Network::ListenerConfig& config) PURE;
+  virtual void startRCWorkflow(Event::Dispatcher& dispatcher, Network::ConnectionHandler& conn_handler, Network::ListenerConfig& config) PURE;
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
 };
 using ReverseConnectionListenerPtr = std::unique_ptr<ReverseConnectionListener>;

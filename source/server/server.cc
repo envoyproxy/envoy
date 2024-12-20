@@ -636,10 +636,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
         bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
         factory);
     ENVOY_LOG(trace, "creating bootstrap extension from factory: {}", factory.name());
-    if (factory.name() == "envoy.bootstrap.reverse_connection") {
-      ENVOY_LOG(debug, "Reverse connections need to be enabled");
-      enable_reverse_connections_ = true;
-    }
     bootstrap_extensions_.push_back(
         factory.createBootstrapExtension(*config, serverFactoryContext()));
   }
@@ -811,16 +807,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // Now that we are initialized, notify the bootstrap extensions.
   for (auto&& bootstrap_extension : bootstrap_extensions_) {
     bootstrap_extension->onServerInitialized();
-  }
-
-  if (enable_reverse_connections_) {
-    std::shared_ptr<Network::RevConnRegistry> reverse_conn_registry =
-        singleton_manager_.getTyped<Network::RevConnRegistry>("reverse_conn_registry_singleton");
-    if (reverse_conn_registry == nullptr) {
-      throw EnvoyException(
-          "Cannot enable reverse connections. Reverse connection registry not found");
-    }
-    listener_manager_->enableReverseConnections(*reverse_conn_registry);
   }
 
   // GuardDog (deadlock detection) object and thread setup before workers are

@@ -81,9 +81,13 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         disable_listeners_, std::move(internal_listener),
         config.shouldBypassOverloadManager() ? null_overload_manager_ : overload_manager_);
   } else if (config.reverseConnectionListenerConfig().has_value()) {
-    ENVOY_LOG_MISC(debug, "adding reverse connection listener with name: {} tag: {}", config.name(),
+    ENVOY_LOG(debug, "adding reverse connection listener with name: {} tag: {}", config.name(),
                    config.listenerTag());
-    ASSERT(local_reverse_conn_registry_ != nullptr, "Reverse connection local registry is not set.");
+    Network::RevConnRegistry& reverse_conn_registry = config.reverseConnectionListenerConfig()->reverseConnRegistry();
+    ENVOY_LOG(debug, "Obtaining thread local reverse conn registry");
+    local_reverse_conn_registry_ = reverse_conn_registry.getLocalRegistry();
+    RELEASE_ASSERT(local_reverse_conn_registry_ != nullptr,
+                  "Failed to get local reverse conn listener registry");
     auto rc_listener = local_reverse_conn_registry_->createActiveReverseConnectionListener(*this, dispatcher(), config);
     details->addActiveListener(
         config, config.listenSocketFactories()[0]->localAddress(), listener_reject_fraction_,
@@ -317,14 +321,6 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
       }
     });
   }
-}
-
-void ConnectionHandlerImpl::enableReverseConnections(
-    Network::RevConnRegistry& reverse_conn_registry) {
-  ENVOY_LOG_MISC(debug, "Creating thread local reverse conn registry");
-  local_reverse_conn_registry_ = reverse_conn_registry.getLocalRegistry();
-  RELEASE_ASSERT(local_reverse_conn_registry_ != nullptr,
-                 "Thread local rverse conn registry should not be null.");
 }
 
 void ConnectionHandlerImpl::saveUpstreamConnection(Network::ConnectionSocketPtr&& upstream_socket,

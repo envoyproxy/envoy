@@ -103,10 +103,6 @@ void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
       std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
 }
 
-void DispatcherImpl::setConnectionHandler(Network::ConnectionHandler* connection_handler) {
-  connection_handler_ = connection_handler;
-};
-
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
                                      const absl::optional<std::string>& prefix) {
   const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
