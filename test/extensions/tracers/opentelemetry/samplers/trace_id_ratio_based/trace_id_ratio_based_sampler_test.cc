@@ -63,6 +63,69 @@ TEST(TraceIdRatioBasedSamplerTest, TestTraceIdRatioSamplesInclusively) {
   }
 }
 
+// Test special ratios including 0, 1, and numbers out of [0, 1]
+TEST(TraceIdRatioBasedSamplerTest, TestSpecialRatios) {
+  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  envoy::extensions::tracers::opentelemetry::samplers::v3::TraceIdRatioBasedSamplerConfig config;
+  std::srand(std::time(nullptr));
+
+  // ratio = 0, should never sample
+  config.set_ratio(0);
+  auto sampler = std::make_shared<TraceIdRatioBasedSampler>(config, context);
+
+  for (int i = 0; i < 10; ++i) {
+    Random::RandomGeneratorImpl random_generator;
+    auto trace_id = absl::StrCat(Hex::uint64ToHex(random_generator.random()),
+                                 Hex::uint64ToHex(random_generator.random()));
+    auto sampling_result =
+        sampler->shouldSample(absl::nullopt, trace_id, "operation_name",
+                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
+    EXPECT_EQ(sampling_result.decision, Decision::Drop);
+  }
+
+  // ratio < 0, should never sample
+  config.set_ratio(-5);
+  sampler = std::make_shared<TraceIdRatioBasedSampler>(config, context);
+
+  for (int i = 0; i < 10; ++i) {
+    Random::RandomGeneratorImpl random_generator;
+    auto trace_id = absl::StrCat(Hex::uint64ToHex(random_generator.random()),
+                                 Hex::uint64ToHex(random_generator.random()));
+    auto sampling_result =
+        sampler->shouldSample(absl::nullopt, trace_id, "operation_name",
+                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
+    EXPECT_EQ(sampling_result.decision, Decision::Drop);
+  }
+
+  // ratio = 1, should always sample
+  config.set_ratio(1);
+  sampler = std::make_shared<TraceIdRatioBasedSampler>(config, context);
+
+  for (int i = 0; i < 10; ++i) {
+    Random::RandomGeneratorImpl random_generator;
+    auto trace_id = absl::StrCat(Hex::uint64ToHex(random_generator.random()),
+                                 Hex::uint64ToHex(random_generator.random()));
+    auto sampling_result =
+        sampler->shouldSample(absl::nullopt, trace_id, "operation_name",
+                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
+    EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
+  }
+
+  // ratio < 0, should never sample
+  config.set_ratio(7);
+  sampler = std::make_shared<TraceIdRatioBasedSampler>(config, context);
+
+  for (int i = 0; i < 10; ++i) {
+    Random::RandomGeneratorImpl random_generator;
+    auto trace_id = absl::StrCat(Hex::uint64ToHex(random_generator.random()),
+                                 Hex::uint64ToHex(random_generator.random()));
+    auto sampling_result =
+        sampler->shouldSample(absl::nullopt, trace_id, "operation_name",
+                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
+    EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
+  }
+}
+
 TEST(TraceIdRatioBasedSamplerTest, TestTraceIdRatioDescription) {
   envoy::extensions::tracers::opentelemetry::samplers::v3::TraceIdRatioBasedSamplerConfig config;
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
