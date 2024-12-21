@@ -80,6 +80,11 @@ struct SupportedCommands {
   static const std::string& mset() { CONSTRUCT_ON_FIRST_USE(std::string, "mset"); }
 
   /**
+   * @return keys command
+   */
+  static const std::string& keys() { CONSTRUCT_ON_FIRST_USE(std::string, "keys"); }
+
+  /**
    * @return ping command
    */
   static const std::string& ping() { CONSTRUCT_ON_FIRST_USE(std::string, "ping"); }
@@ -93,6 +98,11 @@ struct SupportedCommands {
    * @return quit command
    */
   static const std::string& quit() { CONSTRUCT_ON_FIRST_USE(std::string, "quit"); }
+
+  /**
+   * @return select command
+   */
+  static const std::string& select() { CONSTRUCT_ON_FIRST_USE(std::string, "select"); }
 
   /**
    * @return commands which alters the state of redis
@@ -111,6 +121,14 @@ struct SupportedCommands {
 
   static bool isReadCommand(const std::string& command) {
     return !writeCommands().contains(command);
+  }
+
+  static bool isSupportedCommand(const std::string& command) {
+    return (simpleCommands().contains(command) || evalCommands().contains(command) ||
+            hashMultipleSumResultCommands().contains(command) ||
+            transactionCommands().contains(command) || auth() == command || echo() == command ||
+            mget() == command || mset() == command || keys() == command || ping() == command ||
+            time() == command || quit() == command || select() == command);
   }
 };
 

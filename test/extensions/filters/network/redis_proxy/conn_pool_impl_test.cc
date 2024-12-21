@@ -365,6 +365,96 @@ TEST_F(RedisConnPoolImplTest, Basic) {
   tls_.shutdownThread();
 };
 
+TEST_F(RedisConnPoolImplTest, ShardSize) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+
+  uint16_t shard_size = 3;
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillRepeatedly(
+          Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+            EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+            EXPECT_EQ(context->downstreamConnection(), nullptr);
+            std::cout << (context->computeHashKey().value()) << std::endl;
+            if (context->computeHashKey() < shard_size) {
+              return cm_.thread_local_cluster_.lb_.host_;
+            }
+            return nullptr;
+          }));
+  EXPECT_CALL(*this, create_(_)).WillRepeatedly(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  EXPECT_EQ(conn_pool_->shardSize(), shard_size);
+
+  for (uint16_t i = 0; i < 100; i++) {
+    shard_size = i;
+    EXPECT_EQ(conn_pool_->shardSize(), shard_size);
+  }
+
+  delete client;
+  tls_.shutdownThread();
+};
+
+TEST_F(RedisConnPoolImplTest, ShardHost) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  Common::Redis::Client::MockPoolRequest active_request;
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), 0);
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->downstreamConnection(), nullptr);
+        return cm_.thread_local_cluster_.lb_.host_;
+      }));
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(*client, makeRequest_(Ref(*value), _)).WillOnce(Return(&active_request));
+  Common::Redis::Client::PoolRequest* request =
+      conn_pool_->makeRequestToShard(0, value, callbacks, transaction_);
+  EXPECT_NE(nullptr, request);
+
+  EXPECT_CALL(active_request, cancel());
+  EXPECT_CALL(callbacks, onFailure_());
+  EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+};
+
+TEST_F(RedisConnPoolImplTest, ShardNoHost) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
+  MockPoolCallbacks callbacks;
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), 0);
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->downstreamConnection(), nullptr);
+        return nullptr;
+      }));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  Common::Redis::Client::PoolRequest* request =
+      conn_pool_->makeRequestToShard(0, value, callbacks, transaction_);
+  EXPECT_EQ(nullptr, request);
+
+  tls_.shutdownThread();
+};
+
 TEST_F(RedisConnPoolImplTest, BasicRespVariant) {
   InSequence s;
 
@@ -392,6 +482,35 @@ TEST_F(RedisConnPoolImplTest, BasicRespVariant) {
 
   EXPECT_CALL(active_request, cancel());
   EXPECT_CALL(callbacks, onFailure_());
+  EXPECT_CALL(*client, close());
+  tls_.shutdownThread();
+};
+
+TEST_F(RedisConnPoolImplTest, ShardRequestFailed) {
+  InSequence s;
+
+  setup();
+
+  Common::Redis::RespValue value;
+  MockPoolCallbacks callbacks;
+  Common::Redis::Client::MockClient* client = new NiceMock<Common::Redis::Client::MockClient>();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        EXPECT_EQ(context->computeHashKey().value(), 0);
+        EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
+        EXPECT_EQ(context->downstreamConnection(), nullptr);
+        return cm_.thread_local_cluster_.lb_.host_;
+      }));
+  EXPECT_CALL(*this, create_(_)).WillOnce(Return(client));
+  EXPECT_CALL(*cm_.thread_local_cluster_.lb_.host_, address())
+      .WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(*client, makeRequest_(Eq(value), _)).WillOnce(Return(nullptr));
+  Common::Redis::Client::PoolRequest* request =
+      conn_pool_->makeRequestToShard(0, ConnPool::RespVariant(value), callbacks, transaction_);
+
+  // the request should be null and the callback is not called
+  EXPECT_EQ(nullptr, request);
   EXPECT_CALL(*client, close());
   tls_.shutdownThread();
 };

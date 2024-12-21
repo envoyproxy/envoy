@@ -113,6 +113,26 @@ private:
   const NetworkFilters::Common::Redis::Client::ReadPolicy read_policy_;
 };
 
+class RedisSpecifyShardContextImpl : public RedisLoadBalancerContextImpl {
+public:
+  /**
+   * The redis specify Shard load balancer context for Redis requests.
+   * @param shard_index specify the shard index for the Redis request.
+   * @param request specify the Redis request.
+   * @param read_policy specify the read policy.
+   */
+  RedisSpecifyShardContextImpl(uint64_t shard_index,
+                               const NetworkFilters::Common::Redis::RespValue& request,
+                               NetworkFilters::Common::Redis::Client::ReadPolicy read_policy =
+                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Primary);
+
+  // Upstream::LoadBalancerContextBase
+  absl::optional<uint64_t> computeHashKey() override { return shard_index_; }
+
+private:
+  const absl::optional<uint64_t> shard_index_;
+};
+
 class ClusterSlotUpdateCallBack {
 public:
   virtual ~ClusterSlotUpdateCallBack() = default;
