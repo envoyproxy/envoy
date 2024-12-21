@@ -149,7 +149,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
 
     // If credential provider is being created during Envoy initialization, use init manager to
-    // delay cluster creation If we are here during normal processing, such as xDS update, then
+    // delay cluster creation. If we are here during normal processing, such as xDS update, then
     // create clusters and initialize TLS immediately
     if (context_->initManager().state() == Envoy::Init::Manager::State::Initialized) {
       initializeTlsAndCluster();
@@ -1077,9 +1077,9 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
         !web_identity.role_arn().empty()) {
 
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-      const auto region_uuid = absl::StrCat(region, "_", context->api().randomGenerator().uuid());
+      // const auto region_uuid = absl::StrCat(region, "_", context->api().randomGenerator().uuid());
 
-      const auto cluster_name = stsClusterName(region_uuid);
+      const auto cluster_name = stsClusterName(region);
 
       ENVOY_LOG(
           debug,
@@ -1135,6 +1135,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
 // extensions
 SINGLETON_MANAGER_REGISTRATION(container_credentials_provider);
 SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
+SINGLETON_MANAGER_REGISTRATION(web_identity_credentials_provider);
 
 CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,

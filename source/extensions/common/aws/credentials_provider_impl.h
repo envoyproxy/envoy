@@ -323,6 +323,7 @@ private:
  * OpenID)
  */
 class WebIdentityCredentialsProvider : public MetadataCredentialsProviderBase,
+                                       public Envoy::Singleton::Instance,
                                        public MetadataFetcher::MetadataReceiver {
 public:
   // token and token_file_path are mutually exclusive. If token is not empty, token_file_path is
