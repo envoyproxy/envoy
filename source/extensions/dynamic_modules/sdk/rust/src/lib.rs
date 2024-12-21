@@ -216,7 +216,348 @@ pub struct EnvoyHttpFilter {
 }
 
 impl EnvoyHttpFilter {
-  // TODO: add methods like getters for headers, etc.
+  /// Get the value of the request header with the given key.
+  /// If the header is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use [`Self::get_request_header_values`] variant.
+  pub fn get_request_header_value(&self, key: &[u8]) -> Option<&[u8]> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_request_header,
+    )
+  }
+
+  /// Get the values of the request header with the given key.
+  ///
+  /// If the header is not found, this returns an empty vector.
+  pub fn get_request_header_values(&self, key: &[u8]) -> Vec<&[u8]> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_request_header,
+    )
+  }
+
+  /// Get all request headers.
+  ///
+  /// Returns a list of key-value pairs of the request headers.
+  /// If there are no headers or headers are not available, this returns an empty list.
+  pub fn get_request_headers(&self) -> Vec<(&[u8], &[u8])> {
+    self.get_headers_impl(
+      abi::envoy_dynamic_module_callback_http_get_request_headers_count,
+      abi::envoy_dynamic_module_callback_http_get_request_headers,
+    )
+  }
+
+  /// Set the request header with the given key and value.
+  ///
+  /// This will overwrite the existing value if the header is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and set
+  /// the new value.
+  ///
+  /// Returns true if the header is set successfully.
+  pub fn set_request_header(&self, key: &[u8], value: &[u8]) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let value_ptr = value.as_ptr();
+    let value_size = value.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_request_header(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        value_ptr as *const _ as *mut _,
+        value_size,
+      )
+    }
+  }
+
+  /// Get the value of the request trailer with the given key.
+  /// If the trailer is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use [``Self::get_request_trailer_values`] variant.
+  pub fn get_request_trailer_value(&self, key: &[u8]) -> Option<&[u8]> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_request_trailer,
+    )
+  }
+
+  /// Get the values of the request trailer with the given key.
+  ///
+  /// If the trailer is not found, this returns an empty vector.
+  pub fn get_request_trailer_values(&self, key: &[u8]) -> Vec<&[u8]> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_request_trailer,
+    )
+  }
+
+  /// Get all request trailers.
+  ///
+  /// Returns a list of key-value pairs of the request trailers.
+  /// If there are no trailers or trailers are not available, this returns an empty list.
+  pub fn get_request_trailers(&self) -> Vec<(&[u8], &[u8])> {
+    self.get_headers_impl(
+      abi::envoy_dynamic_module_callback_http_get_request_trailers_count,
+      abi::envoy_dynamic_module_callback_http_get_request_trailers,
+    )
+  }
+
+  /// Set the request trailer with the given key and value.
+  ///
+  /// This will overwrite the existing value if the trailer is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and set
+  /// the new value.
+  ///
+  /// Returns true if the trailer is set successfully.
+  pub fn set_request_trailer(&self, key: &[u8], value: &[u8]) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let value_ptr = value.as_ptr();
+    let value_size = value.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_request_trailer(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        value_ptr as *const _ as *mut _,
+        value_size,
+      )
+    }
+  }
+
+  /// Get the value of the response header with the given key.
+  /// If the header is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use [``Self::get_response_header_values`] variant.
+  pub fn get_response_header_value(&self, key: &[u8]) -> Option<&[u8]> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_response_header,
+    )
+  }
+
+  /// Get the values of the response header with the given key.
+  ///
+  /// If the header is not found, this returns an empty vector.
+  pub fn get_response_header_values(&self, key: &[u8]) -> Vec<&[u8]> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_response_header,
+    )
+  }
+
+  /// Get all response headers.
+  ///
+  /// Returns a list of key-value pairs of the response headers.
+  /// If there are no headers or headers are not available, this returns an empty list.
+  pub fn get_response_headers(&self) -> Vec<(&[u8], &[u8])> {
+    self.get_headers_impl(
+      abi::envoy_dynamic_module_callback_http_get_response_headers_count,
+      abi::envoy_dynamic_module_callback_http_get_response_headers,
+    )
+  }
+
+  /// Set the response header with the given key and value.
+  ///
+  /// This will overwrite the existing value if the header is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and set
+  /// the new value.
+  ///
+  /// Returns true if the header is set successfully.
+  pub fn set_response_header(&self, key: &[u8], value: &[u8]) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let value_ptr = value.as_ptr();
+    let value_size = value.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_response_header(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        value_ptr as *const _ as *mut _,
+        value_size,
+      )
+    }
+  }
+
+
+  /// Get the value of the response trailer with the given key.
+  /// If the trailer is not found, this returns `None`.
+  ///
+  /// To handle multiple values for the same key, use [`Self::get_response_trailer_values`] variant.
+  pub fn get_response_trailer_value(&self, key: &[u8]) -> Option<&[u8]> {
+    self.get_header_value_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_response_trailer,
+    )
+  }
+
+  /// Get the values of the response trailer with the given key.
+  ///
+  /// If the trailer is not found, this returns an empty vector.
+  pub fn get_response_trailer_values(&self, key: &[u8]) -> Vec<&[u8]> {
+    self.get_header_values_impl(
+      key,
+      abi::envoy_dynamic_module_callback_http_get_response_trailer,
+    )
+  }
+
+  /// Get all response trailers.
+  ///
+  /// Returns a list of key-value pairs of the response trailers.
+  /// If there are no trailers or trailers are not available, this returns an empty list.
+  pub fn get_response_trailers(&self) -> Vec<(&[u8], &[u8])> {
+    self.get_headers_impl(
+      abi::envoy_dynamic_module_callback_http_get_response_trailers_count,
+      abi::envoy_dynamic_module_callback_http_get_response_trailers,
+    )
+  }
+
+  /// Set the response trailer with the given key and value.
+  ///
+  /// This will overwrite the existing value if the trailer is already present.
+  /// In case of multiple values for the same key, this will remove all the existing values and set
+  /// the new value.
+  ///
+  /// Returns true if the operation is successful.
+  pub fn set_response_trailer(&self, key: &[u8], value: &[u8]) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let value_ptr = value.as_ptr();
+    let value_size = value.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_response_trailer(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        value_ptr as *const _ as *mut _,
+        value_size,
+      )
+    }
+  }
+
+  /// Implement the common logic for getting all headers/trailers.
+  fn get_headers_impl(
+    &self,
+    count_callback: unsafe extern "C" fn(
+      filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+    ) -> usize,
+    getter_callback: unsafe extern "C" fn(
+      filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+      result_buffer_ptr: *mut abi::envoy_dynamic_module_type_http_header,
+    ) -> bool,
+  ) -> Vec<(&[u8], &[u8])> {
+    let count = unsafe { count_callback(self.raw_ptr) };
+    let mut headers = vec![(&[][..], &[][..]); count];
+    let success = unsafe {
+      getter_callback(
+        self.raw_ptr,
+        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_http_header,
+      )
+    };
+    if success {
+      headers
+    } else {
+      Vec::default()
+    }
+  }
+
+  /// This implements the common logic for getting the header/trailer values.
+  fn get_header_value_impl(
+    &self,
+    key: &[u8],
+    callback: unsafe extern "C" fn(
+      filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+      key: abi::envoy_dynamic_module_type_buffer_module_ptr,
+      key_length: usize,
+      result_buffer_ptr: *mut abi::envoy_dynamic_module_type_buffer_envoy_ptr,
+      result_buffer_length_ptr: *mut usize,
+      index: usize,
+    ) -> usize,
+  ) -> Option<&[u8]> {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+
+    let mut result_ptr: *const u8 = std::ptr::null();
+    let mut result_size: usize = 0;
+
+    unsafe {
+      callback(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        &mut result_ptr as *mut _ as *mut _,
+        &mut result_size as *mut _ as *mut _,
+        0, // Only the first value is needed.
+      )
+    };
+
+    if result_ptr.is_null() {
+      None
+    } else {
+      Some(unsafe { std::slice::from_raw_parts(result_ptr, result_size) })
+    }
+  }
+
+  /// This implements the common logic for getting the header/trailer values.
+  ///
+  /// TODO: use smallvec or similar to avoid the heap allocations for majority of the cases.
+  fn get_header_values_impl(
+    &self,
+    key: &[u8],
+    callback: unsafe extern "C" fn(
+      filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+      key: abi::envoy_dynamic_module_type_buffer_module_ptr,
+      key_length: usize,
+      result_buffer_ptr: *mut abi::envoy_dynamic_module_type_buffer_envoy_ptr,
+      result_buffer_length_ptr: *mut usize,
+      index: usize,
+    ) -> usize,
+  ) -> Vec<&[u8]> {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let mut result_ptr: *const u8 = std::ptr::null();
+    let mut result_size: usize = 0;
+
+    // Get the first value to get the count.
+    let counts = unsafe {
+      callback(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        &mut result_ptr as *mut _ as *mut _,
+        &mut result_size as *mut _ as *mut _,
+        0,
+      )
+    };
+
+    let mut results = Vec::new();
+    if counts == 0 {
+      return results;
+    }
+
+    // At this point, we assume at least one value is present.
+    results.push(unsafe { std::slice::from_raw_parts(result_ptr, result_size) });
+    // So, we iterate from 1 to counts - 1.
+    for i in 1 .. counts {
+      let mut result_ptr: *const u8 = std::ptr::null();
+      let mut result_size: usize = 0;
+      unsafe {
+        callback(
+          self.raw_ptr,
+          key_ptr as *const _ as *mut _,
+          key_size,
+          &mut result_ptr as *mut _ as *mut _,
+          &mut result_size as *mut _ as *mut _,
+          i,
+        )
+      };
+      // Within the range, all results are guaranteed to be non-null by Envoy.
+      results.push(unsafe { std::slice::from_raw_parts(result_ptr, result_size) });
+    }
+    results
+  }
 }
 
 #[no_mangle]

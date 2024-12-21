@@ -27,3 +27,8 @@ crate-type = ["cdylib"]
 name = "abi_version_mismatch"
 path = "abi_version_mismatch.rs"
 crate-type = ["cdylib"]
+
+[[example]]
+name = "http"
+path = "http.rs"
+crate-type = ["cdylib"]
