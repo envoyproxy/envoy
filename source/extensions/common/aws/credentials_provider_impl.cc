@@ -149,7 +149,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
     stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
 
     // If credential provider is being created during Envoy initialization, use init manager to
-    // delay cluster creation If we are here during normal processing, such as xDS update, then
+    // delay cluster creation. If we are here during normal processing, such as xDS update, then
     // create clusters and initialize TLS immediately
     if (context_->initManager().state() == Envoy::Init::Manager::State::Initialized) {
       initializeTlsAndCluster();
@@ -977,16 +977,16 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     if (!web_token_path.empty() && !role_arn.empty()) {
       const auto session_name = sessionName(api);
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-      const auto region_uuid = absl::StrCat(region, "_", context->api().randomGenerator().uuid());
+      // const auto region_uuid = absl::StrCat(region, "_", context->api().randomGenerator().uuid());
 
-      const auto cluster_name = stsClusterName(region_uuid);
+      const auto cluster_name = stsClusterName(region);
 
       ENVOY_LOG(
           debug,
           "Using web identity credentials provider with STS endpoint: {} and session name: {}",
           sts_endpoint, session_name);
       add(factories.createWebIdentityCredentialsProvider(
-          api, context, fetch_metadata_using_curl, MetadataFetcher::create, cluster_name,
+          api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create, cluster_name,
           web_token_path, "", sts_endpoint, role_arn, session_name, refresh_state,
           initialization_timer));
     }
@@ -1036,6 +1036,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
 // extensions
 SINGLETON_MANAGER_REGISTRATION(container_credentials_provider);
 SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
+SINGLETON_MANAGER_REGISTRATION(web_identity_credentials_provider);
 
 CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCredentialsProvider(
     Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
@@ -1070,6 +1071,24 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
             initialization_timer, cluster_name);
       });
 }
+
+  CredentialsProviderSharedPtr 
+  DefaultCredentialsProviderChain::createWebIdentityCredentialsProvider(
+      Api::Api& api, ServerFactoryContextOptRef context,Singleton::Manager& singleton_manager,
+      const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
+      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
+      absl::string_view token_file_path, absl::string_view token, absl::string_view sts_endpoint,
+      absl::string_view role_arn, absl::string_view role_session_name,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+      std::chrono::seconds initialization_timer) const {
+    return singleton_manager.getTyped<WebIdentityCredentialsProvider>(
+      SINGLETON_MANAGER_REGISTERED_NAME(web_identity_credentials_provider),
+      [&context, &api, cluster_name, fetch_metadata_using_curl,create_metadata_fetcher_cb,token_file_path, token, sts_endpoint, role_arn, role_session_name, refresh_state, initialization_timer] {
+  return std::make_shared<WebIdentityCredentialsProvider>(api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, token_file_path, token,
+        sts_endpoint, role_arn, role_session_name, refresh_state, initialization_timer,
+        cluster_name);
+      });
+  }
 
 absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,

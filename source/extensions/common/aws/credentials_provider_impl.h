@@ -319,6 +319,7 @@ private:
  * OpenID)
  */
 class WebIdentityCredentialsProvider : public MetadataCredentialsProviderBase,
+                                       public Envoy::Singleton::Instance,
                                        public MetadataFetcher::MetadataReceiver {
 public:
   // token and token_file_path are mutually exclusive. If token is not empty, token_file_path is
@@ -382,7 +383,7 @@ public:
   createCredentialsFileCredentialsProvider(Api::Api& api) const PURE;
 
   virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view token_file_path, absl::string_view token, absl::string_view sts_endpoint,
@@ -456,18 +457,13 @@ private:
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) const override;
 
   CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context,
+      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view token_file_path, absl::string_view token, absl::string_view sts_endpoint,
       absl::string_view role_arn, absl::string_view role_session_name,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer) const override {
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, token_file_path, token,
-        sts_endpoint, role_arn, role_session_name, refresh_state, initialization_timer,
-        cluster_name);
-  }
+      std::chrono::seconds initialization_timer) const override;
 };
 
 /**
