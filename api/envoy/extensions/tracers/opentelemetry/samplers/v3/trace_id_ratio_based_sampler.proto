@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package envoy.extensions.tracers.opentelemetry.samplers.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.tracers.opentelemetry.samplers.v3";
+option java_outer_classname = "TraceIdRatioBasedSamplerProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/tracers/opentelemetry/samplers/v3;samplersv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Trace Id Ratio Based Sampler config]
+// Configuration for the "TraceIdRatioBased" Sampler extension.
+// The sampler follows the "TraceIdRatioBased" implementation from the OpenTelemetry
+// SDK specification.
+//
+// See:
+// `TraceIdRatioBased sampler specification <https://opentelemetry.io/docs/specs/otel/trace/sdk/#traceidratiobased>`_
+// [#extension: envoy.tracers.opentelemetry.samplers.trace_id_ratio_based]
+
+message TraceIdRatioBasedSamplerConfig {
+  // This is a required value in the [0, 1] interval, If the given trace_id
+  // falls into a given ratio of all possible trace_id values, ShouldSample will
+  // return RECORD_AND_SAMPLE.
+  // required
+  // [#extension-category: envoy.tracers.opentelemetry.samplers]
+  double ratio = 1;
+}

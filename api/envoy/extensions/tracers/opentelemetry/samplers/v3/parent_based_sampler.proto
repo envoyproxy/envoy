@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package envoy.extensions.tracers.opentelemetry.samplers.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.tracers.opentelemetry.samplers.v3";
+option java_outer_classname = "ParentBasedSamplerProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/tracers/opentelemetry/samplers/v3;samplersv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Parent Based Sampler config]
+// Configuration for the "ParentBased" Sampler extension.
+// The sampler follows the "ParentBased" implementation from the OpenTelemetry
+// SDK specification.
+//
+// See:
+// `ParentBased sampler specification <https://opentelemetry.io/docs/specs/otel/trace/sdk/#parentbased>`_
+// [#extension: envoy.tracers.opentelemetry.samplers.parent_based]
+
+message ParentBasedSamplerConfig {
+  // Specifies the sampler to be used by this sampler.
+  // The configured sampler will be used if the parent trace ID is not passed to Envoy
+  //
+  // required
+  // [#extension-category: envoy.tracers.opentelemetry.samplers]
+  config.core.v3.TypedExtensionConfig wrapped_sampler = 1;
+}
