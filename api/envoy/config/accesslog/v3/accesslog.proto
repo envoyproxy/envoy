@@ -153,14 +153,13 @@ message TraceableFilter {
 }
 
 // Filters requests based on runtime-configurable sampling rates.
-// [#next-free-field: 4]
 message RuntimeFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.RuntimeFilter";
 
   // Specifies a key used to look up a custom sampling rate from the runtime configuration. If a value is found for this
   // key, it will override the default sampling rate specified in ``percent_sampled``.
-  string runtime_key = 1 [(validate.rules).string = {min_bytes: 1}];
+  string runtime_key = 1 [(validate.rules).string = {min_len: 1}];
 
   // Defines the default sampling percentage when no runtime override is present. If not specified, the default is
   // **0%** (with a denominator of 100).
