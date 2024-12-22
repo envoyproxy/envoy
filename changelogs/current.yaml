@@ -232,6 +232,9 @@ removed_config_or_runtime:
     Removed runtime flag ``envoy.reloadable_features.exclude_host_in_eds_status_draining``.
 
 new_features:
+- area: redis
+  change: |
+    Added support for keys and select.
 - area: wasm
   change: |
     Added the wasm vm reload support to reload wasm vm when the wasm vm is failed with runtime errors. See
