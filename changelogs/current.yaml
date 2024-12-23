@@ -405,7 +405,8 @@ new_features:
 - area: resource_monitors
   change: |
     Added extension to monitor Container CPU utilization in Linux K8s environment via :ref:`envoy container cpu utilization monitor
-    <envoy_v3_api_msg_extensions.resource_monitors.envoy_container_cpu_utilization.v3.EnvoyContainerCpuUtilizationConfig>` in overload manager.
+    <envoy_v3_api_msg_extensions.resource_monitors.envoy_container_cpu_utilization.v3.EnvoyContainerCpuUtilizationConfig>` in
+    overload manager.
 
 deprecated:
 - area: rbac
