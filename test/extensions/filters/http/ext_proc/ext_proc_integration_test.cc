@@ -5188,7 +5188,7 @@ TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamed) {
   // Enable FULL_DUPLEX_STREAMED body processing in both directions.
   IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true, true);
 
-  // The ext_proc server receives the requst headers and body.
+  // The ext_proc server receives the request headers and body.
   ProcessingRequest header_request;
   serverReceiveHeaderDuplexStreamed(header_request);
   uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent);
