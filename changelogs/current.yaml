@@ -29,7 +29,7 @@ behavior_changes:
     temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
 - area: ext_proc
   change: |
-    Adding support for a new body mode: FULL_DUPLEX_STREAMED into
+    Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter 
     :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
 
 minor_behavior_changes:
