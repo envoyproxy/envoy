@@ -49,12 +49,11 @@ public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
                        std::unique_ptr<RateLimitClient> local_client,
-                       Grpc::GrpcServiceConfigWithHashKey config_with_hash_key)
+                       Grpc::GrpcServiceConfigWithHashKey config_with_hash_key,
+                       Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher)
       : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
-        factory_context_(factory_context), client_(std::move(local_client)),
-        time_source_(factory_context.serverFactoryContext().mainThreadDispatcher().timeSource()) {
-    createMatcher();
-  }
+        factory_context_(factory_context), matcher_(matcher), client_(std::move(local_client)),
+        time_source_(factory_context.serverFactoryContext().mainThreadDispatcher().timeSource()) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
   void onDestroy() override;
@@ -72,9 +71,6 @@ public:
   }
 
 private:
-  // Create the matcher factory and matcher.
-  void createMatcher();
-
   Http::FilterHeadersStatus processCachedBucket(CachedBucket& cached_bucket);
   bool shouldAllowRequest(const CachedBucket& cached_bucket);
 
@@ -83,7 +79,7 @@ private:
   Server::Configuration::FactoryContext& factory_context_;
   Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
   RateLimitQuotaValidationVisitor visitor_ = {};
-  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_ = nullptr;
+  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
 
   // Own a local, filter-specific client to provider functions needed by worker
