@@ -232,6 +232,9 @@ removed_config_or_runtime:
     Removed runtime flag ``envoy.reloadable_features.exclude_host_in_eds_status_draining``.
 
 new_features:
+- area: redis
+  change: |
+    Added support for keys and select.
 - area: wasm
   change: |
     Added the wasm vm reload support to reload wasm vm when the wasm vm is failed with runtime errors. See
@@ -364,6 +367,12 @@ new_features:
   change: |
     Added new health check filter stats including total requests, successful/failed checks, cached responses, and
     cluster health status counters. These stats help track health check behavior and cluster health state.
+- area: http
+  change: |
+    Add :ref:`query parameter mutations
+    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.query_parameter_mutations>`
+    to :ref:`Header Mutation Filter <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
+    for adding/removing query parameters on a request.
 - area: local_ratelimit
   change: |
     Added per descriptor custom hits addend support for local rate limit filter. See :ref:`hits_addend
@@ -389,6 +398,10 @@ new_features:
     :ref:`VirtualHost.rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
     :ref:`RouteAction.rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
     will be ignored.
+- area: ratelimit
+  change: |
+    Add the option to reduce the rate limit budget based on request/response contexts on stream done.
+    See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
 - area: access log
   change: |
     Added new command-line flag :option:`--suppress-deprecated-warning-logs`.

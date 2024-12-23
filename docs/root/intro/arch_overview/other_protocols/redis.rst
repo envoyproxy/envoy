@@ -157,11 +157,13 @@ For details on each command's usage see the official
   EXISTS, Generic
   EXPIRE, Generic
   EXPIREAT, Generic
+  KEYS, String
   PERSIST, Generic
   PEXPIRE, Generic
   PEXPIREAT, Generic
   PTTL, Generic
   RESTORE, Generic
+  SELECT, Generic
   TOUCH, Generic
   TTL, Generic
   TYPE, Generic
@@ -300,7 +302,7 @@ Envoy can also generate its own errors in response to the client.
   the connection."
   invalid request, "Command was rejected by the first stage of the command splitter due to
   datatype or length."
-  unsupported command, "The command was not recognized by Envoy and therefore cannot be serviced
+  ERR unknown command, "The command was not recognized by Envoy and therefore cannot be serviced
   because it cannot be hashed to a backend server."
   finished with n errors, "Fragmented commands which sum the response (e.g. DEL) will return the
   total number of errors received if any were received."
