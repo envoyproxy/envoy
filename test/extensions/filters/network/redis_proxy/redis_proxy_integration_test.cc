@@ -880,13 +880,65 @@ TEST_P(RedisProxyIntegrationTest, QUITRequestAndResponse) {
 
 // This test sends an invalid Redis command from a fake
 // downstream client to the envoy proxy. Envoy will respond
+// with an ERR unknown command error.
+
+TEST_P(RedisProxyIntegrationTest, UnknownCommand) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "ERR unknown command 'foo', with args beginning with: "
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"foo"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an ERR unknown command error.
+
+TEST_P(RedisProxyIntegrationTest, UnknownCommandWithArgs) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "ERR unknown command 'hello', with args beginning with: world"
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello", "world"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an ERR unknown command error.
+
+TEST_P(RedisProxyIntegrationTest, HelloCommand) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "ERR unknown command 'hello', with args beginning with: world"
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello", "world"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
 // with an invalid request error.
 
 TEST_P(RedisProxyIntegrationTest, InvalidRequest) {
   std::stringstream error_response;
   error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
   initialize();
-  simpleProxyResponse(makeBulkStringArray({"foo"}), error_response.str());
+  simpleProxyResponse(makeBulkStringArray({"keys"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an invalid request error.
+
+TEST_P(RedisProxyIntegrationTest, InvalidArgsRequest) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "wrong number of arguments for 'keys' command"
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"keys", "a*", "b*"}), error_response.str());
 }
 
 // This test sends a simple Redis command to a fake upstream
