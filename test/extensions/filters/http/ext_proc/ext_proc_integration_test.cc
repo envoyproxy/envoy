@@ -5207,6 +5207,28 @@ TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamed) {
   verifyDownstreamResponse(*response, 400);
 }
 
+// The ext_proc server failed to send response in time trigger Envoy HCM stream_idle_timeout.
+TEST_P(ExtProcIntegrationTest, ServerWaitTooLongBeforeSendRespDuplexStreamed) {
+  // Set HCM stream_idle_timeout to be 10s. Note one can also set the
+  // RouteAction:idle_timeout under the route configuration to override it.
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_stream_idle_timeout()->set_seconds(10); });
+
+  const std::string body_sent(8 * 1024, 's');
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true);
+
+  // The ext_proc server receives the headers and body.
+  ProcessingRequest header_request;
+  serverReceiveHeaderDuplexStreamed(header_request);
+  serverReceiveBodyDuplexStreamed(body_sent);
+
+  // The ext_proc server waits for 12s before sending any response.
+  // HCM stream_idle_timeout is triggered, and local reply is sent to downstream.
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(12000));
+  verifyDownstreamResponse(*response, 504);
+}
+
 TEST_P(ExtProcIntegrationTest, ModeOverrideAllowed) {
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   proto_config_.set_allow_mode_override(true);
