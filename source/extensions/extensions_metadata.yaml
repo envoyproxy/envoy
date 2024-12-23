@@ -1112,6 +1112,13 @@ envoy.resource_monitors.cpu_utilization:
   status: alpha
   type_urls:
   - envoy.extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig
+envoy.resource_monitors.envoy_container_cpu_utilization:
+  categories:
+  - envoy.resource_monitors
+  security_posture: data_plane_agnostic
+  status: alpha
+  type_urls:
+  - envoy.extensions.resource_monitors.envoy_container_cpu_utilization.v3.EnvoyContainerCpuUtilizationConfig
 envoy.resource_monitors.global_downstream_max_connections:
   categories:
   - envoy.resource_monitors
