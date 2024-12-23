@@ -400,6 +400,50 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
 }
 
+#ifdef __linux__
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       AllowUpdateListenerWithAddAndRemoveAdditionalAddress) {
+  const std::string yaml1 = R"EOF(
+name: foo
+enable_reuse_port: true
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 8000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 8001
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: foo
+enable_reuse_port: true
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 8000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 8002
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, _)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, _)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+}
+#endif
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, SetListenerPerConnectionBufferLimit) {
   const std::string yaml = R"EOF(
 address:
@@ -2034,7 +2078,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
-  EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(2);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, _)).Times(2);
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
 
