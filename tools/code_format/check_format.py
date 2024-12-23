@@ -146,6 +146,10 @@ class FormatChecker:
         return not self.args.skip_envoy_build_rule_check
 
     @property
+    def run_code_validation(self):
+        return not self.args.skip_code_validation
+
+    @property
     def excluded_prefixes(self):
         return (
             self.config.paths["excluded"] + tuple(self.args.add_excluded_prefixes)
@@ -195,6 +199,10 @@ class FormatChecker:
             "--skip_envoy_build_rule_check",
             action="store_true",
             help="skip checking for '@envoy//' prefix in build rules.")
+        parser.add_argument(
+            "--skip_code_validation",
+            action="store_true",
+            help="skip custom code validation steps")
         parser.add_argument(
             "--namespace_check",
             type=str,
@@ -885,7 +893,9 @@ class FormatChecker:
         return error_messages
 
     def check_source_path(self, file_path):
-        error_messages = self.check_file_contents(file_path, self.check_source_line)
+        error_messages = []
+        if (self.run_code_validation):
+            error_messages = self.check_file_contents(file_path, self.check_source_line)
         if not file_path.endswith(self.config.suffixes["proto"]):
             error_messages += self.check_namespace(file_path)
             command = (
