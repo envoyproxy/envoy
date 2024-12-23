@@ -58,16 +58,18 @@ class Factory : public Common::FactoryBase<LeastRequestLbProto, LeastRequestCrea
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.least_request") {}
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Server::Configuration::ServerFactoryContext&,
-                                             const Protobuf::Message& config) override {
-    auto active_or_legacy = Common::ActiveOrLegacy<LeastRequestLbProto, ClusterProto>::get(&config);
-    ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadConfig(Server::Configuration::ServerFactoryContext&,
+             const Protobuf::Message& config) override {
+    ASSERT(dynamic_cast<const LeastRequestLbProto*>(&config) != nullptr);
+    const LeastRequestLbProto& typed_config = dynamic_cast<const LeastRequestLbProto&>(config);
+    // TODO(wbocode): to merge the legacy and typed config and related constructors into one.
+    return Upstream::LoadBalancerConfigPtr{new TypedLeastRequestLbConfig(typed_config)};
+  }
 
-    return active_or_legacy.hasLegacy()
-               ? Upstream::LoadBalancerConfigPtr{new LegacyLeastRequestLbConfig(
-                     *active_or_legacy.legacy())}
-               : Upstream::LoadBalancerConfigPtr{
-                     new TypedLeastRequestLbConfig(*active_or_legacy.active())};
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadLegacy(Server::Configuration::ServerFactoryContext&, const ClusterProto& cluster) override {
+    return Upstream::LoadBalancerConfigPtr{new LegacyLeastRequestLbConfig(cluster)};
   }
 };
 
