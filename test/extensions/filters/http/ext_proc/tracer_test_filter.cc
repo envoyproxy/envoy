@@ -115,10 +115,10 @@ private:
   std::string operation_name_;
   ExpectedSpansSharedPtr expected_spans_;
 
-  std::map<std::string, std::string> tags_;
-  bool context_injected_;
-  bool sampled_;
-  bool finished_;
+  std::map<std::string, std::string> tags_{};
+  bool context_injected_{false};
+  bool sampled_{false};
+  bool finished_{false};
 };
 
 class Driver : public Tracing::Driver, Logger::Loggable<Logger::Id::tracing> {
