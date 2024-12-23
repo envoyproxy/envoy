@@ -20,7 +20,6 @@
 
 #include "contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha/golang.pb.h"
 #include "source/common/protobuf/protobuf.h"
-#include "google/protobuf/any.pb.h"
 #include "processor_state.h"
 #include "xds/type/v3/typed_struct.pb.h"
 

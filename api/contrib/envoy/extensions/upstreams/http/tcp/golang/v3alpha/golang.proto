@@ -15,14 +15,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Http-Tcp Bridge]
 
-// A bridge which forwards downstream HTTP as TCP to upstream,
+// This bridge enables an HTTP client to connect to a TCP server via a Golang plugin, facilitating Protocol Convert from HTTP to any RPC protocol in Envoy.
 // [#extension: envoy.upstreams.http.tcp.golang]
 message Config {
   // Globally unique ID for a dynamic library file.
   string library_id = 1 [(validate.rules).string = {min_len: 1}];
 
   // Path to a dynamic library implementing the
-  // :repo:`DownstreamFilter API <contrib/golang/common/go/api.DownstreamFilter>`
+  // :repo:`HttpTcpBridge API <contrib/golang/common/go/api.HttpTcpBridge>`
   // interface.
   string library_path = 2 [(validate.rules).string = {min_len: 1}];
 
@@ -38,7 +38,7 @@ message Config {
   //     This configuration is only parsed in the go plugin, and is therefore not validated
   //     by Envoy.
   //
-  //     See the :repo:`TcpUpstreamFilter API <contrib/golang/common/go/api/filter.go>`
+  //     See the :repo:`HttpTcpBridge API <contrib/golang/common/go/api/filter.go>`
   //     for more information about how the plugin's configuration data can be accessed.
   //
   google.protobuf.Any plugin_config = 4;

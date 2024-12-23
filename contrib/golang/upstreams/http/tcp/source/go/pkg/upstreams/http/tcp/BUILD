@@ -7,8 +7,10 @@ go_library(
     srcs = [
         "api.h",
         "capi_impl.go",
+        "config.go",
         "factory.go",
         "filter.go",
+        "passthrough.go",
         "shim.go",
         "type.go",
     ],

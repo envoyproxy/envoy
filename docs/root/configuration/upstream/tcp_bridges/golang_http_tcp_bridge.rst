@@ -64,7 +64,7 @@ Configuration
    This filter should be configured with the type URL
    :ref:`type.googleapis.com/envoy.extensions.upstreams.http.tcp.golang.v3alpha.Config <envoy_v3_api_msg_extensions.upstreams.http.tcp.golang.v3alpha.Config>`.
 
-A prebuilt Golang Tcp Upstream filter  ``my_plugin.so`` might be configured as follows:
+A prebuilt Golang Http Tcp Bridge  ``my_plugin.so`` might be configured as follows:
 
 .. literalinclude:: /_configs/go/golang-tcp-upstream.yaml
    :language: yaml
@@ -72,7 +72,7 @@ A prebuilt Golang Tcp Upstream filter  ``my_plugin.so`` might be configured as f
    :lines: 42-48
    :lineno-start: 43
    :emphasize-lines: 2-7
-   :caption: :download:`golang.yaml </_configs/go/golang-tcp-upstream.yaml>`
+   :caption: :download:`golang-tcp-upstream.yaml </_configs/go/golang-tcp-upstream.yaml>`
 
 Extensible plugin configuration
 -------------------------------
@@ -89,5 +89,5 @@ Below is a very simple example of how such a plugin might be configured in Envoy
    :emphasize-lines: 8-13
    :caption: :download:`golang-tcp-upstream-with-config.yaml </_configs/go/golang-tcp-upstream-with-config.yaml>`
 
-See the :repo:`TcpUpstreamFilter API <contrib/golang/common/go/api/filter.go>`
+See the :repo:`HttpTcpBridge API <contrib/golang/common/go/api/filter.go>`
 for more information about how the plugin's configuration data can be accessed.

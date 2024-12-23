@@ -132,6 +132,6 @@ envoy.router.cluster_specifier_plugin.golang:
   status: alpha
 envoy.upstreams.http.tcp.golang:
   categories:
-  - envoy.upstreams.http.tcp
+  - envoy.upstreams
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
