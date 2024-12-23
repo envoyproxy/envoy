@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package envoy.extensions.resource_monitors.envoy_container_cpu_utilization.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.resource_monitors.envoy_container_cpu_utilization.v3";
+option java_outer_classname = "EnvoyContainerCpuUtilizationProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/resource_monitors/envoy_container_cpu_utilization/v3;envoy_container_cpu_utilizationv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Container CPU utilization]
+// [#extension: envoy.resource_monitors.envoy_container_cpu_utilization]
+
+// The Container CPU utilization resource monitor reports the Envoy process the CPU Utilization of the container in which envoy is running.
+// Today, this only works on Linux and is calculated using the Cgroup stats.
+message EnvoyContainerCpuUtilizationConfig {
+}

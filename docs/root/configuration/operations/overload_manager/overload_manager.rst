@@ -375,6 +375,30 @@ workload.
     :linenos:
     :caption: :download:`cpu_utilization_monitor_overload.yaml <_include/cpu_utilization_monitor_overload.yaml>`
 
+Loadshedding in K8s environment
+-------------------------------
+
+In a Kubernetes environment, where Envoy workloads often share node resources with other applications, configuring this
+overload action with a target container CPU utilization percentage offers a more adaptable approach than defining a fixed
+request rate. This ensures that Envoy workloads can dynamically manage their CPU usage based on container-level metrics
+without impacting other co-located workloads.
+
+The ``envoy.overload_actions.stop_accepting_requests`` overload action can be utilized to safeguard Envoy workloads
+in a Kubernetes environment from experiencing degraded performance during unexpected spikes in incoming requests
+that saturate the container's allocated CPU resources. When combined with the ``envoy.resource_monitors.envoy_container_cpu_utilization``
+resource monitor, this overload action can effectively reduce CPU pressure by rejecting new requests at a minimal computational cost.
+While the long-term solution to handle such spikes is horizontally scaling the workload,
+this overload action can help prevent cascading failures across the fleet by maintaining stability.
+
+.. literalinclude:: _include/container_cpu_utilization_monitor_overload.yaml
+    :language: yaml
+    :lines: 1-13
+    :emphasize-lines: 3-13
+    :linenos:
+    :caption: :download:`container_cpu_utilization_monitor_overload.yaml <_include/container_cpu_utilization_monitor_overload.yaml>`
+
+If neither CPU Requests nor CPU Limits has been provided to the envoy deployment in K8s, please use ``envoy.resource_monitors.cpu_utilization``
+since in absence of resource limits or requests, the envoy container would be able to use as much resources available on a Kubernetes Node.
 
 Statistics
 ----------
