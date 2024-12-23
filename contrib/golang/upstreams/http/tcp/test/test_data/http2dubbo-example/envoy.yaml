@@ -26,15 +26,15 @@ static_resources:
                   prefix: "/mytest.service"
                 route:
                   cluster: local_service
-                  upgrade_configs: 
+                  upgrade_configs:
                   - upgrade_type: "CONNECT"
-                    connect_config: 
+                    connect_config:
                       allow_post: true
-                      # proxy_protocol_config: 
+                      # proxy_protocol_config:
                       #   version: 0
-          
+
   clusters:
-  - name: local_service          
+  - name: local_service
     connect_timeout: 5s
     type: strict_dns
     lb_policy: round_robin
@@ -55,7 +55,7 @@ static_resources:
             cluster_for_special_label: "local_service"
             enable_tunneling: true
 
-      ## =========== Here is config for golang tcp upstream extension =========== END ##      
+      ## =========== Here is config for golang tcp upstream extension =========== END ##
 
     load_assignment:
       cluster_name: local_service

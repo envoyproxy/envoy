@@ -37,18 +37,21 @@ std::string ProcessorState::stateStr() {
 
 void ProcessorState::processData() {
   ASSERT(filterState() == FilterState::WaitingData ||
-          (filterState() == FilterState::WaitingAllData));
+         (filterState() == FilterState::WaitingAllData));
   setFilterState(FilterState::ProcessingData);
 }
 
-EncodingProcessorState::EncodingProcessorState(HttpTcpBridge& http_tpc_bridge) : ProcessorState(dynamic_cast<httpRequest*>(&http_tpc_bridge)) {
-    is_encoding = 1;
+EncodingProcessorState::EncodingProcessorState(HttpTcpBridge& http_tpc_bridge)
+    : ProcessorState(dynamic_cast<httpRequest*>(&http_tpc_bridge)) {
+  is_encoding = 1;
 }
 
 // headers_ should set to nullptr when return true.
 void EncodingProcessorState::handleHeaderGolangStatus(HttpTcpBridgeStatus status) {
-  ENVOY_LOG(debug, "golang http-tcp bridge handleHeaderGolangStatus handle header status, state: {}, status: {}", stateStr(),
-            int(status));
+  ENVOY_LOG(
+      debug,
+      "golang http-tcp bridge handleHeaderGolangStatus handle header status, state: {}, status: {}",
+      stateStr(), int(status));
 
   ASSERT(filterState() == FilterState::ProcessingHeader);
 
@@ -58,59 +61,77 @@ void EncodingProcessorState::handleHeaderGolangStatus(HttpTcpBridgeStatus status
 
     setFilterState(FilterState::WaitingData);
     break;
-  
+
   case HttpTcpBridgeStatus::HttpTcpBridgeStopAndBuffer:
-    // will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole data one-off.
+    // will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole
+    // data one-off.
 
     setFilterState(FilterState::WaitingAllData);
     break;
 
   default:
-    PANIC(fmt::format("golang http-tcp bridge handleHeaderGolangStatus unexpected go_tatus: {}", int(status)));
+    PANIC(fmt::format("golang http-tcp bridge handleHeaderGolangStatus unexpected go_tatus: {}",
+                      int(status)));
   }
 
-  ENVOY_LOG(debug, "golang http-tcp bridge handleHeaderGolangStatus after handle header status, state: {}, status: {}", stateStr(), int(status));
+  ENVOY_LOG(debug,
+            "golang http-tcp bridge handleHeaderGolangStatus after handle header status, state: "
+            "{}, status: {}",
+            stateStr(), int(status));
 };
 
-void EncodingProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus status, bool end_stream) {
-  ENVOY_LOG(debug, "golang http-tcp bridge handleDataGolangStatus handle data status, state: {}, status: {}", stateStr(),
-            int(status));
+void EncodingProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus status,
+                                                    bool end_stream) {
+  ENVOY_LOG(
+      debug,
+      "golang http-tcp bridge handleDataGolangStatus handle data status, state: {}, status: {}",
+      stateStr(), int(status));
 
   ASSERT(filterState() == FilterState::ProcessingData);
 
   switch (status) {
-    case HttpTcpBridgeStatus::HttpTcpBridgeContinue:
-      // streaming send data to upstream, go side get each_data_piece, may be called multipled times.
+  case HttpTcpBridgeStatus::HttpTcpBridgeContinue:
+    // streaming send data to upstream, go side get each_data_piece, may be called multipled times.
 
-      if (end_stream) {
-        setFilterState(FilterState::Done);
-        // http req is end, drain data buffer
-        drainBufferData();
-        break;
-      }
-
-      RELEASE_ASSERT(isBufferDataEmpty(), fmt::format("golang http-tcp bridge handleDataGolangStatus unexpected HttpTcpBridgeContinue while data_buffer_ is not empty: {}", int(status)));
-      setFilterState(FilterState::WaitingData);
+    if (end_stream) {
+      setFilterState(FilterState::Done);
+      // http req is end, drain data buffer
+      drainBufferData();
       break;
-
-    case HttpTcpBridgeStatus::HttpTcpBridgeStopAndBuffer:
-      // buffer further whole data, go side in encodeData get whole data one-off.
-
-      if (end_stream) {
-        PANIC(fmt::format("golang http-tcp bridge handleDataGolangStatus unexpected go_tatus when end_stream is true: {}", int(status)));
-      }
-      setFilterState(FilterState::WaitingAllData);
-      break;
-
-    default:
-      PANIC(fmt::format("golang http-tcp bridge handleDataGolangStatus unexpected go_tatus: {}", int(status)));
     }
 
-    ENVOY_LOG(debug, "golang http-tcp bridge handleDataGolangStatus handle data status, state: {}, status: {}", stateStr(), int(status));
+    RELEASE_ASSERT(isBufferDataEmpty(),
+                   fmt::format("golang http-tcp bridge handleDataGolangStatus unexpected "
+                               "HttpTcpBridgeContinue while data_buffer_ is not empty: {}",
+                               int(status)));
+    setFilterState(FilterState::WaitingData);
+    break;
+
+  case HttpTcpBridgeStatus::HttpTcpBridgeStopAndBuffer:
+    // buffer further whole data, go side in encodeData get whole data one-off.
+
+    if (end_stream) {
+      PANIC(fmt::format("golang http-tcp bridge handleDataGolangStatus unexpected go_tatus when "
+                        "end_stream is true: {}",
+                        int(status)));
+    }
+    setFilterState(FilterState::WaitingAllData);
+    break;
+
+  default:
+    PANIC(fmt::format("golang http-tcp bridge handleDataGolangStatus unexpected go_tatus: {}",
+                      int(status)));
+  }
+
+  ENVOY_LOG(
+      debug,
+      "golang http-tcp bridge handleDataGolangStatus handle data status, state: {}, status: {}",
+      stateStr(), int(status));
 };
 
-DecodingProcessorState::DecodingProcessorState(HttpTcpBridge& http_tpc_bridge) : ProcessorState(dynamic_cast<httpRequest*>(&http_tpc_bridge)) {
-    is_encoding = 0;
+DecodingProcessorState::DecodingProcessorState(HttpTcpBridge& http_tpc_bridge)
+    : ProcessorState(dynamic_cast<httpRequest*>(&http_tpc_bridge)) {
+  is_encoding = 0;
 }
 
 } // namespace Golang

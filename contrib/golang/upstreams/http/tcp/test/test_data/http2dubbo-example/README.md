@@ -2,16 +2,16 @@
 
 * To simply support http2dubbo by go extension on envoy, we only need to write one extension by golang: **golang-tcp-upstream**.
 
-## Example 
+## Example
 
 ### Build golang-so with filter.go and config.go
 > cd ./ \
 > go mod tidy \
-> go build -v -o ./envoy/libgolang.so -buildmode=c-shared . 
+> go build -v -o ./envoy/libgolang.so -buildmode=c-shared .
 
 
 ### Run Envoy with golang-so
-> run envoy with ./envoy.yaml 
+> run envoy with ./envoy.yaml
 >> (remember to replace golang-so path with your own).
 
 ### Run Dubbo Server
@@ -24,7 +24,7 @@
 
 > dubbo Interface: com.alibaba.nacos.example.dubbo.service.DemoService \
 > dubbo method: sayName
-    
+
     public class DefaultService implements DemoService {
         public String sayName(String name) {
             return String.format("Hello, %s !\n", name);
@@ -45,8 +45,8 @@ if we pass <u>name</u> param in dubbo req body, it will return <u>Hello {name} !
     > Host: 127.0.0.1:10001
     > User-Agent: curl/7.68.0
     > Accept: */*
-    
-    * Response Msg: 
+
+    * Response Msg:
     < HTTP/1.1 200 OK
     < content-type: application/json; charset=utf-8
     < extension: golang-tcp-upstream
@@ -73,8 +73,8 @@ if we pass <u>name</u> param in dubbo req body, it will return <u>Hello {name} !
     > dubbo_interface: com.alibaba.nacos.example.dubbo.service.DemoService
     > Content-Length: 16
     > Content-Type: application/x-www-form-urlencoded
-    
-    * Response Msg: 
+
+    * Response Msg:
     < HTTP/1.1 200 OK
     < content-type: application/json; charset=utf-8
     < extension: golang-tcp-upstream

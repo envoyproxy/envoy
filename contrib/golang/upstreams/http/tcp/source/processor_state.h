@@ -26,8 +26,8 @@ namespace Golang {
 class HttpTcpBridge;
 
 /**
-  * This describes the processor state.
-*/
+ * This describes the processor state.
+ */
 enum class FilterState {
   // Waiting header
   WaitingHeader,
@@ -43,40 +43,43 @@ enum class FilterState {
   Done,
 };
 /**
-  * An enum specific for Golang status.
-*/
+ * An enum specific for Golang status.
+ */
 enum class HttpTcpBridgeStatus {
-  /** 
-  * Area of status: encodeHeaders, encodeData, onUpstreamData
-  *
-  * Used when you want to leave the current func area and continue further func. (when streaming, go side get each_data_piece, may be called multipled times)
-  *
-  * Here is the specific explanation in different funcs:
-  * encodeHeaders: will go to encodeData, go side in encodeData will streaming get each_data_piece.
-  * encodeData: streaming send data to upstream, go side get each_data_piece, may be called multipled times.
-  * onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
-  */
+  /**
+   * Area of status: encodeHeaders, encodeData, onUpstreamData
+   *
+   * Used when you want to leave the current func area and continue further func. (when streaming,
+   * go side get each_data_piece, may be called multipled times)
+   *
+   * Here is the specific explanation in different funcs:
+   * encodeHeaders: will go to encodeData, go side in encodeData will streaming get each_data_piece.
+   * encodeData: streaming send data to upstream, go side get each_data_piece, may be called
+   * multipled times. onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data
+   * and headers to downstream streaming.
+   */
   HttpTcpBridgeContinue,
 
-  /** 
-  * Area of status: encodeHeaders, encodeData, onUpstreamData
-  *
-  * Used when you want to buffer data.
-  *
-  * Here is the specific explanation in different funcs:
-  * encodeHeaders: will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole data one-off.
-  * encodeData: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot be used when end_stream=true)
-  * onUpstreamData: every data trigger will call go side, and go side get whloe buffered data ever since at every time.
-  */
+  /**
+   * Area of status: encodeHeaders, encodeData, onUpstreamData
+   *
+   * Used when you want to buffer data.
+   *
+   * Here is the specific explanation in different funcs:
+   * encodeHeaders: will go to encodeData, encodeData will buffer whole data, go side in encodeData
+   * get whole data one-off. encodeData: buffer further whole data, go side in encodeData get whole
+   * data one-off. (Be careful: cannot be used when end_stream=true) onUpstreamData: every data
+   * trigger will call go side, and go side get whloe buffered data ever since at every time.
+   */
   HttpTcpBridgeStopAndBuffer,
 
   /** Area of status: onUpstreamData
-  *
-  * Used when you want to endStream for sending data to downstream in onUpstreamData.
-  *
-  * Here is the specific explanation in different funcs:
-  * onUpstreamData: endStream to downstream which means the whole resp to http has finished.
-  */
+   *
+   * Used when you want to endStream for sending data to downstream in onUpstreamData.
+   *
+   * Here is the specific explanation in different funcs:
+   * onUpstreamData: endStream to downstream which means the whole resp to http has finished.
+   */
   HttpTcpBridgeEndStream,
 };
 
@@ -94,9 +97,9 @@ public:
   FilterState filterState() const { return static_cast<FilterState>(state); }
   void setFilterState(FilterState st) { state = static_cast<int>(st); }
   bool isProcessingInGo() {
-    return filterState() == FilterState::ProcessingHeader || filterState() == FilterState::ProcessingData;
+    return filterState() == FilterState::ProcessingHeader ||
+           filterState() == FilterState::ProcessingData;
   }
-
 };
 
 class EncodingProcessorState : public ProcessorState {
@@ -137,7 +140,7 @@ protected:
 class DecodingProcessorState : public ProcessorState {
 public:
   DecodingProcessorState(HttpTcpBridge& http_tcp_bridge);
-  
+
   // store response header for http
   std::unique_ptr<Envoy::Http::ResponseHeaderMapImpl> resp_headers{nullptr};
 };

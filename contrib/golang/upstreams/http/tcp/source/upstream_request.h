@@ -9,21 +9,19 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
-#include "google/protobuf/any.pb.h"
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
-#include "source/common/router/upstream_request.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/router/upstream_request.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
-#include "processor_state.h"
-#include "processor_state.h"
-
-#include "contrib/golang/common/dso/dso.h"
 
 #include "contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha/golang.pb.h"
+#include "source/common/protobuf/protobuf.h"
+#include "google/protobuf/any.pb.h"
+#include "processor_state.h"
 #include "xds/type/v3/typed_struct.pb.h"
 
 namespace Envoy {
@@ -51,7 +49,7 @@ class BridgeConfig : httpConfig,
                      Logger::Loggable<Logger::Id::golang> {
 public:
   BridgeConfig(const envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config proto_config,
-   Dso::HttpTcpBridgeDsoPtr dso_lib);
+               Dso::HttpTcpBridgeDsoPtr dso_lib);
   ~BridgeConfig();
 
   const std::string& soId() const { return so_id_; }
@@ -79,7 +77,8 @@ class TcpConnPool : public Router::GenericConnPool,
                     Logger::Loggable<Logger::Id::golang> {
 public:
   TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-              Upstream::ResourcePriority priority, Upstream::LoadBalancerContext* ctx, const Protobuf::Message& config);
+              Upstream::ResourcePriority priority, Upstream::LoadBalancerContext* ctx,
+              const Protobuf::Message& config);
 
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
@@ -104,7 +103,7 @@ public:
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_handle_ = nullptr;
-    callbacks_->onPoolFailure(reason, transport_failure_reason, host);    
+    callbacks_->onPoolFailure(reason, transport_failure_reason, host);
   }
 
   void onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
@@ -120,22 +119,23 @@ private:
   BridgeConfigSharedPtr config_;
 };
 
-
 /**
- *  The bridge enables an HTTP client to connect to a TCP server via a Golang plugin, facilitating Protocol Convert from HTTP to any RPC protocol in Envoy. 
+ *  The bridge enables an HTTP client to connect to a TCP server via a Golang plugin, facilitating
+ * Protocol Convert from HTTP to any RPC protocol in Envoy.
  *
- *  Notice: the bridge is designed for sync data flow between go and c, so DO NOT use goroutine in go side.
+ *  Notice: the bridge is designed for sync data flow between go and c, so DO NOT use goroutine in
+ * go side.
  *
  */
 class HttpTcpBridge : public Router::GenericUpstream,
-                    public Envoy::Tcp::ConnectionPool::UpstreamCallbacks,
-                    public httpRequest,
-                    Logger::Loggable<Logger::Id::golang>  {
+                      public Envoy::Tcp::ConnectionPool::UpstreamCallbacks,
+                      public httpRequest,
+                      Logger::Loggable<Logger::Id::golang> {
 public:
   HttpTcpBridge(Router::UpstreamToDownstream* upstream_request,
-              Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream, Dso::HttpTcpBridgeDsoPtr dynamic_lib,
-              BridgeConfigSharedPtr config);
-  ~HttpTcpBridge() override;            
+                Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream,
+                Dso::HttpTcpBridgeDsoPtr dynamic_lib, BridgeConfigSharedPtr config);
+  ~HttpTcpBridge() override;
 
   enum class EndStreamType {
     NotEndStream,
@@ -153,11 +153,12 @@ public:
   void initResponse();
 
   // GenericUpstream
-  Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap& headers, bool end_stream) override;
+  Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap& headers,
+                                    bool end_stream) override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeMetadata(const Envoy::Http::MetadataMapVector&) override {}
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
-  void enableTcpTunneling() override {upstream_conn_data_->connection().enableHalfClose(true);};
+  void enableTcpTunneling() override { upstream_conn_data_->connection().enableHalfClose(true); };
   void readDisable(bool disable) override;
   void resetStream() override;
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
@@ -174,11 +175,13 @@ public:
   void sendDataToDownstream(Buffer::Instance& data, bool end_stream);
 
   CAPIStatus copyHeaders(ProcessorState& state, GoString* go_strs, char* go_buf);
-  CAPIStatus setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value, headerAction act);
+  CAPIStatus setRespHeader(ProcessorState& state, absl::string_view key, absl::string_view value,
+                           headerAction act);
   CAPIStatus removeRespHeader(ProcessorState& state, absl::string_view key);
   CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
   CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
-  CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer, absl::string_view& value, bufferAction action);
+  CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
+                             absl::string_view& value, bufferAction action);
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
   CAPIStatus setSelfHalfCloseForUpstreamConn(int enabled);
 
@@ -190,7 +193,8 @@ public:
 
   const Router::RouteEntry* route_entry_;
 
-  // cache routeName for getStringValue, since upstream_request_->route().virtualHost().routeConfig().name() is not concurrent safe.
+  // cache routeName for getStringValue, since
+  // upstream_request_->route().virtualHost().routeConfig().name() is not concurrent safe.
   std::string route_name_;
 
 private:
@@ -211,8 +215,6 @@ private:
   // lock to avoid race in c thread between multi go code calls(go call c).
   Thread::MutexBasicLockable mutex_for_go_{};
 };
-
-
 
 } // namespace Golang
 } // namespace Tcp

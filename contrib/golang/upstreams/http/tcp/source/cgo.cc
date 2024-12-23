@@ -9,13 +9,6 @@ namespace Http {
 namespace Tcp {
 namespace Golang {
 
-//
-// These functions may be invoked in another go thread,
-// which means may introduce race between go thread and envoy thread.
-// So we use the envoy's dispatcher in the filter to post it, and make it only executes in the envoy
-// thread.
-//
-
 // The returned absl::string_view only refer to Go memory,
 // should not use it after the current cgo call returns.
 absl::string_view stringViewFromGoPointer(void* p, int len) {
@@ -32,7 +25,7 @@ CAPIStatus envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
 }
 
 CAPIStatus envoyGoHttpTcpBridgeHandlerWrapper(void* r,
-                                       std::function<CAPIStatus(HttpTcpBridge&)> f) {
+                                              std::function<CAPIStatus(HttpTcpBridge&)> f) {
   auto req = static_cast<HttpTcpBridge*>(reinterpret_cast<httpRequest*>(r));
   return f(*req);
 }
@@ -47,7 +40,7 @@ CAPIStatus envoyGoHttpTcpBridgeCopyHeaders(void* s, void* strs, void* buf) {
 }
 
 CAPIStatus envoyGoHttpTcpBridgeSetRespHeader(void* s, void* key_data, int key_len, void* value_data,
-                                            int value_len, headerAction act) {
+                                             int value_len, headerAction act) {
   return envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
       s,
       [key_data, key_len, value_data, value_len, act](HttpTcpBridge& t,
@@ -76,26 +69,24 @@ CAPIStatus envoyGoHttpTcpBridgeGetBuffer(void* s, uint64_t buffer_ptr, void* dat
 
 CAPIStatus envoyGoHttpTcpBridgeDrainBuffer(void* s, uint64_t buffer_ptr, uint64_t length) {
   return envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
-      s,
-      [buffer_ptr, length](HttpTcpBridge& t, ProcessorState& state) -> CAPIStatus {
+      s, [buffer_ptr, length](HttpTcpBridge& t, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         return t.drainBuffer(state, buffer, length);
       });
 }
 
 CAPIStatus envoyGoHttpTcpBridgeSetBufferHelper(void* s, uint64_t buffer_ptr, void* data, int length,
-                                            bufferAction action) {
+                                               bufferAction action) {
   return envoyGoHttpTcpBridgeProcessStateHandlerWrapper(
-      s,
-      [buffer_ptr, data, length, action](HttpTcpBridge& t,
-                                         ProcessorState& state) -> CAPIStatus {
+      s, [buffer_ptr, data, length, action](HttpTcpBridge& t, ProcessorState& state) -> CAPIStatus {
         auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
         auto value = stringViewFromGoPointer(data, length);
         return t.setBufferHelper(state, buffer, value, action);
       });
 }
 
-CAPIStatus envoyGoHttpTcpBridgeGetStringValue(void* r, int id, uint64_t* value_data, int* value_len) {
+CAPIStatus envoyGoHttpTcpBridgeGetStringValue(void* r, int id, uint64_t* value_data,
+                                              int* value_len) {
   return envoyGoHttpTcpBridgeHandlerWrapper(
       r, [id, value_data, value_len](HttpTcpBridge& t) -> CAPIStatus {
         return t.getStringValue(id, value_data, value_len);
@@ -103,10 +94,9 @@ CAPIStatus envoyGoHttpTcpBridgeGetStringValue(void* r, int id, uint64_t* value_d
 }
 
 CAPIStatus envoyGoHttpTcpBridgeSetSelfHalfCloseForUpstreamConn(void* r, int enabled) {
-  return envoyGoHttpTcpBridgeHandlerWrapper(
-      r, [enabled](HttpTcpBridge& t) -> CAPIStatus {
-        return t.setSelfHalfCloseForUpstreamConn(enabled);
-      });
+  return envoyGoHttpTcpBridgeHandlerWrapper(r, [enabled](HttpTcpBridge& t) -> CAPIStatus {
+    return t.setSelfHalfCloseForUpstreamConn(enabled);
+  });
 }
 
 } // extern "C"

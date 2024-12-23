@@ -179,3 +179,13 @@ updates:
   schedule:
     interval: daily
     time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/upstreams/http/tcp/test/test_data/http2dubbo-example"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"

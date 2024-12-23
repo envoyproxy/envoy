@@ -3,13 +3,13 @@
 #include "envoy/http/header_map.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "google/protobuf/any.pb.h"
 #include "source/common/http/codec_client.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/null_route_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -309,7 +309,7 @@ std::unique_ptr<Router::GenericConnPool> HttpConnPool::createConnPool(
     return nullptr;
   }
 
-  google::protobuf::Any message;
+  ProtobufWkt::Any message;
   if (cluster.info()->upstreamConfig()) {
     message = cluster.info()->upstreamConfig()->typed_config();
   }

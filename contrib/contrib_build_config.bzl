@@ -28,7 +28,6 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
     "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
-    "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
 
     #
     # Sip proxy
@@ -84,4 +83,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.router.cluster_specifier_plugin.golang":             "//contrib/golang/router/cluster_specifier/source:config",
+
+    #
+    # http tcp upstream plugin
+    #
+
+    "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
 }

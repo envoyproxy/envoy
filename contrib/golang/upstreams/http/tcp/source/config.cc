@@ -10,10 +10,10 @@ namespace Tcp {
 namespace Golang {
 
 Router::GenericConnPoolPtr GolangGenericConnPoolFactory::createGenericConnPool(
-    Upstream::HostConstSharedPtr,
-    Upstream::ThreadLocalCluster& thread_local_cluster,
+    Upstream::HostConstSharedPtr, Upstream::ThreadLocalCluster& thread_local_cluster,
     Router::GenericConnPoolFactory::UpstreamProtocol, Upstream::ResourcePriority priority,
-    absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx, const Protobuf::Message& config) const {
+    absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext* ctx,
+    const Protobuf::Message& config) const {
   auto ret = std::make_unique<TcpConnPool>(thread_local_cluster, priority, ctx, config);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
@@ -21,7 +21,7 @@ Router::GenericConnPoolPtr GolangGenericConnPoolFactory::createGenericConnPool(
 REGISTER_FACTORY(GolangGenericConnPoolFactory, Router::GenericConnPoolFactory);
 
 } // namespace Golang
-} // namespace DubboTcp
+} // namespace Tcp
 } // namespace Http
 } // namespace Upstreams
 } // namespace Extensions

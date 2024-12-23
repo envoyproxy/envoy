@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 licenses(["notice"])  # Apache 2
 
 go_library(
-    name = "tcp_upstream",
+    name = "http_tcp_bridge",
     srcs = [
         "api.h",
         "capi_impl.go",
@@ -32,6 +32,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/golang/common/go/api",
+        "//contrib/golang/common/go/api_impl",
         "//contrib/golang/common/go/utils",
         "@org_golang_google_protobuf//proto",
         "@org_golang_google_protobuf//types/known/anypb",

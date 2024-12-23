@@ -28,21 +28,22 @@ protected:
 };
 
 TEST_F(GenericGenericConnPoolFactoryTest, CreateValidHttpConnPool) {
-  EXPECT_TRUE(factory_.createGenericConnPool(nullptr, thread_local_cluster_,
-                                             Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-                                             priority_, Envoy::Http::Protocol::Http2, nullptr, *message_));
+  EXPECT_TRUE(factory_.createGenericConnPool(
+      nullptr, thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
+      priority_, Envoy::Http::Protocol::Http2, nullptr, *message_));
 }
 
 TEST_F(GenericGenericConnPoolFactoryTest, CreateValidTcpConnPool) {
-  EXPECT_TRUE(factory_.createGenericConnPool(nullptr, thread_local_cluster_,
-                                             Router::GenericConnPoolFactory::UpstreamProtocol::TCP,
-                                             priority_, Envoy::Http::Protocol::Http2, nullptr, *message_));
+  EXPECT_TRUE(factory_.createGenericConnPool(
+      nullptr, thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::TCP,
+      priority_, Envoy::Http::Protocol::Http2, nullptr, *message_));
 }
 
 TEST_F(GenericGenericConnPoolFactoryTest, CreateValidUdpConnPool) {
   EXPECT_TRUE(factory_.createGenericConnPool(thread_local_cluster_.lb_.host_, thread_local_cluster_,
                                              Router::GenericConnPoolFactory::UpstreamProtocol::UDP,
-                                             priority_, Envoy::Http::Protocol::Http2, nullptr, *message_));
+                                             priority_, Envoy::Http::Protocol::Http2, nullptr,
+                                             *message_));
 }
 
 TEST_F(GenericGenericConnPoolFactoryTest, InvalidConnPool) {

@@ -15,7 +15,7 @@ go_binary(
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/golang/common/go/api",
-        "//contrib/golang/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp:tcp_upstream",
+        "//contrib/golang/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp:http_tcp_bridge",
         "@org_golang_google_protobuf//types/known/anypb",
         "@org_golang_google_protobuf//types/known/structpb",
     ],
