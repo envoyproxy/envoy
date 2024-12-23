@@ -7423,6 +7423,37 @@ TEST_F(ClusterManagerImplTest, CheckAddressesList) {
   ASSERT_EQ(hosts[0]->addressListOrNull()->size(), 2);
 }
 
+// Verify that non-IP additional addresses are rejected.
+TEST_F(ClusterManagerImplTest, RejectNonIpAdditionalAddresses) {
+  const std::string bootstrap = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_0
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              additionalAddresses:
+              - address:
+                  envoyInternalAddress:
+                   server_listener_name: internal_address
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  try {
+    create(parseBootstrapFromV3Yaml(bootstrap));
+    FAIL() << "Invalid address was not rejected";
+  } catch (const EnvoyException& e) {
+    EXPECT_STREQ("additional_addresses must be IP addresses.", e.what());
+  }
+}
+
 TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {
   const std::string yaml = R"EOF(
   static_resources:

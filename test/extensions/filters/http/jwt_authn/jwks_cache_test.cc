@@ -98,48 +98,13 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
 
-  EXPECT_EQ(jwks->setRemoteJwks(std::move(jwks_), false)->getStatus(), Status::Ok);
+  EXPECT_EQ(jwks->setRemoteJwks(std::move(jwks_))->getStatus(), Status::Ok);
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
   EXPECT_FALSE(jwks->isExpired());
 
   // cache duration is 1 second, sleep two seconds to expire it
   context_.server_factory_context_.time_system_.advanceTimeWait(std::chrono::seconds(2));
   EXPECT_TRUE(jwks->isExpired());
-}
-
-// Test setRemoteJwks to all threads
-TEST_F(JwksCacheTest, TestSetRemoteJwksToAllThreads) {
-  cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
-
-  auto jwks = cache_->findByIssuer("https://example.com");
-  EXPECT_TRUE(jwks->getJwksObj() == nullptr);
-
-  EXPECT_EQ(jwks->setRemoteJwks(std::move(jwks_), true)->getStatus(), Status::Ok);
-  EXPECT_FALSE(jwks->getJwksObj() == nullptr);
-}
-
-// Test allowing/disallowing remote fetch.
-TEST_F(JwksCacheTest, TestRemoteFetchAllowed) {
-  cache_ = JwksCache::create(config_, context_, mock_fetcher_.AsStdFunction(), stats_);
-  auto jwks = cache_->findByIssuer("https://example.com");
-
-  // Fetch should be allowed by default.
-  EXPECT_TRUE(jwks->isRemoteJwksFetchAllowed());
-
-  // Start backoff which should disallow fetch.
-  jwks->allowRemoteJwksFetch(true, false);
-  EXPECT_FALSE(jwks->isRemoteJwksFetchAllowed());
-  // Stop backoff which should allow fetch.
-  jwks->allowRemoteJwksFetch(false, false);
-  EXPECT_TRUE(jwks->isRemoteJwksFetchAllowed());
-
-  // Fetch in flight.
-  jwks->allowRemoteJwksFetch(false, true);
-  EXPECT_FALSE(jwks->isRemoteJwksFetchAllowed());
-
-  // Fetch in flight completed, which should allow further fetches.
-  jwks->allowRemoteJwksFetch(false, false);
-  EXPECT_TRUE(jwks->isRemoteJwksFetchAllowed());
 }
 
 // Test setRemoteJwks and use default cache duration.
@@ -152,7 +117,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwksWithDefaultCacheDuration) {
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
 
-  EXPECT_EQ(jwks->setRemoteJwks(std::move(jwks_), false)->getStatus(), Status::Ok);
+  EXPECT_EQ(jwks->setRemoteJwks(std::move(jwks_))->getStatus(), Status::Ok);
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
   EXPECT_FALSE(jwks->isExpired());
 }

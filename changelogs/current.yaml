@@ -28,6 +28,7 @@ behavior_changes:
     but also means shadowing may take place for requests which are canceled mid-stream. This behavior change can be
     temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
 
+
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: access_log
@@ -89,6 +90,15 @@ minor_behavior_changes:
   change: |
     Local replies now traverse the filter chain if 1xx headers have been sent to the client. This change can be reverted
     by setting the runtime guard ``envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx`` to false.
+- area: cluster
+  change: |
+      Clusters can no longer use unregistered extension types in
+      :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`.
+- area: cluster
+  change: |
+      Clusters factories are registered by configuration type for
+      :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`
+      and will use configuration type to lookup the corresponding factory when available.
 - area: dns
   change: |
     Patched c-ares to address CVE-2024-25629.
@@ -163,6 +173,24 @@ bug_fixes:
 - area: csrf
   change: |
     Handle requests that have a "privacy sensitive" / opaque origin (``Origin: null``) as if the request had no origin information.
+- area: udp_proxy
+  change: |
+    Fix a bug that cause Envoy to crash due to segmentation fault when onBelowWriteBufferLowWatermark callback is called.
+- area: orca
+  change: |
+    The previous ORCA parser will use ``:`` as the delimiter of key/value pair in the native HTTP report. This is wrong
+    based on the design document. The correct delimiter should be ``=``. This change add the ``=`` delimiter support to
+    match the design document and keep the ``:`` delimiter for backward compatibility.
+- area: http/1
+  change: |
+    Fixes sending overload crashes when HTTP/1 request is reset.
+- area: happy_eyeballs
+  change: |
+    Validate that ``additional_address`` are IP addresses instead of crashing when sorting.
+- area: balsa
+  change: |
+    Fix incorrect handling of non-101 1xx responses. This fix can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -204,6 +232,9 @@ removed_config_or_runtime:
     Removed runtime flag ``envoy.reloadable_features.exclude_host_in_eds_status_draining``.
 
 new_features:
+- area: redis
+  change: |
+    Added support for keys and select.
 - area: wasm
   change: |
     Added the wasm vm reload support to reload wasm vm when the wasm vm is failed with runtime errors. See
@@ -332,15 +363,20 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.cx_pool_ready_duration``
     to get the duration from when the upstream request was created to when the upstream connection pool is ready.
-- area: jwt_authn
-  change: |
-    Added  :ref:`refetch_jwks_on_kid_mismatch
-    <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.RemoteJwks.refetch_jwks_on_kid_mismatch>`
-    to allow filter to refetch JWKS when extracted JWT's KID does not match cached JWKS's KID.
 - area: health_check
   change: |
     Added new health check filter stats including total requests, successful/failed checks, cached responses, and
     cluster health status counters. These stats help track health check behavior and cluster health state.
+- area: http
+  change: |
+    Add :ref:`query parameter mutations
+    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.query_parameter_mutations>`
+    to :ref:`Header Mutation Filter <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
+    for adding/removing query parameters on a request.
+- area: local_ratelimit
+  change: |
+    Added per descriptor custom hits addend support for local rate limit filter. See :ref:`hits_addend
+    <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` for more details.
 - area: filters
   change: |
     Updatd the ``set_filter_state`` :ref:`filter <config_http_filters_set_filter_state>` to support per-route overrides.
@@ -351,12 +387,33 @@ new_features:
   change: |
     added new ``xds.virtual_host_name`` and ``xds.virtual_host_metadata`` attributes support. See
     :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
+- area: redis
+  change: |
+    Added support for UNWATCH command.
+- area: ratelimit
+  change: |
+    Add the :ref:`rate_limits
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
+    field to generate rate limit descriptors. If this field is set, the
+    :ref:`VirtualHost.rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
+    :ref:`RouteAction.rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
+    will be ignored.
+- area: ratelimit
+  change: |
+    Add the option to reduce the rate limit budget based on request/response contexts on stream done.
+    See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
 
 deprecated:
 - area: rbac
   change: |
     metadata :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>` is now deprecated in the
     favor of :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>`.
+- area: cluster
+  change: |
+    `DNS-related fields in :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster> are deprecated when using
+    strict and logical dns clusters. Instead, use the :ref:`cluster_type <envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type`
+    extension point with :ref:`typed_config<envoy_v3_api_field_config.cluster.v3.Cluster.CustomClusterType.typed_config>` of type
+    :ref:`DnsCluster <envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
 - area: aws_iam
   change: |
     The :ref:`aws_iam extension <envoy_v3_api_msg_config.grpc_credential.v3.AwsIamConfig>` is deprecated and will be

@@ -270,7 +270,16 @@ jobs:
         gcs-bucket: ${{ inputs.gcs-cache-bucket }}
         key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch || 'x64' }}
         path: ${{ runner.temp }}/bazel_root
+
+    # HACK/WORKAROUND for cache scope issue (https://github.com/envoyproxy/envoy/issues/37603)
     - if: ${{ inputs.cache-build-image }}
+      id: cache-lookup
+      uses: actions/cache/restore@6849a6489940f00c2f30c0fb92c6274307ccb58a  # v4.1.2
+      with:
+        lookup-only: true
+        path: /tmp/cache
+        key: ${{ inputs.cache-build-image }}${{ inputs.cache-build-image-key-suffix }}
+    - if: ${{ inputs.cache-build-image && steps.cache-lookup.outputs.cache-hit == 'true' }}
       name: Restore Docker cache ${{ inputs.cache-build-image && format('({0})', inputs.cache-build-image) || '' }}
       uses: envoyproxy/toolshed/gh-actions/docker/cache/restore@actions-v0.3.14
       with:

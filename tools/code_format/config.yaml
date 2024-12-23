@@ -182,7 +182,6 @@ paths:
     - source/extensions/filters/http/grpc_json_reverse_transcoder
     - source/extensions/filters/http/grpc_json_transcoder
     - source/extensions/filters/http/grpc_stats
-    - source/extensions/filters/http/header_mutation
     - source/extensions/filters/http/header_to_metadata
     - source/extensions/filters/http/health_check
     - source/extensions/filters/http/ip_tagging
@@ -461,6 +460,7 @@ visibility_excludes:
 - source/extensions/clusters/static/
 - source/extensions/clusters/original_dst/
 - source/extensions/clusters/logical_dns/
+- source/extensions/clusters/dns/
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD
