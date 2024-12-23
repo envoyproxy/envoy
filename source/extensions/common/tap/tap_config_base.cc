@@ -3,6 +3,7 @@
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/extensions/tap_sinks/udp_sink/v3/udp_sink.pb.validate.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "source/common/common/assert.h"
@@ -110,6 +111,7 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
       config = Config::Utility::translateAnyToFactoryConfig(sinks[0].custom_sink().typed_config(),
                                                             tsf_context.messageValidationVisitor(),
                                                             tap_sink_factory);
+      sink_ = tap_sink_factory.createTransportSinkPtr(*config, tsf_context);
     } else {
       Server::Configuration::FactoryContext& http_context =
           absl::get<HttpContextRef>(context).get();
@@ -117,9 +119,9 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
           sinks[0].custom_sink().typed_config(),
           http_context.serverFactoryContext().messageValidationContext().staticValidationVisitor(),
           tap_sink_factory);
+      sink_ = tap_sink_factory.createHttpSinkPtr(*config, http_context);
     }
 
-    sink_ = tap_sink_factory.createSinkPtr(*config, context);
     sink_to_use_ = sink_.get();
     break;
   }
