@@ -273,12 +273,13 @@ protected:
     EXPECT_EQ(std::to_string(status_code), response.headers().getStatusValue());
   }
 
-  void handleUpstreamRequest(bool add_content_length = false) {
+  void handleUpstreamRequest(bool add_content_length = false,
+                             const std::string status_code = "200") {
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
     Http::TestResponseHeaderMapImpl response_headers =
-        Http::TestResponseHeaderMapImpl{{":status", "200"}};
+        Http::TestResponseHeaderMapImpl{{":status", status_code}};
     uint64_t content_length = 100;
     if (add_content_length) {
       response_headers.setContentLength(content_length);
@@ -5180,7 +5181,8 @@ TEST_P(ExtProcIntegrationTest, DuplexStreamedInBothDirection) {
   verifyDownstreamResponse(*response, 200);
 }
 
-// The ext_proc server sends out-of-order response causing Envoy to shutdown the external processing.
+// The ext_proc server sends out-of-order response causing Envoy to shutdown the external
+// processing.
 TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamed) {
   const std::string body_sent(8 * 1024, 's');
   // Enable FULL_DUPLEX_STREAMED body processing in both directions.
@@ -5197,12 +5199,13 @@ TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamed) {
   processor_stream_->startGrpcStream();
   serverSendBodyRespDuplexStreamed(total_req_body_msg);
 
-  // The backend server processes the request and sends back a 200 response. As the external
-  // processing is shut down, the messages are not sent to the ext_proc server.
-  handleUpstreamRequest();
+  // The backend server processes the request and sends back a 400 response.
+  handleUpstreamRequest(false, "400");
   // The body received by upstream server is expected to be empty.
   EXPECT_EQ(upstream_request_->body().toString(), "");
-  verifyDownstreamResponse(*response, 200);
+  // As the external processing is shut down, the response messages are not sent
+  // to the ext_proc server. Instead it is sent to the downstream directly.
+  verifyDownstreamResponse(*response, 400);
 }
 
 TEST_P(ExtProcIntegrationTest, ModeOverrideAllowed) {
