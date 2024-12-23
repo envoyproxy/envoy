@@ -305,7 +305,8 @@ private:
     case StringMatcherType::MatchPatternCase::kCustom:
       return CustomStringMatcher(matcher.custom(), context);
     default:
-      PANIC("unexpected");
+      ExceptionUtil::throwEnvoyException(
+          fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
     }
   }
 

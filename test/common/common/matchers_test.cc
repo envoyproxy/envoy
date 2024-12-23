@@ -445,6 +445,14 @@ TEST_F(StringMatcher, SafeRegexValueIgnoreCase) {
                             EnvoyException, "ignore_case has no effect for safe_regex.");
 }
 
+TEST_F(StringMatcher, NoMatcherRejected) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_ignore_case(true);
+  EXPECT_THROW_WITH_MESSAGE(
+      Matchers::StringMatcherImpl(matcher, context_).match("foo"), EnvoyException,
+      fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
+}
+
 class PathMatcher : public BaseTest {};
 
 TEST_F(PathMatcher, MatchExactPath) {
