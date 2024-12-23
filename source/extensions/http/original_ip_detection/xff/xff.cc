@@ -55,8 +55,8 @@ XffIPDetection::detect(Envoy::Http::OriginalIPDetectionParams& params) {
     return {ret.address_, ret.allow_trusted_address_checks_, absl::nullopt, skip_xff_append_};
   }
 
-  auto ret =
-      Envoy::Http::Utility::getLastAddressFromXFF(params.request_headers, xff_num_trusted_hops_);
+  auto ret = Envoy::Http::Utility::getLastAddressFromXFF(params.request_headers,
+                                                         xff_num_trusted_hops_ - 1);
   return {ret.address_, ret.allow_trusted_address_checks_, absl::nullopt, skip_xff_append_};
 }
 
