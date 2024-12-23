@@ -5152,7 +5152,7 @@ TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamed) {
     auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
     auto* streamed_response = body_mut->mutable_streamed_response();
     streamed_response->set_body("r");
-    const bool end_of_stream = (i == 2)  ? true : false;
+    const bool end_of_stream = (i == 2) ? true : false;
     streamed_response->set_end_of_stream(end_of_stream);
     processor_stream_->sendGrpcMessage(response_body);
   }
