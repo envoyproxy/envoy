@@ -8,7 +8,7 @@ namespace ResourceMonitors {
 namespace EnvoyContainerCpuUtilizationMonitor {
 
 
-LinuxContainerStatsReader::LinuxContainerStatsReader(const std::string& linux_cgroup_cpu_allocated_file, const std::string& linux_cgroup_cpu_times_file ) 
+LinuxContainerStatsReader::LinuxContainerStatsReader(const std::string& linux_cgroup_cpu_allocated_file, const std::string& linux_cgroup_cpu_times_file )
 : linux_cgroup_cpu_allocated_file_(linux_cgroup_cpu_allocated_file), linux_cgroup_cpu_times_file_(linux_cgroup_cpu_times_file)  {}
 
 

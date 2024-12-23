@@ -59,7 +59,7 @@ void EnvoyContainerCpuUtilizationMonitor::updateResourceUsage(Server::ResourceUp
 
   double cpu_usage = (system_time_elapsed_milliseconds > 0 && cpu_milli_cores > 0 && cpu_work > 0 ) ? cpu_work / (system_time_elapsed_milliseconds * 1000 * cpu_milli_cores) : 0;
   ENVOY_LOG_MISC(trace, "Current CPU work={}, Current CPU USAGE Time Delta work={}", cpu_work, system_time_elapsed_milliseconds);
-  
+
   // The new utilization is calculated/smoothed using EWMA
   utilization_ = cpu_usage * DAMPENING_ALPHA + (1 - DAMPENING_ALPHA) * utilization_;
 

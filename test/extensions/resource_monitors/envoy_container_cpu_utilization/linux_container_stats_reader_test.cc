@@ -22,7 +22,7 @@ TEST(LinuxContainerStatsReader, ReadsCgroupContainerStats) {
   const std::string mock_contents_cpu_allocated = R"EOF(1000
 )EOF";
   file_updater_cpu_allocated.update(mock_contents_cpu_allocated);
-   
+
   const std::string temp_path_cpu_times = TestEnvironment::temporaryPath("cgroup_cpu_times_stats");
   AtomicFileUpdater file_updater_cpu_times(temp_path_cpu_times);
   const std::string mock_contents_cpu_times = R"EOF(10000000000

@@ -43,10 +43,7 @@ private:
   absl::optional<EnvoyException> error_;
 };
 
-// std::chrono::system_clock::time_point time_point_ns = 
-//         std::chrono::system_clock::time_point(std::chrono::milliseconds(epoch_ns));
 
-//         1734711389000
 TEST(EnvoyContainerCpuUtilizationMonitorTest, ComputesCorrectUsage) {
   envoy::extensions::resource_monitors::envoy_container_cpu_utilization::v3::EnvoyContainerCpuUtilizationConfig config;
   auto stats_reader = std::make_unique<MockContainerStatsReader>();
