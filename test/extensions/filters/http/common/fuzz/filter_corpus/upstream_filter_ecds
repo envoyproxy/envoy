@@ -1,0 +1,7 @@
+config {
+  name: "envoy.router"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+    value: " \001Bj\n\tenvoy.lua\"]\nWtype.googleapis.com/envoy.extensions.filters.http.admission_control.v3.AdmissionControl\022\002\022\000B\322\001\n\tenvoy.lua*\304\001\n\005B\003\n\001p\"\272\001type.googlkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkeapis.com/envoy.extensions.filters.http.admission_control.v3.AdmissionControlB\031\n\tenvoy.lua\"\014\022\n\022\000\032\004\020\200\200\0102\000"
+  }
+}
