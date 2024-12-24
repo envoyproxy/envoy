@@ -1114,8 +1114,9 @@ class FormatChecker:
 
     def _run_build_fixer(self, filepath: str) -> bool:
         return (
-            self.run_build_fixer and not self.is_build_fixer_excluded_file(filepath) and not self.is_api_file(filepath)
-            and not self.is_starlark_file(filepath) and not self.is_workspace_file(filepath))
+            self.run_build_fixer and not self.is_build_fixer_excluded_file(filepath)
+            and not self.is_api_file(filepath) and not self.is_starlark_file(filepath)
+            and not self.is_workspace_file(filepath))
 
 
 def main(*args):
