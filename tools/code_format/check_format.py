@@ -200,9 +200,7 @@ class FormatChecker:
             action="store_true",
             help="skip checking for '@envoy//' prefix in build rules.")
         parser.add_argument(
-            "--skip_code_validation",
-            action="store_true",
-            help="skip custom code validation steps")
+            "--skip_code_validation", action="store_true", help="skip custom code validation steps")
         parser.add_argument(
             "--namespace_check",
             type=str,
