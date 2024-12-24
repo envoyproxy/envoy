@@ -1,24 +1,24 @@
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 
 #include <chrono>
-#include <cstddef>
-#include <fstream>
 #include <memory>
 
 #include "envoy/common/exception.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/common/aws/iam_roles_anywhere_credentials_provider_impl.h"
+#include "source/extensions/common/aws/iam_roles_anywhere_sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 #include "fmt/chrono.h"
-#include "metadata_fetcher.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -38,6 +38,7 @@ constexpr char AWS_ROLE_SESSION_NAME[] = "AWS_ROLE_SESSION_NAME";
 constexpr char CREDENTIALS[] = "Credentials";
 constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
 constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
+
 constexpr char TOKEN[] = "Token";
 constexpr char EXPIRATION[] = "Expiration";
 constexpr char EXPIRATION_FORMAT[] = "%E4Y-%m-%dT%H:%M:%S%z";
@@ -295,12 +296,22 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
         // If our returned token had an expiration time, use that to set the cache duration
         if (expiration_time_.has_value()) {
           const auto now = api_.timeSource().systemTime();
-          cache_duration_ =
-              std::chrono::duration_cast<std::chrono::seconds>(expiration_time_.value() - now);
-          ENVOY_LOG_MISC(debug,
-                         "Metadata fetcher setting credential refresh to {}, based on "
-                         "credential expiration",
-                         std::chrono::seconds(cache_duration_.count()));
+          if (expiration_time_.value() <= now) {
+            cache_duration_ = getCacheDuration();
+            ENVOY_LOG_MISC(
+                debug,
+                "Metadata fetcher calculated invalid duration {}, setting credential refresh to {} "
+                "based on default expiration",
+                std::chrono::duration_cast<std::chrono::seconds>(expiration_time_.value() - now),
+                std::chrono::seconds(cache_duration_.count()));
+          } else {
+            cache_duration_ =
+                std::chrono::duration_cast<std::chrono::seconds>(expiration_time_.value() - now);
+            ENVOY_LOG_MISC(debug,
+                           "Metadata fetcher setting credential refresh to {}, based on "
+                           "received credential expiration",
+                           std::chrono::seconds(cache_duration_.count()));
+          }
         } else {
           cache_duration_ = getCacheDuration();
           ENVOY_LOG_MISC(
@@ -967,9 +978,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
       const auto session_name = sessionName(api);
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
       const auto region_uuid = absl::StrCat(region, "_", context->api().randomGenerator().uuid());
-
       const auto cluster_name = stsClusterName(region_uuid);
-
       ENVOY_LOG(
           debug,
           "Using web identity credentials provider with STS endpoint: {} and session name: {}",
@@ -981,8 +990,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     }
   }
 
-  // Even if WebIdentity is supported keep the fallback option open so that
-  // Envoy can use other credentials provider if available.
+  // Container Credentials Provider
   const auto relative_uri =
       absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_RELATIVE_URI));
   const auto full_uri = absl::NullSafeStringView(std::getenv(AWS_CONTAINER_CREDENTIALS_FULL_URI));
@@ -1012,7 +1020,9 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
           api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
           CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer));
     }
-  } else if (metadata_disabled != TRUE) {
+  }
+  // Instance Profile Credentials Provider
+  else if (metadata_disabled != TRUE) {
     ENVOY_LOG(debug, "Using instance profile credentials provider");
     add(factories.createInstanceProfileCredentialsProvider(
         api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
@@ -1083,6 +1093,38 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
     return std::make_shared<WebIdentityCredentialsProvider>(
         context.api(), context, nullptr, MetadataFetcher::create, "", token, sts_endpoint, role_arn,
         role_session_name, refresh_state, initialization_timer, cluster_name);
+  } else if (config.has_iam_roles_anywhere()) {
+    const auto& roles_anywhere = config.iam_roles_anywhere();
+    const std::string iam_roles_anywhere_endpoint =
+        Utility::getRolesAnywhereEndpoint(region) + ":443";
+    std::string role_session_name;
+    if (!roles_anywhere.role_session_name().empty()) {
+      role_session_name = roles_anywhere.role_session_name();
+    } else {
+      role_session_name = sessionName(context.api());
+    }
+
+    absl::optional<uint16_t> session_duration;
+    if (roles_anywhere.has_session_duration()) {
+      session_duration = PROTOBUF_GET_SECONDS_OR_DEFAULT(
+          roles_anywhere, session_duration,
+          Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration);
+    }
+
+    const auto initialization_timer = std::chrono::seconds(2);
+
+    absl::optional<envoy::config::core::v3::DataSource> cert_chain;
+    if (roles_anywhere.has_certificate_chain()) {
+      cert_chain = roles_anywhere.certificate_chain();
+    }
+
+    roles_anywhere.certificate_chain();
+    return std::make_shared<IAMRolesAnywhereCredentialsProvider>(
+        context.api(), context, MetadataFetcher::create,
+        MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh, initialization_timer,
+        roles_anywhere.role_arn(), roles_anywhere.profile_arn(), roles_anywhere.trust_anchor_arn(),
+        role_session_name, session_duration, region, iam_roles_anywhere_endpoint,
+        roles_anywhere.certificate(), roles_anywhere.private_key(), cert_chain);
   } else {
     return absl::InvalidArgumentError("No AWS credential provider specified");
   }
