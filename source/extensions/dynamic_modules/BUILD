@@ -15,6 +15,28 @@ envoy_cc_library(
         "abi.h",
         "dynamic_modules.h",
     ],
+    linkopts = [
+        # Export callback symbols so that they can be found by the dynamic modules when loaded via dlopen.
+        #
+        # Note: with lld, we can use the glob matching to avoid listing all the symbols, but gold and ld are
+        # not able to do that. So we list all the symbols here.
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_request_header",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_request_headers",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_request_headers_count",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_set_request_header",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_request_trailer",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_request_trailers",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_request_trailers_count",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_set_request_trailer",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_response_header",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_response_headers",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_response_headers_count",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_set_response_header",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_response_trailer",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_response_trailers",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_response_trailers_count",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_set_response_trailer",
+    ],
     deps = [
         ":abi_version_lib",
         "//envoy/common:exception_lib",
