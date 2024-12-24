@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.extensions.upstreams.http.tcp.golang.v3alpha;
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.tcp.golang.v3alpha";
+option java_outer_classname = "GolangProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Http-Tcp Bridge]
+
+// This bridge enables an HTTP client to connect to a TCP server via a Golang plugin, facilitating Protocol Convert from HTTP to any RPC protocol in Envoy.
+// [#extension: envoy.upstreams.http.tcp.golang]
+message Config {
+  // Globally unique ID for a dynamic library file.
+  string library_id = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Path to a dynamic library implementing the
+  // :repo:`HttpTcpBridge API <contrib/golang/common/go/api.HttpTcpBridge>`
+  // interface.
+  string library_path = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Globally unique name of the Go plugin.
+  //
+  // This name **must** be consistent with the name registered in ``tcp::RegisterHttpTcpBridgeFactoryAndConfigParser``
+  //
+  string plugin_name = 3 [(validate.rules).string = {min_len: 1}];
+
+  // Configuration for the Go plugin.
+  //
+  // .. note::
+  //     This configuration is only parsed in the go plugin, and is therefore not validated
+  //     by Envoy.
+  //
+  //     See the :repo:`HttpTcpBridge API <contrib/golang/common/go/api/filter.go>`
+  //     for more information about how the plugin's configuration data can be accessed.
+  //
+  google.protobuf.Any plugin_config = 4;
+}
