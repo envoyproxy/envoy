@@ -1466,7 +1466,19 @@ public:
   MetadataFetcher::MetadataReceiver::RefreshState refresh_state_;
   Init::TargetHandlePtr init_target_;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
+  NiceMock<Init::MockManager> init_manager_;
 };
+
+TEST_F(ContainerCredentialsProviderTest, CreationAfterInitCompleted) {
+  // Handle the case where we've already completed init. This validates that clusters create
+  // successfully but init manager is not used
+  ON_CALL(context_, initManager()).WillByDefault(ReturnRef(init_manager_));
+  ON_CALL(init_manager_, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+  EXPECT_CALL(cluster_manager_, addOrUpdateCluster(_, _, _));
+  EXPECT_CALL(init_manager_, add(_)).Times(0);
+  setupProvider();
+  delete (raw_metadata_fetcher_);
+}
 
 TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
 
