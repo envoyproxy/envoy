@@ -156,6 +156,10 @@ class FormatChecker:
         return []
 
     @property
+    def run_build_fixer(self):
+        return not self.args.skip_build_fixer
+
+    @property
     def operation_type(self):
         return self.args.operation_type
 
@@ -207,6 +211,8 @@ class FormatChecker:
             nargs="+",
             default=[],
             help="exclude paths from the namespace_check.")
+        parser.add_argument(
+            "--skip_build_fixer", action="store_true", help="skip running build fixer script")
         parser.add_argument(
             "--build_fixer_check_excluded_paths",
             type=str,
@@ -1108,8 +1114,9 @@ class FormatChecker:
 
     def _run_build_fixer(self, filepath: str) -> bool:
         return (
-            not self.is_build_fixer_excluded_file(filepath) and not self.is_api_file(filepath)
-            and not self.is_starlark_file(filepath) and not self.is_workspace_file(filepath))
+            self.run_build_fixer and not self.is_build_fixer_excluded_file(filepath)
+            and not self.is_api_file(filepath) and not self.is_starlark_file(filepath)
+            and not self.is_workspace_file(filepath))
 
 
 def main(*args):
