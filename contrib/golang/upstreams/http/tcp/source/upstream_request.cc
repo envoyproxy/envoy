@@ -74,12 +74,12 @@ TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
   envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config c;
   std::string serialized_config;
   if (!config.SerializeToString(&serialized_config)) {
-    PANIC(
-            fmt::format("golang http-tcp bridge: failed to serialize input Protobuf::Message to string."));
+    PANIC(fmt::format(
+        "golang http-tcp bridge: failed to serialize input Protobuf::Message to string."));
   }
   if (!c.ParseFromString(serialized_config)) {
-    PANIC(
-            fmt::format("golang http-tcp bridge: failed to parse serialized data into target config object."));
+    PANIC(fmt::format(
+        "golang http-tcp bridge: failed to parse serialized data into target config object."));
   }
 
   ENVOY_LOG(debug, "golang http-tcp bridge load library at parse config: {} {}", c.library_id(),
@@ -88,8 +88,8 @@ TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
   dynamic_lib_ = Dso::DsoManager<Dso::HttpTcpBridgeDsoImpl>::load(c.library_id(), c.library_path(),
                                                                   c.plugin_name());
   if (dynamic_lib_ == nullptr) {
-    PANIC(
-        fmt::format("golang http-tcp bridge: load library failed: {} {}", c.library_id(), c.library_path()));
+    PANIC(fmt::format("golang http-tcp bridge: load library failed: {} {}", c.library_id(),
+                      c.library_path()));
   };
 
   BridgeConfigSharedPtr conf = std::make_shared<BridgeConfig>(c, dynamic_lib_);

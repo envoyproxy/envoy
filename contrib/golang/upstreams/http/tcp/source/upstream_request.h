@@ -14,12 +14,12 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/router/upstream_request.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/upstreams/http/tcp/upstream_request.h"
 
 #include "contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha/golang.pb.h"
-#include "source/common/protobuf/protobuf.h"
 #include "processor_state.h"
 #include "xds/type/v3/typed_struct.pb.h"
 

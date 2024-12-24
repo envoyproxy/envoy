@@ -847,9 +847,11 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
     ENVOY_BUG(factory != nullptr,
               fmt::format("invalid factory type '{}', failing over to default upstream",
                           cluster_->upstreamConfig().ref().DebugString()));
-    message = Envoy::Config::Utility::translateToFactoryConfig(
-        *cluster_->upstreamConfig(), config_->factory_context_.messageValidationVisitor(),
-        *factory);
+    if (!cluster_->upstreamConfig()->typed_config().value().empty()) {
+      message = Envoy::Config::Utility::translateToFactoryConfig(
+          *cluster_->upstreamConfig(), config_->factory_context_.messageValidationVisitor(),
+          *factory);
+    }
   }
   if (!factory) {
     factory = &config_->router_context_.genericConnPoolFactory();
