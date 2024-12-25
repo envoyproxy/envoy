@@ -16,7 +16,7 @@ fn new_http_filter_config_fn(
 ) -> Option<Box<dyn HttpFilterConfig>> {
   match name {
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
-    // TODO: add various congigs for body, etc.
+    // TODO: add various configs for body, etc.
     _ => panic!("Unknown filter name: {}", name),
   }
 }
