@@ -83,7 +83,7 @@ public:
     OwnedActiveStreamListenerBase::onFilterChainDraining(draining_filter_chains);
   }
 
-  void startRCWorkflow(Event::Dispatcher& dispatcher, Network::ListenerConfig& config) override;
+  void startRCWorkflow(Event::Dispatcher& dispatcher, Network::ConnectionHandler& conn_handler, Network::ListenerConfig& config) override;
 
   // ActiveStreamListenerBase
   void incNumConnections() override { config_->openConnections().inc(); }

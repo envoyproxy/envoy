@@ -9,7 +9,7 @@ ActiveReverseConnectionListener::ActiveReverseConnectionListener(
     Network::ListenerConfig& config, Bootstrap::ReverseConnection::RCThreadLocalRegistry& local_registry)
     : Server::OwnedActiveStreamListenerBase(
           conn_handler, dispatcher, std::make_unique<NetworkReverseConnectionListener>(), config), local_registry_(local_registry) {
-  startRCWorkflow(dispatcher, config);
+  startRCWorkflow(dispatcher, conn_handler, config);
 }
 
 ActiveReverseConnectionListener::ActiveReverseConnectionListener(
@@ -39,10 +39,11 @@ ActiveReverseConnectionListener::~ActiveReverseConnectionListener() {
 }
 
 void ActiveReverseConnectionListener::startRCWorkflow(Event::Dispatcher& dispatcher,
+                                                      Network::ConnectionHandler& conn_handler,
                                                       Network::ListenerConfig& config) {
   ENVOY_LOG(debug, "Starting reverse conn workflow on worker: {} listener: {}", dispatcher.name(),
             config.name());
-  local_registry_.getRCManager().registerRCInitiators(config);
+  local_registry_.getRCManager().registerRCInitiators(conn_handler, config);
 }
 
 void ActiveReverseConnectionListener::removeConnection(Server::ActiveTcpConnection& connection) {
