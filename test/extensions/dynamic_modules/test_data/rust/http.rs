@@ -44,24 +44,24 @@ impl HttpFilter for HeaderCallbacksFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // Test single getter API.
     let single_value = envoy_filter
-      .get_request_header_value(b"single")
+      .get_request_header_value("single")
       .expect("header single not found");
     assert_eq!(std::str::from_utf8(&single_value).unwrap(), "value");
-    let non_exist = envoy_filter.get_request_header_value(b"non-exist");
+    let non_exist = envoy_filter.get_request_header_value("non-exist");
     assert!(non_exist.is_none());
 
     // Test multi getter API.
-    let multi_value = envoy_filter.get_request_header_values(b"multi");
+    let multi_value = envoy_filter.get_request_header_values("multi");
     assert_eq!(multi_value.len(), 2);
     assert_eq!(std::str::from_utf8(&multi_value[0]).unwrap(), "value1");
     assert_eq!(std::str::from_utf8(&multi_value[1]).unwrap(), "value2");
-    let non_exist = envoy_filter.get_request_header_values(b"non-exist");
+    let non_exist = envoy_filter.get_request_header_values("non-exist");
     assert!(non_exist.is_empty());
 
     // Test setter API.
-    envoy_filter.set_request_header(b"new", b"value");
+    envoy_filter.set_request_header("new", b"value");
     let new_value = envoy_filter
-      .get_request_header_value(b"new")
+      .get_request_header_value("new")
       .expect("header new not found");
     assert_eq!(std::str::from_utf8(&new_value).unwrap(), "value");
 
@@ -94,24 +94,24 @@ impl HttpFilter for HeaderCallbacksFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
     // Test single getter API.
     let single_value = envoy_filter
-      .get_request_trailer_value(b"single")
+      .get_request_trailer_value("single")
       .expect("trailer single not found");
     assert_eq!(std::str::from_utf8(&single_value).unwrap(), "value");
-    let non_exist = envoy_filter.get_request_trailer_value(b"non-exist");
+    let non_exist = envoy_filter.get_request_trailer_value("non-exist");
     assert!(non_exist.is_none());
 
     // Test multi getter API.
-    let multi_value = envoy_filter.get_request_trailer_values(b"multi");
+    let multi_value = envoy_filter.get_request_trailer_values("multi");
     assert_eq!(multi_value.len(), 2);
     assert_eq!(std::str::from_utf8(&multi_value[0]).unwrap(), "value1");
     assert_eq!(std::str::from_utf8(&multi_value[1]).unwrap(), "value2");
-    let non_exist = envoy_filter.get_request_trailer_values(b"non-exist");
+    let non_exist = envoy_filter.get_request_trailer_values("non-exist");
     assert!(non_exist.is_empty());
 
     // Test setter API.
-    envoy_filter.set_request_trailer(b"new", b"value");
+    envoy_filter.set_request_trailer("new", b"value");
     let new_value = envoy_filter
-      .get_request_trailer_value(b"new")
+      .get_request_trailer_value("new")
       .expect("trailer new not found");
     assert_eq!(std::str::from_utf8(&new_value).unwrap(), "value");
 
@@ -137,24 +137,24 @@ impl HttpFilter for HeaderCallbacksFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     // Test single getter API.
     let single_value = envoy_filter
-      .get_response_header_value(b"single")
+      .get_response_header_value("single")
       .expect("header single not found");
     assert_eq!(std::str::from_utf8(&single_value).unwrap(), "value");
-    let non_exist = envoy_filter.get_response_header_value(b"non-exist");
+    let non_exist = envoy_filter.get_response_header_value("non-exist");
     assert!(non_exist.is_none());
 
     // Test multi getter API.
-    let multi_value = envoy_filter.get_response_header_values(b"multi");
+    let multi_value = envoy_filter.get_response_header_values("multi");
     assert_eq!(multi_value.len(), 2);
     assert_eq!(std::str::from_utf8(&multi_value[0]).unwrap(), "value1");
     assert_eq!(std::str::from_utf8(&multi_value[1]).unwrap(), "value2");
-    let non_exist = envoy_filter.get_response_header_values(b"non-exist");
+    let non_exist = envoy_filter.get_response_header_values("non-exist");
     assert!(non_exist.is_empty());
 
     // Test setter API.
-    envoy_filter.set_response_header(b"new", b"value");
+    envoy_filter.set_response_header("new", b"value");
     let new_value = envoy_filter
-      .get_response_header_value(b"new")
+      .get_response_header_value("new")
       .expect("header new not found");
     assert_eq!(std::str::from_utf8(&new_value).unwrap(), "value");
 
@@ -187,24 +187,24 @@ impl HttpFilter for HeaderCallbacksFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
     // Test single getter API.
     let single_value = envoy_filter
-      .get_response_trailer_value(b"single")
+      .get_response_trailer_value("single")
       .expect("trailer single not found");
     assert_eq!(std::str::from_utf8(&single_value).unwrap(), "value");
-    let non_exist = envoy_filter.get_response_trailer_value(b"non-exist");
+    let non_exist = envoy_filter.get_response_trailer_value("non-exist");
     assert!(non_exist.is_none());
 
     // Test multi getter API.
-    let multi_value = envoy_filter.get_response_trailer_values(b"multi");
+    let multi_value = envoy_filter.get_response_trailer_values("multi");
     assert_eq!(multi_value.len(), 2);
     assert_eq!(std::str::from_utf8(&multi_value[0]).unwrap(), "value1");
     assert_eq!(std::str::from_utf8(&multi_value[1]).unwrap(), "value2");
-    let non_exist = envoy_filter.get_response_trailer_values(b"non-exist");
+    let non_exist = envoy_filter.get_response_trailer_values("non-exist");
     assert!(non_exist.is_empty());
 
     // Test setter API.
-    envoy_filter.set_response_trailer(b"new", b"value");
+    envoy_filter.set_response_trailer("new", b"value");
     let new_value = envoy_filter
-      .get_response_trailer_value(b"new")
+      .get_response_trailer_value("new")
       .expect("trailer new not found");
     assert_eq!(std::str::from_utf8(&new_value).unwrap(), "value");
 
