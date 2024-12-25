@@ -94,19 +94,17 @@ private:
     Network::Address::InstanceConstSharedPtr address_;
     uint64_t listener_tag_;
 
-    absl::variant<
-        absl::monostate, std::reference_wrapper<ActiveTcpListener>,
-        std::reference_wrapper<Network::UdpListenerCallbacks>,
-        std::reference_wrapper<Network::InternalListener>,
-        std::reference_wrapper<Network::ReverseConnectionListener>>
+    absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
+                  std::reference_wrapper<Network::UdpListenerCallbacks>,
+                  std::reference_wrapper<Network::InternalListener>,
+                  std::reference_wrapper<Network::ReverseConnectionListener>>
         typed_listener_;
 
     // Helpers for accessing the data in the variant for cleaner code.
     ActiveTcpListenerOptRef tcpListener();
     UdpListenerCallbacksOptRef udpListener();
     Network::InternalListenerOptRef internalListener();
-    OptRef<Network::ReverseConnectionListener>
-    reverseConnectionListener();
+    OptRef<Network::ReverseConnectionListener> reverseConnectionListener();
   };
 
   struct ActiveListenerDetails {

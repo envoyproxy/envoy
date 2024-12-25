@@ -82,13 +82,15 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
         config.shouldBypassOverloadManager() ? null_overload_manager_ : overload_manager_);
   } else if (config.reverseConnectionListenerConfig().has_value()) {
     ENVOY_LOG(debug, "adding reverse connection listener with name: {} tag: {}", config.name(),
-                   config.listenerTag());
-    Network::RevConnRegistry& reverse_conn_registry = config.reverseConnectionListenerConfig()->reverseConnRegistry();
+              config.listenerTag());
+    Network::RevConnRegistry& reverse_conn_registry =
+        config.reverseConnectionListenerConfig()->reverseConnRegistry();
     ENVOY_LOG(debug, "Obtaining thread local reverse conn registry");
     local_reverse_conn_registry_ = reverse_conn_registry.getLocalRegistry();
     RELEASE_ASSERT(local_reverse_conn_registry_ != nullptr,
-                  "Failed to get local reverse conn listener registry");
-    auto rc_listener = local_reverse_conn_registry_->createActiveReverseConnectionListener(*this, dispatcher(), config);
+                   "Failed to get local reverse conn listener registry");
+    auto rc_listener = local_reverse_conn_registry_->createActiveReverseConnectionListener(
+        *this, dispatcher(), config);
     details->addActiveListener(
         config, config.listenSocketFactories()[0]->localAddress(), listener_reject_fraction_,
         disable_listeners_, std::move(rc_listener),
@@ -378,9 +380,8 @@ ConnectionHandlerImpl::PerAddressActiveListenerDetails::internalListener() {
 OptRef<Network::ReverseConnectionListener>
 ConnectionHandlerImpl::PerAddressActiveListenerDetails::reverseConnectionListener() {
   ENVOY_LOG(debug, "reverseConnectionListener");
-  auto* val = absl::get_if<
-      std::reference_wrapper<Network::ReverseConnectionListener>>(
-      &typed_listener_);
+  auto* val =
+      absl::get_if<std::reference_wrapper<Network::ReverseConnectionListener>>(&typed_listener_);
   return (val != nullptr) ? makeOptRef(val->get()) : absl::nullopt;
 }
 

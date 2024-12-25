@@ -257,4 +257,3 @@ envoy_cc_library(
         ":address_interface",
     ],
 )
-

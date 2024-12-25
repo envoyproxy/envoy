@@ -596,8 +596,8 @@ ListenerImpl::buildInternalListener(const envoy::config::listener::v3::Listener&
   return absl::OkStatus();
 }
 
-absl::Status ListenerImpl::buildReverseConnectionListener(
-    const envoy::config::listener::v3::Listener& config) {
+absl::Status
+ListenerImpl::buildReverseConnectionListener(const envoy::config::listener::v3::Listener& config) {
 
   ENVOY_LOG(debug, "Listener: {}; Reverse conn metadata : {}", config.name(),
             config.reverse_connection_listener_config().DebugString());
@@ -614,14 +614,19 @@ absl::Status ListenerImpl::buildReverseConnectionListener(
   ENVOY_LOG(debug, "Building reverse connection config for listener: {} tag: {}", config.name(),
             listener_tag_);
   std::shared_ptr<Network::RevConnRegistry> reverse_conn_registry =
-    listener_factory_context_->serverFactoryContext().singletonManager().getTyped<Network::RevConnRegistry>("reverse_conn_registry_singleton");
+      listener_factory_context_->serverFactoryContext()
+          .singletonManager()
+          .getTyped<Network::RevConnRegistry>("reverse_conn_registry_singleton");
   if (reverse_conn_registry == nullptr) {
-    return absl::InternalError("Cannot build reverse conn listener. Reverse connection registry not found");
+    return absl::InternalError(
+        "Cannot build reverse conn listener. Reverse connection registry not found");
   }
-  auto config_or_error = reverse_conn_registry->fromAnyConfig(config.reverse_connection_listener_config());
+  auto config_or_error =
+      reverse_conn_registry->fromAnyConfig(config.reverse_connection_listener_config());
   if (!config_or_error.ok() || *config_or_error == nullptr) {
     return absl::InvalidArgumentError(
-        fmt::format("Cannot build reverse conn listener name: {} tag: {} Error {} : failed to unpack reverse connection "
+        fmt::format("Cannot build reverse conn listener name: {} tag: {} Error {} : failed to "
+                    "unpack reverse connection "
                     "config",
                     config.name(), listener_tag_, config_or_error.status()));
   }

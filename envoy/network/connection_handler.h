@@ -324,7 +324,9 @@ using InternalListenerOptRef = OptRef<InternalListener>;
  */
 class ReverseConnectionListener : public virtual ConnectionHandler::ActiveListener {
 public:
-  virtual void startRCWorkflow(Event::Dispatcher& dispatcher, Network::ConnectionHandler& conn_handler, Network::ListenerConfig& config) PURE;
+  virtual void startRCWorkflow(Event::Dispatcher& dispatcher,
+                               Network::ConnectionHandler& conn_handler,
+                               Network::ListenerConfig& config) PURE;
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
 };
 using ReverseConnectionListenerPtr = std::unique_ptr<ReverseConnectionListener>;
@@ -382,9 +384,10 @@ class LocalRevConnRegistry {
 public:
   virtual ~LocalRevConnRegistry() = default;
 
-  virtual Network::ReverseConnectionListenerPtr createActiveReverseConnectionListener(Network::ConnectionHandler& conn_handler,
-                                                      Event::Dispatcher& dispatcher,
-                                                      Network::ListenerConfig& config) PURE;
+  virtual Network::ReverseConnectionListenerPtr
+  createActiveReverseConnectionListener(Network::ConnectionHandler& conn_handler,
+                                        Event::Dispatcher& dispatcher,
+                                        Network::ListenerConfig& config) PURE;
 };
 
 // The central reverse conn registry interface providing the thread local accessor.
@@ -397,13 +400,13 @@ public:
    */
   virtual LocalRevConnRegistry* getLocalRegistry() PURE;
 
-  /** 
+  /**
    * Helper function to create a ReverseConnectionListenerConfig from a google.protobuf.Any.
    * @param config is the reverse connection listener config.
    * @return the ReverseConnectionListenerConfig object.
    */
-  virtual absl::StatusOr<Network::ReverseConnectionListenerConfigPtr> fromAnyConfig(
-      const google::protobuf::Any& config) PURE;
+  virtual absl::StatusOr<Network::ReverseConnectionListenerConfigPtr>
+  fromAnyConfig(const google::protobuf::Any& config) PURE;
 };
 
 } // namespace Network

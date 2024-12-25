@@ -48,7 +48,8 @@ public:
   virtual ConnectionPool::InstancePtr allocateConnPool(
       Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
       Singleton::Manager& singleton_manager, Upstream::HostConstSharedPtr host,
-      Upstream::ResourcePriority priority, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      Upstream::ResourcePriority priority,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
       Upstream::ClusterConnectivityState& state,
       absl::optional<HttpServerPropertiesCache::Origin> origin = absl::nullopt,
