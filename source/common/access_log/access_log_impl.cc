@@ -129,18 +129,19 @@ RuntimeFilter::RuntimeFilter(const envoy::config::accesslog::v3::RuntimeFilter& 
                              Runtime::Loader& runtime, Random::RandomGenerator& random)
     : runtime_(runtime), random_(random), runtime_key_(config.runtime_key()),
       percent_(config.percent_sampled()),
-      use_independent_randomness_(config.use_independent_randomness()) {}
+      use_independent_randomness_(config.use_independent_randomness()),
+      emit_metadata_(config.emit_metadata()), metadata_key_suffix_(config.metadata_key_suffix()) {}
 
 bool RuntimeFilter::evaluate(const Formatter::HttpFormatterContext&,
-                             const StreamInfo::StreamInfo& stream_info) const {
-  // This code is verbose to avoid preallocating a random number that is not needed.
+                             const StreamInfo::StreamInfo& info) const {
+  // This code is verbose to avoid pre-allocating a random number that is not needed.
   uint64_t random_value;
   if (use_independent_randomness_) {
     random_value = random_.random();
-  } else if (!stream_info.getStreamIdProvider().has_value()) {
+  } else if (!info.getStreamIdProvider().has_value()) {
     random_value = random_.random();
   } else {
-    const auto rid_to_integer = stream_info.getStreamIdProvider()->toInteger();
+    const auto rid_to_integer = info.getStreamIdProvider()->toInteger();
     if (!rid_to_integer.has_value()) {
       random_value = random_.random();
     } else {
@@ -150,9 +151,31 @@ bool RuntimeFilter::evaluate(const Formatter::HttpFormatterContext&,
     }
   }
 
-  return runtime_.snapshot().featureEnabled(
-      runtime_key_, percent_.numerator(), random_value,
-      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator()));
+  const uint64_t denominator =
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator());
+
+  bool sampled = runtime_.snapshot().featureEnabled(runtime_key_, percent_.numerator(),
+                                                    random_value, denominator);
+
+  // Store the sampling decision and fraction information in dynamic metadata if configured.
+  if (emit_metadata_) {
+    auto& mutable_info = const_cast<StreamInfo::StreamInfo&>(info);
+    ProtobufWkt::Struct sampling_metadata;
+    auto* sampling_fields = sampling_metadata.mutable_fields();
+
+    // Store the basic sampling decision
+    (*sampling_fields)[SamplingDecisionKey].set_bool_value(sampled);
+    (*sampling_fields)[RuntimeKeyFieldName].set_string_value(runtime_key_);
+
+    // Store the fraction information
+    const uint64_t numerator = runtime_.snapshot().getInteger(runtime_key_, percent_.numerator());
+    (*sampling_fields)[NumeratorKey].set_number_value(numerator);
+    (*sampling_fields)[DenominatorKey].set_number_value(denominator);
+
+    mutable_info.setDynamicMetadata(getMetadataKey(), sampling_metadata);
+  }
+
+  return sampled;
 }
 
 OperatorFilter::OperatorFilter(
@@ -318,7 +341,7 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
   const auto& value =
       Envoy::Config::Metadata::metadataValue(&info.dynamicMetadata(), filter_, path_);
   // If the key corresponds to a set value in dynamic metadata, return true if the value matches the
-  // the configured 'MetadataMatcher' value and false otherwise
+  // configured 'MetadataMatcher' value and false otherwise
   if (present_matcher_->match(value)) {
     return value_matcher_ && value_matcher_->match(value);
   }
