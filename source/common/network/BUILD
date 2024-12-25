@@ -99,13 +99,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "connection_impl",
-    srcs = [
-        "connection_impl.cc",
-    ],
-    hdrs = [
-        "connection_impl.h",
-    ],
-    external_deps = ["abseil_optional"],
+    srcs = ["connection_impl.cc"],
+    hdrs = ["connection_impl.h"],
     deps = [
         ":address_lib",
         ":connection_base_lib",

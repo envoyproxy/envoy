@@ -23,12 +23,6 @@
 #include "absl/container/inlined_vector.h"
 
 namespace Envoy {
-namespace Server {
-class ListenerImpl;
-}
-namespace Upstream {
-class ClusterManager;
-}
 namespace Event {
 
 // The tracked object stack likely won't grow larger than this initial
@@ -156,6 +150,7 @@ private:
   Buffer::WatermarkFactorySharedPtr buffer_factory_;
   LibeventScheduler base_scheduler_;
   SchedulerPtr scheduler_;
+
   SchedulableCallbackPtr thread_local_delete_cb_;
   Thread::MutexBasicLockable thread_local_deletable_lock_;
   // `deletables_in_dispatcher_thread` must be destroyed last to allow other callbacks populate.

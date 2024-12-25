@@ -84,15 +84,11 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
                                 std::function<void()> completion) {
   ASSERT(thread_);
   const uint64_t listener_tag = listener.listenerTag();
-  ENVOY_LOG(debug, "worker:{} Removing listener name:{} tag:{} ", dispatcher_->name(),
-            listener.name(), listener.listenerTag());
   dispatcher_->post([this, listener_tag, completion]() -> void {
     handler_->removeListeners(listener_tag);
     completion();
     hooks_.onWorkerListenerRemoved();
   });
-  ENVOY_LOG(debug, "worker:{} Removed listener name:{} tag:{} ", dispatcher_->name(),
-            listener.name(), listener.listenerTag());
 }
 
 void WorkerImpl::removeFilterChains(uint64_t listener_tag,

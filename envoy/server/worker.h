@@ -94,10 +94,6 @@ public:
                             const Network::ExtraShutdownListenerOptions& options,
                             std::function<void()> completion) PURE;
 
-  /**
-   * @return the dispatcher associated with this worker.
-   */
-  virtual Event::Dispatcher& getDispatcher() PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;

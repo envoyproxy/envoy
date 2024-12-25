@@ -421,7 +421,6 @@ private:
   std::unique_ptr<OverloadManager> null_overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
   std::unique_ptr<Http::HttpServerPropertiesCacheManager> http_server_properties_cache_manager_;
-  bool enable_reverse_connections_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
