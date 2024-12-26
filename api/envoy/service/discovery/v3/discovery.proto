@@ -31,6 +31,7 @@ message ResourceLocator {
   map<string, string> dynamic_parameters = 2;
 }
 
+// [#not-implemented-hide:]
 // Specifies a concrete resource name.
 message ResourceName {
   // The name of the resource.
@@ -147,6 +148,7 @@ message DiscoveryResponse {
   // The control plane instance that sent the response.
   config.core.v3.ControlPlane control_plane = 6;
 
+  // [#not-implemented-hide:]
   // Errors associated with specific resources. Clients are expected to
   // remember the most recent error for a given resource across responses;
   // the error condition is not considered to be cleared until a response is
@@ -296,6 +298,7 @@ message DeltaDiscoveryResponse {
   // The control plane instance that sent the response.
   config.core.v3.ControlPlane control_plane = 7;
 
+  // [#not-implemented-hide:]
   // Errors associated with specific resources. Note that a resource in
   // this field with a status of NOT_FOUND should be treated the same as
   // a resource listed in the 'removed_resources' or 'removed_resource_names'
