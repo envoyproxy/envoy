@@ -30,5 +30,6 @@ rust_library(
     edition = "2021",
     deps = all_crate_deps(
         normal = True,
+        normal_dev = True,
     ) + [":build_script"],
 )

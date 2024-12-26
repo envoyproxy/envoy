@@ -181,6 +181,12 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
     &filter_config,
   );
 
+  let envoy_filter_ctx = EnvoyHttpFilter::new_context();
+  envoy_filter_ctx
+    .expect()
+    .times(6)
+    .returning(|_| EnvoyHttpFilter::default());
+
   unsafe {
     assert_eq!(
       envoy_dynamic_module_on_http_filter_request_headers(std::ptr::null_mut(), filter, false),
