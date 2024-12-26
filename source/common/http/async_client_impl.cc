@@ -32,7 +32,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
           *stats_store.rootScope(), cm, factory_context.runtime(),
           factory_context.api().randomGenerator(), std::move(shadow_writer), true, false, false,
           false, false, false, Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(),
-          http_context, router_context)),
+          http_context, router_context, nullptr)),
       dispatcher_(dispatcher), runtime_(factory_context.runtime()),
       local_reply_(LocalReply::Factory::createDefault()) {}
 

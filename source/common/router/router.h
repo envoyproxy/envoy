@@ -210,7 +210,8 @@ public:
                bool flush_upstream_log_on_upstream_stream,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
-               Router::Context& router_context)
+               Router::Context& router_context,
+               const envoy::config::bootstrap::v3::DumpStateConfig* dump_state_config)
       : factory_context_(factory_context), router_context_(router_context), scope_(scope),
         local_info_(local_info), cm_(cm), runtime_(runtime),
         default_stats_(router_context_.statNames(), scope_, stat_prefix),
@@ -221,7 +222,8 @@ public:
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
         flush_upstream_log_on_upstream_stream_(flush_upstream_log_on_upstream_stream),
         http_context_(http_context), zone_name_(local_info_.zoneStatName()),
-        shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
+        shadow_writer_(std::move(shadow_writer)), time_source_(time_source),
+        dump_state_config_(dump_state_config) {
     if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<HeaderVector>();
       for (const auto& header : strict_check_headers) {
@@ -261,6 +263,10 @@ public:
     return false;
   }
 
+  const envoy::config::bootstrap::v3::DumpStateConfig* dumpStateConfig() const {
+    return dump_state_config_;
+  }
+
   using HeaderVector = std::vector<Http::LowerCaseString>;
   using HeaderVectorPtr = std::unique_ptr<HeaderVector>;
 
@@ -295,6 +301,7 @@ public:
 private:
   ShadowWriterPtr shadow_writer_;
   TimeSource& time_source_;
+  const envoy::config::bootstrap::v3::DumpStateConfig* dump_state_config_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -483,6 +490,9 @@ public:
   TimeoutData timeout() override { return timeout_; }
   absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
     return dynamic_max_stream_duration_;
+  }
+  const envoy::config::bootstrap::v3::DumpStateConfig* dumpStateConfig() const override {
+    return config_->dumpStateConfig();
   }
   Http::RequestHeaderMap* downstreamHeaders() override { return downstream_headers_; }
   Http::RequestTrailerMap* downstreamTrailers() override { return downstream_trailers_; }

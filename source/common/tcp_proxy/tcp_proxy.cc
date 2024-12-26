@@ -702,7 +702,14 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
                      true, false, false, false, false, false, {},
                      context.serverFactoryContext().api().timeSource(),
                      context.serverFactoryContext().httpContext(),
-                     context.serverFactoryContext().routerContext()),
+                     context.serverFactoryContext().routerContext(),
+                     [&context]() -> const envoy::config::bootstrap::v3::DumpStateConfig* {
+                       const auto& bootstrap = context.serverFactoryContext().bootstrap();
+                       if (bootstrap.has_dump_state_config()) {
+                         return &bootstrap.dump_state_config();
+                       }
+                       return nullptr;
+                     }()),
       server_factory_context_(context.serverFactoryContext()) {
   if (!post_path_.empty() && !use_post_) {
     throw EnvoyException("Can't set a post path when POST method isn't used");

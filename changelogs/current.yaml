@@ -406,6 +406,12 @@ new_features:
   change: |
     Add the option to reduce the rate limit budget based on request/response contexts on stream done.
     See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
+- area: filter_manager
+  change: |
+    Added new configuration options in :ref:`bootstrap dump_state_config<envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dump_state_config>`
+    to redact sensitive headers in the state dump. This provide users more control over sensitive data exposure during
+    fatal error dumps. Users can choose to disable dumping the entire request or response headers or selectively pass a
+    list of allowed headers.
 
 deprecated:
 - area: rbac

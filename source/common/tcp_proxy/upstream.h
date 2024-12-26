@@ -341,6 +341,9 @@ public:
   bool downstreamResponseStarted() const override { return false; }
   bool downstreamEndStream() const override { return false; }
   uint32_t attemptCount() const override { return 0; }
+  const envoy::config::bootstrap::v3::DumpStateConfig* dumpStateConfig() const override {
+    return nullptr;
+  }
 
 protected:
   void onResetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);

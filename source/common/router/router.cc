@@ -95,7 +95,14 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
               : false,
           config.strict_check_headers(), context.serverFactoryContext().api().timeSource(),
           context.serverFactoryContext().httpContext(),
-          context.serverFactoryContext().routerContext()) {
+          context.serverFactoryContext().routerContext(),
+          [&context]() -> const envoy::config::bootstrap::v3::DumpStateConfig* {
+            const auto& bootstrap = context.serverFactoryContext().bootstrap();
+            if (bootstrap.has_dump_state_config()) {
+              return &bootstrap.dump_state_config();
+            }
+            return nullptr;
+          }()) {
   for (const auto& upstream_log : config.upstream_log()) {
     upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
   }

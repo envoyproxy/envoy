@@ -18,6 +18,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/grpc/common.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/matching/data_impl.h"
@@ -394,6 +395,11 @@ public:
   virtual ~FilterManagerCallbacks() = default;
 
   /**
+   * Returns the current dump state configuration if one exists.
+   */
+  virtual const envoy::config::bootstrap::v3::DumpStateConfig* dumpStateConfig() const PURE;
+
+  /**
    * Called when the provided headers have been encoded by all the filters in the chain.
    * @param response_headers the encoded headers.
    * @param end_stream whether this is a header only response.
@@ -705,11 +711,47 @@ public:
        << DUMP_MEMBER(state_.observed_decode_end_stream_)
        << DUMP_MEMBER(state_.observed_encode_end_stream_) << "\n";
 
-    DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
-    DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
-    DUMP_DETAILS(filter_manager_callbacks_.responseHeaders());
-    DUMP_DETAILS(filter_manager_callbacks_.responseTrailers());
-    DUMP_DETAILS(&streamInfo());
+    const auto* dump_config = filter_manager_callbacks_.dumpStateConfig();
+
+    const auto& headers = filter_manager_callbacks_.requestHeaders();
+    if (headers) {
+      if (!dump_config) {
+        DUMP_DETAILS(headers);
+      } else {
+        dumpHeadersIfEnabled(os, *headers, dump_config->request_headers(), indent_level);
+      }
+    }
+
+    const auto& req_trailers = filter_manager_callbacks_.requestTrailers();
+    if (req_trailers) {
+      if (!dump_config) {
+        DUMP_DETAILS(headers);
+      } else {
+        dumpHeadersIfEnabled(os, *req_trailers, dump_config->request_trailers(), indent_level);
+      }
+    }
+
+    const auto& resp_headers = filter_manager_callbacks_.responseHeaders();
+    if (resp_headers) {
+      if (!dump_config) {
+        DUMP_DETAILS(headers);
+      } else {
+        dumpHeadersIfEnabled(os, *resp_headers, dump_config->response_headers(), indent_level);
+      }
+    }
+
+    const auto& resp_trailers = filter_manager_callbacks_.responseTrailers();
+    if (resp_trailers) {
+      if (!dump_config) {
+        DUMP_DETAILS(headers);
+      } else {
+        dumpHeadersIfEnabled(os, *resp_trailers, dump_config->response_trailers(), indent_level);
+      }
+    }
+
+    if (!dump_config || shouldDumpStreamInfo(dump_config->stream_info())) {
+      DUMP_DETAILS(&streamInfo());
+    }
   }
 
   // FilterChainManager
@@ -979,6 +1021,47 @@ protected:
   State& state() { return state_; }
 
 private:
+  bool shouldDumpStreamInfo(
+      const envoy::config::bootstrap::v3::DumpStateConfig::DumpConfig& config) const {
+    return !(config.has_disabled() && config.disabled());
+  }
+
+  void dumpHeadersIfEnabled(std::ostream& os, const HeaderMap& headers,
+                            const envoy::config::bootstrap::v3::DumpStateConfig::DumpConfig& config,
+                            int indent_level) const {
+    const char* spaces = spacesForLevel(indent_level);
+
+    // Don't dump anything if explicitly disabled
+    if (config.has_disabled() && config.disabled()) {
+      return;
+    }
+
+    if (!config.has_allowed_headers()) {
+      // Dump all headers
+      DUMP_DETAILS(&headers);
+    } else {
+      // Dump only allowed headers
+      auto filtered = filterHeaders(headers, config);
+      DUMP_DETAILS(filtered.get());
+    }
+  }
+
+  Http::HeaderMapPtr
+  filterHeaders(const Http::HeaderMap& headers,
+                const envoy::config::bootstrap::v3::DumpStateConfig::DumpConfig& config) const {
+    auto filtered_headers = Http::ResponseHeaderMapImpl::create();
+    const auto& allowed = config.allowed_headers().headers();
+
+    for (const auto& header_name : allowed) {
+      auto values = headers.get(Http::LowerCaseString(header_name));
+      if (!values.empty()) {
+        filtered_headers->addCopy(Http::LowerCaseString(header_name),
+                                  values[0]->value().getStringView());
+      }
+    }
+    return filtered_headers;
+  }
+
   friend class DownstreamFilterManager;
   class FilterChainFactoryCallbacksImpl : public Http::FilterChainFactoryCallbacks {
   public:
@@ -1240,9 +1323,19 @@ public:
            streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
   }
 
+  /**
+   * Returns true if the downstream filter load shed point is configured and load shedding is needed.
+   */
   bool shouldLoadShed() override {
     return downstream_filter_load_shed_point_ != nullptr &&
            downstream_filter_load_shed_point_->shouldShedLoad();
+  }
+
+  /**
+   * Returns the dump state config from the filter manager callbacks.
+   */
+  const envoy::config::bootstrap::v3::DumpStateConfig* dumpStateConfig() const {
+    return filter_manager_callbacks_.dumpStateConfig();
   }
 
 private:
