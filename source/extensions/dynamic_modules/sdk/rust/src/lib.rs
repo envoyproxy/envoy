@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 
 pub mod buffer;
-use buffer::EnvoyBuffer;
+pub use buffer::EnvoyBuffer;
 
 #[cfg(test)]
 #[path = "./lib_test.rs"]
