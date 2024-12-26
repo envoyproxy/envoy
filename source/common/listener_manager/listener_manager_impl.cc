@@ -671,25 +671,26 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
-  draining_it->listener_->localDrainManager().startDrainSequence([this, draining_it]() -> void {
-    draining_it->listener_->debugLog("removing draining listener");
-    for (const auto& worker : workers_) {
-      // Once the drain time has completed via the drain manager's timer, we tell the workers
-      // to remove the listener.
-      worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
-        // The remove listener completion is called on the worker thread. We post back to the
-        // main thread to avoid locking. This makes sure that we don't destroy the listener
-        // while filters might still be using its context (stats, etc.).
-        server_.dispatcher().post([this, draining_it]() -> void {
-          if (--draining_it->workers_pending_removal_ == 0) {
-            draining_it->listener_->debugLog("draining listener removal complete");
-            draining_listeners_.erase(draining_it);
-            stats_.total_listeners_draining_.set(draining_listeners_.size());
-          }
-        });
+  draining_it->listener_->localDrainManager().startDrainSequence(
+      Network::DrainDirection::All, [this, draining_it]() -> void {
+        draining_it->listener_->debugLog("removing draining listener");
+        for (const auto& worker : workers_) {
+          // Once the drain time has completed via the drain manager's timer, we tell the workers
+          // to remove the listener.
+          worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
+            // The remove listener completion is called on the worker thread. We post back to the
+            // main thread to avoid locking. This makes sure that we don't destroy the listener
+            // while filters might still be using its context (stats, etc.).
+            server_.dispatcher().post([this, draining_it]() -> void {
+              if (--draining_it->workers_pending_removal_ == 0) {
+                draining_it->listener_->debugLog("draining listener removal complete");
+                draining_listeners_.erase(draining_it);
+                stats_.total_listeners_draining_.set(draining_listeners_.size());
+              }
+            });
+          });
+        }
       });
-    }
-  });
 
   updateWarmingActiveGauges();
 }

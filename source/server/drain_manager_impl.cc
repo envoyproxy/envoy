@@ -28,9 +28,11 @@ bool DrainManagerImpl::drainClose() const {
     return true;
   }
 
-  if (!draining_) {
+  if (!draining_.load().first) {
     return false;
   }
+
+  ASSERT(draining_.load().first);
 
   if (server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {
     return true;
@@ -61,7 +63,10 @@ bool DrainManagerImpl::drainClose() const {
          (server_.api().randomGenerator().random() % drain_time_count);
 }
 
-void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
+Network::DrainDirection DrainManagerImpl::drainDirection() const { return draining_.load().second; }
+
+void DrainManagerImpl::startDrainSequence(Network::DrainDirection direction,
+                                          std::function<void()> drain_complete_cb) {
   ASSERT(!drain_tick_timer_);
   drain_tick_timer_ = server_.dispatcher().createTimer(drain_complete_cb);
 
@@ -80,7 +85,7 @@ void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_c
   // https://stackoverflow.com/questions/40320254/reordering-atomic-operations-in-c .
   drain_deadline_ = server_.dispatcher().timeSource().monotonicTime() + drain_delay;
   // Atomic assign must come after the assign to drain_deadline_.
-  draining_.store(true, std::memory_order_seq_cst);
+  draining_.store(DrainPair{true, direction}, std::memory_order_seq_cst);
 }
 
 void DrainManagerImpl::startParentShutdownSequence() {
