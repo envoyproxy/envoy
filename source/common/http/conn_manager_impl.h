@@ -611,6 +611,7 @@ private:
   void onDeferredRequestProcessing();
 
   enum class DrainState { NotDraining, Draining, Closing };
+  enum class DrainDirecction { All, Inbound };
 
   ConnectionManagerConfigSharedPtr config_;
   ConnectionManagerStats& stats_; // We store a reference here to avoid an extra stats() call on
