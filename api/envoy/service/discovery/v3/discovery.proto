@@ -45,9 +45,11 @@ message ResourceName {
 // An error associated with a specific resource name, returned to the
 // client by the server.
 message ResourceError {
- ResourceName resource_name = 1;
+  // The name of the resource.
+  ResourceName resource_name = 1;
 
- google.rpc.Status error_detail = 2;
+  // The error reported for the resource.
+  google.rpc.Status error_detail = 2;
 }
 
 // A DiscoveryRequest requests a set of versioned resources of the same type for
