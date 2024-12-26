@@ -1,9 +1,5 @@
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 
-#[cfg(test)]
-#[path = "./http_test.rs"]
-mod http_test;
-
 declare_init_functions!(init, new_http_filter_config_fn);
 
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::ProgramInitFunction`] signature.
@@ -225,5 +221,20 @@ impl HttpFilter for HeaderCallbacksFilter {
     assert_eq!(&all_trailers[3].1.as_slice(), b"value");
 
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
+  }
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+
+  #[test]
+  fn test_header_callbacks_filter_on_request_headers() {
+    let mut f = HeaderCallbacksFilter {};
+    let mut envoy_filter = envoy_proxy_dynamic_modules_rust_sdk::EnvoyHttpFilter::default();
+
+    // TODO: assertions.
+
+    f.on_request_headers(envoy_filter, false);
   }
 }
