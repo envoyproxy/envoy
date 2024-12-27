@@ -3,7 +3,8 @@
 /// The life time (not in Rust sense) of the buffer is managed by Envoy, and it depends on how
 /// this [`EnvoyBuffer`] is created, for example, via [`crate::EnvoyHttpFilter`]'s methods.
 ///
-/// This is cloneable and copyable, but the underlying memory is not copied.
+/// This is cloneable and copyable, but the underlying memory is not copied. It can be
+/// thought of as an alias to &\[u8\] but the underlying memory is owned by Envoy.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct EnvoyBuffer {

@@ -18,9 +18,13 @@ def test_program(name):
         targets = ["//test/extensions/dynamic_modules/test_data/rust:" + name],
     )
 
+    if name + "_test.rs" not in native.glob(["*.rs"]):
+        return
+
     rust_test(
         name = "rust_test_" + name,
         srcs = [name + ".rs"],
+        compile_data = [name + "_test.rs"],
         edition = "2021",
         deps = [
             "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk_for_testing",
