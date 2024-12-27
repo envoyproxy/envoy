@@ -21,7 +21,7 @@ public:
                          const envoy::config::core::v3::GrpcService& config,
                          bool skip_cluster_check, TimeSource& time_source,
                          absl::Status& creation_status);
-  RawAsyncClientPtr createUncachedRawAsyncClient() override;
+  absl::StatusOr<RawAsyncClientPtr> createUncachedRawAsyncClient() override;
 
 private:
   Upstream::ClusterManager& cm_;
@@ -36,7 +36,7 @@ public:
                                const envoy::config::core::v3::GrpcService& config,
                                Server::Configuration::CommonFactoryContext& context,
                                const StatNames& stat_names, absl::Status& creation_status);
-  RawAsyncClientPtr createUncachedRawAsyncClient() override;
+  absl::StatusOr<RawAsyncClientPtr> createUncachedRawAsyncClient() override;
 
 private:
   ThreadLocal::Instance& tls_;
