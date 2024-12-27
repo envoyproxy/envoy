@@ -53,7 +53,8 @@ public:
                    std::unique_ptr<Server::Platform> platform_impl,
                    std::unique_ptr<Random::RandomGenerator>&& random_generator,
                    std::unique_ptr<ProcessContext> process_context,
-                   CreateInstanceFunction create_instance, bool set_new_handler = true);
+                   CreateInstanceFunction create_instance, bool set_new_handler = true,
+                   bool activate_saved_logging_context_on_destruction = true);
 
   void runServer() {
     ASSERT(options_.mode() == Server::Mode::Serve);

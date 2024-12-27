@@ -47,7 +47,8 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
                                    std::unique_ptr<Server::Platform> platform_impl,
                                    std::unique_ptr<Random::RandomGenerator>&& random_generator,
                                    std::unique_ptr<ProcessContext> process_context,
-                                   CreateInstanceFunction create_instance, bool set_new_handler)
+                                   CreateInstanceFunction create_instance, bool set_new_handler,
+                                   bool activate_saved_logging_context_on_destruction)
     : platform_impl_(std::move(platform_impl)), options_(options),
       component_factory_(component_factory), stats_allocator_(symbol_table_) {
   // Process the option to disable extensions as early as possible,
@@ -72,9 +73,9 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         log_lock, options_.logFormatEscaped(),
-                                                         options_.enableFineGrainLogging());
+    logging_context_ = std::make_unique<Logger::Context>(
+        options_.logLevel(), options_.logFormat(), log_lock, options_.logFormatEscaped(),
+        options_.enableFineGrainLogging(), activate_saved_logging_context_on_destruction);
 
     configureComponentLogLevels();
 
