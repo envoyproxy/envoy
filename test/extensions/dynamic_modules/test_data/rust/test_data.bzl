@@ -18,20 +18,20 @@ def test_program(name):
     # As per the discussion in https://github.com/envoyproxy/envoy/pull/35627,
     # we set the rust_fmt and clippy target here instead of the part of //tools/code_format target for now.
     rustfmt_test(
-        name = "rust_fmt_" + name,
+        name = "fmt_" + name,
         tags = ["nocoverage"],
         targets = [":" + name],
         testonly = True,
     )
     rust_clippy(
-        name = "rust_clippy_" + name,
+        name = "clippy_" + name,
         tags = ["nocoverage"],
         deps = [":" + name],
         testonly = True,
     )
 
     rust_test(
-        name = "rust_test_" + name,
+        name = "test_" + name,
         srcs = [name + ".rs"],
         compile_data = compile_data,
         edition = "2021",
