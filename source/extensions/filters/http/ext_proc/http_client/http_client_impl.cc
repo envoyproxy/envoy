@@ -11,8 +11,7 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 namespace {
-Http::RequestMessagePtr buildHttpRequest(absl::string_view uri, const uint64_t stream_id,
-                                         absl::string_view req_in_json) {
+Http::RequestHeaderMapPtr buildHttpRequestHeaders(absl::string_view uri, const uint64_t stream_id) {
   absl::string_view host, path;
   Envoy::Http::Utility::extractHostPathFromUri(uri, host, path);
   ENVOY_LOG_MISC(debug, " Ext_Proc HTTP client send request to uri {}, host {}, path {}", uri, host,
@@ -28,10 +27,7 @@ Http::RequestMessagePtr buildHttpRequest(absl::string_view uri, const uint64_t s
            {header_values.ContentType, "application/json"},
            {header_values.RequestId, std::to_string(stream_id)},
            {header_values.Host, std::string(host)}});
-  Http::RequestMessagePtr message =
-      std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
-  message->body().add(req_in_json);
-  return message;
+  return headers;
 }
 
 } // namespace
@@ -47,8 +43,7 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
   auto req_in_json = MessageUtil::getJsonStringFromMessage(req);
   if (req_in_json.ok()) {
     const auto http_uri = config_.http_service().http_service().http_uri();
-    Http::RequestMessagePtr message =
-        buildHttpRequest(http_uri.uri(), stream_id, req_in_json.value());
+    Http::RequestHeaderMapPtr headers = buildHttpRequestHeaders(http_uri.uri(), stream_id);
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(std::chrono::milliseconds(
                            DurationUtil::durationToMilliseconds(http_uri.timeout())))
@@ -58,7 +53,11 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
     const auto thread_local_cluster = context().clusterManager().getThreadLocalCluster(cluster);
     if (thread_local_cluster) {
       active_request_ =
-          thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
+          thread_local_cluster->httpAsyncClient().startRequest(std::move(headers), *this, options);
+      if (active_request_ != nullptr) {
+        Buffer::OwnedImpl body(req_in_json.value());
+        active_request_->sendData(body, true);
+      }
     } else {
       ENVOY_LOG(error, "ext_proc cluster {} does not exist in the config", cluster);
     }
@@ -68,7 +67,6 @@ void ExtProcHttpClient::sendRequest(envoy::service::ext_proc::v3::ProcessingRequ
 void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,
                                   Http::ResponseMessagePtr&& response) {
   auto status = Envoy::Http::Utility::getResponseStatusOrNullopt(response->headers());
-  active_request_ = nullptr;
   if (status.has_value()) {
     uint64_t status_code = status.value();
     if (status_code == Envoy::enumToInt(Envoy::Http::Code::OK)) {
@@ -93,6 +91,7 @@ void ExtProcHttpClient::onSuccess(const Http::AsyncClient::Request&,
       if (callbacks_) {
         callbacks_->onComplete(response_msg);
         callbacks_ = nullptr;
+        active_request_ = nullptr;
       }
     } else {
       ENVOY_LOG(error, "Response status is not OK, status: {}", status_code);
@@ -110,18 +109,24 @@ void ExtProcHttpClient::onFailure(const Http::AsyncClient::Request&,
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset ||
          reason == Http::AsyncClient::FailureReason::ExceedResponseBufferLimit);
   ENVOY_LOG(error, "Request failed: stream has been reset");
-  active_request_ = nullptr;
   onError();
 }
 
+const Envoy::StreamInfo::StreamInfo* ExtProcHttpClient::getStreamInfo() const {
+  if (active_request_ != nullptr) {
+    return &active_request_->streamInfo();
+  } else {
+    return nullptr;
+  }
+}
+
 void ExtProcHttpClient::onError() {
-  // Cancel if the request is active.
-  cancel();
   ENVOY_LOG(error, "ext_proc HTTP client error condition happens.");
   if (callbacks_) {
     callbacks_->onError();
     callbacks_ = nullptr;
   }
+  active_request_ = nullptr;
 }
 
 void ExtProcHttpClient::cancel() {

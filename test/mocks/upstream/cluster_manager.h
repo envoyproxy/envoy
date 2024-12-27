@@ -37,7 +37,7 @@ public:
   // Upstream::ClusterManager
   MOCK_METHOD(absl::Status, initialize, (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(bool, initialized, ());
-  MOCK_METHOD(bool, addOrUpdateCluster,
+  MOCK_METHOD(absl::StatusOr<bool>, addOrUpdateCluster,
               (const envoy::config::cluster::v3::Cluster& cluster, const std::string& version_info,
                const bool avoid_cds_removal));
   MOCK_METHOD(void, setPrimaryClustersInitializedCb, (PrimaryClustersReadyCallback));

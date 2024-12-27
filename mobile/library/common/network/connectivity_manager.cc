@@ -78,10 +78,9 @@ constexpr unsigned int InitialFaultThreshold = 1;
 constexpr unsigned int MaxFaultThreshold = 3;
 
 ConnectivityManagerImpl::NetworkState ConnectivityManagerImpl::network_state_{
-    1, NetworkType::Generic, MaxFaultThreshold, SocketMode::DefaultPreferredNetworkMode,
-    Thread::MutexBasicLockable{}};
+    1, 0, MaxFaultThreshold, SocketMode::DefaultPreferredNetworkMode, Thread::MutexBasicLockable{}};
 
-envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(NetworkType network) {
+envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(int network) {
   Thread::LockGuard lock{network_state_.mutex_};
 
   // TODO(goaway): Re-enable this guard. There's some concern that this will miss network updates
@@ -118,7 +117,7 @@ void ConnectivityManagerImpl::setProxySettings(ProxySettingsConstSharedPtr new_p
 
 ProxySettingsConstSharedPtr ConnectivityManagerImpl::getProxySettings() { return proxy_settings_; }
 
-NetworkType ConnectivityManagerImpl::getPreferredNetwork() {
+int ConnectivityManagerImpl::getPreferredNetwork() {
   Thread::LockGuard lock{network_state_.mutex_};
   return network_state_.network_;
 }
@@ -299,17 +298,16 @@ std::vector<InterfacePair> ConnectivityManagerImpl::enumerateV6Interfaces() {
   return enumerateInterfaces(AF_INET6, 0, 0);
 }
 
-Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(NetworkType network,
+Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(int network,
                                                                            SocketMode socket_mode) {
   if (enable_interface_binding_ && socket_mode == SocketMode::AlternateBoundInterfaceMode &&
-      network != NetworkType::Generic) {
+      network != 0) {
     return getAlternateInterfaceSocketOptions(network);
   }
 
   // Envoy uses the hash signature of overridden socket options to choose a connection pool.
   // Setting a dummy socket option is a hack that allows us to select a different
   // connection pool without materially changing the socket configuration.
-  ASSERT(static_cast<int>(network) >= 0 && static_cast<int>(network) < 3);
   int ttl_value = DEFAULT_IP_TTL + static_cast<int>(network);
   auto options = std::make_shared<Socket::Options>();
   options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
@@ -318,8 +316,7 @@ Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(Netwo
   return options;
 }
 
-Socket::OptionsSharedPtr
-ConnectivityManagerImpl::getAlternateInterfaceSocketOptions(NetworkType network) {
+Socket::OptionsSharedPtr ConnectivityManagerImpl::getAlternateInterfaceSocketOptions(int network) {
   auto v4_pair = getActiveAlternateInterface(network, AF_INET);
   auto v6_pair = getActiveAlternateInterface(network, AF_INET6);
   ENVOY_LOG(debug, "found active alternate interface (ipv4): {} {}", std::get<0>(v4_pair),
@@ -357,7 +354,7 @@ ConnectivityManagerImpl::getAlternateInterfaceSocketOptions(NetworkType network)
 envoy_netconf_t
 ConnectivityManagerImpl::addUpstreamSocketOptions(Socket::OptionsSharedPtr options) {
   envoy_netconf_t configuration_key;
-  NetworkType network;
+  int network;
   SocketMode socket_mode;
 
   {
@@ -372,10 +369,10 @@ ConnectivityManagerImpl::addUpstreamSocketOptions(Socket::OptionsSharedPtr optio
   return configuration_key;
 }
 
-InterfacePair ConnectivityManagerImpl::getActiveAlternateInterface(NetworkType network,
+InterfacePair ConnectivityManagerImpl::getActiveAlternateInterface(int network,
                                                                    unsigned short family) {
   // Attempt to derive an active interface that differs from the passed network parameter.
-  if (network == NetworkType::WWAN) {
+  if (network & static_cast<int>(NetworkType::WWAN)) {
     // Network is cellular, so look for a WiFi interface.
     // WiFi should always support multicast, and will not be point-to-point.
     auto interfaces =
@@ -389,7 +386,7 @@ InterfacePair ConnectivityManagerImpl::getActiveAlternateInterface(NetworkType n
         return interface;
       }
     }
-  } else if (network == NetworkType::WLAN) {
+  } else if (network & static_cast<int>(NetworkType::WLAN)) {
     // Network is WiFi, so look for a cellular interface.
     // Cellular networks should be point-to-point.
     auto interfaces = enumerateInterfaces(family, IFF_UP | IFF_POINTOPOINT, IFF_LOOPBACK);

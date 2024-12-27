@@ -1476,11 +1476,11 @@ public:
         }));
     ON_CALL(filter_manager_callbacks_, requestHeaders())
         .WillByDefault(Return(makeOptRef(*request_headers_)));
-    filter_manager_->createFilterChain();
+    filter_manager_->createDownstreamFilterChain();
     filter_manager_->requestHeadersInitialized();
   }
 
-  std::unique_ptr<Http::FilterManager> filter_manager_;
+  std::unique_ptr<Http::DownstreamFilterManager> filter_manager_;
   NiceMock<Http::MockFilterManagerCallbacks> filter_manager_callbacks_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Network::MockConnection> connection_;

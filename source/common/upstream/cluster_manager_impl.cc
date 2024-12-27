@@ -117,8 +117,9 @@ void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
   ASSERT(state_ != State::AllClustersInitialized);
 
   const auto initialize_cb = [&cm_cluster, this] {
-    onClusterInit(cm_cluster);
+    RETURN_IF_NOT_OK(onClusterInit(cm_cluster));
     cm_cluster.cluster().info()->configUpdateStats().warming_state_.set(0);
+    return absl::OkStatus();
   };
   Cluster& cluster = cm_cluster.cluster();
 
@@ -142,10 +143,11 @@ void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
             primary_init_clusters_.size(), secondary_init_clusters_.size());
 }
 
-void ClusterManagerInitHelper::onClusterInit(ClusterManagerCluster& cluster) {
+absl::Status ClusterManagerInitHelper::onClusterInit(ClusterManagerCluster& cluster) {
   ASSERT(state_ != State::AllClustersInitialized);
-  per_cluster_init_callback_(cluster);
+  RETURN_IF_NOT_OK(per_cluster_init_callback_(cluster));
   removeCluster(cluster);
+  return absl::OkStatus();
 }
 
 void ClusterManagerInitHelper::removeCluster(ClusterManagerCluster& cluster) {
@@ -186,7 +188,7 @@ void ClusterManagerInitHelper::initializeSecondaryClusters() {
     ClusterManagerCluster* cluster = iter->second;
     ENVOY_LOG(debug, "initializing secondary cluster {}", iter->first);
     ++iter;
-    cluster->cluster().initialize([cluster, this] { onClusterInit(*cluster); });
+    cluster->cluster().initialize([cluster, this] { return onClusterInit(*cluster); });
   }
 }
 
@@ -309,7 +311,7 @@ ClusterManagerImpl::ClusterManagerImpl(
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     OptRef<Server::Admin> admin, ProtobufMessage::ValidationContext& validation_context,
     Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
-    Router::Context& router_context, Server::Instance& server)
+    Router::Context& router_context, Server::Instance& server, absl::Status& creation_status)
     : server_(server), factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
       random_(api.randomGenerator()),
       deferred_cluster_creation_(bootstrap.cluster_manager().enable_deferred_cluster_creation()),
@@ -317,7 +319,8 @@ ClusterManagerImpl::ClusterManagerImpl(
                        ? absl::make_optional(bootstrap.cluster_manager().upstream_bind_config())
                        : absl::nullopt),
       local_info_(local_info), cm_stats_(generateStats(*stats.rootScope())),
-      init_helper_(*this, [this](ClusterManagerCluster& cluster) { onClusterInit(cluster); }),
+      init_helper_(*this,
+                   [this](ClusterManagerCluster& cluster) { return onClusterInit(cluster); }),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context), validation_context_(validation_context),
       router_context_(router_context), cluster_stat_names_(stats.symbolTable()),
@@ -345,9 +348,10 @@ ClusterManagerImpl::ClusterManagerImpl(
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
-      outlier_event_logger_ = THROW_OR_RETURN_VALUE(
-          Outlier::EventLoggerImpl::create(log_manager, event_log_file_path, time_source_),
-          std::unique_ptr<Outlier::EventLoggerImpl>);
+      auto outlier_or_error =
+          Outlier::EventLoggerImpl::create(log_manager, event_log_file_path, time_source_);
+      SET_AND_RETURN_IF_NOT_OK(outlier_or_error.status(), creation_status);
+      outlier_event_logger_ = std::move(*outlier_or_error);
     }
   }
 
@@ -693,7 +697,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::generateStats(Stats::Scope& s
   return {ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
-void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
+absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
   // This routine is called when a cluster has finished initializing. The cluster has not yet
   // been setup for cross-thread updates to avoid needless updates during initialization. The order
   // of operations here is important. We start by initializing the thread aware load balancer if
@@ -710,7 +714,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
   cluster_data = active_clusters_.find(cluster.info()->name());
 
   if (cluster_data->second->thread_aware_lb_ != nullptr) {
-    THROW_IF_NOT_OK(cluster_data->second->thread_aware_lb_->initialize());
+    RETURN_IF_NOT_OK(cluster_data->second->thread_aware_lb_->initialize());
   }
 
   // Now setup for cross-thread updates.
@@ -793,6 +797,7 @@ void ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
   // clusters being added/updated. We could gate the below update on hosts being available on
   // the cluster or the cluster not already existing, but the special logic is not worth it.
   postThreadLocalClusterUpdate(cm_cluster, std::move(params));
+  return absl::OkStatus();
 }
 
 bool ClusterManagerImpl::scheduleUpdate(ClusterManagerCluster& cluster, uint32_t priority,
@@ -870,9 +875,10 @@ void ClusterManagerImpl::applyUpdates(ClusterManagerCluster& cluster, uint32_t p
   updates.last_updated_ = time_source_.monotonicTime();
 }
 
-bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                                            const std::string& version_info,
-                                            const bool avoid_cds_removal) {
+absl::StatusOr<bool>
+ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                                       const std::string& version_info,
+                                       const bool avoid_cds_removal) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration. We check
   // both the warming clusters and the active clusters to see if we need an update or the update
@@ -924,7 +930,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
   auto status_or_cluster =
       loadCluster(cluster, new_hash, version_info, /*added_via_api=*/true,
                   /*required_for_ads=*/false, warming_clusters_, avoid_cds_removal);
-  THROW_IF_NOT_OK_REF(status_or_cluster.status());
+  RETURN_IF_NOT_OK_REF(status_or_cluster.status());
   const ClusterDataPtr previous_cluster = std::move(status_or_cluster.value());
   auto& cluster_entry = warming_clusters_.at(cluster_name);
   cluster_entry->cluster_->info()->configUpdateStats().warming_state_.set(1);
@@ -938,7 +944,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cl
       auto state_changed_cluster_entry = warming_clusters_.find(cluster_name);
       state_changed_cluster_entry->second->cluster_->info()->configUpdateStats().warming_state_.set(
           0);
-      onClusterInit(*state_changed_cluster_entry->second);
+      return onClusterInit(*state_changed_cluster_entry->second);
     });
   }
 
@@ -1172,10 +1178,10 @@ void ClusterManagerImpl::maybePreconnect(
 
 absl::optional<HttpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
-    ResourcePriority priority, absl::optional<Http::Protocol> protocol,
+    HostConstSharedPtr host, ResourcePriority priority, absl::optional<Http::Protocol> protocol,
     LoadBalancerContext* context) {
   // Select a host and create a connection pool for it if it does not already exist.
-  auto pool = httpConnPoolImpl(priority, protocol, context, false);
+  auto pool = httpConnPoolImpl(host, priority, protocol, context);
   if (pool == nullptr) {
     return absl::nullopt;
   }
@@ -1183,10 +1189,34 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
   HttpPoolData data(
       [this, priority, protocol, context]() -> void {
         // Now that a new stream is being established, attempt to preconnect.
-        maybePreconnect(*this, parent_.cluster_manager_state_,
-                        [this, &priority, &protocol, &context]() {
-                          return httpConnPoolImpl(priority, protocol, context, true);
-                        });
+        maybePreconnect(
+            *this, parent_.cluster_manager_state_, [this, &priority, &protocol, &context]() {
+              HostConstSharedPtr peek_host = peekAnotherHost(context);
+              return peek_host ? httpConnPoolImpl(peek_host, priority, protocol, context) : nullptr;
+            });
+      },
+      pool);
+  return data;
+}
+
+absl::optional<TcpPoolData>
+ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
+    HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context) {
+  if (!host) {
+    return absl::nullopt;
+  }
+  // Select a host and create a connection pool for it if it does not already exist.
+  auto pool = tcpConnPoolImpl(host, priority, context);
+  if (pool == nullptr) {
+    return absl::nullopt;
+  }
+
+  TcpPoolData data(
+      [this, priority, context]() -> void {
+        maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &context]() {
+          HostConstSharedPtr peek_host = peekAnotherHost(context);
+          return peek_host ? tcpConnPoolImpl(peek_host, priority, context) : nullptr;
+        });
       },
       pool);
   return data;
@@ -1195,20 +1225,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPool(
 absl::optional<TcpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ResourcePriority priority, LoadBalancerContext* context) {
-  // Select a host and create a connection pool for it if it does not already exist.
-  auto pool = tcpConnPoolImpl(priority, context, false);
-  if (pool == nullptr) {
+  HostConstSharedPtr host = chooseHost(context);
+  if (!host) {
     return absl::nullopt;
   }
-
-  TcpPoolData data(
-      [this, priority, context]() -> void {
-        maybePreconnect(*this, parent_.cluster_manager_state_, [this, &priority, &context]() {
-          return tcpConnPoolImpl(priority, context, true);
-        });
-      },
-      pool);
-  return data;
+  return tcpConnPool(host, priority, context);
 }
 
 void ClusterManagerImpl::drainConnections(const std::string& cluster,
@@ -1602,10 +1623,8 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
               parent_, logical_host, *conn_info.connection_));
     }
     return conn_info;
-  } else {
-    cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
-    return {nullptr, nullptr};
   }
+  return {nullptr, nullptr};
 }
 
 Http::AsyncClient&
@@ -1762,12 +1781,12 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std
 }
 
 void ClusterManagerImpl::notifyMissingCluster(absl::string_view name) {
-  ENVOY_LOG(debug, "cm odcds: cluster {} not found during on-demand discovery", name);
+  ENVOY_LOG(info, "cm odcds: cluster {} not found during on-demand discovery", name);
   notifyClusterDiscoveryStatus(name, ClusterDiscoveryStatus::Missing);
 }
 
 void ClusterManagerImpl::notifyExpiredDiscovery(absl::string_view name) {
-  ENVOY_LOG(debug, "cm odcds: on-demand discovery for cluster {} timed out", name);
+  ENVOY_LOG(info, "cm odcds: on-demand discovery for cluster {} timed out", name);
   notifyClusterDiscoveryStatus(name, ClusterDiscoveryStatus::Timeout);
 }
 
@@ -2072,17 +2091,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::~ClusterEntry()
 
 Http::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpConnPoolImpl(
-    ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
-    LoadBalancerContext* context, bool peek) {
-  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
+    HostConstSharedPtr host, ResourcePriority priority,
+    absl::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context) {
   if (!host) {
-    if (!peek) {
-      ENVOY_LOG(debug, "no healthy host for HTTP connection pool");
-      cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
-    }
     return nullptr;
   }
-
   // Right now, HTTP, HTTP/2 and ALPN pools are considered separate.
   // We could do better here, and always use the ALPN pool and simply make sure
   // we end up on a connection of the correct protocol, but for simplicity we're
@@ -2187,10 +2200,15 @@ HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEnt
   if (host != nullptr) {
     return host;
   }
-  if (!HostUtility::allowLBChooseHost(context)) {
-    return nullptr;
+  if (HostUtility::allowLBChooseHost(context)) {
+    host = lb_->chooseHost(context);
   }
-  return lb_->chooseHost(context);
+  if (host) {
+    return host;
+  }
+  cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
+  ENVOY_LOG(debug, "no healthy host");
+  return nullptr;
 }
 
 HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
@@ -2206,17 +2224,7 @@ HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEnt
 
 Tcp::ConnectionPool::Instance*
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPoolImpl(
-    ResourcePriority priority, LoadBalancerContext* context, bool peek) {
-
-  HostConstSharedPtr host = (peek ? peekAnotherHost(context) : chooseHost(context));
-  if (!host) {
-    if (!peek) {
-      ENVOY_LOG(debug, "no healthy host for TCP connection pool");
-      cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
-    }
-    return nullptr;
-  }
-
+    HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context) {
   // Inherit socket options from downstream connection, if set.
   std::vector<uint8_t> hash_key = {uint8_t(priority)};
 
@@ -2296,13 +2304,15 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
   }
 }
 
-ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
+absl::StatusOr<ClusterManagerPtr> ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  absl::Status creation_status = absl::OkStatus();
   auto cluster_manager_impl = std::unique_ptr<ClusterManagerImpl>{new ClusterManagerImpl(
       bootstrap, *this, context_, stats_, tls_, context_.runtime(), context_.localInfo(),
       context_.accessLogManager(), context_.mainThreadDispatcher(), context_.admin(),
       context_.messageValidationContext(), context_.api(), http_context_, context_.grpcContext(),
-      context_.routerContext(), server_)};
+      context_.routerContext(), server_, creation_status)};
+  RETURN_IF_NOT_OK(creation_status);
   return cluster_manager_impl;
 }
 

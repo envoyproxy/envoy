@@ -132,8 +132,15 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       cluster_name_(std::string(cluster_name)), cluster_type_(cluster_type), uri_(std::string(uri)),
       cache_duration_(getCacheDuration()), refresh_state_(refresh_state),
       initialization_timer_(initialization_timer), debug_name_(cluster_name) {
+
+  // Most code sets the context and uses the async http client, except for one extension
+  // which is scheduled to be deprecated and deleted. Modes can no longer be switched via runtime,
+  // so each caller should only pass parameters to support a single mode.
+  // https://github.com/envoyproxy/envoy/issues/36910
+  ASSERT((context.has_value() ^ (fetch_metadata_using_curl != nullptr)));
+
   // Async provider cluster setup
-  if (useHttpAsyncClient() && context_) {
+  if (context_) {
     // Set up metadata credentials statistics
     scope_ = api.rootScope().createScope(
         fmt::format("aws.metadata_credentials_provider.{}.", cluster_name_));
@@ -191,7 +198,7 @@ void MetadataCredentialsProviderBase::createCluster(bool new_timer) {
                    cluster_type_str, cluster_name_, host_port);
   }
 
-  context_->clusterManager().addOrUpdateCluster(cluster, "");
+  THROW_IF_NOT_OK(context_->clusterManager().addOrUpdateCluster(cluster, "").status());
 }
 
 // A thread local callback that occurs on every worker thread during cluster initialization.
@@ -249,7 +256,7 @@ void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterRemo
 
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 Credentials MetadataCredentialsProviderBase::getCredentials() {
-  if (useHttpAsyncClient()) {
+  if (context_) {
     if (tls_slot_) {
       return *(*tls_slot_)->credentials_.get();
     } else {
@@ -269,7 +276,7 @@ std::chrono::seconds MetadataCredentialsProviderBase::getCacheDuration() {
 }
 
 void MetadataCredentialsProviderBase::handleFetchDone() {
-  if (useHttpAsyncClient() && context_) {
+  if (context_) {
     if (cache_duration_timer_ && !cache_duration_timer_->enabled()) {
       // Receiver state handles the initial credential refresh scenario. If for some reason we are
       // unable to perform credential refresh after cluster initialization has completed, we use a
@@ -315,11 +322,6 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
       obj->credentials_ = shared_credentials;
     });
   }
-}
-
-bool MetadataCredentialsProviderBase::useHttpAsyncClient() {
-  return Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.use_http_client_to_fetch_aws_credentials");
 }
 
 bool CredentialsFileCredentialsProvider::needsRefresh() {
@@ -403,7 +405,7 @@ void InstanceProfileCredentialsProvider::refresh() {
   token_req_message.headers().setCopy(Http::LowerCaseString(EC2_IMDS_TOKEN_TTL_HEADER),
                                       EC2_IMDS_TOKEN_TTL_DEFAULT_VALUE);
 
-  if (!useHttpAsyncClient() || !context_) {
+  if (!context_) {
     // Using curl to fetch the AWS credentials where we first get the token.
     const auto token_string = fetch_metadata_using_curl_(token_req_message);
     if (token_string) {
@@ -555,7 +557,7 @@ void InstanceProfileCredentialsProvider::extractCredentials(
             session_token.empty() ? "" : "*****");
 
   last_updated_ = api_.timeSource().systemTime();
-  if (useHttpAsyncClient() && context_) {
+  if (context_) {
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
     stats_->credential_refreshes_succeeded_.inc();
@@ -642,7 +644,7 @@ void ContainerCredentialsProvider::refresh() {
   message.headers().setHost(host);
   message.headers().setPath(path);
   message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
-  if (!useHttpAsyncClient() || !context_) {
+  if (!context_) {
     // Using curl to fetch the AWS credentials.
     const auto credential_document = fetch_metadata_using_curl_(message);
     if (!credential_document) {
@@ -708,7 +710,7 @@ void ContainerCredentialsProvider::extractCredentials(
   }
 
   last_updated_ = api_.timeSource().systemTime();
-  if (useHttpAsyncClient() && context_) {
+  if (context_) {
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
     ENVOY_LOG(debug, "Metadata receiver {} moving to Ready state", cluster_name_);
@@ -760,12 +762,6 @@ bool WebIdentityCredentialsProvider::needsRefresh() {
 }
 
 void WebIdentityCredentialsProvider::refresh() {
-  // If http async client is not enabled then just set empty credentials and return.
-  if (!useHttpAsyncClient()) {
-    cached_credentials_ = Credentials();
-    return;
-  }
-
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}", sts_endpoint_);
 
   std::string identity_token = token_;
@@ -1085,9 +1081,8 @@ absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig
     // This "two seconds" is a bit arbitrary, but matches the other places in the codebase.
     const auto initialization_timer = std::chrono::seconds(2);
     return std::make_shared<WebIdentityCredentialsProvider>(
-        context.api(), context, Extensions::Common::Aws::Utility::fetchMetadata,
-        MetadataFetcher::create, "", token, sts_endpoint, role_arn, role_session_name,
-        refresh_state, initialization_timer, cluster_name);
+        context.api(), context, nullptr, MetadataFetcher::create, "", token, sts_endpoint, role_arn,
+        role_session_name, refresh_state, initialization_timer, cluster_name);
   } else {
     return absl::InvalidArgumentError("No AWS credential provider specified");
   }

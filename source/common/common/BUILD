@@ -109,6 +109,7 @@ envoy_cc_library(
         "//envoy/network:dns_interface",
         "//source/common/network:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/dns/v3:pkg_cc_proto",
     ],
 )
 
@@ -507,14 +508,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "callback_impl_lib",
-    srcs = ["callback_impl.cc"],
     hdrs = ["callback_impl.h"],
     deps = [
         ":assert_lib",
-        ":lock_guard_lib",
-        ":thread_lib",
         "//envoy/common:callback",
-        "//source/common/event:dispatcher_lib",
     ],
 )
 

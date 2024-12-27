@@ -34,7 +34,7 @@ DynamicForwardProxyFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 DynamicForwardProxyFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig& config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {

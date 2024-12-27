@@ -2,6 +2,9 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: tracing
+  change: |
+    Removed support for (long deprecated) opencensus tracing extension.
 - area: wasm
   change: |
     The route cache will not be cleared by default if the wasm extension modified the request headers and
@@ -24,6 +27,7 @@ behavior_changes:
     rather than waiting for the original request to complete. This allows shadowing requests larger than the buffer limit,
     but also means shadowing may take place for requests which are canceled mid-stream. This behavior change can be
     temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
+
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -66,6 +70,14 @@ minor_behavior_changes:
     :ref:`use_refresh_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.use_refresh_token>`
     is now enabled by default. This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.oauth2_use_refresh_token`` to false.
+- area: oauth2
+  change: |
+    The ``state`` parameter in the OAuth2 authorization request has been changed to a base64url-encoded JSON object.
+    The JSON object contains the original request URL and a nonce for CSRF prevention.
+- area: oauth2
+  change: |
+    Implement the Signed Double-Submit Cookie pattern, as recommended by OWASP, by using the HMAC secret to sign and verify
+    the nonce.
 - area: quic
   change: |
     Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
@@ -78,6 +90,15 @@ minor_behavior_changes:
   change: |
     Local replies now traverse the filter chain if 1xx headers have been sent to the client. This change can be reverted
     by setting the runtime guard ``envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx`` to false.
+- area: cluster
+  change: |
+      Clusters can no longer use unregistered extension types in
+      :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`.
+- area: cluster
+  change: |
+      Clusters factories are registered by configuration type for
+      :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>`
+      and will use configuration type to lookup the corresponding factory when available.
 - area: dns
   change: |
     Patched c-ares to address CVE-2024-25629.
@@ -85,6 +106,17 @@ minor_behavior_changes:
   change: |
     Increase only the statistics counter ``missing_source_origin`` for requests with a missing source origin.
     Previously, the ``request_invalid`` counter was also increased for such requests.
+- area: rate_limit
+  change: |
+    add ``WEEK`` to the unit of time for rate limit.
+- area: rds
+  change: |
+    When a new RDS provider config is pushed via xDS and the only difference is change to
+    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>`,
+    the already existing provider will be reused. Envoy will not ask RDS server for routes
+    config because existing provider already has up to date routes config.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.normalize_rds_provider_config`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -138,6 +170,31 @@ bug_fixes:
   change: |
     Fixed bug where dynamic_forward_proxy udp session filter disabled buffer in filter config
     instead of disabling buffer for the filter instance.
+- area: csrf
+  change: |
+    Handle requests that have a "privacy sensitive" / opaque origin (``Origin: null``) as if the request had no origin information.
+- area: udp_proxy
+  change: |
+    Fix a bug that cause Envoy to crash due to segmentation fault when onBelowWriteBufferLowWatermark callback is called.
+- area: orca
+  change: |
+    The previous ORCA parser will use ``:`` as the delimiter of key/value pair in the native HTTP report. This is wrong
+    based on the design document. The correct delimiter should be ``=``. This change add the ``=`` delimiter support to
+    match the design document and keep the ``:`` delimiter for backward compatibility.
+- area: http/1
+  change: |
+    Fixes sending overload crashes when HTTP/1 request is reset.
+- area: happy_eyeballs
+  change: |
+    Validate that ``additional_address`` are IP addresses instead of crashing when sorting.
+- area: balsa
+  change: |
+    Fix incorrect handling of non-101 1xx responses. This fix can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`` to false.
+- area: dns_cache
+  change: |
+    Fixed a bug where the DNS refresh rate was the DNS TTL instead of the configured dns_refresh_rate/dns_failure_refresh_rate
+    when we failed to resolve the DNS query after a successful resolution.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -162,17 +219,26 @@ removed_config_or_runtime:
 - area: dns
   change: |
     Removed runtime flag ``envoy.reloadable_features.dns_reresolve_on_eai_again`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime flag ``envoy.restart_features.sanitize_te`` and legacy code paths.
 - area: quic
   change: |
     Removed runtime flag ``envoy.restart_features.quic_handle_certs_with_shared_tls_code`` and legacy code paths.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.restart_features.allow_client_socket_creation_failure`` and legacy code paths.
+- area: aws
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials``.
 - area: upstream
   change: |
     Removed runtime flag ``envoy.reloadable_features.exclude_host_in_eds_status_draining``.
 
 new_features:
+- area: redis
+  change: |
+    Added support for keys and select.
 - area: wasm
   change: |
     Added the wasm vm reload support to reload wasm vm when the wasm vm is failed with runtime errors. See
@@ -247,6 +313,10 @@ new_features:
   change: |
     Added support for dynamic cluster selection in UDP proxy. The cluster can be set by one of the session filters
     by setting a per-session state object under the key ``envoy.udp_proxy.cluster``.
+- area: filters
+  change: |
+    Added :ref:`the Api Key Auth filter <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.ApiKeyAuth>`, which
+    can be used to authenticate requests using an API key.
 - area: CEL-attributes
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.request_attempt_count``
@@ -297,9 +367,58 @@ new_features:
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.cx_pool_ready_duration``
     to get the duration from when the upstream request was created to when the upstream connection pool is ready.
+- area: health_check
+  change: |
+    Added new health check filter stats including total requests, successful/failed checks, cached responses, and
+    cluster health status counters. These stats help track health check behavior and cluster health state.
+- area: http
+  change: |
+    Add :ref:`query parameter mutations
+    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.query_parameter_mutations>`
+    to :ref:`Header Mutation Filter <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
+    for adding/removing query parameters on a request.
+- area: local_ratelimit
+  change: |
+    Added per descriptor custom hits addend support for local rate limit filter. See :ref:`hits_addend
+    <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` for more details.
+- area: filters
+  change: |
+    Updatd the ``set_filter_state`` :ref:`filter <config_http_filters_set_filter_state>` to support per-route overrides.
+- area: grpc-json
+  change: |
+    Added a new http filter for :ref:`gRPC to JSON transcoding <config_http_filters_grpc_json_reverse_transcoder>`.
+- area: attributes
+  change: |
+    added new ``xds.virtual_host_name`` and ``xds.virtual_host_metadata`` attributes support. See
+    :ref:`attributes <arch_overview_attributes>` for looking up xDS configuration information.
+- area: redis
+  change: |
+    Added support for UNWATCH command.
+- area: ratelimit
+  change: |
+    Add the :ref:`rate_limits
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
+    field to generate rate limit descriptors. If this field is set, the
+    :ref:`VirtualHost.rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
+    :ref:`RouteAction.rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
+    will be ignored.
+- area: ratelimit
+  change: |
+    Add the option to reduce the rate limit budget based on request/response contexts on stream done.
+    See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
 
 deprecated:
 - area: rbac
   change: |
     metadata :ref:`metadata <envoy_v3_api_field_config.rbac.v3.Permission.metadata>` is now deprecated in the
     favor of :ref:`sourced_metadata <envoy_v3_api_field_config.rbac.v3.Permission.sourced_metadata>`.
+- area: cluster
+  change: |
+    `DNS-related fields in :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster> are deprecated when using
+    strict and logical dns clusters. Instead, use the :ref:`cluster_type <envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type`
+    extension point with :ref:`typed_config<envoy_v3_api_field_config.cluster.v3.Cluster.CustomClusterType.typed_config>` of type
+    :ref:`DnsCluster <envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
+- area: aws_iam
+  change: |
+    The :ref:`aws_iam extension <envoy_v3_api_msg_config.grpc_credential.v3.AwsIamConfig>` is deprecated and will be
+    deleted from Envoy in a future release, no later than Envoy 1.35, but possibly sooner.
