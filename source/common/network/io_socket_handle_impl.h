@@ -14,7 +14,6 @@
 #include "source/common/network/io_socket_handle_base_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
-#include "quiche/quic/core/quic_lru_cache.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
 
 namespace Envoy {
