@@ -21,11 +21,13 @@ def test_program(name):
         name = "rust_fmt_" + name,
         tags = ["nocoverage"],
         targets = [":" + name],
+        testonly = True,
     )
     rust_clippy(
         name = "rust_clippy_" + name,
         tags = ["nocoverage"],
         deps = [":" + name],
+        testonly = True,
     )
 
     rust_test(
