@@ -1,14 +1,13 @@
 load("@rules_rust//rust:defs.bzl", "rust_clippy", "rust_shared_library", "rust_test", "rustfmt_test")
 
 def test_program(name):
-    compile_data = []
+    srcs = [name + ".rs"]
     if name + "_test.rs" in native.glob(["*.rs"]):
-        compile_data = [name + "_test.rs"]
+        srcs = srcs + [name + "_test.rs"]
 
     rust_shared_library(
         name = name,
-        srcs = [name + ".rs"],
-        compile_data = compile_data,
+        srcs = srcs,
         edition = "2021",
         deps = [
             "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
@@ -32,8 +31,8 @@ def test_program(name):
 
     rust_test(
         name = "test_" + name,
-        srcs = [name + ".rs"],
-        compile_data = compile_data,
+        srcs = srcs,
+        crate_root = name + ".rs",
         edition = "2021",
         deps = [
             "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk_for_testing",
