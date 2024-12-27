@@ -78,6 +78,7 @@ ProxyFilter::ProxyFilter(Common::Redis::DecoderFactory& factory,
                          ExternalAuth::ExternalAuthClientPtr&& auth_client)
     : decoder_(factory.create(*this)), encoder_(std::move(encoder)), splitter_(splitter),
       config_(config), transaction_(this) {
+  assert(!transaction_.active_);
   config_->stats_.downstream_cx_total_.inc();
   config_->stats_.downstream_cx_active_.inc();
   connection_allowed_ = config_->downstream_auth_username_.empty() &&

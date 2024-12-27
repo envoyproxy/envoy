@@ -625,7 +625,8 @@ SplitRequestPtr TransactionRequest::create(Router& router,
   }
 
   // If we do a WATCH command without having started a transaction, we send it upstream and save the
-  // key, so we can support UNWATCH. We have to also set the connection details.
+  // key, so we can support UNWATCH. Connection details are set only when transaction actually
+  // starts.
   if (command_name == "watch" && !transaction.active_) {
     transaction.key_ = incoming_request->asArray()[1].asString();
   }
