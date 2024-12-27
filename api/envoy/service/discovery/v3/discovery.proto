@@ -31,7 +31,6 @@ message ResourceLocator {
   map<string, string> dynamic_parameters = 2;
 }
 
-// [#not-implemented-hide:]
 // Specifies a concrete resource name.
 message ResourceName {
   // The name of the resource.
@@ -42,6 +41,7 @@ message ResourceName {
   DynamicParameterConstraints dynamic_parameter_constraints = 2;
 }
 
+// [#not-implemented-hide:]
 // An error associated with a specific resource name, returned to the
 // client by the server.
 message ResourceError {
