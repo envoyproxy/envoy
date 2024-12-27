@@ -735,7 +735,7 @@ case $CI_TARGET in
                 test "${BAZEL_BUILD_OPTIONS[@]}" \
                 --remote_download_minimal \
                 "${BAZEL_RELEASE_OPTIONS[@]}" \
-                "//test/extensions/dynamic_modules/..."
+                "${TEST_TARGETS[@]}"
         fi
 
         if [[ "$CI_TARGET" == "release.test_only" ]]; then
