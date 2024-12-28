@@ -353,7 +353,6 @@ bool CredentialsFileCredentialsProvider::needsRefresh() {
   return has_watched_directory_
              ? true
              : context_.api().timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
-  // return context_.api().timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
 }
 
 void CredentialsFileCredentialsProvider::refresh() {
