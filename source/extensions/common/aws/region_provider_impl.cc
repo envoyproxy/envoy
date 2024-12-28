@@ -56,15 +56,13 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
   absl::flat_hash_map<std::string, std::string> elements = {{REGION, ""}};
   absl::flat_hash_map<std::string, std::string>::iterator it;
 
-  absl::string_view file_path;
+  std::string file_path, profile;
   file_path = credential_file_path_.has_value() ? credential_file_path_.value()
                                                 : Utility::getCredentialFilePath();
-
-  absl::string_view profile;
   profile = profile_.has_value() ? profile_.value() : Utility::getCredentialProfileName();
 
   // Search for the region in the credentials file
-  if (!Utility::resolveProfileElementsFromFile(file_path.data(), profile.data(), elements)) {
+  if (!Utility::resolveProfileElementsFromFile(file_path, profile, elements)) {
     return absl::nullopt;
   }
   it = elements.find(REGION);
@@ -83,15 +81,14 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegionSet() {
 
   // Search for the region in the credentials file
 
-  absl::string_view file_path;
+  std::string file_path, profile;
   file_path = credential_file_path_.has_value() ? credential_file_path_.value()
                                                 : Utility::getCredentialFilePath();
 
-  absl::string_view profile;
   profile = profile_.has_value() ? profile_.value() : Utility::getCredentialProfileName();
 
   // Search for the region in the credentials file
-  if (!Utility::resolveProfileElementsFromFile(file_path.data(), profile.data(), elements)) {
+  if (!Utility::resolveProfileElementsFromFile(file_path, profile, elements)) {
     return absl::nullopt;
   }
   it = elements.find(SIGV4A_SIGNING_REGION_SET);
