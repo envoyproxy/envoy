@@ -338,8 +338,6 @@ public:
   void onMetadataSuccess(const std::string&& body) override;
   void onMetadataError(Failure reason) override;
 
-  const std::string& roleArnForTesting() const { return role_arn_; }
-
 private:
   const std::string sts_endpoint_;
   absl::optional<Config::DataSource::DataSourceProviderPtr> web_identity_data_source_provider_;
@@ -406,13 +404,33 @@ public:
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) const PURE;
 };
 
+class CustomCredentialsProviderChainFactories {
+public:
+  virtual ~CustomCredentialsProviderChainFactories() = default;
+
+  virtual CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+          credential_file_config = {}) const PURE;
+
+  virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
+      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+      std::chrono::seconds initialization_timer,
+      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+          web_identity_config,
+      absl::string_view cluster_name) const PURE;
+};
+
+// TODO(nbaws) Add additional providers to the custom chain.
 class CustomCredentialsProviderChain : public CredentialsProviderChain,
-                                       public CredentialsProviderChainFactories {
+                                       public CustomCredentialsProviderChainFactories {
 public:
   CustomCredentialsProviderChain(
       Server::Configuration::ServerFactoryContext& context, absl::string_view region,
       const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
-      const CredentialsProviderChainFactories& factories);
+      const CustomCredentialsProviderChainFactories& factories);
 
   CustomCredentialsProviderChain(
       Server::Configuration::ServerFactoryContext& context, absl::string_view region,
@@ -441,36 +459,6 @@ public:
         context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
         web_identity_config, cluster_name);
   };
-
-  CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const override {
-    return nullptr;
-  }
-
-  CredentialsProviderSharedPtr createContainerCredentialsProvider(
-      ABSL_ATTRIBUTE_UNUSED Api::Api& api, ABSL_ATTRIBUTE_UNUSED ServerFactoryContextOptRef context,
-      ABSL_ATTRIBUTE_UNUSED Singleton::Manager& singleton_manager,
-      ABSL_ATTRIBUTE_UNUSED const MetadataCredentialsProviderBase::CurlMetadataFetcher&
-          fetch_metadata_using_curl,
-      ABSL_ATTRIBUTE_UNUSED CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      ABSL_ATTRIBUTE_UNUSED absl::string_view cluster_name,
-      ABSL_ATTRIBUTE_UNUSED absl::string_view credential_uri,
-      ABSL_ATTRIBUTE_UNUSED MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      ABSL_ATTRIBUTE_UNUSED std::chrono::seconds initialization_timer,
-      ABSL_ATTRIBUTE_UNUSED absl::string_view authorization_token = {}) const override {
-    return nullptr;
-  }
-
-  CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
-      ABSL_ATTRIBUTE_UNUSED Api::Api& api, ABSL_ATTRIBUTE_UNUSED ServerFactoryContextOptRef context,
-      ABSL_ATTRIBUTE_UNUSED Singleton::Manager& singleton_manager,
-      ABSL_ATTRIBUTE_UNUSED const MetadataCredentialsProviderBase::CurlMetadataFetcher&
-          fetch_metadata_using_curl,
-      ABSL_ATTRIBUTE_UNUSED CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      ABSL_ATTRIBUTE_UNUSED MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      ABSL_ATTRIBUTE_UNUSED std::chrono::seconds initialization_timer,
-      ABSL_ATTRIBUTE_UNUSED absl::string_view cluster_name) const override {
-    return nullptr;
-  }
 };
 
 /**

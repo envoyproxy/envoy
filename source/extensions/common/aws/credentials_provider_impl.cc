@@ -998,7 +998,7 @@ std::string stsClusterName(absl::string_view region) {
 CustomCredentialsProviderChain::CustomCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
-    const CredentialsProviderChainFactories& factories) {
+    const CustomCredentialsProviderChainFactories& factories) {
 
   // Custom chain currently only supports file based and web identity credentials
   if (credential_provider_config.has_assume_role_with_web_identity_provider()) {
