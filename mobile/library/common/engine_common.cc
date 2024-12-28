@@ -107,7 +107,8 @@ EngineCommon::EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options) : op
   base_ = std::make_unique<StrippedMainBase>(
       *options_, real_time_system_, default_listener_hooks_, prod_component_factory_,
       std::make_unique<PlatformImpl>(), std::make_unique<Random::RandomGeneratorImpl>(), nullptr,
-      create_instance, /*set_new_handler=*/false, /*activate_saved_logging_context_on_destruction=*/false);
+      create_instance, /*set_new_handler=*/false,
+      /*activate_saved_logging_context_on_destruction=*/false);
   // Disabling signal handling in the options makes it so that the server's event dispatcher _does
   // not_ listen for termination signals such as SIGTERM, SIGINT, etc
   // (https://github.com/envoyproxy/envoy/blob/048f4231310fbbead0cbe03d43ffb4307fff0517/source/server/server.cc#L519).
