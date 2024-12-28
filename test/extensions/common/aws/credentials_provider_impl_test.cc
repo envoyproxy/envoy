@@ -2530,6 +2530,30 @@ public:
               (const));
 };
 
+class MockCustomCredentialsProviderChainFactories : public CustomCredentialsProviderChainFactories {
+public:
+  MOCK_METHOD(
+      CredentialsProviderSharedPtr, mockCreateCredentialsFileCredentialsProvider,
+      (Server::Configuration::ServerFactoryContext&,
+       (const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)),
+      (const));
+
+  CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)
+      const override {
+    return mockCreateCredentialsFileCredentialsProvider(context, config);
+  }
+
+  MOCK_METHOD(
+      CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
+      (Server::Configuration::ServerFactoryContext&, CreateMetadataFetcherCb, absl::string_view,
+       MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
+       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&,
+       absl::string_view),
+      (const));
+};
+
 class DefaultCredentialsProviderChainTest : public testing::Test {
 public:
   DefaultCredentialsProviderChainTest() : api_(Api::createApiForTest(time_system_)) {
@@ -2872,7 +2896,7 @@ TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
 class CustomCredentialsProviderChainTest : public testing::Test {};
 
 TEST_F(CustomCredentialsProviderChainTest, CreateFileCredentialProviderOnly) {
-  NiceMock<MockCredentialsProviderChainFactories> factories;
+  NiceMock<MockCustomCredentialsProviderChainFactories> factories;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   auto region = "ap-southeast-2";
   auto file_path = TestEnvironment::writeStringToFileForTest("credentials", "hello");
@@ -2892,7 +2916,7 @@ TEST_F(CustomCredentialsProviderChainTest, CreateFileCredentialProviderOnly) {
 }
 
 TEST_F(CustomCredentialsProviderChainTest, CreateWebIdentityCredentialProviderOnly) {
-  NiceMock<MockCredentialsProviderChainFactories> factories;
+  NiceMock<MockCustomCredentialsProviderChainFactories> factories;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   auto region = "ap-southeast-2";
   auto file_path = TestEnvironment::writeStringToFileForTest("credentials", "hello");
@@ -2913,7 +2937,7 @@ TEST_F(CustomCredentialsProviderChainTest, CreateWebIdentityCredentialProviderOn
 }
 
 TEST_F(CustomCredentialsProviderChainTest, CreateFileAndWebProviders) {
-  NiceMock<MockCredentialsProviderChainFactories> factories;
+  NiceMock<MockCustomCredentialsProviderChainFactories> factories;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
   auto region = "ap-southeast-2";
   auto file_path = TestEnvironment::writeStringToFileForTest("credentials", "hello");
