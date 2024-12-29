@@ -1221,7 +1221,7 @@ UDP
     Provides a way to fingerprint TLS clients based on various Client Hello parameters like cipher suites,
     extensions, elliptic curves, etc. Will be ``-`` if TLS is not used or the handshake is incomplete.
   UDP
-    Not implemented ("-").
+    Not implemented (``-``).
 
 .. _config_access_log_format_downstream_peer_cert_v_start:
 
