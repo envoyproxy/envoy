@@ -522,8 +522,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   // Kick off the refresh timer.
   if (status == Network::DnsResolver::ResolutionStatus::Completed) {
-    primary_host_info->failure_backoff_strategy_->reset(
-        std::chrono::duration_cast<std::chrono::milliseconds>(dns_ttl).count());
+    primary_host_info->failure_backoff_strategy_->reset();
     primary_host_info->refresh_timer_->enableTimer(dns_ttl);
     ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', refresh rate {} ms", host,
               dns_ttl.count() * 1000);
