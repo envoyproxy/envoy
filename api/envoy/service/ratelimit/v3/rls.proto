@@ -112,6 +112,12 @@ message RateLimitResponse {
 
     // The unit of time.
     Unit unit = 2;
+
+    // The multiplier for the unit of time.
+    // This value multiplies the base unit of time to define a custom time period for the rate limit.
+    // For example, if the unit is set to MINUTE and the unit_multiplier is set to 5, the rate limit
+    // will be applied over a 5-minute period.
+    uint32 unit_multiplier = 4;
   }
 
   // Cacheable quota for responses.
