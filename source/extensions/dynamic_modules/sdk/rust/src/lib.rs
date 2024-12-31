@@ -245,7 +245,7 @@ pub trait EnvoyHttpFilter {
   /// set the new value.
   ///
   /// Returns true if the header is set successfully.
-  fn set_request_header(&self, key: &str, value: &[u8]) -> bool;
+  fn set_request_header(&mut self, key: &str, value: &[u8]) -> bool;
 
   /// Get the value of the request trailer with the given key.
   /// If the trailer is not found, this returns `None`.
@@ -272,7 +272,7 @@ pub trait EnvoyHttpFilter {
   /// set the new value.
   ///
   /// Returns true if the trailer is set successfully.
-  fn set_request_trailer(&self, key: &str, value: &[u8]) -> bool;
+  fn set_request_trailer(&mut self, key: &str, value: &[u8]) -> bool;
 
   /// Get the value of the response header with the given key.
   /// If the header is not found, this returns `None`.
@@ -299,7 +299,7 @@ pub trait EnvoyHttpFilter {
   /// set the new value.
   ///
   /// Returns true if the header is set successfully.
-  fn set_response_header(&self, key: &str, value: &[u8]) -> bool;
+  fn set_response_header(&mut self, key: &str, value: &[u8]) -> bool;
 
   /// Get the value of the response trailer with the given key.
   /// If the trailer is not found, this returns `None`.
@@ -325,7 +325,7 @@ pub trait EnvoyHttpFilter {
   /// set the new value.
   ///
   /// Returns true if the operation is successful.
-  fn set_response_trailer(&self, key: &str, value: &[u8]) -> bool;
+  fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -358,7 +358,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     )
   }
 
-  fn set_request_header(&self, key: &str, value: &[u8]) -> bool {
+  fn set_request_header(&mut self, key: &str, value: &[u8]) -> bool {
     let key_ptr = key.as_ptr();
     let key_size = key.len();
     let value_ptr = value.as_ptr();
@@ -395,7 +395,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     )
   }
 
-  fn set_request_trailer(&self, key: &str, value: &[u8]) -> bool {
+  fn set_request_trailer(&mut self, key: &str, value: &[u8]) -> bool {
     let key_ptr = key.as_ptr();
     let key_size = key.len();
     let value_ptr = value.as_ptr();
@@ -432,7 +432,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     )
   }
 
-  fn set_response_header(&self, key: &str, value: &[u8]) -> bool {
+  fn set_response_header(&mut self, key: &str, value: &[u8]) -> bool {
     let key_ptr = key.as_ptr();
     let key_size = key.len();
     let value_ptr = value.as_ptr();
@@ -470,7 +470,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     )
   }
 
-  fn set_response_trailer(&self, key: &str, value: &[u8]) -> bool {
+  fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool {
     let key_ptr = key.as_ptr();
     let key_size = key.len();
     let value_ptr = value.as_ptr();
