@@ -1,10 +1,10 @@
 use super::*;
-use envoy_proxy_dynamic_modules_rust_sdk::{EnvoyBuffer, EnvoyHttpFilter};
+use envoy_proxy_dynamic_modules_rust_sdk::EnvoyBuffer;
 
 #[test]
 fn test_header_callbacks_filter_on_request_headers() {
   let mut f = HeaderCallbacksFilter {};
-  let mut envoy_filter = EnvoyHttpFilter::default();
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   envoy_filter
     .expect_get_request_header_value()

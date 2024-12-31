@@ -13,11 +13,11 @@ fn init() -> bool {
 
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewHttpFilterConfigFunction`]
 /// signature.
-fn new_http_filter_config_fn(
+fn new_http_filter_config_fn<EHF: EnvoyHttpFilter>(
   _envoy_filter_factory: EnvoyHttpFilterConfig,
   name: &str,
   _config: &str,
-) -> Option<Box<dyn HttpFilterConfig>> {
+) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
     // TODO: add various configs for body, etc.
@@ -30,8 +30,8 @@ fn new_http_filter_config_fn(
 /// related callbacks.
 struct HeaderCallbacksFilterConfig {}
 
-impl HttpFilterConfig for HeaderCallbacksFilterConfig {
-  fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HeaderCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HeaderCallbacksFilter {})
   }
 }
@@ -40,10 +40,10 @@ impl HttpFilterConfig for HeaderCallbacksFilterConfig {
 /// as well as the [`Drop`] to test the cleanup of the filter.
 struct HeaderCallbacksFilter {}
 
-impl HttpFilter for HeaderCallbacksFilter {
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
   fn on_request_headers(
     &mut self,
-    envoy_filter: EnvoyHttpFilter,
+    envoy_filter: EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // Test single getter API.
@@ -86,7 +86,7 @@ impl HttpFilter for HeaderCallbacksFilter {
 
   fn on_request_body(
     &mut self,
-    _envoy_filter: EnvoyHttpFilter,
+    _envoy_filter: EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
     abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
@@ -94,7 +94,7 @@ impl HttpFilter for HeaderCallbacksFilter {
 
   fn on_request_trailers(
     &mut self,
-    envoy_filter: EnvoyHttpFilter,
+    envoy_filter: EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
     // Test single getter API.
     let single_value = envoy_filter
@@ -136,7 +136,7 @@ impl HttpFilter for HeaderCallbacksFilter {
 
   fn on_response_headers(
     &mut self,
-    envoy_filter: EnvoyHttpFilter,
+    envoy_filter: EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     // Test single getter API.
@@ -179,7 +179,7 @@ impl HttpFilter for HeaderCallbacksFilter {
 
   fn on_response_body(
     &mut self,
-    _envoy_filter: EnvoyHttpFilter,
+    _envoy_filter: EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
@@ -187,7 +187,7 @@ impl HttpFilter for HeaderCallbacksFilter {
 
   fn on_response_trailers(
     &mut self,
-    envoy_filter: EnvoyHttpFilter,
+    envoy_filter: EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
     // Test single getter API.
     let single_value = envoy_filter
