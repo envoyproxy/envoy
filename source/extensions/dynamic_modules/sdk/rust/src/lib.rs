@@ -113,6 +113,10 @@ pub trait HttpFilterConfig<EHF: EnvoyHttpFilter> {
 
 /// The trait that corresponds to an Envoy Http filter for each stream
 /// created via the [`HttpFilterConfig::new_http_filter`] method.
+///
+/// All the event hooks are called on the same thread as the one that the [`HttpFilter`] is created
+/// via the [`HttpFilterConfig::new_http_filter`] method. In other words, the [`HttpFilter`] object
+/// is thread-local.
 pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// This is called when the request headers are received.
   /// The `envoy_filter` can be used to interact with the underlying Envoy filter object.
@@ -216,8 +220,8 @@ impl EnvoyHttpFilterConfig {
 /// An opaque object that represents the underlying Envoy Http filter. This has one to one
 /// mapping with the Envoy Http filter object as well as [`HttpFilter`] object per HTTP stream.
 ///
-/// This is a shallow wrapper around the raw pointer to the Envoy HTTP filter object, and it
-/// can be copied and used up until the corresponding [`HttpFilter`] is dropped.
+/// The Envoy filter object is inherently not thread-safe, and it is always recommended to
+/// access it from the same thread as the one that [`HttpFilter`] even hooks are called.
 #[automock]
 pub trait EnvoyHttpFilter {
   /// Get the value of the request header with the given key.
