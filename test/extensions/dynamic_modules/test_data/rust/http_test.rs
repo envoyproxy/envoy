@@ -9,7 +9,7 @@ fn test_header_callbacks_filter_on_request_headers() {
   envoy_filter
     .expect_get_request_header_value()
     .withf(|name| name == "single")
-    .returning(|_| Some(EnvoyBuffer::new("value".as_ptr(), "value".len())))
+    .returning(|_| Some(EnvoyBuffer::new("value")))
     .once();
 
   envoy_filter
@@ -22,8 +22,8 @@ fn test_header_callbacks_filter_on_request_headers() {
     .expect_get_request_header_values()
     .withf(|name| name == "multi")
     .returning(|_| {
-      let value1 = EnvoyBuffer::new("value1".as_ptr(), "value1".len());
-      let value2 = EnvoyBuffer::new("value2".as_ptr(), "value2".len());
+      let value1 = EnvoyBuffer::new("value1");
+      let value2 = EnvoyBuffer::new("value2");
       vec![value1, value2]
     })
     .once();
@@ -43,31 +43,16 @@ fn test_header_callbacks_filter_on_request_headers() {
   envoy_filter
     .expect_get_request_header_value()
     .withf(|name| name == "new")
-    .returning(|_| {
-      const VALUE: &str = "value";
-      Some(EnvoyBuffer::new(VALUE.as_ptr(), VALUE.len()))
-    })
+    .returning(|_| Some(EnvoyBuffer::new("value")))
     .once();
 
   envoy_filter
     .expect_get_request_headers()
     .returning(|| {
-      let single = (
-        EnvoyBuffer::new("single".as_ptr(), "single".len()),
-        EnvoyBuffer::new("value".as_ptr(), "value".len()),
-      );
-      let multi1 = (
-        EnvoyBuffer::new("multi".as_ptr(), "multi".len()),
-        EnvoyBuffer::new("value1".as_ptr(), "value1".len()),
-      );
-      let multi2 = (
-        EnvoyBuffer::new("multi".as_ptr(), "multi".len()),
-        EnvoyBuffer::new("value2".as_ptr(), "value2".len()),
-      );
-      let new = (
-        EnvoyBuffer::new("new".as_ptr(), "new".len()),
-        EnvoyBuffer::new("value".as_ptr(), "value".len()),
-      );
+      let single = (EnvoyBuffer::new("single"), EnvoyBuffer::new("value"));
+      let multi1 = (EnvoyBuffer::new("multi"), EnvoyBuffer::new("value1"));
+      let multi2 = (EnvoyBuffer::new("multi"), EnvoyBuffer::new("value2"));
+      let new = (EnvoyBuffer::new("new"), EnvoyBuffer::new("value"));
       vec![single, multi1, multi2, new]
     })
     .once();

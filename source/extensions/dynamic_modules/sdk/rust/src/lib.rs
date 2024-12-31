@@ -554,7 +554,7 @@ impl EnvoyHttpFilterImpl {
     if result_ptr.is_null() {
       None
     } else {
-      Some(EnvoyBuffer::new(result_ptr, result_size))
+      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
     }
   }
 
@@ -596,7 +596,7 @@ impl EnvoyHttpFilterImpl {
     }
 
     // At this point, we assume at least one value is present.
-    results.push(EnvoyBuffer::new(result_ptr, result_size));
+    results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
     // So, we iterate from 1 to counts - 1.
     for i in 1 .. counts {
       let mut result_ptr: *const u8 = std::ptr::null();
@@ -612,7 +612,7 @@ impl EnvoyHttpFilterImpl {
         )
       };
       // Within the range, all results are guaranteed to be non-null by Envoy.
-      results.push(EnvoyBuffer::new(result_ptr, result_size));
+      results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
     }
     results
   }

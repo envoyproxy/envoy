@@ -13,7 +13,24 @@ pub struct EnvoyBuffer {
 }
 
 impl EnvoyBuffer {
-  pub fn new(raw_ptr: *const u8, length: usize) -> Self {
+  /// This is a helper function to create an [`EnvoyBuffer`] from a static string.
+  ///
+  /// This is meant for use by the end users in unit tests.
+  // TODO: relax the lifetime constraint to 'static, so that it becomes more flexible.
+  pub fn new(static_str: &'static str) -> Self {
+    Self {
+      raw_ptr: static_str.as_ptr(),
+      length: static_str.len(),
+    }
+  }
+
+  /// This is a helper function to create an [`EnvoyBuffer`] from a raw pointer and length.
+  ///
+  /// # Safety
+  ///
+  /// This is not meant to be used by the end users, but rather by the SDK itself in the
+  /// actual integration with Envoy.
+  pub unsafe fn new_from_raw(raw_ptr: *const u8, length: usize) -> Self {
     Self { raw_ptr, length }
   }
 
