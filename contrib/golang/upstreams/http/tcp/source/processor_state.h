@@ -10,11 +10,11 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 
 #include "absl/status/status.h"
 #include "contrib/golang/common/dso/dso.h"
-#include "upstream_request.h"
 
 namespace Envoy {
 namespace Extensions {

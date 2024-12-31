@@ -30,10 +30,6 @@ namespace Http {
 namespace Tcp {
 namespace Golang {
 
-class ProcessorState;
-class DecodingProcessorState;
-class EncodingProcessorState;
-
 class HttpTcpBridge;
 
 class BridgeConfig;
@@ -122,7 +118,7 @@ private:
  *  The bridge enables an HTTP client to connect to a TCP server via a Golang plugin, facilitating
  * Protocol Convert from HTTP to any RPC protocol in Envoy.
  *
- *  Notice: the bridge is designed for sync data flow between go and c, so DO NOT use goroutine in
+ *  Notice: the bridge is designed for sync-data-flow between go and c, so DO NOT use goroutine in
  * go side.
  *
  */
@@ -184,11 +180,8 @@ public:
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
   CAPIStatus setSelfHalfCloseForUpstreamConn(int enabled);
 
-  DecodingProcessorState* decodingState() { return decoding_state_; }
-  EncodingProcessorState* encodingState() { return encoding_state_; }
-
-  EncodingProcessorState* encoding_state_;
-  DecodingProcessorState* decoding_state_;
+  EncodingProcessorState encoding_state_;
+  DecodingProcessorState decoding_state_;
 
   const Router::RouteEntry* route_entry_;
 
@@ -205,14 +198,9 @@ private:
 
   bool already_send_resp_headers_{false};
 
-  // lock to avoid race in c thread between multi go code calls(go call c) and native c code.
-  Thread::MutexBasicLockable mutex_for_c_and_go_{};
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
-  std::string str_value_ ABSL_GUARDED_BY(mutex_for_c_and_go_);
-  bool upstream_conn_self_half_close_ ABSL_GUARDED_BY(mutex_for_c_and_go_){false};
-
-  // lock to avoid race in c thread between multi go code calls(go call c).
-  Thread::MutexBasicLockable mutex_for_go_{};
+  std::string str_value_;
+  bool upstream_conn_self_half_close_ {false};
 };
 
 } // namespace Golang
