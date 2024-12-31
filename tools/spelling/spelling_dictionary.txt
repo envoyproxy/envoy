@@ -38,6 +38,7 @@ BPF
 Bdecoded
 Bencoded
 CIO
+constness
 deadcode
 DFP
 Dynatrace
