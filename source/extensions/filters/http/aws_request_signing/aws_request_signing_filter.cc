@@ -71,6 +71,7 @@ Http::FilterHeadersStatus Filter::onCredentialNoLongerPending(FilterConfig& conf
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   auto& config = getConfig();
+    ENVOY_LOG_MISC(debug, "******* HERE");
 
   if(config.credentialsProvider()->credentialsPending(
     [this, &dispatcher = decoder_callbacks_->dispatcher(), &end_stream, &headers, &config](Envoy::Extensions::Common::Aws::Credentials credentials) {
@@ -78,9 +79,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
             this->onCredentialNoLongerPending(config, headers, end_stream, credentials);
         });
   }
-  )) 
+  ))
   {
-    return Http::FilterHeadersStatus::StopIteration;
+    ENVOY_LOG_MISC(debug, "Credentials are pending");
+    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+  } else
+  {
+    ENVOY_LOG_MISC(debug, "Credentials are not pending");
   }
   return onCredentialNoLongerPending(config, headers, end_stream, config.credentialsProvider()->getCredentials());
 }

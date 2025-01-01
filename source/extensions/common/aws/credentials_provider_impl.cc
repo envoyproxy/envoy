@@ -270,9 +270,10 @@ void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterRemo
     if(cb)
     {
       ENVOY_LOG_MISC(debug,"Adding credentials pending callback to queue");
+      credential_pending_callbacks_.push_back(std::move(cb));
     }
     return credentials_pending_; 
-    }
+  }
 
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 Credentials MetadataCredentialsProviderBase::getCredentials() {
@@ -331,20 +332,33 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
         cache_duration_timer_->enableTimer(cache_duration_);
       }
     }
-
-    // We are now no longer waiting for credentials
-    credentials_pending_.exchange(false);
   }
 }
 
 void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
     CredentialsConstUniquePtr&& creds) {
+
+  ENVOY_LOG_MISC(debug, "Setting credentials to all threads");
+
+  // Call all of our callbacks to unblock pending requests
+  for(const auto& cb: credential_pending_callbacks_)
+  {
+    cb(Credentials(creds->accessKeyId().has_value()?creds->accessKeyId().value():"",
+    creds->secretAccessKey().has_value()?creds->accessKeyId().value():"",
+    creds->sessionToken().has_value()?creds->accessKeyId().value():""));
+  }
+  credential_pending_callbacks_.clear();
+
   CredentialsConstSharedPtr shared_credentials = std::move(creds);
   if (tls_slot_) {
     tls_slot_->runOnAllThreads([shared_credentials](OptRef<ThreadLocalCredentialsCache> obj) {
       obj->credentials_ = shared_credentials;
     });
   }
+
+  // We are now no longer waiting for credentials
+  credentials_pending_.exchange(false);
+
 }
 
 CredentialsFileCredentialsProvider::CredentialsFileCredentialsProvider(

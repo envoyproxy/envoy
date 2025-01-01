@@ -2521,7 +2521,7 @@ public:
 
   MOCK_METHOD(
       CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
-      (Server::Configuration::ServerFactoryContext&, CreateMetadataFetcherCb, absl::string_view,
+      (Server::Configuration::ServerFactoryContext&, Singleton::Manager&, CreateMetadataFetcherCb, absl::string_view,
        MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&,
        absl::string_view),
@@ -2559,7 +2559,7 @@ public:
 
   MOCK_METHOD(
       CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
-      (Server::Configuration::ServerFactoryContext&, CreateMetadataFetcherCb, absl::string_view,
+      (Server::Configuration::ServerFactoryContext&, Singleton::Manager&,CreateMetadataFetcherCb, absl::string_view,
        MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&,
        absl::string_view),
@@ -2686,7 +2686,7 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567890));
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(
-                              Ref(context_), _, "sts.region.amazonaws.com:443", _, _, _, _));
+                              Ref(context_), _,_, "sts.region.amazonaws.com:443", _, _, _, _));
   EXPECT_CALL(factories_,
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
@@ -2704,7 +2704,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
   EXPECT_CALL(factories_,
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(
-                              Ref(context_), _, "sts.region.amazonaws.com:443", _, _, _, _));
+                              Ref(context_),_, _, "sts.region.amazonaws.com:443", _, _, _, _));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
@@ -2720,7 +2720,7 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityWithBlankConfig) {
   EXPECT_CALL(factories_,
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(
-                              Ref(context_), _, "sts.region.amazonaws.com:443", _, _, _, _))
+                              Ref(context_),_, _, "sts.region.amazonaws.com:443", _, _, _, _))
       .Times(0);
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
@@ -2743,8 +2743,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomSessionName) {
   std::string role_session_name;
 
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(
-                              Ref(context_), _, "sts.region.amazonaws.com:443", _, _, _, _))
-      .WillOnce(Invoke(WithArg<5>(
+                              Ref(context_), _,_, "sts.region.amazonaws.com:443", _, _, _, _))
+      .WillOnce(Invoke(WithArg<6>(
           [&role_session_name](
               const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
                   provider) -> CredentialsProviderSharedPtr {
@@ -2773,8 +2773,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomRoleArn) {
   std::string role_arn;
 
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(
-                              Ref(context_), _, "sts.region.amazonaws.com:443", _, _, _, _))
-      .WillOnce(Invoke(WithArg<5>(
+                              Ref(context_), _,_, "sts.region.amazonaws.com:443", _, _, _, _))
+      .WillOnce(Invoke(WithArg<6>(
           [&role_arn](
               const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
                   provider) -> CredentialsProviderSharedPtr {
@@ -2803,8 +2803,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomDataSource) {
   std::string inline_string;
 
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(
-                              Ref(context_), _, "sts.region.amazonaws.com:443", _, _, _, _))
-      .WillOnce(Invoke(WithArg<5>(
+                              Ref(context_),_, _, "sts.region.amazonaws.com:443", _, _, _, _))
+      .WillOnce(Invoke(WithArg<6>(
           [&inline_string](
               const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
                   provider) -> CredentialsProviderSharedPtr {
@@ -2843,7 +2843,7 @@ TEST_F(DefaultCredentialsProviderChainTest, CredentialsFileWithCustomDataSource)
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
 
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(
-                              Ref(context_), _, "sts.region.amazonaws.com:443", _, _, _, _));
+                              Ref(context_),_, _, "sts.region.amazonaws.com:443", _, _, _, _));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
   credential_provider_config.mutable_credentials_file_provider()
@@ -2920,7 +2920,7 @@ TEST_F(CustomCredentialsProviderChainTest, CreateFileCredentialProviderOnly) {
 
   EXPECT_CALL(factories, mockCreateCredentialsFileCredentialsProvider(Ref(server_context), _));
   EXPECT_CALL(factories,
-              createWebIdentityCredentialsProvider(Ref(server_context), _, _, _, _, _, _))
+              createWebIdentityCredentialsProvider(Ref(server_context),_, _, _, _, _, _, _))
       .Times(0);
 
   auto chain = std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
@@ -2942,7 +2942,7 @@ TEST_F(CustomCredentialsProviderChainTest, CreateWebIdentityCredentialProviderOn
   EXPECT_CALL(factories, mockCreateCredentialsFileCredentialsProvider(Ref(server_context), _))
       .Times(0);
   EXPECT_CALL(factories,
-              createWebIdentityCredentialsProvider(Ref(server_context), _, _, _, _, _, _));
+              createWebIdentityCredentialsProvider(Ref(server_context), _,_, _, _, _, _, _));
 
   auto chain = std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
       server_context, region, cred_provider, factories);
@@ -2965,7 +2965,7 @@ TEST_F(CustomCredentialsProviderChainTest, CreateFileAndWebProviders) {
 
   EXPECT_CALL(factories, mockCreateCredentialsFileCredentialsProvider(Ref(server_context), _));
   EXPECT_CALL(factories,
-              createWebIdentityCredentialsProvider(Ref(server_context), _, _, _, _, _, _));
+              createWebIdentityCredentialsProvider(Ref(server_context), _,_, _, _, _, _, _));
 
   auto chain = std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
       server_context, region, cred_provider, factories);

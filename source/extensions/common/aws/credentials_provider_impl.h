@@ -250,6 +250,8 @@ protected:
   std::atomic<bool> is_creating_ = false;
   // Are credentials pending?
   std::atomic<bool> credentials_pending_ = true;
+  // Callbacks list for pending credentials
+  std::vector<CredentialsPendingCallback> credential_pending_callbacks_ = {};
 };
 
 /**
