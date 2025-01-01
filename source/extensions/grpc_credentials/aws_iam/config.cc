@@ -71,12 +71,12 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
             context.api(), absl::nullopt /*Empty factory context*/, context.singletonManager(),
             region, Common::Aws::Utility::fetchMetadataWithCurl);
         auto signer = std::make_unique<Common::Aws::SigV4SignerImpl>(
-            config.service_name(), region, credentials_provider, context,
+            config.service_name(), region, context,
             // TODO: extend API to allow specifying header exclusion. ref:
             // https://github.com/envoyproxy/envoy/pull/18998
             Common::Aws::AwsSigningHeaderExclusionVector{});
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(
-            std::make_unique<AwsIamHeaderAuthenticator>(std::move(signer)));
+            std::make_unique<AwsIamHeaderAuthenticator>(std::move(signer), credentials_provider));
         if (call_creds == nullptr) {
           call_creds = new_call_creds;
         } else {
@@ -106,7 +106,7 @@ AwsIamHeaderAuthenticator::GetMetadata(grpc::string_ref service_url, grpc::strin
   auto message = buildMessageToSign(absl::string_view(service_url.data(), service_url.length()),
                                     absl::string_view(method_name.data(), method_name.length()));
 
-  auto status = signer_->sign(message, false);
+  auto status = signer_->sign(message, credentials_provider_->getCredentials(), false);
   if (!status.ok()) {
     return {grpc::StatusCode::INTERNAL, std::string{status.message()}};
   }

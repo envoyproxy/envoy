@@ -56,7 +56,6 @@ public:
     }
     return SigV4ASignerImpl{"service",
                             "region",
-                            getTestCredentialsProvider(),
                             context_,
                             Extensions::Common::Aws::AwsSigningHeaderExclusionVector{},
                             query_string,
@@ -79,16 +78,17 @@ public:
     EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
     // Sign the message using our signing algorithm
     auto signer_ = getTestSigner(query_string, expiration_time);
+    auto credentials_provider = getTestCredentialsProvider();
 
     switch (signing_type) {
     case EmptyPayload:
-      status = signer_.signEmptyPayload(message->headers(), override_region);
+      status = signer_.signEmptyPayload(message->headers(), credentials_provider->getCredentials(), override_region);
       break;
     case NormalSign:
-      status = signer_.sign(*message, sign_body, override_region);
+      status = signer_.sign(*message, credentials_provider->getCredentials(), sign_body, override_region);
       break;
     case UnsignedPayload:
-      status = signer_.signUnsignedPayload(message->headers(), override_region);
+      status = signer_.signUnsignedPayload(message->headers(), credentials_provider->getCredentials(), override_region);
       break;
     }
     EXPECT_TRUE(status.ok());
@@ -150,7 +150,9 @@ TEST_F(SigV4ASignerImplTest, AnonymousCredentials) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(Credentials()));
 
   auto signer_ = getTestSigner(false);
-  auto status = signer_.sign(*message_);
+  auto credentials_provider = getTestCredentialsProvider();
+
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials());
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
@@ -159,7 +161,8 @@ TEST_F(SigV4ASignerImplTest, AnonymousCredentials) {
 TEST_F(SigV4ASignerImplTest, MissingMethod) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   auto signer_ = getTestSigner(false);
-  auto status = signer_.sign(*message_);
+    auto credentials_provider = getTestCredentialsProvider();
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials());
   EXPECT_EQ(status.message(), "Message is missing :method header");
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
@@ -169,7 +172,8 @@ TEST_F(SigV4ASignerImplTest, MissingPath) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("GET");
   auto signer_ = getTestSigner(false);
-  auto status = signer_.sign(*message_);
+    auto credentials_provider = getTestCredentialsProvider();
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials());
   EXPECT_EQ(status.message(), "Message is missing :path header");
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
 }
@@ -180,12 +184,13 @@ TEST_F(SigV4ASignerImplTest, DontDuplicateHeaders) {
   addMethod("GET");
   addPath("/");
   auto signer_ = getTestSigner(false);
+    auto credentials_provider = getTestCredentialsProvider();
   addHeader("authorization", "existing_value");
   addHeader("x-amz-security-token", "existing_value_2");
   addHeader("x-amz-date", "existing_value_3");
   addHeader("x-amz-region-set", "existing_value_4");
 
-  auto status = signer_.sign(*message_);
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials());
   EXPECT_EQ(message_->headers().get(Http::CustomHeaders::get().Authorization).size(), 1);
 
   EXPECT_FALSE(absl::StrContains(
@@ -218,7 +223,9 @@ TEST_F(SigV4ASignerImplTest, QueryStringDoesntModifyAuthorization) {
   addPath("/");
   addHeader("Authorization", "testValue");
   auto signer_ = getTestSigner(true);
-  auto status = signer_.sign(*message_);
+      auto credentials_provider = getTestCredentialsProvider();
+
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials());
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value(),
             "testValue");
@@ -230,7 +237,9 @@ TEST_F(SigV4ASignerImplTest, SignDateHeader) {
   addMethod("GET");
   addPath("/");
   auto signer_ = getTestSigner(false);
-  auto status = signer_.sign(*message_);
+      auto credentials_provider = getTestCredentialsProvider();
+
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials());
   EXPECT_TRUE(status.ok());
   EXPECT_FALSE(message_->headers().get(SigV4ASignatureHeaders::get().ContentSha256).empty());
   EXPECT_EQ(
@@ -249,7 +258,8 @@ TEST_F(SigV4ASignerImplTest, SignSecurityTokenHeader) {
   addMethod("GET");
   addPath("/");
   auto signer_ = getTestSigner(false);
-  auto status = signer_.sign(*message_);
+    auto credentials_provider = getTestCredentialsProvider();
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials()); 
   EXPECT_TRUE(status.ok());
   EXPECT_EQ("token", message_->headers()
                          .get(SigV4ASignatureHeaders::get().SecurityToken)[0]
@@ -269,7 +279,8 @@ TEST_F(SigV4ASignerImplTest, SignEmptyContentHeader) {
   addMethod("GET");
   addPath("/");
   auto signer_ = getTestSigner(false);
-  auto status = signer_.sign(*message_, true);
+    auto credentials_provider = getTestCredentialsProvider();
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials(), true);
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(SigV4ASignatureConstants::HashedEmptyString,
             message_->headers()
@@ -290,7 +301,8 @@ TEST_F(SigV4ASignerImplTest, SignContentHeader) {
   addPath("/");
   setBody("test1234");
   auto signer_ = getTestSigner(false);
-  auto status = signer_.sign(*message_, true);
+    auto credentials_provider = getTestCredentialsProvider();
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials(),true);
   EXPECT_TRUE(status.ok());
   EXPECT_EQ("937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
             message_->headers()
@@ -311,7 +323,8 @@ TEST_F(SigV4ASignerImplTest, SignContentHeaderOverrideRegion) {
   addPath("/");
   setBody("test1234");
   auto signer_ = getTestSigner(false);
-  auto status = signer_.sign(*message_, true, "region1");
+    auto credentials_provider = getTestCredentialsProvider();
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials(), true, "region1");
   EXPECT_TRUE(status.ok());
   EXPECT_EQ("937e8d5fbb48bd4949536cd65b8d35c426b80d2f830c5c308e2cdec422ae2244",
             message_->headers()
@@ -334,7 +347,9 @@ TEST_F(SigV4ASignerImplTest, SignExtraHeaders) {
   addHeader("b", "b_value");
   addHeader("c", "c_value");
   auto signer_ = getTestSigner(false);
-  auto status = signer_.sign(*message_);
+      auto credentials_provider = getTestCredentialsProvider();
+
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials());
   EXPECT_TRUE(status.ok());
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
@@ -350,7 +365,9 @@ TEST_F(SigV4ASignerImplTest, SignHostHeader) {
   addPath("/");
   addHeader("host", "www.example.com");
   auto signer_ = getTestSigner(false);
-  auto status = signer_.sign(*message_);
+      auto credentials_provider = getTestCredentialsProvider();
+
+  auto status = signer_.sign(*message_, credentials_provider->getCredentials());
   EXPECT_TRUE(status.ok());
   EXPECT_THAT(
       message_->headers().get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
@@ -531,10 +548,12 @@ TEST_F(SigV4ASignerImplTest, QueryStringDefault5s) {
   headers.setPath("/example/path");
   headers.addCopy(Http::LowerCaseString("host"), "example.service.zz");
   headers.addCopy("testheader", "value1");
-  SigV4ASignerImpl querysigner("service", "region", getTestCredentialsProvider(), context_,
+      auto credentials_provider = getTestCredentialsProvider();
+
+  SigV4ASignerImpl querysigner("service", "region",  context_,
                                Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true);
 
-  auto status = querysigner.signUnsignedPayload(headers);
+  auto status = querysigner.signUnsignedPayload(headers, credentials_provider->getCredentials());
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(absl::StrContains(headers.getPathValue(), "X-Amz-Expires=5&"));
 }

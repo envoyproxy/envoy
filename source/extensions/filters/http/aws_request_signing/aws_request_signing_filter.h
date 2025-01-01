@@ -6,6 +6,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/extensions/common/aws/signer.h"
+#include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -44,6 +45,11 @@ public:
   virtual Extensions::Common::Aws::Signer& signer() PURE;
 
   /**
+   * @return the config's credentials provider.
+   */
+  virtual Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentialsProvider() PURE;
+
+  /**
    * @return the filter stats.
    */
   virtual FilterStats& stats() PURE;
@@ -66,16 +72,20 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class FilterConfigImpl : public FilterConfig {
 public:
-  FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
+  FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider, 
+        const std::string& stats_prefix,
                    Stats::Scope& scope, const std::string& host_rewrite, bool use_unsigned_payload);
 
   Extensions::Common::Aws::Signer& signer() override;
+  Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentialsProvider() override;
+
   FilterStats& stats() override;
   const std::string& hostRewrite() const override;
   bool useUnsignedPayload() const override;
 
 private:
   Extensions::Common::Aws::SignerPtr signer_;
+  Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider_;
   FilterStats stats_;
   std::string host_rewrite_;
   const bool use_unsigned_payload_;
@@ -96,6 +106,8 @@ public:
 
 private:
   FilterConfig& getConfig() const;
+  Http::FilterHeadersStatus onCredentialNoLongerPending(FilterConfig& config, 
+  Http::RequestHeaderMap& headers, bool end_stream, Envoy::Extensions::Common::Aws::Credentials credentials);
 
   std::shared_ptr<FilterConfig> config_;
   Http::RequestHeaderMap* request_headers_{};

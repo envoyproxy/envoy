@@ -44,10 +44,10 @@ public:
   MockSigner();
   ~MockSigner() override;
 
-  MOCK_METHOD(absl::Status, sign, (Http::RequestMessage&, bool, absl::string_view));
-  MOCK_METHOD(absl::Status, sign, (Http::RequestHeaderMap&, const std::string&, absl::string_view));
-  MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, absl::string_view));
-  MOCK_METHOD(absl::Status, signUnsignedPayload, (Http::RequestHeaderMap&, absl::string_view));
+  MOCK_METHOD(absl::Status, sign, (Http::RequestMessage&,const Credentials, bool, absl::string_view));
+  MOCK_METHOD(absl::Status, sign, (Http::RequestHeaderMap&, const Credentials, const std::string&, absl::string_view));
+  MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, const Credentials, absl::string_view));
+  MOCK_METHOD(absl::Status, signUnsignedPayload, (Http::RequestHeaderMap&, const Credentials, absl::string_view));
 };
 
 class MockFetchMetadata {

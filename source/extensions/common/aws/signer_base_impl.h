@@ -63,14 +63,13 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 class SignerBaseImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
   SignerBaseImpl(absl::string_view service_name, absl::string_view region,
-                 const CredentialsProviderSharedPtr& credentials_provider,
                  Server::Configuration::CommonFactoryContext& context,
                  const AwsSigningHeaderExclusionVector& matcher_config,
                  const bool query_string = false,
                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
       : service_name_(service_name), region_(region),
         excluded_header_matchers_(defaultMatchers(context)),
-        credentials_provider_(credentials_provider), query_string_(query_string),
+        query_string_(query_string),
         expiration_time_(expiration_time), time_source_(context.timeSource()),
         long_date_formatter_(std::string(SignatureConstants::LongDateFormat)),
         short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
@@ -81,13 +80,13 @@ public:
     }
   }
 
-  absl::Status sign(Http::RequestMessage& message, bool sign_body = false,
+  absl::Status sign(Http::RequestMessage& message, const Credentials credentials, bool sign_body = false,
                     const absl::string_view override_region = "") override;
-  absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
+  absl::Status sign(Http::RequestHeaderMap& headers, const Credentials credentials, const std::string& content_hash,
                     const absl::string_view override_region = "") override;
-  absl::Status signEmptyPayload(Http::RequestHeaderMap& headers,
+  absl::Status signEmptyPayload(Http::RequestHeaderMap& headers, const Credentials credentials, 
                                 const absl::string_view override_region = "") override;
-  absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
+  absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers, const Credentials credentials, 
                                    const absl::string_view override_region = "") override;
 
 protected:
@@ -154,7 +153,6 @@ protected:
       Http::Headers::get().ForwardedFor.get(), Http::Headers::get().ForwardedProto.get(),
       "x-amzn-trace-id"};
   std::vector<Matchers::StringMatcherPtr> excluded_header_matchers_;
-  CredentialsProviderSharedPtr credentials_provider_;
   const bool query_string_;
   const uint16_t expiration_time_;
   TimeSource& time_source_;

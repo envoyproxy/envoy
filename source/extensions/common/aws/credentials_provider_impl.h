@@ -145,7 +145,8 @@ public:
       std::chrono::seconds initialization_timer);
 
   Credentials getCredentials() override;
-
+  bool credentialsPending(CredentialsPendingCallback&& cb) override;
+  
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
 
@@ -247,6 +248,8 @@ protected:
   std::shared_ptr<MetadataCredentialsProviderStats> stats_;
   // Atomic flag for cluster recreate
   std::atomic<bool> is_creating_ = false;
+  // Are credentials pending?
+  std::atomic<bool> credentials_pending_ = true;
 };
 
 /**
@@ -325,7 +328,6 @@ private:
  */
 class WebIdentityCredentialsProvider : public MetadataCredentialsProviderBase,
                                        public Envoy::Singleton::Instance,
-                                       public Envoy::Singleton::Instance,
                                        public MetadataFetcher::MetadataReceiver {
 public:
   // token and token_file_path are mutually exclusive. If token is not empty, token_file_path is
@@ -367,6 +369,7 @@ public:
   }
 
   Credentials getCredentials() override;
+  bool credentialsPending(CredentialsPendingCallback&& cb) override;
 
 protected:
   std::list<CredentialsProviderSharedPtr> providers_;
@@ -384,7 +387,7 @@ public:
           credential_file_config = {}) const PURE;
 
   virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ServerFactoryContext& context, Singleton::Manager& singleton_manager,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
@@ -419,7 +422,7 @@ public:
           credential_file_config = {}) const PURE;
 
   virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ServerFactoryContext& context, Singleton::Manager& singleton_manager,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
@@ -453,17 +456,13 @@ public:
   };
 
   CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ServerFactoryContext& context, Singleton::Manager& singleton_manager,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
           web_identity_config,
-      absl::string_view cluster_name) const override {
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
-        web_identity_config, cluster_name);
-  };
+      absl::string_view cluster_name) const override;
 };
 
 /**
@@ -539,17 +538,13 @@ private:
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) const override;
 
   CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ServerFactoryContext& context, Singleton::Manager& singleton_manager,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
           web_identity_config,
-      absl::string_view cluster_name) const override {
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
-        web_identity_config, cluster_name);
-  }
+      absl::string_view cluster_name) const override;
 };
 
 using InstanceProfileCredentialsProviderPtr = std::shared_ptr<InstanceProfileCredentialsProvider>;

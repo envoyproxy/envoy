@@ -3,17 +3,7 @@
 #include <iterator>
 #include <string>
 
-#include "envoy/common/optref.h"
-#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
-#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
-#include "envoy/registry/registry.h"
 
-#include "source/extensions/common/aws/credentials_provider_impl.h"
-#include "source/extensions/common/aws/region_provider_impl.h"
-#include "source/extensions/common/aws/sigv4_signer_impl.h"
-#include "source/extensions/common/aws/sigv4a_signer_impl.h"
-#include "source/extensions/common/aws/utility.h"
-#include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -36,12 +26,16 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
     const AwsRequestSigningProtoConfig& config, const std::string& stats_prefix, DualInfo dual_info,
     Server::Configuration::ServerFactoryContext& server_context) {
 
+  auto credentials_provider = createCredentialsProvider(config, server_context);
+  if (!credentials_provider.ok()) {
+    return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
+  }
   auto signer = createSigner(config, server_context);
   if (!signer.ok()) {
     return absl::InvalidArgumentError(std::string(signer.status().message()));
   }
   auto filter_config =
-      std::make_shared<FilterConfigImpl>(std::move(signer.value()), stats_prefix, dual_info.scope,
+      std::make_shared<FilterConfigImpl>(std::move(signer.value()), credentials_provider.value(), stats_prefix, dual_info.scope,
                                          config.host_rewrite(), config.use_unsigned_payload());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
@@ -55,22 +49,26 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     Server::Configuration::ServerFactoryContext& server_context,
     ProtobufMessage::ValidationVisitor&) {
 
+  auto credentials_provider = createCredentialsProvider(per_route_config.aws_request_signing(), server_context);
+  if (!credentials_provider.ok()) {
+    return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
+  }
+
   auto signer = createSigner(per_route_config.aws_request_signing(), server_context);
   if (!signer.ok()) {
     return absl::InvalidArgumentError(std::string(signer.status().message()));
   }
 
   return std::make_shared<const FilterConfigImpl>(
-      std::move(signer.value()), per_route_config.stat_prefix(), server_context.scope(),
+      std::move(signer.value()), credentials_provider.value(), per_route_config.stat_prefix(), server_context.scope(),
       per_route_config.aws_request_signing().host_rewrite(),
       per_route_config.aws_request_signing().use_unsigned_payload());
 }
 
-absl::StatusOr<Envoy::Extensions::Common::Aws::SignerPtr>
-AwsRequestSigningFilterFactory::createSigner(
+absl::StatusOr<Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr>
+AwsRequestSigningFilterFactory::createCredentialsProvider(
     const AwsRequestSigningProtoConfig& config,
     Server::Configuration::ServerFactoryContext& server_context) {
-
   std::string region = config.region();
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
@@ -121,7 +119,7 @@ AwsRequestSigningFilterFactory::createSigner(
     } else if (config.credential_provider().custom_credential_provider_chain()) {
       // Custom credential provider chain
       if (has_credential_provider_settings) {
-        credentials_provider =
+        return
             std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
                 server_context, region, config.credential_provider());
       }
@@ -130,21 +128,56 @@ AwsRequestSigningFilterFactory::createSigner(
       if (has_credential_provider_settings) {
         credential_provider_config = config.credential_provider();
       }
-      credentials_provider =
+      return
           std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
               server_context.api(), makeOptRef(server_context), server_context.singletonManager(),
               region, nullptr, credential_provider_config);
     }
   } else {
     // No credential provider settings provided, so make the default credentials provider chain
-    credentials_provider =
+    return
         std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
             server_context.api(), makeOptRef(server_context), server_context.singletonManager(),
             region, nullptr, credential_provider_config);
   }
 
-  if (!credentials_provider.ok()) {
     return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
+
+}
+
+absl::StatusOr<Envoy::Extensions::Common::Aws::SignerPtr>
+AwsRequestSigningFilterFactory::createSigner(
+    const AwsRequestSigningProtoConfig& config,
+    Server::Configuration::ServerFactoryContext& server_context) {
+
+  std::string region = config.region();
+
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+
+  // If we have an overriding credential provider configuration, read it here as it may contain
+  // references to the region
+  envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config = {};
+  if (config.has_credential_provider()) {
+    if (config.credential_provider().has_credentials_file_provider()) {
+      credential_file_config = config.credential_provider().credentials_file_provider();
+    }
+  }
+
+  if (region.empty()) {
+    auto region_provider =
+        std::make_shared<Extensions::Common::Aws::RegionProviderChain>(credential_file_config);
+    absl::optional<std::string> regionOpt;
+    if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
+      regionOpt = region_provider->getRegionSet();
+    } else {
+      regionOpt = region_provider->getRegion();
+    }
+    if (!regionOpt.has_value()) {
+      return absl::InvalidArgumentError(
+          "AWS region is not set in xDS configuration and failed to retrieve from "
+          "environment variable or AWS profile/config files.");
+    }
+    region = regionOpt.value();
   }
 
   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
@@ -160,7 +193,7 @@ AwsRequestSigningFilterFactory::createSigner(
 
   if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
     return std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
-        config.service_name(), region, credentials_provider.value(), server_context, matcher_config,
+        config.service_name(), region, server_context, matcher_config,
         query_string, expiration_time);
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm
@@ -170,7 +203,7 @@ AwsRequestSigningFilterFactory::createSigner(
           "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     return std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-        config.service_name(), region, credentials_provider.value(), server_context, matcher_config,
+        config.service_name(), region, server_context, matcher_config,
         query_string, expiration_time);
   }
 }

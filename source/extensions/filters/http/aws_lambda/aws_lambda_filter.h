@@ -87,6 +87,7 @@ public:
   virtual InvocationMode invocationMode() const PURE;
   virtual const std::string& hostRewrite() const PURE;
   virtual Extensions::Common::Aws::Signer& signer() PURE;
+  virtual Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentialsProvider() PURE;
 };
 
 class FilterSettingsImpl : public FilterSettings {
@@ -101,6 +102,7 @@ public:
   InvocationMode invocationMode() const override { return invocation_mode_; }
   const std::string& hostRewrite() const override { return host_rewrite_; }
   Extensions::Common::Aws::Signer& signer() override { return *signer_; }
+  Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentialsProvider() override { return credentials_provider_;}
 
 private:
   Arn arn_;
@@ -108,6 +110,8 @@ private:
   bool payload_passthrough_;
   const std::string host_rewrite_;
   Extensions::Common::Aws::SignerPtr signer_;
+  Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider_;
+
 };
 
 using FilterSettingsSharedPtr = std::shared_ptr<FilterSettings>;

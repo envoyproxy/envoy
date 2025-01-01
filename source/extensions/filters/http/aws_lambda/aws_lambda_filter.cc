@@ -147,7 +147,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   if (settings.payloadPassthrough()) {
     setLambdaHeaders(headers, settings.arn(), settings.invocationMode(), settings.hostRewrite());
-    auto status = settings.signer().signEmptyPayload(headers, settings.arn().region());
+    auto status = settings.signer().signEmptyPayload(headers, settings.credentialsProvider()->getCredentials(),settings.arn().region());
     if (!status.ok()) {
       ENVOY_LOG(debug, "signing failed: {}", status.message());
     }
@@ -165,7 +165,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hash = Hex::encode(hashing_util.getSha256Digest(json_buf));
 
-  auto status = settings.signer().sign(headers, hash, settings.arn().region());
+  auto status = settings.signer().sign(headers, settings.credentialsProvider()->getCredentials(), hash, settings.arn().region());
   if (!status.ok()) {
     ENVOY_LOG(debug, "signing failed: {}", status.message());
   }
@@ -229,7 +229,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
                    settings.hostRewrite());
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
 
-  auto status = settings.signer().sign(*request_headers_, hash, settings.arn().region());
+  auto status = settings.signer().sign(*request_headers_,settings.credentialsProvider()->getCredentials(), hash, settings.arn().region());
   if (!status.ok()) {
     ENVOY_LOG(debug, "signing failed: {}", status.message());
   }
