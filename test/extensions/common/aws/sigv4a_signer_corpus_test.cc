@@ -275,9 +275,9 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusHeaderSigning) {
   setDate();
   addBodySigningIfRequired();
 
-  SigV4ASignerImpl headersigner_(
-      service_, region_,  context_,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false, expiration_);
+  SigV4ASignerImpl headersigner_(service_, region_, context_,
+                                 Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false,
+                                 expiration_);
 
   auto signer_friend = SigV4ASignerImplFriend(&headersigner_);
 
@@ -336,9 +336,9 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusQueryStringSigning) {
 
   const auto calculated_canonical_headers = Utility::canonicalizeHeaders(message_.headers(), {});
 
-  SigV4ASignerImpl querysigner_(
-      service_, region_,  context_,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, expiration_);
+  SigV4ASignerImpl querysigner_(service_, region_, context_,
+                                Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
+                                expiration_);
 
   auto signer_friend = SigV4ASignerImplFriend(&querysigner_);
 

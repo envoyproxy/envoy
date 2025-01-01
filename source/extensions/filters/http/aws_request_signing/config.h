@@ -1,20 +1,18 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
-#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
-
-#include "source/extensions/common/aws/signer.h"
-#include "source/extensions/filters/http/common/factory_base.h"
-#include "source/extensions/common/aws/credentials_provider_impl.h"
-#include "source/extensions/common/aws/region_provider_impl.h"
-#include "source/extensions/common/aws/sigv4_signer_impl.h"
-#include "source/extensions/common/aws/sigv4a_signer_impl.h"
-#include "source/extensions/common/aws/utility.h"
-#include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
 #include "envoy/registry/registry.h"
+
+#include "source/extensions/common/aws/credentials_provider_impl.h"
+#include "source/extensions/common/aws/region_provider_impl.h"
+#include "source/extensions/common/aws/signer.h"
+#include "source/extensions/common/aws/sigv4_signer_impl.h"
+#include "source/extensions/common/aws/sigv4a_signer_impl.h"
+#include "source/extensions/common/aws/utility.h"
+#include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,10 +50,8 @@ private:
                Server::Configuration::ServerFactoryContext& server_context);
 
   absl::StatusOr<Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr>
-createCredentialsProvider(
-    const AwsRequestSigningProtoConfig& config,
-    Server::Configuration::ServerFactoryContext& server_context);
-
+  createCredentialsProvider(const AwsRequestSigningProtoConfig& config,
+                            Server::Configuration::ServerFactoryContext& server_context);
 };
 
 using UpstreamAwsRequestSigningFilterFactory = AwsRequestSigningFilterFactory;

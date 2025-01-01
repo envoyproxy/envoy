@@ -12,7 +12,6 @@
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/http/message.h"
 #include "envoy/init/manager.h"
-#include "envoy/init/manager.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/common/lock_guard.h"
@@ -146,7 +145,7 @@ public:
 
   Credentials getCredentials() override;
   bool credentialsPending(CredentialsPendingCallback&& cb) override;
-  
+
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
 

@@ -23,25 +23,29 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-absl::Status SignerBaseImpl::sign(Http::RequestMessage& message,const Credentials credentials,  bool sign_body,
-                                  const absl::string_view override_region) {
+absl::Status SignerBaseImpl::sign(Http::RequestMessage& message, const Credentials credentials,
+                                  bool sign_body, const absl::string_view override_region) {
 
   const auto content_hash = createContentHash(message, sign_body);
   auto& headers = message.headers();
   return sign(headers, credentials, content_hash, override_region);
 }
 
-absl::Status SignerBaseImpl::signEmptyPayload(Http::RequestHeaderMap& headers, const Credentials credentials, 
+absl::Status SignerBaseImpl::signEmptyPayload(Http::RequestHeaderMap& headers,
+                                              const Credentials credentials,
                                               const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::HashedEmptyString);
-  return sign(headers, credentials, std::string(SignatureConstants::HashedEmptyString), override_region);
+  return sign(headers, credentials, std::string(SignatureConstants::HashedEmptyString),
+              override_region);
 }
 
-absl::Status SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers, const Credentials credentials, 
+absl::Status SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers,
+                                                 const Credentials credentials,
                                                  const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256, SignatureConstants::UnsignedPayload);
-  return sign(headers, credentials, std::string(SignatureConstants::UnsignedPayload), override_region);
+  return sign(headers, credentials, std::string(SignatureConstants::UnsignedPayload),
+              override_region);
 }
 
 // Region support utilities for sigv4a
@@ -54,20 +58,20 @@ void SignerBaseImpl::addRegionQueryParam(
 
 std::string SignerBaseImpl::getRegion() const { return region_; }
 
-absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const Credentials credentials, const std::string& content_hash,
+absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const Credentials credentials,
+                                  const std::string& content_hash,
                                   const absl::string_view override_region) {
 
   if (!query_string_ && !content_hash.empty()) {
     headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   }
 
-  // const auto& credentials = credentials_provider_->getCredentials();
-  // if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
-  //   // Empty or "anonymous" credentials are a valid use-case for non-production environments.
-  //   // This behavior matches what the AWS SDK would do.
-  //   ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");
-  //   return absl::OkStatus();
-  // }
+  if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
+    // Empty or "anonymous" credentials are a valid use-case for non-production environments.
+    // This behavior matches what the AWS SDK would do.
+    ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");
+    return absl::OkStatus();
+  }
 
   if (headers.Method() == nullptr) {
     return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :method header"};

@@ -52,13 +52,14 @@ public:
     headers.setPath("/");
     headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
 
-    SigV4SignerImpl signer(service_name, "region",
-                            context_,
+    SigV4SignerImpl signer(service_name, "region", context_,
                            Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false, 5);
     if (use_unsigned_payload) {
-      status = signer.signUnsignedPayload(headers, credentials_provider->getCredentials(), override_region);
+      status = signer.signUnsignedPayload(headers, credentials_provider->getCredentials(),
+                                          override_region);
     } else {
-      status = signer.signEmptyPayload(headers, credentials_provider->getCredentials(), override_region);
+      status =
+          signer.signEmptyPayload(headers, credentials_provider->getCredentials(), override_region);
     }
     EXPECT_TRUE(status.ok());
 
@@ -83,11 +84,11 @@ public:
       EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
     }
 
-    SigV4SignerImpl signer(service_name, "region",
-                            context_,
+    SigV4SignerImpl signer(service_name, "region", context_,
                            Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, 5);
 
-    auto status = signer.signUnsignedPayload(extra_headers, credentials_provider->getCredentials(), override_region);
+    auto status = signer.signUnsignedPayload(extra_headers, credentials_provider->getCredentials(),
+                                             override_region);
     EXPECT_TRUE(status.ok());
     auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
         extra_headers.Path()->value().getStringView());
@@ -220,7 +221,7 @@ TEST_F(SigV4SignerImplTest, SignEmptyContentHeader) {
   EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
-  auto status = signer_.sign(*message_, credentials_provider_->getCredentials(),true);
+  auto status = signer_.sign(*message_, credentials_provider_->getCredentials(), true);
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(SigV4SignatureConstants::HashedEmptyString,
             message_->headers()
@@ -338,8 +339,7 @@ TEST_F(SigV4SignerImplTest, QueryStringDefault5s) {
   headers.setPath("/example/path");
   headers.addCopy(Http::LowerCaseString("host"), "example.service.zz");
   headers.addCopy("testheader", "value1");
-  SigV4SignerImpl querysigner("service", "region",
-                               context_,
+  SigV4SignerImpl querysigner("service", "region", context_,
                               Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true);
 
   auto status = querysigner.signUnsignedPayload(headers, credentials_provider_->getCredentials());

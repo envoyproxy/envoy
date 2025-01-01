@@ -49,8 +49,8 @@ public:
                   const AwsSigningHeaderExclusionVector& matcher_config,
                   const bool query_string = false,
                   const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
-      : SignerBaseImpl(service_name, region, context, matcher_config,
-                       query_string, expiration_time) {}
+      : SignerBaseImpl(service_name, region, context, matcher_config, query_string,
+                       expiration_time) {}
 
 private:
   std::string createCredentialScope(const absl::string_view short_date,

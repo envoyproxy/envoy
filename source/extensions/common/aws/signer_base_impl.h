@@ -68,8 +68,7 @@ public:
                  const bool query_string = false,
                  const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
       : service_name_(service_name), region_(region),
-        excluded_header_matchers_(defaultMatchers(context)),
-        query_string_(query_string),
+        excluded_header_matchers_(defaultMatchers(context)), query_string_(query_string),
         expiration_time_(expiration_time), time_source_(context.timeSource()),
         long_date_formatter_(std::string(SignatureConstants::LongDateFormat)),
         short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
@@ -80,13 +79,14 @@ public:
     }
   }
 
-  absl::Status sign(Http::RequestMessage& message, const Credentials credentials, bool sign_body = false,
+  absl::Status sign(Http::RequestMessage& message, const Credentials credentials,
+                    bool sign_body = false, const absl::string_view override_region = "") override;
+  absl::Status sign(Http::RequestHeaderMap& headers, const Credentials credentials,
+                    const std::string& content_hash,
                     const absl::string_view override_region = "") override;
-  absl::Status sign(Http::RequestHeaderMap& headers, const Credentials credentials, const std::string& content_hash,
-                    const absl::string_view override_region = "") override;
-  absl::Status signEmptyPayload(Http::RequestHeaderMap& headers, const Credentials credentials, 
+  absl::Status signEmptyPayload(Http::RequestHeaderMap& headers, const Credentials credentials,
                                 const absl::string_view override_region = "") override;
-  absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers, const Credentials credentials, 
+  absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers, const Credentials credentials,
                                    const absl::string_view override_region = "") override;
 
 protected:

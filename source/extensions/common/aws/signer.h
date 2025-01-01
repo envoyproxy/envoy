@@ -1,8 +1,9 @@
 #pragma once
 
-#include "credentials_provider.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/message.h"
+
+#include "credentials_provider.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,8 +21,8 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual absl::Status sign(Http::RequestMessage& message, const Credentials credentials, bool sign_body,
-                            const absl::string_view override_region = "") PURE;
+  virtual absl::Status sign(Http::RequestMessage& message, const Credentials credentials,
+                            bool sign_body, const absl::string_view override_region = "") PURE;
 
   /**
    * Sign an AWS request without a payload (empty string used as content hash).
@@ -29,7 +30,8 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual absl::Status signEmptyPayload(Http::RequestHeaderMap& headers, const Credentials credentials, 
+  virtual absl::Status signEmptyPayload(Http::RequestHeaderMap& headers,
+                                        const Credentials credentials,
                                         const absl::string_view override_region = "") PURE;
 
   /**
@@ -38,7 +40,8 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers, const Credentials credentials, 
+  virtual absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
+                                           const Credentials credentials,
                                            const absl::string_view override_region = "") PURE;
 
   /**
@@ -48,7 +51,8 @@ public:
    * @param override_region override the default region that has to be used to sign the request
    * @throws EnvoyException if the request cannot be signed.
    */
-  virtual absl::Status sign(Http::RequestHeaderMap& headers, const Credentials credentials, const std::string& content_hash,
+  virtual absl::Status sign(Http::RequestHeaderMap& headers, const Credentials credentials,
+                            const std::string& content_hash,
                             const absl::string_view override_region = "") PURE;
 };
 

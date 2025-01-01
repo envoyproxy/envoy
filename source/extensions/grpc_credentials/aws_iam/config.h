@@ -34,8 +34,10 @@ public:
  */
 class AwsIamHeaderAuthenticator : public grpc::MetadataCredentialsPlugin {
 public:
-  AwsIamHeaderAuthenticator(Common::Aws::SignerPtr signer,   
-  Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider) : signer_(std::move(signer)), credentials_provider_(credentials_provider) {}
+  AwsIamHeaderAuthenticator(
+      Common::Aws::SignerPtr signer,
+      Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider)
+      : signer_(std::move(signer)), credentials_provider_(credentials_provider) {}
 
   grpc::Status GetMetadata(grpc::string_ref, grpc::string_ref, const grpc::AuthContext&,
                            std::multimap<grpc::string, grpc::string>* metadata) override;
@@ -51,7 +53,6 @@ private:
 
   const Common::Aws::SignerPtr signer_;
   Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider_;
-
 };
 
 } // namespace AwsIam

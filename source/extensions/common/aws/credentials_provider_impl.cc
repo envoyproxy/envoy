@@ -266,14 +266,13 @@ void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterRemo
   }
 };
 
-  bool MetadataCredentialsProviderBase::credentialsPending(CredentialsPendingCallback&& cb) { 
-    if(cb)
-    {
-      ENVOY_LOG_MISC(debug,"Adding credentials pending callback to queue");
-      credential_pending_callbacks_.push_back(std::move(cb));
-    }
-    return credentials_pending_; 
+bool MetadataCredentialsProviderBase::credentialsPending(CredentialsPendingCallback&& cb) {
+  if (cb) {
+    ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
+    credential_pending_callbacks_.push_back(std::move(cb));
   }
+  return credentials_pending_;
+}
 
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 Credentials MetadataCredentialsProviderBase::getCredentials() {
@@ -341,11 +340,15 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
   ENVOY_LOG_MISC(debug, "Setting credentials to all threads");
 
   // Call all of our callbacks to unblock pending requests
-  for(const auto& cb: credential_pending_callbacks_)
-  {
-    cb(Credentials(creds->accessKeyId().has_value()?creds->accessKeyId().value():"",
-    creds->secretAccessKey().has_value()?creds->accessKeyId().value():"",
-    creds->sessionToken().has_value()?creds->accessKeyId().value():""));
+  for (const auto& cb : credential_pending_callbacks_) {
+    ENVOY_LOG_MISC(debug, "*** Calling pending callback {} {} {}",
+                   creds->accessKeyId().has_value() ? creds->accessKeyId().value() : "",
+                   creds->secretAccessKey().has_value() ? creds->secretAccessKey().value() : "",
+                   creds->sessionToken().has_value() ? creds->sessionToken().value() : "");
+
+    cb(Credentials(creds->accessKeyId().has_value() ? creds->accessKeyId().value() : "",
+                   creds->secretAccessKey().has_value() ? creds->secretAccessKey().value() : "",
+                   creds->sessionToken().has_value() ? creds->sessionToken().value() : ""));
   }
   credential_pending_callbacks_.clear();
 
@@ -358,7 +361,6 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
 
   // We are now no longer waiting for credentials
   credentials_pending_.exchange(false);
-
 }
 
 CredentialsFileCredentialsProvider::CredentialsFileCredentialsProvider(
@@ -1010,13 +1012,12 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
 
 bool CredentialsProviderChain::credentialsPending(CredentialsPendingCallback&& cb) {
   for (auto& provider : providers_) {
-    if(provider->credentialsPending(std::move(cb)))
-    {
-      ENVOY_LOG_MISC(debug,"Credentials are pending");
+    if (provider->credentialsPending(std::move(cb))) {
+      ENVOY_LOG_MISC(debug, "Credentials are pending");
       return true;
     }
   }
-  ENVOY_LOG_MISC(debug,"Credentials are not pending");
+  ENVOY_LOG_MISC(debug, "Credentials are not pending");
   return false;
 }
 
@@ -1081,8 +1082,8 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
     add(factories.createWebIdentityCredentialsProvider(
-        context, context.singletonManager(), MetadataFetcher::create, sts_endpoint, refresh_state, initialization_timer,
-        web_identity, cluster_name));
+        context, context.singletonManager(), MetadataFetcher::create, sts_endpoint, refresh_state,
+        initialization_timer, web_identity, cluster_name));
   }
 
   if (credential_provider_config.has_credentials_file_provider()) {
@@ -1135,7 +1136,8 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
         !web_identity.role_arn().empty()) {
 
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-      // const auto region_uuid = absl::StrCat(region, "_", context->api().randomGenerator().uuid());
+      // const auto region_uuid = absl::StrCat(region, "_",
+      // context->api().randomGenerator().uuid());
 
       const auto cluster_name = stsClusterName(region);
 
@@ -1144,8 +1146,8 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
           "Using web identity credentials provider with STS endpoint: {} and session name: {}",
           sts_endpoint, web_identity.role_session_name());
       add(factories.createWebIdentityCredentialsProvider(
-          context.value(), context->singletonManager(), MetadataFetcher::create, sts_endpoint, refresh_state,
-          initialization_timer, web_identity, cluster_name));
+          context.value(), context->singletonManager(), MetadataFetcher::create, sts_endpoint,
+          refresh_state, initialization_timer, web_identity, cluster_name));
     }
   }
 
@@ -1227,39 +1229,43 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
             api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
             initialization_timer, cluster_name);
       });
-    }
-        CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context, Singleton::Manager& singleton_manager,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer,
-      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config,
-      absl::string_view cluster_name) const  {
-    return singleton_manager.getTyped<WebIdentityCredentialsProvider>(SINGLETON_MANAGER_REGISTERED_NAME(web_identity_credentials_provider),
-    [&context, create_metadata_fetcher_cb,sts_endpoint,refresh_state, initialization_timer, web_identity_config, cluster_name]{
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
-        web_identity_config, cluster_name);
+}
+CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context, Singleton::Manager& singleton_manager,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    std::chrono::seconds initialization_timer,
+    const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+        web_identity_config,
+    absl::string_view cluster_name) const {
+  return singleton_manager.getTyped<WebIdentityCredentialsProvider>(
+      SINGLETON_MANAGER_REGISTERED_NAME(web_identity_credentials_provider),
+      [&context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
+       web_identity_config, cluster_name] {
+        return std::make_shared<WebIdentityCredentialsProvider>(
+            context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
+            web_identity_config, cluster_name);
       });
-  };
+};
 
-    CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context, Singleton::Manager& singleton_manager,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer,
-      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config,
-      absl::string_view cluster_name) const  {
-    return singleton_manager.getTyped<WebIdentityCredentialsProvider>(SINGLETON_MANAGER_REGISTERED_NAME(web_identity_credentials_provider),
-    [&context, create_metadata_fetcher_cb,sts_endpoint,refresh_state, initialization_timer, web_identity_config, cluster_name]{
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
-        web_identity_config, cluster_name);
+CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context, Singleton::Manager& singleton_manager,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    std::chrono::seconds initialization_timer,
+    const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+        web_identity_config,
+    absl::string_view cluster_name) const {
+  return singleton_manager.getTyped<WebIdentityCredentialsProvider>(
+      SINGLETON_MANAGER_REGISTERED_NAME(web_identity_credentials_provider),
+      [&context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
+       web_identity_config, cluster_name] {
+        return std::make_shared<WebIdentityCredentialsProvider>(
+            context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
+            web_identity_config, cluster_name);
       });
-  };
-  
+};
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

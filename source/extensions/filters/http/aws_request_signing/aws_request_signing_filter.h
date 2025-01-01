@@ -5,8 +5,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "source/extensions/common/aws/signer.h"
+#include "source/common/common/cancel_wrapper.h"
 #include "source/extensions/common/aws/credentials_provider.h"
+#include "source/extensions/common/aws/signer.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -72,9 +73,11 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class FilterConfigImpl : public FilterConfig {
 public:
-  FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider, 
-        const std::string& stats_prefix,
-                   Stats::Scope& scope, const std::string& host_rewrite, bool use_unsigned_payload);
+  FilterConfigImpl(
+      Extensions::Common::Aws::SignerPtr&& signer,
+      Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider,
+      const std::string& stats_prefix, Stats::Scope& scope, const std::string& host_rewrite,
+      bool use_unsigned_payload);
 
   Extensions::Common::Aws::Signer& signer() override;
   Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentialsProvider() override;
@@ -97,7 +100,11 @@ private:
 class Filter : public Http::PassThroughDecoderFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const std::shared_ptr<FilterConfig>& config);
-
+  ~Filter() override {
+    if (cancel_callback_) {
+      cancel_callback_();
+    }
+  }
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -106,8 +113,11 @@ public:
 
 private:
   FilterConfig& getConfig() const;
-  Http::FilterHeadersStatus onCredentialNoLongerPending(FilterConfig& config, 
-  Http::RequestHeaderMap& headers, bool end_stream, Envoy::Extensions::Common::Aws::Credentials credentials);
+  Http::FilterHeadersStatus
+  decodeHeadersCredentialsAvailable(Envoy::Extensions::Common::Aws::Credentials credentials);
+  Http::FilterDataStatus
+  decodeDataCredentialsAvailable(Envoy::Extensions::Common::Aws::Credentials credentials);
+  Envoy::CancelWrapper::CancelFunction cancel_callback_;
 
   std::shared_ptr<FilterConfig> config_;
   Http::RequestHeaderMap* request_headers_{};

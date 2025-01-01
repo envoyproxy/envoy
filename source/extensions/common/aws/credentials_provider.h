@@ -58,7 +58,6 @@ private:
  */
 class CredentialsProvider {
 public:
-
   using CredentialsPendingCallback = std::function<void(Credentials credentials)>;
 
   virtual ~CredentialsProvider() = default;
@@ -71,12 +70,13 @@ public:
   virtual Credentials getCredentials() PURE;
 
   /**
-    * Check if credentials are pending, which supports async credential fetching.
-    *
-    * @return bool true if credentials are pending, false otherwise
+   * Check if credentials are pending, which supports async credential fetching.
+   *
+   * @return bool true if credentials are pending, false otherwise
    */
-  virtual bool credentialsPending(ABSL_ATTRIBUTE_UNUSED CredentialsPendingCallback&& cb) { return false; }
-
+  virtual bool credentialsPending(ABSL_ATTRIBUTE_UNUSED CredentialsPendingCallback&& cb) {
+    return false;
+  }
 };
 
 using CredentialsConstSharedPtr = std::shared_ptr<const Credentials>;

@@ -3,8 +3,6 @@
 #include <iterator>
 #include <string>
 
-
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -34,9 +32,9 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
   if (!signer.ok()) {
     return absl::InvalidArgumentError(std::string(signer.status().message()));
   }
-  auto filter_config =
-      std::make_shared<FilterConfigImpl>(std::move(signer.value()), credentials_provider.value(), stats_prefix, dual_info.scope,
-                                         config.host_rewrite(), config.use_unsigned_payload());
+  auto filter_config = std::make_shared<FilterConfigImpl>(
+      std::move(signer.value()), credentials_provider.value(), stats_prefix, dual_info.scope,
+      config.host_rewrite(), config.use_unsigned_payload());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
     callbacks.addStreamDecoderFilter(filter);
@@ -49,7 +47,8 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
     Server::Configuration::ServerFactoryContext& server_context,
     ProtobufMessage::ValidationVisitor&) {
 
-  auto credentials_provider = createCredentialsProvider(per_route_config.aws_request_signing(), server_context);
+  auto credentials_provider =
+      createCredentialsProvider(per_route_config.aws_request_signing(), server_context);
   if (!credentials_provider.ok()) {
     return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
   }
@@ -60,8 +59,8 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   }
 
   return std::make_shared<const FilterConfigImpl>(
-      std::move(signer.value()), credentials_provider.value(), per_route_config.stat_prefix(), server_context.scope(),
-      per_route_config.aws_request_signing().host_rewrite(),
+      std::move(signer.value()), credentials_provider.value(), per_route_config.stat_prefix(),
+      server_context.scope(), per_route_config.aws_request_signing().host_rewrite(),
       per_route_config.aws_request_signing().use_unsigned_payload());
 }
 
@@ -119,30 +118,26 @@ AwsRequestSigningFilterFactory::createCredentialsProvider(
     } else if (config.credential_provider().custom_credential_provider_chain()) {
       // Custom credential provider chain
       if (has_credential_provider_settings) {
-        return
-            std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
-                server_context, region, config.credential_provider());
+        return std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
+            server_context, region, config.credential_provider());
       }
     } else {
       // Override default credential provider chain settings with any provided settings
       if (has_credential_provider_settings) {
         credential_provider_config = config.credential_provider();
       }
-      return
-          std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-              server_context.api(), makeOptRef(server_context), server_context.singletonManager(),
-              region, nullptr, credential_provider_config);
+      return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+          server_context.api(), makeOptRef(server_context), server_context.singletonManager(),
+          region, nullptr, credential_provider_config);
     }
   } else {
     // No credential provider settings provided, so make the default credentials provider chain
-    return
-        std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-            server_context.api(), makeOptRef(server_context), server_context.singletonManager(),
-            region, nullptr, credential_provider_config);
+    return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+        server_context.api(), makeOptRef(server_context), server_context.singletonManager(), region,
+        nullptr, credential_provider_config);
   }
 
-    return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
-
+  return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
 }
 
 absl::StatusOr<Envoy::Extensions::Common::Aws::SignerPtr>
@@ -193,8 +188,8 @@ AwsRequestSigningFilterFactory::createSigner(
 
   if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
     return std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
-        config.service_name(), region, server_context, matcher_config,
-        query_string, expiration_time);
+        config.service_name(), region, server_context, matcher_config, query_string,
+        expiration_time);
   } else {
     // Verify that we have not specified a region set when using sigv4 algorithm
     if (isARegionSet(region)) {
@@ -203,8 +198,8 @@ AwsRequestSigningFilterFactory::createSigner(
           "can be specified when using signing_algorithm: AWS_SIGV4A.");
     }
     return std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-        config.service_name(), region, server_context, matcher_config,
-        query_string, expiration_time);
+        config.service_name(), region, server_context, matcher_config, query_string,
+        expiration_time);
   }
 }
 
