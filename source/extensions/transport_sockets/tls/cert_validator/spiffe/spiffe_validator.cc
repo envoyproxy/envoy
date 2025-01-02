@@ -123,11 +123,8 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
             return true;
           });
 
-  // json_object::iterate seems to always return ok(), so this check is
-  // redundant...
-  if (!status.ok() || !parsing_status.ok()) {
-    return parsing_status;
-  }
+  RETURN_IF_NOT_OK_REF(status);
+  RETURN_IF_NOT_OK_REF(parsing_status);
 
   ENVOY_LOG(info, "Successfully loaded SPIFFE bundle map");
   return spiffe_data;
@@ -192,10 +189,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
         Config::DataSource::read(message.trust_bundles(), false, config->api()), std::string);
     auto parse_result = parseTrustBundles(trust_bundles_str);
 
-    if (!parse_result.ok()) {
-      throw EnvoyException(
-          fmt::format("Failed to load SPIFFE Bundle map: {}", parse_result.status()));
-    }
+    THROW_IF_NOT_OK_REF(parse_result.status());
 
     spiffe_data_ = *parse_result;
 

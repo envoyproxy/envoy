@@ -784,32 +784,7 @@ typed_config:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_empty_keys.json"
   )EOF")),
                               EnvoyException,
-                              "Failed to load SPIFFE Bundle map: INVALID_ARGUMENT: No keys found "
-                              "in SPIFFE bundle for domain 'example.com'");
-  }
-  {
-    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
-name: envoy.tls.cert_validator.spiffe
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_invalid_key.json"
-  )EOF")),
-                              EnvoyException,
-                              "Failed to load SPIFFE Bundle map: INVALID_ARGUMENT: Failed to "
-                              "create x509 object while loading certs in domain 'example.com'");
-  }
-  {
-    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
-name: envoy.tls.cert_validator.spiffe
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
-  trust_bundles:
-    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_missing_use.json"
-  )EOF")),
-                              EnvoyException,
-                              "Failed to load SPIFFE Bundle map: INVALID_ARGUMENT: missing or "
-                              "invalid 'use' field found in cert for domain 'example.com'");
+                              "No keys found in SPIFFE bundle for domain 'example.com'");
   }
   {
     EXPECT_THROW_WITH_MESSAGE(
@@ -818,10 +793,30 @@ name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_invalid_key.json"
+  )EOF")),
+        EnvoyException, "Failed to create x509 object while loading certs in domain 'example.com'");
+  }
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_bundles:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_missing_use.json"
+  )EOF")),
+        EnvoyException, "missing or invalid 'use' field found in cert for domain 'example.com'");
+  }
+  {
+    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_invalid_json.json"
   )EOF")),
-        EnvoyException,
-        "Failed to load SPIFFE Bundle map: INVALID_ARGUMENT: Invalid JSON found in SPIFFE bundle");
+                              EnvoyException, "Invalid JSON found in SPIFFE bundle");
   }
   {
     EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
@@ -831,21 +826,18 @@ typed_config:
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_zero_domains.json"
   )EOF")),
-                              EnvoyException,
-                              "Failed to load SPIFFE Bundle map: INVALID_ARGUMENT: No trust "
-                              "domains found in SPIFFE bundle");
+                              EnvoyException, "No trust domains found in SPIFFE bundle");
   }
   {
-    EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
+    EXPECT_THROW_WITH_MESSAGE(
+        initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_missing_x5c.json"
   )EOF")),
-                              EnvoyException,
-                              "Failed to load SPIFFE Bundle map: INVALID_ARGUMENT: missing or "
-                              "empty 'x5c' field found in keys for domain: 'example.com'");
+        EnvoyException, "missing or empty 'x5c' field found in keys for domain: 'example.com'");
   }
   {
     EXPECT_THROW_WITH_MESSAGE(initialize(TestEnvironment::substitute(R"EOF(
@@ -856,8 +848,7 @@ typed_config:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_invalid_x5c.json"
   )EOF")),
                               EnvoyException,
-                              "Failed to load SPIFFE Bundle map: INVALID_ARGUMENT: Invalid x509 "
-                              "object in certs for domain 'example.com'");
+                              "Invalid x509 object in certs for domain 'example.com'");
   }
 }
 
