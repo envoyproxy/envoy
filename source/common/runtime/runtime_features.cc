@@ -170,6 +170,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_logging_with_fast_json_formatter);
 // Controls whether a stream stays open when HTTP/2 or HTTP/3 upstream half closes
 // before downstream.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_close);
+// A flag to enable normalization of RDS provider config. (see PR 37180).
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_normalize_rds_provider_config);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
