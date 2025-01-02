@@ -316,7 +316,7 @@ public:
     yaml += enable_merge_window ? merge_window_enabled : merge_window_disabled;
 
     const auto& bootstrap = parseBootstrapFromV3Yaml(yaml);
-    absl::Status creation_status;
+    absl::Status creation_status = absl::OkStatus();
     cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
@@ -7421,6 +7421,37 @@ TEST_F(ClusterManagerImplTest, CheckAddressesList) {
   hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   ASSERT_NE(hosts[0]->addressListOrNull(), nullptr);
   ASSERT_EQ(hosts[0]->addressListOrNull()->size(), 2);
+}
+
+// Verify that non-IP additional addresses are rejected.
+TEST_F(ClusterManagerImplTest, RejectNonIpAdditionalAddresses) {
+  const std::string bootstrap = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_0
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              additionalAddresses:
+              - address:
+                  envoyInternalAddress:
+                   server_listener_name: internal_address
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  try {
+    create(parseBootstrapFromV3Yaml(bootstrap));
+    FAIL() << "Invalid address was not rejected";
+  } catch (const EnvoyException& e) {
+    EXPECT_STREQ("additional_addresses must be IP addresses.", e.what());
+  }
 }
 
 TEST_F(ClusterManagerImplTest, CheckActiveStaticCluster) {

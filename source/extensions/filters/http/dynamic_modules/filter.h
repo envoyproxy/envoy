@@ -17,9 +17,13 @@ using namespace Envoy::Http;
 class DynamicModuleHttpFilter : public Http::StreamFilter,
                                 public std::enable_shared_from_this<DynamicModuleHttpFilter> {
 public:
-  DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr dynamic_module)
-      : dynamic_module_(dynamic_module){};
+  DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config) : config_(config) {}
   ~DynamicModuleHttpFilter() override = default;
+
+  /**
+   * Initializes the in-module filter.
+   */
+  void initializeInModuleFilter();
 
   // ---------- Http::StreamFilterBase ------------
   void onStreamComplete() override;
@@ -50,8 +54,20 @@ public:
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
 
+  RequestHeaderMap* request_headers_ = nullptr;
+  RequestTrailerMap* request_trailers_ = nullptr;
+  ResponseHeaderMap* response_headers_ = nullptr;
+  ResponseTrailerMap* response_trailers_ = nullptr;
+
 private:
-  const DynamicModuleHttpFilterConfigSharedPtr dynamic_module_ = nullptr;
+  /**
+   * This is a helper function to get the `this` pointer as a void pointer which is passed to the
+   * various event hooks.
+   */
+  void* thisAsVoidPtr() { return static_cast<void*>(this); }
+
+  const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
+  envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
 };
 
 } // namespace HttpFilters

@@ -8,6 +8,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/http/message.h"
