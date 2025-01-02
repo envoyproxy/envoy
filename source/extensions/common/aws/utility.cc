@@ -454,7 +454,6 @@ std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable
 bool Utility::resolveProfileElementsFromString(
     const std::string& string_data, const std::string& profile_name,
     absl::flat_hash_map<std::string, std::string>& elements) {
-  // std::istringstream a(string_data);
   std::unique_ptr<std::istream> stream;
 
   stream = std::make_unique<std::istringstream>(std::istringstream{string_data});

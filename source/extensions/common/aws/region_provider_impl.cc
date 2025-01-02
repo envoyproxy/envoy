@@ -79,8 +79,6 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegionSet() {
   absl::flat_hash_map<std::string, std::string> elements = {{SIGV4A_SIGNING_REGION_SET, ""}};
   absl::flat_hash_map<std::string, std::string>::iterator it;
 
-  // Search for the region in the credentials file
-
   std::string file_path, profile;
   file_path = credential_file_path_.has_value() ? credential_file_path_.value()
                                                 : Utility::getCredentialFilePath();
