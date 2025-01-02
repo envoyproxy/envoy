@@ -50,6 +50,8 @@ constexpr absl::string_view queryParamsError = "error";
 constexpr absl::string_view queryParamsCode = "code";
 constexpr absl::string_view queryParamsState = "state";
 constexpr absl::string_view queryParamsRedirectUri = "redirect_uri";
+constexpr absl::string_view queryParamsCodeChallenge = "code_challenge";
+constexpr absl::string_view queryParamsCodeChallengeMethod = "code_challenge_method";
 
 constexpr absl::string_view stateParamsUrl = "url";
 constexpr absl::string_view stateParamsCsrfToken = "csrf_token";
@@ -201,6 +203,30 @@ bool validateCsrfTokenHmac(const std::string& hmac_secret, const std::string& cs
   std::string hmac = std::string(csrf_token.substr(pos + 1));
   std::vector<uint8_t> hmac_secret_vec(hmac_secret.begin(), hmac_secret.end());
   return generateHmacBase64(hmac_secret_vec, token) == hmac;
+}
+
+// Generates a PKCE code verifier with 32 octets of randomness.
+// This follows recommendations in RFC 7636
+std::string generateCodeVerifier(Random::RandomGenerator& random) {
+  // Allocate memory to hold two uint64_t values
+  size_t totalSize = 4 * sizeof(uint64_t);
+  char* data = new char[totalSize];
+  // create 4 random uint64_t values to fill the buffer because RFC 7636 recommends 32 octets of
+  // randomness.
+  for (size_t i = 0; i < 4; i++) {
+    uint64_t randomValue = random.random();
+    std::memcpy(data + i * sizeof(uint64_t), &randomValue, sizeof(uint64_t));
+  }
+  return Base64Url::encode(data, totalSize);
+}
+
+// Generates a PKCE code challenge from a code verifier.
+std::string generateCodeChallenge(const std::string& code_verifier) {
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  std::vector<uint8_t> sha256_digest =
+      crypto_util.getSha256Digest(Buffer::OwnedImpl(code_verifier));
+  std::string sha256_string(sha256_digest.begin(), sha256_digest.end());
+  return Base64Url::encode(sha256_string.data(), sha256_string.size());
 }
 
 /**
@@ -464,8 +490,17 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
   const auto redirect_uri =
       formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
+
+  std::string code_verifier =
+      Http::Utility::parseCookieValue(headers, config_->cookieNames().code_verifier_);
+  if (code_verifier.empty()) {
+      ENVOY_LOG(error, "code_verifier is missing in the request");
+      sendUnauthorizedResponse();
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
-                                     redirect_uri, config_->authType());
+                                     redirect_uri, code_verifier, config_->authType());
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
@@ -526,22 +561,13 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   // The CSRF token cookie contains the CSRF token that is used to prevent CSRF attacks for the
   // OAuth flow. It was named "oauth_nonce" because the CSRF token contains a generated nonce.
   // "oauth_csrf_token" would be a more accurate name for the cookie.
-  std::string csrf_token;
-  bool csrf_token_cookie_exists = false;
-  const auto csrf_token_cookie =
-      Http::Utility::parseCookies(headers, [this](absl::string_view key) {
-        return key == config_->cookieNames().oauth_nonce_;
-      });
-  if (csrf_token_cookie.find(config_->cookieNames().oauth_nonce_) != csrf_token_cookie.end()) {
-    csrf_token = csrf_token_cookie.at(config_->cookieNames().oauth_nonce_);
-    csrf_token_cookie_exists = true;
-  } else {
-    // Generate a CSRF token to prevent CSRF attacks.
-    csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
-  }
-
+  std::string csrf_token =
+      Http::Utility::parseCookieValue(headers, config_->cookieNames().oauth_nonce_);
+  bool csrf_token_cookie_exists = !csrf_token.empty();
   // Set the CSRF token cookie if it does not exist.
   if (!csrf_token_cookie_exists) {
+        // Generate a CSRF token to prevent CSRF attacks.
+    csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
     // Expire the CSRF token cookie in 10 minutes.
     // This should be enough time for the user to complete the OAuth flow.
     std::string expire_in = std::to_string(10 * 60);
@@ -573,6 +599,24 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   const std::string escaped_redirect_uri =
       Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri);
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
+
+  // Generate a PKCE code verifier and challenge for the OAuth flow.
+  const std::string code_verifier = generateCodeVerifier(random_);
+  // Expire the code verifier cookie in 10 minutes.
+  // This should be enough time for the user to complete the OAuth flow.
+  std::string expire_in = std::to_string(10 * 60);
+  std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
+  if (!config_->cookieDomain().empty()) {
+    cookie_tail_http_only = absl::StrCat(
+        fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
+  }
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(config_->cookieNames().code_verifier_, "=", code_verifier, cookie_tail_http_only));
+
+  const std::string code_challenge = generateCodeChallenge(code_verifier);
+  query_params.overwrite(queryParamsCodeChallenge, code_challenge);
+  query_params.overwrite(queryParamsCodeChallengeMethod, "S256");
 
   // Copy the authorization endpoint URL to replace its query params.
   auto authorization_endpoint_url = config_->authorizationEndpointUrl();
