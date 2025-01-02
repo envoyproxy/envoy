@@ -27,7 +27,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 6]
 message OAuth2Credentials {
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message CookieNames {
     // Cookie name to hold OAuth bearer token value. When the authentication server validates the
     // client and returns an authorization token back to the OAuth filter, no matter what format
@@ -55,6 +55,10 @@ message OAuth2Credentials {
 
     // Cookie name to hold the nonce value. Defaults to ``OauthNonce``.
     string oauth_nonce = 6
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // Cookie name to hold the PKCE code verifier. Defaults to ``OauthCodeVerifier``.
+    string code_verifier = 7
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
   }
 
@@ -84,7 +88,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -186,6 +190,9 @@ message OAuth2Config {
   // will still process incoming Refresh Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
   // sessions would not set the Refresh Token cookie header.
   bool disable_refresh_token_set_cookie = 20;
+
+  // If set to true, enable PKCE (Proof Key for Code Exchange) for the OAuth2 authorization code flow.
+  bool enable_pkce = 21;
 }
 
 // Filter config.
