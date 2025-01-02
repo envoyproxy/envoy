@@ -46,7 +46,7 @@ public:
     config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
     tracer_ = std::make_unique<FluentdTracerImpl>(
         cluster_, Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_,
-        BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_);
+        BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_, time_source_);
   }
 
   std::string getExpectedMsgpackPayload(int entries_count) {
@@ -84,6 +84,7 @@ public:
   std::unique_ptr<FluentdTracerImpl> tracer_;
   envoy::config::trace::v3::FluentdConfig config_;
   NiceMock<Random::MockRandomGenerator> random_;
+  Event::SimulatedTimeSystem time_source_;
 };
 ;
 

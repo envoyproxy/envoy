@@ -19,7 +19,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Fluentd {
 
-// Tests adapted from test/extensions/tracers/opentelemetry @alexanderellis @yanavlasov
+// Tests adapted from OpenTelemetry tracer @alexanderellis @yanavlasov
 
 class FluentdTracerIntegrationTest : public testing::Test {
 public:
@@ -64,7 +64,8 @@ TEST_F(FluentdTracerIntegrationTest, Breathing) {
   auto tracer_ = std::make_unique<FluentdTracerImpl>(
       *cluster, std::make_unique<NiceMock<Envoy::Tcp::AsyncClient::MockAsyncTcpClient>>(),
       dispatcher_, config_,
-      std::make_unique<JitteredExponentialBackOffStrategy>(1000, 10000, random_), scope_, random_);
+      std::make_unique<JitteredExponentialBackOffStrategy>(1000, 10000, random_), scope_, random_,
+      time_);
 
   EXPECT_NE(nullptr, tracer_);
 }
@@ -83,7 +84,7 @@ TEST_F(FluentdTracerIntegrationTest, ParseSpanContextFromHeadersTest) {
 
   const auto tracer_ =
       std::make_shared<FluentdTracerImpl>(*cluster, std::move(client), dispatcher_, config_,
-                                          std::move(backoff_strategy), scope_, random_);
+                                          std::move(backoff_strategy), scope_, random_, time_);
 
   EXPECT_NE(nullptr, tracer_);
 
@@ -169,7 +170,7 @@ TEST_F(FluentdTracerIntegrationTest, GenerateSpanContextWithoutHeadersTest) {
 
   const auto tracer_ =
       std::make_shared<FluentdTracerImpl>(*cluster, std::move(client), dispatcher_, config_,
-                                          std::move(backoff_strategy), scope_, random_);
+                                          std::move(backoff_strategy), scope_, random_, time_);
 
   EXPECT_NE(nullptr, tracer_);
 
@@ -232,7 +233,7 @@ TEST_F(FluentdTracerIntegrationTest, SpawnChildSpan) {
 
   const auto tracer_ =
       std::make_shared<FluentdTracerImpl>(*cluster, std::move(client), dispatcher_, config_,
-                                          std::move(backoff_strategy), scope_, random_);
+                                          std::move(backoff_strategy), scope_, random_, time_);
 
   EXPECT_NE(nullptr, tracer_);
 
