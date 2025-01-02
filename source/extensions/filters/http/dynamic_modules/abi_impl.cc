@@ -210,15 +210,15 @@ void envoy_dynamic_module_callback_http_send_response(
     modify_headers = [headers_vector, headers_vector_size](ResponseHeaderMap& headers) {
       for (size_t i = 0; i < headers_vector_size; i++) {
         const auto& header = &headers_vector[i];
-        const std::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
-        const std::string_view value(static_cast<const char*>(header->value_ptr),
-                                     header->value_length);
+        const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
+        const absl::string_view value(static_cast<const char*>(header->value_ptr),
+                                      header->value_length);
         headers.addCopy(Http::LowerCaseString(key), std::string(value));
       }
     };
   }
-  const std::string_view body =
-      body_ptr ? std::string_view(static_cast<const char*>(body_ptr), body_length) : "";
+  const absl::string_view body =
+      body_ptr ? absl::string_view(static_cast<const char*>(body_ptr), body_length) : "";
 
   if (filter->decoder_callbacks_) {
     filter->decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), body,

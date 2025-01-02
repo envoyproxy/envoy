@@ -36,7 +36,7 @@ class DynamicModuleHttpFilterGetHeaderValueTest
     : public DynamicModuleHttpFilterTest,
       public ::testing::WithParamInterface<GetHeaderValueCallbackType> {};
 
-TEST_P(DynamicModuleHttpFilterGetHeaderValueTest, get_header_value) {
+TEST_P(DynamicModuleHttpFilterGetHeaderValueTest, GetHeaderValue) {
   GetHeaderValueCallbackType callback = GetParam();
 
   // Test with nullptr accessors.
@@ -150,7 +150,7 @@ class DynamicModuleHttpFilterSetHeaderValueTest
     : public DynamicModuleHttpFilterTest,
       public ::testing::WithParamInterface<SetHeaderValueCallbackType> {};
 
-TEST_P(DynamicModuleHttpFilterSetHeaderValueTest, set_header_value) {
+TEST_P(DynamicModuleHttpFilterSetHeaderValueTest, SetHeaderValue) {
   SetHeaderValueCallbackType callback = GetParam();
 
   // Test with nullptr accessors.
@@ -241,7 +241,7 @@ class DynamicModuleHttpFilterGetHeadersCountTest
     : public DynamicModuleHttpFilterTest,
       public ::testing::WithParamInterface<GetHeadersCountCallbackType> {};
 
-TEST_P(DynamicModuleHttpFilterGetHeadersCountTest, get_headers_count) {
+TEST_P(DynamicModuleHttpFilterGetHeadersCountTest, GetHeadersCount) {
   GetHeadersCountCallbackType callback = GetParam();
 
   // Test with nullptr accessors.
@@ -276,7 +276,7 @@ class DynamicModuleHttpFilterGetHeadersTest
     : public DynamicModuleHttpFilterTest,
       public ::testing::WithParamInterface<GetHeadersCallbackType> {};
 
-TEST_P(DynamicModuleHttpFilterGetHeadersTest, get_headers) {
+TEST_P(DynamicModuleHttpFilterGetHeadersTest, GetHeaders) {
   GetHeadersCallbackType callback = GetParam();
 
   // Test with nullptr accessors.
@@ -319,13 +319,13 @@ INSTANTIATE_TEST_SUITE_P(
                       envoy_dynamic_module_callback_http_get_response_headers,
                       envoy_dynamic_module_callback_http_get_response_trailers));
 
-TEST_F(DynamicModuleHttpFilterTest, send_response_nullptr) {
+TEST_F(DynamicModuleHttpFilterTest, SendResponseNullptr) {
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
                                                  testing::Eq(0), testing::Eq("dynamic_module")));
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 3, nullptr, 0);
 }
 
-TEST_F(DynamicModuleHttpFilterTest, send_response_empty_response) {
+TEST_F(DynamicModuleHttpFilterTest, SendResponseEmptyResponse) {
   Http::TestResponseHeaderMapImpl response_headers;
   filter_->response_headers_ = &response_headers;
 
@@ -337,7 +337,7 @@ TEST_F(DynamicModuleHttpFilterTest, send_response_empty_response) {
   envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 3, nullptr, 0);
 }
 
-TEST_F(DynamicModuleHttpFilterTest, send_response) {
+TEST_F(DynamicModuleHttpFilterTest, SendResponse) {
   std::list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   size_t header_count = headers.size();
@@ -364,7 +364,7 @@ TEST_F(DynamicModuleHttpFilterTest, send_response) {
                                                    nullptr, 0);
 }
 
-TEST_F(DynamicModuleHttpFilterTest, send_response_with_body) {
+TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
   std::list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   size_t header_count = headers.size();
