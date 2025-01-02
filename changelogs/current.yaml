@@ -13,5 +13,10 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tracing
+  change: |
+    added support for :ref:`Fluentd <arch_overview_tracing>` tracer to send
+    traces in `Fluentd format
+    <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 
 deprecated:
