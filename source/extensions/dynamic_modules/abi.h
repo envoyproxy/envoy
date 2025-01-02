@@ -130,7 +130,6 @@ typedef char* envoy_dynamic_module_type_buffer_module_ptr;
  */
 typedef char* envoy_dynamic_module_type_buffer_envoy_ptr;
 
-
 // envoy_dynamic_module_type_InModuleHeader is a struct that contains representation of a
 // header. This is used to pass headers to Envoy from modules.
 //
@@ -141,7 +140,6 @@ typedef struct {
   envoy_dynamic_module_type_buffer_module_ptr value_ptr;
   size_t value_length;
 } envoy_dynamic_module_type_module_http_header;
-
 
 /**
  * envoy_dynamic_module_type_Header represents a key-value pair of an HTTP header owned by Envoy's
@@ -623,11 +621,9 @@ bool envoy_dynamic_module_callback_http_set_response_trailer(
     envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length);
 
 void envoy_dynamic_module_callback_http_send_response(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    uint32_t status_code,  envoy_dynamic_module_type_module_http_header* headers_vector,
-    size_t headers_vector_size,
-    envoy_dynamic_module_type_buffer_module_ptr body,
-    size_t body_length);
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
+    envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
+    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_length);
 
 #ifdef __cplusplus
 }

@@ -29,10 +29,12 @@ public:
 // Parameterized test for get_header_value
 using GetHeaderValueCallbackType = size_t (*)(envoy_dynamic_module_type_http_filter_envoy_ptr,
                                               envoy_dynamic_module_type_buffer_module_ptr, size_t,
-                                              envoy_dynamic_module_type_buffer_envoy_ptr*, size_t*, size_t);
+                                              envoy_dynamic_module_type_buffer_envoy_ptr*, size_t*,
+                                              size_t);
 
-class DynamicModuleHttpFilterGetHeaderValueTest : public DynamicModuleHttpFilterTest,
-                                                  public ::testing::WithParamInterface<GetHeaderValueCallbackType> {};
+class DynamicModuleHttpFilterGetHeaderValueTest
+    : public DynamicModuleHttpFilterTest,
+      public ::testing::WithParamInterface<GetHeaderValueCallbackType> {};
 
 TEST_P(DynamicModuleHttpFilterGetHeaderValueTest, get_header_value) {
   GetHeaderValueCallbackType callback = GetParam();
@@ -134,19 +136,19 @@ TEST_P(DynamicModuleHttpFilterGetHeaderValueTest, get_header_value) {
 
 INSTANTIATE_TEST_SUITE_P(
     GetHeaderValueTests, DynamicModuleHttpFilterGetHeaderValueTest,
-    ::testing::Values(
-        envoy_dynamic_module_callback_http_get_request_header,
-        envoy_dynamic_module_callback_http_get_request_trailer,
-        envoy_dynamic_module_callback_http_get_response_header,
-        envoy_dynamic_module_callback_http_get_response_trailer));
+    ::testing::Values(envoy_dynamic_module_callback_http_get_request_header,
+                      envoy_dynamic_module_callback_http_get_request_trailer,
+                      envoy_dynamic_module_callback_http_get_response_header,
+                      envoy_dynamic_module_callback_http_get_response_trailer));
 
 // Parameterized test for set_header_value
 using SetHeaderValueCallbackType = bool (*)(envoy_dynamic_module_type_http_filter_envoy_ptr,
                                             envoy_dynamic_module_type_buffer_module_ptr, size_t,
                                             envoy_dynamic_module_type_buffer_module_ptr, size_t);
 
-class DynamicModuleHttpFilterSetHeaderValueTest : public DynamicModuleHttpFilterTest,
-                                                  public ::testing::WithParamInterface<SetHeaderValueCallbackType> {};
+class DynamicModuleHttpFilterSetHeaderValueTest
+    : public DynamicModuleHttpFilterTest,
+      public ::testing::WithParamInterface<SetHeaderValueCallbackType> {};
 
 TEST_P(DynamicModuleHttpFilterSetHeaderValueTest, set_header_value) {
   SetHeaderValueCallbackType callback = GetParam();
@@ -191,7 +193,8 @@ TEST_P(DynamicModuleHttpFilterSetHeaderValueTest, set_header_value) {
   size_t new_key_length = new_key.size();
   envoy_dynamic_module_type_buffer_envoy_ptr new_value_ptr = const_cast<char*>(new_value.data());
   size_t new_value_length = new_value.size();
-  EXPECT_TRUE(callback(filter_.get(), new_key_ptr, new_key_length, new_value_ptr, new_value_length));
+  EXPECT_TRUE(
+      callback(filter_.get(), new_key_ptr, new_key_length, new_value_ptr, new_value_length));
 
   auto values = header_map->get(Envoy::Http::LowerCaseString(new_key));
   EXPECT_EQ(values.size(), 1);
@@ -226,17 +229,17 @@ TEST_P(DynamicModuleHttpFilterSetHeaderValueTest, set_header_value) {
 
 INSTANTIATE_TEST_SUITE_P(
     SetHeaderValueTests, DynamicModuleHttpFilterSetHeaderValueTest,
-    ::testing::Values(
-        envoy_dynamic_module_callback_http_set_request_header,
-        envoy_dynamic_module_callback_http_set_request_trailer,
-        envoy_dynamic_module_callback_http_set_response_header,
-        envoy_dynamic_module_callback_http_set_response_trailer));
+    ::testing::Values(envoy_dynamic_module_callback_http_set_request_header,
+                      envoy_dynamic_module_callback_http_set_request_trailer,
+                      envoy_dynamic_module_callback_http_set_response_header,
+                      envoy_dynamic_module_callback_http_set_response_trailer));
 
 // Parameterized test for get_headers_count
 using GetHeadersCountCallbackType = size_t (*)(envoy_dynamic_module_type_http_filter_envoy_ptr);
 
-class DynamicModuleHttpFilterGetHeadersCountTest : public DynamicModuleHttpFilterTest,
-                                                   public ::testing::WithParamInterface<GetHeadersCountCallbackType> {};
+class DynamicModuleHttpFilterGetHeadersCountTest
+    : public DynamicModuleHttpFilterTest,
+      public ::testing::WithParamInterface<GetHeadersCountCallbackType> {};
 
 TEST_P(DynamicModuleHttpFilterGetHeadersCountTest, get_headers_count) {
   GetHeadersCountCallbackType callback = GetParam();
@@ -260,18 +263,18 @@ TEST_P(DynamicModuleHttpFilterGetHeadersCountTest, get_headers_count) {
 
 INSTANTIATE_TEST_SUITE_P(
     GetHeadersCountTests, DynamicModuleHttpFilterGetHeadersCountTest,
-    ::testing::Values(
-        envoy_dynamic_module_callback_http_get_request_headers_count,
-        envoy_dynamic_module_callback_http_get_request_trailers_count,
-        envoy_dynamic_module_callback_http_get_response_headers_count,
-        envoy_dynamic_module_callback_http_get_response_trailers_count));
+    ::testing::Values(envoy_dynamic_module_callback_http_get_request_headers_count,
+                      envoy_dynamic_module_callback_http_get_request_trailers_count,
+                      envoy_dynamic_module_callback_http_get_response_headers_count,
+                      envoy_dynamic_module_callback_http_get_response_trailers_count));
 
 // Parameterized test for get_headers
 using GetHeadersCallbackType = bool (*)(envoy_dynamic_module_type_http_filter_envoy_ptr,
                                         envoy_dynamic_module_type_http_header*);
 
-class DynamicModuleHttpFilterGetHeadersTest : public DynamicModuleHttpFilterTest,
-                                              public ::testing::WithParamInterface<GetHeadersCallbackType> {};
+class DynamicModuleHttpFilterGetHeadersTest
+    : public DynamicModuleHttpFilterTest,
+      public ::testing::WithParamInterface<GetHeadersCallbackType> {};
 
 TEST_P(DynamicModuleHttpFilterGetHeadersTest, get_headers) {
   GetHeadersCallbackType callback = GetParam();
@@ -311,18 +314,15 @@ TEST_P(DynamicModuleHttpFilterGetHeadersTest, get_headers) {
 
 INSTANTIATE_TEST_SUITE_P(
     GetHeadersTests, DynamicModuleHttpFilterGetHeadersTest,
-    ::testing::Values(
-        envoy_dynamic_module_callback_http_get_request_headers,
-        envoy_dynamic_module_callback_http_get_request_trailers,
-        envoy_dynamic_module_callback_http_get_response_headers,
-        envoy_dynamic_module_callback_http_get_response_trailers));
+    ::testing::Values(envoy_dynamic_module_callback_http_get_request_headers,
+                      envoy_dynamic_module_callback_http_get_request_trailers,
+                      envoy_dynamic_module_callback_http_get_response_headers,
+                      envoy_dynamic_module_callback_http_get_response_trailers));
 
 TEST_F(DynamicModuleHttpFilterTest, send_response_nullptr) {
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
-                                                 testing::Eq(0), testing::Eq("dynamic_module")))
-      .Times(1);
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 3, nullptr,
-                                                   0);
+                                                 testing::Eq(0), testing::Eq("dynamic_module")));
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 3, nullptr, 0);
 }
 
 TEST_F(DynamicModuleHttpFilterTest, send_response_empty_response) {
@@ -331,12 +331,10 @@ TEST_F(DynamicModuleHttpFilterTest, send_response_empty_response) {
 
   // Test with empty response.
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
-                                                 testing::Eq(0), testing::Eq("dynamic_module")))
-      .Times(1);
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).Times(1);
+                                                 testing::Eq(0), testing::Eq("dynamic_module")));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _));
 
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 3, nullptr,
-                                                   0);
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, nullptr, 3, nullptr, 0);
 }
 
 TEST_F(DynamicModuleHttpFilterTest, send_response) {
@@ -355,19 +353,15 @@ TEST_F(DynamicModuleHttpFilterTest, send_response) {
     ++index;
   }
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
-                                                 testing::Eq(0), testing::Eq("dynamic_module")))
-      .Times(1);
+                                                 testing::Eq(0), testing::Eq("dynamic_module")));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce(Invoke([](auto& headers, auto) {
-    EXPECT_EQ(headers.get(Http::LowerCaseString("single"))[0]->value().getStringView(),
-              "value");
-    EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[0]->value().getStringView(),
-              "value1");
-    EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[1]->value().getStringView(),
-              "value2");
+    EXPECT_EQ(headers.get(Http::LowerCaseString("single"))[0]->value().getStringView(), "value");
+    EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[0]->value().getStringView(), "value1");
+    EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[1]->value().getStringView(), "value2");
   }));
 
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array, header_count, nullptr,
-                                                   0);
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array, header_count,
+                                                   nullptr, 0);
 }
 
 TEST_F(DynamicModuleHttpFilterTest, send_response_with_body) {
@@ -389,17 +383,15 @@ TEST_F(DynamicModuleHttpFilterTest, send_response_with_body) {
   const std::string body_str = "body";
   envoy_dynamic_module_type_buffer_module_ptr body = const_cast<char*>(body_str.data());
   size_t body_length = body_str.size();
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _, testing::Eq(0), testing::Eq("dynamic_module"))).Times(1);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
+                                                 testing::Eq(0), testing::Eq("dynamic_module")));
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce(Invoke([](auto& headers, auto) {
-    EXPECT_EQ(headers.get(Http::LowerCaseString("single"))[0]->value().getStringView(),
-              "value");
-    EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[0]->value().getStringView(),
-              "value1");
-    EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[1]->value().getStringView(),
-              "value2");
+    EXPECT_EQ(headers.get(Http::LowerCaseString("single"))[0]->value().getStringView(), "value");
+    EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[0]->value().getStringView(), "value1");
+    EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[1]->value().getStringView(), "value2");
   }));
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array, 3, body, body_length);
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array, 3, body,
+                                                   body_length);
 }
 
 } // namespace HttpFilters
