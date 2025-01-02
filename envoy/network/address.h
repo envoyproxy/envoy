@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/stream_info/filter_state.h"
@@ -24,6 +25,7 @@ namespace Address {
 
 class Instance;
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
+using InstanceConstOptRef = OptRef<const Instance>;
 
 /**
  * Interface for an Ipv4 address.
@@ -242,11 +244,11 @@ public:
 /*
  * Used to store Instance in filter state.
  */
-class InstanceConstSharedPtrAccessor : public Envoy::StreamInfo::FilterState::Object {
+class InstanceAccessor : public Envoy::StreamInfo::FilterState::Object {
 public:
-  InstanceConstSharedPtrAccessor(InstanceConstSharedPtr ip) : ip_(std::move(ip)) {}
+  InstanceAccessor(InstanceConstSharedPtr ip) : ip_(std::move(ip)) {}
 
-  InstanceConstSharedPtr getIp() const { return ip_; }
+  InstanceConstOptRef getIp() const { return makeOptRefFromPtr<const Instance>(ip_.get()); }
 
 private:
   InstanceConstSharedPtr ip_;

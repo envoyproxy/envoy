@@ -17,8 +17,8 @@ FilterStateIpRangeMatcher::FilterStateIpRangeMatcher(
     : ip_list_(std::move(ip_list)) {}
 
 bool FilterStateIpRangeMatcher::match(const StreamInfo::FilterState::Object& object) const {
-  const Network::Address::InstanceConstSharedPtrAccessor* ip =
-      dynamic_cast<const Network::Address::InstanceConstSharedPtrAccessor*>(&object);
+  const Network::Address::InstanceAccessor* ip =
+      dynamic_cast<const Network::Address::InstanceAccessor*>(&object);
   if (ip == nullptr) {
     return false;
   }

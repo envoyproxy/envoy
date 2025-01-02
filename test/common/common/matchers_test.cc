@@ -618,7 +618,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv4) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
       key,
-      std::make_shared<Network::Address::InstanceConstSharedPtrAccessor>(
+      std::make_shared<Network::Address::InstanceAccessor>(
           Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.7", 456, false)),
       StreamInfo::FilterState::StateType::Mutable);
 
@@ -642,7 +642,7 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv4) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
       key,
-      std::make_shared<Network::Address::InstanceConstSharedPtrAccessor>(
+      std::make_shared<Network::Address::InstanceAccessor>(
           Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.8", 456, false)),
       StreamInfo::FilterState::StateType::Mutable);
 
@@ -666,7 +666,7 @@ TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv6) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
       key,
-      std::make_shared<Network::Address::InstanceConstSharedPtrAccessor>(
+      std::make_shared<Network::Address::InstanceAccessor>(
           Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db8::1", 8080, false)),
       StreamInfo::FilterState::StateType::Mutable);
 
@@ -690,7 +690,7 @@ TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(
       key,
-      std::make_shared<Network::Address::InstanceConstSharedPtrAccessor>(
+      std::make_shared<Network::Address::InstanceAccessor>(
           Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db7::1", 8080, false)),
       StreamInfo::FilterState::StateType::Mutable);
 

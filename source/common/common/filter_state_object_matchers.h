@@ -14,7 +14,7 @@ namespace Matchers {
 class FilterStateObjectMatcher {
 public:
   virtual bool match(const StreamInfo::FilterState::Object& object) const PURE;
-  virtual ~FilterStateObjectMatcher(){};
+  virtual ~FilterStateObjectMatcher() = default;
 };
 
 using FilterStateObjectMatcherPtr = std::unique_ptr<FilterStateObjectMatcher>;
