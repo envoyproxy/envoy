@@ -66,10 +66,10 @@ TEST(UtilityTest, TestProfileResolver) {
   auto file_path = TestEnvironment::writeStringToFileForTest(
       credential_file, CREDENTIALS_FILE_CONTENTS, true, false);
 
-  Utility::resolveProfileElements(file_path, "default", elements);
+  Utility::resolveProfileElementsFromFile(file_path, "default", elements);
   it = elements.find("AWS_ACCESS_KEY_ID");
   EXPECT_EQ(it->second, "default_access_key");
-  Utility::resolveProfileElements(file_path, "profile4", elements);
+  Utility::resolveProfileElementsFromFile(file_path, "profile4", elements);
   it = elements.find("AWS_ACCESS_KEY_ID");
   EXPECT_EQ(it->second, "profile4_access_key");
 }
