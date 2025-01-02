@@ -228,8 +228,8 @@ AwsRequestSigningFilterFactory::createSigner(
 
 //   // If we have an overriding credential provider configuration, read it here as it may contain
 //   // references to the region
-//   envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config = {};
-//   if (config.has_credential_provider()) {
+//   envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config =
+//   {}; if (config.has_credential_provider()) {
 //     if (config.credential_provider().has_credentials_file_provider()) {
 //       credential_file_config = config.credential_provider().credentials_file_provider();
 //     }
@@ -248,8 +248,8 @@ AwsRequestSigningFilterFactory::createSigner(
 //       }
 //       credentials_provider =
 //           std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-//               server_context.api(), makeOptRef(server_context), server_context.singletonManager(),
-//               region, nullptr, credential_provider_config);
+//               server_context.api(), makeOptRef(server_context),
+//               server_context.singletonManager(), region, nullptr, credential_provider_config);
 //     }
 //   } else {
 //     // No credential provider settings provided, so make the default credentials provider chain

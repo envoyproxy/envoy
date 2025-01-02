@@ -1082,8 +1082,8 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
     add(factories.createWebIdentityCredentialsProvider(
-        context, context.singletonManager(), MetadataFetcher::create, sts_endpoint, refresh_state, initialization_timer,
-        web_identity, cluster_name));
+        context, context.singletonManager(), MetadataFetcher::create, sts_endpoint, refresh_state,
+        initialization_timer, web_identity, cluster_name));
   }
 
   if (credential_provider_config.has_credentials_file_provider()) {
