@@ -175,117 +175,33 @@ AwsRequestSigningFilterFactory::createSigner(
     region = regionOpt.value();
   }
 
-  absl::StatusOr<Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr>
-      credentials_provider =
-          absl::InvalidArgumentError("No credentials provider settings configured.");
+  const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
+      config.match_excluded_headers().begin(), config.match_excluded_headers().end());
 
-  const bool has_credential_provider_settings =
-      config.has_credential_provider() &&
-      (config.credential_provider().has_assume_role_with_web_identity_provider() ||
-       config.credential_provider().has_credentials_file_provider());
+  const bool query_string = config.has_query_string();
 
-  if (config.has_credential_provider()) {
-    if (config.credential_provider().has_inline_credential()) {
-      // If inline credential provider is set, use it instead of the default or custom credentials
-      // chain
-      const auto& inline_credential = config.credential_provider().inline_credential();
-      credentials_provider = std::make_shared<Extensions::Common::Aws::InlineCredentialProvider>(
-          inline_credential.access_key_id(), inline_credential.secret_access_key(),
-          inline_credential.session_token());
-    } else if (config.credential_provider().custom_credential_provider_chain()) {
-      // Custom credential provider chain
-      if (has_credential_provider_settings) {
-        return std::make_shared<Extensions::Common::Aws::CustomCredentialsProviderChain>(
-            server_context, region, config.credential_provider());
-      }
-    } else {
-      // Override default credential provider chain settings with any provided settings
-      if (has_credential_provider_settings) {
-        credential_provider_config = config.credential_provider();
-      }
-      return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          server_context.api(), makeOptRef(server_context), server_context.singletonManager(),
-          region, nullptr, credential_provider_config);
-    }
+  const uint16_t expiration_time = PROTOBUF_GET_SECONDS_OR_DEFAULT(
+      config.query_string(), expiration_time,
+      Extensions::Common::Aws::SignatureQueryParameterValues::DefaultExpiration);
+
+  std::unique_ptr<Extensions::Common::Aws::Signer> signer;
+
+  if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
+    return std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
+        config.service_name(), region, server_context, matcher_config, query_string,
+        expiration_time);
   } else {
-    // No credential provider settings provided, so make the default credentials provider chain
-    return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-        server_context.api(), makeOptRef(server_context), server_context.singletonManager(), region,
-        nullptr, credential_provider_config);
+    // Verify that we have not specified a region set when using sigv4 algorithm
+    if (isARegionSet(region)) {
+      return absl::InvalidArgumentError(
+          "SigV4 region string cannot contain wildcards or commas. Region sets "
+          "can be specified when using signing_algorithm: AWS_SIGV4A.");
+    }
+    return std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+        config.service_name(), region, server_context, matcher_config, query_string,
+        expiration_time);
   }
-
-  return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
 }
-
-// absl::StatusOr<Envoy::Extensions::Common::Aws::SignerPtr>
-// AwsRequestSigningFilterFactory::createSigner(
-//     const AwsRequestSigningProtoConfig& config,
-//     Server::Configuration::ServerFactoryContext& server_context) {
-
-//   std::string region = config.region();
-
-//   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
-
-//   // If we have an overriding credential provider configuration, read it here as it may contain
-//   // references to the region
-//   envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config =
-//   {}; if (config.has_credential_provider()) {
-//     if (config.credential_provider().has_credentials_file_provider()) {
-//       credential_file_config = config.credential_provider().credentials_file_provider();
-//     }
-//   }
-
-//   if (region.empty()) {
-//     auto region_provider =
-//         std::make_shared<Extensions::Common::Aws::RegionProviderChain>(credential_file_config);
-//     absl::optional<std::string> regionOpt;
-//     if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
-//       regionOpt = region_provider->getRegionSet();
-//     } else {
-//       // Override default credential provider chain settings with any provided settings
-//       if (has_credential_provider_settings) {
-//         credential_provider_config = config.credential_provider();
-//       }
-//       credentials_provider =
-//           std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-//               server_context.api(), makeOptRef(server_context),
-//               server_context.singletonManager(), region, nullptr, credential_provider_config);
-//     }
-//   } else {
-//     // No credential provider settings provided, so make the default credentials provider chain
-//     credentials_provider =
-//         std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-//             server_context.api(), makeOptRef(server_context), server_context.singletonManager(),
-//             region, nullptr, credential_provider_config);
-//   }
-
-//   const auto matcher_config = Extensions::Common::Aws::AwsSigningHeaderExclusionVector(
-//       config.match_excluded_headers().begin(), config.match_excluded_headers().end());
-
-//   const bool query_string = config.has_query_string();
-
-//   const uint16_t expiration_time = PROTOBUF_GET_SECONDS_OR_DEFAULT(
-//       config.query_string(), expiration_time,
-//       Extensions::Common::Aws::SignatureQueryParameterValues::DefaultExpiration);
-
-//   std::unique_ptr<Extensions::Common::Aws::Signer> signer;
-
-//   if (config.signing_algorithm() == AwsRequestSigning_SigningAlgorithm_AWS_SIGV4A) {
-//     return std::make_unique<Extensions::Common::Aws::SigV4ASignerImpl>(
-//         config.service_name(), region, server_context, matcher_config, query_string,
-//         expiration_time);
-//   } else {
-//     // Verify that we have not specified a region set when using sigv4 algorithm
-//     if (isARegionSet(region)) {
-//       return absl::InvalidArgumentError(
-//           "SigV4 region string cannot contain wildcards or commas. Region sets "
-//           "can be specified when using signing_algorithm: AWS_SIGV4A.");
-//     }
-//     return std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-//         config.service_name(), region, server_context, matcher_config, query_string,
-//         expiration_time);
-//   }
-// }
 
 /**
  * Static registration for the AWS request signing filter. @see RegisterFactory.
