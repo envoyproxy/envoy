@@ -55,8 +55,10 @@ AwsLambdaFilterFactory::getCredentialsProvider(
               "credentials profile is set to \"{}\" in config, default credentials providers chain "
               "will be ignored and only credentials file provider will be used",
               proto_config.credentials_profile());
+    envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config;
+    credential_file_config.set_profile(proto_config.credentials_profile());
     return std::make_shared<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
-        server_context.api(), proto_config.credentials_profile());
+        server_context, credential_file_config);
   }
   return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
       server_context.api(), makeOptRef(server_context), server_context.singletonManager(), region,

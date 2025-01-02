@@ -248,7 +248,8 @@ new_features:
   change: |
     Added an optional field :ref:`credential_provider
     <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>`
-    to the AWS request signing filter to explicitly specify a source for AWS credentials.
+    to the AWS request signing filter to explicitly specify a source for AWS credentials. Credential file and AssumeRoleWithWebIdentity
+    behaviour can also be overridden with this field.
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.
