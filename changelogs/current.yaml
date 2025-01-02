@@ -407,6 +407,11 @@ new_features:
   change: |
     Add the option to reduce the rate limit budget based on request/response contexts on stream done.
     See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
+- area: tracing
+  change: |
+    added support for :ref:`Fluentd <arch_overview_tracing>` tracer to send
+    traces in `Fluentd format
+    <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 
 deprecated:
 - area: rbac
