@@ -120,25 +120,21 @@ TEST(DynamiModulesTest, DynamicMetadataCallbacks) {
   EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(data, false));
 
   // Check dynamic metadata set by the filter during even hooks.
-  // namespace: ns_req_header, key: key, value: 123
   auto ns_req_header = metadata.filter_metadata().find("ns_req_header");
   ASSERT_NE(ns_req_header, metadata.filter_metadata().end());
   auto key = ns_req_header->second.fields().find("key");
   ASSERT_NE(key, ns_req_header->second.fields().end());
   EXPECT_EQ(key->second.number_value(), 123);
-  // namespace: ns_res_header, key: key, value: 123
   auto ns_res_header = metadata.filter_metadata().find("ns_res_header");
   ASSERT_NE(ns_res_header, metadata.filter_metadata().end());
   key = ns_res_header->second.fields().find("key");
   ASSERT_NE(key, ns_res_header->second.fields().end());
   EXPECT_EQ(key->second.number_value(), 123);
-  // namespace: ns_req_body, key: key, value: "value"
   auto ns_req_body = metadata.filter_metadata().find("ns_req_body");
   ASSERT_NE(ns_req_body, metadata.filter_metadata().end());
   key = ns_req_body->second.fields().find("key");
   ASSERT_NE(key, ns_req_body->second.fields().end());
   EXPECT_EQ(key->second.string_value(), "value");
-  // namespace: ns_res_body, key: key, value: "value"
   auto ns_res_body = metadata.filter_metadata().find("ns_res_body");
   ASSERT_NE(ns_res_body, metadata.filter_metadata().end());
   key = ns_res_body->second.fields().find("key");
