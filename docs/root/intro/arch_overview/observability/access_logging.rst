@@ -53,7 +53,7 @@ HTTP Router Filter
 ******************
 
 For Router Filter, it is possible to enable one-time upstream access log entry each time a new upstream stream is
-associated with a downstream stream, after the connection with the upstream is established, by using
+associated with a downstream stream, after the connection with the upstream is established, by enabling
 :ref:`flush upstream log on upstream stream <envoy_v3_api_field_extensions.filters.http.router.v3.Router.UpstreamAccessLogOptions.flush_upstream_log_on_upstream_stream>`
 
 .. note::
