@@ -31,7 +31,7 @@ UDP Proxy
 
 For UDP Proxy, when UDP tunneling over HTTP is configured, it is possible to enable an access log record once after a
 successful upstream tunnel connection is established by setting
-:ref:`access log flush interval <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions.flush_access_log_on_tunnel_connected>`
+:ref:`flush access log on tunnel connected <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpAccessLogOptions.flush_access_log_on_tunnel_connected>`.
 
 TCP Proxy
 *********
