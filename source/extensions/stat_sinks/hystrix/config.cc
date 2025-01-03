@@ -6,7 +6,6 @@
 #include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/network/resolver_impl.h"
 #include "source/extensions/stat_sinks/hystrix/hystrix.h"
 
 namespace Envoy {

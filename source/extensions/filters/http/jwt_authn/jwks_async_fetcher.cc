@@ -36,12 +36,9 @@ std::chrono::milliseconds getFailedRefetchDuration(const JwksAsyncFetch& async_f
 JwksAsyncFetcher::JwksAsyncFetcher(const RemoteJwks& remote_jwks,
                                    Server::Configuration::FactoryContext& context,
                                    CreateJwksFetcherCb create_fetcher_fn,
-                                   JwtAuthnFilterStats& stats, JwksDoneFetched done_fn,
-                                   isRemoteJwksFetchAllowedCb is_fetch_allowed_fn,
-                                   allowRemoteJwksFetchCb allow_fetch_fn)
+                                   JwtAuthnFilterStats& stats, JwksDoneFetched done_fn)
     : remote_jwks_(remote_jwks), context_(context), create_fetcher_fn_(create_fetcher_fn),
-      stats_(stats), done_fn_(done_fn), is_fetch_allowed_fn_(is_fetch_allowed_fn),
-      allow_fetch_fn_(allow_fetch_fn),
+      stats_(stats), done_fn_(done_fn),
       debug_name_(absl::StrCat("Jwks async fetching url=", remote_jwks_.http_uri().uri())) {
   // if async_fetch is not enabled, do nothing.
   if (!remote_jwks_.has_async_fetch()) {
@@ -81,14 +78,7 @@ std::chrono::seconds JwksAsyncFetcher::getCacheDuration(const RemoteJwks& remote
   return DefaultCacheExpirationSec;
 }
 
-void JwksAsyncFetcher::resetFetchTimer() { refetch_timer_->enableTimer(good_refetch_duration_); }
-
 void JwksAsyncFetcher::fetch() {
-  if (remote_jwks_.refetch_jwks_on_kid_mismatch() && !is_fetch_allowed_fn_()) {
-    resetFetchTimer();
-    return;
-  }
-
   if (fetcher_) {
     fetcher_->cancel();
   }
@@ -96,10 +86,6 @@ void JwksAsyncFetcher::fetch() {
   ENVOY_LOG(debug, "{}: started", debug_name_);
   fetcher_ = create_fetcher_fn_(context_.serverFactoryContext().clusterManager(), remote_jwks_);
   fetcher_->fetch(Tracing::NullSpan::instance(), *this);
-
-  if (remote_jwks_.refetch_jwks_on_kid_mismatch()) {
-    allow_fetch_fn_(absl::nullopt, true);
-  }
 }
 
 void JwksAsyncFetcher::handleFetchDone() {
@@ -111,12 +97,8 @@ void JwksAsyncFetcher::handleFetchDone() {
 
 void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
   done_fn_(std::move(jwks));
-  if (remote_jwks_.refetch_jwks_on_kid_mismatch()) {
-    // Don't modify backoff for async fetch.
-    allow_fetch_fn_(absl::nullopt, false);
-  }
   handleFetchDone();
-  resetFetchTimer();
+  refetch_timer_->enableTimer(good_refetch_duration_);
   stats_.jwks_fetch_success_.inc();
 
   // Note: not to free fetcher_ within onJwksSuccess or onJwksError function.
@@ -131,10 +113,6 @@ void JwksAsyncFetcher::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
 
 void JwksAsyncFetcher::onJwksError(Failure) {
   ENVOY_LOG(warn, "{}: failed", debug_name_);
-  if (remote_jwks_.refetch_jwks_on_kid_mismatch()) {
-    // Don't modify backoff for async fetch.
-    allow_fetch_fn_(absl::nullopt, false);
-  }
   handleFetchDone();
   refetch_timer_->enableTimer(failed_refetch_duration_);
   stats_.jwks_fetch_failed_.inc();

@@ -96,8 +96,9 @@ TEST(AwsRequestSigningFilterConfigTest, CredentialProvider_assume_role_web_ident
 service_name: s3
 region: us-west-2
 credential_provider:
-  assume_role_with_web_identity:
-    web_identity_token: this-is-token
+  assume_role_with_web_identity_provider:
+    web_identity_token_data_source:
+      inline_string: this-is-token
     role_arn: arn:aws:iam::123456789012:role/role-name
   )EOF";
 
@@ -107,10 +108,88 @@ credential_provider:
   AwsRequestSigningProtoConfig expected_config;
   expected_config.set_service_name("s3");
   expected_config.set_region("us-west-2");
-  auto credential_provider =
-      expected_config.mutable_credential_provider()->mutable_assume_role_with_web_identity();
-  credential_provider->set_web_identity_token("this-is-token");
+  auto credential_provider = expected_config.mutable_credential_provider()
+                                 ->mutable_assume_role_with_web_identity_provider();
+  credential_provider->mutable_web_identity_token_data_source()->set_inline_string("this-is-token");
   credential_provider->set_role_arn("arn:aws:iam::123456789012:role/role-name");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
+TEST(AwsRequestSigningFilterConfigTest, CredentialProvider_credential_file) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+credential_provider:
+  credentials_file_provider:
+    profile: profile1
+    credentials_data_source:
+      filename:  this-is-filename
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  AwsRequestSigningProtoConfig expected_config;
+  expected_config.set_service_name("s3");
+  expected_config.set_region("us-west-2");
+  auto credential_provider =
+      expected_config.mutable_credential_provider()->mutable_credentials_file_provider();
+  credential_provider->mutable_credentials_data_source()->set_filename("this-is-filename");
+  credential_provider->set_profile("profile1");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  AwsRequestSigningFilterFactory factory;
+
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callbacks;
+  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
+  cb(filter_callbacks);
+}
+
+TEST(AwsRequestSigningFilterConfigTest, CredentialProvider_credential_file_watched_dir) {
+  const std::string yaml = R"EOF(
+service_name: s3
+region: us-west-2
+credential_provider:
+  credentials_file_provider:
+    profile: profile5
+    credentials_data_source:
+      filename:  this-is-filename
+      watched_directory:
+        path: /tmp
+  )EOF";
+
+  AwsRequestSigningProtoConfig proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  AwsRequestSigningProtoConfig expected_config;
+  expected_config.set_service_name("s3");
+  expected_config.set_region("us-west-2");
+  auto credential_provider =
+      expected_config.mutable_credential_provider()->mutable_credentials_file_provider();
+  credential_provider->mutable_credentials_data_source()->set_filename("this-is-filename");
+  credential_provider->mutable_credentials_data_source()->mutable_watched_directory()->set_path(
+      "/tmp");
+  credential_provider->set_profile("profile5");
 
   Protobuf::util::MessageDifferencer differencer;
   differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
@@ -131,7 +210,8 @@ TEST(AwsRequestSigningFilterConfigTest, CredentialProvider_invalid) {
   const std::string yaml = R"EOF(
 service_name: s3
 region: us-west-2
-credential_provider: {}
+credential_provider:
+  custom_credential_provider_chain: true
   )EOF";
 
   AwsRequestSigningProtoConfig proto_config;
