@@ -244,6 +244,9 @@ new_features:
     Added the wasm vm reload support to reload wasm vm when the wasm vm is failed with runtime errors. See
     :ref:`failure_policy <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.failure_policy>` for more details.
     The ``FAIL_RELOAD`` reload policy will be used by default.
+- area: wasm
+  change: |
+    Added support for wasm plugins written in Go with the github.com/proxy-wasm/proxy-wasm-go-sdk and compiled with Go v1.24+.
 - area: aws_request_signing
   change: |
     Added an optional field :ref:`credential_provider
