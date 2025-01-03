@@ -671,7 +671,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
-  draining_it->listener_->localDrainManager().startDrainSequence([this, draining_it]() -> void {
+  draining_it->listener_->localDrainManager().startDrainSequence(Network::DrainDirection::All, [this, draining_it]() -> void {
     draining_it->listener_->debugLog("removing draining listener");
     for (const auto& worker : workers_) {
       // Once the drain time has completed via the drain manager's timer, we tell the workers
