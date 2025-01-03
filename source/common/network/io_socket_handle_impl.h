@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
@@ -13,15 +14,12 @@
 #include "source/common/network/io_socket_handle_base_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
-#include "quiche/quic/core/quic_lru_cache.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
 
 namespace Envoy {
 namespace Network {
 
-using AddressInstanceLRUCache =
-    quic::QuicLRUCache<quic::QuicSocketAddress, Address::InstanceConstSharedPtr,
-                       quic::QuicSocketAddressHash>;
+using QuicEnvoyAddressPair = std::pair<quic::QuicSocketAddress, Address::InstanceConstSharedPtr>;
 
 /**
  * IoHandle derivative for sockets.
@@ -32,10 +30,10 @@ public:
                               absl::optional<int> domain = absl::nullopt,
                               size_t address_cache_max_capacity = 0)
       : IoSocketHandleBaseImpl(fd, socket_v6only, domain),
-        receive_ecn_(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")) {
+        receive_ecn_(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")),
+        address_cache_max_capacity_(address_cache_max_capacity) {
     if (address_cache_max_capacity > 0) {
-      recent_received_addresses_ =
-          std::make_unique<AddressInstanceLRUCache>(address_cache_max_capacity);
+      recent_received_addresses_ = std::vector<QuicEnvoyAddressPair>();
     }
   }
 
@@ -111,9 +109,7 @@ protected:
   // Latches a copy of the runtime feature "envoy.reloadable_features.quic_receive_ecn".
   const bool receive_ecn_;
 
-  size_t addressCacheMaxSize() const {
-    return recent_received_addresses_ == nullptr ? 0 : recent_received_addresses_->MaxSize();
-  }
+  size_t addressCacheMaxSize() const { return address_cache_max_capacity_; }
 
 private:
   // Returns the destination address if the control message carries it.
@@ -128,7 +124,11 @@ private:
   // Should only be used by UDP sockets to avoid creating multiple address instances for the same
   // address in each read operation. Only be instantiated if the non-zero address_cache_max_capacity
   // is passed in during the construction.
-  std::unique_ptr<AddressInstanceLRUCache> recent_received_addresses_;
+  size_t address_cache_max_capacity_;
+  absl::optional<std::vector<QuicEnvoyAddressPair>> recent_received_addresses_ = absl::nullopt;
+
+  // For testing and benchmarking non-public methods.
+  friend class IoSocketHandleImplTestWrapper;
 };
 } // namespace Network
 } // namespace Envoy

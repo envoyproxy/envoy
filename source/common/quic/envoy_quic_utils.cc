@@ -189,6 +189,12 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   ASSERT(peer_addr != nullptr);
   const bool should_connect =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_connect_client_udp_sockets");
+  // NOTE: If changing the default cache size from 4 entries, make sure to profile it using
+  // the benchmark test: //test/common/network:io_socket_handle_impl_benchmark
+  //
+  // If setting a higher cache size, try profiling std::deque instead of std::vector for the
+  // `recent_received_addresses_` cache in
+  // https://github.com/envoyproxy/envoy/blob/main/source/common/network/io_socket_handle_impl.h.
   size_t max_addresses_cache_size =
       Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.quic_upstream_socket_use_address_cache_for_read")

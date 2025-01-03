@@ -265,7 +265,6 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
-        "@com_github_google_quiche//:quic_core_lru_cache_lib",
         "@com_github_google_quiche//:quic_platform_socket_address",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ],
