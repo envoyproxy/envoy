@@ -36,10 +36,6 @@ public:
    * @param request The protobuf-encoded OTLP trace request.
    */
   void logExportedSpans(const ExportTraceServiceRequest& request) {
-    if (!ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(ENVOY_LOGGER(), debug)) {
-      return;
-    }
-
     if (request.resource_spans(0).has_resource()) {
       if (request.resource_spans(0).scope_spans(0).has_scope()) {
         ENVOY_LOG(debug, "Number of exported spans: {}",
