@@ -46,6 +46,9 @@ MockHostDescription::MockHostDescription()
       .WillByDefault(Invoke([this](Upstream::ResourcePriority pri) -> bool {
         return cluster().resourceManager(pri).connections().canCreate();
       }));
+  ON_CALL(*this, lbPolicyData()).WillByDefault(Invoke([this]() -> OptRef<HostLbPolicyData> {
+    return makeOptRefFromPtr(lb_policy_data_.get());
+  }));
 }
 
 MockHostDescription::~MockHostDescription() = default;

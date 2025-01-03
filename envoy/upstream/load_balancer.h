@@ -110,29 +110,6 @@ public:
    * and return the corresponding host directly.
    */
   virtual absl::optional<OverrideHost> overrideHostToSelect() const PURE;
-
-  // Interface for callbacks when ORCA load reports are received from upstream.
-  class OrcaLoadReportCallbacks {
-  public:
-    virtual ~OrcaLoadReportCallbacks() = default;
-    /**
-     * Invoked when a new orca report is received for this LB context.
-     * @param orca_load_report supplies the ORCA load report.
-     * @param host supplies the upstream host, which provided the load report.
-     * @return absl::Status the result of ORCA load report processing by the load balancer.
-     */
-    virtual absl::Status
-    onOrcaLoadReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-                     const HostDescription& host) PURE;
-  };
-
-  /**
-   * Install a callback to be invoked when ORCA Load report is received for this
-   * LB context.
-   * Note: LB Context keeps a weak pointer to `callbacks` and doesn't invoke the callback
-   * if it is `expired()`.
-   */
-  virtual void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks> callbacks) PURE;
 };
 
 /**
