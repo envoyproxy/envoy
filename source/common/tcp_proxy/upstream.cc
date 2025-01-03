@@ -9,6 +9,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/null_route_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -308,9 +309,13 @@ std::unique_ptr<Router::GenericConnPool> HttpConnPool::createConnPool(
     return nullptr;
   }
 
+  ProtobufWkt::Any message;
+  if (cluster.info()->upstreamConfig()) {
+    message = cluster.info()->upstreamConfig()->typed_config();
+  }
   return factory->createGenericConnPool(
       host, cluster, Envoy::Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-      decoder_filter_callbacks_->route()->routeEntry()->priority(), protocol, context);
+      decoder_filter_callbacks_->route()->routeEntry()->priority(), protocol, context, message);
 }
 
 HttpConnPool::~HttpConnPool() {
