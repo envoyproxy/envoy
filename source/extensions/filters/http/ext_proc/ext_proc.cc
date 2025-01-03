@@ -399,7 +399,8 @@ Filter::StreamOpenState Filter::openStream() {
     auto options = Http::AsyncClient::StreamOptions()
                        .setParentSpan(decoder_callbacks_->activeSpan())
                        .setParentContext(grpc_context)
-                       .setBufferBodyForRetry(grpc_service_.has_retry_policy());
+                       .setBufferBodyForRetry(grpc_service_.has_retry_policy())
+                       .setSampled(absl::nullopt);
 
     ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
     ExternalProcessorStreamPtr stream_object =

@@ -862,7 +862,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
     ext_proc_span.set_operation_name(
         "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
     ext_proc_span.set_context_injected(true);
-    ext_proc_span.set_sampled(true);
+    ext_proc_span.set_sampled(false);
     ext_proc_span.mutable_tags()->insert({"grpc.status_code", "0"});
     ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
     if (IsEnvoyGrpc()) {
@@ -928,7 +928,7 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamWithTracing) {
     ext_proc_span.set_operation_name(
         "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
     ext_proc_span.set_context_injected(true);
-    ext_proc_span.set_sampled(true);
+    ext_proc_span.set_sampled(false);
     ext_proc_span.mutable_tags()->insert({"grpc.status_code", "2"});
     ext_proc_span.mutable_tags()->insert({"error", "true"});
     ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
@@ -2554,7 +2554,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithTracing) {
     ext_proc_span.set_operation_name(
         "async envoy.service.ext_proc.v3.ExternalProcessor.Process egress");
     ext_proc_span.set_context_injected(true);
-    ext_proc_span.set_sampled(true);
+    ext_proc_span.set_sampled(false);
     ext_proc_span.mutable_tags()->insert({"status", "canceled"});
     ext_proc_span.mutable_tags()->insert({"error", ""}); // not an error
     ext_proc_span.mutable_tags()->insert({"upstream_cluster", "ext_proc_server_0"});
