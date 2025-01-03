@@ -35,12 +35,15 @@
 #ifdef __cplusplus
 #include <cstdbool>
 #include <cstddef>
+#include <cstdint>
 
 extern "C" {
 #else
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+
 #endif
 
 // -----------------------------------------------------------------------------
@@ -128,7 +131,18 @@ typedef char* envoy_dynamic_module_type_buffer_module_ptr;
 typedef char* envoy_dynamic_module_type_buffer_envoy_ptr;
 
 /**
- * envoy_dynamic_module_type_Header represents a key-value pair of an HTTP header owned by Envoy's
+ * envoy_dynamic_module_type_module_http_header represents a key-value pair of an HTTP header owned
+ * by the module.
+ */
+typedef struct {
+  envoy_dynamic_module_type_buffer_module_ptr key_ptr;
+  size_t key_length;
+  envoy_dynamic_module_type_buffer_module_ptr value_ptr;
+  size_t value_length;
+} envoy_dynamic_module_type_module_http_header;
+
+/**
+ * envoy_dynamic_module_type_http_header represents a key-value pair of an HTTP header owned by Envoy's
  * HeaderMap.
  */
 typedef struct {
@@ -605,6 +619,24 @@ bool envoy_dynamic_module_callback_http_set_response_trailer(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length);
+
+/**
+ * envoy_dynamic_module_callback_http_send_response is called by the module to send the response
+ * to the downstream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param status_code is the status code of the response.
+ * @param headers_vector is the array of envoy_dynamic_module_type_module_http_header that contains
+ * the headers of the response.
+ * @param headers_vector_size is the size of the headers_vector.
+ * @param body is the pointer to the buffer of the body of the response.
+ * @param body_length is the length of the body.
+ */
+void envoy_dynamic_module_callback_http_send_response(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
+    envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
+    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_length);
 
 #ifdef __cplusplus
 }

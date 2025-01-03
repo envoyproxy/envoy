@@ -4,6 +4,7 @@
 #![allow(dead_code)]
 
 pub mod buffer;
+use abi::envoy_dynamic_module_type_module_http_header;
 pub use buffer::EnvoyBuffer;
 use mockall::predicate::*;
 use mockall::*;
@@ -330,6 +331,17 @@ pub trait EnvoyHttpFilter {
   ///
   /// Returns true if the operation is successful.
   fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Send a response to the downstream with the given status code, headers, and body.
+  ///
+  /// The headers are passed as a list of key-value pairs.
+  #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall
+  fn send_response<'a, 'b, 'c>(
+    &mut self,
+    status_code: u32,
+    headers: Vec<(&'a str, &'b [u8])>,
+    body: Option<&'c str>,
+  );
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -452,7 +464,6 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-
   fn get_response_trailer_value(&self, key: &str) -> Option<EnvoyBuffer> {
     self.get_header_value_impl(
       key,
@@ -486,6 +497,34 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         key_size,
         value_ptr as *const _ as *mut _,
         value_size,
+      )
+    }
+  }
+
+  fn send_response(&mut self, status_code: u32, headers: Vec<(&str, &[u8])>, body: Option<&str>) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+
+    let headers_c: Vec<envoy_dynamic_module_type_module_http_header> = headers
+      .iter()
+      .map(
+        |(key, value)| envoy_dynamic_module_type_module_http_header {
+          key_ptr: key.as_ptr() as *mut _,
+          key_length: key.len(),
+          value_ptr: value.as_ptr() as *mut _,
+          value_length: value.len(),
+        },
+      )
+      .collect();
+
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_send_response(
+        self.raw_ptr,
+        status_code,
+        headers_c.as_ptr() as *mut _,
+        headers_c.len(),
+        body_ptr as *mut _,
+        body_length,
       )
     }
   }

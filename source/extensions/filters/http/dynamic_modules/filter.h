@@ -50,6 +50,11 @@ public:
   }
   void encodeComplete() override;
 
+  void sendLocalReply(Code code, absl::string_view body,
+                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details);
+
   // The callbacks for the filter. They are only valid until onDestroy() is called.
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
@@ -60,6 +65,9 @@ public:
   ResponseTrailerMap* response_trailers_ = nullptr;
 
 private:
+  // This ensures that we do not re-enter the dynamic filter hooks when sending a local reply
+  bool sent_local_reply_ = false;
+
   /**
    * This is a helper function to get the `this` pointer as a void pointer which is passed to the
    * various event hooks.
