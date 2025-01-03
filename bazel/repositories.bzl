@@ -895,7 +895,7 @@ def _com_github_wamr():
 def _com_github_wasmtime():
     external_http_archive(
         name = "com_github_wasmtime",
-        build_file = "@envoy//bazel/external:wasmtime.BUILD",
+        build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
     )
 
     native.bind(
@@ -907,7 +907,7 @@ def _com_github_wasmtime():
     # complains about a missing dependency, so point it at the regular target.
     native.bind(
         name = "prefixed_wasmtime",
-        actual = "@com_github_wasmtime//:wasmtime_lib",
+        actual = "@com_github_wasmtime//:prefixed_wasmtime_lib",
     )
 
 def _intel_dlb():
