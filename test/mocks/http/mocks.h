@@ -64,6 +64,7 @@ public:
   MOCK_METHOD(void, chargeStats, (const ResponseHeaderMap&));
   MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr &&));
   MOCK_METHOD(void, setInformationalHeaders_, (ResponseHeaderMap&));
+  MOCK_METHOD(const envoy::config::bootstrap::v3::DumpStateConfig*, dumpStateConfig, (), (const));
   void setInformationalHeaders(ResponseHeaderMapPtr&& informational_headers) override {
     informational_headers_ = std::move(informational_headers);
     setInformationalHeaders_(*informational_headers_);

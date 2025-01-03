@@ -12,6 +12,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
+#include "envoy/router/router_filter_interface.h"
 #include "envoy/stats/scope.h"
 #include "envoy/tcp/conn_pool.h"
 
@@ -304,6 +305,9 @@ public:
       return {*response_headers_};
     }
     return {};
+  }
+  const envoy::config::bootstrap::v3::DumpStateConfig* dumpStateConfig() const override {
+    return upstream_request_.parent_.dumpStateConfig();
   }
   Http::ResponseTrailerMapOptRef responseTrailers() override {
     if (response_trailers_) {
