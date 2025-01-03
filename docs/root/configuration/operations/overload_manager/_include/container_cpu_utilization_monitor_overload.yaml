@@ -1,0 +1,13 @@
+overload_manager:
+  refresh_interval: 5s
+  resource_monitors:
+  - name: "envoy.resource_monitors.envoy_container_cpu_utilization"
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.resource_monitors.envoy_container_cpu_utilization.v3.EnvoyContainerCpuUtilizationConfig
+  actions:
+  - name: "envoy.overload_actions.stop_accepting_requests"
+    triggers:
+    - name: "envoy.resource_monitors.envoy_container_cpu_utilization"
+      scaled:
+        scaling_threshold: 0.80
+        saturation_threshold: 0.95

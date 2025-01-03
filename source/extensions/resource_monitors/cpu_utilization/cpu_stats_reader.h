@@ -22,11 +22,24 @@ struct CpuTimes {
   uint64_t total_time;
 };
 
+struct CgroupStats {
+  bool is_valid;
+  uint64_t cpu_allocated_millicores_; //total millicores of cpu allocated to container
+  uint64_t total_cpu_times_ns_; //total cpu times in nanoseconds
+};
+
 class CpuStatsReader {
 public:
   CpuStatsReader() = default;
   virtual ~CpuStatsReader() = default;
   virtual CpuTimes getCpuTimes() = 0;
+};
+
+class CgroupStatsReader {
+public:
+  CgroupStatsReader() = default;
+  virtual ~CgroupStatsReader() = default;
+  virtual CgroupStats getCgroupStats() = 0;
 };
 
 } // namespace CpuUtilizationMonitor
