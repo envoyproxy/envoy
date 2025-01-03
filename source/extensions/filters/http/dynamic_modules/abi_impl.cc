@@ -205,7 +205,7 @@ void envoy_dynamic_module_callback_http_send_response(
     envoy_dynamic_module_type_buffer_module_ptr body_ptr, size_t body_length) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
 
-  std::function<void(ResponseHeaderMap & headers)> modify_headers = nullptr;
+  std::function<void(ResponseHeaderMap& headers)> modify_headers = nullptr;
   if (headers_vector != nullptr && headers_vector_size != 0) {
     modify_headers = [headers_vector, headers_vector_size](ResponseHeaderMap& headers) {
       for (size_t i = 0; i < headers_vector_size; i++) {
@@ -220,13 +220,8 @@ void envoy_dynamic_module_callback_http_send_response(
   const absl::string_view body =
       body_ptr ? absl::string_view(static_cast<const char*>(body_ptr), body_length) : "";
 
-  if (filter->decoder_callbacks_) {
-    filter->decoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), body,
+  filter->sendLocalReply(static_cast<Http::Code>(status_code), body,
                                                modify_headers, 0, "dynamic_module");
-  } else if (filter->encoder_callbacks_) {
-    filter->encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), body,
-                                               modify_headers, 0, "dynamic_module");
-  }
 }
 }
 } // namespace HttpFilters

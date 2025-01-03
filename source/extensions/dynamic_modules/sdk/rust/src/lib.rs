@@ -4,8 +4,8 @@
 #![allow(dead_code)]
 
 pub mod buffer;
+use abi::envoy_dynamic_module_type_module_http_header;
 pub use buffer::EnvoyBuffer;
-use http::HeaderMap;
 use mockall::predicate::*;
 use mockall::*;
 
@@ -214,27 +214,6 @@ pub struct EnvoyHttpFilterConfig {
   raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
 }
 
-/// Header struct to pass across FFI boundary
-#[repr(C)]
-pub struct Header {
-  key_ptr: *const u8,
-  key_length: usize,
-  value_ptr: *const u8,
-  value_length: usize,
-}
-
-fn header_map_to_ffi(headers: &HeaderMap) -> Vec<Header> {
-  headers
-    .iter()
-    .map(|(key, value)| Header {
-      key_ptr: key.as_str().as_bytes().as_ptr(),
-      key_length: key.as_str().len(),
-      value_ptr: value.as_bytes().as_ptr(),
-      value_length: value.as_bytes().len(),
-    })
-    .collect()
-}
-
 impl EnvoyHttpFilterConfig {
   // TODO: add methods like defining metrics, etc.
 }
@@ -353,7 +332,16 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool;
 
-  fn send_response(&mut self, status_code: u32, headers: &HeaderMap, body: &str);
+  /// Send a response to the downstream with the given status code, headers, and body.
+  ///
+  /// The headers are passed as a list of key-value pairs.
+  #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall
+  fn send_response<'a, 'b, 'c>(
+    &mut self,
+    status_code: u32,
+    headers: Vec<(&'a str, &'b [u8])>,
+    body: Option<&'c str>,
+  );
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -513,19 +501,28 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn send_response(&mut self, status_code: u32, headers: &HeaderMap, body: &str) {
-    let headers_vec = header_map_to_ffi(headers);
-    let headers_ptr = headers_vec.as_ptr();
-    let headers_count = headers_vec.len();
-    let body_ptr = body.as_ptr();
-    let body_length = body.len();
+  fn send_response(&mut self, status_code: u32, headers: Vec<(&str, &[u8])>, body: Option<&str>) {
+    let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
+    let body_length = body.map(|s| s.len()).unwrap_or(0);
+
+    let headers_c: Vec<envoy_dynamic_module_type_module_http_header> = headers
+      .iter()
+      .map(
+        |(key, value)| envoy_dynamic_module_type_module_http_header {
+          key_ptr: key.as_ptr() as *mut _,
+          key_length: key.len(),
+          value_ptr: value.as_ptr() as *mut _,
+          value_length: value.len(),
+        },
+      )
+      .collect();
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response(
         self.raw_ptr,
         status_code,
-        headers_ptr as *mut _,
-        headers_count,
+        headers_c.as_ptr() as *mut _,
+        headers_c.len(),
         body_ptr as *mut _,
         body_length,
       )

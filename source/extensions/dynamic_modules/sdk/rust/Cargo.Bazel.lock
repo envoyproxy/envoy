@@ -1,5 +1,5 @@
 {
-  "checksum": "df4af811c1312bed44d0eefe8cad5554709cd02a56c6ddfa5cda059f79a7ac3f",
+  "checksum": "c0d467a39180d065453586687649d169eafc9222d6c3352463a214d2b1b6cf84",
   "crates": {
     "aho-corasick 1.1.3": {
       "name": "aho-corasick",
@@ -261,51 +261,6 @@
         "MIT"
       ],
       "license_file": "LICENSE-APACHE"
-    },
-    "bytes 1.9.0": {
-      "name": "bytes",
-      "version": "1.9.0",
-      "package_url": "https://github.com/tokio-rs/bytes",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/bytes/1.9.0/download",
-          "sha256": "325918d6fe32f23b19878fe4b34794ae41fc19ddbe53b10571a4874d44ffd39b"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "bytes",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "bytes",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "crate_features": {
-          "common": [
-            "default",
-            "std"
-          ],
-          "selects": {}
-        },
-        "edition": "2018",
-        "version": "1.9.0"
-      },
-      "license": "MIT",
-      "license_ids": [
-        "MIT"
-      ],
-      "license_file": "LICENSE"
     },
     "cexpr 0.6.0": {
       "name": "cexpr",
@@ -625,10 +580,6 @@
               "target": "build_script_build"
             },
             {
-              "id": "http 1.2.0",
-              "target": "http"
-            },
-            {
               "id": "mockall 0.13.1",
               "target": "mockall"
             }
@@ -660,52 +611,6 @@
         "Apache-2.0"
       ],
       "license_file": null
-    },
-    "fnv 1.0.7": {
-      "name": "fnv",
-      "version": "1.0.7",
-      "package_url": "https://github.com/servo/rust-fnv",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/fnv/1.0.7/download",
-          "sha256": "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "fnv",
-            "crate_root": "lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "fnv",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "crate_features": {
-          "common": [
-            "default",
-            "std"
-          ],
-          "selects": {}
-        },
-        "edition": "2015",
-        "version": "1.0.7"
-      },
-      "license": "Apache-2.0 / MIT",
-      "license_ids": [
-        "Apache-2.0",
-        "MIT"
-      ],
-      "license_file": "LICENSE-APACHE"
     },
     "fragile 2.0.0": {
       "name": "fragile",
@@ -784,69 +689,6 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "http 1.2.0": {
-      "name": "http",
-      "version": "1.2.0",
-      "package_url": "https://github.com/hyperium/http",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/http/1.2.0/download",
-          "sha256": "f16ca2af56261c99fba8bac40a10251ce8188205a4c448fbb745a2e4daa76fea"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "http",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "http",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "crate_features": {
-          "common": [
-            "default",
-            "std"
-          ],
-          "selects": {}
-        },
-        "deps": {
-          "common": [
-            {
-              "id": "bytes 1.9.0",
-              "target": "bytes"
-            },
-            {
-              "id": "fnv 1.0.7",
-              "target": "fnv"
-            },
-            {
-              "id": "itoa 1.0.14",
-              "target": "itoa"
-            }
-          ],
-          "selects": {}
-        },
-        "edition": "2018",
-        "version": "1.2.0"
-      },
-      "license": "MIT OR Apache-2.0",
-      "license_ids": [
-        "Apache-2.0",
-        "MIT"
-      ],
-      "license_file": "LICENSE-APACHE"
-    },
     "itertools 0.13.0": {
       "name": "itertools",
       "version": "0.13.0",
@@ -887,45 +729,6 @@
         },
         "edition": "2018",
         "version": "0.13.0"
-      },
-      "license": "MIT OR Apache-2.0",
-      "license_ids": [
-        "Apache-2.0",
-        "MIT"
-      ],
-      "license_file": "LICENSE-APACHE"
-    },
-    "itoa 1.0.14": {
-      "name": "itoa",
-      "version": "1.0.14",
-      "package_url": "https://github.com/dtolnay/itoa",
-      "repository": {
-        "Http": {
-          "url": "https://static.crates.io/crates/itoa/1.0.14/download",
-          "sha256": "d75a2a4b1b190afb6f5425f10f6a8f959d2ea0b9c2b1d79553551850539e4674"
-        }
-      },
-      "targets": [
-        {
-          "Library": {
-            "crate_name": "itoa",
-            "crate_root": "src/lib.rs",
-            "srcs": {
-              "allow_empty": true,
-              "include": [
-                "**/*.rs"
-              ]
-            }
-          }
-        }
-      ],
-      "library_target_name": "itoa",
-      "common_attrs": {
-        "compile_data_glob": [
-          "**"
-        ],
-        "edition": "2018",
-        "version": "1.0.14"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -2965,7 +2768,6 @@
   },
   "direct_deps": [
     "bindgen 0.70.1",
-    "http 1.2.0",
     "mockall 0.13.1"
   ],
   "direct_dev_deps": [],
