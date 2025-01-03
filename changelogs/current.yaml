@@ -27,10 +27,6 @@ behavior_changes:
     rather than waiting for the original request to complete. This allows shadowing requests larger than the buffer limit,
     but also means shadowing may take place for requests which are canceled mid-stream. This behavior change can be
     temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
-- area: ext_proc
-  change: |
-    Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter 
-    :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -398,6 +394,10 @@ new_features:
     :ref:`VirtualHost.rate_limits <envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
     :ref:`RouteAction.rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
     will be ignored.
+- area: ext_proc
+  change: |
+    Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
+    :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
 
 deprecated:
 - area: rbac
