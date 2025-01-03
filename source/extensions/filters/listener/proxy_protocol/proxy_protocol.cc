@@ -612,6 +612,10 @@ ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
   auto raw_slice = buffer.rawSlice();
   // waiting for more data if there is no enough data for extensions.
   if (raw_slice.len_ < (proxy_protocol_header_.value().wholeHeaderLength())) {
+    ENVOY_LOG(
+        trace,
+        "waiting for more data to read extensions. Buffer length: {}, extension header length {}",
+        raw_slice.len_, proxy_protocol_header_.value().wholeHeaderLength());
     return ReadOrParseState::TryAgainLater;
   }
 
