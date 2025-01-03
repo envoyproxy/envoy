@@ -42,6 +42,9 @@ public:
   absl::StatusOr<CancelFunction>
   duplicate(Event::Dispatcher* dispatcher,
             absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete) override;
+  absl::StatusOr<CancelFunction>
+  truncate(Event::Dispatcher* dispatcher, size_t length,
+           absl::AnyInvocable<void(absl::Status)> on_complete) override;
 
   int& fileDescriptor() { return file_descriptor_; }
 
