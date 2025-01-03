@@ -165,7 +165,7 @@ public:
     case MatcherType::MATCHER_TYPE_NOT_SET:
       return createAnyMatcher(config);
     }
-    PANIC_DUE_TO_CORRUPT_ENUM; // GCOVR_EXCL_LINE
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   absl::optional<OnMatchFactoryCb<DataType>>
@@ -259,9 +259,9 @@ private:
       };
     }
     case PredicateType::MATCH_TYPE_NOT_SET:
-      PANIC_DUE_TO_PROTO_UNSET; // GCOVR_EXCL_LINE
+      PANIC_DUE_TO_PROTO_UNSET;
     }
-    PANIC_DUE_TO_CORRUPT_ENUM; // GCOVR_EXCL_LINE
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   template <class MatcherType>
@@ -280,7 +280,7 @@ private:
                                                 &PrefixMapMatcher<DataType>::create);
     }
     case MatcherType::MatcherTree::TREE_TYPE_NOT_SET:
-      PANIC("unexpected matcher type"); // GCOVR_EXCL_LINE
+      PANIC("unexpected matcher type");
     case MatcherType::MatcherTree::kCustomMatch: {
       auto& factory = Config::Utility::getAndCheckFactory<CustomMatcherFactory<DataType>>(
           matcher.matcher_tree().custom_match());
@@ -291,7 +291,7 @@ private:
                                                   on_no_match, *this);
     }
     }
-    PANIC_DUE_TO_CORRUPT_ENUM; // GCOVR_EXCL_LINE
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   using MapCreationFunction = std::function<absl::StatusOr<std::unique_ptr<MapMatcher<DataType>>>(
@@ -359,9 +359,9 @@ private:
       return factory.createInputMatcherFactoryCb(*message, server_factory_context_);
     }
     case SinglePredicateType::MATCHER_NOT_SET:
-      PANIC_DUE_TO_PROTO_UNSET; // GCOVR_EXCL_LINE
+      PANIC_DUE_TO_PROTO_UNSET;
     }
-    PANIC_DUE_TO_CORRUPT_ENUM; // GCOVR_EXCL_LINE
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   const std::string stats_prefix_;

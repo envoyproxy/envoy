@@ -1995,7 +1995,7 @@ VirtualHostImpl::VirtualHostImpl(
   shared_virtual_host_ = std::move(host_or_error.value());
 
   switch (virtual_host.require_tls()) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES; // GCOVR_EXCL_LINE
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::None;
     break;
@@ -2112,7 +2112,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
 
         return getRouteFromRoutes(cb, headers, stream_info, random_value, action.routes());
       }
-      PANIC("Action in router matcher should be Route or RouteList"); // GCOVR_EXCL_LINE
+      PANIC("Action in router matcher should be Route or RouteList");
     }
 
     ENVOY_LOG(debug, "failed to match incoming request: {}", static_cast<int>(match.match_state_));

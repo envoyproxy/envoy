@@ -65,7 +65,7 @@ ConfigUtility::parsePriority(const envoy::config::core::v3::RoutingPriority& pri
   case envoy::config::core::v3::HIGH:
     return Upstream::ResourcePriority::High;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM; // GCOVR_EXCL_LINE
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool ConfigUtility::matchQueryParams(
@@ -83,7 +83,7 @@ bool ConfigUtility::matchQueryParams(
 Http::Code ConfigUtility::parseRedirectResponseCode(
     const envoy::config::route::v3::RedirectAction::RedirectResponseCode& code) {
   switch (code) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES; // GCOVR_EXCL_LINE
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::RedirectAction::MOVED_PERMANENTLY:
     return Http::Code::MovedPermanently;
   case envoy::config::route::v3::RedirectAction::FOUND:
@@ -95,7 +95,7 @@ Http::Code ConfigUtility::parseRedirectResponseCode(
   case envoy::config::route::v3::RedirectAction::PERMANENT_REDIRECT:
     return Http::Code::PermanentRedirect;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM; // GCOVR_EXCL_LINE
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 absl::optional<Http::Code>
@@ -111,7 +111,7 @@ ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& ro
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
     const envoy::config::route::v3::RouteAction::ClusterNotFoundResponseCode& code) {
   switch (code) {
-    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES; // GCOVR_EXCL_LINE
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::RouteAction::SERVICE_UNAVAILABLE:
     return Http::Code::ServiceUnavailable;
   case envoy::config::route::v3::RouteAction::NOT_FOUND:
@@ -119,7 +119,7 @@ Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
   case envoy::config::route::v3::RouteAction::INTERNAL_SERVER_ERROR:
     return Http::Code::InternalServerError;
   }
-  PANIC_DUE_TO_CORRUPT_ENUM; // GCOVR_EXCL_LINE
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Router
