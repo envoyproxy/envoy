@@ -1,0 +1,23 @@
+version: '2'
+services:
+
+  on-prem-envoy:
+    image: upstream/envoy:latest
+    volumes:
+      - ./on-prem-envoy.yaml:/etc/on-prem-envoy.yaml
+    command: envoy -c /etc/on-prem-envoy.yaml --concurrency 1 -l trace --drain-time-s 3
+    ports:
+      - "8080:80"
+      - "9000:9000"
+
+  on-prem-service:
+    image: nginxdemos/hello:plain-text
+
+  cloud-envoy:
+    image: upstream/envoy:latest
+    volumes:
+      - ./cloud-envoy.yaml:/etc/cloud-envoy.yaml
+    command: envoy -c /etc/cloud-envoy.yaml --concurrency 1 -l trace --drain-time-s 3
+    ports:
+      - "8081:80"
+      - "9001:9000"
