@@ -43,7 +43,7 @@ HTTP Connection Manager
 ***********************
 
 For HTTP Connection Manager, it is possible to enable a one-time access log entry each time a new HTTP request arrives,
-and before the filter chain is processed by using
+and before the filter chain is processed by enabling
 :ref:`flush access log on new request <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.HcmAccessLogOptions.flush_access_log_on_new_request>`
 
 .. note::
