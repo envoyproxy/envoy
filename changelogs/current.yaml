@@ -393,7 +393,7 @@ new_features:
     Added support for injecting custom Type-Length-Value (TLV) entries into the Proxy Protocol v2 header for upstream
     transport sockets. Custom TLVs can be defined both in the endpoint host's typed metadata under the
     ``envoy.transport_sockets.proxy_protocol`` namespace and at the configuration level via the `ProxyProtocolConfig`'s
-    ``entries`` field. Host-level TLV definitions override config-level entries when the same type is specified, allowing
+    ``custom_tlvs`` field. Host-level TLV definitions override config-level entries when the same type is specified, allowing
     default TLVs to be set globally, while enabling further per-endpoint customizations.
 - area: attributes
   change: |

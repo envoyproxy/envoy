@@ -480,7 +480,7 @@ public:
 
         envoy::config::core::v3::ProxyProtocolConfig tlvs_metadata;
         for (const auto& tlv : custom_tlvs_from_host_) {
-          auto entry = tlvs_metadata.add_entries();
+          auto entry = tlvs_metadata.add_custom_tlvs();
           entry->set_type(tlv.first);
           entry->set_value(std::string(tlv.second.begin(), tlv.second.end()));
         }
@@ -494,7 +494,7 @@ public:
       // Add custom TLVs to proxy protocol config if needed.
       if (!custom_tlvs_from_config_.empty()) {
         for (const auto& tlv : custom_tlvs_from_config_) {
-          auto entry = proxy_protocol.add_entries();
+          auto entry = proxy_protocol.add_custom_tlvs();
           entry->set_type(tlv.first);
           entry->set_value(std::string(tlv.second.begin(), tlv.second.end()));
         }

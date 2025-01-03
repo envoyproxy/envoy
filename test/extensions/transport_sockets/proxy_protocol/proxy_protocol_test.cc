@@ -727,10 +727,10 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromConfig) {
 
   ProxyProtocolConfig config;
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
-  auto valid_tlv_entry = config.add_entries();
+  auto valid_tlv_entry = config.add_custom_tlvs();
   valid_tlv_entry->set_type(0x96);
   valid_tlv_entry->set_value("moredata");
-  auto invalid_tlv_entry = config.add_entries();
+  auto invalid_tlv_entry = config.add_custom_tlvs();
   invalid_tlv_entry->set_type(0x97);
   invalid_tlv_entry->set_value("");
   initialize(config, socket_options);
@@ -771,10 +771,10 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
       Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
 
   ProxyProtocolConfig custom_tlv_metadata;
-  auto valid_entry = custom_tlv_metadata.add_entries();
+  auto valid_entry = custom_tlv_metadata.add_custom_tlvs();
   valid_entry->set_type(0x96);
   valid_entry->set_value("moredata");
-  auto invalid_entry = custom_tlv_metadata.add_entries();
+  auto invalid_entry = custom_tlv_metadata.add_custom_tlvs();
   invalid_entry->set_type(0x97);
   invalid_entry->set_value("");
 
@@ -833,7 +833,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsOverwriteHostMetadata) {
       Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
 
   ProxyProtocolConfig custom_tlv_metadata;
-  auto entry = custom_tlv_metadata.add_entries();
+  auto entry = custom_tlv_metadata.add_custom_tlvs();
   entry->set_type(0x96);
   entry->set_value("foo");
 
@@ -854,10 +854,10 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsOverwriteHostMetadata) {
 
   ProxyProtocolConfig config;
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
-  auto tlv_entry = config.add_entries();
+  auto tlv_entry = config.add_custom_tlvs();
   tlv_entry->set_type(0x96);
   tlv_entry->set_value("bar");
-  tlv_entry = config.add_entries();
+  tlv_entry = config.add_custom_tlvs();
   tlv_entry->set_type(0x97);
   tlv_entry->set_value("baz");
   initialize(config, socket_options);
@@ -898,7 +898,7 @@ TEST_F(ProxyProtocolTest, V2CustomAndPassthroughTLVs) {
       Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
 
   ProxyProtocolConfig custom_tlv_metadata;
-  auto entry = custom_tlv_metadata.add_entries();
+  auto entry = custom_tlv_metadata.add_custom_tlvs();
   entry->set_type(0x96);
   entry->set_value("foo");
 
@@ -956,13 +956,13 @@ TEST_F(ProxyProtocolTest, V2CustomTLVInvalidMetadataValues) {
       Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
 
   ProxyProtocolConfig custom_tlv_metadata;
-  auto valid_entry = custom_tlv_metadata.add_entries();
+  auto valid_entry = custom_tlv_metadata.add_custom_tlvs();
   valid_entry->set_type(0x96);
   valid_entry->set_value("cluster_0");
-  auto invalid_entry_empty_val = custom_tlv_metadata.add_entries();
+  auto invalid_entry_empty_val = custom_tlv_metadata.add_custom_tlvs();
   invalid_entry_empty_val->set_type(0x97);
   invalid_entry_empty_val->set_value("");
-  auto invalid_entry_duplicate = custom_tlv_metadata.add_entries();
+  auto invalid_entry_duplicate = custom_tlv_metadata.add_custom_tlvs();
   invalid_entry_duplicate->set_type(0x96);
   invalid_entry_duplicate->set_value("cluster_1");
 
