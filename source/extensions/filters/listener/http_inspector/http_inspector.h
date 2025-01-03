@@ -2,7 +2,6 @@
 
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
-#include "envoy/extensions/filters/listener/http_inspector/v3/http_inspector.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"

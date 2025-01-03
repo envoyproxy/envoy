@@ -19,7 +19,6 @@ public:
       const Protobuf::Message&,
       const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
       Server::Configuration::ListenerFactoryContext& context) override {
-
     ConfigSharedPtr config(std::make_shared<Config>(context.scope()));
     return
         [listener_filter_matcher, config](Network::ListenerFilterManager& filter_manager) -> void {
