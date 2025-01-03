@@ -28,6 +28,7 @@ behavior_changes:
     but also means shadowing may take place for requests which are canceled mid-stream. This behavior change can be
     temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
 
+
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
 - area: access_log
