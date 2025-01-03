@@ -59,6 +59,19 @@ public:
   ResponseHeaderMap* response_headers_ = nullptr;
   ResponseTrailerMap* response_trailers_ = nullptr;
 
+  /**
+   * Helper to get the downstream information of the stream.
+   */
+  StreamInfo::StreamInfo* streamInfo() {
+    if (decoder_callbacks_) {
+      return &decoder_callbacks_->streamInfo();
+    } else if (encoder_callbacks_) {
+      return &encoder_callbacks_->streamInfo();
+    } else {
+      return nullptr;
+    }
+  }
+
 private:
   /**
    * This is a helper function to get the `this` pointer as a void pointer which is passed to the
