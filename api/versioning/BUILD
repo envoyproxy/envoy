@@ -9,6 +9,7 @@ proto_library(
     name = "active_protos",
     visibility = ["//visibility:public"],
     deps = [
+        "//contrib/envoy/extensions/bootstrap/reverse_connection/v3alpha:pkg",
         "//contrib/envoy/extensions/compression/qatzip/compressor/v3alpha:pkg",
         "//contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha:pkg",
         "//contrib/envoy/extensions/config/v3alpha:pkg",
