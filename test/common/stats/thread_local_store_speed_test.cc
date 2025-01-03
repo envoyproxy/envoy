@@ -221,37 +221,6 @@ class TestSinkForHistogramContention : public Envoy::Stats::Sink {
 
 bool TestSinkForHistogramContention::buffer_histograms_ = false;
 
-// BM_ExportOnRecordValue   27664026 ns        60752 ns          100
-// BM_ExportOnFlush          3757351 ns        50485 ns         1000
-//
-// This benchmark exaggerates the problem by having all 10 worker
-// threads constantly calling recordValue, which will cause contention.
-// Note that the elapsed time for BM_ExportOnRecordValue is 7x slower
-// than for BM_ExportOnFlush. This is likely because the delays are
-// due to mutex contention, rather than CPU.
-
-/*
-#include <atomic>
-#include <chrono>  // NOLINT
-#include <cstdint>
-#include <memory>
-
-#include "base/logging.h"
-#include "net/envoy/source/extensions/stat_sinks/monarch/export_server.h"
-#include "net/envoy/source/extensions/stat_sinks/monarch/monarch_sink.h"
-#include "net/envoy/source/extensions/stat_sinks/monarch/options.proto.h"
-#include "testing/base/public/gmock.h"
-#include "third_party/absl/flags/flag.h"
-#include "third_party/benchmark/include/benchmark/benchmark.h"
-#include "third_party/envoy/src/envoy/event/dispatcher.h"
-#include "third_party/envoy/src/envoy/stats/scope.h"
-#include "third_party/envoy/src/envoy/stats/stats_macros.h"
-#include "third_party/envoy/src/envoy/stats/store.h"
-#include "third_party/envoy/src/source/exe/process_wide.h"
-#include "third_party/envoy/src/source/server/server.h"
-#include "third_party/envoy/src/test/mocks/upstream/cluster_manager.h"
-*/
-
 // Captures context needed to run a histogram sync benchmark.
 class StatsDHistogramBenchmarkTest :
     public Envoy::InitBase, public Envoy::Stats::ThreadLocalRealThreadsMixin {
