@@ -196,7 +196,7 @@ protected:
   }
 
   void cleanUp() {
-    if (rlqs_connection_) {
+    if (rlqs_connection_ != nullptr) {
       ASSERT_TRUE(rlqs_connection_->close());
       ASSERT_TRUE(rlqs_connection_->waitForDisconnect());
     }

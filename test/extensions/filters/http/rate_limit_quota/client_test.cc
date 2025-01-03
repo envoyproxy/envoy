@@ -242,7 +242,7 @@ void setAtomic(uint64_t value, std::atomic<uint64_t>& counter) {
 absl::StatusOr<std::shared_ptr<CachedBucket>>
 tryGetBucket(ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls, size_t id) {
   auto cache_ref = buckets_tls.get();
-  if (!cache_ref.has_value() || !cache_ref->quota_buckets_)
+  if (!cache_ref.has_value() || cache_ref->quota_buckets_ == nullptr)
     return absl::NotFoundError("Bucket TLS not initialized");
 
   auto bucket_it = cache_ref->quota_buckets_->find(id);
