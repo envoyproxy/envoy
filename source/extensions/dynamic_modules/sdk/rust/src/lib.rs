@@ -333,11 +333,11 @@ pub trait EnvoyHttpFilter {
 
   /// Get the number-typed dynamic metadata value with the given key.
   /// If the metadata is not found, this returns `None`.
-  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<i64>;
+  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64>;
 
   /// Set the number-typed dynamic metadata value with the given key.
   /// Returns true if the operation is successful.
-  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: u64) -> bool;
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
 
   /// Get the string-typed dynamic metadata value with the given key.
   /// If the metadata is not found, this returns `None`.
@@ -506,12 +506,12 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<i64> {
+  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64> {
     let namespace_ptr = namespace.as_ptr();
     let namespace_size = namespace.len();
     let key_ptr = key.as_ptr();
     let key_size = key.len();
-    let mut value: i64 = 0;
+    let mut value: f64 = 0f64;
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
         self.raw_ptr,
@@ -529,7 +529,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: u64) -> bool {
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
     let namespace_ptr = namespace.as_ptr();
     let namespace_size = namespace.len();
     let key_ptr = key.as_ptr();

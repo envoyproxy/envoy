@@ -253,9 +253,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     let no_namespace = envoy_filter.get_dynamic_metadata_number("no_namespace", "key");
     assert!(no_namespace.is_none());
     // Set a number.
-    envoy_filter.set_dynamic_metadata_number("ns_req_header", "key", 123);
+    envoy_filter.set_dynamic_metadata_number("ns_req_header", "key", 123f64);
     let ns_req_header = envoy_filter.get_dynamic_metadata_number("ns_req_header", "key");
-    assert_eq!(ns_req_header, Some(123));
+    assert_eq!(ns_req_header, Some(123f64));
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
@@ -284,9 +284,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     let no_namespace = envoy_filter.get_dynamic_metadata_string("no_namespace", "key");
     assert!(no_namespace.is_none());
     // Set a number.
-    envoy_filter.set_dynamic_metadata_number("ns_res_header", "key", 123);
+    envoy_filter.set_dynamic_metadata_number("ns_res_header", "key", 123f64);
     let ns_res_header = envoy_filter.get_dynamic_metadata_number("ns_res_header", "key");
-    assert_eq!(ns_res_header, Some(123));
+    assert_eq!(ns_res_header, Some(123f64));
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 

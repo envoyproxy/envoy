@@ -629,7 +629,7 @@ bool envoy_dynamic_module_callback_http_set_response_trailer(
 bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, uint64_t value);
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double value);
 
 /**
  * envoy_dynamic_module_callback_http_get_dynamic_metadata_number is called by the module to get
@@ -649,7 +649,7 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
 bool envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, uint64_t* result);
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double* result);
 
 /**
  * envoy_dynamic_module_callback_http_set_dynamic_metadata_string is called by the module to set

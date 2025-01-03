@@ -281,11 +281,11 @@ TEST(ABIImpl, dynamic_metadata) {
   size_t namespace_length = namespace_str.size();
   envoy_dynamic_module_type_buffer_module_ptr key_ptr = const_cast<char*>(key_str.data());
   size_t key_length = key_str.size();
-  uint64_t value = 42;
+  double value = 42;
   const std::string value_str = "value";
   envoy_dynamic_module_type_buffer_module_ptr value_ptr = const_cast<char*>(value_str.data());
   size_t value_length = value_str.size();
-  uint64_t result_number = 0;
+  double result_number = 0;
   char* result_str_ptr = nullptr;
   size_t result_str_length = 0;
 

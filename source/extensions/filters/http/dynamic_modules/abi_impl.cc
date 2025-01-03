@@ -267,7 +267,7 @@ getDynamicMetadataValue(envoy_dynamic_module_type_http_filter_envoy_ptr filter_e
 bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, uint64_t value) {
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double value) {
   auto metadata_namespace =
       getDynamicMetadataNamespace(filter_envoy_ptr, namespace_ptr, namespace_length, true);
   if (!metadata_namespace) {
@@ -283,7 +283,7 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
 bool envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
-    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, uint64_t* result) {
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double* result) {
   const auto key_metadata = getDynamicMetadataValue(filter_envoy_ptr, namespace_ptr,
                                                     namespace_length, key_ptr, key_length);
   if (!key_metadata) {
