@@ -36,7 +36,7 @@ successful upstream tunnel connection is established by setting
 TCP Proxy
 *********
 
-For TCP Proxy, it is possible to enable a one-time access log entry right after a successful upstream connection by using
+For TCP Proxy, it is possible to enable a one-time access log entry right after a successful upstream connection by enabling
 :ref:`flush access log on connected <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`
 
 HTTP Connection Manager
