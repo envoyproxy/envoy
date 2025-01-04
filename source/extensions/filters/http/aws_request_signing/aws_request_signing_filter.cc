@@ -13,14 +13,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AwsRequestSigningFilter {
 
-FilterConfigImpl::FilterConfigImpl(
-    Extensions::Common::Aws::SignerPtr&& signer,
-    Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider,
-    const std::string& stats_prefix, Stats::Scope& scope, const std::string& host_rewrite,
-    bool use_unsigned_payload)
+FilterConfigImpl::FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer,
+                                   Common::Aws::CredentialsProviderSharedPtr credentials_provider,
+                                   const std::string& stats_prefix, Stats::Scope& scope,
+                                   const std::string& host_rewrite, bool use_unsigned_payload)
     : signer_(std::move(signer)), credentials_provider_(credentials_provider),
-      stats_(Filter::generateStats(stats_prefix, scope)),
-      host_rewrite_(host_rewrite), use_unsigned_payload_{use_unsigned_payload} {}
+      stats_(Filter::generateStats(stats_prefix, scope)), host_rewrite_(host_rewrite),
+      use_unsigned_payload_(use_unsigned_payload) {}
 
 Filter::Filter(const std::shared_ptr<FilterConfig>& config) : config_(config) {}
 
@@ -76,28 +75,29 @@ Filter::decodeHeadersCredentialsAvailable(Envoy::Extensions::Common::Aws::Creden
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   auto& config = getConfig();
 
+  request_headers_ = &headers;
+
   if (!config.useUnsignedPayload() && !end_stream) {
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  request_headers_ = &headers;
-
   // If we are pending credentials, send the decodeHeadersCredentialsAvailable callback for when
   // they become available, and stop iteration.
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this](Envoy::Extensions::Common::Aws::Credentials credentials) {
+        decodeHeadersCredentialsAvailable(credentials);
+      },
+      &cancel_callback_);
+
   if (config.credentialsProvider()->credentialsPending(
-
-          Envoy::CancelWrapper::cancelWrapped(
-              [this, &dispatcher = decoder_callbacks_->dispatcher()](
-                  Envoy::Extensions::Common::Aws::Credentials credentials) {
-                dispatcher.post([this, credentials]() {
-                  this->decodeHeadersCredentialsAvailable(credentials);
-                });
-              },
-              &cancel_callback_)
-
-              )) {
+          [&dispatcher = decoder_callbacks_->dispatcher(),
+           completion_cb = std::move(completion_cb)](
+              Envoy::Extensions::Common::Aws::Credentials credentials) mutable {
+            dispatcher.post([creds = std::move(credentials),
+                             cb = std::move(completion_cb)]() mutable { cb(creds); });
+          })) {
     ENVOY_LOG_MISC(debug, "Credentials are pending");
-    return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   } else {
     ENVOY_LOG_MISC(debug, "Credentials are not pending");
   }

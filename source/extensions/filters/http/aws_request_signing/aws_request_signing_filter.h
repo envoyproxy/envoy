@@ -6,6 +6,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/cancel_wrapper.h"
+#include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -48,7 +49,7 @@ public:
   /**
    * @return the config's credentials provider.
    */
-  virtual Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentialsProvider() PURE;
+  virtual Common::Aws::CredentialsProviderSharedPtr credentialsProvider() PURE;
 
   /**
    * @return the filter stats.
@@ -80,7 +81,7 @@ public:
       bool use_unsigned_payload);
 
   Extensions::Common::Aws::Signer& signer() override;
-  Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentialsProvider() override;
+  Common::Aws::CredentialsProviderSharedPtr credentialsProvider() override;
 
   FilterStats& stats() override;
   const std::string& hostRewrite() const override;
@@ -88,7 +89,7 @@ public:
 
 private:
   Extensions::Common::Aws::SignerPtr signer_;
-  Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider_;
+  Common::Aws::CredentialsProviderSharedPtr credentials_provider_;
   FilterStats stats_;
   std::string host_rewrite_;
   const bool use_unsigned_payload_;
@@ -102,6 +103,7 @@ public:
   Filter(const std::shared_ptr<FilterConfig>& config);
   ~Filter() override {
     if (cancel_callback_) {
+      ENVOY_LOG_MISC(debug, "Cancelling pending credentials");
       cancel_callback_();
     }
   }

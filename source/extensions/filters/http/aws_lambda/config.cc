@@ -60,8 +60,9 @@ AwsLambdaFilterFactory::getCredentialsProvider(
     return std::make_shared<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
         server_context, credential_file_config);
   }
+
   return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-      server_context.api(), makeOptRef(server_context), server_context.singletonManager(), region,
+      server_context.api(), makeOptRef(server_context), region,
       nullptr);
 }
 

@@ -74,9 +74,7 @@ public:
    *
    * @return bool true if credentials are pending, false otherwise
    */
-  virtual bool credentialsPending(ABSL_ATTRIBUTE_UNUSED CredentialsPendingCallback&& cb) {
-    return false;
-  }
+  virtual bool credentialsPending(CredentialsPendingCallback&&) { return false; }
 };
 
 using CredentialsConstSharedPtr = std::shared_ptr<const Credentials>;

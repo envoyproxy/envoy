@@ -25,16 +25,19 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoTyped(
     Server::Configuration::ServerFactoryContext& server_context) {
 
   auto credentials_provider = createCredentialsProvider(config, server_context);
+
   if (!credentials_provider.ok()) {
     return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
   }
+
   auto signer = createSigner(config, server_context);
   if (!signer.ok()) {
     return absl::InvalidArgumentError(std::string(signer.status().message()));
   }
   auto filter_config = std::make_shared<FilterConfigImpl>(
-      std::move(signer.value()), credentials_provider.value(), stats_prefix, dual_info.scope,
-      config.host_rewrite(), config.use_unsigned_payload());
+      std::move(signer.value()), std::move(credentials_provider.value()), stats_prefix,
+      dual_info.scope, config.host_rewrite(), config.use_unsigned_payload());
+
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<Filter>(filter_config);
     callbacks.addStreamDecoderFilter(filter);
@@ -59,8 +62,9 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
   }
 
   return std::make_shared<const FilterConfigImpl>(
-      std::move(signer.value()), credentials_provider.value(), per_route_config.stat_prefix(),
-      server_context.scope(), per_route_config.aws_request_signing().host_rewrite(),
+      std::move(signer.value()), std::move(credentials_provider.value()),
+      per_route_config.stat_prefix(), server_context.scope(),
+      per_route_config.aws_request_signing().host_rewrite(),
       per_route_config.aws_request_signing().use_unsigned_payload());
 }
 
@@ -112,7 +116,7 @@ AwsRequestSigningFilterFactory::createCredentialsProvider(
       // If inline credential provider is set, use it instead of the default or custom credentials
       // chain
       const auto& inline_credential = config.credential_provider().inline_credential();
-      credentials_provider = std::make_shared<Extensions::Common::Aws::InlineCredentialProvider>(
+      return std::make_shared<Extensions::Common::Aws::InlineCredentialProvider>(
           inline_credential.access_key_id(), inline_credential.secret_access_key(),
           inline_credential.session_token());
     } else if (config.credential_provider().custom_credential_provider_chain()) {
@@ -127,14 +131,14 @@ AwsRequestSigningFilterFactory::createCredentialsProvider(
         credential_provider_config = config.credential_provider();
       }
       return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          server_context.api(), makeOptRef(server_context), server_context.singletonManager(),
-          region, nullptr, credential_provider_config);
+          server_context.api(), makeOptRef(server_context), region, nullptr,
+          credential_provider_config);
     }
   } else {
     // No credential provider settings provided, so make the default credentials provider chain
     return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-        server_context.api(), makeOptRef(server_context), server_context.singletonManager(), region,
-        nullptr, credential_provider_config);
+        server_context.api(), makeOptRef(server_context), region, nullptr,
+        credential_provider_config);
   }
 
   return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));

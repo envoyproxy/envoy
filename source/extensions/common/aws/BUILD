@@ -10,6 +10,21 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "aws_cluster_manager_lib",
+    srcs = ["aws_cluster_manager.cc"],
+    hdrs = ["aws_cluster_manager.h"],
+    deps = [
+        ":utility_lib",
+        "//envoy/http:message_interface",
+        "//envoy/singleton:manager_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/init:target_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "signer_interface",
     hdrs = ["signer.h"],
     deps = [
@@ -114,6 +129,7 @@ envoy_cc_library(
     srcs = ["credentials_provider_impl.cc"],
     hdrs = ["credentials_provider_impl.h"],
     deps = [
+        ":aws_cluster_manager_lib",
         ":credentials_provider_interface",
         ":metadata_fetcher_lib",
         ":utility_lib",
@@ -128,7 +144,6 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/tracing:http_tracer_lib",
         "@com_google_absl//absl/time",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )

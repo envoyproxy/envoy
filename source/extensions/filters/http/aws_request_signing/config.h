@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/region_provider_impl.h"
 #include "source/extensions/common/aws/signer.h"
@@ -52,6 +53,7 @@ private:
   absl::StatusOr<Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr>
   createCredentialsProvider(const AwsRequestSigningProtoConfig& config,
                             Server::Configuration::ServerFactoryContext& server_context);
+  Envoy::Server::ServerLifecycleNotifier::HandlePtr shutdown_handle_;
 };
 
 using UpstreamAwsRequestSigningFilterFactory = AwsRequestSigningFilterFactory;

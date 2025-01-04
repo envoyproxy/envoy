@@ -1909,6 +1909,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::~ThreadLocalClusterManagerImp
       cluster.second.reset();
     }
   }
+
   thread_local_clusters_.clear();
 
   // Ensure that all pools are completely destructed.

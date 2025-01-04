@@ -37,6 +37,7 @@ public:
   ~MockCredentialsProvider() override;
 
   MOCK_METHOD(Credentials, getCredentials, ());
+  MOCK_METHOD(bool, credentialsPending, (CredentialsPendingCallback && cb));
 };
 
 class MockSigner : public Signer {
