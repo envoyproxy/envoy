@@ -6849,7 +6849,8 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_))
       .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
         received_orca_load_report = orca_load_report;
-        return absl::OkStatus();
+        // Return an error that gets logged by router filter.
+        return absl::InvalidArgumentError("Unexpected ORCA load Report");
       }));
 
   // Send metrics in the trailers.

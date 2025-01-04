@@ -106,8 +106,6 @@ public:
 
   // This class is used to handle ORCA load reports.
   // It stores the config necessary to calculate host weight based on the report.
-  // The load balancer context stores a weak pointer to this handler,
-  // so it is NOT invoked if the load balancer is deleted.
   class OrcaLoadReportHandler {
   public:
     OrcaLoadReportHandler(const ClientSideWeightedRoundRobinLbConfig& lb_config,
