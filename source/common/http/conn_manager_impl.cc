@@ -11,6 +11,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -98,14 +99,12 @@ ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::S
   return {CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
-ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfigSharedPtr config,
-                                             const Network::DrainDecision& drain_close,
-                                             Random::RandomGenerator& random_generator,
-                                             Http::Context& http_context, Runtime::Loader& runtime,
-                                             const LocalInfo::LocalInfo& local_info,
-                                             Upstream::ClusterManager& cluster_manager,
-                                             Server::OverloadManager& overload_manager,
-                                             TimeSource& time_source)
+ConnectionManagerImpl::ConnectionManagerImpl(
+    ConnectionManagerConfigSharedPtr config, const Network::DrainDecision& drain_close,
+    Random::RandomGenerator& random_generator, Http::Context& http_context,
+    Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+    Upstream::ClusterManager& cluster_manager, Server::OverloadManager& overload_manager,
+    TimeSource& time_source, envoy::config::core::v3::TrafficDirection direction)
     : config_(std::move(config)), stats_(config_->stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
@@ -128,6 +127,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfigSharedPtr co
                                      /*proxy_status_config=*/config_->proxyStatusConfig())),
       max_requests_during_dispatch_(
           runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
+      direction_(direction),
       allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
   ENVOY_LOG_ONCE_IF(
@@ -1801,8 +1801,15 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.
+  auto drain_is_inbound_only =
+      connection_manager_.drain_close_.drainDirection() == Network::DrainDirection::InboundOnly;
+  // Only drain if the drain direction is not inbound only or the connection is inbound.
+  auto should_drain_direction =
+      !drain_is_inbound_only ||
+      connection_manager_.direction_ == envoy::config::core::v3::TrafficDirection::INBOUND;
+  auto should_drain = should_drain_direction && connection_manager_.drain_close_.drainClose();
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      (connection_manager_.drain_close_.drainClose() || drain_connection_due_to_overload)) {
+      (should_drain || drain_connection_due_to_overload)) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
     // of time to race with incoming requests. For HTTP/2 connections, send a GOAWAY frame to
@@ -1851,6 +1858,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   // point, the cached route should never be updated or refreshed.
   blockRouteCache();
 
+  // We check here specifically
   if (connection_manager_.drain_state_ != DrainState::NotDraining &&
       connection_manager_.codec_->protocol() < Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.

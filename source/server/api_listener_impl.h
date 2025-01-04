@@ -43,6 +43,7 @@ public:
   // Network::DrainDecision
   // TODO(junr03): hook up draining to listener state management.
   bool drainClose() const override { return false; }
+  // Using default implementation of drainDirection() which returns DrainDirection::None.
 
 protected:
   ApiListenerImplBase(Network::Address::InstanceConstSharedPtr&& address,
