@@ -126,7 +126,6 @@ message RateLimitDescriptor {
 
   // Optional hits_addend for the rate limit descriptor. If set the value will override the
   // request level hits_addend.
-  // [#not-implemented-hide:]
   google.protobuf.UInt64Value hits_addend = 3;
 }
 

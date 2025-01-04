@@ -19,6 +19,7 @@
 #include "source/common/router/header_parser.h"
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 #include "source/extensions/filters/common/ratelimit/stat_names.h"
+#include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -130,22 +131,45 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfigPerRoute(
-      const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& config)
-      : vh_rate_limits_(config.vh_rate_limits()), domain_(config.domain()) {}
+      Server::Configuration::ServerFactoryContext& context,
+      const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& config,
+      absl::Status& creation_status)
+      : local_info_(context.localInfo()), vh_rate_limits_(config.vh_rate_limits()),
+        domain_(config.domain()) {
+    rate_limit_config_ = std::make_unique<Filters::Common::RateLimit::RateLimitConfig>(
+        config.rate_limits(), context, creation_status);
+  }
 
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
   virtualHostRateLimits() const {
     return vh_rate_limits_;
   }
 
+  bool hasRateLimitConfigs() const {
+    ASSERT(rate_limit_config_ != nullptr);
+    return !rate_limit_config_->empty();
+  }
+
+  void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const StreamInfo::StreamInfo& info,
+                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
+                           bool on_stream_done) const {
+    ASSERT(rate_limit_config_ != nullptr);
+    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors,
+                                            on_stream_done);
+  }
+
   std::string domain() const { return domain_; }
 
 private:
+  const LocalInfo::LocalInfo& local_info_;
   const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
       vh_rate_limits_;
-
   const std::string domain_;
+  std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
 };
+
+using FilterConfigPerRouteSharedPtr = std::shared_ptr<FilterConfigPerRoute>;
 
 /**
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
@@ -205,9 +229,10 @@ private:
   Filters::Common::RateLimit::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};
-  VhRateLimitOptions vh_rate_limits_;
+  VhRateLimitOptions vh_rate_limits_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   Router::RouteConstSharedPtr route_ = nullptr;
+  const FilterConfigPerRoute* route_config_ = nullptr;
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
   Http::RequestHeaderMap* request_headers_{};

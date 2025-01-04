@@ -1,5 +1,5 @@
 {
-  "checksum": "5ff777576de72e162bfc455e1e2adc51f9bfda8dd57c6b29858d6e14beea2381",
+  "checksum": "c0d467a39180d065453586687649d169eafc9222d6c3352463a214d2b1b6cf84",
   "crates": {
     "aho-corasick 1.1.3": {
       "name": "aho-corasick",
@@ -39,6 +39,52 @@
         "Unlicense"
       ],
       "license_file": "LICENSE-MIT"
+    },
+    "anstyle 1.0.10": {
+      "name": "anstyle",
+      "version": "1.0.10",
+      "package_url": "https://github.com/rust-cli/anstyle.git",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/anstyle/1.0.10/download",
+          "sha256": "55cc3b69f167a1ef2e161439aa98aed94e6028e5f9a59be9a6ffb47aef1651f9"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "anstyle",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "anstyle",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "default",
+            "std"
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "1.0.10"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
     },
     "bindgen 0.70.1": {
       "name": "bindgen",
@@ -407,6 +453,51 @@
       ],
       "license_file": "LICENSE.txt"
     },
+    "downcast 0.11.0": {
+      "name": "downcast",
+      "version": "0.11.0",
+      "package_url": "https://github.com/fkoep/downcast-rs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/downcast/0.11.0/download",
+          "sha256": "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "downcast",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "downcast",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "default",
+            "std"
+          ],
+          "selects": {}
+        },
+        "edition": "2018",
+        "version": "0.11.0"
+      },
+      "license": "MIT",
+      "license_ids": [
+        "MIT"
+      ],
+      "license_file": "LICENSE-MIT"
+    },
     "either 1.13.0": {
       "name": "either",
       "version": "1.13.0",
@@ -487,6 +578,10 @@
             {
               "id": "envoy-proxy-dynamic-modules-rust-sdk 0.1.0",
               "target": "build_script_build"
+            },
+            {
+              "id": "mockall 0.13.1",
+              "target": "mockall"
             }
           ],
           "selects": {}
@@ -516,6 +611,44 @@
         "Apache-2.0"
       ],
       "license_file": null
+    },
+    "fragile 2.0.0": {
+      "name": "fragile",
+      "version": "2.0.0",
+      "package_url": "https://github.com/mitsuhiko/fragile",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/fragile/2.0.0/download",
+          "sha256": "6c2141d6d6c8512188a7891b4b01590a45f6dac67afb4f255c4124dbb86d4eaa"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "fragile",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "fragile",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "edition": "2018",
+        "version": "2.0.0"
+      },
+      "license": "Apache-2.0",
+      "license_ids": [
+        "Apache-2.0"
+      ],
+      "license_file": "LICENSE"
     },
     "glob 0.3.1": {
       "name": "glob",
@@ -857,6 +990,163 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
+    "mockall 0.13.1": {
+      "name": "mockall",
+      "version": "0.13.1",
+      "package_url": "https://github.com/asomers/mockall",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/mockall/0.13.1/download",
+          "sha256": "39a6bfcc6c8c7eed5ee98b9c3e33adc726054389233e201c95dab2d41a3839d2"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "mockall",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "mockall",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "cfg-if 1.0.0",
+              "target": "cfg_if"
+            },
+            {
+              "id": "downcast 0.11.0",
+              "target": "downcast"
+            },
+            {
+              "id": "fragile 2.0.0",
+              "target": "fragile"
+            },
+            {
+              "id": "predicates 3.1.3",
+              "target": "predicates"
+            },
+            {
+              "id": "predicates-tree 1.0.12",
+              "target": "predicates_tree"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "mockall_derive 0.13.1",
+              "target": "mockall_derive"
+            }
+          ],
+          "selects": {}
+        },
+        "version": "0.13.1"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "mockall_derive 0.13.1": {
+      "name": "mockall_derive",
+      "version": "0.13.1",
+      "package_url": "https://github.com/asomers/mockall",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/mockall_derive/0.13.1/download",
+          "sha256": "25ca3004c2efe9011bd4e461bd8256445052b9615405b4f7ea43fc8ca5c20898"
+        }
+      },
+      "targets": [
+        {
+          "ProcMacro": {
+            "crate_name": "mockall_derive",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        },
+        {
+          "BuildScript": {
+            "crate_name": "build_script_build",
+            "crate_root": "build.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "mockall_derive",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "cfg-if 1.0.0",
+              "target": "cfg_if"
+            },
+            {
+              "id": "mockall_derive 0.13.1",
+              "target": "build_script_build"
+            },
+            {
+              "id": "proc-macro2 1.0.86",
+              "target": "proc_macro2"
+            },
+            {
+              "id": "quote 1.0.37",
+              "target": "quote"
+            },
+            {
+              "id": "syn 2.0.77",
+              "target": "syn"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.13.1"
+      },
+      "build_script_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "data_glob": [
+          "**"
+        ]
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "nom 7.1.3": {
       "name": "nom",
       "version": "7.1.3",
@@ -914,6 +1204,149 @@
         "MIT"
       ],
       "license_file": "LICENSE"
+    },
+    "predicates 3.1.3": {
+      "name": "predicates",
+      "version": "3.1.3",
+      "package_url": "https://github.com/assert-rs/predicates-rs",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/predicates/3.1.3/download",
+          "sha256": "a5d19ee57562043d37e82899fade9a22ebab7be9cef5026b07fda9cdd4293573"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "predicates",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "predicates",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "anstyle 1.0.10",
+              "target": "anstyle"
+            },
+            {
+              "id": "predicates-core 1.0.9",
+              "target": "predicates_core"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "3.1.3"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "predicates-core 1.0.9": {
+      "name": "predicates-core",
+      "version": "1.0.9",
+      "package_url": "https://github.com/assert-rs/predicates-rs/tree/master/crates/core",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/predicates-core/1.0.9/download",
+          "sha256": "727e462b119fe9c93fd0eb1429a5f7647394014cf3c04ab2c0350eeb09095ffa"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "predicates_core",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "predicates_core",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "edition": "2021",
+        "version": "1.0.9"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
+    "predicates-tree 1.0.12": {
+      "name": "predicates-tree",
+      "version": "1.0.12",
+      "package_url": "https://github.com/assert-rs/predicates-rs/tree/master/crates/tree",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/predicates-tree/1.0.12/download",
+          "sha256": "72dd2d6d381dfb73a193c7fca536518d7caee39fc8503f74e7dc0be0531b425c"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "predicates_tree",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "predicates_tree",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "predicates-core 1.0.9",
+              "target": "predicates_core"
+            },
+            {
+              "id": "termtree 0.5.1",
+              "target": "termtree"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "1.0.12"
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
     },
     "prettyplease 0.2.22": {
       "name": "prettyplease",
@@ -1041,6 +1474,7 @@
         ],
         "crate_features": {
           "common": [
+            "default",
             "proc-macro"
           ],
           "selects": {}
@@ -1107,6 +1541,7 @@
         ],
         "crate_features": {
           "common": [
+            "default",
             "proc-macro"
           ],
           "selects": {}
@@ -1457,6 +1892,44 @@
         "MIT"
       ],
       "license_file": "LICENSE-APACHE"
+    },
+    "termtree 0.5.1": {
+      "name": "termtree",
+      "version": "0.5.1",
+      "package_url": "https://github.com/rust-cli/termtree",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/termtree/0.5.1/download",
+          "sha256": "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "termtree",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "termtree",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "edition": "2021",
+        "version": "0.5.1"
+      },
+      "license": "MIT",
+      "license_ids": [
+        "MIT"
+      ],
+      "license_file": "LICENSE-MIT"
     },
     "unicode-ident 1.0.13": {
       "name": "unicode-ident",
@@ -2294,7 +2767,8 @@
     ]
   },
   "direct_deps": [
-    "bindgen 0.70.1"
+    "bindgen 0.70.1",
+    "mockall 0.13.1"
   ],
   "direct_dev_deps": [],
   "unused_patches": []
