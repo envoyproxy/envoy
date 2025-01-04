@@ -599,6 +599,117 @@ actions:
   EXPECT_TRUE(descriptors_.empty());
 }
 
+TEST_F(ThriftRateLimitPolicyEntryTest, QueryParametersBasicMatch) {
+  std::string yaml = R"EOF(
+actions:
+  - query_parameters:
+      query_parameter_name: x-parameter-name
+      descriptor_key: my_param
+  )EOF";
+
+  initialize(yaml);
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{":path"},
+                                     "/?x-parameter-name=test_value");
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
+                                         default_remote_address_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_param", "test_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(ThriftRateLimitPolicyEntryTest, QueryParametersSkipIfAbsentFalse) {
+  std::string yaml = R"EOF(
+actions:
+  - query_parameters:
+      query_parameter_name: x-parameter-name
+      descriptor_key: my_param
+      skip_if_absent: false
+  )EOF";
+
+  initialize(yaml);
+  // No matching query parameter
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{":path"}, "/no-match");
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
+                                         default_remote_address_);
+  EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(ThriftRateLimitPolicyEntryTest, QueryParametersSkipIfAbsentTrue) {
+  std::string yaml = R"EOF(
+actions:
+  - query_parameters:
+      query_parameter_name: x-parameter-name
+      descriptor_key: my_param
+      skip_if_absent: true
+  )EOF";
+
+  initialize(yaml);
+  // No matching query parameter
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{":path"}, "/no-match");
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
+                                         default_remote_address_);
+  // Descriptor should be added even if the query parameter is missing
+  EXPECT_FALSE(descriptors_.empty());
+}
+
+TEST_F(ThriftRateLimitPolicyEntryTest, QueryParametersMultipleValues) {
+  std::string yaml = R"EOF(
+actions:
+  - query_parameters:
+      query_parameter_name: x-parameter-name
+      descriptor_key: my_param
+  )EOF";
+
+  initialize(yaml);
+  // Multiple values for the same query parameter
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{":path"},
+                                     "/?x-parameter-name=value1&x-parameter-name=value2");
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
+                                         default_remote_address_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_param", "value1"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(ThriftRateLimitPolicyEntryTest, QueryParametersUrlEncoding) {
+  std::string yaml = R"EOF(
+actions:
+  - query_parameters:
+      query_parameter_name: test-parameter
+      descriptor_key: my_param
+  )EOF";
+
+  initialize(yaml);
+  // URL-encoded query parameter
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{":path"},
+                                     "/?test-parameter=hello%20world");
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
+                                         default_remote_address_);
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_param", "hello world"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(ThriftRateLimitPolicyEntryTest, QueryParametersNoMatch) {
+  std::string yaml = R"EOF(
+actions:
+  - query_parameters:
+      query_parameter_name: x-parameter-name
+      descriptor_key: my_param
+  )EOF";
+
+  initialize(yaml);
+  // No matching query parameter name
+  metadata_.requestHeaders().addCopy(Http::LowerCaseString{":path"},
+                                     "/?different-parameter=test_value");
+
+  rate_limit_entry_->populateDescriptors(route_, descriptors_, "service_cluster", metadata_,
+                                         default_remote_address_);
+  EXPECT_TRUE(descriptors_.empty());
+}
+
 } // namespace
 } // namespace Router
 } // namespace ThriftProxy

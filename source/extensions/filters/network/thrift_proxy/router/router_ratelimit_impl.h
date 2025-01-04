@@ -41,6 +41,26 @@ public:
 };
 
 /**
+ * Action for query parameters rate limiting.
+ */
+class QueryParametersAction : public RateLimitAction {
+public:
+  QueryParametersAction(const envoy::config::route::v3::RateLimit::Action::QueryParameters& action)
+      : query_param_name_(action.query_parameter_name()), descriptor_key_(action.descriptor_key()),
+        skip_if_absent_(action.skip_if_absent()) {}
+
+  // Ratelimit::RateLimitAction
+  bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
+                          const std::string& local_service_cluster, const MessageMetadata& metadata,
+                          const Network::Address::Instance& remote_address) const override;
+
+private:
+  const std::string query_param_name_;
+  const std::string descriptor_key_;
+  const bool skip_if_absent_;
+};
+
+/**
  * Action for request headers rate limiting.
  */
 class RequestHeadersAction : public RateLimitAction {

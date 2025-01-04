@@ -407,6 +407,16 @@ new_features:
   change: |
     Add the option to reduce the rate limit budget based on request/response contexts on stream done.
     See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
+- area: ratelimit
+  change: |
+    added support for use of dynamic metadata :ref:`dynamic_metadata
+    <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>` as a ratelimit action.
+- area: ratelimit
+  change: |
+    added support for query parameter rate limiting via the :ref:`query_parameters
+    <envoy_v3_api_field_config.route.v3.RateLimit.Action.query_parameters>` action across HTTP and Thrift. This allows
+    rate limiting based on specific query parameter values, with option to control the behavior when the query parameter
+    is absent.
 
 deprecated:
 - area: rbac
