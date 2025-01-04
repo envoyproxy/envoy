@@ -379,6 +379,11 @@ public:
       sampled_ = sampled;
       return *this;
     }
+    StreamOptions&
+    setMetadataMatchCriteria(const Envoy::Router::MetadataMatchCriteria* metadata_match) {
+      this->metadata_match = metadata_match;
+      return *this;
+    }
 
     StreamOptions& setSidestreamWatermarkCallbacks(SidestreamWatermarkCallbacks* callbacks) {
       sidestream_watermark_callbacks = callbacks;
@@ -444,6 +449,8 @@ public:
     absl::optional<bool> sampled_{true};
     // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
     Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
+    // MetadataMatchCriteria to be associated to the new stream
+    const Envoy::Router::MetadataMatchCriteria* metadata_match;
   };
 
   /**
