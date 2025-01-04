@@ -4,7 +4,6 @@
 #![allow(dead_code)]
 
 pub mod buffer;
-use abi::envoy_dynamic_module_type_module_http_header;
 pub use buffer::EnvoyBuffer;
 use mockall::predicate::*;
 use mockall::*;
@@ -340,7 +339,7 @@ pub trait EnvoyHttpFilter {
     &mut self,
     status_code: u32,
     headers: Vec<(&'a str, &'b [u8])>,
-    body: Option<&'c str>,
+    body: Option<&'c [u8]>,
   );
 }
 
@@ -501,28 +500,18 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn send_response(&mut self, status_code: u32, headers: Vec<(&str, &[u8])>, body: Option<&str>) {
+  fn send_response(&mut self, status_code: u32, headers: Vec<(&str, &[u8])>, body: Option<&[u8]>) {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
 
-    let headers_c: Vec<envoy_dynamic_module_type_module_http_header> = headers
-      .iter()
-      .map(
-        |(key, value)| envoy_dynamic_module_type_module_http_header {
-          key_ptr: key.as_ptr() as *mut _,
-          key_length: key.len(),
-          value_ptr: value.as_ptr() as *mut _,
-          value_length: value.len(),
-        },
-      )
-      .collect();
+    let headers_ptr = headers.as_ptr() as *mut abi::envoy_dynamic_module_type_module_http_header;
 
     unsafe {
       abi::envoy_dynamic_module_callback_http_send_response(
         self.raw_ptr,
         status_code,
-        headers_c.as_ptr() as *mut _,
-        headers_c.len(),
+        headers_ptr,
+        headers.len(),
         body_ptr as *mut _,
         body_length,
       )

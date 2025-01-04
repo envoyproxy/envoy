@@ -1,4 +1,3 @@
-#include "source/common/common/logger.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
@@ -213,7 +212,7 @@ void envoy_dynamic_module_callback_http_send_response(
         const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
         const absl::string_view value(static_cast<const char*>(header->value_ptr),
                                       header->value_length);
-        headers.addCopy(Http::LowerCaseString(key), std::string(value));
+        headers.addCopy(Http::LowerCaseString(key), value);
       }
     };
   }

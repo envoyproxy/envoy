@@ -77,7 +77,7 @@ fn test_header_callbacks_on_request_headers_local_resp() {
             ("header1", "value1".as_bytes()),
             ("header2", "value2".as_bytes()),
           ]
-        && *body == Some("Hello, World!")
+        && *body == Some(b"Hello, World!")
     })
     .once()
     .return_const(());

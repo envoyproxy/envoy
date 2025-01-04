@@ -256,7 +256,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
         ("header1", "value1".as_bytes()),
         ("header2", "value2".as_bytes()),
       ],
-      Some("Hello, World!"),
+      Some(b"Hello, World!"),
     );
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   }
