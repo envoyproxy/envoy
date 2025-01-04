@@ -149,14 +149,14 @@ The aggregate cluster uses a tiered load balancing algorithm with two main steps
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
 
 .. note::
-   By default, the :ref:`overprovisioning factor <arch_overview_load_balancing_overprovisioning_factor>` is ``1.4``.
+   By default, the :ref:`overprovisioning factor <arch_overview_load_balancing_overprovisioning_factor>` is **1.4**.
    This factor boosts lower health percentages to account for partial availability. For instance, if a priority level is
-   ``80%`` healthy, multiplying by ``1.4`` results in ``112%``, which is capped at ``100%``. In other words, any product
-   above ``100%`` is treated as ``100%``.
+   **80%** healthy, multiplying by **1.4** results in **112%**, which is capped at **100%**. In other words, any product
+   above **100%** is treated as **100%**.
 
 The aggregate cluster load balancer first calculates each priority's health score for every cluster, sums those up,
-and then assigns traffic based on the overall total. If the total is at least ``100``, the combined traffic is capped at
-``100%``. If it's below ``100``, Envoy scales (normalizes) it so that the final distribution sums to ``100%``.
+and then assigns traffic based on the overall total. If the total is at least **100**, the combined traffic is capped at
+**100%**. If it's below **100**, Envoy scales (normalizes) it so that the final distribution sums to **100%**.
 
 Scenario A: Total Health ≥ 100
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -210,7 +210,7 @@ Scenario B: Total Health < 100
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Sometimes the health scores add up to less than **100**. In that case, Envoy 'normalizes' them so that each cluster and
-priority still receives a portion out of ``100%``.
+priority still receives a portion out of 100%.
 
 For instance, consider:
 
@@ -234,11 +234,11 @@ For instance, consider:
 
 2. Total raw health = 28 + 28 = **56** (below 100).
 
-3. Normalize so that the final total is ``100%``.
+3. Normalize so that the final total is 100%.
 
    * Both clusters end up at ``28 / 56 = 50%``.
 
-Thus each cluster, primary and secondary, receives ``50%`` of the traffic. And since all of each cluster's share is in
+Thus each cluster, primary and secondary, receives 50% of the traffic. And since all of each cluster's share is in
 the **Priority 0** (28 points) and the others are 0, the final distribution is:
 
 * Primary: ``{50%, 0%, 0%}``
@@ -246,8 +246,8 @@ the **Priority 0** (28 points) and the others are 0, the final distribution is:
 
 These scenarios show how Envoy's aggregate cluster load balancer decides which cluster (and priority level) gets traffic,
 depending on the overall health of the endpoints. When the summed health across all clusters and priorities reaches or
-exceeds ``100``, Envoy caps the total at ``100%`` and allocates accordingly. If the total is below ``100``, Envoy scales
-up proportionally so that all traffic still adds up to ``100%``.
+exceeds **100**, Envoy caps the total at **100%** and allocates accordingly. If the total is below **100**, Envoy scales
+up proportionally so that all traffic still adds up to **100%**.
 
 Within each cluster, priority levels are also respected and allocated traffic based on their computed health scores.
 
@@ -256,7 +256,7 @@ Putting It All Together
 
 To sum this up in pseudo algorithms:
 
-* Calculates each priority level's health score using ``(healthy% × overprovisioning factor)``, capped at ``100%``.
+* Calculates each priority level's health score using ``(healthy% × overprovisioning factor)``, capped at **100%**.
 * Sums and optionally normalizes total health across clusters.
 * Computes each cluster's share of overall traffic i.e. its "cluster priority load".
 * Distributes traffic among the priorities within each cluster according to their health scores.
