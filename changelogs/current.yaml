@@ -407,6 +407,16 @@ new_features:
   change: |
     Add the option to reduce the rate limit budget based on request/response contexts on stream done.
     See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
+- area: tcp_proxy
+  change: |
+    Added support for :ref:`backoff_options
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.RetryOptions.backoff_options>`
+    to configure the backoff strategy for TCP proxy retries.
+- area: udp_proxy
+  change: |
+    Added support for :ref:`backoff_options
+    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions.backoff_options>`
+    to configure the backoff strategy for UDP proxy retries when tunneling over HTTP.
 
 deprecated:
 - area: rbac
@@ -423,3 +433,9 @@ deprecated:
   change: |
     The :ref:`aws_iam extension <envoy_v3_api_msg_config.grpc_credential.v3.AwsIamConfig>` is deprecated and will be
     deleted from Envoy in a future release, no later than Envoy 1.35, but possibly sooner.
+- area: tcp_proxy
+  change: |
+    deprecated :ref:`max_connect_attempts
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.max_connect_attempts>` in favour
+    of :ref:`max_connect_attempts
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.RetryOptions.max_connect_attempts>`.
