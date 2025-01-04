@@ -11542,6 +11542,50 @@ virtual_hosts:
             shared_config.ignorePathParametersInPathMatching());
 }
 
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithTraceSampled) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains: ["*"]
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+      # Policy with explicit trace_sampled set to false
+      - cluster: some_cluster
+        trace_sampled: false
+      # Policy with explicit trace_sampled set to true
+      - cluster: some_cluster2
+        trace_sampled: true
+      # Policy with no trace_sampled specified (should default to true)
+      - cluster: some_cluster3
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www2", "some_cluster", "some_cluster2", "some_cluster3"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    const auto& shadow_policies = config.route(headers, 0)->routeEntry()->shadowPolicies();
+
+    // First policy should have trace sampled = false
+    EXPECT_TRUE(shadow_policies[0]->hasTraceSampledConf());
+    EXPECT_FALSE(shadow_policies[0]->traceSampled());
+
+    // Second policy should have trace sampled = true
+    EXPECT_TRUE(shadow_policies[1]->hasTraceSampledConf());
+    EXPECT_TRUE(shadow_policies[1]->traceSampled());
+
+    // Since the config is unspecified for the third policy, trace sampled should default to true
+    EXPECT_FALSE(shadow_policies[2]->hasTraceSampledConf());
+    EXPECT_TRUE(shadow_policies[2]->traceSampled());
+  }
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

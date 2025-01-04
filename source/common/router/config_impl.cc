@@ -490,6 +490,7 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Stat
     default_value_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   }
   trace_sampled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, trace_sampled, true);
+  has_trace_sampled_ = config.has_trace_sampled();
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)

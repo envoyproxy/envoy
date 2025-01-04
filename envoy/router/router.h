@@ -541,6 +541,11 @@ public:
   virtual bool traceSampled() const PURE;
 
   /**
+   * @return true if the config has `trace_sampled` set.
+   */
+  virtual bool hasTraceSampledConf() const PURE;
+
+  /**
    * @return true if host name should be suffixed with "-shadow".
    */
   virtual bool disableShadowHostSuffixAppend() const PURE;

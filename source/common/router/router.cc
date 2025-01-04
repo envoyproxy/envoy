@@ -444,6 +444,14 @@ void Filter::chargeUpstreamCode(Http::Code code,
   chargeUpstreamCode(response_status_code, *fake_response_headers, upstream_host, dropped);
 }
 
+absl::optional<bool> getSampleValueFromShadowPolicy(const ShadowPolicy& shadow_policy) {
+  // If trace sampling is not explicitly configured in shadow_policy, we pass null optional to
+  // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
+  // disabled.
+  return shadow_policy.hasTraceSampledConf() ? absl::make_optional(shadow_policy.traceSampled())
+                                             : absl::nullopt;
+}
+
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   downstream_headers_ = &headers;
 
@@ -802,7 +810,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               .setTimeout(timeout_.global_timeout_)
               .setParentSpan(callbacks_->activeSpan())
               .setChildSpanName("mirror")
-              .setSampled(shadow_policy.traceSampled())
+              .setSampled(getSampleValueFromShadowPolicy(shadow_policy))
               .setIsShadow(true)
               .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
               .setBufferAccount(callbacks_->account())
@@ -1066,12 +1074,11 @@ void Filter::maybeDoShadowing() {
     if (shadow_trailers_) {
       request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
     }
-
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(timeout_.global_timeout_)
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
-                       .setSampled(shadow_policy.traceSampled())
+                       .setSampled(getSampleValueFromShadowPolicy(shadow_policy))
                        .setIsShadow(true)
                        .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend());
     options.setFilterConfig(config_);

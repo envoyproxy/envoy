@@ -117,6 +117,11 @@ minor_behavior_changes:
     config because existing provider already has up to date routes config.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.normalize_rds_provider_config`` to false.
+- area: router
+  change: |
+    Changed the behavior of shadow request sampling so that if trace sampling is not explicitly configured in the shadow
+    policy, the shadow request will inherit the parent's sampling decision. This means sampling will follow the trace
+    sampling policy of the original request, which prevents oversampling when runtime sampling is disabled.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
