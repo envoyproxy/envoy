@@ -29,6 +29,20 @@ public:
    * @return false When sending the request failed.
    */
   virtual bool log(const ExportTraceServiceRequest& request) = 0;
+
+  /**
+   * @brief Logs as debug the number of exported spans.
+   *
+   * @param request The protobuf-encoded OTLP trace request.
+   */
+  void logExportedSpans(const ExportTraceServiceRequest& request) {
+    if (request.resource_spans(0).has_resource()) {
+      if (request.resource_spans(0).scope_spans(0).has_scope()) {
+        ENVOY_LOG(debug, "Number of exported spans: {}",
+                  request.resource_spans(0).scope_spans(0).spans_size());
+      }
+    }
+  }
 };
 
 using OpenTelemetryTraceExporterPtr = std::unique_ptr<OpenTelemetryTraceExporter>;

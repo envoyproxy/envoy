@@ -42,6 +42,7 @@ void OpenTelemetryGrpcTraceExporter::onFailure(Grpc::Status::GrpcStatus status,
 bool OpenTelemetryGrpcTraceExporter::log(const ExportTraceServiceRequest& request) {
   client_->send(service_method_, request, *this, Tracing::NullSpan::instance(),
                 Http::AsyncClient::RequestOptions());
+  OpenTelemetryTraceExporter::logExportedSpans(request);
   return true;
 }
 
