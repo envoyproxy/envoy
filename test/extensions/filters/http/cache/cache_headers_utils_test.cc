@@ -496,9 +496,7 @@ TEST(GetAllMatchingHeaderNames, EmptyHeaderMap) {
 
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("accept");
-  ruleset.emplace_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher, context));
+  ruleset.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
@@ -513,9 +511,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchSingleValue) {
 
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("accept");
-  ruleset.emplace_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher, context));
+  ruleset.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
@@ -531,9 +527,7 @@ TEST(GetAllMatchingHeaderNames, SingleMatchMultiValue) {
 
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("accept");
-  ruleset.emplace_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher, context));
+  ruleset.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
@@ -549,13 +543,9 @@ TEST(GetAllMatchingHeaderNames, MultipleMatches) {
 
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("accept");
-  ruleset.emplace_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher, context));
+  ruleset.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
   matcher.set_exact("accept-language");
-  ruleset.emplace_back(
-      std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-          matcher, context));
+  ruleset.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
 
   CacheHeadersUtils::getAllMatchingHeaderNames(headers, ruleset, result);
 
