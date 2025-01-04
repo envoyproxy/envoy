@@ -5,6 +5,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/common/cancel_wrapper.h"
+#include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -44,6 +46,11 @@ public:
   virtual Extensions::Common::Aws::Signer& signer() PURE;
 
   /**
+   * @return the config's credentials provider.
+   */
+  virtual Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentialsProvider() PURE;
+
+  /**
    * @return the filter stats.
    */
   virtual FilterStats& stats() PURE;
@@ -66,16 +73,22 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class FilterConfigImpl : public FilterConfig {
 public:
-  FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
-                   Stats::Scope& scope, const std::string& host_rewrite, bool use_unsigned_payload);
+  FilterConfigImpl(
+      Extensions::Common::Aws::SignerPtr&& signer,
+      Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider,
+      const std::string& stats_prefix, Stats::Scope& scope, const std::string& host_rewrite,
+      bool use_unsigned_payload);
 
   Extensions::Common::Aws::Signer& signer() override;
+  Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentialsProvider() override;
+
   FilterStats& stats() override;
   const std::string& hostRewrite() const override;
   bool useUnsignedPayload() const override;
 
 private:
   Extensions::Common::Aws::SignerPtr signer_;
+  Envoy::Extensions::Common::Aws::CredentialsProviderSharedPtr credentials_provider_;
   FilterStats stats_;
   std::string host_rewrite_;
   const bool use_unsigned_payload_;
@@ -87,7 +100,11 @@ private:
 class Filter : public Http::PassThroughDecoderFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const std::shared_ptr<FilterConfig>& config);
-
+  ~Filter() override {
+    if (cancel_callback_) {
+      cancel_callback_();
+    }
+  }
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -96,6 +113,11 @@ public:
 
 private:
   FilterConfig& getConfig() const;
+  Http::FilterHeadersStatus
+  decodeHeadersCredentialsAvailable(Envoy::Extensions::Common::Aws::Credentials credentials);
+  Http::FilterDataStatus
+  decodeDataCredentialsAvailable(Envoy::Extensions::Common::Aws::Credentials credentials);
+  Envoy::CancelWrapper::CancelFunction cancel_callback_;
 
   std::shared_ptr<FilterConfig> config_;
   Http::RequestHeaderMap* request_headers_{};
