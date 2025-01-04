@@ -124,8 +124,6 @@ HttpTcpBridge::HttpTcpBridge(Router::UpstreamToDownstream* upstream_request,
   plugin_name.data = config->pluginName().data();
   plugin_name.len = config->pluginName().length();
 
-  route_name_ = upstream_request_->route().virtualHost().routeConfig().name();
-
   upstream_conn_data_->connection().enableHalfClose(true);
   upstream_conn_data_->addUpstreamCallbacks(*this);
 }
@@ -314,6 +312,7 @@ void HttpTcpBridge::encodeDataGo(Buffer::Instance& data, bool end_stream) {
       s, end_stream ? 1 : 0, reinterpret_cast<uint64_t>(&data), data.length());
 
   encoding_state_.handleDataGolangStatus(static_cast<HttpTcpBridgeStatus>(go_status), end_stream);
+  ENVOY_LOG(debug, "golang http-tcp bridge encodeDataGo, state: {}", encoding_state_.stateStr());
 
   if (encoding_state_.filterState() == FilterState::Done ||
       encoding_state_.filterState() == FilterState::WaitingData) {
@@ -322,12 +321,12 @@ void HttpTcpBridge::encodeDataGo(Buffer::Instance& data, bool end_stream) {
 }
 
 void HttpTcpBridge::sendDataToDownstream(Buffer::Instance& data, bool end_stream) {
+  // we can send resp headers only one time.
   if (!already_send_resp_headers_) {
     ENVOY_LOG(debug, "golang http-tcp bridge send resp headers to downstream. end_stream: {}",
               end_stream);
-    // we can send resp headers only one time.
+    // if go side not set status, c++ side set default status
     if (!decoding_state_.resp_headers->Status()) {
-      // if go side not set status, c++ side set default status
       decoding_state_.resp_headers->setStatus(static_cast<uint64_t>(HttpStatusCode::Success));
     }
     upstream_request_->decodeHeaders(std::move(decoding_state_.resp_headers), false);
@@ -528,7 +527,7 @@ CAPIStatus HttpTcpBridge::getStringValue(int id, uint64_t* value_data, int* valu
   // it on the Go side.
   switch (static_cast<EnvoyValue>(id)) {
   case EnvoyValue::RouteName:
-    str_value_ = route_name_;
+    str_value_ = upstream_request_->route().virtualHost().routeConfig().name();
     break;
   case EnvoyValue::ClusterName: {
     str_value_ = route_entry_->clusterName();

@@ -33,6 +33,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"sync"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
@@ -40,6 +41,8 @@ import (
 
 var (
 	ErrDupRequestKey = errors.New("dup request key")
+
+	ErrorInfoForPanic = "error happened in golang http-tcp bridge\r\n"
 )
 
 var Requests = &requestMap{}
@@ -118,10 +121,8 @@ func getRequest(r *C.httpRequest) *httpRequest {
 }
 
 //export envoyGoHttpTcpBridgeOnEncodeHeader
-func envoyGoHttpTcpBridgeOnEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, buffer, length uint64) uint64 {
+func envoyGoHttpTcpBridgeOnEncodeHeader(s *C.processState, endStream, headerNum, headerBytes, buffer, length uint64) (status uint64) {
 	state := getOrCreateState(s)
-	defer state.RecoverPanic()
-
 	req := state.request
 	buf := &httpBuffer{
 		state:               state,
@@ -139,14 +140,21 @@ func envoyGoHttpTcpBridgeOnEncodeHeader(s *C.processState, endStream, headerNum,
 			},
 		},
 	}
+
+	defer func() {
+		if e := recover(); e != nil {
+			api.LogErrorf("go side: golang http-tcp bridge: encodeHeader: panic serving: %v\n%s", e, debug.Stack())
+			status = uint64(api.HttpTcpBridgeContinue)
+			buf.SetString(ErrorInfoForPanic)
+		}
+	}()
+
 	return uint64(filter.EncodeHeaders(header, buf, endStream == uint64(api.EndStream)))
 }
 
 //export envoyGoHttpTcpBridgeOnEncodeData
-func envoyGoHttpTcpBridgeOnEncodeData(s *C.processState, endStream, buffer, length uint64) uint64 {
+func envoyGoHttpTcpBridgeOnEncodeData(s *C.processState, endStream, buffer, length uint64) (status uint64) {
 	state := getOrCreateState(s)
-	defer state.RecoverPanic()
-
 	req := state.request
 	buf := &httpBuffer{
 		state:               state,
@@ -156,15 +164,21 @@ func envoyGoHttpTcpBridgeOnEncodeData(s *C.processState, endStream, buffer, leng
 
 	filter := req.httpTcpBridge
 
+	defer func() {
+		if e := recover(); e != nil {
+			api.LogErrorf("go side: golang http-tcp bridge: encodeData: panic serving: %v\n%s", e, debug.Stack())
+			status = uint64(api.HttpTcpBridgeContinue)
+			buf.SetString(ErrorInfoForPanic)
+		}
+	}()
+
 	return uint64(filter.EncodeData(buf, endStream == uint64(api.EndStream)))
 }
 
 //export envoyGoHttpTcpBridgeOnUpstreamData
-func envoyGoHttpTcpBridgeOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes, buffer, length uint64) uint64 {
+func envoyGoHttpTcpBridgeOnUpstreamData(s *C.processState, endStream, headerNum, headerBytes, buffer, length uint64) (status uint64) {
 
 	state := getOrCreateState(s)
-	defer state.RecoverPanic()
-
 	req := state.request
 	buf := &httpBuffer{
 		state:               state,
@@ -183,6 +197,14 @@ func envoyGoHttpTcpBridgeOnUpstreamData(s *C.processState, endStream, headerNum,
 		},
 	}
 
+	defer func() {
+		if e := recover(); e != nil {
+			api.LogErrorf("go side: golang http-tcp bridge: onUpstreamData: panic serving: %v\n%s", e, debug.Stack())
+			status = uint64(api.HttpTcpBridgeEndStream)
+			buf.SetString(ErrorInfoForPanic)
+		}
+	}()
+
 	return uint64(filter.OnUpstreamData(header, buf, endStream == uint64(api.EndStream)))
 }
 
@@ -190,7 +212,12 @@ func envoyGoHttpTcpBridgeOnUpstreamData(s *C.processState, endStream, headerNum,
 func envoyGoHttpTcpBridgeOnDestroy(r *C.httpRequest) {
 	req := getRequest(r)
 	// do nothing even when get panic, since filter is already destroying.
-	defer req.recoverPanic()
+	defer func() {
+		if e := recover(); e != nil {
+			buf := debug.Stack()
+			api.LogErrorf("go side: golang http-tcp bridge: httpRequest: panic serving: %v\n%s", e, buf)
+		}
+	}()
 
 	f := req.httpTcpBridge
 	f.OnDestroy()

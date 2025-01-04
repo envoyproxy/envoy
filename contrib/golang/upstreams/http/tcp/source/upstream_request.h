@@ -185,10 +185,6 @@ public:
 
   const Router::RouteEntry* route_entry_;
 
-  // cache routeName for getStringValue, since
-  // upstream_request_->route().virtualHost().routeConfig().name() is not concurrent safe.
-  std::string route_name_;
-
 private:
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;

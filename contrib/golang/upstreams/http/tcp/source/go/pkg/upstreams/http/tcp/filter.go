@@ -32,7 +32,6 @@ package tcp
 */
 import "C"
 import (
-	"runtime/debug"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
@@ -46,31 +45,13 @@ type httpRequest struct {
 	encodingState processState
 }
 
-// processState implements the FilterCallbacks interface.
 type processState struct {
 	request      *httpRequest
 	processState *C.processState
 }
 
-func (s *processState) RecoverPanic() {
-	if e := recover(); e != nil {
-		buf := debug.Stack()
-		api.LogErrorf("go side: golang http-tcp bridge: processState: panic serving: %v\n%s", e, buf)
-		// do nothing to retrun default value in origin func to continue normal status in c side.
-		// we DO NOT send local reply(panic) to c in order to avoid data race when upstream full-duplex.
-	}
-}
-
 func (r *httpRequest) pluginName() string {
 	return C.GoStringN(r.req.plugin_name.data, C.int(r.req.plugin_name.len))
-}
-
-// recover goroutine to stop Envoy process crashing when panic happens
-func (r *httpRequest) recoverPanic() {
-	if e := recover(); e != nil {
-		buf := debug.Stack()
-		api.LogErrorf("o side: golang http-tcp bridge: httpRequest: panic serving: %v\n%s", e, buf)
-	}
 }
 
 func (r *httpRequest) GetRouteName() string {

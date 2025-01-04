@@ -55,6 +55,7 @@ type httpTcpBridge struct {
 *
 */
 func (f *httpTcpBridge) EncodeHeaders(headerMap api.RequestHeaderMap, dataToUpstream api.BufferInstance, endOfStream bool) api.HttpTcpBridgeStatus {
+	api.LogInfof("[EncodeHeaders] come, endStream: %v", endOfStream)
 	// =========== step 1: get dubbo method and interface from http header =========== //
 	dubboMethod, _ := headerMap.Get("dubbo_method")
 	dubboInterface, _ := headerMap.Get("dubbo_interface")
