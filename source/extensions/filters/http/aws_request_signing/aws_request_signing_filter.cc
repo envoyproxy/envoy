@@ -84,19 +84,25 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // If we are pending credentials, send the decodeHeadersCredentialsAvailable callback for when
   // they become available, and stop iteration.
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+    [this] (Envoy::Extensions::Common::Aws::Credentials credentials) {
+  decodeHeadersCredentialsAvailable(credentials);
+}, &cancel_callback_);
+
   if (config.credentialsProvider()->credentialsPending(
-
-          Envoy::CancelWrapper::cancelWrapped(
-              [this, &dispatcher = decoder_callbacks_->dispatcher()](
-                  Envoy::Extensions::Common::Aws::Credentials credentials) {
-                dispatcher.post([this, credentials]() {
-                  this->decodeHeadersCredentialsAvailable(credentials);
-                });
-              },
-              &cancel_callback_)
-
-              )) {
-    ENVOY_LOG_MISC(debug, "Credentials are pending");
+          config,
+          [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)](Envoy::Extensions::Common::Aws::Credentials credentials) mutable
+          {
+            dispatcher.post(
+              [creds = std::move(credentials), cb = std::move(completion_cb)]() mutable
+              {
+                cb(creds);
+              }
+            );
+          }
+  ))
+  {
+   ENVOY_LOG_MISC(debug, "Credentials are pending");
     return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
   } else {
     ENVOY_LOG_MISC(debug, "Credentials are not pending");
@@ -119,7 +125,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   // If we are pending credentials, send the decodeDataCredentialsAvailable callback for when they
   // become available, and stop iteration.
-  if (config.credentialsProvider()->credentialsPending(Envoy::CancelWrapper::cancelWrapped(
+  if (config.credentialsProvider()->credentialsPending(config, Envoy::CancelWrapper::cancelWrapped(
 
           [this, &dispatcher = decoder_callbacks_->dispatcher()](
               Envoy::Extensions::Common::Aws::Credentials credentials) {

@@ -180,12 +180,12 @@ void MetadataCredentialsProviderBase::initializeTlsAndCluster() {
 
   tls_slot_->set(
       [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(*this); });
-  createCluster(true);
+  createCluster(true, cluster_name_, cluster_type_, uri_);
 }
 
-void MetadataCredentialsProviderBase::createCluster(bool new_timer) {
+void MetadataCredentialsProviderBase::createCluster(bool new_timer, std::string cluster_name, const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, std::string uri ) {
 
-  auto cluster = Utility::createInternalClusterStatic(cluster_name_, cluster_type_, uri_);
+  auto cluster = Utility::createInternalClusterStatic(cluster_name, cluster_type, uri);
   // Async credential refresh timer. Only create this if it is the first time we're creating a
   // cluster
   if (new_timer) {
@@ -196,7 +196,7 @@ void MetadataCredentialsProviderBase::createCluster(bool new_timer) {
 
     // Store the timer in pending cluster list for use in onClusterAddOrUpdate
     cluster_load_handle_ = std::make_unique<LoadClusterEntryHandleImpl>(
-        (*tls_slot_)->pending_clusters_, cluster_name_, cache_duration_timer_);
+        (*tls_slot_)->pending_clusters_, cluster_name, cache_duration_timer_);
 
     const auto cluster_type_str = envoy::config::cluster::v3::Cluster::DiscoveryType_descriptor()
                                       ->FindValueByNumber(cluster.type())
@@ -207,7 +207,7 @@ void MetadataCredentialsProviderBase::createCluster(bool new_timer) {
     ENVOY_LOG_MISC(info,
                    "Added a {} internal cluster [name: {}, address:{}] to fetch aws "
                    "credentials",
-                   cluster_type_str, cluster_name_, host_port);
+                   cluster_type_str, cluster_name, host_port);
   }
 
   THROW_IF_NOT_OK(context_->clusterManager().addOrUpdateCluster(cluster, "").status());
@@ -260,15 +260,16 @@ void MetadataCredentialsProviderBase::ThreadLocalCredentialsCache::onClusterRemo
     if (!already_creating_) {
       parent_.stats_->clusters_removed_by_cds_.inc();
       // Recreate our cluster if it has been deleted via CDS
-      parent_.context_->mainThreadDispatcher().post([this]() { parent_.createCluster(false); });
+      parent_.context_->mainThreadDispatcher().post([this]() { parent_.createCluster(false, parent_.cluster_name_,parent_.cluster_type_, parent_.uri_); });
       ENVOY_LOG_MISC(debug, "Re-adding async credential cluster {}", parent_.cluster_name_);
     }
   }
 };
 
-bool MetadataCredentialsProviderBase::credentialsPending(CredentialsPendingCallback&& cb) {
+bool MetadataCredentialsProviderBase::credentialsPending(ABSL_ATTRIBUTE_UNUSED Envoy::Extensions::HttpFilters::AwsRequestSigningFilter::FilterConfig& config, CredentialsPendingCallback&& cb) {
   if (cb) {
     ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
+    Thread::LockGuard guard(mu_);
     credential_pending_callbacks_.push_back(std::move(cb));
   }
   return credentials_pending_;
@@ -834,17 +835,16 @@ void ContainerCredentialsProvider::onMetadataError(Failure reason) {
 
 WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
     const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-        web_identity_config,
-    absl::string_view cluster_name = {})
+        web_identity_config)
     : MetadataCredentialsProviderBase(
-          context.api(), context, nullptr, create_metadata_fetcher_cb, cluster_name,
-          envoy::config::cluster::v3::Cluster::LOGICAL_DNS /*cluster_type*/, sts_endpoint,
+          context.api(), context, nullptr, create_metadata_fetcher_cb, Utility::getSTSEndpoint(region),
+          envoy::config::cluster::v3::Cluster::LOGICAL_DNS /*cluster_type*/, Utility::getSTSEndpoint(region),
           refresh_state, initialization_timer),
-      sts_endpoint_(sts_endpoint), role_arn_(web_identity_config.role_arn()),
+      sts_endpoint_(Utility::getSTSEndpoint(region)), role_arn_(web_identity_config.role_arn()),
       role_session_name_(web_identity_config.role_session_name()) {
 
   auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
@@ -857,6 +857,15 @@ WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
     web_identity_data_source_provider_.reset();
   }
 }
+
+// CredentialsProviderSharedPtr WebIdentityCredentialsProvider::createInstance(const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+//             web_identity_config,
+//         absl::string_view region)
+//         {
+//           const std::string sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
+//           auto role_arn = web_identity_config.role_arn();
+
+//         }
 
 bool WebIdentityCredentialsProvider::needsRefresh() {
 
@@ -1010,9 +1019,9 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
   handleFetchDone();
 }
 
-bool CredentialsProviderChain::credentialsPending(CredentialsPendingCallback&& cb) {
+bool CredentialsProviderChain::credentialsPending(Envoy::Extensions::HttpFilters::AwsRequestSigningFilter::FilterConfig& config, CredentialsPendingCallback&& cb) {
   for (auto& provider : providers_) {
-    if (provider->credentialsPending(std::move(cb))) {
+    if (provider->credentialsPending(config, std::move(cb))) {
       ENVOY_LOG_MISC(debug, "Credentials are pending");
       return true;
     }
@@ -1082,8 +1091,8 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
     add(factories.createWebIdentityCredentialsProvider(
-        context, context.singletonManager(), MetadataFetcher::create, sts_endpoint, refresh_state,
-        initialization_timer, web_identity, cluster_name));
+        context, context.singletonManager(), MetadataFetcher::create, region, refresh_state,
+        initialization_timer, web_identity));
   }
 
   if (credential_provider_config.has_credentials_file_provider()) {
@@ -1135,19 +1144,19 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
          !web_identity.web_identity_token_data_source().environment_variable().empty()) &&
         !web_identity.role_arn().empty()) {
 
-      const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
+      // const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
       // const auto region_uuid = absl::StrCat(region, "_",
       // context->api().randomGenerator().uuid());
 
-      const auto cluster_name = stsClusterName(region);
+      // const auto cluster_name = stsClusterName(region);
 
       ENVOY_LOG(
           debug,
-          "Using web identity credentials provider with STS endpoint: {} and session name: {}",
-          sts_endpoint, web_identity.role_session_name());
+          "Using web identity credentials provider with region {} and session name: {}",
+          region, web_identity.role_session_name());
       add(factories.createWebIdentityCredentialsProvider(
-          context.value(), context->singletonManager(), MetadataFetcher::create, sts_endpoint,
-          refresh_state, initialization_timer, web_identity, cluster_name));
+          context.value(), context->singletonManager(), MetadataFetcher::create, region,
+          refresh_state, initialization_timer, web_identity));
     }
   }
 
@@ -1232,37 +1241,36 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
 }
 CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context, Singleton::Manager& singleton_manager,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
     const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-        web_identity_config,
-    absl::string_view cluster_name) const {
+        web_identity_config) const {
   return singleton_manager.getTyped<WebIdentityCredentialsProvider>(
       SINGLETON_MANAGER_REGISTERED_NAME(web_identity_credentials_provider),
-      [&context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
-       web_identity_config, cluster_name] {
+      [&context, create_metadata_fetcher_cb, region, refresh_state, initialization_timer,
+       web_identity_config] {
         return std::make_shared<WebIdentityCredentialsProvider>(
-            context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
-            web_identity_config, cluster_name);
+            context, create_metadata_fetcher_cb, region, refresh_state, initialization_timer,
+            web_identity_config);
       });
 };
 
 CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context, Singleton::Manager& singleton_manager,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
     const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-        web_identity_config,
-    absl::string_view cluster_name) const {
+        web_identity_config) const {
+  ENVOY_LOG_MISC(debug, "**************** Instantiating web identity with region {} role arn {} session name{}", region, web_identity_config.role_arn(), web_identity_config.role_session_name());
   return singleton_manager.getTyped<WebIdentityCredentialsProvider>(
       SINGLETON_MANAGER_REGISTERED_NAME(web_identity_credentials_provider),
-      [&context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
-       web_identity_config, cluster_name] {
+      [&context, create_metadata_fetcher_cb, region, refresh_state, initialization_timer,
+       web_identity_config] {
         return std::make_shared<WebIdentityCredentialsProvider>(
-            context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
-            web_identity_config, cluster_name);
+            context, create_metadata_fetcher_cb, region, refresh_state, initialization_timer,
+            web_identity_config);
       });
 };
 

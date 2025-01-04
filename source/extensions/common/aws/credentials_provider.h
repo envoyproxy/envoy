@@ -10,6 +10,16 @@
 
 namespace Envoy {
 namespace Extensions {
+namespace HttpFilters {
+namespace AwsRequestSigningFilter {
+class FilterConfig;
+}
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
+
+namespace Envoy {
+namespace Extensions {
 namespace Common {
 namespace Aws {
 
@@ -74,7 +84,10 @@ public:
    *
    * @return bool true if credentials are pending, false otherwise
    */
-  virtual bool credentialsPending(ABSL_ATTRIBUTE_UNUSED CredentialsPendingCallback&& cb) {
+  virtual bool credentialsPending(
+       ABSL_ATTRIBUTE_UNUSED Envoy::Extensions::HttpFilters::AwsRequestSigningFilter::FilterConfig&
+          config,
+       ABSL_ATTRIBUTE_UNUSED CredentialsPendingCallback&& cb) {
     return false;
   }
 };
