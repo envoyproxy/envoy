@@ -144,7 +144,7 @@ func envoyGoHttpTcpBridgeOnEncodeHeader(s *C.processState, endStream, headerNum,
 	defer func() {
 		if e := recover(); e != nil {
 			api.LogErrorf("go side: golang http-tcp bridge: encodeHeader: panic serving: %v\n%s", e, debug.Stack())
-			status = uint64(api.HttpTcpBridgeContinue)
+			status = uint64(api.HttpTcpBridgeEndStream)
 			buf.SetString(ErrorInfoForPanic)
 		}
 	}()
@@ -167,7 +167,7 @@ func envoyGoHttpTcpBridgeOnEncodeData(s *C.processState, endStream, buffer, leng
 	defer func() {
 		if e := recover(); e != nil {
 			api.LogErrorf("go side: golang http-tcp bridge: encodeData: panic serving: %v\n%s", e, debug.Stack())
-			status = uint64(api.HttpTcpBridgeContinue)
+			status = uint64(api.HttpTcpBridgeEndStream)
 			buf.SetString(ErrorInfoForPanic)
 		}
 	}()

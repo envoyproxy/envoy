@@ -221,7 +221,7 @@ const (
 func (f *httpTcpBridge) OnUpstreamData(responseHeaderForSet api.ResponseHeaderMap, buffer api.BufferInstance, endOfStream bool) api.HttpTcpBridgeStatus {
 	api.LogInfof("[OnUpstreamData] receive body, len: %d", buffer.Len())
 
-	// panic("rrr")
+	panic("rrr")
 
 	responseHeaderForSet.Set("a", "1")
 	responseHeaderForSet.Set("b", "1")

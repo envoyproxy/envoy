@@ -70,6 +70,12 @@ void EncodingProcessorState::handleHeaderGolangStatus(HttpTcpBridgeStatus status
     setFilterState(FilterState::WaitingAllData);
     break;
 
+  case HttpTcpBridgeStatus::HttpTcpBridgeEndStream:
+    // end stream, send resp to downstream.
+
+    setFilterState(FilterState::EndStream);
+    break;
+
   default:
     PANIC(fmt::format("golang http-tcp bridge handleHeaderGolangStatus unexpected go_tatus: {}",
                       int(status)));
@@ -117,6 +123,12 @@ void EncodingProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus st
                         int(status)));
     }
     setFilterState(FilterState::WaitingAllData);
+    break;
+
+  case HttpTcpBridgeStatus::HttpTcpBridgeEndStream:
+    // end stream, send resp to downstream.
+
+    setFilterState(FilterState::EndStream);
     break;
 
   default:

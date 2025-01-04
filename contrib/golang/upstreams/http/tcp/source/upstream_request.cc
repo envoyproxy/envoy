@@ -148,6 +148,9 @@ Envoy::Http::Status HttpTcpBridge::encodeHeaders(const Envoy::Http::RequestHeade
   ENVOY_LOG(debug, "golang http-tcp bridge encodeHeaders, header size: {}, end_stream: {}",
             headers.size(), end_stream);
 
+  // init response headers here since go side may return EndStream status.
+  initResponse();
+  
   encoding_state_.req_headers = &headers;
   encoding_state_.setFilterState(FilterState::ProcessingHeader);
   Buffer::OwnedImpl buffer;
@@ -159,6 +162,13 @@ Envoy::Http::Status HttpTcpBridge::encodeHeaders(const Envoy::Http::RequestHeade
 
   encoding_state_.handleHeaderGolangStatus(static_cast<HttpTcpBridgeStatus>(go_status));
   ENVOY_LOG(debug, "golang http-tcp bridge encodeHeaders, state: {}", encoding_state_.stateStr());
+
+  if (encoding_state_.filterState() == FilterState::EndStream) {
+    // TODO(duxin40): use golang to specify status-code when EndStream.
+    end_stream = true;
+    sendDataToDownstream(buffer, end_stream);
+    return Envoy::Http::okStatus();
+  }
 
   // if go side set data for buffer, then we send it to upstream
   bool send_data_to_upstream = (buffer.length() != 0);
@@ -222,8 +232,6 @@ void HttpTcpBridge::resetStream() {
 void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "golang http-tcp bridge onUpstreamData, data length: {}, end_stream: {}",
             data.length(), end_stream);
-
-  initResponse();
 
   decoding_state_.setFilterState(FilterState::ProcessingData);
   auto s = dynamic_cast<processState*>(&decoding_state_);
@@ -313,6 +321,13 @@ void HttpTcpBridge::encodeDataGo(Buffer::Instance& data, bool end_stream) {
 
   encoding_state_.handleDataGolangStatus(static_cast<HttpTcpBridgeStatus>(go_status), end_stream);
   ENVOY_LOG(debug, "golang http-tcp bridge encodeDataGo, state: {}", encoding_state_.stateStr());
+
+  if (encoding_state_.filterState() == FilterState::EndStream) {
+    // TODO(duxin40): use golang to specify status-code when EndStream.
+    end_stream = true;
+    sendDataToDownstream(data, end_stream);
+    return;
+  }
 
   if (encoding_state_.filterState() == FilterState::Done ||
       encoding_state_.filterState() == FilterState::WaitingData) {

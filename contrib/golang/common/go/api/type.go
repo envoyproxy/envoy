@@ -491,35 +491,49 @@ type HttpTcpBridgeStatus int
 
 const (
 	/**
-	* Area of status: encodeHeaders, encodeData, onUpstreamData
-	*
-	* Used when you want to leave the current func area and continue further func. (when streaming, go side get each_data_piece, may be called multipled times)
-	*
-	* Here is the specific explanation in different funcs:
-	* encodeHeaders: will go to encodeData, go side in encodeData will streaming get each_data_piece.
-	* encodeData: streaming send data to upstream, go side get each_data_piece, may be called multipled times.
-	* onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data and headers to downstream streaming.
+	 *
+	 * Used when you want to leave the current func area and continue further func. (when streaming,
+	 * go side get each_data_piece, may be called multipled times)
+	 *
+	 * Here is the specific explanation in different funcs:
+	 *
+	 * encodeHeaders: will go to encodeData, go side in encodeData will streaming get each_data_piece.
+	 *
+	 * encodeData: streaming send data to upstream, go side get each_data_piece, may be called
+	 * multipled times.
+	 *
+	 * onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data
+	 * and headers to downstream streaming.
 	 */
 	HttpTcpBridgeContinue HttpTcpBridgeStatus = 0
 
 	/**
-	 * Area of status: encodeHeaders, encodeData, onUpstreamData
-	 *
-	 * Used when you want to buffer data.
-	 *
-	 * Here is the specific explanation in different funcs:
-	 * encodeHeaders: will go to encodeData, encodeData will buffer whole data, go side in encodeData get whole data one-off.
-	 * encodeData: buffer further whole data, go side in encodeData get whole data one-off. (Be careful: cannot bed used when end_stream=true)
-	 * onUpstreamData: every data trigger will call go side, and go side get buffer data from start.
+	*
+	* Used when you want to buffer data.
+	*
+	* Here is the specific explanation in different funcs:
+	*
+	* encodeHeaders: will go to encodeData, encodeData will buffer whole data, go side in encodeData
+	* get whole data one-off.
+	*
+	* encodeData: buffer further whole data, go side in encodeData get whole
+	* data one-off. (Be careful: cannot be used when end_stream=true)
+	*
+	* onUpstreamData: every data
+	* trigger will call go side, and go side get whloe buffered data ever since at every time.
 	 */
 	HttpTcpBridgeStopAndBuffer HttpTcpBridgeStatus = 1
 
-	/** Area of status: onUpstreamData
-	 *
-	 * Used when you want to endStream for sending data to downstream in onUpstreamData.
-	 *
-	 * Here is the specific explanation in different funcs:
-	 * onUpstreamData: endStream to downstream which means the whole resp to http is finished.
+	/**
+	*
+	* Used when you want to endStream for sending resp to downstream.
+	*
+	* Here is the specific explanation in different funcs:
+	*
+	* encodeHeaders, encodeData: endStream to upstream&downstream and send data to
+	* downstream(if not blank), which means the whole resp to http has finished.
+	*
+	* onUpstreamData: endStream to downstream which means the whole resp to http has finished.
 	 */
 	HttpTcpBridgeEndStream HttpTcpBridgeStatus = 2
 )
