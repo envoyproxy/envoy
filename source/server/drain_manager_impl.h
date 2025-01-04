@@ -28,14 +28,18 @@ public:
   Network::DrainDirection drainDirection() const override;
 
   // Server::DrainManager
-  void startDrainSequence(Network::DrainDirection direction, std::function<void()> drain_complete_cb) override;
+  void startDrainSequence(Network::DrainDirection direction,
+                          std::function<void()> drain_complete_cb) override;
   bool draining() const override { return draining_.load().first; }
   void startParentShutdownSequence() override;
 
 private:
   Instance& server_;
   const envoy::config::listener::v3::Listener::DrainType drain_type_;
-  using DrainPair = struct {bool first; Network::DrainDirection second;};
+  using DrainPair = struct {
+    bool first;
+    Network::DrainDirection second;
+  };
   std::atomic<DrainPair> draining_{DrainPair{false, Network::DrainDirection::None}};
   Event::TimerPtr drain_tick_timer_;
   MonotonicTime drain_deadline_;

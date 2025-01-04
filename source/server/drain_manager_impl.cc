@@ -63,11 +63,10 @@ bool DrainManagerImpl::drainClose() const {
          (server_.api().randomGenerator().random() % drain_time_count);
 }
 
-Network::DrainDirection DrainManagerImpl::drainDirection() const {
-  return draining_.load().second;
-}
+Network::DrainDirection DrainManagerImpl::drainDirection() const { return draining_.load().second; }
 
-void DrainManagerImpl::startDrainSequence(Network::DrainDirection direction, std::function<void()> drain_complete_cb) {
+void DrainManagerImpl::startDrainSequence(Network::DrainDirection direction,
+                                          std::function<void()> drain_complete_cb) {
   ASSERT(!drain_tick_timer_);
   drain_tick_timer_ = server_.dispatcher().createTimer(drain_complete_cb);
 

@@ -93,7 +93,6 @@ Network::DrainDirection PerFilterChainFactoryContextImpl::drainDirection() const
     direction = parent_context_.drainDecision().drainDirection();
   } else {
     direction = Network::DrainDirection::None;
-
   }
   return direction;
 }

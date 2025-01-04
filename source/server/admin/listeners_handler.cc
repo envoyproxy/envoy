@@ -36,11 +36,12 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
       if (stop_listeners_type == ListenerManager::StopListenersType::InboundOnly) {
         direction = Network::DrainDirection::InboundOnly;
       }
-      server_.drainManager().startDrainSequence(direction, [this, stop_listeners_type, skip_exit]() {
-        if (!skip_exit) {
-          server_.listenerManager().stopListeners(stop_listeners_type, {});
-        }
-      });
+      server_.drainManager().startDrainSequence(
+          direction, [this, stop_listeners_type, skip_exit]() {
+            if (!skip_exit) {
+              server_.listenerManager().stopListeners(stop_listeners_type, {});
+            }
+          });
     }
   } else {
     server_.listenerManager().stopListeners(stop_listeners_type, {});

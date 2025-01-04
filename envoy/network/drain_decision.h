@@ -33,9 +33,7 @@ public:
    */
   virtual bool drainClose() const PURE;
 
-  virtual DrainDirection drainDirection() const {
-    return DrainDirection::None;
-  };
+  virtual DrainDirection drainDirection() const { return DrainDirection::None; };
 };
 
 } // namespace Network
