@@ -547,7 +547,9 @@ TEST_F(FilterStateMatcher, MatchAbsentFilterState) {
   matcher.set_key("test.key");
   matcher.mutable_string_match()->set_exact("exact");
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
-  EXPECT_FALSE(Matchers::FilterStateMatcher(matcher, context_).match(filter_state));
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
 class TestObject : public StreamInfo::FilterState::Object {
@@ -567,7 +569,9 @@ TEST_F(FilterStateMatcher, MatchFilterStateWithoutString) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(key, std::make_shared<TestObject>(absl::nullopt),
                        StreamInfo::FilterState::StateType::ReadOnly);
-  EXPECT_FALSE(Matchers::FilterStateMatcher(matcher, context_).match(filter_state));
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
 TEST_F(FilterStateMatcher, MatchFilterStateDifferentString) {
@@ -580,7 +584,9 @@ TEST_F(FilterStateMatcher, MatchFilterStateDifferentString) {
   filter_state.setData(key,
                        std::make_shared<TestObject>(absl::make_optional<std::string>("different")),
                        StreamInfo::FilterState::StateType::ReadOnly);
-  EXPECT_FALSE(Matchers::FilterStateMatcher(matcher, context_).match(filter_state));
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
 TEST_F(FilterStateMatcher, MatchFilterState) {
@@ -592,7 +598,105 @@ TEST_F(FilterStateMatcher, MatchFilterState) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
   filter_state.setData(key, std::make_shared<TestObject>(absl::make_optional<std::string>(value)),
                        StreamInfo::FilterState::StateType::ReadOnly);
-  EXPECT_TRUE(Matchers::FilterStateMatcher(matcher, context_).match(filter_state));
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
+}
+
+TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv4) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  auto* cidrv4 = matcher.mutable_address_match()->add_ranges();
+  cidrv4->set_address_prefix("4.5.6.7");
+  cidrv4->mutable_prefix_len()->set_value(32);
+  auto* cidrv6 = matcher.mutable_address_match()->add_ranges();
+  cidrv6->set_address_prefix("2001:db8::");
+  cidrv6->mutable_prefix_len()->set_value(32);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(
+      key,
+      std::make_shared<Network::Address::InstanceAccessor>(
+          Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.7", 456, false)),
+      StreamInfo::FilterState::StateType::Mutable);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
+}
+
+TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv4) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  auto* cidrv4 = matcher.mutable_address_match()->add_ranges();
+  cidrv4->set_address_prefix("4.5.6.7");
+  cidrv4->mutable_prefix_len()->set_value(32);
+  auto* cidrv6 = matcher.mutable_address_match()->add_ranges();
+  cidrv6->set_address_prefix("2001:db8::");
+  cidrv6->mutable_prefix_len()->set_value(32);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(
+      key,
+      std::make_shared<Network::Address::InstanceAccessor>(
+          Envoy::Network::Utility::parseInternetAddressNoThrow("4.5.6.8", 456, false)),
+      StreamInfo::FilterState::StateType::Mutable);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
+}
+
+TEST_F(FilterStateMatcher, MatchFilterStateAddressMatchIpv6) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  auto* cidrv4 = matcher.mutable_address_match()->add_ranges();
+  cidrv4->set_address_prefix("4.5.6.7");
+  cidrv4->mutable_prefix_len()->set_value(32);
+  auto* cidrv6 = matcher.mutable_address_match()->add_ranges();
+  cidrv6->set_address_prefix("2001:db8::");
+  cidrv6->mutable_prefix_len()->set_value(32);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(
+      key,
+      std::make_shared<Network::Address::InstanceAccessor>(
+          Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db8::1", 8080, false)),
+      StreamInfo::FilterState::StateType::Mutable);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_TRUE((*filter_state_matcher)->match(filter_state));
+}
+
+TEST_F(FilterStateMatcher, NoMatchFilterStateAddressMatchIpv6) {
+  const std::string key = "test.key";
+  const std::string value = "exact_value";
+  envoy::type::matcher::v3::FilterStateMatcher matcher;
+  matcher.set_key(key);
+  auto* cidrv4 = matcher.mutable_address_match()->add_ranges();
+  cidrv4->set_address_prefix("4.5.6.7");
+  cidrv4->mutable_prefix_len()->set_value(32);
+  auto* cidrv6 = matcher.mutable_address_match()->add_ranges();
+  cidrv6->set_address_prefix("2001:db8::");
+  cidrv6->mutable_prefix_len()->set_value(32);
+
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  filter_state.setData(
+      key,
+      std::make_shared<Network::Address::InstanceAccessor>(
+          Envoy::Network::Utility::parseInternetAddressNoThrow("2001:db7::1", 8080, false)),
+      StreamInfo::FilterState::StateType::Mutable);
+
+  auto filter_state_matcher = Matchers::FilterStateMatcher::create(matcher, context_);
+  ASSERT_TRUE(filter_state_matcher.ok());
+  EXPECT_FALSE((*filter_state_matcher)->match(filter_state));
 }
 
 } // namespace

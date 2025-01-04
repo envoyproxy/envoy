@@ -6,13 +6,16 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
+#include "source/common/common/filter_state_object_matchers.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/regex.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/path_utility.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/match.h"
+#include "filter_state_object_matchers.h"
 
 namespace Envoy {
 namespace Matchers {
@@ -122,13 +125,22 @@ MetadataMatcher::MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher
 }
 
 namespace {
-StringMatcherPtr valueMatcherFromProto(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
-                                       Server::Configuration::CommonFactoryContext& context) {
+
+absl::StatusOr<FilterStateObjectMatcherPtr>
+filterStateObjectMatcherFromProto(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
+                                  Server::Configuration::CommonFactoryContext& context) {
   switch (matcher.matcher_case()) {
   case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kStringMatch:
-    return std::make_unique<const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-        matcher.string_match(), context);
+    return std::make_unique<FilterStateStringMatcher>(
+        std::make_unique<const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            matcher.string_match(), context));
     break;
+  case envoy::type::matcher::v3::FilterStateMatcher::MatcherCase::kAddressMatch: {
+    auto ip_list = Network::Address::IpList::create(matcher.address_match().ranges());
+    RETURN_IF_NOT_OK_REF(ip_list.status());
+    return std::make_unique<FilterStateIpRangeMatcher>(std::move(*ip_list));
+    break;
+  }
   default:
     PANIC_DUE_TO_PROTO_UNSET;
   }
@@ -136,17 +148,27 @@ StringMatcherPtr valueMatcherFromProto(const envoy::type::matcher::v3::FilterSta
 
 } // namespace
 
-FilterStateMatcher::FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
-                                       Server::Configuration::CommonFactoryContext& context)
-    : key_(matcher.key()), value_matcher_(valueMatcherFromProto(matcher, context)) {}
+absl::StatusOr<FilterStateMatcherPtr>
+FilterStateMatcher::create(const envoy::type::matcher::v3::FilterStateMatcher& config,
+                           Server::Configuration::CommonFactoryContext& context) {
+  absl::StatusOr<FilterStateObjectMatcherPtr> matcher =
+      filterStateObjectMatcherFromProto(config, context);
+  if (!matcher.ok()) {
+    return matcher.status();
+  }
+  return std::make_unique<FilterStateMatcher>(config.key(), std::move(*matcher));
+}
+
+FilterStateMatcher::FilterStateMatcher(std::string key,
+                                       FilterStateObjectMatcherPtr&& object_matcher)
+    : key_(key), object_matcher_(std::move(object_matcher)) {}
 
 bool FilterStateMatcher::match(const StreamInfo::FilterState& filter_state) const {
   const auto* object = filter_state.getDataReadOnlyGeneric(key_);
   if (object == nullptr) {
     return false;
   }
-  const auto string_value = object->serializeAsString();
-  return string_value && value_matcher_->match(*string_value);
+  return object_matcher_->match(*object);
 }
 
 PathMatcherConstSharedPtr

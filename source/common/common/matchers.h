@@ -13,6 +13,7 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
+#include "source/common/common/filter_state_object_matchers.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -239,8 +240,7 @@ private:
 
 class FilterStateMatcher {
 public:
-  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
-                     Server::Configuration::CommonFactoryContext& context);
+  FilterStateMatcher(std::string key, FilterStateObjectMatcherPtr&& object_matcher);
 
   /**
    * Check whether the filter state object is matched to the matcher.
@@ -249,10 +249,16 @@ public:
    */
   bool match(const StreamInfo::FilterState& filter_state) const;
 
+  static absl::StatusOr<std::unique_ptr<FilterStateMatcher>>
+  create(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
+         Server::Configuration::CommonFactoryContext& context);
+
 private:
   const std::string key_;
-  const StringMatcherPtr value_matcher_;
+  const FilterStateObjectMatcherPtr object_matcher_;
 };
+
+using FilterStateMatcherPtr = std::unique_ptr<FilterStateMatcher>;
 
 class PathMatcher : public StringMatcher {
 public:

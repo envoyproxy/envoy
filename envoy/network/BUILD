@@ -13,7 +13,9 @@ envoy_cc_library(
     hdrs = ["address.h"],
     deps = [
         "//envoy/common:base_includes",
+        "//envoy/common:optref_lib",
         "//envoy/common:pure_lib",
+        "//envoy/stream_info:filter_state_interface",
     ],
 )
 

@@ -263,14 +263,13 @@ private:
 class FilterStateMatcher : public Matcher {
 public:
   FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
-                     Server::Configuration::CommonFactoryContext& context)
-      : matcher_(matcher, context) {}
+                     Server::Configuration::CommonFactoryContext& context);
 
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                const StreamInfo::StreamInfo& info) const override;
 
 private:
-  const Envoy::Matchers::FilterStateMatcher matcher_;
+  const Envoy::Matchers::FilterStateMatcherPtr matcher_;
 };
 
 /**
