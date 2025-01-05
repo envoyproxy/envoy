@@ -434,6 +434,10 @@ new_features:
   change: |
     Added :ref:`routeName() <config_http_filters_lua_stream_info_route_name>` API to the Stream Info Object to get the
     name of the route matched by the filter chain.
+- area: lua
+  change: |
+    Added :ref:`virtualClusterName() <config_http_filters_lua_stream_info_virtual_cluster_name>` API to the Stream Info
+    Object to get the name of the virtual cluster matched.
 
 deprecated:
 - area: rbac
