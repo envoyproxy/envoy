@@ -407,6 +407,10 @@ new_features:
   change: |
     Add the option to reduce the rate limit budget based on request/response contexts on stream done.
     See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
+- area: lua
+  change: |
+    Added :ref:`routeName() <config_http_filters_lua_stream_info_route_name>` API to the Stream Info Object to get the
+    name of the route matched by the filter chain.
 
 deprecated:
 - area: rbac
