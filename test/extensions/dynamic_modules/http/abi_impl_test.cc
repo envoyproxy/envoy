@@ -341,8 +341,8 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponse) {
   std::list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   size_t header_count = headers.size();
-  envoy_dynamic_module_type_module_http_header* header_array =
-      new envoy_dynamic_module_type_module_http_header[header_count];
+  auto header_array =
+      std::make_unique<envoy_dynamic_module_type_module_http_header[]>(header_count);
 
   size_t index = 0;
   for (const auto& [key, value] : headers) {
@@ -360,16 +360,16 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponse) {
     EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[1]->value().getStringView(), "value2");
   }));
 
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array, header_count,
-                                                   nullptr, 0);
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array.get(),
+                                                   header_count, nullptr, 0);
 }
 
 TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
   std::list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   size_t header_count = headers.size();
-  envoy_dynamic_module_type_module_http_header* header_array =
-      new envoy_dynamic_module_type_module_http_header[header_count];
+  auto header_array =
+      std::make_unique<envoy_dynamic_module_type_module_http_header[]>(header_count);
 
   size_t index = 0;
   for (const auto& [key, value] : headers) {
@@ -390,7 +390,7 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
     EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[0]->value().getStringView(), "value1");
     EXPECT_EQ(headers.get(Http::LowerCaseString("multi"))[1]->value().getStringView(), "value2");
   }));
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array, 3, body,
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array.get(), 3, body,
                                                    body_length);
 }
 
@@ -400,8 +400,8 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseFromEncoderWithBody) {
   std::list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   size_t header_count = headers.size();
-  envoy_dynamic_module_type_module_http_header* header_array =
-      new envoy_dynamic_module_type_module_http_header[header_count];
+  auto header_array =
+      std::make_unique<envoy_dynamic_module_type_module_http_header[]>(header_count);
 
   size_t index = 0;
   for (const auto& [key, value] : headers) {
@@ -419,8 +419,9 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseFromEncoderWithBody) {
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
                                                  testing::Eq(0), testing::Eq("dynamic_module")));
-  // Note that there is no assertion on encodeHeaders_() because upstream filters defer to the downstream filter manager to send the reply
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array, 3, body,
+  // Note that there is no assertion on encodeHeaders_() because upstream filters defer to the
+  // downstream filter manager to send the reply
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array.get(), 3, body,
                                                    body_length);
 }
 

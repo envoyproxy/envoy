@@ -142,8 +142,8 @@ typedef struct {
 } envoy_dynamic_module_type_module_http_header;
 
 /**
- * envoy_dynamic_module_type_http_header represents a key-value pair of an HTTP header owned by Envoy's
- * HeaderMap.
+ * envoy_dynamic_module_type_http_header represents a key-value pair of an HTTP header owned by
+ * Envoy's HeaderMap.
  */
 typedef struct {
   envoy_dynamic_module_type_buffer_envoy_ptr key_ptr;

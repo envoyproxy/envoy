@@ -93,10 +93,10 @@ FilterMetadataStatus DynamicModuleHttpFilter::encodeMetadata(MetadataMap&) {
   return FilterMetadataStatus::Continue;
 }
 
-void DynamicModuleHttpFilter::sendLocalReply(Code code, absl::string_view body,
-                                             std::function<void(ResponseHeaderMap& headers)> modify_headers,
-                                             const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                                             absl::string_view details) {
+void DynamicModuleHttpFilter::sendLocalReply(
+    Code code, absl::string_view body,
+    std::function<void(ResponseHeaderMap& headers)> modify_headers,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   if (sent_local_reply_) {
     return;
   }
