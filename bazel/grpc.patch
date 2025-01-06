@@ -24,6 +24,19 @@ index f65a41fbe3..0a1e3dc631 100644
      ],
  )
  
+diff --git a/src/core/lib/promise/detail/promise_factory.h b/src/core/lib/promise/detail/promise_factory.h
+index a4cd1bacc8..8a21719cc7 100644
+--- a/src/core/lib/promise/detail/promise_factory.h
++++ b/src/core/lib/promise/detail/promise_factory.h
+@@ -188,7 +188,7 @@ class OncePromiseFactory {
+   GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit OncePromiseFactory(F f)
+       : f_(std::move(f)) {}
+ 
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Promise Make(Arg&& a) {
++  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline Promise Make(Arg&& a) {
+     return PromiseFactoryImpl(std::move(f_), std::forward<Arg>(a));
+   }
+ };
 diff --git a/third_party/BUILD b/third_party/BUILD
 index 77cb52d0fc..5f69f71978 100644
 --- a/third_party/BUILD
