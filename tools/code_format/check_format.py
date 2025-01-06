@@ -892,7 +892,7 @@ class FormatChecker:
 
     def check_source_path(self, file_path):
         error_messages = []
-        if (self.run_code_validation):
+        if self.run_code_validation:
             error_messages = self.check_file_contents(file_path, self.check_source_line)
         if not file_path.endswith(self.config.suffixes["proto"]):
             error_messages += self.check_namespace(file_path)
