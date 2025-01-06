@@ -191,6 +191,10 @@ bug_fixes:
   change: |
     Fix incorrect handling of non-101 1xx responses. This fix can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`` to false.
+- area: dns_cache
+  change: |
+    Fixed a bug where the DNS refresh rate was the DNS TTL instead of the configured dns_refresh_rate/dns_failure_refresh_rate
+    when we failed to resolve the DNS query after a successful resolution.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -244,7 +248,8 @@ new_features:
   change: |
     Added an optional field :ref:`credential_provider
     <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>`
-    to the AWS request signing filter to explicitly specify a source for AWS credentials.
+    to the AWS request signing filter to explicitly specify a source for AWS credentials. Credential file and AssumeRoleWithWebIdentity
+    behaviour can also be overridden with this field.
 - area: tls
   change: |
     Added support for P-384 and P-521 curves for TLS server certificates.

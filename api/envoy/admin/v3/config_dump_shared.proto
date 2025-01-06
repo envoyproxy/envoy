@@ -39,6 +39,11 @@ enum ClientResourceStatus {
 
   // Client received this resource and replied with NACK.
   NACKED = 4;
+
+  // Client received an error from the control plane. The attached config
+  // dump is the most recent accepted one. If no config is accepted yet,
+  // the attached config dump will be empty.
+  CLIENT_RECEIVED_ERROR = 5;
 }
 
 message UpdateFailureState {

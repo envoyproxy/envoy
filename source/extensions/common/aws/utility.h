@@ -140,9 +140,18 @@ public:
    * @return true if profile file could be read and searched.
    * @return false if profile file could not be read.
    */
-  static bool resolveProfileElements(const std::string& profile_file,
-                                     const std::string& profile_name,
-                                     absl::flat_hash_map<std::string, std::string>& elements);
+
+  static bool
+  resolveProfileElementsFromString(const std::string& string_data, const std::string& profile_name,
+                                   absl::flat_hash_map<std::string, std::string>& elements);
+
+  static bool
+  resolveProfileElementsFromFile(const std::string& profile_file, const std::string& profile_name,
+                                 absl::flat_hash_map<std::string, std::string>& elements);
+
+  static bool
+  resolveProfileElementsFromStream(std::istream& stream, const std::string& profile_name,
+                                   absl::flat_hash_map<std::string, std::string>& elements);
 
   /**
    * @brief Return the path of AWS credential file, following environment variable expansions
