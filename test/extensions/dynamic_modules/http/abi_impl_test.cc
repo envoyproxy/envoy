@@ -319,7 +319,11 @@ TEST(ABIImpl, dynamic_metadata) {
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, value));
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_number));
-  EXPECT_EQ(result_number, value); // Round trip.
+  EXPECT_EQ(result_number, value);
+  // Wrong type.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_str_ptr,
+      &result_str_length));
 
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, value_ptr, value_length));
@@ -327,7 +331,10 @@ TEST(ABIImpl, dynamic_metadata) {
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_str_ptr,
       &result_str_length));
   EXPECT_EQ(result_str_length, value_length);
-  EXPECT_EQ(std::string(result_str_ptr, result_str_length), value_str); // Round trip.
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), value_str);
+  // Wrong type.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_number));
 }
 
 } // namespace HttpFilters

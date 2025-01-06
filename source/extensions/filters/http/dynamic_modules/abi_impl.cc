@@ -289,6 +289,13 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
   if (!key_metadata) {
     return false;
   }
+  if (!key_metadata->has_number_value()) {
+    ENVOY_LOG_TO_LOGGER(
+        Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+        fmt::format("key {} is not a number",
+                    absl::string_view(static_cast<const char*>(key_ptr), key_length)));
+    return false;
+  }
   *result = key_metadata->number_value();
   return true;
 }
@@ -319,6 +326,13 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
   const auto key_metadata = getDynamicMetadataValue(filter_envoy_ptr, namespace_ptr,
                                                     namespace_length, key_ptr, key_length);
   if (!key_metadata) {
+    return false;
+  }
+  if (!key_metadata->has_string_value()) {
+    ENVOY_LOG_TO_LOGGER(
+        Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
+        fmt::format("key {} is not a string",
+                    absl::string_view(static_cast<const char*>(key_ptr), key_length)));
     return false;
   }
   const auto& value = key_metadata->string_value();

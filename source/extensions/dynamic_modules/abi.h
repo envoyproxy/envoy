@@ -634,7 +634,8 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
 /**
  * envoy_dynamic_module_callback_http_get_dynamic_metadata_number is called by the module to get
  * the number value of the dynamic metadata with the given namespace and key. If the metadata is not
- * accessible, the namespace does not exist, or the key does not exist, this returns false.
+ * accessible, the namespace does not exist, the key does not exist or the value is not a number,
+ * this returns false.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -675,7 +676,8 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
 /**
  * envoy_dynamic_module_callback_http_get_dynamic_metadata_string is called by the module to get
  * the string value of the dynamic metadata with the given namespace and key. If the metadata is not
- * accessible, the namespace does not exist, or the key does not exist, this returns false.
+ * accessible, the namespace does not exist, the key does not exist or the value is not a string,
+ * this returns false.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.

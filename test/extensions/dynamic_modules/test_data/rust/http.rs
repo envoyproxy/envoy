@@ -256,6 +256,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     envoy_filter.set_dynamic_metadata_number("ns_req_header", "key", 123f64);
     let ns_req_header = envoy_filter.get_dynamic_metadata_number("ns_req_header", "key");
     assert_eq!(ns_req_header, Some(123f64));
+    // Try getting a number as string.
+    let ns_req_header = envoy_filter.get_dynamic_metadata_string("ns_req_header", "key");
+    assert!(ns_req_header.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
@@ -272,6 +275,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     let ns_req_body = envoy_filter.get_dynamic_metadata_string("ns_req_body", "key");
     assert!(ns_req_body.is_some());
     assert_eq!(ns_req_body.unwrap().as_slice(), b"value");
+    // Try getting a string as number.
+    let ns_req_body = envoy_filter.get_dynamic_metadata_number("ns_req_body", "key");
+    assert!(ns_req_body.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
   }
 
@@ -287,6 +293,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     envoy_filter.set_dynamic_metadata_number("ns_res_header", "key", 123f64);
     let ns_res_header = envoy_filter.get_dynamic_metadata_number("ns_res_header", "key");
     assert_eq!(ns_res_header, Some(123f64));
+    // Try getting a number as string.
+    let ns_res_header = envoy_filter.get_dynamic_metadata_string("ns_res_header", "key");
+    assert!(ns_res_header.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 
@@ -302,6 +311,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     envoy_filter.set_dynamic_metadata_string("ns_res_body", "key", "value");
     let ns_res_body = envoy_filter.get_dynamic_metadata_string("ns_res_body", "key");
     assert!(ns_res_body.is_some());
+    // Try getting a string as number.
+    let ns_res_body = envoy_filter.get_dynamic_metadata_number("ns_res_body", "key");
+    assert!(ns_res_body.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }
 }

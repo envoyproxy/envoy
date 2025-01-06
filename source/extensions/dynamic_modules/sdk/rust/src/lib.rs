@@ -332,7 +332,7 @@ pub trait EnvoyHttpFilter {
   fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool;
 
   /// Get the number-typed dynamic metadata value with the given key.
-  /// If the metadata is not found, this returns `None`.
+  /// If the metadata is not found or is the wrong type, this returns `None`.
   fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64>;
 
   /// Set the number-typed dynamic metadata value with the given key.
@@ -340,7 +340,7 @@ pub trait EnvoyHttpFilter {
   fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
 
   /// Get the string-typed dynamic metadata value with the given key.
-  /// If the metadata is not found, this returns `None`.
+  /// If the metadata is not found or is the wrong type, this returns `None`.
   fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer>;
 
   /// Set the string-typed dynamic metadata value with the given key.
