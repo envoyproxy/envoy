@@ -34,7 +34,6 @@
 #include "source/common/http/http1/conn_pool.h"
 #include "source/common/http/http2/conn_pool.h"
 #include "source/common/http/mixed_conn_pool.h"
-#include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/shadow_writer_impl.h"
