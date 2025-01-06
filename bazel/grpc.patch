@@ -38,10 +38,24 @@ index a4cd1bacc8..8a21719cc7 100644
    }
  };
 diff --git a/third_party/BUILD b/third_party/BUILD
-index 77cb52d0fc..5f69f71978 100644
+index 77cb52d0fc..0fd5bae3ab 100644
 --- a/third_party/BUILD
 +++ b/third_party/BUILD
-@@ -30,7 +30,7 @@ alias(
+@@ -18,19 +18,19 @@ package(default_visibility = ["//:__subpackages__"])
+ 
+ alias(
+     name = "libssl",
+-    actual = "@boringssl//:ssl",
++    actual = "@envoy//bazel:boringssl",
+     tags = ["manual"],
+ )
+ 
+ alias(
+     name = "libcrypto",
+-    actual = "@boringssl//:crypto",
++    actual = "@envoy//bazel:crypto",
+     tags = ["manual"],
+ )
  
  alias(
      name = "madler_zlib",
