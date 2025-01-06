@@ -438,7 +438,7 @@ config_setting(
 
 cc_proto_library(
     name = "grpc_health_proto",
-    deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:_health_proto_only"],
+    deps = ["@com_github_grpc_grpc//src/proto/grpc/health/v1:health_proto"],
 )
 
 config_setting(
