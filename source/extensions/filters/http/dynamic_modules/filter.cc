@@ -7,9 +7,7 @@ namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
 
-DynamicModuleHttpFilter::~DynamicModuleHttpFilter() {
-  destroy();
-}
+DynamicModuleHttpFilter::~DynamicModuleHttpFilter() { destroy(); }
 
 void DynamicModuleHttpFilter::initializeInModuleFilter() {
   in_module_filter_ = config_->on_http_filter_new_(config_->in_module_config_, thisAsVoidPtr());
@@ -20,7 +18,7 @@ void DynamicModuleHttpFilter::onStreamComplete() {}
 void DynamicModuleHttpFilter::onDestroy() {
   ENVOY_LOG_MISC(trace, "onDestroy called");
   destroy();
- };
+};
 
 void DynamicModuleHttpFilter::destroy() {
   if (in_module_filter_ == nullptr) {
