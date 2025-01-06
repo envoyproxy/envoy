@@ -336,6 +336,8 @@ pub trait EnvoyHttpFilter {
   fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64>;
 
   /// Set the number-typed dynamic metadata value with the given key.
+  /// If the namespace is not found, this will create a new namespace.
+  ///
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
 
@@ -344,6 +346,8 @@ pub trait EnvoyHttpFilter {
   fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer>;
 
   /// Set the string-typed dynamic metadata value with the given key.
+  /// If the namespace is not found, this will create a new namespace.
+  ///
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
 }

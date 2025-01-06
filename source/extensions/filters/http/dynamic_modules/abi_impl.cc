@@ -204,7 +204,8 @@ bool envoy_dynamic_module_callback_http_get_response_trailers(
  * corresponding HTTP filter.
  * @param namespace_ptr is the namespace of the dynamic metadata.
  * @param namespace_length is the length of the namespace.
- * @param create_if_not_exist is true if the namespace should be created if it does not exist.
+ * @param create_if_not_exist is true if the namespace should be created if it does not exist,
+ * assuming stream info is available.
  * @return the metadata namespace if it exists, nullptr otherwise.
  */
 ProtobufWkt::Struct*
@@ -271,6 +272,7 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
   auto metadata_namespace =
       getDynamicMetadataNamespace(filter_envoy_ptr, namespace_ptr, namespace_length, true);
   if (!metadata_namespace) {
+    // If stream info is not available, we cannot guarantee that the namespace is created.
     return false;
   }
   absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
@@ -308,6 +310,7 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
   auto metadata_namespace =
       getDynamicMetadataNamespace(filter_envoy_ptr, namespace_ptr, namespace_length, true);
   if (!metadata_namespace) {
+    // If stream info is not available, we cannot guarantee that the namespace is created.
     return false;
   }
   absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
