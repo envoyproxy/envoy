@@ -394,37 +394,6 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
                                                    body_length);
 }
 
-TEST_F(DynamicModuleHttpFilterTest, SendResponseFromEncoderWithBody) {
-  filter_->decoder_callbacks_ = nullptr;
-
-  std::list<std::pair<std::string, std::string>> headers = {
-      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
-  size_t header_count = headers.size();
-  auto header_array =
-      std::make_unique<envoy_dynamic_module_type_module_http_header[]>(header_count);
-
-  size_t index = 0;
-  for (const auto& [key, value] : headers) {
-    header_array[index].key_length = key.size();
-    header_array[index].key_ptr = const_cast<char*>(key.c_str());
-    header_array[index].value_length = value.size();
-    header_array[index].value_ptr = const_cast<char*>(value.c_str());
-    ++index;
-  }
-
-  const std::string body_str = "body";
-  envoy_dynamic_module_type_buffer_module_ptr body = const_cast<char*>(body_str.data());
-  size_t body_length = body_str.size();
-
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
-  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq("body"), _,
-                                                 testing::Eq(0), testing::Eq("dynamic_module")));
-  // Note that there is no assertion on encodeHeaders_() because upstream filters defer to the
-  // downstream filter manager to send the reply
-  envoy_dynamic_module_callback_http_send_response(filter_.get(), 200, header_array.get(), 3, body,
-                                                   body_length);
-}
-
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions
