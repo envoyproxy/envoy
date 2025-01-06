@@ -29,7 +29,6 @@ TEST(HttpInspectorConfigFactoryTest, TestCreateFactory) {
 
   Server::Configuration::MockListenerFactoryContext context;
   EXPECT_CALL(context, scope());
-  EXPECT_CALL(context, messageValidationVisitor());
   Network::ListenerFilterFactoryCb cb =
       factory->createListenerFilterFactoryFromProto(*proto_config, nullptr, context);
 
