@@ -781,7 +781,7 @@ name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
-    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_empty_keys.json"
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_empty_keys.json"
   )EOF")),
                               EnvoyException,
                               "No keys found in SPIFFE bundle for domain 'example.com'");
@@ -793,7 +793,7 @@ name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
-    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_invalid_key.json"
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_invalid_key.json"
   )EOF")),
         EnvoyException, "Failed to create x509 object while loading certs in domain 'example.com'");
   }
@@ -804,7 +804,7 @@ name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
-    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_missing_use.json"
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_missing_use.json"
   )EOF")),
         EnvoyException, "missing or invalid 'use' field found in cert for domain 'example.com'");
   }
@@ -814,7 +814,7 @@ name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
-    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_invalid_json.json"
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_invalid_json.json"
   )EOF")),
                               EnvoyException, "Invalid JSON found in SPIFFE bundle");
   }
@@ -824,7 +824,7 @@ name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
-    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_zero_domains.json"
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_zero_domains.json"
   )EOF")),
                               EnvoyException, "No trust domains found in SPIFFE bundle");
   }
@@ -835,7 +835,7 @@ name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
-    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_missing_x5c.json"
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_missing_x5c.json"
   )EOF")),
         EnvoyException, "missing or empty 'x5c' field found in keys for domain: 'example.com'");
   }
@@ -845,7 +845,7 @@ name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
-    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/trust_bundles_invalid_x5c.json"
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_invalid_x5c.json"
   )EOF")),
                               EnvoyException,
                               "Invalid x509 object in certs for domain 'example.com'");

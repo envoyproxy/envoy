@@ -11,8 +11,8 @@ load(
 licenses(["notice"])  # Apache 2
 
 filegroup(
-    name = "trust_bundles",
-    srcs = glob(["trust_bundles*.json*"]),
+    name = "test_data",
+    srcs = glob(["test_data"]),
 )
 
 envoy_package()
