@@ -17,9 +17,8 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzWithDat
     return;
   }
 
-  envoy::extensions::filters::listener::http_inspector::v3::HttpInspector proto_config;
   Stats::IsolatedStoreImpl store;
-  ConfigSharedPtr cfg = std::make_shared<Config>(*store.rootScope(), proto_config);
+  ConfigSharedPtr cfg = std::make_shared<Config>(*store.rootScope());
   auto filter = std::make_unique<Filter>(cfg);
 
   ListenerFilterWithDataFuzzer fuzzer;
