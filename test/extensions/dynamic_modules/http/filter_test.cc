@@ -86,6 +86,64 @@ TEST(DynamiModulesTest, HeaderCallbacks) {
   filter->onDestroy();
 }
 
+TEST(DynamiModulesTest, DynamicMetadataCallbacks) {
+  const std::string filter_name = "dynamic_metadata_callbacks";
+  const std::string filter_config = "";
+  // TODO: Add non-Rust test program once we have non-Rust SDK.
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module.ok());
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, std::move(dynamic_module.value()));
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
+  filter->initializeInModuleFilter();
+
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  filter->setDecoderFilterCallbacks(callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{};
+  Http::TestResponseHeaderMapImpl response_headers{};
+  Buffer::OwnedImpl data;
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter->decodeData(data, false));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
+  EXPECT_EQ(FilterDataStatus::Continue, filter->encodeData(data, false));
+
+  // Check dynamic metadata set by the filter during even hooks.
+  auto ns_req_header = metadata.filter_metadata().find("ns_req_header");
+  ASSERT_NE(ns_req_header, metadata.filter_metadata().end());
+  auto key = ns_req_header->second.fields().find("key");
+  ASSERT_NE(key, ns_req_header->second.fields().end());
+  EXPECT_EQ(key->second.number_value(), 123);
+  auto ns_res_header = metadata.filter_metadata().find("ns_res_header");
+  ASSERT_NE(ns_res_header, metadata.filter_metadata().end());
+  key = ns_res_header->second.fields().find("key");
+  ASSERT_NE(key, ns_res_header->second.fields().end());
+  EXPECT_EQ(key->second.number_value(), 123);
+  auto ns_req_body = metadata.filter_metadata().find("ns_req_body");
+  ASSERT_NE(ns_req_body, metadata.filter_metadata().end());
+  key = ns_req_body->second.fields().find("key");
+  ASSERT_NE(key, ns_req_body->second.fields().end());
+  EXPECT_EQ(key->second.string_value(), "value");
+  auto ns_res_body = metadata.filter_metadata().find("ns_res_body");
+  ASSERT_NE(ns_res_body, metadata.filter_metadata().end());
+  key = ns_res_body->second.fields().find("key");
+  ASSERT_NE(key, ns_res_body->second.fields().end());
+  EXPECT_EQ(key->second.string_value(), "value");
+
+  filter->onDestroy();
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions
