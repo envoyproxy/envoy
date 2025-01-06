@@ -82,14 +82,19 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
   if (config->has_bucket_matchers()) {
     matcher = matcher_factory.create(config->bucket_matchers())();
   }
+  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> preview_matcher = nullptr;
+  if (config->has_preview_bucket_matchers()) {
+    preview_matcher = matcher_factory.create(config->preview_bucket_matchers())();
+  }
 
-  return [&, config = std::move(config), config_with_hash_key, tls_store,
-          matcher](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [&, config = std::move(config), config_with_hash_key, tls_store = std::move(tls_store),
+          matcher = std::move(matcher), preview_matcher = std::move(preview_matcher)](
+             Http::FilterChainFactoryCallbacks& callbacks) -> void {
     std::unique_ptr<RateLimitClient> local_client =
         createLocalRateLimitClient(tls_store->global_client_tls, tls_store->buckets_tls);
 
     callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
-        config, context, std::move(local_client), config_with_hash_key, matcher));
+        config, context, std::move(local_client), config_with_hash_key, matcher, preview_matcher));
   };
 }
 
