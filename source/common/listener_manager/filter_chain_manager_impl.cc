@@ -89,10 +89,8 @@ Network::DrainDirection PerFilterChainFactoryContextImpl::drainDirection() const
   if (is_draining_.load()) {
     // If we're draining at a filter chain level, the direction was all
     direction = Network::DrainDirection::All;
-  } else if (parent_context_.drainDecision().drainDirection() != Network::DrainDirection::None) {
-    direction = parent_context_.drainDecision().drainDirection();
   } else {
-    direction = Network::DrainDirection::None;
+    direction = parent_context_.drainDecision().drainDirection();
   }
   return direction;
 }

@@ -264,6 +264,7 @@ envoy_cc_test_library(
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/common/http:rds_lib",
+        "//source/common/listener_manager:listener_info_lib",
         "//source/common/tracing:custom_tag_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",

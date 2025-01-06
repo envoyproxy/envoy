@@ -149,6 +149,8 @@ public:
   }
 
   Network::DrainDirection drainDirection() const override {
+    // Note: drain_manager knows how to implement the drain direction logic,
+    // so we can trust it.
     auto direction = drain_manager_->drainDirection();
     if (direction == Network::DrainDirection::None) {
       direction = server_.drainManager().drainDirection();
