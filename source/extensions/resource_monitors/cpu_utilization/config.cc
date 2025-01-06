@@ -17,7 +17,7 @@ Server::ResourceMonitorPtr CpuUtilizationMonitorFactory::createResourceMonitorFr
     Server::Configuration::ResourceMonitorFactoryContext& context) {
   // In the future, the below can be configurable based on the operating system.
   TimeSource& time_source = context.api().timeSource();
-  if (config.mode() == envoy::extensions::resource_monitors::cpu_utilization::v3::UtilizationComputeStrategy::CONTAINER){
+  if (config.mode() == envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER) {
     auto cgroup_stats_reader = std::make_unique<LinuxContainerCpuStatsReader>();
     return std::make_unique<CpuUtilizationMonitor>(config, std::move(cgroup_stats_reader), time_source);
   }

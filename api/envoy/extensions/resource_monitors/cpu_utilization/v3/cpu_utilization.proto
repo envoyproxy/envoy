@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.resource_monitors.cpu_utilization.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.resource_monitors.cpu_utilization.v3";
 option java_outer_classname = "CpuUtilizationProto";
@@ -13,12 +12,17 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: CPU utilization]
 // [#extension: envoy.resource_monitors.cpu_utilization]
-enum UtilizationComputeStrategy {
-    HOST = 0;
-    CONTAINER = 1;
-}
-// The CPU utilization resource monitor reports the Envoy process the CPU Utilization of the entire host.
+
+// The CPU utilization resource monitor reports the Envoy process the,
+// CPU Utilization of the entire host if HOST mode is selected, reports
+// Container CPU Utilization if CONTAINER mode is selected. 
 // Today, this only works on Linux and is calculated using the stats in the /proc/stat file.
+// Currently, Container CPU Usage monitor works in Linux K8s environment where cgroup stats
+// are used to calculate the usage.
 message CpuUtilizationConfig {
+    enum UtilizationComputeStrategy {
+        HOST = 0;
+        CONTAINER = 1;
+    }
     UtilizationComputeStrategy mode = 1;
 }

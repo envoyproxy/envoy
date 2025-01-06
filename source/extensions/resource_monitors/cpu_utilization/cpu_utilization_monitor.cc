@@ -44,11 +44,11 @@ CpuUtilizationMonitor::CpuUtilizationMonitor(
 void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   switch (mode_)
   {
-  case envoy::extensions::resource_monitors::cpu_utilization::v3::UtilizationComputeStrategy::HOST:
+  case envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::HOST:
     computeHostCpuUsage(callbacks);
     break;
   
-  case envoy::extensions::resource_monitors::cpu_utilization::v3::UtilizationComputeStrategy::CONTAINER:
+  case envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER:
     computeContainerCpuUsage(callbacks);
     break;
 

@@ -35,7 +35,7 @@ private:
   std::unique_ptr <CgroupStatsReader> cgroup_stats_reader_;
   TimeSource& time_source_;
   MonotonicTime last_update_time_;
-  envoy::extensions::resource_monitors::cpu_utilization::v3::UtilizationComputeStrategy mode_;
+  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig_UtilizationComputeStrategy mode_;
 };
 
 } // namespace CpuUtilizationMonitor
