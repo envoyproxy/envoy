@@ -4,7 +4,7 @@
 /// thought of as an alias to &\[u8\] but the underlying memory is owned by Envoy.
 //
 // Implementation note: The lifetime parameter `'a` is used to ensure that the memory region pointed
-// to by `raw_ptr` is valid for the lifetime of the buffer, which can happen when the mutable
+// to by `raw_ptr` is valid. The invalidation can happen when the mutable
 // methods of [`crate::EnvoyHttpFilter`] are called.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
