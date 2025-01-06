@@ -342,7 +342,8 @@ new_features:
   change: |
     Added new filter state matcher ip_range to
     :ref:`FilterStateMatcher <envoy_api_msg_type.matcher.v3.FilterStateMatcher>` which attempts to
-    cast the filter state object to an IP and match it against a list of CidrRanges.
+    cast the filter state object to an IP and match it against a list of CidrRanges. To support
+    this, also added an :ref:`AddressMatcher <envoy_api_msg_type.matcher.v3.AddressMatcher>`.
 - area: attributes
   change: |
     added new ``xds.virtual_host_name`` and ``xds.virtual_host_metadata`` attributes support. See
