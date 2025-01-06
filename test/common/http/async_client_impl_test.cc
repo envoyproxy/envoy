@@ -22,6 +22,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
@@ -55,6 +56,8 @@ public:
     message_->headers().setPath("/");
     ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
+    ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, transportSocketFactory())
+        .WillByDefault(ReturnRef(socket_factory_));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
     HttpTestUtility::addDefaultHeaders(headers_);
     ON_CALL(cm_.thread_local_cluster_, chooseHost(_))
@@ -96,6 +99,7 @@ public:
   Router::ContextImpl router_context_;
   AsyncClientImpl client_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  testing::NiceMock<Network::MockTransportSocketFactory> socket_factory_;
 };
 
 class AsyncClientImplTracingTest : public AsyncClientImplTest {
@@ -2403,6 +2407,35 @@ TEST_F(AsyncClientImplUnitTest, NullConfig) {
 
 TEST_F(AsyncClientImplUnitTest, NullVirtualHost) {
   EXPECT_EQ(std::numeric_limits<uint32_t>::max(), vhost_.retryShadowBufferLimit());
+}
+
+TEST_F(AsyncClientImplTest, UpstreamTlsScheme) {
+  message_->body().add("test body");
+  Buffer::Instance& data = message_->body();
+
+  Envoy::Ssl::ClientContextSharedPtr sslCtx{new Envoy::Ssl::MockClientContext()};
+  EXPECT_CALL(socket_factory_, sslCtx()).WillRepeatedly(Return(sslCtx));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          }));
+
+  TestRequestHeaderMapImpl copy(message_->headers());
+  copy.addCopy("x-envoy-internal", "true");
+  copy.addCopy("x-forwarded-for", "127.0.0.1");
+  copy.addCopy(":scheme", "https");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&copy), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data), true));
+
+  auto* request = client_.send(std::move(message_), callbacks_, AsyncClient::RequestOptions());
+  EXPECT_NE(request, nullptr);
 }
 
 } // namespace Http
