@@ -102,11 +102,7 @@ void DynamicModuleHttpFilter::sendLocalReply(
   }
 
   sent_local_reply_ = true;
-  if (decoder_callbacks_) {
-    decoder_callbacks_->sendLocalReply(code, body, modify_headers, grpc_status, details);
-  } else if (encoder_callbacks_) {
-    encoder_callbacks_->sendLocalReply(code, body, modify_headers, grpc_status, details);
-  }
+  decoder_callbacks_->sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void DynamicModuleHttpFilter::encodeComplete(){};
