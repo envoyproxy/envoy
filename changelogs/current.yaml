@@ -417,7 +417,7 @@ deprecated:
 - area: cluster
   change: |
     DNS-related fields in :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` are deprecated when using
-    strict and logical dns clusters. Instead, use the
+    strict and logical DNS clusters. Instead, use the
     :ref:`cluster_type <envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` extension point with
     :ref:`typed_config <envoy_v3_api_field_config.cluster.v3.Cluster.CustomClusterType.typed_config>` of type
     :ref:`DnsCluster <envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
