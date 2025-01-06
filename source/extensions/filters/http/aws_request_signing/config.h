@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
 
+#include "source/extensions/common/aws/signer.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
@@ -35,6 +36,10 @@ private:
   createRouteSpecificFilterConfigTyped(const AwsRequestSigningProtoPerRouteConfig& per_route_config,
                                        Server::Configuration::ServerFactoryContext& context,
                                        ProtobufMessage::ValidationVisitor&) override;
+
+  absl::StatusOr<Envoy::Extensions::Common::Aws::SignerPtr>
+  createSigner(const AwsRequestSigningProtoConfig& config,
+               Server::Configuration::ServerFactoryContext& server_context);
 };
 
 using UpstreamAwsRequestSigningFilterFactory = AwsRequestSigningFilterFactory;

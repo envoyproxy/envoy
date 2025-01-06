@@ -324,36 +324,78 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
   }
 }
 
+CredentialsFileCredentialsProvider::CredentialsFileCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context,
+    const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+        credential_file_config)
+    : context_(context), profile_("") {
+
+  if (credential_file_config.has_credentials_data_source()) {
+    auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+        credential_file_config.credentials_data_source(), context.mainThreadDispatcher(),
+        context.threadLocal(), context.api(), false, 4096);
+    if (provider_or_error_.ok()) {
+      credential_file_data_source_provider_ = std::move(provider_or_error_.value());
+      if (credential_file_config.credentials_data_source().has_watched_directory()) {
+        has_watched_directory_ = true;
+      }
+    } else {
+      ENVOY_LOG_MISC(info, "Invalid credential file data source");
+      credential_file_data_source_provider_.reset();
+    }
+  }
+  if (!credential_file_config.profile().empty()) {
+    profile_ = credential_file_config.profile();
+  }
+}
+
 bool CredentialsFileCredentialsProvider::needsRefresh() {
-  return api_.timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
+  return has_watched_directory_
+             ? true
+             : context_.api().timeSource().systemTime() - last_updated_ > REFRESH_INTERVAL;
 }
 
 void CredentialsFileCredentialsProvider::refresh() {
-  ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
-
-  auto credentials_file = Utility::getCredentialFilePath();
   auto profile = profile_.empty() ? Utility::getCredentialProfileName() : profile_;
 
-  ENVOY_LOG(debug, "Credentials file path = {}, profile name = {}", credentials_file, profile);
+  ENVOY_LOG(debug, "Getting AWS credentials from the credentials file");
 
-  extractCredentials(credentials_file, profile);
+  std::string credential_file_data, credential_file_path;
+
+  // Use data source if provided, otherwise read from default AWS credential file path
+  if (credential_file_data_source_provider_.has_value()) {
+    credential_file_data = credential_file_data_source_provider_.value()->data();
+    credential_file_path = "<config datasource>";
+  } else {
+    credential_file_path = Utility::getCredentialFilePath();
+    auto credential_file = context_.api().fileSystem().fileReadToEnd(credential_file_path);
+    if (credential_file.ok()) {
+      credential_file_data = credential_file.value();
+    } else {
+      ENVOY_LOG(debug, "Unable to read from credential file {}", credential_file_path);
+      // Update last_updated_ now so that even if this function returns before successfully
+      // extracting credentials, this function won't be called again until after the
+      // REFRESH_INTERVAL. This prevents envoy from attempting and failing to read the credentials
+      // file on every request if there are errors extracting credentials from it (e.g. if the
+      // credentials file doesn't exist).
+      last_updated_ = context_.api().timeSource().systemTime();
+      return;
+    }
+  }
+  ENVOY_LOG(debug, "Credentials file path = {}, profile name = {}", credential_file_path, profile);
+
+  extractCredentials(credential_file_data.data(), profile);
 }
 
-void CredentialsFileCredentialsProvider::extractCredentials(const std::string& credentials_file,
-                                                            const std::string& profile) {
-  // Update last_updated_ now so that even if this function returns before successfully
-  // extracting credentials, this function won't be called again until after the REFRESH_INTERVAL.
-  // This prevents envoy from attempting and failing to read the credentials file on every request
-  // if there are errors extracting credentials from it (e.g. if the credentials file doesn't
-  // exist).
-  last_updated_ = api_.timeSource().systemTime();
+void CredentialsFileCredentialsProvider::extractCredentials(absl::string_view credentials_string,
+                                                            absl::string_view profile) {
 
   std::string access_key_id, secret_access_key, session_token;
 
   absl::flat_hash_map<std::string, std::string> elements = {
       {AWS_ACCESS_KEY_ID, ""}, {AWS_SECRET_ACCESS_KEY, ""}, {AWS_SESSION_TOKEN, ""}};
   absl::flat_hash_map<std::string, std::string>::iterator it;
-  Utility::resolveProfileElements(credentials_file, profile, elements);
+  Utility::resolveProfileElementsFromString(credentials_string.data(), profile.data(), elements);
   // if profile file fails to load, or these elements are not found in the profile, their values
   // will remain blank when retrieving them from the hash map
   access_key_id = elements.find(AWS_ACCESS_KEY_ID)->second;
@@ -364,14 +406,14 @@ void CredentialsFileCredentialsProvider::extractCredentials(const std::string& c
     // Return empty credentials if we're unable to retrieve from profile
     cached_credentials_ = Credentials();
   } else {
-    ENVOY_LOG(debug, "Found following AWS credentials for profile '{}' in {}: {}={}, {}={}, {}={}",
-              profile, credentials_file, AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
+    ENVOY_LOG(debug, "Found following AWS credentials for profile '{}': {}={}, {}={}, {}={}",
+              profile, AWS_ACCESS_KEY_ID, access_key_id, AWS_SECRET_ACCESS_KEY,
               secret_access_key.empty() ? "" : "*****", AWS_SESSION_TOKEN,
               session_token.empty() ? "" : "*****");
 
     cached_credentials_ = Credentials(access_key_id, secret_access_key, session_token);
   }
-  last_updated_ = api_.timeSource().systemTime();
+  last_updated_ = context_.api().timeSource().systemTime();
 }
 
 InstanceProfileCredentialsProvider::InstanceProfileCredentialsProvider(
@@ -736,21 +778,33 @@ void ContainerCredentialsProvider::onMetadataError(Failure reason) {
 }
 
 WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
-    Api::Api& api, ServerFactoryContextOptRef context,
-    const CurlMetadataFetcher& fetch_metadata_using_curl,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view token_file_path,
-    absl::string_view token, absl::string_view sts_endpoint, absl::string_view role_arn,
-    absl::string_view role_session_name,
+    Server::Configuration::ServerFactoryContext& context,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-    std::chrono::seconds initialization_timer, absl::string_view cluster_name = {})
+    std::chrono::seconds initialization_timer,
+    const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+        web_identity_config,
+    absl::string_view cluster_name = {})
     : MetadataCredentialsProviderBase(
-          api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, cluster_name,
+          context.api(), context, nullptr, create_metadata_fetcher_cb, cluster_name,
           envoy::config::cluster::v3::Cluster::LOGICAL_DNS /*cluster_type*/, sts_endpoint,
           refresh_state, initialization_timer),
-      token_file_path_(token_file_path), token_(token), sts_endpoint_(sts_endpoint),
-      role_arn_(role_arn), role_session_name_(role_session_name) {}
+      sts_endpoint_(sts_endpoint), role_arn_(web_identity_config.role_arn()),
+      role_session_name_(web_identity_config.role_session_name()) {
+
+  auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
+      web_identity_config.web_identity_token_data_source(), context.mainThreadDispatcher(),
+      context.threadLocal(), context.api(), false, 4096);
+  if (provider_or_error_.ok()) {
+    web_identity_data_source_provider_ = std::move(provider_or_error_.value());
+  } else {
+    ENVOY_LOG_MISC(info, "Invalid web identity data source");
+    web_identity_data_source_provider_.reset();
+  }
+}
 
 bool WebIdentityCredentialsProvider::needsRefresh() {
+
   const auto now = api_.timeSource().systemTime();
   auto expired = (now - last_updated_ > REFRESH_INTERVAL);
 
@@ -762,18 +816,17 @@ bool WebIdentityCredentialsProvider::needsRefresh() {
 }
 
 void WebIdentityCredentialsProvider::refresh() {
+
+  absl::string_view web_identity_data;
+
+  // If we're unable to read from the configured data source, exit early.
+  if (!web_identity_data_source_provider_.has_value()) {
+    return;
+  }
+
   ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}", sts_endpoint_);
 
-  std::string identity_token = token_;
-  if (identity_token.empty()) {
-    const auto web_token_file_or_error = api_.fileSystem().fileReadToEnd(token_file_path_);
-    if (!web_token_file_or_error.ok()) {
-      ENVOY_LOG(debug, "Unable to read AWS web identity credentials from {}", token_file_path_);
-      cached_credentials_ = Credentials();
-      return;
-    }
-    identity_token = web_token_file_or_error.value();
-  }
+  web_identity_data = web_identity_data_source_provider_.value()->data();
 
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
@@ -787,7 +840,7 @@ void WebIdentityCredentialsProvider::refresh() {
                   "&WebIdentityToken={}",
                   Envoy::Http::Utility::PercentEncoding::encode(role_session_name_),
                   Envoy::Http::Utility::PercentEncoding::encode(role_arn_),
-                  Envoy::Http::Utility::PercentEncoding::encode(identity_token)));
+                  Envoy::Http::Utility::PercentEncoding::encode(web_identity_data)));
   // Use the Accept header to ensure that AssumeRoleWithWebIdentityResponse is returned as JSON.
   message.headers().setReference(Http::CustomHeaders::get().Accept,
                                  Http::Headers::get().ContentTypeValues.Json);
@@ -941,30 +994,77 @@ std::string stsClusterName(absl::string_view region) {
   return absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
 }
 
+CustomCredentialsProviderChain::CustomCredentialsProviderChain(
+    Server::Configuration::ServerFactoryContext& context, absl::string_view region,
+    const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
+    const CustomCredentialsProviderChainFactories& factories) {
+
+  // Custom chain currently only supports file based and web identity credentials
+  if (credential_provider_config.has_assume_role_with_web_identity_provider()) {
+    auto web_identity = credential_provider_config.assume_role_with_web_identity_provider();
+    const std::string sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
+    const auto region_uuid = absl::StrCat(region, "_", context.api().randomGenerator().uuid());
+    const std::string cluster_name = stsClusterName(region_uuid);
+    std::string role_session_name = web_identity.role_session_name();
+    if (role_session_name.empty()) {
+      web_identity.set_role_session_name(sessionName(context.api()));
+    }
+    const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+    const auto initialization_timer = std::chrono::seconds(2);
+    add(factories.createWebIdentityCredentialsProvider(
+        context, MetadataFetcher::create, sts_endpoint, refresh_state, initialization_timer,
+        web_identity, cluster_name));
+  }
+
+  if (credential_provider_config.has_credentials_file_provider()) {
+    add(factories.createCredentialsFileCredentialsProvider(
+        context, credential_provider_config.credentials_file_provider()));
+  }
+}
+
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
     absl::string_view region,
     const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
+    const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
     const CredentialsProviderChainFactories& factories) {
 
   ENVOY_LOG(debug, "Using environment credentials provider");
   add(factories.createEnvironmentCredentialsProvider());
-
-  ENVOY_LOG(debug, "Using credentials file credentials provider");
-  add(factories.createCredentialsFileCredentialsProvider(api));
 
   // Initial state for an async credential receiver
   auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
   // Initial amount of time for async credential receivers to wait for an initial refresh to succeed
   auto initialization_timer = std::chrono::seconds(2);
 
-  // WebIdentityCredentialsProvider can be used only if `context` is supplied which is required to
-  // use http async http client to make http calls to fetch the credentials.
   if (context) {
-    const auto web_token_path = absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE));
-    const auto role_arn = absl::NullSafeStringView(std::getenv(AWS_ROLE_ARN));
-    if (!web_token_path.empty() && !role_arn.empty()) {
-      const auto session_name = sessionName(api);
+
+    ENVOY_LOG(debug, "Using credentials file credentials provider");
+    add(factories.createCredentialsFileCredentialsProvider(
+        context.value(), credential_provider_config.credentials_file_provider()));
+
+    auto web_identity = credential_provider_config.assume_role_with_web_identity_provider();
+
+    // Configure defaults if nothing is set in the config
+    if (!web_identity.has_web_identity_token_data_source()) {
+      web_identity.mutable_web_identity_token_data_source()->set_filename(
+          absl::NullSafeStringView(std::getenv(AWS_WEB_IDENTITY_TOKEN_FILE)));
+    }
+
+    if (web_identity.role_arn().empty()) {
+      web_identity.set_role_arn(absl::NullSafeStringView(std::getenv(AWS_ROLE_ARN)));
+    }
+
+    if (web_identity.role_session_name().empty()) {
+      web_identity.set_role_session_name(sessionName(api));
+    }
+
+    if ((!web_identity.web_identity_token_data_source().filename().empty() ||
+         !web_identity.web_identity_token_data_source().inline_bytes().empty() ||
+         !web_identity.web_identity_token_data_source().inline_string().empty() ||
+         !web_identity.web_identity_token_data_source().environment_variable().empty()) &&
+        !web_identity.role_arn().empty()) {
+
       const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
       const auto region_uuid = absl::StrCat(region, "_", context->api().randomGenerator().uuid());
 
@@ -973,11 +1073,10 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
       ENVOY_LOG(
           debug,
           "Using web identity credentials provider with STS endpoint: {} and session name: {}",
-          sts_endpoint, session_name);
+          sts_endpoint, web_identity.role_session_name());
       add(factories.createWebIdentityCredentialsProvider(
-          api, context, fetch_metadata_using_curl, MetadataFetcher::create, cluster_name,
-          web_token_path, "", sts_endpoint, role_arn, session_name, refresh_state,
-          initialization_timer));
+          context.value(), MetadataFetcher::create, sts_endpoint, refresh_state,
+          initialization_timer, web_identity, cluster_name));
     }
   }
 
@@ -1058,34 +1157,6 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
             api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
             initialization_timer, cluster_name);
       });
-}
-
-absl::StatusOr<CredentialsProviderSharedPtr> createCredentialsProviderFromConfig(
-    Server::Configuration::ServerFactoryContext& context, absl::string_view region,
-    const envoy::extensions::common::aws::v3::AwsCredentialProvider& config) {
-  // The precedence order is: inline_credential > assume_role_with_web_identity.
-  if (config.has_inline_credential()) {
-    const auto& inline_credential = config.inline_credential();
-    return std::make_shared<InlineCredentialProvider>(inline_credential.access_key_id(),
-                                                      inline_credential.secret_access_key(),
-                                                      inline_credential.session_token());
-  } else if (config.has_assume_role_with_web_identity()) {
-    const auto& web_identity = config.assume_role_with_web_identity();
-    const std::string& role_arn = web_identity.role_arn();
-    const std::string& token = web_identity.web_identity_token();
-    const std::string sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-    const auto region_uuid = absl::StrCat(region, "_", context.api().randomGenerator().uuid());
-    const std::string cluster_name = stsClusterName(region_uuid);
-    const std::string role_session_name = sessionName(context.api());
-    const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
-    // This "two seconds" is a bit arbitrary, but matches the other places in the codebase.
-    const auto initialization_timer = std::chrono::seconds(2);
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        context.api(), context, nullptr, MetadataFetcher::create, "", token, sts_endpoint, role_arn,
-        role_session_name, refresh_state, initialization_timer, cluster_name);
-  } else {
-    return absl::InvalidArgumentError("No AWS credential provider specified");
-  }
 }
 
 } // namespace Aws
