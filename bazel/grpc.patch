@@ -33,7 +33,7 @@ index 77cb52d0fc..1ebc72ada6 100644
  alias(
      name = "cares",
 -    actual = "@com_github_cares_cares//:ares",
-+    actual = "@com_github_c_ares_c_ares//:ares",
++    actual = "@envoy//bazel/foreign_cc:ares",
      tags = ["manual"],
  )
  
