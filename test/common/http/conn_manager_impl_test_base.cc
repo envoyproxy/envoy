@@ -1,9 +1,9 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
 
-#include "source/common/listener_manager/listener_info_impl.h"
 #include "source/extensions/request_id/uuid/config.h"
 
 #include "test/common/http/xff_extension.h"
+#include "test/extensions/filters/network/common/fuzz/utils/fakes.h"
 
 using testing::AtLeast;
 using testing::InSequence;
@@ -201,7 +201,7 @@ void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
         return filter_callbacks_.connection_.dispatcher_.createTimer(callback).release();
       });
 
-  const Network::ListenerInfo& listener_info = Server::ListenerInfoImpl();
+  const Network::ListenerInfo& listener_info = Server::Configuration::FakeListenerInfo();
   ON_CALL(factory_context_, listenerInfo()).WillByDefault(ReturnRef(listener_info));
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443));

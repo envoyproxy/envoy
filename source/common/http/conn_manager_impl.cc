@@ -1807,7 +1807,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   auto should_drain_direction =
       !drain_is_inbound_only ||
       connection_manager_.direction_ == envoy::config::core::v3::TrafficDirection::INBOUND;
-  auto should_drain = should_drain_direction && connection_manager_.drain_close_.drainClose();
+  auto should_drain = connection_manager_.drain_close_.drainClose() && should_drain_direction;
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
       (should_drain || drain_connection_due_to_overload)) {
 
