@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "29.1"
+PROTOBUF_VERSION = "29.2"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,11 +8,11 @@ PROTOBUF_VERSION = "29.1"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "1f74a3f3355de7c0666bc125611c13532c2598f853521d0d3e621a5b09f24799",
-    linux_x86_64 = "00c83fe9722d85e96c81b941b29f17a744b33b4ce66e0f18009fd8937de22c60",
-    osx_aarch_64 = "b8fd5976926198a7c4ea5c6eb4bf78959d5faed27bfc618254caa1043f770445",
-    osx_x86_64 = "db02b4b86de4d4cced3ea9934347da28dc95e7f38863ffc4ce3cc26283028da6",
-    win64 = "7ea48225857ffc1224588c335c2b1af9d78a18af9d57c0528cca3193e336e9ce",
+    linux_aarch_64 = "29cf483e2fb21827e5fac4964e35eae472a238e28c762f02fb17dcd93ff8b89f",
+    linux_x86_64 = "52e9e7ece55c7e30e7e8bbd254b4b21b408a5309bca826763c7124b696a132e9",
+    osx_aarch_64 = "0e153a38d6da19594c980e7f7cd3ea0ddd52c9da1068c03c0d8533369fbfeb20",
+    osx_x86_64 = "ba2bd983b5f06ec38d663b602884a597dea3990a43803d7e153ed8f7c54269e1",
+    win64 = "59ea61efb24b9d8a214171e2ca3fec55c3f1517eff067656c875d8a1cd06ce4f",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -33,11 +33,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Bazel features",
         project_desc = "Support Bazel feature detection from starlark",
         project_url = "https://github.com/bazel-contrib/bazel_features",
-        version = "1.22.0",
-        sha256 = "9c7f9a4c997cbf0eb93572b68b0ff0bb9822004633101a16d89499e814190323",
+        version = "1.23.0",
+        sha256 = "8b1c9b7558498000f5adebbc584b7bf15b6b2bf181448a66f6b2fc5b4c84231c",
         urls = ["https://github.com/bazel-contrib/bazel_features/releases/download/v{version}/bazel_features-v{version}.tar.gz"],
         strip_prefix = "bazel_features-{version}",
-        release_date = "2024-12-06",
+        release_date = "2024-12-18",
         use_category = ["build"],
         license = "Apache-2.0",
         license_url = "https://github.com/bazel-contrib/bazel_features/blob/v{version}/LICENSE",
@@ -73,10 +73,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Apple Rules for Bazel",
         project_desc = "Bazel rules for Apple platforms",
         project_url = "https://github.com/bazelbuild/rules_apple",
-        version = "3.13.0",
-        sha256 = "b892911288715b354e05b9a6fe9009635f7155991f24f27e779fe80d435c92bc",
+        version = "3.16.1",
+        sha256 = "352428421c89dba8859055c3e1ba42f742c224544bf0e196c926d1cf44a2d726",
         urls = ["https://github.com/bazelbuild/rules_apple/releases/download/{version}/rules_apple.{version}.tar.gz"],
-        release_date = "2024-11-13",
+        release_date = "2024-12-13",
         use_category = ["build"],
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_apple/blob/{version}/LICENSE",
@@ -282,12 +282,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "xxHash",
         project_desc = "Extremely fast hash algorithm",
         project_url = "https://github.com/Cyan4973/xxHash",
-        version = "0.8.2",
-        sha256 = "baee0c6afd4f03165de7a4e67988d16f0f2b257b51d0e3cb91909302a26a79c4",
+        version = "0.8.3",
+        sha256 = "aae608dfe8213dfd05d909a57718ef82f30722c392344583d3f39050c7f29a80",
         strip_prefix = "xxHash-{version}",
         urls = ["https://github.com/Cyan4973/xxHash/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2023-07-21",
+        release_date = "2024-12-30",
         cpe = "N/A",
         license = "BSD-2-Clause",
         license_url = "https://github.com/Cyan4973/xxHash/blob/v{version}/LICENSE",
@@ -936,11 +936,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "3d32940e975c4ad9b8ba69640e78f5527075bae33ca2890275bf26b853c0962c",
+        sha256 = "63150aba23f7a90fd7d87bdf514e459dd5fe7023fdde01b56ac53335df64d4bd",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2024-12-04",
+        release_date = "2024-12-18",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1024,11 +1024,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Go rules for Bazel",
         project_desc = "Bazel rules for the Go language",
         project_url = "https://github.com/bazelbuild/rules_go",
-        version = "0.49.0",
-        sha256 = "d93ef02f1e72c82d8bb3d5169519b36167b33cf68c252525e3b9d3d5dd143de7",
+        version = "0.51.0",
+        sha256 = "0936c9bc3c4321ee372cb8f66dd972d368cb940ed01a9ba9fd7debcf0093f09b",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
         use_category = ["build", "api"],
-        release_date = "2024-07-13",
+        release_date = "2024-12-15",
         implied_untracked_deps = [
             "com_github_golang_protobuf",
             "io_bazel_rules_nogo",
@@ -1295,8 +1295,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "FlatBuffers",
         project_desc = "FlatBuffers is a cross platform serialization library architected for maximum memory efficiency",
         project_url = "https://github.com/google/flatbuffers",
-        version = "24.3.25",
-        sha256 = "4157c5cacdb59737c5d627e47ac26b140e9ee28b1102f812b36068aab728c1ed",
+        version = "24.12.23",
+        sha256 = "7e2ef35f1af9e2aa0c6a7d0a09298c2cb86caf3d4f58c0658b306256e5bcab10",
         strip_prefix = "flatbuffers-{version}",
         urls = ["https://github.com/google/flatbuffers/archive/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
@@ -1317,7 +1317,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.matching.inputs.cel_data_input",
             "envoy.matching.matchers.cel_matcher",
         ],
-        release_date = "2024-03-26",
+        release_date = "2024-12-23",
         cpe = "cpe:2.3:a:google:flatbuffers:*",
         license = "Apache-2.0",
         license_url = "https://github.com/google/flatbuffers/blob/v{version}/LICENSE",
@@ -1607,7 +1607,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2024-12-04",
+            release_date = "2024-12-18",
             cpe = "N/A",
             license = "Protocol Buffers",
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
