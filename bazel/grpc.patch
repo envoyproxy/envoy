@@ -25,9 +25,18 @@ index f65a41fbe3..0a1e3dc631 100644
  )
  
 diff --git a/third_party/BUILD b/third_party/BUILD
-index 77cb52d0fc..1ebc72ada6 100644
+index 77cb52d0fc..5f69f71978 100644
 --- a/third_party/BUILD
 +++ b/third_party/BUILD
+@@ -30,7 +30,7 @@ alias(
+ 
+ alias(
+     name = "madler_zlib",
+-    actual = "@zlib//:zlib",
++    actual = "@envoy//bazel/foreign_cc:zlib",
+     tags = ["manual"],
+ )
+ 
 @@ -61,7 +61,7 @@ alias(
  
  alias(
