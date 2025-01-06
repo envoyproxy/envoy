@@ -38,7 +38,7 @@ index a4cd1bacc8..8a21719cc7 100644
    }
  };
 diff --git a/third_party/BUILD b/third_party/BUILD
-index 77cb52d0fc..0fd5bae3ab 100644
+index 77cb52d0fc..596b348ccd 100644
 --- a/third_party/BUILD
 +++ b/third_party/BUILD
 @@ -18,19 +18,19 @@ package(default_visibility = ["//:__subpackages__"])
@@ -53,7 +53,7 @@ index 77cb52d0fc..0fd5bae3ab 100644
  alias(
      name = "libcrypto",
 -    actual = "@boringssl//:crypto",
-+    actual = "@envoy//bazel:crypto",
++    actual = "@envoy//bazel:boringcrypto",
      tags = ["manual"],
  )
  
