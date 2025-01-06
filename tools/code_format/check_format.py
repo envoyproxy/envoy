@@ -299,7 +299,7 @@ class FormatChecker:
     def read_lines(self, path):
         with open(path) as f:
             for l in f:
-                yield l[:-1]
+                yield l.rstrip('\r\n')
         yield ""
 
     # Read a UTF-8 encoded file as a str.
