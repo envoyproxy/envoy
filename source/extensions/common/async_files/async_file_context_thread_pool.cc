@@ -180,7 +180,7 @@ public:
 
   absl::Status executeImpl() override {
     ASSERT(fileDescriptor() != -1);
-    auto result = posix().ftruncate(fileDescriptor(), length_);
+    Api::SysCallIntResult result = posix().ftruncate(fileDescriptor(), length_);
     if (result.return_value_ == -1) {
       return statusAfterFileError(result);
     }
@@ -188,7 +188,7 @@ public:
   }
 
 private:
-  size_t length_;
+  const size_t length_;
 };
 
 class ActionDuplicateFile : public AsyncFileActionThreadPool<absl::StatusOr<AsyncFileHandle>> {

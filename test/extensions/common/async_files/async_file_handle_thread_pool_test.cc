@@ -300,7 +300,7 @@ TEST_F(AsyncFileHandleTest, OpenExistingReadWriteCanReadAndWrite) {
 }
 
 TEST_F(AsyncFileHandleTest, TruncateReducesFileSize) {
-  auto handle = createAnonymousFile();
+  AsyncFileHandle handle = createAnonymousFile();
   absl::StatusOr<size_t> write_status;
   Buffer::OwnedImpl buf("hello world");
   EXPECT_OK(handle->write(dispatcher_.get(), buf, 0, [&](absl::StatusOr<size_t> result) {
@@ -385,7 +385,7 @@ TEST_F(AsyncFileHandleWithMockPosixTest, PartialWriteRetries) {
 }
 
 TEST_F(AsyncFileHandleWithMockPosixTest, TruncateReturnsErrorOnTruncatingToLargerThanFile) {
-  auto handle = createAnonymousFile();
+  AsyncFileHandle handle = createAnonymousFile();
   absl::Status truncate_status;
   EXPECT_CALL(mock_posix_file_operations_, ftruncate(_, _))
       .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
