@@ -111,10 +111,8 @@ Http::FilterHeadersStatus BasicAuthFilter::onDenied(absl::string_view body,
       Http::Code::Unauthorized, body,
       [this](Http::ResponseHeaderMap& headers) {
         const auto request_headers = this->decoder_callbacks_->requestHeaders();
-        const std::string uri =
-            request_headers.has_value()
-                ? Http::Utility::buildOriginalUri(*request_headers, MaximumUriLength)
-                : "";
+        RELEASE_ASSERT(request_headers.has_value(), "request_headers has no value.");
+        const std::string uri = Http::Utility::buildOriginalUri(*request_headers, MaximumUriLength);
         const std::string value = absl::StrCat("Basic realm=\"", uri, "\"");
         headers.setReferenceKey(Http::Headers::get().WWWAuthenticate, value);
       },
