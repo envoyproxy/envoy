@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.resource_monitors.cpu_utilization.v3;
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.resource_monitors.cpu_utilization.v3";
 option java_outer_classname = "CpuUtilizationProto";
@@ -24,5 +25,5 @@ message CpuUtilizationConfig {
         HOST = 0;
         CONTAINER = 1;
     }
-    UtilizationComputeStrategy mode = 1;
+    UtilizationComputeStrategy mode = 1 [(validate.rules).enum = { defined_only: true }];
 }

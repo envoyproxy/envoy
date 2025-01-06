@@ -409,9 +409,8 @@ new_features:
     See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
 - area: resource_monitors
   change: |
-    Added extension to monitor Container CPU utilization in Linux K8s environment via :ref:`envoy container cpu utilization monitor
-    <envoy_v3_api_msg_extensions.resource_monitors.envoy_container_cpu_utilization.v3.EnvoyContainerCpuUtilizationConfig>` in
-    overload manager.
+    Added support for to monitor Container CPU utilization in Linux K8s environment using existing
+    extension <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>.
 
 deprecated:
 - area: rbac
