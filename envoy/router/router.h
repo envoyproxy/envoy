@@ -538,12 +538,7 @@ public:
   /**
    * @return true if the trace span should be sampled.
    */
-  virtual bool traceSampled() const PURE;
-
-  /**
-   * @return true if the config has `trace_sampled` set.
-   */
-  virtual bool hasTraceSampledConf() const PURE;
+  virtual absl::optional<bool> traceSampled() const PURE;
 
   /**
    * @return true if host name should be suffixed with "-shadow".

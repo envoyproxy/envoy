@@ -121,7 +121,9 @@ minor_behavior_changes:
   change: |
     Changed the behavior of shadow request sampling so that if trace sampling is not explicitly configured in the shadow
     policy, the shadow request will inherit the parent's sampling decision. This means sampling will follow the trace
-    sampling policy of the original request, which prevents oversampling when runtime sampling is disabled.
+    sampling policy of the original request, which prevents oversampling when runtime sampling is disabled. This
+    behavior can be temporarily reverted by setting the runtime guard
+    ``envoy.reloadable_features.shadow_policy_inherit_trace_sampling`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

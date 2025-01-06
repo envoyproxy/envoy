@@ -445,11 +445,7 @@ void Filter::chargeUpstreamCode(Http::Code code,
 }
 
 absl::optional<bool> getSampleValueFromShadowPolicy(const ShadowPolicy& shadow_policy) {
-  // If trace sampling is not explicitly configured in shadow_policy, we pass null optional to
-  // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
-  // disabled.
-  return shadow_policy.hasTraceSampledConf() ? absl::make_optional(shadow_policy.traceSampled())
-                                             : absl::nullopt;
+  return shadow_policy.traceSampled();
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {

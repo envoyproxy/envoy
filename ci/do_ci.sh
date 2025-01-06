@@ -434,7 +434,7 @@ case $CI_TARGET in
         # Make sure that there are no regressions to building Envoy with autolink disabled.
         EXTRA_OPTIONS=(
             "--define" "library_autolink=disabled")
-        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               "${EXTRA_OPTIONS[@]}" \
               -c dbg \
               "${TEST_TARGETS[@]}"

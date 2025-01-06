@@ -11558,31 +11558,61 @@ virtual_hosts:
       # Policy with explicit trace_sampled set to true
       - cluster: some_cluster2
         trace_sampled: true
-      # Policy with no trace_sampled specified (should default to true)
+      # Policy with no trace_sampled specified
       - cluster: some_cluster3
       cluster: www2
   )EOF";
 
   factory_context_.cluster_manager_.initializeClusters(
       {"www2", "some_cluster", "some_cluster2", "some_cluster3"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                        creation_status_);
 
+  // Test with runtime flag disabled (old behavior)
   {
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.shadow_policy_inherit_trace_sampling", "false"}});
+
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                          creation_status_);
+
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.databricks.com", "/foo", "GET");
     const auto& shadow_policies = config.route(headers, 0)->routeEntry()->shadowPolicies();
 
     // First policy should have trace sampled = false
-    EXPECT_TRUE(shadow_policies[0]->hasTraceSampledConf());
-    EXPECT_FALSE(shadow_policies[0]->traceSampled());
+    EXPECT_TRUE(shadow_policies[0]->traceSampled().has_value());
+    EXPECT_FALSE(shadow_policies[0]->traceSampled().value());
 
     // Second policy should have trace sampled = true
-    EXPECT_TRUE(shadow_policies[1]->hasTraceSampledConf());
-    EXPECT_TRUE(shadow_policies[1]->traceSampled());
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().has_value());
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().value());
 
-    // Since the config is unspecified for the third policy, trace sampled should default to true
-    EXPECT_FALSE(shadow_policies[2]->hasTraceSampledConf());
-    EXPECT_TRUE(shadow_policies[2]->traceSampled());
+    // With flag disabled, unspecified should default to true
+    EXPECT_TRUE(shadow_policies[2]->traceSampled().has_value());
+    EXPECT_TRUE(shadow_policies[2]->traceSampled().value());
+  }
+
+  // Test with runtime flag enabled (new behavior)
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.shadow_policy_inherit_trace_sampling", "true"}});
+
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                          creation_status_);
+
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.databricks.com", "/foo", "GET");
+    const auto& shadow_policies = config.route(headers, 0)->routeEntry()->shadowPolicies();
+
+    // First policy should have trace sampled = false
+    EXPECT_TRUE(shadow_policies[0]->traceSampled().has_value());
+    EXPECT_FALSE(shadow_policies[0]->traceSampled().value());
+
+    // Second policy should have trace sampled = true
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().has_value());
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().value());
+
+    // With flag enabled, unspecified should be nullopt
+    EXPECT_FALSE(shadow_policies[2]->traceSampled().has_value());
   }
 }
 
