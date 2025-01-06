@@ -252,7 +252,7 @@ new_features:
     behaviour can also be overridden with this field.
 - area: tls
   change: |
-    Added support for ``P-384`` and ``P-521`` curves for TLS server certificates.
+    Added support for **P-384** and **P-521** curves for TLS server certificates.
 - area: tls
   change: |
     Added an :ref:`option
