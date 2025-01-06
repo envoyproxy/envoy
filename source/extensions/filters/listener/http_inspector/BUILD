@@ -27,7 +27,6 @@ envoy_cc_library(
         "//source/common/http/http1:balsa_parser_lib",
         "//source/common/http/http1:legacy_parser_lib",
         "//source/common/http/http1:parser_interface",
-        "@envoy_api//envoy/extensions/filters/listener/http_inspector/v3:pkg_cc_proto",
     ],
 )
 
