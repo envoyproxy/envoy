@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.filters.listener.http_inspector.v3;
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
