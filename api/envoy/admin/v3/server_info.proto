@@ -125,8 +125,8 @@ message CommandLineOptions {
   // See :option:`--ignore-unknown-dynamic-fields` for details.
   bool ignore_unknown_dynamic_fields = 30;
 
-  // See :option:`--suppress-deprecated-warning-logs` for details.
-  bool suppress_deprecated_warning_logs = 41;
+  // See :option:`--skip-deprecated-logs` for details.
+  bool skip_deprecated_logs = 41;
 
   // See :option:`--admin-address-path` for details.
   string admin_address_path = 6;

@@ -409,7 +409,7 @@ new_features:
     See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
 - area: access log
   change: |
-    Added new command-line flag :option:`--suppress-deprecated-warning-logs`.
+    Added new command-line flag :option:`--skip-deprecated-logs`.
 
 deprecated:
 - area: rbac

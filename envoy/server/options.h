@@ -155,9 +155,9 @@ public:
   virtual bool ignoreUnknownDynamicFields() const PURE;
 
   /**
-   * @return bool suppress deprecated warning log messages?
+   * @return bool skip deprecated warning log messages?
    **/
-  virtual bool suppressDeprecatedWarningLogs() const PURE;
+  virtual bool skipDeprecatedLogs() const PURE;
 
   /**
    * @return const std::string& the admin address output file.

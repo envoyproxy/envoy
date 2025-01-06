@@ -50,7 +50,7 @@ TEST(WarningValidationVisitorImpl, UnknownField) {
   EXPECT_LOG_CONTAINS("warn", "Deprecated field: ",
                       EXPECT_TRUE(warning_validation_visitor.onDeprecatedField("foo", true).ok()));
   // Enable suppressing of warning log messages for deprecated fields.
-  warning_validation_visitor.setSuppressDeprecatedWarningLogs(true);
+  warning_validation_visitor.setSkipDeprecatedLogs(true);
   EXPECT_LOG_NOT_CONTAINS(
       "warn", "Deprecated field: ",
       EXPECT_TRUE(warning_validation_visitor.onDeprecatedField("foo", true).ok()));
@@ -65,7 +65,7 @@ TEST(StrictValidationVisitorImpl, UnknownField) {
 
   EXPECT_LOG_CONTAINS("warn", "Deprecated field: ",
                       EXPECT_TRUE(strict_validation_visitor.onDeprecatedField("foo", true).ok()));
-  strict_validation_visitor.setSuppressDeprecatedWarningLogs(true);
+  strict_validation_visitor.setSkipDeprecatedLogs(true);
   EXPECT_LOG_NOT_CONTAINS(
       "warn", "Deprecated field: ",
       EXPECT_TRUE(strict_validation_visitor.onDeprecatedField("foo", true).ok()));
