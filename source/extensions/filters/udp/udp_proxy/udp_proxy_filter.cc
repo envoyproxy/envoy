@@ -1242,43 +1242,6 @@ void UdpProxyFilter::TunnelingActiveSession::onSessionComplete() {
   ActiveSession::onSessionComplete();
 }
 
-void UdpProxyFilter::TunnelingActiveSession::onRetryTimer() {
-  if (!establishUpstreamConnection()) {
-    filter_.removeSession(this);
-  }
-}
-
-void UdpProxyFilter::TunnelingActiveSession::resetRetryTimer() {
-  // Create the retry timer on the first retry.
-  if (!retry_timer_) {
-    retry_timer_ =
-        filter_.read_callbacks_->udpListener().dispatcher().createTimer([this] { onRetryTimer(); });
-  }
-
-  // If the backoff strategy is not configured, the next backoff time will be 0.
-  // This will allow the retry to happen on different event loop iteration, which
-  // will allow the connection pool to be cleaned up from the previous closed connection.
-  uint64_t next_backoff_ms = 0;
-
-  if (filter_.config_->tunnelingConfig()->backoffStrategy()) {
-    next_backoff_ms = filter_.config_->tunnelingConfig()->backoffStrategy()->nextBackOffMs();
-  }
-
-  retry_timer_->enableTimer(std::chrono::milliseconds(next_backoff_ms));
-}
-
-void UdpProxyFilter::TunnelingActiveSession::disableRetryTimer() {
-  if (retry_timer_ != nullptr) {
-    retry_timer_->disableTimer();
-    retry_timer_.reset();
-  }
-}
-
-void UdpProxyFilter::TunnelingActiveSession::onSessionComplete() {
-  disableRetryTimer();
-  ActiveSession::onSessionComplete();
-}
-
 } // namespace UdpProxy
 } // namespace UdpFilters
 } // namespace Extensions
