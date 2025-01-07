@@ -40,7 +40,7 @@ UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
       pass_through_tlvs_.insert(0xFF & tlv_type);
     }
   }
-  for (const auto& entry : config.custom_tlvs()) {
+  for (const auto& entry : config.added_tlvs()) {
     if (entry.value().empty()) {
       continue;
     }
@@ -215,7 +215,7 @@ void UpstreamProxyProtocolSocket::processCustomTLVsFromHost() {
   }
 
   // process the custom TLVs from the host metadata first.
-  for (const auto& entry : tlvs_metadata.custom_tlvs()) {
+  for (const auto& entry : tlvs_metadata.added_tlvs()) {
     // prevent empty values from being added to custom TLVs.
     if (entry.value().empty()) {
       continue;

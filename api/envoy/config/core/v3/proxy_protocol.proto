@@ -61,5 +61,5 @@ message ProxyProtocolConfig {
   // is only valid when the version is V2. These TLVs can be defined both in the
   // endpoint host's typed metadata and at the config-level. In the case that the same
   // TLV is defined in both places, the endpoint host's typed metadata will take precedence.
-  repeated TlvEntry custom_tlvs = 3;
+  repeated TlvEntry added_tlvs = 3;
 }
