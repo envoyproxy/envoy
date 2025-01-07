@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.extensions.clusters.reverse_connection.v3alpha;
+
+import "udpa/annotations/status.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.clusters.reverse_connection.v3alpha";
+option java_outer_classname = "ReverseConnectionProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/reverse_connection/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Settings for the Reverse Connection Cluster]
+// [#extension: envoy.clusters.reverse_connection]
+
+ // Specific configuration for a cluster configured as REVERSE_CONNECTION cluster.
+message RevConClusterConfig {
+    // List of HTTP headers to look for in downstream request headers, to deduce the
+    // upstream endpoint.
+    repeated string http_header_names = 1;
+
+    // Time interval after which envoy attempts to clean the stale host entries.
+    google.protobuf.Duration cleanup_interval = 2;
+}
