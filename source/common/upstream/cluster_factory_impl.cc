@@ -6,7 +6,6 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
-#include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/upstream/health_checker_impl.h"

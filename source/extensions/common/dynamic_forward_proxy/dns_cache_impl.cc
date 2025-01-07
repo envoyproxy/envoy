@@ -7,7 +7,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
-#include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
