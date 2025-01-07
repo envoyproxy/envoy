@@ -270,9 +270,6 @@ public:
   createPrefix(const std::string& prefix, bool ignore_case,
                Server::Configuration::CommonFactoryContext& context);
   static PathMatcherConstSharedPtr
-  createPattern(const std::string& pattern, bool ignore_case,
-                Server::Configuration::CommonFactoryContext& context);
-  static PathMatcherConstSharedPtr
   createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher,
                   Server::Configuration::CommonFactoryContext& context);
 

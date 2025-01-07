@@ -5,13 +5,24 @@ The filter uses a number of different credentials providers to obtain an AWS acc
 By default, it moves through the credentials providers in the order described below, stopping when one of them returns an access key ID and a
 secret access key (the session token is optional).
 
-1. Environment variables. The environment variables ``AWS_ACCESS_KEY_ID``, ``AWS_SECRET_ACCESS_KEY``, and ``AWS_SESSION_TOKEN`` are used.
+1. :ref:`inline_credentials <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.inline_credential>` field.
+   If this field is configured, no other credentials providers will be used.
 
-2. The AWS credentials file. The environment variables ``AWS_SHARED_CREDENTIALS_FILE`` and ``AWS_PROFILE`` are respected if they are set, else
+2. :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field.
+   By using this field, the filter allows override of the default environment variables, credential parameters and file locations.
+   Currently this supports both AWS credentials file locations and content, and AssumeRoleWithWebIdentity token files.
+   If the :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field is provided,
+   it can be used either to modify the default credentials provider chain, or when :ref:`custom_credential_provider_chain <envoy_v3_api_field_extensions.common.aws.v3.AwsCredentialProvider.custom_credential_provider_chain>`
+   is set to ``true``, to create a custom credentials provider chain containing only the specified credentials provider settings. Examples of using these fields
+   are provided in :ref:`configuration examples <config_http_filters_aws_request_signing_examples>`.
+
+3. Environment variables. The environment variables ``AWS_ACCESS_KEY_ID``, ``AWS_SECRET_ACCESS_KEY``, and ``AWS_SESSION_TOKEN`` are used.
+
+4. The AWS credentials file. The environment variables ``AWS_SHARED_CREDENTIALS_FILE`` and ``AWS_PROFILE`` are respected if they are set, else
    the file ``~/.aws/credentials`` and profile ``default`` are used. The fields ``aws_access_key_id``, ``aws_secret_access_key``, and
    ``aws_session_token`` defined for the profile in the credentials file are used. These credentials are cached for 1 hour.
 
-3. From `AssumeRoleWithWebIdentity <https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html>`_ API call
+5. From `AssumeRoleWithWebIdentity <https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRoleWithWebIdentity.html>`_ API call
    towards AWS Security Token Service using ``WebIdentityToken`` read from a file pointed by ``AWS_WEB_IDENTITY_TOKEN_FILE`` environment
    variable and role arn read from ``AWS_ROLE_ARN`` environment variable. The credentials are extracted from the fields ``AccessKeyId``,
    ``SecretAccessKey``, and ``SessionToken`` are used, and credentials are cached for 1 hour or until they expire (according to the field
@@ -30,7 +41,7 @@ secret access key (the session token is optional).
   If you require the use of SigV4A signing and you are using an alternate partition, such as cn or GovCloud, you can ensure correct generation
   of the STS endpoint by setting the first region in your SigV4A region set to the correct region (such as ``cn-northwest-1`` with no wildcard)
 
-4. Either EC2 instance metadata, ECS task metadata or EKS Pod Identity.
+6. Either EC2 instance metadata, ECS task metadata or EKS Pod Identity.
    For EC2 instance metadata, the fields ``AccessKeyId``, ``SecretAccessKey``, and ``Token`` are used, and credentials are cached for 1 hour.
    For ECS task metadata, the fields ``AccessKeyId``, ``SecretAccessKey``, and ``Token`` are used, and credentials are cached for 1 hour or
    until they expire (according to the field ``Expiration``).
@@ -45,9 +56,6 @@ secret access key (the session token is optional).
    If these clusters are not provided in the bootstrap configuration then either of these will be added by default.
    The static internal cluster will still be added even if initially ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` is
    not set so that subsequently if the reloadable feature is set to ``true`` the cluster config is available to fetch the credentials.
-
-Alternatively, each AWS filter (either AWS Request Signing or AWS Lambda) has its own optional configuration to specify the source of the credentials. For example, AWS Request Signing filter
-has :ref:`credential_provider <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.credential_provider>` field.
 
 Statistics
 ----------

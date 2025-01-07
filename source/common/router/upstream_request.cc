@@ -34,6 +34,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/router.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
@@ -142,19 +143,16 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       parent_.callbacks()->streamId(), parent_.callbacks()->account(), true,
       parent_.callbacks()->decoderBufferLimit(), *this);
   // Attempt to create custom cluster-specified filter chain
-  bool created = filter_manager_
-                     ->createFilterChain(*parent_.cluster(),
-                                         /*only_create_if_configured=*/true)
-                     .created();
+  bool created = filter_manager_->createFilterChain(*parent_.cluster()).created();
 
   if (!created) {
     // Attempt to create custom router-specified filter chain.
-    created = filter_manager_->createFilterChain(parent_.config(), false).created();
+    created = filter_manager_->createFilterChain(parent_.config()).created();
   }
   if (!created) {
     // Neither cluster nor router have a custom filter chain; add the default
     // cluster filter chain, which only consists of the codec filter.
-    created = filter_manager_->createFilterChain(*parent_.cluster(), false).created();
+    created = filter_manager_->createFilterChain(defaultUpstreamHttpFilterChainFactory()).created();
   }
   // There will always be a codec filter present, which sets the upstream
   // interface. Fast-fail any tests that don't set up mocks correctly.

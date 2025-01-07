@@ -30,7 +30,7 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
-    if: ${{ false && github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     uses: ./.github/workflows/_load.yml
     with:
       check-name: mobile-release-validation
@@ -67,7 +67,8 @@ jobs:
         - run: |
             xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj \
                        -scheme EnvoySwiftPMExample \
-                       -destination platform="iOS Simulator,name=iPhone 15 Pro Max,OS=16.3"
+                       -destination platform="iOS Simulator,name=iPhone 15 Pro Max,OS=17.4" \
+                       -allowProvisioningUpdates
           shell: bash
           name: Build app
         # TODO(jpsim): Run app and inspect logs to validate

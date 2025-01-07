@@ -31,9 +31,15 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
             THROW_OR_RETURN_VALUE(resolveProtoAddress(lb_endpoint.endpoint().address()),
                                   const Network::Address::InstanceConstSharedPtr));
         for (const auto& additional_address : lb_endpoint.endpoint().additional_addresses()) {
-          address_list.emplace_back(
-              THROW_OR_RETURN_VALUE(resolveProtoAddress(additional_address.address()),
-                                    const Network::Address::InstanceConstSharedPtr));
+          Network::Address::InstanceConstSharedPtr address =
+              returnOrThrow(resolveProtoAddress(additional_address.address()));
+          address_list.emplace_back(address);
+        }
+        for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+          // All addresses must by IP addresses.
+          if (!address->ip()) {
+            throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+          }
         }
       }
       priority_state_manager_->registerHostForPriority(

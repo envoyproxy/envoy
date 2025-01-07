@@ -238,6 +238,13 @@ public:
     last_hc_pass_time_.emplace(std::move(last_hc_pass_time));
   }
 
+  void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
+    lb_policy_data_ = std::move(lb_policy_data);
+  }
+  OptRef<HostLbPolicyData> lbPolicyData() const override {
+    return makeOptRefFromPtr(lb_policy_data_.get());
+  }
+
 protected:
   HostDescriptionImplBase(
       ClusterInfoConstSharedPtr cluster, const std::string& hostname,
@@ -273,6 +280,7 @@ private:
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
   const MonotonicTime creation_time_;
   absl::optional<MonotonicTime> last_hc_pass_time_;
+  HostLbPolicyDataPtr lb_policy_data_;
 };
 
 /**
@@ -424,13 +432,6 @@ public:
     return std::make_unique<HostHandleImpl>(shared_from_this());
   }
 
-  void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) override {
-    lb_policy_data_ = std::move(lb_policy_data);
-  }
-  OptRef<HostLbPolicyData> lbPolicyData() const override {
-    return makeOptRefFromPtr(lb_policy_data_.get());
-  }
-
 protected:
   static CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
@@ -457,7 +458,6 @@ private:
   // flag access? May be we could refactor HealthFlag to contain all these statuses and flags in the
   // future.
   std::atomic<Host::HealthStatus> eds_health_status_{};
-  HostLbPolicyDataPtr lb_policy_data_;
 
   struct HostHandleImpl : HostHandle {
     HostHandleImpl(const std::shared_ptr<const HostImplBase>& parent) : parent_(parent) {
@@ -1022,11 +1022,12 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(Http::FilterChainManager& manager, bool only_create_if_configured,
+  bool createFilterChain(Http::FilterChainManager& manager,
                          const Http::FilterChainOptions&) const override {
-    if (!has_configured_http_filters_ && only_create_if_configured) {
+    if (http_filter_factories_.empty()) {
       return false;
     }
+
     Http::FilterChainUtility::createFilterChainForFactories(
         manager, Http::EmptyFilterChainOptions{}, http_filter_factories_);
     return true;
@@ -1166,8 +1167,6 @@ private:
   const bool warm_hosts_ : 1;
   const bool set_local_interface_name_on_upstream_connections_ : 1;
   const bool added_via_api_ : 1;
-  // true iff the cluster proto specified upstream http filters.
-  bool has_configured_http_filters_ : 1;
   const bool per_endpoint_stats_ : 1;
 };
 
@@ -1232,7 +1231,7 @@ public:
   ClusterInfoConstSharedPtr info() const override { return info_; }
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
-  void initialize(std::function<void()> callback) override;
+  void initialize(std::function<absl::Status()> callback) override;
   UnitFloat dropOverload() const override { return drop_overload_; }
   const std::string& dropCategory() const override { return drop_category_; }
   void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
@@ -1301,7 +1300,7 @@ private:
   void reloadHealthyHosts(const HostSharedPtr& host);
 
   bool initialization_started_{};
-  std::function<void()> initialization_complete_callback_;
+  std::function<absl::Status()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
   const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;

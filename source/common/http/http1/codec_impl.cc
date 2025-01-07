@@ -1362,6 +1362,10 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
   if (active_request_ == nullptr) {
     RETURN_IF_ERROR(onMessageBeginImpl());
   }
+
+  if (resetStreamCalled()) {
+    return okStatus();
+  }
   ASSERT(active_request_);
 
   active_request_->response_encoder_.setDetails(details);

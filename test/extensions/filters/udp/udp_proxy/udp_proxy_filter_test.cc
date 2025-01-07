@@ -43,6 +43,7 @@ using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
+using testing::Throw;
 
 namespace Envoy {
 namespace Extensions {
@@ -53,6 +54,19 @@ namespace {
 class TestUdpProxyFilter : public virtual UdpProxyFilter {
 public:
   using UdpProxyFilter::UdpProxyFilter;
+
+  std::shared_ptr<TunnelingActiveSession> createTunnelingSession() {
+    Network::UdpRecvData::LocalPeerAddresses addresses;
+    addresses.peer_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.1:1000");
+    addresses.local_ = Network::Utility::parseInternetAddressAndPortNoThrow("10.0.0.2:80");
+
+    std::shared_ptr<TunnelingActiveSession> tunneling_session =
+        std::make_shared<TunnelingActiveSession>(*this, std::move(addresses));
+    sessions_.emplace(tunneling_session);
+    config_->stats().downstream_sess_active_.inc();
+
+    return tunneling_session;
+  }
 
   TestUdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
                      const UdpProxyFilterConfigSharedPtr& config)
@@ -927,6 +941,18 @@ matcher:
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+
+  // Push a new cluster again, we expect this to trigger active session removal.
+  {
+    NiceMock<Upstream::MockThreadLocalCluster> other_thread_local_cluster;
+    other_thread_local_cluster.cluster_.info_->name_ = "fake_cluster";
+    Upstream::ThreadLocalClusterCommand command =
+        [&other_thread_local_cluster]() -> Upstream::ThreadLocalCluster& {
+      return other_thread_local_cluster;
+    };
+    cluster_update_callbacks_->onClusterAddOrUpdate(other_thread_local_cluster.info()->name(),
+                                                    command);
+  }
 }
 
 // Hitting the maximum per-cluster connection/session circuit breaker.
@@ -1799,6 +1825,148 @@ session_filters:
   EXPECT_EQ(output_.back(), "1");
 }
 
+TEST_F(UdpProxyFilterTest, TunnelingSessionHighWatermarkDoesNotThrow) {
+  Event::MockTimer* idle_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  buffer_options:
+    max_buffered_datagrams: 1000
+    max_buffered_bytes: 10000
+  )EOF"),
+        true);
+
+  auto session = filter_->createTunnelingSession();
+  EXPECT_NO_THROW(session->onAboveWriteBufferHighWatermark());
+  session->onSessionComplete();
+}
+
+TEST_F(UdpProxyFilterTest, TunnelingSessionUpstreamClosedDuringFlush) {
+  Event::MockTimer* idle_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  buffer_options:
+    max_buffered_datagrams: 1000
+    max_buffered_bytes: 10000
+  )EOF"),
+        true);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_connection_info_provider_->setConnectionID(0);
+  Upstream::HostDescriptionConstSharedPtr upstream_host;
+  Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
+
+  auto session = filter_->createTunnelingSession();
+
+  Network::UdpRecvData data1;
+  data1.buffer_ = std::make_unique<Buffer::OwnedImpl>("initial buffered data");
+  session->writeUpstream(data1);
+
+  Event::PostCb resume_post_cb;
+  EXPECT_CALL(callbacks_.udp_listener_.dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+    session->onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
+    resume_post_cb = std::move(cb);
+  });
+
+  auto* upstream = new NiceMock<SessionFilters::MockHttpUpstream>();
+  EXPECT_CALL(*upstream, encodeData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    session->onBelowWriteBufferLowWatermark();
+  }));
+
+  session->onNewSession();
+  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host,
+                         address_provider, nullptr);
+}
+
+TEST_F(UdpProxyFilterTest, TunnelingSessionFlushBufferCauseLowWatermark) {
+  Event::MockTimer* idle_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  buffer_options:
+    max_buffered_datagrams: 1000
+    max_buffered_bytes: 10000
+  )EOF"),
+        true);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_connection_info_provider_->setConnectionID(0);
+  Upstream::HostDescriptionConstSharedPtr upstream_host;
+  Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
+
+  auto session = filter_->createTunnelingSession();
+
+  // Since stream is not ready, two datagrams will be buffered.
+  Network::UdpRecvData data1;
+  data1.buffer_ = std::make_unique<Buffer::OwnedImpl>("initial buffered data");
+  session->writeUpstream(data1);
+  Network::UdpRecvData data2;
+  data2.buffer_ = std::make_unique<Buffer::OwnedImpl>("initial buffered data");
+  session->writeUpstream(data2);
+
+  bool writing = false;
+  Event::PostCb resume_post_cb;
+  EXPECT_CALL(callbacks_.udp_listener_.dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+    writing = false;
+    resume_post_cb = std::move(cb);
+  });
+
+  auto* upstream = new NiceMock<SessionFilters::MockHttpUpstream>();
+  EXPECT_CALL(*upstream, encodeData(_))
+      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
+        writing = true;
+        session->onBelowWriteBufferLowWatermark();
+      }))
+      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
+        if (writing) {
+          throw EnvoyException("write upstream operation while already during previous write");
+        }
+
+        resume_post_cb();
+      }));
+
+  session->onNewSession();
+  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host,
+                         address_provider, nullptr);
+}
+
 using MockUdpTunnelingConfig = SessionFilters::MockUdpTunnelingConfig;
 using MockUpstreamTunnelCallbacks = SessionFilters::MockUpstreamTunnelCallbacks;
 using MockTunnelCreationCallbacks = SessionFilters::MockTunnelCreationCallbacks;
@@ -2161,7 +2329,7 @@ TEST_F(TunnelingConnectionPoolImplTest, ValidPool) {
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, InvalidPool) {
-  EXPECT_CALL(cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
   setup();
   EXPECT_FALSE(pool_->valid());
 }
@@ -2230,7 +2398,7 @@ TEST_F(TunnelingConnectionPoolImplTest, FactoryTest) {
   auto valid_pool = factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_FALSE(valid_pool == nullptr);
 
-  EXPECT_CALL(cluster_, httpConnPool(_, _, _)).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(cluster_, httpConnPool(_, _, _, _)).WillOnce(Return(absl::nullopt));
   auto invalid_pool =
       factory.createConnPool(cluster_, &context_, *config_, callbacks_, stream_info_);
   EXPECT_TRUE(invalid_pool == nullptr);
