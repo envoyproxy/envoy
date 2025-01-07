@@ -4666,7 +4666,7 @@ TEST_P(RouterShadowingTest, BufferingShadowWithClusterHeader) {
         EXPECT_NE(request->body().length(), 0);
         EXPECT_NE(nullptr, request->trailers());
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_TRUE(options.sampled_.value());
+        EXPECT_EQ(absl::nullopt, options.sampled_);
       }));
 
   router_->decodeTrailers(trailers);
@@ -4794,7 +4794,7 @@ TEST_P(RouterShadowingTest, StreamingShadow) {
       .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
                            const Http::AsyncClient::RequestOptions& options) {
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_TRUE(options.sampled_.value());
+        EXPECT_EQ(absl::nullopt, options.sampled_);
         return &foo_request;
       }));
   NiceMock<Http::MockAsyncClient> fizz_client;
@@ -4874,7 +4874,7 @@ TEST_P(RouterShadowingTest, BufferingShadow) {
         EXPECT_NE(request->body().length(), 0);
         EXPECT_NE(nullptr, request->trailers());
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_TRUE(options.sampled_.value());
+        EXPECT_EQ(absl::nullopt, options.sampled_);
       }));
   EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, _))
       .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
@@ -4938,7 +4938,7 @@ TEST_P(RouterShadowingTest, ShadowCallbacksNotCalledInDestructor) {
       .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
                            const Http::AsyncClient::RequestOptions& options) {
         EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_TRUE(options.sampled_.value());
+        EXPECT_EQ(absl::nullopt, options.sampled_);
         return &foo_request;
       }));
   router_->decodeHeaders(headers, false);
