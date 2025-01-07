@@ -19,7 +19,15 @@ namespace OpenTelemetry {
 // Configure with only required fields
 TEST(FluentdTracerConfigTest, FluentdTracerMinimalConfig) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  ON_CALL(context.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillByDefault(testing::Return(&thread_local_cluster));
+
+  auto client = std::make_unique<NiceMock<Envoy::Tcp::AsyncClient::MockAsyncTcpClient>>();
+  ON_CALL(thread_local_cluster, tcpAsyncClient(_, _))
+      .WillByDefault(testing::Return(testing::ByMove(std::move(client))));
+
   Envoy::Extensions::Tracers::Fluentd::FluentdTracerFactory factory;
 
   const std::string yaml_json = R"EOF(
@@ -37,13 +45,21 @@ TEST(FluentdTracerConfigTest, FluentdTracerMinimalConfig) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   auto fluentd_tracer = factory.createTracerDriver(*message, context);
+
   EXPECT_NE(nullptr, fluentd_tracer);
 }
 
 // Configure with all fields
 TEST(FluentdTracerConfigTest, FluentdTracerFullConfig) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-  context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
+
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  ON_CALL(context.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillByDefault(testing::Return(&thread_local_cluster));
+
+  auto client = std::make_unique<NiceMock<Envoy::Tcp::AsyncClient::MockAsyncTcpClient>>();
+  ON_CALL(thread_local_cluster, tcpAsyncClient(_, _))
+      .WillByDefault(testing::Return(testing::ByMove(std::move(client))));
   Envoy::Extensions::Tracers::Fluentd::FluentdTracerFactory factory;
 
   const std::string yaml_json = R"EOF(
@@ -54,7 +70,7 @@ TEST(FluentdTracerConfigTest, FluentdTracerFullConfig) {
           cluster: "fake_cluster"
           tag: "fake_tag"
           stat_prefix: "envoy.tracers.fluentd"
-          buffer_flush_interval: 1s
+          buffer_flush_interval: 0.0001s
           buffer_size_bytes: 16384
           retry_options:
             max_connect_attempts: 1024
@@ -68,6 +84,7 @@ TEST(FluentdTracerConfigTest, FluentdTracerFullConfig) {
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
   auto fluentd_tracer = factory.createTracerDriver(*message, context);
+
   EXPECT_NE(nullptr, fluentd_tracer);
 }
 

@@ -2,11 +2,13 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/fluentd/config.h"
 #include "source/extensions/tracers/fluentd/fluentd_tracer_impl.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -46,7 +48,7 @@ public:
     config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
     tracer_ = std::make_unique<FluentdTracerImpl>(
         cluster_, Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_,
-        BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_, time_source_);
+        BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_, time_system_);
   }
 
   std::string getExpectedMsgpackPayload(int entries_count) {
@@ -84,9 +86,8 @@ public:
   std::unique_ptr<FluentdTracerImpl> tracer_;
   envoy::config::trace::v3::FluentdConfig config_;
   NiceMock<Random::MockRandomGenerator> random_;
-  Event::SimulatedTimeSystem time_source_;
+  Event::SimulatedTimeSystem time_system_;
 };
-;
 
 // Fluentd tracer does not write if not connected to upstream.
 TEST_F(FluentdTracerImplTest, NoWriteOnTraceIfNotConnectedToUpstream) {
@@ -318,6 +319,257 @@ TEST_F(FluentdTracerImplTest, NoWriteOnBufferFull) {
   EXPECT_CALL(*async_client_, connected()).Times(0);
   tracer_->trace(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
+}
+
+// Testing cache and and tracer creation
+class FluentdTracerCacheImplTest : public testing::Test {
+public:
+  FluentdTracerCacheImplTest() {
+    ON_CALL(context.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+        .WillByDefault(testing::Return(&thread_local_cluster));
+
+    auto client = std::make_unique<NiceMock<Envoy::Tcp::AsyncClient::MockAsyncTcpClient>>();
+    ON_CALL(thread_local_cluster, tcpAsyncClient(_, _))
+        .WillByDefault(testing::Return(testing::ByMove(std::move(client))));
+
+    tracer_cache_ = std::make_unique<FluentdTracerCacheImpl>(
+        context.serverFactoryContext().clusterManager(), context.serverFactoryContext().scope(),
+        context.serverFactoryContext().threadLocal());
+  }
+
+protected:
+  // mock cluster manager
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  std::unique_ptr<FluentdTracerCacheImpl> tracer_cache_;
+};
+
+// Create a tracer with invalid cluster
+TEST_F(FluentdTracerCacheImplTest, CreateTracerWhenClusterNotFound) {
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test_cluster")).WillOnce(Return(nullptr));
+  tracer_cache_ = std::make_unique<FluentdTracerCacheImpl>(
+      cluster_manager_, context.serverFactoryContext().scope(),
+      context.serverFactoryContext().threadLocal());
+
+  envoy::config::trace::v3::FluentdConfig config;
+  config.set_cluster("test_cluster");
+  config.set_tag("test.tag");
+  config.mutable_buffer_size_bytes()->set_value(123);
+  auto tracer = tracer_cache_->getOrCreateTracer(
+      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+      context.serverFactoryContext().api().randomGenerator(),
+      context.serverFactoryContext().timeSource());
+  EXPECT_EQ(tracer, nullptr);
+}
+
+// Create a new tracer with valid cluster
+TEST_F(FluentdTracerCacheImplTest, CreateNonExistingLogger) {
+  envoy::config::trace::v3::FluentdConfig config;
+  config.set_cluster("test_cluster");
+  config.set_tag("test.tag");
+  config.mutable_buffer_size_bytes()->set_value(123);
+  auto tracer = tracer_cache_->getOrCreateTracer(
+      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+      context.serverFactoryContext().api().randomGenerator(),
+      context.serverFactoryContext().timeSource());
+  EXPECT_NE(tracer, nullptr);
+}
+
+// Create a tracer with the same config
+TEST_F(FluentdTracerCacheImplTest, CreateTwoTracersSameHash) {
+  envoy::config::trace::v3::FluentdConfig config;
+  config.set_cluster("test_cluster");
+  config.set_tag("test.tag");
+  config.mutable_buffer_size_bytes()->set_value(123);
+
+  auto tracer1 = tracer_cache_->getOrCreateTracer(
+      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+      context.serverFactoryContext().api().randomGenerator(),
+      context.serverFactoryContext().timeSource());
+
+  auto tracer2 = tracer_cache_->getOrCreateTracer(
+      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+      context.serverFactoryContext().api().randomGenerator(),
+      context.serverFactoryContext().timeSource());
+
+  EXPECT_EQ(tracer1, tracer2);
+}
+
+// Adapted from OpenTelemetry Span context extractor tests @alexanderellis @yanavlasov
+using StatusHelpers::HasStatusMessage;
+
+constexpr absl::string_view version = "00";
+constexpr absl::string_view trace_id = "00000000000000000000000000000001";
+constexpr absl::string_view parent_id = "0000000000000003";
+constexpr absl::string_view trace_flags = "01";
+
+TEST(SpanContextExtractorTest, ExtractSpanContext) {
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent", fmt::format("{}-{}-{}-{}", version, trace_id, parent_id, trace_flags)}};
+
+  SpanContextExtractor span_context_extractor(request_headers);
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_OK(span_context);
+  EXPECT_EQ(span_context->traceId(), trace_id);
+  EXPECT_EQ(span_context->parentId(), parent_id);
+  EXPECT_EQ(span_context->version(), version);
+  EXPECT_TRUE(span_context->sampled());
+}
+
+TEST(SpanContextExtractorTest, ExtractSpanContextNotSampled) {
+  const std::string trace_flags_unsampled{"00"};
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent",
+       fmt::format("{}-{}-{}-{}", version, trace_id, parent_id, trace_flags_unsampled)}};
+  SpanContextExtractor span_context_extractor(request_headers);
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_OK(span_context);
+  EXPECT_EQ(span_context->traceId(), trace_id);
+  EXPECT_EQ(span_context->parentId(), parent_id);
+  EXPECT_EQ(span_context->version(), version);
+  EXPECT_FALSE(span_context->sampled());
+}
+
+TEST(SpanContextExtractorTest, ThrowsExceptionWithoutHeader) {
+  Tracing::TestTraceContextImpl request_headers{{}};
+  SpanContextExtractor span_context_extractor(request_headers);
+
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("No propagation header found"));
+}
+
+TEST(SpanContextExtractorTest, ThrowsExceptionWithTooLongHeader) {
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent", fmt::format("000{}-{}-{}-{}", version, trace_id, parent_id, trace_flags)}};
+  SpanContextExtractor span_context_extractor(request_headers);
+
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent header length"));
+}
+
+TEST(SpanContextExtractorTest, ThrowsExceptionWithTooShortHeader) {
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent", fmt::format("{}-{}-{}", trace_id, parent_id, trace_flags)}};
+  SpanContextExtractor span_context_extractor(request_headers);
+
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent header length"));
+}
+
+TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidHyphenation) {
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent", fmt::format("{}{}-{}-{}", version, trace_id, parent_id, trace_flags)}};
+  SpanContextExtractor span_context_extractor(request_headers);
+
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent header length"));
+}
+
+TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidSizes) {
+  const std::string invalid_version{"0"};
+  const std::string invalid_trace_flags{"001"};
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent",
+       fmt::format("{}-{}-{}-{}", invalid_version, trace_id, parent_id, invalid_trace_flags)}};
+  SpanContextExtractor span_context_extractor(request_headers);
+
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent field sizes"));
+}
+
+TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidHex) {
+  const std::string invalid_version{"ZZ"};
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent",
+       fmt::format("{}-{}-{}-{}", invalid_version, trace_id, parent_id, trace_flags)}};
+  SpanContextExtractor span_context_extractor(request_headers);
+
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid header hex"));
+}
+
+TEST(SpanContextExtractorTest, ThrowsExceptionWithAllZeroTraceId) {
+  const std::string invalid_trace_id{"00000000000000000000000000000000"};
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent",
+       fmt::format("{}-{}-{}-{}", version, invalid_trace_id, parent_id, trace_flags)}};
+  SpanContextExtractor span_context_extractor(request_headers);
+
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid trace id"));
+}
+
+TEST(SpanContextExtractorTest, ThrowsExceptionWithAllZeroParentId) {
+  const std::string invalid_parent_id{"0000000000000000"};
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent",
+       fmt::format("{}-{}-{}-{}", version, trace_id, invalid_parent_id, trace_flags)}};
+  SpanContextExtractor span_context_extractor(request_headers);
+
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid parent id"));
+}
+
+TEST(SpanContextExtractorTest, ExtractSpanContextWithEmptyTracestate) {
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent", fmt::format("{}-{}-{}-{}", version, trace_id, parent_id, trace_flags)}};
+  SpanContextExtractor span_context_extractor(request_headers);
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_OK(span_context);
+  EXPECT_TRUE(span_context->tracestate().empty());
+}
+
+TEST(SpanContextExtractorTest, ExtractSpanContextWithTracestate) {
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent", fmt::format("{}-{}-{}-{}", version, trace_id, parent_id, trace_flags)},
+      {"tracestate", "sample-tracestate"}};
+  SpanContextExtractor span_context_extractor(request_headers);
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_OK(span_context);
+  EXPECT_EQ(span_context->tracestate(), "sample-tracestate");
+}
+
+TEST(SpanContextExtractorTest, IgnoreTracestateWithoutTraceparent) {
+  Tracing::TestTraceContextImpl request_headers{{"tracestate", "sample-tracestate"}};
+  SpanContextExtractor span_context_extractor(request_headers);
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("No propagation header found"));
+}
+
+TEST(SpanContextExtractorTest, ExtractSpanContextWithMultipleTracestateEntries) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"traceparent", fmt::format("{}-{}-{}-{}", version, trace_id, parent_id, trace_flags)},
+      {"tracestate", "sample-tracestate"},
+      {"tracestate", "sample-tracestate-2"}};
+  Tracing::HttpTraceContext trace_context(request_headers);
+  SpanContextExtractor span_context_extractor(trace_context);
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_OK(span_context);
+  EXPECT_EQ(span_context->tracestate(), "sample-tracestate,sample-tracestate-2");
 }
 
 } // namespace Fluentd
