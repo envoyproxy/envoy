@@ -736,13 +736,26 @@ TEST(ConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedMaxConnectAttempts)) {
       stat_prefix: name
       cluster: foo
       retry_options:
-        max_connect_attempts: 3
+        max_connect_attempts: 2
       max_connect_attempts: 3 # deprecated field
     )EOF";
 
-    EXPECT_THROW_WITH_MESSAGE(
-        Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context)),
-        EnvoyException, "Only one of max_connect_attempts or retry_options can be specified.");
+    Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context));
+    EXPECT_EQ(2, config_obj.maxConnectAttempts());
+  }
+
+  {
+    const std::string deprecated_yaml = R"EOF(
+      stat_prefix: name
+      cluster: foo
+      retry_options:
+        backoff_options:
+          base_interval: 1s
+      max_connect_attempts: 3 # deprecated field
+    )EOF";
+
+    Config config_obj(constructConfigFromYaml(deprecated_yaml, factory_context));
+    EXPECT_EQ(3, config_obj.maxConnectAttempts());
   }
 }
 

@@ -223,7 +223,7 @@ message TcpProxy {
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.RetryOptions.max_connect_attempts>`.
   // Note that if both this field and :ref:`max_connect_attempts
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.RetryOptions.max_connect_attempts>`
-  // are specified, an exception will be thrown.
+  // are specified, the former (deprecated field) is ignored.
   google.protobuf.UInt32Value max_connect_attempts = 7 [
     deprecated = true,
     (validate.rules).uint32 = {gte: 1},
@@ -253,7 +253,7 @@ message TcpProxy {
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`.
   // Note that if both this field and :ref:`access_log_flush_interval
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`
-  // are specified, an exception will be thrown.
+  // are specified, the former (deprecated field) is ignored.
   google.protobuf.Duration access_log_flush_interval = 15 [
     deprecated = true,
     (validate.rules).duration = {gte {nanos: 1000000}},
@@ -266,7 +266,7 @@ message TcpProxy {
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.
   // Note that if both this field and :ref:`flush_access_log_on_connected
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`
-  // are specified, an exception will be thrown.
+  // are specified, the former (deprecated field) is ignored.
   bool flush_access_log_on_connected = 16
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 

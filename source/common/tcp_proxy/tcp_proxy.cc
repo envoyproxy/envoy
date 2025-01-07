@@ -175,15 +175,10 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
       shared_config_(std::make_shared<SharedConfig>(config, context)),
       random_generator_(context.serverFactoryContext().api().randomGenerator()),
       regex_engine_(context.serverFactoryContext().regexEngine()) {
+  max_connect_attempts_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1);
   if (config.has_retry_options()) {
-    if (config.has_max_connect_attempts()) {
-      throw EnvoyException("Only one of max_connect_attempts or retry_options can be specified.");
-    }
-
-    max_connect_attempts_ =
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_options(), max_connect_attempts, 1);
-  } else {
-    max_connect_attempts_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1);
+    max_connect_attempts_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+        config.retry_options(), max_connect_attempts, max_connect_attempts_);
   }
 
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
