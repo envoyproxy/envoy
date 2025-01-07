@@ -316,6 +316,10 @@ QuicPacketizer::QuicPacketPtr QuicPacketizer::serializePacket(const QuicFrame& f
     return serializeMessageFrame(frame.message_frame());
   case QuicFrame::kNewToken:
     return serializeNewTokenFrame(frame.new_token());
+#if 0
+  // AckFrequency is undergoing major revision to update to the most recent
+  // draft. This test is blocking QUICHE development; restore when QUICHE is
+  // up to date.
   case QuicFrame::kAckFrequency: {
     const auto& f = frame.ack_frequency();
     auto delta = quic::QuicTime::Delta::FromMilliseconds(clampU64(f.milliseconds()));
@@ -323,6 +327,7 @@ QuicPacketizer::QuicPacketPtr QuicPacketizer::serializePacket(const QuicFrame& f
         f.control_frame_id(), clampU64(f.sequence_number()), clampU64(f.packet_tolerance()), delta);
     return serialize(quic::QuicFrame(&ack_frequency));
   }
+#endif
   default:
     break;
   }
