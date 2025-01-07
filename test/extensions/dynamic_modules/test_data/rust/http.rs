@@ -20,6 +20,7 @@ fn new_http_filter_config_fn<EHF: EnvoyHttpFilter>(
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
+    "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
     // TODO: add various configs for body, etc.
     _ => panic!("Unknown filter name: {}", name),
   }
@@ -36,8 +37,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HeaderCallbacksFilterConfig
   }
 }
 
-/// A no-op HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`]
-/// as well as the [`Drop`] to test the cleanup of the filter.
+/// A HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`].
 struct HeaderCallbacksFilter {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
@@ -225,5 +225,95 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_trailers[3].1.as_slice(), b"value");
 
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
+  }
+}
+
+
+/// A HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the dynamic metadata related
+/// callbacks.
+struct DynamicMetadataCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for DynamicMetadataCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(DynamicMetadataCallbacksFilter {})
+  }
+}
+
+/// A HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`].
+struct DynamicMetadataCallbacksFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    mut envoy_filter: EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // No namespace.
+    let no_namespace = envoy_filter.get_dynamic_metadata_number("no_namespace", "key");
+    assert!(no_namespace.is_none());
+    // Set a number.
+    envoy_filter.set_dynamic_metadata_number("ns_req_header", "key", 123f64);
+    let ns_req_header = envoy_filter.get_dynamic_metadata_number("ns_req_header", "key");
+    assert_eq!(ns_req_header, Some(123f64));
+    // Try getting a number as string.
+    let ns_req_header = envoy_filter.get_dynamic_metadata_string("ns_req_header", "key");
+    assert!(ns_req_header.is_none());
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_request_body(
+    &mut self,
+    mut envoy_filter: EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
+    // No namespace.
+    let no_namespace = envoy_filter.get_dynamic_metadata_string("no_namespace", "key");
+    assert!(no_namespace.is_none());
+    // Set a string.
+    envoy_filter.set_dynamic_metadata_string("ns_req_body", "key", "value");
+    let ns_req_body = envoy_filter.get_dynamic_metadata_string("ns_req_body", "key");
+    assert!(ns_req_body.is_some());
+    assert_eq!(ns_req_body.unwrap().as_slice(), b"value");
+    // Try getting a string as number.
+    let ns_req_body = envoy_filter.get_dynamic_metadata_number("ns_req_body", "key");
+    assert!(ns_req_body.is_none());
+    abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    mut envoy_filter: EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    // No namespace.
+    let no_namespace = envoy_filter.get_dynamic_metadata_string("no_namespace", "key");
+    assert!(no_namespace.is_none());
+    // Set a number.
+    envoy_filter.set_dynamic_metadata_number("ns_res_header", "key", 123f64);
+    let ns_res_header = envoy_filter.get_dynamic_metadata_number("ns_res_header", "key");
+    assert_eq!(ns_res_header, Some(123f64));
+    // Try getting a number as string.
+    let ns_res_header = envoy_filter.get_dynamic_metadata_string("ns_res_header", "key");
+    assert!(ns_res_header.is_none());
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+
+  fn on_response_body(
+    &mut self,
+    mut envoy_filter: EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
+    // No namespace.
+    let no_namespace = envoy_filter.get_dynamic_metadata_string("no_namespace", "key");
+    assert!(no_namespace.is_none());
+    // Set a string.
+    envoy_filter.set_dynamic_metadata_string("ns_res_body", "key", "value");
+    let ns_res_body = envoy_filter.get_dynamic_metadata_string("ns_res_body", "key");
+    assert!(ns_res_body.is_some());
+    // Try getting a string as number.
+    let ns_res_body = envoy_filter.get_dynamic_metadata_number("ns_res_body", "key");
+    assert!(ns_res_body.is_none());
+    abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }
 }
