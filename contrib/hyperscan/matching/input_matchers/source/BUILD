@@ -19,7 +19,7 @@ envoy_cmake(
     name = "hyperscan",
     build_data = ["@org_boost//:header"],
     cache_entries = {
-        "BOOST_ROOT": "$EXT_BUILD_ROOT/external/org_boost",
+        "BOOST_ROOT": "$$EXT_BUILD_ROOT/external/org_boost",
         "BUILD_AVX512": "on",
         "BUILD_AVX512VBMI": "on",
         "BUILD_EXAMPLES": "off",
@@ -42,7 +42,7 @@ envoy_cmake(
     name = "vectorscan",
     build_data = ["@org_boost//:header"],
     cache_entries = {
-        "BOOST_ROOT": "$EXT_BUILD_ROOT/external/org_boost",
+        "BOOST_ROOT": "$$EXT_BUILD_ROOT/external/org_boost",
         #        "BUILD_SVE2_BITPERM": "on",
         #        "BUILD_SVE2": "on",
         #        "BUILD_SVE": "on",
