@@ -19,9 +19,7 @@ typed_config:
 )EOF";
 
     config_helper_.prependFilter(fmt::format(filter_config, module_name, filter_name, config));
-    std::cout << "here 1" << module_name << filter_name << config << std::endl;
     initialize();
-    std::cout << "here 2" << std::endl;
   }
 };
 
@@ -37,7 +35,6 @@ TEST_P(DynamicModulesIntegrationTest, Nop) {
       1);
 
   initializeFilter("http", "passthrough");
-  // initialize();
   // Create a client aimed at Envoy’s default HTTP port.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
@@ -57,19 +54,6 @@ TEST_P(DynamicModulesIntegrationTest, Nop) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(10U, response->body().size());
-
-  // codec_client_ = makeHttpConnection(lookupPort("http"));
-  // std::cout << "here 3" << std::endl;
-  // auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{{":path",
-  // "/"}}); std::cout << "here 4" << std::endl; waitForNextUpstreamRequest(); std::cout <<
-  // "upstream_request_->headers(): " << upstream_request_->headers() << std::endl;
-
-  // upstream_request_->encodeHeaders(default_response_headers_, true);
-  // ASSERT_TRUE(response->waitForEndStream());
-  // EXPECT_TRUE(upstream_request_->complete());
-  // EXPECT_TRUE(response->complete());
-
-  // cleanupUpstreamAndDownstream();
 }
 
 } // namespace Envoy
