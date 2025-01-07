@@ -25,9 +25,27 @@ index f65a41fbe3..0a1e3dc631 100644
  )
  
 diff --git a/src/core/lib/promise/detail/promise_factory.h b/src/core/lib/promise/detail/promise_factory.h
-index a4cd1bacc8..8a21719cc7 100644
+index a4cd1bacc8..86eea6594c 100644
 --- a/src/core/lib/promise/detail/promise_factory.h
 +++ b/src/core/lib/promise/detail/promise_factory.h
+@@ -159,7 +159,7 @@ PromiseFactoryImpl(F& f, A&& arg) {
+ // Given a callable() -> Promise<T>, promote it to a
+ // PromiseFactory(A) -> Promise<T> by dropping the first argument.
+ template <typename A, typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION
++GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline
+     absl::enable_if_t<IsVoidCallable<ResultOf<F()>>::value,
+                       PromiseLike<decltype(std::declval<F>()())>>
+     PromiseFactoryImpl(F&& f, A&&) {
+@@ -168,7 +168,7 @@ GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION
+ 
+ // Given a callable() -> Promise<T>, name it a PromiseFactory and use it.
+ template <typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION
++GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline
+     absl::enable_if_t<IsVoidCallable<ResultOf<F()>>::value,
+                       PromiseLike<decltype(std::declval<F>()())>>
+     PromiseFactoryImpl(F&& f) {
 @@ -188,7 +188,7 @@ class OncePromiseFactory {
    GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit OncePromiseFactory(F f)
        : f_(std::move(f)) {}
