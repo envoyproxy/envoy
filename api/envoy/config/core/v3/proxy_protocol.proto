@@ -58,6 +58,8 @@ message ProxyProtocolConfig {
   ProxyProtocolPassThroughTLVs pass_through_tlvs = 2;
 
   // Custom TLV metadata to be sent in the upstream PROXY protocol header. This field
-  // is only valid when the version is V2.
+  // is only valid when the version is V2. These TLVs can be defined both in the
+  // endpoint host's typed metadata and at the config-level. In the case that the same
+  // TLV is defined in both places, the endpoint host's typed metadata will take precedence.
   repeated TlvEntry custom_tlvs = 3;
 }
