@@ -15,10 +15,7 @@ void DynamicModuleHttpFilter::initializeInModuleFilter() {
 
 void DynamicModuleHttpFilter::onStreamComplete() {}
 
-void DynamicModuleHttpFilter::onDestroy() {
-  ENVOY_LOG_MISC(trace, "onDestroy called");
-  destroy();
-};
+void DynamicModuleHttpFilter::onDestroy() { destroy(); };
 
 void DynamicModuleHttpFilter::destroy() {
   if (in_module_filter_ == nullptr) {

@@ -66,6 +66,11 @@ private:
    */
   void* thisAsVoidPtr() { return static_cast<void*>(this); }
 
+  /**
+   * Called when filter is destroyed via onDestroy() or destructor. Forwards the call to the
+   * module via on_http_filter_destroy_ and resets in_module_filter_ to null. Subsequent calls are a
+   * no-op.
+   */
   void destroy();
 
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
