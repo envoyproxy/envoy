@@ -5,6 +5,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/registry/registry.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/common/http/conn_manager_impl.h"
@@ -13,6 +14,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
+#include "source/extensions/filters/http/ext_proc/on_receive_message_decorator.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/conn_manager_impl_test_base.h"
@@ -30,6 +32,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -5234,6 +5237,107 @@ TEST_F(HttpFilterTest, InvalidResponseContentLength) {
 
   processResponseHeaders(false, absl::nullopt);
   filter_->onDestroy();
+}
+
+// Using the default configuration, test the filter with a processor that
+// replies to the request_headers message with a message that modifies the request
+// headers.
+TEST_F(HttpFilterTest, OnReceiveMessageDecorateRequestHeaders) {
+  TestOnReceiveMessageDecoratorFactory factory;
+  Envoy::Registry::InjectFactory<OnReceiveMessageDecoratorFactory> registration(factory);
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  on_receive_message_decorator:
+    name: "abc"
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF");
+
+  request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
+  request_headers_.addCopy(LowerCaseString("x-do-we-want-this"), "no");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& header_resp) {
+        auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
+        auto add1 = headers_mut->add_set_headers();
+        add1->mutable_header()->set_key("x-new-header");
+        add1->mutable_header()->set_raw_value("new");
+        add1->mutable_append()->set_value(false);
+        auto add2 = headers_mut->add_set_headers();
+        add2->mutable_header()->set_key("x-some-other-header");
+        add2->mutable_header()->set_raw_value("no");
+        add2->mutable_append()->set_value(true);
+        *headers_mut->add_remove_headers() = "x-do-we-want-this";
+      });
+
+  // We should now have changed the original header a bit
+  TestRequestHeaderMapImpl expected{{":path", "/"},
+                                    {":method", "POST"},
+                                    {":scheme", "http"},
+                                    {"host", "host"},
+                                    {"x-new-header", "new"},
+                                    {"x-some-other-header", "yes"},
+                                    {"x-some-other-header", "no"}};
+  EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
+
+  ASSERT_TRUE(
+      dynamic_metadata_.filter_metadata().contains("envoy.test.ext_proc.request_headers_response"));
+  const auto& struct_metadata =
+      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.request_headers_response");
+  google::protobuf::Struct expected_struct;
+  TestUtility::loadFromJson(R"EOF(
+{
+  "x-do-we-want-this": "remove",
+  "x-new-header": "new",
+  "x-some-other-header": "no"
+})EOF",
+                            expected_struct);
+  EXPECT_TRUE(TestUtility::protoEqual(struct_metadata, expected_struct, true));
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "3");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, [](const HttpHeaders& response_headers, ProcessingResponse&,
+                                   HeadersResponse& header_resp) {
+    EXPECT_FALSE(response_headers.end_of_stream());
+    TestRequestHeaderMapImpl expected_response{
+        {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "3"}};
+    EXPECT_THAT(response_headers.headers(), HeaderProtosEqual(expected_response));
+
+    auto* resp_headers_mut = header_resp.mutable_response()->mutable_header_mutation();
+    auto* resp_add1 = resp_headers_mut->add_set_headers();
+    resp_add1->mutable_header()->set_key("x-new-header");
+    resp_add1->mutable_header()->set_raw_value("new");
+  });
+
+  // We should now have changed the original header a bit
+  TestRequestHeaderMapImpl final_expected_response{{":status", "200"},
+                                                   {"content-type", "text/plain"},
+                                                   {"content-length", "3"},
+                                                   {"x-new-header", "new"}};
+  EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
+
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
+  Buffer::OwnedImpl empty_data;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 } // namespace

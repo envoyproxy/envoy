@@ -30,6 +30,7 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        "on_receive_message_decorator",
         ":client_base_interface",
         ":client_interface",
         ":matching_utils_lib",
@@ -138,6 +139,17 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:typed_async_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "on_receive_message_decorator",
+    hdrs = ["on_receive_message_decorator.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )

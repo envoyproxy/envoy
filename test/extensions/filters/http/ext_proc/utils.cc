@@ -1,5 +1,15 @@
 #include "test/extensions/filters/http/ext_proc/utils.h"
 
+#include <string>
+#include <utility>
+
+// #include "google/protobuf/struct.proto.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/status/status.h"
+#include "envoy/http/header_map.h"
+#include "envoy/stream_info/stream_info.h"
+#include "source/common/common/macros.h"
+
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -31,6 +41,30 @@ envoy::config::core::v3::HeaderValue makeHeaderValue(const std::string& key,
   v.set_key(key);
   v.set_value(value);
   return v;
+}
+
+void TestOnReceiveMessageDecorator::onReceiveMessage(
+    const envoy::service::ext_proc::v3::ProcessingResponse& response, absl::Status,
+    Envoy::StreamInfo::StreamInfo& stream_info) {
+  if (response.has_request_headers()) {
+    if (response.request_headers().has_response() &&
+        response.request_headers().response().has_header_mutation()) {
+      Envoy::ProtobufWkt::Struct struct_metadata;
+      for (auto& header : response.request_headers().response().header_mutation().set_headers()) {
+        Envoy::ProtobufWkt::Value value;
+        value.mutable_string_value()->assign(header.header().raw_value());
+        struct_metadata.mutable_fields()->insert(std::make_pair(header.header().key(), value));
+      }
+      for (auto& header :
+           response.request_headers().response().header_mutation().remove_headers()) {
+        Envoy::ProtobufWkt::Value value;
+        value.mutable_string_value()->assign("remove");
+        struct_metadata.mutable_fields()->insert(std::make_pair(header, value));
+      }
+      stream_info.setDynamicMetadata("envoy.test.ext_proc.request_headers_response",
+                                     struct_metadata);
+    }
+  }
 }
 
 } // namespace ExternalProcessing

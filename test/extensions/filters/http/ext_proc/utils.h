@@ -1,7 +1,13 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/stream_info/stream_info.h"
+
+#include "source/extensions/filters/http/ext_proc/on_receive_message_decorator.h"
 
 #include "absl/strings/str_format.h"
 #include "gmock/gmock.h"
@@ -56,6 +62,30 @@ MATCHER_P2(SingleProtoHeaderValueIs, key, value,
 
 envoy::config::core::v3::HeaderValue makeHeaderValue(const std::string& key,
                                                      const std::string& value);
+
+class TestOnReceiveMessageDecorator : public OnReceiveMessageDecorator {
+public:
+  void onReceiveMessage(const envoy::service::ext_proc::v3::ProcessingResponse& response,
+                        absl::Status processing_status, Envoy::StreamInfo::StreamInfo&) override;
+};
+
+class TestOnReceiveMessageDecoratorFactory : public OnReceiveMessageDecoratorFactory {
+public:
+  ~TestOnReceiveMessageDecoratorFactory() override = default;
+  std::unique_ptr<OnReceiveMessageDecorator>
+  createDecorator(const Protobuf::Message&,
+                  const Envoy::Server::Configuration::CommonFactoryContext&) const override {
+    return std::make_unique<TestOnReceiveMessageDecorator>();
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    // Using Struct instead of a custom filter config proto. This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+
+  std::string name() const override { return "on_receive_message_decorator"; }
+};
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

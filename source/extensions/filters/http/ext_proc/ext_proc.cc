@@ -1,16 +1,20 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
+#include <functional>
 #include <memory>
+#include <utility>
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 
+#include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
+#include "source/extensions/filters/http/ext_proc/on_receive_message_decorator.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -225,6 +229,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
+      on_receive_message_decorator_factory_cb_(createOnReceiveMessageDecoratorCb(config, context)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
 
   if (config.disable_clear_route_cache()) {
@@ -1283,6 +1288,11 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     break;
   }
 
+  if (on_receive_message_decorator_ != nullptr) {
+    on_receive_message_decorator_->onReceiveMessage(*response, processing_status,
+                                                    decoder_callbacks_->streamInfo());
+  }
+
   if (processing_status.ok()) {
     stats_.stream_msgs_received_.inc();
   } else if (absl::IsFailedPrecondition(processing_status)) {
@@ -1548,6 +1558,34 @@ std::string responseCaseToString(const ProcessingResponse::ResponseCase response
   default:
     return "unknown";
   }
+}
+
+std::function<std::unique_ptr<OnReceiveMessageDecorator>()>
+FilterConfig::createOnReceiveMessageDecoratorCb(
+    const ExternalProcessor& config, Envoy::Server::Configuration::CommonFactoryContext& context) {
+  if (!config.has_on_receive_message_decorator()) {
+    return nullptr;
+  }
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<OnReceiveMessageDecoratorFactory>(
+      config.on_receive_message_decorator());
+  auto decorator_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.on_receive_message_decorator().typed_config(), context.messageValidationVisitor(),
+      factory);
+  if (decorator_config == nullptr) {
+    return nullptr;
+  }
+  std::shared_ptr<const Protobuf::Message> shared_decorator_config = std::move(decorator_config);
+  return [&factory, shared_decorator_config,
+          &context]() -> std::unique_ptr<OnReceiveMessageDecorator> {
+    return factory.createDecorator(*shared_decorator_config, context);
+  };
+}
+
+std::unique_ptr<OnReceiveMessageDecorator> FilterConfig::createOnReceiveMessageDecorator() const {
+  if (on_receive_message_decorator_factory_cb_ == nullptr) {
+    return nullptr;
+  }
+  return on_receive_message_decorator_factory_cb_();
 }
 
 } // namespace ExternalProcessing
