@@ -5,7 +5,13 @@ This directory contains the Rust SDK for the Dynamic Modules feature. This direc
 Note that this crate references the local ABI header files, so this is intended to be used as
 ```
 [dependencies]
-envoy-proxy-dynamic-modules-rust-sdk = { git = "https://github.com/envoyproxy/envoy", tag = "v1.50.1" }
+envoy-proxy-dynamic-modules-rust-sdk = { git = "https://github.com/envoyproxy/envoy", tag = "vX.Y.Z" }
+
+[dev-dependencies.envoy-proxy-dynamic-modules-rust-sdk]
+git = "https://github.com/envoyproxy/envoy"
+tag = "vX.Y.Z"
+# Enable testing features to use the mock Envoy objects.
+features = ["testing"]
 ```
 
 instead of `envoy-proxy-dynamic-modules-rust-sdk = "X.Y.Z"`.

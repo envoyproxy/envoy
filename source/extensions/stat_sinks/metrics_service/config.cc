@@ -7,7 +7,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 #include "source/common/grpc/async_client_impl.h"
-#include "source/common/network/resolver_impl.h"
 #include "source/extensions/stat_sinks/metrics_service/grpc_metrics_proto_descriptors.h"
 #include "source/extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 

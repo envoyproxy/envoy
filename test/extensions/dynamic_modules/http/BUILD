@@ -38,13 +38,26 @@ envoy_cc_test(
     srcs = ["filter_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/rust:http",
         "//test/extensions/dynamic_modules/test_data/rust:no_op",
     ],
     # http_mocks needs this.
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//source/extensions/filters/http/dynamic_modules:filter_lib",
         "//test/extensions/dynamic_modules:util",
+        "//test/mocks/http:http_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "abi_impl_test",
+    srcs = ["abi_impl_test.cc"],
+    # http_mocks needs this.
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//test/mocks/http:http_mocks",
     ],
 )

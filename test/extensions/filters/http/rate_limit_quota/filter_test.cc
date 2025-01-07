@@ -65,6 +65,11 @@ public:
     TestUtility::loadFromYaml(std::string(GoogleGrpcConfig), config_);
   }
 
+  void addMatcherConfig(xds::type::matcher::v3::Matcher& matcher) {
+    config_.mutable_bucket_matchers()->MergeFrom(matcher);
+    match_tree_ = matcher_factory_.create(matcher)();
+  }
+
   void addMatcherConfig(MatcherConfigType config_type) {
     // Add the matcher configuration.
     xds::type::matcher::v3::Matcher matcher;
@@ -96,7 +101,7 @@ public:
 
     // Empty matcher config will not have the bucket matcher configured.
     if (config_type != MatcherConfigType::Empty) {
-      config_.mutable_bucket_matchers()->MergeFrom(matcher);
+      addMatcherConfig(matcher);
     }
   }
 
@@ -106,8 +111,9 @@ public:
         Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
     mock_local_client_ = new MockRateLimitClient();
-    filter_ = std::make_unique<RateLimitQuotaFilter>(
-        filter_config_, context_, absl::WrapUnique(mock_local_client_), config_with_hash_key);
+    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
+                                                     absl::WrapUnique(mock_local_client_),
+                                                     config_with_hash_key, match_tree_);
     if (set_callback) {
       filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     }
@@ -163,11 +169,18 @@ public:
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<MockFactoryContext> context_;
+  RateLimitOnMatchActionContext action_context_ = {};
+  RateLimitQuotaValidationVisitor visitor_ = {};
+  Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext>
+      matcher_factory_ =
+          Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext>(
+              action_context_, context_.serverFactoryContext(), visitor_);
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 
   MockRateLimitClient* mock_local_client_ = nullptr;
   FilterConfigConstSharedPtr filter_config_;
   FilterConfig config_;
+  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree_ = nullptr;
   std::unique_ptr<RateLimitQuotaFilter> filter_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
@@ -391,6 +404,7 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
   Protobuf::TextFormat::ParseFromString(on_match_str, &on_match);
   inner_matcher->mutable_on_match()->MergeFrom(on_match);
   config_.mutable_bucket_matchers()->MergeFrom(matcher);
+  addMatcherConfig(matcher);
   createFilter();
   // Define the key value pairs that is used to build the bucket_id dynamically
   // via `custom_value` in the config.
