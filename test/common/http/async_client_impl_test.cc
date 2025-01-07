@@ -2410,6 +2410,8 @@ TEST_F(AsyncClientImplUnitTest, NullVirtualHost) {
 }
 
 TEST_F(AsyncClientImplTest, UpstreamTlsScheme) {
+  // Validate the upstream peudo header ':scheme' is set to 'https' if upstream is using TLS
+
   message_->body().add("test body");
   Buffer::Instance& data = message_->body();
 
