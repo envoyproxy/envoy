@@ -13,5 +13,8 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: wasm
+  change: |
+    Added support for wasm plugins written in Go with the github.com/proxy-wasm/proxy-wasm-go-sdk and compiled with Go v1.24+.
 
 deprecated:
