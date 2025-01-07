@@ -404,11 +404,6 @@ new_features:
     Added support for :ref:`backoff_options
     <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.RetryOptions.backoff_options>`
     to configure the backoff strategy for TCP proxy retries.
-- area: udp_proxy
-  change: |
-    Added support for :ref:`backoff_options
-    <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions.backoff_options>`
-    to configure the backoff strategy for UDP proxy retries when tunneling over HTTP.
 
 deprecated:
 - area: rbac

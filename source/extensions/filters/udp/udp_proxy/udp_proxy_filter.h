@@ -98,7 +98,6 @@ public:
   virtual const std::string& postPath() const PURE;
   virtual Http::HeaderEvaluator& headerEvaluator() const PURE;
   virtual uint32_t maxConnectAttempts() const PURE;
-  virtual const BackOffStrategyPtr& backoffStrategy() const PURE;
   virtual bool bufferEnabled() const PURE;
   virtual uint32_t maxBufferedDatagrams() const PURE;
   virtual uint64_t maxBufferedBytes() const PURE;
@@ -603,7 +602,7 @@ protected:
     bool onContinueFilterChain(ActiveReadFilter* filter);
     void onInjectReadDatagramToFilterChain(ActiveReadFilter* filter, Network::UdpRecvData& data);
     void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
-    virtual void onSessionComplete();
+    void onSessionComplete();
 
     // SessionFilters::FilterChainFactoryCallbacks
     void addReadFilter(ReadFilterSharedPtr filter) override {
@@ -744,7 +743,6 @@ protected:
     bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
-    void onSessionComplete() override;
 
     // UpstreamTunnelCallbacks
     void onUpstreamEvent(Network::ConnectionEvent event) override;
@@ -770,11 +768,7 @@ protected:
     bool createConnectionPool();
     void maybeBufferDatagram(Network::UdpRecvData& data);
     void flushBuffer();
-    void onRetryTimer();
-    void resetRetryTimer();
-    void disableRetryTimer();
 
-    Event::TimerPtr retry_timer_;
     TunnelingConnectionPoolFactoryPtr conn_pool_factory_;
     std::unique_ptr<UdpLoadBalancerContext> load_balancer_context_;
     TunnelingConnectionPoolPtr conn_pool_;
