@@ -344,7 +344,11 @@ pub trait EnvoyHttpFilter {
 
   /// Get the string-typed dynamic metadata value with the given key.
   /// If the metadata is not found or is the wrong type, this returns `None`.
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer>;
+  fn get_dynamic_metadata_string<'a>(
+    &'a self,
+    namespace: &str,
+    key: &str,
+  ) -> Option<EnvoyBuffer<'a>>;
 
   /// Set the string-typed dynamic metadata value with the given key.
   /// If the namespace is not found, this will create a new namespace.
