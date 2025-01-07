@@ -223,24 +223,25 @@ impl EnvoyHttpFilterConfig {
 /// The Envoy filter object is inherently not thread-safe, and it is always recommended to
 /// access it from the same thread as the one that [`HttpFilter`] even hooks are called.
 #[automock]
+#[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyHttpFilter {
   /// Get the value of the request header with the given key.
   /// If the header is not found, this returns `None`.
   ///
   /// To handle multiple values for the same key, use
   /// [`EnvoyHttpFilter::get_request_header_values`] variant.
-  fn get_request_header_value(&self, key: &str) -> Option<EnvoyBuffer>;
+  fn get_request_header_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
 
   /// Get the values of the request header with the given key.
   ///
   /// If the header is not found, this returns an empty vector.
-  fn get_request_header_values(&self, key: &str) -> Vec<EnvoyBuffer>;
+  fn get_request_header_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
 
   /// Get all request headers.
   ///
   /// Returns a list of key-value pairs of the request headers.
   /// If there are no headers or headers are not available, this returns an empty list.
-  fn get_request_headers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)>;
+  fn get_request_headers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
 
   /// Set the request header with the given key and value.
   ///
@@ -256,18 +257,18 @@ pub trait EnvoyHttpFilter {
   ///
   /// To handle multiple values for the same key, use
   /// [`EnvoyHttpFilter::get_request_trailer_values`] variant.
-  fn get_request_trailer_value(&self, key: &str) -> Option<EnvoyBuffer>;
+  fn get_request_trailer_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
 
   /// Get the values of the request trailer with the given key.
   ///
   /// If the trailer is not found, this returns an empty vector.
-  fn get_request_trailer_values(&self, key: &str) -> Vec<EnvoyBuffer>;
+  fn get_request_trailer_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
 
   /// Get all request trailers.
   ///
   /// Returns a list of key-value pairs of the request trailers.
   /// If there are no trailers or trailers are not available, this returns an empty list.
-  fn get_request_trailers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)>;
+  fn get_request_trailers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
 
   /// Set the request trailer with the given key and value.
   ///
@@ -283,18 +284,18 @@ pub trait EnvoyHttpFilter {
   ///
   /// To handle multiple values for the same key, use
   /// [`EnvoyHttpFilter::get_response_header_values`] variant.
-  fn get_response_header_value(&self, key: &str) -> Option<EnvoyBuffer>;
+  fn get_response_header_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
 
   /// Get the values of the response header with the given key.
   ///
   /// If the header is not found, this returns an empty vector.
-  fn get_response_header_values(&self, key: &str) -> Vec<EnvoyBuffer>;
+  fn get_response_header_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
 
   /// Get all response headers.
   ///
   /// Returns a list of key-value pairs of the response headers.
   /// If there are no headers or headers are not available, this returns an empty list.
-  fn get_response_headers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)>;
+  fn get_response_headers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
 
   /// Set the response header with the given key and value.
   ///
@@ -310,17 +311,17 @@ pub trait EnvoyHttpFilter {
   ///
   /// To handle multiple values for the same key, use
   /// [`EnvoyHttpFilter::get_response_trailer_values`] variant.
-  fn get_response_trailer_value(&self, key: &str) -> Option<EnvoyBuffer>;
+  fn get_response_trailer_value<'a>(&'a self, key: &str) -> Option<EnvoyBuffer<'a>>;
 
   /// Get the values of the response trailer with the given key.
   ///
   /// If the trailer is not found, this returns an empty vector.
-  fn get_response_trailer_values(&self, key: &str) -> Vec<EnvoyBuffer>;
+  fn get_response_trailer_values<'a>(&'a self, key: &str) -> Vec<EnvoyBuffer<'a>>;
   /// Get all response trailers.
   ///
   /// Returns a list of key-value pairs of the response trailers.
   /// If there are no trailers or trailers are not available, this returns an empty list.
-  fn get_response_trailers(&self) -> Vec<(EnvoyBuffer, EnvoyBuffer)>;
+  fn get_response_trailers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
 
   /// Set the response trailer with the given key and value.
   ///
@@ -330,6 +331,30 @@ pub trait EnvoyHttpFilter {
   ///
   /// Returns true if the operation is successful.
   fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Get the number-typed dynamic metadata value with the given key.
+  /// If the metadata is not found or is the wrong type, this returns `None`.
+  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64>;
+
+  /// Set the number-typed dynamic metadata value with the given key.
+  /// If the namespace is not found, this will create a new namespace.
+  ///
+  /// Returns true if the operation is successful.
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
+
+  /// Get the string-typed dynamic metadata value with the given key.
+  /// If the metadata is not found or is the wrong type, this returns `None`.
+  fn get_dynamic_metadata_string<'a>(
+    &'a self,
+    namespace: &str,
+    key: &str,
+  ) -> Option<EnvoyBuffer<'a>>;
+
+  /// Set the string-typed dynamic metadata value with the given key.
+  /// If the namespace is not found, this will create a new namespace.
+  ///
+  /// Returns true if the operation is successful.
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -482,6 +507,91 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     unsafe {
       abi::envoy_dynamic_module_callback_http_set_response_trailer(
         self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        value_ptr as *const _ as *mut _,
+        value_size,
+      )
+    }
+  }
+
+  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64> {
+    let namespace_ptr = namespace.as_ptr();
+    let namespace_size = namespace.len();
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let mut value: f64 = 0f64;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
+        self.raw_ptr,
+        namespace_ptr as *const _ as *mut _,
+        namespace_size,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        &mut value as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(value)
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool {
+    let namespace_ptr = namespace.as_ptr();
+    let namespace_size = namespace.len();
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+        self.raw_ptr,
+        namespace_ptr as *const _ as *mut _,
+        namespace_size,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        value,
+      )
+    }
+  }
+
+  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer> {
+    let namespace_ptr = namespace.as_ptr();
+    let namespace_size = namespace.len();
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let mut result_ptr: *const u8 = std::ptr::null();
+    let mut result_size: usize = 0;
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
+        self.raw_ptr,
+        namespace_ptr as *const _ as *mut _,
+        namespace_size,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        &mut result_ptr as *mut _ as *mut _,
+        &mut result_size as *mut _ as *mut _,
+      )
+    };
+    if success {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) })
+    } else {
+      None
+    }
+  }
+
+  fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool {
+    let namespace_ptr = namespace.as_ptr();
+    let namespace_size = namespace.len();
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    let value_ptr = value.as_ptr();
+    let value_size = value.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
+        self.raw_ptr,
+        namespace_ptr as *const _ as *mut _,
+        namespace_size,
         key_ptr as *const _ as *mut _,
         key_size,
         value_ptr as *const _ as *mut _,

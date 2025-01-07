@@ -18,7 +18,7 @@ defines the fallback priority.
 The aggregate cluster uses a tiered approach to load balancing:
 
 * At the top level, it decides which cluster and priority to use.
-* It then hands off the actual load balancing to the selected cluster’s own load balancer.
+* It then hands off the actual load balancing to the selected cluster's own load balancer.
 
 Internally, this top-level load balancer treats all the priorities across all referenced clusters as a single linear
 list. By doing so, it reuses the existing load balancing algorithm and makes it possible to seamlessly shift traffic
@@ -88,7 +88,7 @@ PriorityLoad Retry Plugins
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 :ref:`PriorityLoad retry plugins <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_priority>` will not work with an
-aggregate cluster. Because the aggregate cluster’s load balancer controls traffic distribution at a higher level, it
+aggregate cluster. Because the aggregate cluster's load balancer controls traffic distribution at a higher level, it
 effectively overrides the PriorityLoad behavior during load balancing.
 
 Stateful Sessions
@@ -104,7 +104,7 @@ send traffic directly to that host. This works only when the cluster itself know
 In an aggregate cluster, the final routing decision happens one layer beneath the aggregate load balancer, so the filter
 cannot locate that specific endpoint at the aggregate level. As a result, Stateful Sessions are incompatible with
 aggregate clusters, because the final cluster choice is made without direct knowledge of the specific endpoint which
-doesn’t exist at the top level.
+doesn't exist at the top level.
 
 Load Balancing Example
 ----------------------
@@ -116,7 +116,7 @@ configuration describes.
 
 The aggregate cluster uses a tiered load balancing algorithm with two main steps:
 
-* **Top Tier:** Distribute traffic across different clusters based on each cluster’s overall health (across all
+* **Top Tier:** Distribute traffic across different clusters based on each cluster's overall health (across all
   :ref:`priorities <arch_overview_load_balancing_priority_levels>`).
 * **Second Tier:** Once a cluster is chosen, delegate traffic distribution within that cluster to its own load balancer
   (e.g., :ref:`ROUND_ROBIN <arch_overview_load_balancing_types_round_robin>`,
@@ -149,47 +149,138 @@ The aggregate cluster uses a tiered load balancing algorithm with two main steps
 +-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+--------------------+----------------------+
 
 .. note::
-   By default, the :ref:`overprovisioning factor <arch_overview_load_balancing_overprovisioning_factor>` is ``1.4``.
+   By default, the :ref:`overprovisioning factor <arch_overview_load_balancing_overprovisioning_factor>` is **1.4**.
    This factor boosts lower health percentages to account for partial availability. For instance, if a priority level is
-   ``80%`` healthy, multiplying by ``1.4`` results in ``112%``, which is capped at ``100%``. In other words, any product
-   above ``100%`` is treated as ``100%``.
+   **80%** healthy, multiplying by **1.4** results in **112%**, which is capped at **100%**. In other words, any product
+   above **100%** is treated as **100%**.
 
-The example shows how the aggregate cluster level load balancer selects the cluster. E.g., healths
-of {{20, 20, 10}, {25, 25}} would result in a priority load of {{28%, 28%, 14%}, {30%, 0%}} of
-traffic. When normalized total health drops below 100, traffic is distributed after normalizing the
-levels' health scores to that sub-100 total. E.g. healths of {{20, 0, 0}, {20, 0}} (yielding a
-normalized total health of 56) would be normalized and each cluster will receive 20 * 1.4 / 56 = 50%
-of the traffic which results in a priority load of {{50%, 0%, 0%}, {50%, 0%, 0%}} of traffic.
+The aggregate cluster load balancer first calculates each priority's health score for every cluster, sums those up,
+and then assigns traffic based on the overall total. If the total is at least **100**, the combined traffic is capped at
+**100%**. If it's below **100**, Envoy scales (normalizes) it so that the final distribution sums to **100%**.
 
-The load balancer reuses priority level logic to help with the cluster selection. The priority level
-logic works with integer health scores. The health score of a level is (percent of healthy hosts in
-the level) * (overprovisioning factor), capped at 100%. P=0 endpoints receive level 0's health
-score percent of the traffic, with the rest flowing to P=1 (assuming P=1 is 100% healthy - more on
-that later). The integer percents of traffic that each cluster receives are collectively called the
-system's "cluster priority load". For instance, for primary cluster, when 20% of P=0 endpoints are
-healthy, 20% of P=1 endpoints are healthy, and 10% of P=2 endpoints are healthy; for secondary, when
-25% of P=0 endpoints are healthy and 25% of P=1 endpoints are healthy. The primary cluster will
-receive 20% * 1.4 + 20% * 1.4 + 10% * 1.4 = 70% of the traffic. The secondary cluster will receive
-min(100 - 70, 25% * 1.4 + 25% * 1.4) = 30% of the traffic. The traffic to all clusters sum up to
-100. The normalized health score and priority load are pre-computed before selecting the cluster and
-priority.
+Scenario A: Total Health ≥ 100
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Suppose we have two clusters:
+
+* Primary with three priority levels: ``20%, 20%, 10%`` healthy.
+* Secondary with two priority levels: ``25%, 25%`` healthy.
+
+1. Compute raw health scores using ``percent_healthy × overprovisioning_factor (1.4)``, each capped at **100**.
+
+   * Primary:
+
+     * P=0: 20% × 1.4 = 28
+     * P=1: 20% × 1.4 = 28
+     * P=2: 10% × 1.4 = 14
+     * **Sum:** 28 + 28 + 14 = 70
+
+   * Secondary:
+
+     * P=0: 25% × 1.4 = 35
+     * P=1: 25% × 1.4 = 35
+     * **Sum:** 35 + 35 = 70
+
+2. Assign traffic to the first cluster, then the next, etc., without exceeding **100%** total.
+
+   * Primary takes its 70% first.
+   * Secondary then takes min(100 - 70, 70) = 30.
+   * Combined total is 70 + 30 = 100.
+
+3. Distribute that traffic internally by priority.
+
+   * Primary's **70%** is split across its priorities in proportion to **28** : **28** : **14**, i.e.:
+
+     * P=0 → 28%
+     * P=1 → 28%
+     * P=2 → 14%
+
+   * Secondary's **30%** goes first to P=0, which is 35, but capped at whatever remains from 100 after primary
+     took 70 (i.e., 30). So:
+
+     * P=0 → 30%
+     * P=1 → 0%
+
+Hence the final breakdown of traffic is:
+
+* Primary: ``{28%, 28%, 14%}``
+* Secondary: ``{30%, 0%}``
+
+Scenario B: Total Health < 100
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Sometimes the health scores add up to less than **100**. In that case, Envoy 'normalizes' them so that each cluster and
+priority still receives a portion out of 100%.
+
+For instance, consider:
+
+* Primary: ``20%, 0%, 0%``
+* Secondary: ``20%, 0%``
+
+1. Compute raw health scores (same formula: ``percent_healthy × 1.4``, capped at **100**):
+
+   * Primary:
+
+     * P=0: 20% × 1.4 = 28
+     * P=1: 0 → 0
+     * P=2: 0 → 0
+     * **Sum:** 28 + 0 + 0 = 28
+
+   * Secondary:
+
+     * P=0: 20% × 1.4 = 28
+     * P=1: 0 → 0
+     * **Sum:** 28 + 0 = 28
+
+2. Total raw health = 28 + 28 = **56** (below 100).
+
+3. Normalize so that the final total is 100%.
+
+   * Both clusters end up at ``28 / 56 = 50%``.
+
+Thus each cluster, primary and secondary, receives 50% of the traffic. And since all of each cluster's share is in
+the **Priority 0** (28 points) and the others are 0, the final distribution is:
+
+* Primary: ``{50%, 0%, 0%}``
+* Secondary: ``{50%, 0%}``
+
+These scenarios show how Envoy's aggregate cluster load balancer decides which cluster (and priority level) gets traffic,
+depending on the overall health of the endpoints. When the summed health across all clusters and priorities reaches or
+exceeds **100**, Envoy caps the total at **100%** and allocates accordingly. If the total is below **100**, Envoy scales
+up proportionally so that all traffic still adds up to **100%**.
+
+Within each cluster, priority levels are also respected and allocated traffic based on their computed health scores.
+
+Putting It All Together
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 To sum this up in pseudo algorithms:
+
+* Calculates each priority level's health score using ``(healthy% × overprovisioning factor)``, capped at **100%**.
+* Sums and optionally normalizes total health across clusters.
+* Computes each cluster's share of overall traffic i.e. its "cluster priority load".
+* Distributes traffic among the priorities within each cluster according to their health scores.
+* Performs final load balancing within each cluster.
 
 ::
 
   health(P_X) = min(100, 1.4 * 100 * healthy_P_X_backends / total_P_X_backends), where
                   total_P_X_backends is the number of backends for priority P_X after linearization
+
   normalized_total_health = min(100, Σ(health(P_0)...health(P_X)))
+
   cluster_priority_load(C_0) = min(100, Σ(health(P_0)...health(P_k)) * 100 / normalized_total_health),
                   where P_0...P_k belong to C_0
+
   cluster_priority_load(C_X) = min(100 - Σ(priority_load(C_0)..priority_load(C_X-1)),
                            Σ(health(P_x)...health(P_X)) * 100 / normalized_total_health),
                            where P_x...P_X belong to C_X
+
   map from priorities to clusters:
     P_0 ... P_k ... ...P_x ... P_X
     ^       ^          ^       ^
     cluster C_0        cluster C_X
 
-The second tier is delegating the load balancing to the cluster selected in the first step and the
-cluster could use any load balancing algorithms specified by :ref:`load balancer type <arch_overview_load_balancing_types>`.
+In the second tier of load balancing, Envoy hands off traffic to the cluster selected in the first tier. That cluster
+can then apply any of the load balancing algorithms described in
+:ref:`load balancer type <arch_overview_load_balancing_types>`.

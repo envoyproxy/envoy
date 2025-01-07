@@ -35,12 +35,14 @@
 #ifdef __cplusplus
 #include <cstdbool>
 #include <cstddef>
+#include <cstdint>
 
 extern "C" {
 #else
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #endif
 
 // -----------------------------------------------------------------------------
@@ -397,6 +399,8 @@ void envoy_dynamic_module_on_http_filter_destroy(
 // Callbacks are functions implemented by Envoy that can be called by the module to interact with
 // Envoy. The name of a callback must be prefixed with "envoy_dynamic_module_callback_".
 
+// ---------------------- HTTP Header/Trailer callbacks ------------------------
+
 /**
  * envoy_dynamic_module_callback_http_get_request_header is called by the module to get the
  * value of the request header with the given key. Since a header can have multiple values, the
@@ -605,6 +609,97 @@ bool envoy_dynamic_module_callback_http_set_response_trailer(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length);
+
+// ------------------------ Dynamic Metadata Callbacks -------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_number is called by the module to set
+ * the number value of the dynamic metadata with the given namespace and key. If the metadata is not
+ * accessible, this returns false. If the namespace does not exist, it will be created.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param namespace_ptr is the namespace of the dynamic metadata.
+ * @param namespace_length is the length of the namespace.
+ * @param key_ptr is the key of the dynamic metadata.
+ * @param key_length is the length of the key.
+ * @param value is the number value of the dynamic metadata to be set.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double value);
+
+/**
+ * envoy_dynamic_module_callback_http_get_dynamic_metadata_number is called by the module to get
+ * the number value of the dynamic metadata with the given namespace and key. If the metadata is not
+ * accessible, the namespace does not exist, the key does not exist or the value is not a number,
+ * this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param namespace_ptr is the namespace of the dynamic metadata.
+ * @param namespace_length is the length of the namespace.
+ * @param key_ptr is the key of the dynamic metadata.
+ * @param key_length is the length of the key.
+ * @param result is the pointer to the variable where the number value of the dynamic metadata will
+ * be stored.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double* result);
+
+/**
+ * envoy_dynamic_module_callback_http_set_dynamic_metadata_string is called by the module to set
+ * the string value of the dynamic metadata with the given namespace and key. If the metadata is not
+ * accessible, this returns false. If the namespace does not exist, it will be created.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param namespace_ptr is the namespace of the dynamic metadata.
+ * @param namespace_length is the length of the namespace.
+ * @param key_ptr is the key of the dynamic metadata.
+ * @param key_length is the length of the key.
+ * @param value_ptr is the string value of the dynamic metadata to be set.
+ * @param value_length is the length of the value.
+ * @return true if the operation is successful, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_module_ptr value_ptr, size_t value_length);
+
+/**
+ * envoy_dynamic_module_callback_http_get_dynamic_metadata_string is called by the module to get
+ * the string value of the dynamic metadata with the given namespace and key. If the metadata is not
+ * accessible, the namespace does not exist, the key does not exist or the value is not a string,
+ * this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param namespace_ptr is the namespace of the dynamic metadata.
+ * @param namespace_length is the length of the namespace.
+ * @param key_ptr is the key of the dynamic metadata.
+ * @param key_length is the length of the key.
+ * @param result_buffer_ptr is the pointer to the pointer variable where the pointer to the buffer
+ * of the value will be stored.
+ * @param result_buffer_length_ptr is the pointer to the variable where the length of the buffer
+ * will be stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note that the buffer pointed by the pointer stored in result is owned by Envoy, and
+ * they are guaranteed to be valid until the end of the current event hook unless the setter
+ * callback is called.
+ */
+bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
+    envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
+    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
 
 #ifdef __cplusplus
 }

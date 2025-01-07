@@ -203,7 +203,7 @@ void GlobalRateLimitClientImpl::createBucketImpl(const BucketId& bucket_id, size
   sendUsageReportImpl(initial_report);
 
   writeBucketsToTLS();
-  if (callbacks_) {
+  if (callbacks_ != nullptr) {
     callbacks_->onBucketCreated(buckets_cache_[id]->bucket_id, id);
   }
 }
@@ -257,7 +257,7 @@ createTokenBucketFromAction(const RateLimitStrategy& strategy, TimeSource& time_
 }
 
 void GlobalRateLimitClientImpl::onReceiveMessage(RateLimitQuotaResponsePtr&& response) {
-  if (!response) {
+  if (response == nullptr) {
     return;
   }
   main_dispatcher_.post(
@@ -359,7 +359,7 @@ void GlobalRateLimitClientImpl::onQuotaResponseImpl(const RateLimitQuotaResponse
   }
   // Push updates to TLS.
   writeBucketsToTLS();
-  if (callbacks_) {
+  if (callbacks_ != nullptr) {
     callbacks_->onQuotaResponseProcessed();
   }
 }
@@ -388,13 +388,13 @@ bool GlobalRateLimitClientImpl::startStreamImpl() {
 }
 
 void GlobalRateLimitClientImpl::startSendReportsTimerImpl() {
-  if (send_reports_timer_) {
+  if (send_reports_timer_ != nullptr) {
     return;
   }
   ENVOY_LOG(debug, "Start the usage reporting timer for the RLQS stream.");
   send_reports_timer_ = main_dispatcher_.createTimer([&]() {
     onSendReportsTimer();
-    if (callbacks_) {
+    if (callbacks_ != nullptr) {
       callbacks_->onUsageReportsSent();
     }
     send_reports_timer_->enableTimer(send_reports_interval_);
@@ -420,7 +420,7 @@ void GlobalRateLimitClientImpl::startActionExpirationTimer(CachedBucket* cached_
   // Pointer safety as all writes are against the source-of-truth.
   cached_bucket->action_expiration_timer = main_dispatcher_.createTimer([&, id, cached_bucket]() {
     onActionExpirationTimer(cached_bucket, id);
-    if (callbacks_) {
+    if (callbacks_ != nullptr) {
       callbacks_->onActionExpiration();
     }
   });
@@ -442,7 +442,7 @@ void GlobalRateLimitClientImpl::onActionExpirationTimer(CachedBucket* bucket, si
 
   // Without a fallback action, the cached action will be deleted and the bucket
   // will revert to its default action.
-  if (!cached_bucket->fallback_action) {
+  if (cached_bucket->fallback_action == nullptr) {
     ENVOY_LOG(debug,
               "No fallback action is configured for bucket id {}, reverting to "
               "its default action.",
@@ -509,7 +509,7 @@ void GlobalRateLimitClientImpl::startFallbackExpirationTimer(CachedBucket* cache
   // Pointer safety as all writes are against the source-of-truth.
   cached_bucket->fallback_expiration_timer = main_dispatcher_.createTimer([&, id, cached_bucket]() {
     onFallbackExpirationTimer(cached_bucket, id);
-    if (callbacks_) {
+    if (callbacks_ != nullptr) {
       callbacks_->onFallbackExpiration();
     }
   });
