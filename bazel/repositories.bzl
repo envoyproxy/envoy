@@ -903,13 +903,6 @@ def _com_github_wasmtime():
         actual = "@com_github_wasmtime//:wasmtime_lib",
     )
 
-    # This isn't needed in builds with a single Wasm engine, but "bazel query"
-    # complains about a missing dependency, so point it at the regular target.
-    native.bind(
-        name = "prefixed_wasmtime",
-        actual = "@com_github_wasmtime//:prefixed_wasmtime_lib",
-    )
-
 def _intel_dlb():
     external_http_archive(
         name = "intel_dlb",
