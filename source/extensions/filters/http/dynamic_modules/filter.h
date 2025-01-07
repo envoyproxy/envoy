@@ -64,6 +64,19 @@ public:
   ResponseHeaderMap* response_headers_ = nullptr;
   ResponseTrailerMap* response_trailers_ = nullptr;
 
+  /**
+   * Helper to get the downstream information of the stream.
+   */
+  StreamInfo::StreamInfo* streamInfo() {
+    if (decoder_callbacks_) {
+      return &decoder_callbacks_->streamInfo();
+    } else if (encoder_callbacks_) {
+      return &encoder_callbacks_->streamInfo();
+    } else {
+      return nullptr;
+    }
+  }
+
 private:
   // This ensures that we do not re-enter the dynamic filter hooks when sending a local reply
   bool sent_local_reply_ = false;
