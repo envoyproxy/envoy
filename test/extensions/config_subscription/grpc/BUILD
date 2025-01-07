@@ -281,7 +281,8 @@ envoy_cc_test(
 envoy_cc_test(
     name = "xds_failover_integration_test",
     srcs = ["xds_failover_integration_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
+    size = "large",
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",
