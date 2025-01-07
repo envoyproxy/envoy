@@ -54,36 +54,32 @@ LinuxContainerCpuStatsReader::LinuxContainerCpuStatsReader(const std::string& li
 CgroupStats LinuxContainerCpuStatsReader::getCgroupStats() {
   std::ifstream cpu_allocated_file, cpu_times_file;
   uint64_t cpu_allocated_value, cpu_times_value;
-  bool stats_valid = true;
+  
   cpu_allocated_file.open(linux_cgroup_cpu_allocated_file_);
   if (!cpu_allocated_file.is_open()) {
       ENVOY_LOG_MISC(error, "Can't open linux cpu allocated file {}", linux_cgroup_cpu_allocated_file_);
-      stats_valid = false;
-      cpu_allocated_value = 0;
-  }else{
-      cpu_allocated_file >> cpu_allocated_value;
-      if (!cpu_allocated_file) {
-          ENVOY_LOG_MISC(error, "Unexpected format in linux cpu allocated file {}", linux_cgroup_cpu_allocated_file_);
-          stats_valid = false;
-          cpu_allocated_value = 0;
-      }
+      return {false, 0, 0};
   }
 
   cpu_times_file.open(linux_cgroup_cpu_times_file_);
   if (!cpu_times_file.is_open()) {
       ENVOY_LOG_MISC(error, "Can't open linux cpu usage seconds file {}", linux_cgroup_cpu_times_file_);
-      stats_valid = false;
-      cpu_times_value = 0;
-  }else{
-      cpu_times_file >> cpu_times_value;
-      if(!cpu_times_file) {
-          ENVOY_LOG_MISC(error, "Unexpected format in linux cpu usage seconds file {}", linux_cgroup_cpu_times_file_);
-          stats_valid = false;
-          cpu_times_value = 0;
-      }
+      return {false, 0, 0};
   }
 
-  return {stats_valid,cpu_allocated_value, cpu_times_value};
+  cpu_allocated_file >> cpu_allocated_value;
+  if (!cpu_allocated_file) {
+      ENVOY_LOG_MISC(error, "Unexpected format in linux cpu allocated file {}", linux_cgroup_cpu_allocated_file_);
+      return {false, 0, 0};
+  }
+
+  cpu_times_file >> cpu_times_value;
+  if(!cpu_times_file) {
+      ENVOY_LOG_MISC(error, "Unexpected format in linux cpu usage seconds file {}", linux_cgroup_cpu_times_file_);
+      return {false, 0, 0};
+  }
+
+  return {true,cpu_allocated_value, cpu_times_value};
 }
 
 } // namespace CpuUtilizationMonitor
