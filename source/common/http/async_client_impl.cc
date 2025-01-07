@@ -126,6 +126,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_, creation_status)),
       account_(options.account_), buffer_limit_(options.buffer_limit_), send_xff_(options.send_xff),
       send_internal_(options.send_internal) {
+  // A field initialization may set the creation-status as unsuccessful.
+  // In that case return immediately.
+  if (!creation_status.ok()) {
+    return;
+  }
   auto route_or_error = NullRouteImpl::create(
       parent_.cluster_->name(),
       retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,

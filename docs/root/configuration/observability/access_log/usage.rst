@@ -1215,6 +1215,14 @@ UDP
   UDP
     Not implemented ("-").
 
+%TLS_JA3_FINGERPRINT%
+  HTTP/TCP/Thrift
+    The JA3 fingerprint (MD5 hash) of the TLS Client Hello message from the downstream connection.
+    Provides a way to fingerprint TLS clients based on various Client Hello parameters like cipher suites,
+    extensions, elliptic curves, etc. Will be ``-`` if TLS is not used or the handshake is incomplete.
+  UDP
+    Not implemented (``-``).
+
 .. _config_access_log_format_downstream_peer_cert_v_start:
 
 %DOWNSTREAM_PEER_CERT_V_START%
