@@ -2134,10 +2134,10 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   // Check whether we need to send the load report to the LRS or invoke the ORCA
   // callbacks.
   Upstream::HostDescriptionOptConstRef upstream_host = upstream_request.upstreamHost();
-  if (!upstream_host.has_value()) {
-    ENVOY_BUG(false, "upstream host is not available for upstream request");
-    return;
-  }
+
+  // The upstream host should always be available because the upstream request has got
+  // the response headers/trailers from the upstream host.
+  ASSERT(upstream_host.has_value(), "upstream host is not available for upstream request");
 
   OptRef<Upstream::HostLbPolicyData> host_lb_policy_data = upstream_host->lbPolicyData();
 
