@@ -32,14 +32,14 @@ class CpuStatsReader {
 public:
   CpuStatsReader() = default;
   virtual ~CpuStatsReader() = default;
-  virtual CpuTimes getCpuTimes() = 0;
+  virtual CpuTimes getCpuTimes() PURE;
 };
 
 class CgroupStatsReader {
 public:
   CgroupStatsReader() = default;
   virtual ~CgroupStatsReader() = default;
-  virtual CgroupStats getCgroupStats() = 0;
+  virtual CgroupStats getCgroupStats() PURE;
 };
 
 } // namespace CpuUtilizationMonitor
