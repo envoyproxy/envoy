@@ -22,7 +22,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Fluentd {
 
-// Tests adapted from test/extensions/tracers/opentelemetry @alexanderellis @yanavlasov
+// Tests adapted from OpenTelemetry tracer extension @alexanderellis @yanavlasov
 class FluentdTracerIntegrationTest : public testing::Test {
 public:
   FluentdTracerIntegrationTest() = default;

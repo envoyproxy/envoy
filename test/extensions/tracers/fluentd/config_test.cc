@@ -14,7 +14,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
-namespace OpenTelemetry {
+namespace Fluentd {
 
 // Configure with only required fields
 TEST(FluentdTracerConfigTest, FluentdTracerMinimalConfig) {
@@ -88,7 +88,7 @@ TEST(FluentdTracerConfigTest, FluentdTracerFullConfig) {
   EXPECT_NE(nullptr, fluentd_tracer);
 }
 
-} // namespace OpenTelemetry
+} // namespace Fluentd
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy

@@ -201,7 +201,7 @@ FluentdTracerImpl::FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster,
   flush_timer_->enableTimer(buffer_flush_interval_msec_);
 }
 
-// Initalize a span object
+// Initialize a span object
 Span::Span(Tracing::TraceContext& trace_context, SystemTime start_time,
            const std::string& operation_name, Tracing::Decision tracing_decision,
            FluentdTracerSharedPtr tracer, const SpanContext& span_context, TimeSource& time_source)
