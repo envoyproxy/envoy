@@ -86,6 +86,55 @@ TEST(DynamiModulesTest, HeaderCallbacks) {
   filter->onDestroy();
 }
 
+TEST(DynamiModulesTest, SendLocalReplyReentrant) {
+  const std::string filter_name = "send_response";
+  const std::string filter_config = "";
+
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module.ok());
+
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, std::move(dynamic_module.value()));
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
+  filter->initializeInModuleFilter();
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+
+  std::initializer_list<std::pair<std::string, std::string>> headers = {
+      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
+  Http::TestRequestHeaderMapImpl request_headers{headers};
+  Http::TestRequestTrailerMapImpl request_trailers{headers};
+  Http::TestResponseHeaderMapImpl response_headers{headers};
+  Http::TestResponseTrailerMapImpl response_trailers{headers};
+
+  // This sends a local reply
+  EXPECT_CALL(decoder_callbacks,
+              sendLocalReply(Http::Code::OK, "Hello, World!", _, _, "dynamic_module"));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter->decodeHeaders(request_headers, false));
+
+  // Repeated calls will be a no-op
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+
+  // Likewise calling sendLocalReply directly is a noop
+  filter->sendLocalReply(Http::Code::OK, "body", nullptr, absl::nullopt, "details");
+
+  // And the others will also be no-ops after a sendLocalReply and return Continue
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
+
+  filter->onDestroy();
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions

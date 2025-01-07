@@ -335,7 +335,6 @@ pub trait EnvoyHttpFilter {
   /// Send a response to the downstream with the given status code, headers, and body.
   ///
   /// The headers are passed as a list of key-value pairs.
-  #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall
   fn send_response<'a, 'b, 'c>(
     &mut self,
     status_code: u32,
