@@ -10,6 +10,8 @@ import android.net.ConnectivityManager;
 import android.net.ConnectivityManager.NetworkCallback;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
+import android.telephony.TelephonyManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
@@ -69,9 +71,13 @@ public class AndroidNetworkMonitor {
     };
 
     private final EnvoyEngine envoyEngine;
+    private final ConnectivityManager connectivityManager;
     @VisibleForTesting List<Integer> previousTransportTypes = new ArrayList<>();
 
-    DefaultNetworkCallback(EnvoyEngine envoyEngine) { this.envoyEngine = envoyEngine; }
+    DefaultNetworkCallback(EnvoyEngine envoyEngine, ConnectivityManager connectivityManager) {
+      this.envoyEngine = envoyEngine;
+      this.connectivityManager = connectivityManager;
+    }
 
     @Override
     public void onAvailable(@NonNull Network network) {
@@ -87,13 +93,13 @@ public class AndroidNetworkMonitor {
       // https://developer.android.com/reference/android/net/ConnectivityManager.NetworkCallback#onCapabilitiesChanged(android.net.Network,%20android.net.NetworkCapabilities)
       if (previousTransportTypes.isEmpty()) {
         // The network was lost previously, see `onLost`.
-        onDefaultNetworkChanged(networkCapabilities);
+        onDefaultNetworkChanged(network, networkCapabilities);
       } else {
         // Only call the `onDefaultNetworkChanged` callback when there is any changes in the
         // transport types.
         List<Integer> currentTransportTypes = getTransportTypes(networkCapabilities);
         if (!previousTransportTypes.equals(currentTransportTypes)) {
-          onDefaultNetworkChanged(networkCapabilities);
+          onDefaultNetworkChanged(network, networkCapabilities);
         }
       }
     }
@@ -114,7 +120,7 @@ public class AndroidNetworkMonitor {
       return transportTypes;
     }
 
-    private void onDefaultNetworkChanged(NetworkCapabilities networkCapabilities) {
+    private void onDefaultNetworkChanged(Network network, NetworkCapabilities networkCapabilities) {
       if (networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
         int networkType = 0;
         if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
@@ -122,6 +128,41 @@ public class AndroidNetworkMonitor {
           networkType |= EnvoyNetworkType.WLAN.getValue();
         } else if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
           networkType |= EnvoyNetworkType.WWAN.getValue();
+          NetworkInfo networkInfo = connectivityManager.getNetworkInfo(network);
+          if (networkInfo != null) {
+            int subtype = networkInfo.getSubtype();
+            switch (subtype) {
+            case TelephonyManager.NETWORK_TYPE_GPRS:
+            case TelephonyManager.NETWORK_TYPE_EDGE:
+            case TelephonyManager.NETWORK_TYPE_CDMA:
+            case TelephonyManager.NETWORK_TYPE_1xRTT:
+            case TelephonyManager.NETWORK_TYPE_IDEN:
+            case TelephonyManager.NETWORK_TYPE_GSM:
+              networkType |= EnvoyNetworkType.WWAN_2G.getValue();
+              break;
+            case TelephonyManager.NETWORK_TYPE_UMTS:
+            case TelephonyManager.NETWORK_TYPE_EVDO_0:
+            case TelephonyManager.NETWORK_TYPE_EVDO_A:
+            case TelephonyManager.NETWORK_TYPE_HSDPA:
+            case TelephonyManager.NETWORK_TYPE_HSUPA:
+            case TelephonyManager.NETWORK_TYPE_HSPA:
+            case TelephonyManager.NETWORK_TYPE_EVDO_B:
+            case TelephonyManager.NETWORK_TYPE_EHRPD:
+            case TelephonyManager.NETWORK_TYPE_HSPAP:
+            case TelephonyManager.NETWORK_TYPE_TD_SCDMA:
+              networkType |= EnvoyNetworkType.WWAN_3G.getValue();
+              break;
+            case TelephonyManager.NETWORK_TYPE_LTE:
+            case TelephonyManager.NETWORK_TYPE_IWLAN:
+              networkType |= EnvoyNetworkType.WWAN_4G.getValue();
+              break;
+            case TelephonyManager.NETWORK_TYPE_NR:
+              networkType |= EnvoyNetworkType.WWAN_5G.getValue();
+              break;
+            default:
+              break;
+            }
+          }
         } else {
           networkType |= EnvoyNetworkType.GENERIC.getValue();
         }
@@ -149,7 +190,8 @@ public class AndroidNetworkMonitor {
 
     connectivityManager =
         (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
-    connectivityManager.registerDefaultNetworkCallback(new DefaultNetworkCallback(envoyEngine));
+    connectivityManager.registerDefaultNetworkCallback(
+        new DefaultNetworkCallback(envoyEngine, connectivityManager));
   }
 
   /** @returns The singleton instance of {@link AndroidNetworkMonitor}. */
