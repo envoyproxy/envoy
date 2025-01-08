@@ -344,7 +344,7 @@ bool ActiveStreamDecoderFilter::canContinue() {
   // continue to further filters. A concrete example of this is a filter buffering data, the
   // last data frame comes in and the filter continues, but the final buffering takes the stream
   // over the high watermark such that a 413 is returned.
-  return !parent_.stopDecoderFilterChain()
+  return !parent_.stopDecoderFilterChain();
 }
 
 bool ActiveStreamEncoderFilter::canContinue() {
