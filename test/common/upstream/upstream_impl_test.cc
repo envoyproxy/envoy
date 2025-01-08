@@ -1847,7 +1847,7 @@ TEST_F(HostImplTest, HostLbPolicyData) {
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
   EXPECT_TRUE(!host->lbPolicyData().has_value());
 
-  class TestLbPolicyData : public Host::HostLbPolicyData {
+  class TestLbPolicyData : public Upstream::HostLbPolicyData {
   public:
     int foo = 42;
   };

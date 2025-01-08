@@ -83,8 +83,8 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
     matcher = matcher_factory.create(config->bucket_matchers())();
   }
 
-  return [&, config = std::move(config), config_with_hash_key, tls_store,
-          matcher](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [&, config = std::move(config), config_with_hash_key, tls_store = std::move(tls_store),
+          matcher = std::move(matcher)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     std::unique_ptr<RateLimitClient> local_client =
         createLocalRateLimitClient(tls_store->global_client_tls, tls_store->buckets_tls);
 

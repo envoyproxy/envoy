@@ -43,6 +43,9 @@ public:
       absl::StatusOr<CancelFunction>, duplicate,
       (Event::Dispatcher * dispatcher,
        absl::AnyInvocable<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)> on_complete));
+  MOCK_METHOD(absl::StatusOr<CancelFunction>, truncate,
+              (Event::Dispatcher * dispatcher, size_t length,
+               absl::AnyInvocable<void(absl::Status)> on_complete));
 
 private:
   std::shared_ptr<MockAsyncFileManager> manager_;
