@@ -4,9 +4,9 @@ package envoy.extensions.filters.http.ext_proc.v3;
 
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/core/v3/http_service.proto";
-import "envoy/config/core/v3/extension.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/matcher/v3/string.proto";
 
@@ -330,6 +330,8 @@ message ExternalProcessor {
   // the ``allowed_override_modes`` allow-list below.
   repeated ProcessingMode allowed_override_modes = 22;
 
+  // Decorator to introduce custom logic that runs after a message received from
+  // the External Processor is processed.
   config.core.v3.TypedExtensionConfig on_receive_message_decorator = 23;
 }
 

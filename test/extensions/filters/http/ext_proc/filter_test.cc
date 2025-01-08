@@ -5287,7 +5287,7 @@ TEST_F(HttpFilterTest, OnReceiveMessageDecorateRequestHeaders) {
       dynamic_metadata_.filter_metadata().contains("envoy.test.ext_proc.request_headers_response"));
   const auto& struct_metadata =
       dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.request_headers_response");
-  google::protobuf::Struct expected_struct;
+  ProtobufWkt::Struct expected_struct;
   TestUtility::loadFromJson(R"EOF(
 {
   "x-do-we-want-this": "remove",

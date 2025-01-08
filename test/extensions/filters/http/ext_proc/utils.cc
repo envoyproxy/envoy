@@ -3,14 +3,16 @@
 #include <string>
 #include <utility>
 
-// #include "google/protobuf/struct.proto.h"
-#include "absl/container/flat_hash_set.h"
-#include "absl/status/status.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
+
 #include "source/common/common/macros.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/test_common/utility.h"
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/status/status.h"
 
 namespace Envoy {
 namespace Extensions {
