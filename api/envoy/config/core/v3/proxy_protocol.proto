@@ -65,27 +65,27 @@ message ProxyProtocolConfig {
   // granular control over the TLVs that are included in the upstream request.
   //
   // Host-level TLVs are specified in the ``metadata.typed_filter_metadata`` field under the
-  // ``envoy.transport_sockets.proxy_protocol`` namespace. See the following example for how to
-  // define TLVs at the host level.
+  // ``envoy.transport_sockets.proxy_protocol`` namespace.
   //
   // .. code-block:: yaml
   //
-  //    clusters:
-  //      - name: cluster_0
-  //        load_assignment:
-  //          endpoints:
-  //            - lbEndpoints:
-  //                - metadata:
-  //                    typed_filter_metadata:
-  //                      envoy.transport_sockets.proxy_protocol:
-  //                        "@type": type.googleapis.com/envoy.config.core.v3.ProxyProtocolConfig
-  //                        added_tlvs:
-  //                          - type: 0xD7
-  //                            value: b3Zy
-  //                          - type: 0xD8
-  //                            value: bmV3
+  //  clusters:
+  //    - name: cluster_0
+  //      load_assignment:
+  //        endpoints:
+  //          - lbEndpoints:
+  //              - metadata:
+  //                  typed_filter_metadata:
+  //                    envoy.transport_sockets.proxy_protocol:
+  //                      "@type": type.googleapis.com/envoy.config.core.v3.ProxyProtocolConfig
+  //                      added_tlvs:
+  //                        - type: 0xD7
+  //                          value: b3Zy
+  //                        - type: 0xD8
+  //                          value: bmV3
   //
   // **Precedence behavior**:
+  //
   // - When a TLV is defined at both the host level and the transport socket level, the value
   //   from the host level configuration takes precedence. This allows users to define default TLVs
   //   at the transport socket level and override them at the host level.
