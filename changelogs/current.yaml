@@ -246,7 +246,7 @@ new_features:
     The ``FAIL_RELOAD`` reload policy will be used by default.
 - area: wasm
   change: |
-    Added support for Wasm plugins written in Go with the `github.com/proxy-wasm/proxy-wasm-go-sdk` and compiled with Go v1.24+.
+    Added support for Wasm plugins written in Go with the ``github.com/proxy-wasm/proxy-wasm-go-sdk`` and compiled with Go v1.24+.
 - area: aws_request_signing
   change: |
     Added an optional field :ref:`credential_provider
