@@ -18,7 +18,7 @@ class DynamicModuleHttpFilter : public Http::StreamFilter,
                                 public std::enable_shared_from_this<DynamicModuleHttpFilter> {
 public:
   DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config) : config_(config) {}
-  ~DynamicModuleHttpFilter() override = default;
+  ~DynamicModuleHttpFilter() override;
 
   /**
    * Initializes the in-module filter.
@@ -86,6 +86,13 @@ private:
    * various event hooks.
    */
   void* thisAsVoidPtr() { return static_cast<void*>(this); }
+
+  /**
+   * Called when filter is destroyed via onDestroy() or destructor. Forwards the call to the
+   * module via on_http_filter_destroy_ and resets in_module_filter_ to null. Subsequent calls are a
+   * no-op.
+   */
+  void destroy();
 
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
