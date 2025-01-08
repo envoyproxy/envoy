@@ -317,9 +317,9 @@ QuicPacketizer::QuicPacketPtr QuicPacketizer::serializePacket(const QuicFrame& f
   case QuicFrame::kNewToken:
     return serializeNewTokenFrame(frame.new_token());
 #if 0
-  // AckFrequency is undergoing major revision to update to the most recent
-  // draft. This test is blocking QUICHE development; restore when QUICHE is
-  // up to date.
+  // TODO(martinduke): AckFrequency is undergoing major revision to update to
+  // the most recent draft. This test is blocking QUICHE development; restore
+  // when QUICHE is up to date.
   case QuicFrame::kAckFrequency: {
     const auto& f = frame.ack_frequency();
     auto delta = quic::QuicTime::Delta::FromMilliseconds(clampU64(f.milliseconds()));
