@@ -28,25 +28,6 @@ bool DestinationClusterAction::populateDescriptor(const RouteEntry& route,
   return true;
 }
 
-bool QueryParametersAction::populateDescriptor(const RouteEntry&, RateLimit::Descriptor& descriptor,
-                                               const std::string&, const MessageMetadata& metadata,
-                                               const Network::Address::Instance&) const {
-  Http::Utility::QueryParamsMulti query_parameters =
-      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(
-          metadata.requestHeaders().getPathValue());
-
-  const auto query_param_value = query_parameters.getFirstValue(query_param_name_);
-
-  // If query parameter is not present and ``skip_if_absent`` is ``true``, skip this descriptor.
-  // If ``skip_if_absent`` is ``false``, do not call rate limiting service.
-  if (!query_param_value.has_value()) {
-    return skip_if_absent_;
-  }
-
-  descriptor.entries_.push_back({descriptor_key_, query_param_value.value()});
-  return true;
-}
-
 bool RequestHeadersAction::populateDescriptor(const RouteEntry&, RateLimit::Descriptor& descriptor,
                                               const std::string&, const MessageMetadata& metadata,
                                               const Network::Address::Instance&) const {
@@ -122,7 +103,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       actions_.emplace_back(new DestinationClusterAction());
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kQueryParameters:
-      actions_.emplace_back(new QueryParametersAction(action.query_parameters()));
+      throw EnvoyException("Query parameter rate limiting is not supported for Thrift");
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRequestHeaders:
       actions_.emplace_back(new RequestHeadersAction(action.request_headers()));

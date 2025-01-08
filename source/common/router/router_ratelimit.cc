@@ -221,7 +221,8 @@ bool QueryParametersAction::populateDescriptor(RateLimit::DescriptorEntry& descr
   Http::Utility::QueryParamsMulti query_parameters =
       Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
 
-  const auto query_param_value = query_parameters.getFirstValue(query_param_name_);
+  const absl::optional<std::string> query_param_value =
+      query_parameters.getFirstValue(query_param_name_);
 
   // If query parameter is not present and ``skip_if_absent`` is ``true``, skip this descriptor.
   // If ``skip_if_absent`` is ``false``, do not call rate limiting service.
