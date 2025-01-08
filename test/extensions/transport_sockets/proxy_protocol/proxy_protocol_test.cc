@@ -730,9 +730,6 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromConfig) {
   auto valid_tlv_entry = config.add_added_tlvs();
   valid_tlv_entry->set_type(0x96);
   valid_tlv_entry->set_value("moredata");
-  auto invalid_tlv_entry = config.add_added_tlvs();
-  invalid_tlv_entry->set_type(0x97);
-  invalid_tlv_entry->set_value("");
   initialize(config, socket_options);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
@@ -774,9 +771,6 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
   auto valid_entry = custom_tlv_metadata.add_added_tlvs();
   valid_entry->set_type(0x96);
   valid_entry->set_value("moredata");
-  auto invalid_entry = custom_tlv_metadata.add_added_tlvs();
-  invalid_entry->set_type(0x97);
-  invalid_entry->set_value("");
 
   ProtobufWkt::Any typed_metadata;
   typed_metadata.PackFrom(custom_tlv_metadata);
@@ -934,6 +928,7 @@ TEST_F(ProxyProtocolTest, V2CustomAndPassthroughTLVs) {
   EXPECT_EQ(resp.bytes_processed_, expected_buff.length());
 }
 
+// TODO(tim): Extend this test to verify invalid host metadata doesn't affect added_tlvs.
 TEST_F(ProxyProtocolTest, V2CustomTLVInvalidMetadataValues) {
   auto src_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
@@ -959,9 +954,6 @@ TEST_F(ProxyProtocolTest, V2CustomTLVInvalidMetadataValues) {
   auto valid_entry = custom_tlv_metadata.add_added_tlvs();
   valid_entry->set_type(0x96);
   valid_entry->set_value("cluster_0");
-  auto invalid_entry_empty_val = custom_tlv_metadata.add_added_tlvs();
-  invalid_entry_empty_val->set_type(0x97);
-  invalid_entry_empty_val->set_value("");
   auto invalid_entry_duplicate = custom_tlv_metadata.add_added_tlvs();
   invalid_entry_duplicate->set_type(0x96);
   invalid_entry_duplicate->set_value("cluster_1");
@@ -998,7 +990,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVInvalidMetadataValues) {
   EXPECT_EQ(resp.bytes_processed_, expected_buff.length());
 }
 
-TEST_F(ProxyProtocolTest, V2CustomTLVInvalidTypedMetadata) {
+TEST_F(ProxyProtocolTest, V2CustomTLVIgnoredMetadataValues) {
   auto src_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
   auto dst_addr = Network::Address::InstanceConstSharedPtr(

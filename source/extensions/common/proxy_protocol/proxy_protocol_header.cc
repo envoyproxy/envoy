@@ -118,13 +118,11 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
 
   absl::flat_hash_set<uint8_t> seen_types;
   for (const auto& tlv : custom_tlvs) {
-    if (seen_types.contains(tlv.type)) {
-      ENVOY_LOG_MISC(warn, "Ignoring duplicate custom TLV type {}", tlv.type);
-      continue;
-    }
-    seen_types.insert(tlv.type);
+    // TODO(tim): ASSERT(!seen_types.contains(tlv.type));
     combined_tlv_vector.emplace_back(tlv);
+    seen_types.insert(tlv.type);
   }
+
   for (const auto& tlv : proxy_proto_data.tlv_vector_) {
     if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
       // Skip any TLV that is not in the set of passthrough TLVs.
@@ -132,7 +130,7 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
     }
     if (seen_types.contains(tlv.type)) {
       // Skip any duplicate TLVs from being added to the combined TLV vector.
-      ENVOY_LOG_MISC(warn, "Ignoring duplicate custom TLV type {}", tlv.type);
+      ENVOY_LOG_EVERY_POW_2_MISC(info, "Skipping duplicate TLV type {}", tlv.type);
       continue;
     }
     seen_types.insert(tlv.type);
