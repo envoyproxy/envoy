@@ -162,6 +162,8 @@ class fixed_sized_cache
 
     /**
      * Remove an element specified by key
+     * Nao : I believe this function has a bug because lru_cache_policy::Erase() always removes the least recently used element, regardless of the specified key.
+    *        Don't call Remove().
      * \param[in] key Key parameter
      * \retval true if an element specified by key was found and deleted
      * \retval false if an element is not present in a cache

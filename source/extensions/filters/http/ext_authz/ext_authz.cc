@@ -118,8 +118,9 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       charge_cluster_response_stats_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-      cache_(100, std::chrono::seconds(5)), // response cache
-
+      response_cache_max_size_(config.response_cache_max_size() != 0 ? config.response_cache_max_size() : 100),
+      response_cache_ttl_(config.response_cache_ttl() != 0 ? config.response_cache_ttl() : 10),
+      cache_(response_cache_max_size_, response_cache_ttl_), // response cache
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
       ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
       ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),

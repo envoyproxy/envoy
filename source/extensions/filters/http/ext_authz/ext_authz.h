@@ -281,6 +281,9 @@ private:
   Filters::Common::ExtAuthz::MatcherSharedPtr allowed_headers_matcher_;
   Filters::Common::ExtAuthz::MatcherSharedPtr disallowed_headers_matcher_;
 
+  // Fields for response cache configuration
+  uint32_t response_cache_max_size_;
+  std::chrono::seconds response_cache_ttl_;
   // Response cache
   ttl_cache_t cache_;
 
