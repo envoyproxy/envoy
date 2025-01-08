@@ -335,11 +335,11 @@ pub trait EnvoyHttpFilter {
   /// Send a response to the downstream with the given status code, headers, and body.
   ///
   /// The headers are passed as a list of key-value pairs.
-  fn send_response<'a, 'b, 'c>(
+  fn send_response<'a>(
     &mut self,
     status_code: u32,
-    headers: Vec<(&'a str, &'b [u8])>,
-    body: Option<&'c [u8]>,
+    headers: Vec<(&'a str, &'a [u8])>,
+    body: Option<&'a [u8]>,
   );
 
   /// Get the number-typed dynamic metadata value with the given key.
@@ -528,6 +528,13 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let body_ptr = body.map(|s| s.as_ptr()).unwrap_or(std::ptr::null());
     let body_length = body.map(|s| s.len()).unwrap_or(0);
 
+    // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
+    // not because of any formal layout guarantees but because:
+    // 1) tuples _in practice_ are laid out packed and in order
+    // 2) &str and &[u8] are fat pointers (pointers to DSTs), whose layouts _in practice_ are a
+    //    pointer and length
+    // If these assumptions change, this will break. (Vec is guaranteed to point to a contiguous
+    // array, so it's safe to cast to a pointer)
     let headers_ptr = headers.as_ptr() as *mut abi::envoy_dynamic_module_type_module_http_header;
 
     unsafe {

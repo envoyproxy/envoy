@@ -78,9 +78,6 @@ public:
   }
 
 private:
-  // This ensures that we do not re-enter the dynamic filter hooks when sending a local reply
-  bool sent_local_reply_ = false;
-
   /**
    * This is a helper function to get the `this` pointer as a void pointer which is passed to the
    * various event hooks.
