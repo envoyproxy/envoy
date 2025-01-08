@@ -493,7 +493,7 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Stat
   // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
   // disabled.
   if (config.has_trace_sampled()) {
-    trace_sampled_ = absl::optional<bool>(config.trace_sampled().value());
+    trace_sampled_ = config.trace_sampled().value();
   } else {
     // If the shadow policy does not specify trace_sampled, we will inherit the parent's sampling
     // decision.

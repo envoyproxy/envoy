@@ -442,10 +442,6 @@ void Filter::chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionOptCon
   chargeUpstreamCode(response_status_code, *fake_response_headers, upstream_host, dropped);
 }
 
-absl::optional<bool> getSampleValueFromShadowPolicy(const ShadowPolicy& shadow_policy) {
-  return shadow_policy.traceSampled();
-}
-
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   downstream_headers_ = &headers;
 
@@ -804,7 +800,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               .setTimeout(timeout_.global_timeout_)
               .setParentSpan(callbacks_->activeSpan())
               .setChildSpanName("mirror")
-              .setSampled(getSampleValueFromShadowPolicy(shadow_policy))
+              .setSampled(shadow_policy.traceSampled())
               .setIsShadow(true)
               .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
               .setBufferAccount(callbacks_->account())
@@ -1072,7 +1068,7 @@ void Filter::maybeDoShadowing() {
                        .setTimeout(timeout_.global_timeout_)
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
-                       .setSampled(getSampleValueFromShadowPolicy(shadow_policy))
+                       .setSampled(shadow_policy.traceSampled())
                        .setIsShadow(true)
                        .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend());
     options.setFilterConfig(config_);
