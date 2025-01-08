@@ -127,7 +127,7 @@ private:
   std::unique_ptr<Http::Http1::Parser> parser_;
   NoOpParserCallbacks no_op_callbacks_;
   ssize_t nread_ = 0;
-  size_t requested_read_bytes_;
+  size_t requested_read_bytes_ = 0;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
 };
 

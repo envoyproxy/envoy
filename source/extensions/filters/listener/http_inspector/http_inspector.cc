@@ -30,8 +30,8 @@ Filter::Filter(const ConfigSharedPtr config)
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_inspector_use_balsa_parser")) {
     // Set both allow_custom_methods and enable_trailers to true with BalsaParser.
     parser_ = std::make_unique<Http::Http1::BalsaParser>(
-        Http::Http1::MessageType::Request, &no_op_callbacks_,
-        Config::MAX_INSPECT_SIZE + max_request_headers_kb_, true, true);
+        Http::Http1::MessageType::Request, &no_op_callbacks_, Config::MAX_INSPECT_SIZE + 1024, true,
+        true);
   } else {
     parser_ = std::make_unique<Http::Http1::LegacyHttpParserImpl>(Http::Http1::MessageType::Request,
                                                                   &no_op_callbacks_);
@@ -55,7 +55,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
 
     // If we have requested the maximum amount of data, then close the connection
     // the request line is too large to determine the http version.
-    if (static_cast<size_t>(nread_) == Config::MAX_INSPECT_SIZE) {
+    if (static_cast<size_t>(nread_) >= Config::MAX_INSPECT_SIZE) {
       ENVOY_LOG(warn, "http inspector: reached max buffer without determining HTTP version, "
                       "dropping connection");
       config_->stats().read_error_.inc();
