@@ -118,7 +118,7 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
 
   absl::flat_hash_set<uint8_t> seen_types;
   for (const auto& tlv : custom_tlvs) {
-    // TODO(tim): ASSERT(!seen_types.contains(tlv.type));
+    ASSERT(!seen_types.contains(tlv.type));
     combined_tlv_vector.emplace_back(tlv);
     seen_types.insert(tlv.type);
   }

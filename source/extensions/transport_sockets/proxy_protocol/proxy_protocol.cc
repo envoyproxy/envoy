@@ -41,7 +41,6 @@ UpstreamProxyProtocolSocket::UpstreamProxyProtocolSocket(
     }
   }
   for (const auto& entry : config.added_tlvs()) {
-    ENVOY_LOG(trace, "adding config-level TLV");
     added_tlvs_.emplace_back(Network::ProxyProtocolTLV{
         static_cast<uint8_t>(entry.type()),
         std::vector<unsigned char>(entry.value().begin(), entry.value().end())});
@@ -101,7 +100,6 @@ void UpstreamProxyProtocolSocket::generateHeaderV2() {
   if (!options_ || !options_->proxyProtocolOptions().has_value()) {
     Common::ProxyProtocol::generateV2LocalHeader(header_buffer_);
   } else {
-    // Process any custom TLVs from the host metadata.
     std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = processCustomTLVs();
 
     const auto options = options_->proxyProtocolOptions().value();
@@ -206,7 +204,6 @@ void UpstreamProxyProtocolSocket::processHostLevelTLVs(
     return;
   }
 
-  // TODO(tim): unpack only the metadata name we need. I'm not sure how to do that yet.
   ProxyProtocolConfig host_tlv_metadata;
   auto status = MessageUtil::unpackTo(filter_it->second, host_tlv_metadata);
   if (!status.ok()) {

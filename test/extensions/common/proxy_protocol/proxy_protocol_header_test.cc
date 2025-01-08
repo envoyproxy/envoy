@@ -233,33 +233,6 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2WithCustomTLVs) {
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
 
-// // Verify duplicate custom TLV keys are properly handled.
-// TEST(ProxyProtocolHeaderTest, GeneratesV2WithDuplicateCustomTLVKeys) {
-//   const uint8_t v2_protocol[] = {
-//       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21,
-//       0x11, 0x00, 0x15, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01, 0x01, 0x02, 0x03, 0x05,
-//       0x02, 0x01, 0x08, 0x00, 0x01, 0x09, 0xD3, 0x00, 0x02, 0x06, 0x07,
-//   };
-
-//   const Buffer::OwnedImpl expectedBuff(v2_protocol, sizeof(v2_protocol));
-//   auto src_addr =
-//       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4",
-//       773));
-//   auto dst_addr =
-//       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2",
-//       513));
-//   Network::ProxyProtocolTLV tlv{0xD3, {0x06, 0x07}};
-//   Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
-//   std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
-//       {0x8, {0x09}},
-//       {0x8, {0x08}},
-//   };
-//   Buffer::OwnedImpl buff{};
-
-//   ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, false, {0xD3}, custom_tlvs));
-//   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
-// }
-
 TEST(ProxyProtocolHeaderTest, GeneratesV2WithCustomTLVsPrecendence) {
   const uint8_t v2_protocol[] = {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,

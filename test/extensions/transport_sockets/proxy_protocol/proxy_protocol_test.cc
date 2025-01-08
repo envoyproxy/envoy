@@ -869,6 +869,79 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsOverwriteHostMetadata) {
   EXPECT_EQ(resp.bytes_processed_, expected_buff.length());
 }
 
+// Test verifies that duplicate TLVs within the config and host metadata are properly handled.
+TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperly) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
+  auto dst_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv6Instance("1:100:200:3::", 2));
+  Network::ProxyProtocolTLVVector tlv_vector{Network::ProxyProtocolTLV{0x5, {'a', 'b', 'c'}}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, tlv_vector};
+  Network::TransportSocketOptionsConstSharedPtr socket_options =
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          "", std::vector<std::string>{}, std::vector<std::string>{}, std::vector<std::string>{},
+          absl::optional<Network::ProxyProtocolData>(proxy_proto_data));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setLocalAddress(*Network::Utility::resolveUrl("tcp://[1:100:200:3::]:50000"));
+  transport_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(*Network::Utility::resolveUrl("tcp://[e:b:c:f::]:8080"));
+
+  auto host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  const std::string metadata_key =
+      Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
+
+  ProxyProtocolConfig host_metadata_config;
+  auto host_entry = host_metadata_config.add_added_tlvs();
+  host_entry->set_type(0x98);
+  host_entry->set_value("d1");
+  auto duplicate_host_entry = host_metadata_config.add_added_tlvs();
+  duplicate_host_entry->set_type(0x98);
+  duplicate_host_entry->set_value("d2"); // Last duplicate value
+  ProtobufWkt::Any typed_metadata;
+  typed_metadata.PackFrom(host_metadata_config);
+  metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
+  EXPECT_CALL(*host, metadata()).WillRepeatedly(Return(metadata));
+  transport_callbacks_.connection_.streamInfo().upstreamInfo()->setUpstreamHost(host);
+
+  absl::flat_hash_set<uint8_t> pass_through_tlvs{};
+  // The output buffer will include the host TLVs before the config TLVs.
+  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
+      {0x98, {'d', '1'}},
+      {0x96, {'b', 'a', 'r'}},
+      {0x97, {'b', 'a', 'z'}},
+  };
+  Buffer::OwnedImpl expected_buff{};
+  EXPECT_TRUE(Common::ProxyProtocol::generateV2Header(proxy_proto_data, expected_buff, false,
+                                                      pass_through_tlvs, custom_tlvs));
+
+  // Configure duplicate TLVs in the configuration.
+  ProxyProtocolConfig config;
+  config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto tlv_entry = config.add_added_tlvs();
+  tlv_entry->set_type(0x96);
+  tlv_entry->set_value("bar");
+  auto duplicate_tlv_entry = config.add_added_tlvs();
+  duplicate_tlv_entry->set_type(0x96);
+  duplicate_tlv_entry->set_value("baz"); // Last duplicate value for type 0x96
+  auto unique_tlv_entry = config.add_added_tlvs();
+  unique_tlv_entry->set_type(0x97);
+  unique_tlv_entry->set_value("baz");
+  initialize(config, socket_options);
+
+  EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return {length, Api::IoError::none()};
+      }));
+  auto msg = Buffer::OwnedImpl("some data");
+  EXPECT_CALL(*inner_socket_, doWrite(BufferEqual(&msg), false));
+
+  auto resp = proxy_protocol_socket_->doWrite(msg, false);
+  EXPECT_EQ(resp.bytes_processed_, expected_buff.length());
+}
+
 // Test injects V2 PROXY protocol with pass through & custom TLVs.
 TEST_F(ProxyProtocolTest, V2CustomAndPassthroughTLVs) {
   auto src_addr =
@@ -928,7 +1001,6 @@ TEST_F(ProxyProtocolTest, V2CustomAndPassthroughTLVs) {
   EXPECT_EQ(resp.bytes_processed_, expected_buff.length());
 }
 
-// TODO(tim): Extend this test to verify invalid host metadata doesn't affect added_tlvs.
 TEST_F(ProxyProtocolTest, V2CustomTLVInvalidMetadataValues) {
   auto src_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
