@@ -61,3 +61,16 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    data = [
+        "//test/extensions/dynamic_modules/test_data/rust:http",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/http/dynamic_modules:factory_registration",
+        "//test/integration:http_integration_lib",
+    ],
+)

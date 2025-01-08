@@ -300,36 +300,6 @@ public:
    * Set true to disable active health check for the host.
    */
   virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
-
-  /**
-   * Base interface for attaching LbPolicy-specific data to individual hosts.
-   */
-  class HostLbPolicyData {
-  public:
-    virtual ~HostLbPolicyData() = default;
-  };
-  using HostLbPolicyDataPtr = std::unique_ptr<HostLbPolicyData>;
-
-  /**
-   * Set load balancing policy related data to the host.
-   * NOTE: this method should only be called at main thread before the host is used
-   * across worker threads.
-   */
-  virtual void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
-
-  /**
-   * Get the load balancing policy related data of the host.
-   * @return the optional reference to the load balancing policy related data of the host.
-   */
-  virtual OptRef<HostLbPolicyData> lbPolicyData() const PURE;
-
-  /**
-   * Get the typed load balancing policy related data of the host.
-   * @return the optional reference to the typed load balancing policy related data of the host.
-   */
-  template <class HostLbPolicyDataType> OptRef<HostLbPolicyDataType> typedLbPolicyData() const {
-    return makeOptRefFromPtr(dynamic_cast<HostLbPolicyDataType*>(lbPolicyData().ptr()));
-  }
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;

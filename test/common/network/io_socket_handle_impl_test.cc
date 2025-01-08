@@ -197,5 +197,89 @@ TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopback) {
 }
 
 } // namespace
+
+// This test wrapper is a friend class of IoSocketHandleImpl, so it has access to its private and
+// protected methods.
+class IoSocketHandleImplTestWrapper {
+public:
+  void runGetAddressTests(const int cache_size) {
+    IoSocketHandleImpl io_handle(-1, false, absl::nullopt, cache_size);
+
+    // New address.
+    sockaddr_storage ss = Test::getV6SockAddr("2001:DB8::1234", 51234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1234]:51234");
+    // New address.
+    ss = Test::getV6SockAddr("2001:DB8::1235", 51235);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1235]:51235");
+
+    // Access the first entry to test moving recently used entries in the cache.
+    ss = Test::getV6SockAddr("2001:DB8::1234", 51234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1234]:51234");
+    // Access the last entry to test moving recently used entries in the cache.
+    ss = Test::getV6SockAddr("2001:DB8::1234", 51234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1234]:51234");
+
+    // New address.
+    ss = Test::getV6SockAddr("2001:DB8::1236", 51236);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1236]:51236");
+    // New address.
+    ss = Test::getV6SockAddr("2001:DB8::1237", 51237);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1237]:51237");
+
+    // Access the second entry to test moving recently used entries in the cache.
+    ss = Test::getV6SockAddr("2001:DB8::1234", 51234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1234]:51234");
+
+    // New address.
+    ss = Test::getV6SockAddr("2001:DB8::1238", 51238);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "[2001:db8::1238]:51238");
+    // New address.
+    ss = Test::getV4SockAddr("213.0.113.101", 50234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "213.0.113.101:50234");
+    ss = Test::getV4SockAddr("213.0.113.102", 50235);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "213.0.113.102:50235");
+    ss = Test::getV4SockAddr("213.0.113.103", 50236);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "213.0.113.103:50236");
+
+    // Access a middle entry.
+    ss = Test::getV4SockAddr("213.0.113.101", 50234);
+    EXPECT_EQ(io_handle.getOrCreateEnvoyAddressInstance(ss, Test::getSockAddrLen(ss))->asString(),
+              "213.0.113.101:50234");
+  }
+};
+
+TEST(IoSocketHandleImpl, GetOrCreateEnvoyAddressInstance) {
+  IoSocketHandleImplTestWrapper wrapper;
+
+  // No cache.
+  wrapper.runGetAddressTests(/*cache_size=*/0);
+
+  // Cache size 1.
+  wrapper.runGetAddressTests(/*cache_size=*/1);
+
+  // Cache size 3.
+  wrapper.runGetAddressTests(/*cache_size=*/3);
+
+  // Cache size 4.
+  wrapper.runGetAddressTests(/*cache_size=*/4);
+
+  // Cache size 6.
+  wrapper.runGetAddressTests(/*cache_size=*/6);
+
+  // Cache size 10.
+  wrapper.runGetAddressTests(/*cache_size=*/10);
+}
+
 } // namespace Network
 } // namespace Envoy
