@@ -32,14 +32,22 @@ secret access key (the session token is optional).
    To fetch the credentials a static cluster is created with the name ``sts_token_service_internal-<region>`` pointing towards regional
    AWS Security Token Service.
 
-   Note: If ``signing_algorithm: AWS_SIGV4A`` is set, the logic for STS cluster host generation is as follows:
-   - If the ``region`` is configured (either through profile, environment or inline) as a SigV4A region set
-   - And if the first region in the region set contains a wildcard
-   - Then STS cluster host is set to ``sts.amazonaws.com`` (or ``sts-fips.us-east-1.amazonaws.com`` if compiled with FIPS support
-   - Else STS cluster host is set to ``sts.<first region in region set>.amazonaws.com``
+   .. note::
 
-  If you require the use of SigV4A signing and you are using an alternate partition, such as cn or GovCloud, you can ensure correct generation
-  of the STS endpoint by setting the first region in your SigV4A region set to the correct region (such as ``cn-northwest-1`` with no wildcard)
+      When ``signing_algorithm: AWS_SIGV4A`` is set, the STS cluster host is determined as follows:
+
+      * If your ``region``` (set via profile, environment, or inline) is configured as a SigV4A region set **AND**
+        contains a wildcard in the first region:
+
+        - Standard endpoint: ``sts.amazonaws.com``
+        - FIPS endpoint: ``sts-fips.us-east-1.amazonaws.com``
+
+      * Otherwise:
+
+        - Uses regional endpoint: ``sts.<first-region>.amazonaws.com``
+
+  For alternate AWS partitions (e.g. China or GovCloud) with SigV4A signing, specify the correct regional endpoint by
+  setting your first SigV4A region without wildcards (example: ``cn-northwest-1``)
 
 6. Either EC2 instance metadata, ECS task metadata or EKS Pod Identity.
    For EC2 instance metadata, the fields ``AccessKeyId``, ``SecretAccessKey``, and ``Token`` are used, and credentials are cached for 1 hour.
@@ -48,14 +56,25 @@ secret access key (the session token is optional).
    For EKS Pod Identity, The environment variable ``AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`` will point to a mounted file in the container,
    containing the string required in the Authorization header sent to the EKS Pod Identity Agent. The fields ``AccessKeyId``, ``SecretAccessKey``,
    and ``Token`` are used, and credentials are cached for 1 hour or until they expire (according to the field ``Expiration``).
-   Note that the latest update on AWS credentials provider utility provides an option to use http async client functionality instead of libcurl
-   to fetch the credentials. To fetch the credentials from either EC2 instance metadata or ECS task metadata a static cluster pointing
-   towards the credentials provider is required. The static cluster name has to be ``ec2_instance_metadata_server_internal`` for fetching from EC2 instance
-   metadata or ``ecs_task_metadata_server_internal`` for fetching from ECS task metadata.
 
-   If these clusters are not provided in the bootstrap configuration then either of these will be added by default.
-   The static internal cluster will still be added even if initially ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` is
-   not set so that subsequently if the reloadable feature is set to ``true`` the cluster config is available to fetch the credentials.
+   .. note::
+
+      The AWS credentials provider now supports two methods for fetching credentials:
+
+      * HTTP async client (new)
+      * libcurl (legacy)
+
+      To fetch credentials from EC2 or ECS, you must configure a static cluster pointing to the credentials provider:
+
+      * For EC2: use cluster name ``ec2_instance_metadata_server_internal``
+      * For ECS: use cluster name ``ecs_task_metadata_server_internal``
+
+   These static clusters are handled automatically:
+
+   * They are added by default if not specified in bootstrap configuration.
+   * They are created even when ``envoy.reloadable_features.use_http_client_to_fetch_aws_credentials`` is disabled. This
+     ensures the cluster configuration is ready when you enable HTTP client credential fetching later by setting the
+     reloadable feature to ``true``.
 
 Statistics
 ----------
