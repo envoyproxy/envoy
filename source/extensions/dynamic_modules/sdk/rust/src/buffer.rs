@@ -1,18 +1,20 @@
 /// A buffer struct that represents a contiguous memory region owned by Envoy.
 ///
-/// The life time (not in Rust sense) of the buffer is managed by Envoy, and it depends on how
-/// this [`EnvoyBuffer`] is created, for example, via [`crate::EnvoyHttpFilter`]'s methods.
-///
 /// This is cloneable and copyable, but the underlying memory is not copied. It can be
 /// thought of as an alias to &\[u8\] but the underlying memory is owned by Envoy.
+//
+// Implementation note: The lifetime parameter `'a` is used to ensure that the memory region pointed
+// to by `raw_ptr` is valid. The invalidation can happen when the mutable
+// methods of [`crate::EnvoyHttpFilter`] are called.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct EnvoyBuffer {
+pub struct EnvoyBuffer<'a> {
   raw_ptr: *const u8,
   length: usize,
+  _marker: std::marker::PhantomData<&'a ()>,
 }
 
-impl EnvoyBuffer {
+impl EnvoyBuffer<'_> {
   /// This is a helper function to create an [`EnvoyBuffer`] from a static string.
   ///
   /// This is meant for use by the end users in unit tests.
@@ -21,6 +23,7 @@ impl EnvoyBuffer {
     Self {
       raw_ptr: static_str.as_ptr(),
       length: static_str.len(),
+      _marker: std::marker::PhantomData,
     }
   }
 
@@ -31,7 +34,11 @@ impl EnvoyBuffer {
   /// This is not meant to be used by the end users, but rather by the SDK itself in the
   /// actual integration with Envoy.
   pub unsafe fn new_from_raw(raw_ptr: *const u8, length: usize) -> Self {
-    Self { raw_ptr, length }
+    Self {
+      raw_ptr,
+      length,
+      _marker: std::marker::PhantomData,
+    }
   }
 
   pub fn as_slice(&self) -> &[u8] {
