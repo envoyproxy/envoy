@@ -272,6 +272,71 @@ TEST(ABIImpl, get_headers) {
   }
 }
 
+TEST(ABIImpl, dynamic_metadata) {
+  DynamicModuleHttpFilter filter{nullptr};
+  const std::string namespace_str = "foo";
+  const std::string key_str = "key";
+  envoy_dynamic_module_type_buffer_module_ptr namespace_ptr =
+      const_cast<char*>(namespace_str.data());
+  size_t namespace_length = namespace_str.size();
+  envoy_dynamic_module_type_buffer_module_ptr key_ptr = const_cast<char*>(key_str.data());
+  size_t key_length = key_str.size();
+  double value = 42;
+  const std::string value_str = "value";
+  envoy_dynamic_module_type_buffer_module_ptr value_ptr = const_cast<char*>(value_str.data());
+  size_t value_length = value_str.size();
+  double result_number = 0;
+  char* result_str_ptr = nullptr;
+  size_t result_str_length = 0;
+
+  // No stream info.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, value));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, value_ptr, value_length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_number));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_str_ptr,
+      &result_str_length));
+
+  // No namespace.
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  envoy::config::core::v3::Metadata metadata;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  filter.setDecoderFilterCallbacks(callbacks);
+  // Only tests get methods as setters create the namespace.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_number));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_str_ptr,
+      &result_str_length));
+
+  // With namespace and key.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, value));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_number));
+  EXPECT_EQ(result_number, value);
+  // Wrong type.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_str_ptr,
+      &result_str_length));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, value_ptr, value_length));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, value_length);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), value_str);
+  // Wrong type.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_number));
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions
