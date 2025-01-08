@@ -352,8 +352,9 @@ type HttpTcpBridgeCallbackHandler interface {
 type HttpTcpBridge interface {
 
 	// Invoked when header is delivered from the downstream.
-	// Notice: headerMap and dataToUpstream cannot be invoked after the func return.
-	EncodeHeaders(headerMap RequestHeaderMap, dataToUpstream BufferInstance, endOfStream bool) HttpTcpBridgeStatus
+	// Notice-1: when return HttpTcpBridgeContinue or HttpTcpBridgeStopAndBuffer, dataForSet is used to be sent to upstream; when return HttpTcpBridgeEndStream, dataForSet is useed to sent to downstream as response body.
+	// Notice-2: headerMap and dataToUpstream cannot be invoked after the func return.
+	EncodeHeaders(headerMap RequestHeaderMap, dataForSet BufferInstance, endOfStream bool) HttpTcpBridgeStatus
 
 	// Streaming, Invoked when data is delivered from the downstream.
 	// Notice: buffer cannot be invoked after the func return.
@@ -368,7 +369,7 @@ type HttpTcpBridge interface {
 	OnDestroy()
 }
 
-func (*PassThroughHttpTcpBridge) EncodeHeaders(headerMap RequestHeaderMap, dataToUpstream BufferInstance, endOfStream bool) HttpTcpBridgeStatus {
+func (*PassThroughHttpTcpBridge) EncodeHeaders(headerMap RequestHeaderMap, dataForSet BufferInstance, endOfStream bool) HttpTcpBridgeStatus {
 	return HttpTcpBridgeContinue
 }
 
