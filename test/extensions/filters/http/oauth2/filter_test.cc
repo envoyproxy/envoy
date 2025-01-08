@@ -100,7 +100,7 @@ public:
 
   void init() { init(getConfig()); }
 
-  void init(onfigSharedPtr config) {
+  void init(FilterConfigSharedPtr config) {
     // Set up the OAuth client.
     oauth_client_ = new MockOAuth2Client();
     std::unique_ptr<OAuth2Client> oauth_client_ptr{oauth_client_};
