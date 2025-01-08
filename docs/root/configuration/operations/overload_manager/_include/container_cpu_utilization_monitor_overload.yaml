@@ -1,5 +1,5 @@
 overload_manager:
-  refresh_interval: 0.25s
+  refresh_interval: 5s
   resource_monitors:
   - name: "envoy.resource_monitors.cpu_utilization"
     typed_config:

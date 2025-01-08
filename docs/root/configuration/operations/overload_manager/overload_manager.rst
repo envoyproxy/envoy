@@ -389,7 +389,8 @@ The ``envoy.overload_actions.stop_accepting_requests`` overload action can be ut
 in a Kubernetes environment from experiencing degraded performance during unexpected spikes in incoming requests
 that saturate the container's allocated CPU resources. When combined with the ``envoy.resource_monitors.cpu_utilization``
 resource monitor, this overload action can effectively reduce Container CPU pressure by rejecting new requests at a minimal
-computational cost.
+computational cost. Currently the strategy for calculating container cpu utilization ``refresh_interval`` only supports
+for values of ``refresh_interval`` greater than 0.01 seconds.
 
 .. literalinclude:: _include/container_cpu_utilization_monitor_overload.yaml
     :language: yaml

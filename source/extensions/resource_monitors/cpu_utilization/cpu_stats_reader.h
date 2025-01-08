@@ -18,14 +18,8 @@ namespace CpuUtilizationMonitor {
 
 struct CpuTimes {
   bool is_valid;
-  uint64_t work_time;
-  uint64_t total_time;
-};
-
-struct CgroupStats {
-  bool is_valid;
-  uint64_t cpu_allocated_millicores_; //total millicores of cpu allocated to container
-  uint64_t total_cpu_times_ns_; //total cpu times in nanoseconds
+  double work_time;
+  double total_time;
 };
 
 class CpuStatsReader {
@@ -39,7 +33,7 @@ class CgroupStatsReader {
 public:
   CgroupStatsReader() = default;
   virtual ~CgroupStatsReader() = default;
-  virtual CgroupStats getCgroupStats() PURE;
+  virtual CpuTimes getCgroupStats() PURE;
 };
 
 } // namespace CpuUtilizationMonitor

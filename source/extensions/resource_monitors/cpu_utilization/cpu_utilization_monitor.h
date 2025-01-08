@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include "envoy/common/time.h"
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
 #include "envoy/server/resource_monitor.h"
@@ -17,25 +16,21 @@ class CpuUtilizationMonitor : public Server::ResourceMonitor {
 public:
   CpuUtilizationMonitor(
       const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
-      std::unique_ptr<CpuStatsReader> cpu_stats_reader, TimeSource& time_source);
-  
+      std::unique_ptr<CpuStatsReader> cpu_stats_reader);
+
   CpuUtilizationMonitor(
-    const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
-    std::unique_ptr<CgroupStatsReader> cgroup_stats_reader, TimeSource& time_source);
+      const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
+      std::unique_ptr<CgroupStatsReader> cgroup_stats_reader);
 
   void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
-  void computeHostCpuUsage(Server::ResourceUpdateCallbacks& callbacks);
-  void computeContainerCpuUsage(Server::ResourceUpdateCallbacks& callbacks);
 
 private:
   double utilization_ = 0.0;
   CpuTimes previous_cpu_times_;
-  CgroupStats previous_cgroup_stats_;
   std::unique_ptr<CpuStatsReader> cpu_stats_reader_;
-  std::unique_ptr <CgroupStatsReader> cgroup_stats_reader_;
-  TimeSource& time_source_;
-  MonotonicTime last_update_time_;
-  int16_t mode_ = -1; // Will be updated in Resource Monitor Class Constructor
+  std::unique_ptr<CgroupStatsReader> cgroup_stats_reader_;
+  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::
+      UtilizationComputeStrategy mode_;
 };
 
 } // namespace CpuUtilizationMonitor

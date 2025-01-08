@@ -85,6 +85,114 @@ cpu1 1883161 620 375962 1448133 5963 0 85914 10 0 0
   EXPECT_EQ(cpu_times.total_time, 0);
 }
 
+TEST(LinuxContainerCpuStatsReader, ReadsCgroupContainerStats) {
+  const std::string temp_path_cpu_allocated =
+      TestEnvironment::temporaryPath("cgroup_cpu_allocated_stats");
+  AtomicFileUpdater file_updater_cpu_allocated(temp_path_cpu_allocated);
+  const std::string mock_contents_cpu_allocated = R"EOF(1000
+)EOF";
+  file_updater_cpu_allocated.update(mock_contents_cpu_allocated);
+
+  const std::string temp_path_cpu_times = TestEnvironment::temporaryPath("cgroup_cpu_times_stats");
+  AtomicFileUpdater file_updater_cpu_times(temp_path_cpu_times);
+  const std::string mock_contents_cpu_times = R"EOF(10000000000
+)EOF";
+  file_updater_cpu_times.update(mock_contents_cpu_times);
+
+  const std::string temp_path_proc_uptime = TestEnvironment::temporaryPath("linux_uptime");
+  AtomicFileUpdater file_updater_linux_uptime(temp_path_proc_uptime);
+  const std::string mock_contents_linux_uptime = R"EOF(10000.0 123788.9
+)EOF";
+  file_updater_linux_uptime.update(mock_contents_linux_uptime);
+  LinuxContainerCpuStatsReader container_stats_reader(temp_path_cpu_allocated, temp_path_cpu_times,
+                                                      temp_path_proc_uptime);
+  CpuTimes envoy_container_stats = container_stats_reader.getCgroupStats();
+  EXPECT_EQ(envoy_container_stats.work_time, 10);
+  EXPECT_EQ(envoy_container_stats.total_time, 10000.0);
+}
+
+TEST(LinuxContainerCpuStatsReader, CannotReadFile) {
+  const std::string temp_path_cpu_allocated =
+      TestEnvironment::temporaryPath("container_cpu_allocated_not_exists");
+  const std::string temp_path_cpu_times =
+      TestEnvironment::temporaryPath("container_cpu_times_not_exists");
+  const std::string temp_path_linux_uptime =
+      TestEnvironment::temporaryPath("linux_uptime_not_exists");
+  LinuxContainerCpuStatsReader container_stats_reader(temp_path_cpu_allocated, temp_path_cpu_times,
+                                                      temp_path_linux_uptime);
+  CpuTimes envoy_container_stats = container_stats_reader.getCgroupStats();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+}
+
+TEST(LinuxContainerCpuStatsReader, UnexpectedFormatCpuAllocatedLine) {
+  const std::string temp_path_cpu_allocated =
+      TestEnvironment::temporaryPath("container_cpu_allocated_unexpected_format");
+  AtomicFileUpdater file_updater_cpu_allocated(temp_path_cpu_allocated);
+  const std::string cpu_allocated_contents = R"EOF(notanumb3r
+)EOF";
+  file_updater_cpu_allocated.update(cpu_allocated_contents);
+
+  LinuxContainerCpuStatsReader container_stats_reader(temp_path_cpu_allocated);
+  CpuTimes envoy_container_stats = container_stats_reader.getCgroupStats();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+}
+
+TEST(LinuxContainerCpuStatsReader, UnexpectedFormatCpuTimesLine) {
+  const std::string temp_path_cpu_allocated =
+      TestEnvironment::temporaryPath("container_cpu_allocated_unexpected_format");
+  AtomicFileUpdater file_updater_cpu_allocated(temp_path_cpu_allocated);
+  const std::string cpu_allocated_contents = R"EOF(1000101
+)EOF";
+  file_updater_cpu_allocated.update(cpu_allocated_contents);
+
+  const std::string temp_path_cpu_times =
+      TestEnvironment::temporaryPath("container_cpu_times_unexpected_format");
+  AtomicFileUpdater file_update_cpu_times(temp_path_cpu_times);
+  const std::string cpu_times_contents = R"EOF(notanumb3r
+)EOF";
+  file_update_cpu_times.update(cpu_times_contents);
+
+  LinuxContainerCpuStatsReader container_stats_reader(temp_path_cpu_allocated, temp_path_cpu_times);
+  CpuTimes envoy_container_stats = container_stats_reader.getCgroupStats();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+}
+
+TEST(LinuxContainerCpuStatsReader, UnexpectedFormatLinuxUptime) {
+  const std::string temp_path_cpu_allocated =
+      TestEnvironment::temporaryPath("container_cpu_allocated_unexpected_format");
+  AtomicFileUpdater file_updater_cpu_allocated(temp_path_cpu_allocated);
+  const std::string cpu_allocated_contents = R"EOF(1000101
+)EOF";
+  file_updater_cpu_allocated.update(cpu_allocated_contents);
+
+  const std::string temp_path_cpu_times =
+      TestEnvironment::temporaryPath("container_cpu_times_unexpected_format");
+  AtomicFileUpdater file_updater_cpu_times(temp_path_cpu_times);
+  const std::string cpu_times_contents = R"EOF(100000
+)EOF";
+  file_updater_cpu_times.update(cpu_times_contents);
+
+  const std::string temp_path_linux_uptime =
+      TestEnvironment::temporaryPath("container_linux_uptime_unexpected_format");
+  AtomicFileUpdater file_updater_linux_uptime(temp_path_linux_uptime);
+  const std::string linux_uptime_contents = R"EOF(notnumb3r
+)EOF";
+  file_updater_linux_uptime.update(linux_uptime_contents);
+
+  LinuxContainerCpuStatsReader container_stats_reader(temp_path_cpu_allocated, temp_path_cpu_times,
+                                                      temp_path_linux_uptime);
+  CpuTimes envoy_container_stats = container_stats_reader.getCgroupStats();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+}
+
 } // namespace
 } // namespace CpuUtilizationMonitor
 } // namespace ResourceMonitors

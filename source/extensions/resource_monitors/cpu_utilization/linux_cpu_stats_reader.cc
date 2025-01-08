@@ -41,45 +41,64 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
     times[i] = time;
   }
 
-  uint64_t work_time, total_time;
+  double work_time, total_time;
   work_time = times[0] + times[1] + times[2]; // user + nice + system
   total_time = work_time + times[3];          // idle
   return {true, work_time, total_time};
 }
 
+LinuxContainerCpuStatsReader::LinuxContainerCpuStatsReader(
+    const std::string& linux_cgroup_cpu_allocated_file,
+    const std::string& linux_cgroup_cpu_times_file, const std::string& linux_uptime_file)
+    : linux_cgroup_cpu_allocated_file_(linux_cgroup_cpu_allocated_file),
+      linux_cgroup_cpu_times_file_(linux_cgroup_cpu_times_file),
+      linux_uptime_file_(linux_uptime_file) {}
 
-LinuxContainerCpuStatsReader::LinuxContainerCpuStatsReader(const std::string& linux_cgroup_cpu_allocated_file, const std::string& linux_cgroup_cpu_times_file)
-:linux_cgroup_cpu_allocated_file_(linux_cgroup_cpu_allocated_file),linux_cgroup_cpu_times_file_(linux_cgroup_cpu_times_file){}
+CpuTimes LinuxContainerCpuStatsReader::getCgroupStats() {
+  std::ifstream cpu_allocated_file, cpu_times_file, linux_uptime_file;
+  double cpu_allocated_value, cpu_times_value, linux_uptime_value;
 
-CgroupStats LinuxContainerCpuStatsReader::getCgroupStats() {
-  std::ifstream cpu_allocated_file, cpu_times_file;
-  uint64_t cpu_allocated_value, cpu_times_value;
-  
   cpu_allocated_file.open(linux_cgroup_cpu_allocated_file_);
   if (!cpu_allocated_file.is_open()) {
-      ENVOY_LOG_MISC(error, "Can't open linux cpu allocated file {}", linux_cgroup_cpu_allocated_file_);
-      return {false, 0, 0};
+    ENVOY_LOG_MISC(error, "Can't open linux cpu allocated file {}",
+                   linux_cgroup_cpu_allocated_file_);
+    return {false, 0, 0};
   }
 
   cpu_times_file.open(linux_cgroup_cpu_times_file_);
   if (!cpu_times_file.is_open()) {
-      ENVOY_LOG_MISC(error, "Can't open linux cpu usage seconds file {}", linux_cgroup_cpu_times_file_);
-      return {false, 0, 0};
+    ENVOY_LOG_MISC(error, "Can't open linux cpu usage seconds file {}",
+                   linux_cgroup_cpu_times_file_);
+    return {false, 0, 0};
+  }
+
+  linux_uptime_file.open(linux_uptime_file_);
+  if (!linux_uptime_file.is_open()) {
+    ENVOY_LOG_MISC(error, "Can't open linux uptime file {}", linux_uptime_file_);
+    return {false, 0, 0};
   }
 
   cpu_allocated_file >> cpu_allocated_value;
   if (!cpu_allocated_file) {
-      ENVOY_LOG_MISC(error, "Unexpected format in linux cpu allocated file {}", linux_cgroup_cpu_allocated_file_);
-      return {false, 0, 0};
+    ENVOY_LOG_MISC(error, "Unexpected format in linux cpu allocated file {}",
+                   linux_cgroup_cpu_allocated_file_);
+    return {false, 0, 0};
   }
 
   cpu_times_file >> cpu_times_value;
-  if(!cpu_times_file) {
-      ENVOY_LOG_MISC(error, "Unexpected format in linux cpu usage seconds file {}", linux_cgroup_cpu_times_file_);
-      return {false, 0, 0};
+  if (!cpu_times_file) {
+    ENVOY_LOG_MISC(error, "Unexpected format in linux cpu usage seconds file {}",
+                   linux_cgroup_cpu_times_file_);
+    return {false, 0, 0};
   }
 
-  return {true,cpu_allocated_value, cpu_times_value};
+  linux_uptime_file >> linux_uptime_value; // First value of /proc/uptime is uptime in seconds
+  if (!linux_uptime_file) {
+    ENVOY_LOG_MISC(error, "Unexpected format in linux proc uptime file {}", linux_uptime_file_);
+    return {false, 0, 0};
+  }
+
+  return {true, cpu_times_value / (cpu_allocated_value * 1000000), linux_uptime_value};
 }
 
 } // namespace CpuUtilizationMonitor
