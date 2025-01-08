@@ -58,38 +58,38 @@ message ProxyProtocolConfig {
   ProxyProtocolPassThroughTLVs pass_through_tlvs = 2;
 
   // This config allows additional TLVs to be included in the upstream PROXY protocol
-  // V2 header. Unlike `pass_through_tlvs`, which passes TLVs from the downstream request,
-  // `added_tlvs` provides an extension mechanism for defining new TLVs that are included
+  // V2 header. Unlike ``pass_through_tlvs``, which passes TLVs from the downstream request,
+  // ``added_tlvs`` provides an extension mechanism for defining new TLVs that are included
   // with the upstream request. These TLVs may not be present in the downstream request and
   // can be defined at either the transport socket level or the host level to provide more
   // granular control over the TLVs that are included in the upstream request.
   //
-  // Host-level TLVs are specified in the `metadata.typed_filter_metadata` field under the
-  // `envoy.transport_sockets.proxy_protocol` namespace. See the following example for how to
-  // define TLVs at the host level:
+  // Host-level TLVs are specified in the ``metadata.typed_filter_metadata`` field under the
+  // ``envoy.transport_sockets.proxy_protocol`` namespace. See the following example for how to
+  // define TLVs at the host level.
   //
-  // ```yaml
-  // clusters:
-  //   - name: cluster_0
-  //     load_assignment:
-  //       endpoints:
-  //       - lbEndpoints:
-  //         - metadata:
-  //             typed_filter_metadata:
-  //               envoy.transport_sockets.proxy_protocol:
-  //                 "@type": type.googleapis.com/envoy.config.core.v3.ProxyProtocolConfig
-  //                 custom_tlvs:
-  //                   - type: 0xD7
-  //                     value: b3Zy
-  //                   - type: 0xD8
-  //                     value: bmV3
-  // ```
+  // .. code-block:: yaml
   //
-  // Precedence behavior:
+  //    clusters:
+  //      - name: cluster_0
+  //        load_assignment:
+  //          endpoints:
+  //            - lbEndpoints:
+  //                - metadata:
+  //                    typed_filter_metadata:
+  //                      envoy.transport_sockets.proxy_protocol:
+  //                        "@type": type.googleapis.com/envoy.config.core.v3.ProxyProtocolConfig
+  //                        added_tlvs:
+  //                          - type: 0xD7
+  //                            value: b3Zy
+  //                          - type: 0xD8
+  //                            value: bmV3
+  //
+  // **Precedence behavior**:
   // - When a TLV is defined at both the host level and the transport socket level, the value
   //   from the host level configuration takes precedence. This allows users to define default TLVs
   //   at the transport socket level and override them at the host level.
-  // - Any TLV defined in the `pass_through_tlvs` field will be overridden by either the host level
-  //   or transport socket level TLV.
+  // - Any TLV defined in the ``pass_through_tlvs`` field will be overridden by either the host-level
+  //   or transport socket-level TLV.
   repeated TlvEntry added_tlvs = 3;
 }
