@@ -17,13 +17,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The CPU utilization resource monitor reports the Envoy process the, CPU Utilization
 // are used to calculate the usage.
 message CpuUtilizationConfig {
-    enum UtilizationComputeStrategy {
-      // Reports CPU Utilization of Host machine
-      HOST = 0;
+  enum UtilizationComputeStrategy {
+    // Reports CPU Utilization of Host machine
+    HOST = 0;
 
-      // Reports CPU Utilization of Envoy Container using CGROUP stats in K8s environment
-      CONTAINER = 1;
-   }
+    // Reports CPU Utilization of Envoy Container using CGROUP stats in K8s environment
+    CONTAINER = 1;
+  }
 
   UtilizationComputeStrategy mode = 1 [(validate.rules).enum = {defined_only: true}];
 }
