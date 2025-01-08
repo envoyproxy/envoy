@@ -534,6 +534,26 @@ TEST_F(JsonLoaderTest, InvalidJsonToMsgpack) {
   EXPECT_EQ(0, Factory::jsonToMsgpack("{\"hello\":\"world\"").size());
 }
 
+TEST_F(JsonLoaderTest, EmptyListAsJsonString) {
+  std::list<std::string> list{};
+  std::string json_string = Factory::listAsJsonString(list);
+  EXPECT_EQ(json_string, "[]");
+}
+
+TEST_F(JsonLoaderTest, ValidListAsJsonString) {
+  std::list<std::string> list{"item1", "item2", "item3"};
+  std::string json_string = Factory::listAsJsonString(list);
+  EXPECT_EQ(json_string, R"(["item1","item2","item3"])");
+}
+
+TEST_F(JsonLoaderTest, NestedListAsJsonString) {
+  std::list<std::string> list{"item1", "item2", "item3"};
+  std::list<std::string> nested_list{"nested_item1", "nested_item2"};
+  list.push_back(Factory::listAsJsonString(nested_list));
+  std::string json_string = Factory::listAsJsonString(list);
+  EXPECT_EQ(json_string, R"(["item1","item2","item3","[\"nested_item1\",\"nested_item2\"]"])");
+}
+
 } // namespace
 } // namespace Json
 } // namespace Envoy
