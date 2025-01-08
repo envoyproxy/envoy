@@ -111,11 +111,71 @@ TEST(LinuxContainerCpuStatsReader, ReadsCgroupContainerStats) {
   EXPECT_EQ(envoy_container_stats.total_time, 10000.0);
 }
 
-TEST(LinuxContainerCpuStatsReader, CannotReadFile) {
+TEST(LinuxContainerCpuStatsReader, CannotReadFileCpuAllocated) {
   const std::string temp_path_cpu_allocated =
       TestEnvironment::temporaryPath("container_cpu_allocated_not_exists");
+
+  const std::string temp_path_cpu_times = TestEnvironment::temporaryPath("container_cpu_times");
+  AtomicFileUpdater file_updater_cpu_times(temp_path_cpu_times);
+  const std::string cpu_times_contents = R"EOF(100000
+)EOF";
+  file_updater_cpu_times.update(cpu_times_contents);
+
+  const std::string temp_path_linux_uptime =
+      TestEnvironment::temporaryPath("container_linux_uptime");
+  AtomicFileUpdater file_updater_linux_uptime(temp_path_linux_uptime);
+  const std::string linux_uptime_contents = R"EOF(notnumb3r
+)EOF";
+  file_updater_linux_uptime.update(linux_uptime_contents);
+
+  LinuxContainerCpuStatsReader container_stats_reader(temp_path_cpu_allocated, temp_path_cpu_times,
+                                                      temp_path_linux_uptime);
+  CpuTimes envoy_container_stats = container_stats_reader.getCgroupStats();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+}
+
+TEST(LinuxContainerCpuStatsReader, CannotReadFileCpuTimes) {
+  const std::string temp_path_cpu_allocated =
+      TestEnvironment::temporaryPath("container_cpu_allocated");
+  AtomicFileUpdater file_updater_cpu_allocated(temp_path_cpu_allocated);
+  const std::string cpu_allocated_contents = R"EOF(1000101
+)EOF";
+  file_updater_cpu_allocated.update(cpu_allocated_contents);
+
   const std::string temp_path_cpu_times =
       TestEnvironment::temporaryPath("container_cpu_times_not_exists");
+
+  const std::string temp_path_linux_uptime =
+      TestEnvironment::temporaryPath("container_linux_uptime");
+  AtomicFileUpdater file_updater_linux_uptime(temp_path_linux_uptime);
+  const std::string linux_uptime_contents = R"EOF(1000.0 123445.0
+)EOF";
+  file_updater_linux_uptime.update(linux_uptime_contents);
+
+  LinuxContainerCpuStatsReader container_stats_reader(temp_path_cpu_allocated, temp_path_cpu_times,
+                                                      temp_path_linux_uptime);
+  CpuTimes envoy_container_stats = container_stats_reader.getCgroupStats();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+}
+
+TEST(LinuxContainerCpuStatsReader, CannotReadFileLinuxUptime) {
+  const std::string temp_path_cpu_allocated =
+      TestEnvironment::temporaryPath("container_cpu_allocated");
+  AtomicFileUpdater file_updater_cpu_allocated(temp_path_cpu_allocated);
+  const std::string cpu_allocated_contents = R"EOF(1000101
+)EOF";
+  file_updater_cpu_allocated.update(cpu_allocated_contents);
+
+  const std::string temp_path_cpu_times = TestEnvironment::temporaryPath("container_cpu_times");
+  AtomicFileUpdater file_updater_cpu_times(temp_path_cpu_times);
+  const std::string cpu_times_contents = R"EOF(100000
+)EOF";
+  file_updater_cpu_times.update(cpu_times_contents);
+
   const std::string temp_path_linux_uptime =
       TestEnvironment::temporaryPath("linux_uptime_not_exists");
   LinuxContainerCpuStatsReader container_stats_reader(temp_path_cpu_allocated, temp_path_cpu_times,
@@ -143,7 +203,7 @@ TEST(LinuxContainerCpuStatsReader, UnexpectedFormatCpuAllocatedLine) {
 
 TEST(LinuxContainerCpuStatsReader, UnexpectedFormatCpuTimesLine) {
   const std::string temp_path_cpu_allocated =
-      TestEnvironment::temporaryPath("container_cpu_allocated_unexpected_format");
+      TestEnvironment::temporaryPath("container_cpu_allocated");
   AtomicFileUpdater file_updater_cpu_allocated(temp_path_cpu_allocated);
   const std::string cpu_allocated_contents = R"EOF(1000101
 )EOF";
@@ -165,14 +225,13 @@ TEST(LinuxContainerCpuStatsReader, UnexpectedFormatCpuTimesLine) {
 
 TEST(LinuxContainerCpuStatsReader, UnexpectedFormatLinuxUptime) {
   const std::string temp_path_cpu_allocated =
-      TestEnvironment::temporaryPath("container_cpu_allocated_unexpected_format");
+      TestEnvironment::temporaryPath("container_cpu_allocated");
   AtomicFileUpdater file_updater_cpu_allocated(temp_path_cpu_allocated);
   const std::string cpu_allocated_contents = R"EOF(1000101
 )EOF";
   file_updater_cpu_allocated.update(cpu_allocated_contents);
 
-  const std::string temp_path_cpu_times =
-      TestEnvironment::temporaryPath("container_cpu_times_unexpected_format");
+  const std::string temp_path_cpu_times = TestEnvironment::temporaryPath("container_cpu_times");
   AtomicFileUpdater file_updater_cpu_times(temp_path_cpu_times);
   const std::string cpu_times_contents = R"EOF(100000
 )EOF";
