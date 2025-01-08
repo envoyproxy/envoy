@@ -44,6 +44,7 @@ envoy_cc_library(
     name = "oauth_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
+    copts = ["-std=c++17"], 
     deps = [
         ":oauth_client",
         "//envoy/server:filter_config_interface",
