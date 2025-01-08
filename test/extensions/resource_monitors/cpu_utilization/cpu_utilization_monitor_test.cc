@@ -163,6 +163,25 @@ TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsNumerator) {
   ASSERT_TRUE(resource.hasError());
 }
 
+TEST(ContainerCpuUtilizationMonitorTest, ReportsError) {
+  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
+  config.set_mode(
+      envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
+  auto stats_reader = std::make_unique<MockContainerStatsReader>();
+  EXPECT_CALL(*stats_reader, getCgroupStats())
+      .WillOnce(Return(CpuTimes{false, 0, 0}))
+      .WillOnce(Return(CpuTimes{false, 0, 0}))
+      .WillOnce(Return(CpuTimes{false, 0, 200}));
+  auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
+
+  ResourcePressure resource;
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasError());
+
+  monitor->updateResourceUsage(resource);
+  ASSERT_TRUE(resource.hasError());
+}
+
 } // namespace
 } // namespace CpuUtilizationMonitor
 } // namespace ResourceMonitors
