@@ -88,6 +88,11 @@ envoy.tls.key_providers.qat:
   - envoy.tls.key_providers
   security_posture: robust_to_untrusted_downstream
   status: alpha
+envoy.reverse_connection.conn_pool:
+  categories:
+  - envoy.reverse_connection
+  security_posture: unknown
+  status: wip
 envoy.bootstrap.vcl:
   categories:
   - envoy.bootstrap
