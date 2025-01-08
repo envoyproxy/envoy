@@ -32,10 +32,10 @@ public:
    */
   static std::vector<uint8_t> jsonToMsgpack(const std::string& json);
 
+  /*
+   * Constructs a JSON string from a list of strings.
+   */
   static const std::string listAsJsonString(const std::list<std::string>& items);
-  static const std::string setAsJsonString(const absl::flat_hash_set<std::string>& items);
-  static const std::string mapAsJsonString(
-      const absl::flat_hash_map<std::string, absl::flat_hash_map<std::string, int>>& items);
 };
 
 } // namespace Json

@@ -618,8 +618,9 @@ ListenerImpl::buildReverseConnectionListener(const envoy::config::listener::v3::
           .singletonManager()
           .getTyped<Network::RevConnRegistry>("reverse_conn_registry_singleton");
   if (reverse_conn_registry == nullptr) {
-    return absl::InternalError(
-        "Cannot build reverse conn listener. Reverse connection registry not found");
+    ENVOY_LOG(error, "Cannot build reverse conn listener name: {} tag: {}. Reverse conn registry not found",
+              config.name(), listener_tag_);
+    return;
   }
   auto config_or_error =
       reverse_conn_registry->fromAnyConfig(config.reverse_connection_listener_config());

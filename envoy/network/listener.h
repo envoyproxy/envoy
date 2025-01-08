@@ -143,8 +143,10 @@ class ReverseConnectionListenerConfig {
 public:
   virtual ~ReverseConnectionListenerConfig() = default;
 
-  // The source node, cluster and tenant IDs of the local envoy. This is used when the listener is
-  // used to create reverse connections.
+  /**
+   * Encapsulates the source node, cluster and tenant IDs of the local envoy. These are used when
+   * the listener creates reverse connections.
+   */
   struct ReverseConnParams {
     std::string src_node_id_;
     std::string src_cluster_id_;

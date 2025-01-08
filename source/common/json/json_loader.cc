@@ -22,14 +22,5 @@ const std::string Factory::listAsJsonString(const std::list<std::string>& items)
   return Nlohmann::Factory::serialize(items);
 }
 
-const std::string Factory::mapAsJsonString(
-    const absl::flat_hash_map<std::string, absl::flat_hash_map<std::string, int>>& items) {
-  return Nlohmann::Factory::serialize(items);
-}
-
-const std::string Factory::setAsJsonString(const absl::flat_hash_set<std::string>& items) {
-  return Nlohmann::Factory::serialize(items);
-}
-
 } // namespace Json
 } // namespace Envoy

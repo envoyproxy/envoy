@@ -324,9 +324,19 @@ using InternalListenerOptRef = OptRef<InternalListener>;
  */
 class ReverseConnectionListener : public virtual ConnectionHandler::ActiveListener {
 public:
-  virtual void startRCWorkflow(Event::Dispatcher& dispatcher,
-                               Network::ConnectionHandler& conn_handler,
-                               Network::ListenerConfig& config) PURE;
+
+  /**
+   * Helper method that triggers the reverse connection workflow.
+   * @param dispatcher the thread local dispatcher.
+   * @param conn_handler the thread local connection handler.
+   * @param config the listener config that triggers the reverse connection.
+   */
+  virtual void startRCWorkflow(Event::Dispatcher& dispatcher, Network::ConnectionHandler& conn_handler, Network::ListenerConfig& config) PURE;
+
+  /**
+   * Called when a new connection is accepted.
+   * @param socket supplies the socket that is moved into the callee.
+   */
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
 };
 using ReverseConnectionListenerPtr = std::unique_ptr<ReverseConnectionListener>;
