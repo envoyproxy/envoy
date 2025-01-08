@@ -4,11 +4,6 @@
 
 #include "source/extensions/resource_monitors/cpu_utilization/cpu_stats_reader.h"
 #include "source/extensions/resource_monitors/cpu_utilization/cpu_utilization_monitor.h"
-#include "source/server/resource_monitor_config_impl.h"
-
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/server/options.h"
-#include "test/test_common/simulated_time_system.h"
 
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
