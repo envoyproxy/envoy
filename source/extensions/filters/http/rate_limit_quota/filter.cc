@@ -95,7 +95,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   callbacks_->streamInfo().setDynamicMetadata(kBucketMetadataNamespace, bucket_log);
 
   std::shared_ptr<CachedBucket> cached_bucket = client_->getBucket(bucket_id);
-  if (cached_bucket) {
+  if (cached_bucket != nullptr) {
     // Found the cached bucket entry.
     return processCachedBucket(*cached_bucket);
   }
@@ -155,15 +155,6 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
                           StreamInfo::CoreResponseFlag::ResponseFromCacheFilter);
 }
 
-void RateLimitQuotaFilter::createMatcher() {
-  RateLimitOnMatchActionContext context;
-  Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext> factory(
-      context, factory_context_.serverFactoryContext(), visitor_);
-  if (config_->has_bucket_matchers()) {
-    matcher_ = factory.create(config_->bucket_matchers())();
-  }
-}
-
 // TODO(tyxia) Currently request matching is only performed on the request
 // header.
 absl::StatusOr<Matcher::ActionPtr>
@@ -172,37 +163,31 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   // requests. This avoids creating the data object for every request, which
   // is expensive.
   if (data_ptr_ == nullptr) {
-    if (callbacks_ != nullptr) {
-      data_ptr_ = std::make_unique<Http::Matching::HttpMatchingDataImpl>(callbacks_->streamInfo());
-    } else {
+    if (callbacks_ == nullptr) {
       return absl::InternalError("Filter callback has not been initialized successfully yet.");
     }
+    data_ptr_ = std::make_unique<Http::Matching::HttpMatchingDataImpl>(callbacks_->streamInfo());
   }
 
   if (matcher_ == nullptr) {
     return absl::InternalError("Matcher tree has not been initialized yet.");
-  } else {
-    // Populate the request header.
-    if (!headers.empty()) {
-      data_ptr_->onRequestHeaders(headers);
-    }
-
-    // Perform the matching.
-    auto match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
-
-    if (match_result.match_state_ == Matcher::MatchState::MatchComplete) {
-      if (match_result.result_) {
-        // Return the matched result for `on_match` case.
-        return match_result.result_();
-      } else {
-        return absl::NotFoundError("Matching completed but no match result was found.");
-      }
-    } else {
-      // The returned state from `evaluateMatch` function is
-      // `MatchState::UnableToMatch` here.
-      return absl::InternalError("Unable to match due to the required data not being available.");
-    }
   }
+  // Populate the request header.
+  if (!headers.empty()) {
+    data_ptr_->onRequestHeaders(headers);
+  }
+
+  // Perform the matching.
+  auto match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
+  if (match_result.match_state_ != Matcher::MatchState::MatchComplete) {
+    // The returned state from `evaluateMatch` function is `MatchState::UnableToMatch` here.
+    return absl::InternalError("Unable to match due to the required data not being available.");
+  }
+  if (!match_result.result_) {
+    return absl::NotFoundError("Matching completed but no match result was found.");
+  }
+  // Return the matched result for `on_match` case.
+  return match_result.result_();
 }
 
 void RateLimitQuotaFilter::onDestroy() {

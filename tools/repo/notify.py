@@ -150,8 +150,7 @@ class RepoNotifier(runner.Runner):
         opsgenie_name = opsgenie_string.split(' ', 1)[0]
         # Check that the name is in the OPSGENIE_TO_SLACK list, else cc alyssa.
         if not (uid := self.opsgenie_to_slack.get(opsgenie_name)):
-            print("could not find", opsgenie_name)
-            return self.opsgenie_to_slack.get('Alyssa')
+            return None
         return uid
 
     @cached_property
@@ -265,8 +264,13 @@ class RepoNotifier(runner.Runner):
                 oncall = await self.oncall_string
                 await self.send_message(channel='#envoy-maintainer-oncall', text=(f"{oncall}"))
                 await self.send_message(channel='#general', text=(f"{oncall}"))
-            await self.send_message(
-                channel='#envoy-maintainer-oncall', text=(f"Oncall now <@{oncall_handle}>"))
+            if not oncall_handle:
+                await self.send_message(
+                    channel='#envoy-maintainer-oncall',
+                    text=(f"Unable to determine oncall <!here>"))
+            else:
+                await self.send_message(
+                    channel='#envoy-maintainer-oncall', text=(f"Oncall now <@{oncall_handle}>"))
             await self.send_message(
                 channel='#envoy-maintainer-oncall',
                 text=(f"*'Unassigned' PRs* (PRs with no maintainer assigned)\n{unassigned}"))
