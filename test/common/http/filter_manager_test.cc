@@ -707,6 +707,231 @@ TEST_F(FilterManagerTest, EncodeMetadataSendsLocalReply) {
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerTest, DumpState) {
+  initialize();
+
+  auto decoder_filter = std::make_shared<NiceMock<MockStreamDecoderFilter>>();
+  auto encoder_filter = std::make_shared<NiceMock<MockStreamEncoderFilter>>();
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        auto decoder_factory = createDecoderFilterFactoryCb(decoder_filter);
+        manager.applyFilterFactoryCb({}, decoder_factory);
+        auto encoder_factory = createEncoderFilterFactoryCb(encoder_filter);
+        manager.applyFilterFactoryCb({}, encoder_factory);
+        return true;
+      }));
+  filter_manager_->createDownstreamFilterChain();
+
+  RequestHeaderMapPtr request_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  RequestTrailerMapPtr request_trailers{new TestRequestTrailerMapImpl{{"foo", "bar"}}};
+  ResponseTrailerMapPtr response_trailers{new TestResponseTrailerMapImpl{{"foo", "bar"}}};
+  ResponseHeaderMapPtr informational_headers{
+      new TestResponseHeaderMapImpl{{":status", "100"}, {"foo", "bar"}}};
+
+  // Test various dump configs
+  {
+    // Test config that disables request headers dump
+    envoy::config::bootstrap::v3::DumpStateConfig dump_config;
+    dump_config.mutable_request_headers()->set_disabled(true);
+
+    // Set expectation to return the config
+    EXPECT_CALL(filter_manager_callbacks_, dumpStateConfig()).WillRepeatedly(Return(&dump_config));
+
+    // We expect only a single call to the method which checks whether to dump the headers
+    // selectively
+    EXPECT_CALL(filter_manager_callbacks_, requestHeaders());
+    EXPECT_CALL(filter_manager_callbacks_, responseHeaders())
+        .WillRepeatedly(Return(makeOptRef(*response_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, requestTrailers())
+        .WillRepeatedly(Return(makeOptRef(*request_trailers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseTrailers())
+        .WillRepeatedly(Return(makeOptRef(*response_trailers)));
+    EXPECT_CALL(filter_manager_callbacks_, informationalHeaders())
+        .WillRepeatedly(Return(makeOptRef(*informational_headers)));
+
+    std::stringstream out;
+    filter_manager_->dumpState(out, 0);
+  }
+
+  {
+    // Test config that only allows certain request headers
+    envoy::config::bootstrap::v3::DumpStateConfig dump_config;
+    auto* allowed_headers = dump_config.mutable_request_headers()->mutable_allowed_headers();
+    allowed_headers->add_headers(":path");
+    allowed_headers->add_headers(":method");
+
+    // Set expectation to return the config
+    EXPECT_CALL(filter_manager_callbacks_, dumpStateConfig()).WillRepeatedly(Return(&dump_config));
+
+    EXPECT_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillRepeatedly(Return(makeOptRef(*request_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseHeaders())
+        .WillRepeatedly(Return(makeOptRef(*response_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, requestTrailers())
+        .WillRepeatedly(Return(makeOptRef(*request_trailers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseTrailers())
+        .WillRepeatedly(Return(makeOptRef(*response_trailers)));
+    EXPECT_CALL(filter_manager_callbacks_, informationalHeaders())
+        .WillRepeatedly(Return(makeOptRef(*informational_headers)));
+
+    std::stringstream out;
+    filter_manager_->dumpState(out, 0);
+    // Verify output contains only :path and :method headers
+    EXPECT_THAT(out.str(), testing::HasSubstr("':path', '/'"));
+    EXPECT_THAT(out.str(), testing::HasSubstr("':method', 'GET'"));
+    EXPECT_THAT(out.str(), Not(testing::HasSubstr("':authority', 'host'")));
+  }
+
+  {
+    // Test config that disables response trailers dump
+    envoy::config::bootstrap::v3::DumpStateConfig dump_config;
+    dump_config.mutable_response_trailers()->set_disabled(true);
+
+    // Set expectation to return the config
+    EXPECT_CALL(filter_manager_callbacks_, dumpStateConfig()).WillRepeatedly(Return(&dump_config));
+
+    EXPECT_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillRepeatedly(Return(makeOptRef(*request_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseHeaders())
+        .WillRepeatedly(Return(makeOptRef(*response_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, requestTrailers())
+        .WillRepeatedly(Return(makeOptRef(*request_trailers)));
+    // We expect only a single call to the method which checks whether to dump the trailers
+    // selectively
+    EXPECT_CALL(filter_manager_callbacks_, responseTrailers());
+    EXPECT_CALL(filter_manager_callbacks_, informationalHeaders())
+        .WillRepeatedly(Return(makeOptRef(*informational_headers)));
+
+    std::stringstream out;
+    filter_manager_->dumpState(out, 0);
+  }
+
+  {
+    // Test request headers with null config
+    envoy::config::bootstrap::v3::DumpStateConfig* null_config = nullptr;
+
+    EXPECT_CALL(filter_manager_callbacks_, dumpStateConfig()).WillRepeatedly(Return(null_config));
+
+    EXPECT_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillRepeatedly(Return(makeOptRef(*request_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseHeaders())
+        .WillRepeatedly(Return(makeOptRef(*response_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, requestTrailers())
+        .WillRepeatedly(Return(makeOptRef(*request_trailers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseTrailers())
+        .WillRepeatedly(Return(makeOptRef(*response_trailers)));
+
+    std::stringstream out;
+    filter_manager_->dumpState(out, 0);
+    // Verify all headers are dumped with null config
+    EXPECT_THAT(out.str(), testing::HasSubstr("':authority', 'host'"));
+    EXPECT_THAT(out.str(), testing::HasSubstr("':path', '/'"));
+    EXPECT_THAT(out.str(), testing::HasSubstr("':method', 'GET'"));
+  }
+
+  {
+    // Test empty allowed headers list
+    envoy::config::bootstrap::v3::DumpStateConfig dump_config;
+    dump_config.mutable_request_headers()->mutable_allowed_headers(); // Empty list
+
+    EXPECT_CALL(filter_manager_callbacks_, dumpStateConfig()).WillRepeatedly(Return(&dump_config));
+
+    EXPECT_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillRepeatedly(Return(makeOptRef(*request_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseHeaders())
+        .WillRepeatedly(Return(makeOptRef(*response_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, requestTrailers())
+        .WillRepeatedly(Return(makeOptRef(*request_trailers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseTrailers())
+        .WillRepeatedly(Return(makeOptRef(*response_trailers)));
+
+    std::stringstream out;
+    filter_manager_->dumpState(out, 0);
+    // Verify no headers are dumped with empty allowed list
+    EXPECT_THAT(out.str(), Not(testing::HasSubstr("':authority'")));
+    EXPECT_THAT(out.str(), Not(testing::HasSubstr("':path'")));
+    EXPECT_THAT(out.str(), Not(testing::HasSubstr("':method'")));
+  }
+
+  {
+    // Test headers that aren't present in allowed list
+    envoy::config::bootstrap::v3::DumpStateConfig dump_config;
+    auto* allowed_headers = dump_config.mutable_request_headers()->mutable_allowed_headers();
+    allowed_headers->add_headers("non-existent-header"); // Header that doesn't exist
+
+    EXPECT_CALL(filter_manager_callbacks_, dumpStateConfig()).WillRepeatedly(Return(&dump_config));
+
+    EXPECT_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillRepeatedly(Return(makeOptRef(*request_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseHeaders())
+        .WillRepeatedly(Return(makeOptRef(*response_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, requestTrailers())
+        .WillRepeatedly(Return(makeOptRef(*request_trailers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseTrailers())
+        .WillRepeatedly(Return(makeOptRef(*response_trailers)));
+
+    std::stringstream out;
+    filter_manager_->dumpState(out, 0);
+    // Verify no headers are dumped when allowed header doesn't exist
+    EXPECT_THAT(out.str(), Not(testing::HasSubstr("non-existent-header")));
+  }
+
+  {
+    // Test config that disables stream info dump
+    envoy::config::bootstrap::v3::DumpStateConfig dump_config;
+    dump_config.mutable_stream_info()->set_disabled(false);
+
+    // Set expectation to return the config
+    EXPECT_CALL(filter_manager_callbacks_, dumpStateConfig()).WillRepeatedly(Return(&dump_config));
+
+    EXPECT_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillRepeatedly(Return(makeOptRef(*request_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseHeaders())
+        .WillRepeatedly(Return(makeOptRef(*response_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, requestTrailers())
+        .WillRepeatedly(Return(makeOptRef(*request_trailers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseTrailers())
+        .WillRepeatedly(Return(makeOptRef(*response_trailers)));
+    EXPECT_CALL(filter_manager_callbacks_, informationalHeaders())
+        .WillRepeatedly(Return(makeOptRef(*informational_headers)));
+
+    std::stringstream out;
+    filter_manager_->dumpState(out, 0);
+    // Verify streamInfo is dumped
+    EXPECT_THAT(out.str(), testing::HasSubstr("StreamInfo"));
+  }
+
+  {
+    // Test config that enables stream info dump
+    envoy::config::bootstrap::v3::DumpStateConfig dump_config;
+    dump_config.mutable_stream_info()->set_disabled(true);
+
+    // Set expectation to return the config
+    EXPECT_CALL(filter_manager_callbacks_, dumpStateConfig()).WillRepeatedly(Return(&dump_config));
+
+    EXPECT_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillRepeatedly(Return(makeOptRef(*request_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseHeaders())
+        .WillRepeatedly(Return(makeOptRef(*response_headers)));
+    EXPECT_CALL(filter_manager_callbacks_, requestTrailers())
+        .WillRepeatedly(Return(makeOptRef(*request_trailers)));
+    EXPECT_CALL(filter_manager_callbacks_, responseTrailers())
+        .WillRepeatedly(Return(makeOptRef(*response_trailers)));
+    EXPECT_CALL(filter_manager_callbacks_, informationalHeaders())
+        .WillRepeatedly(Return(makeOptRef(*informational_headers)));
+
+    std::stringstream out;
+    filter_manager_->dumpState(out, 0);
+    // Verify streamInfo is not dumped
+    EXPECT_THAT(out.str(), Not(testing::HasSubstr("StreamInfo")));
+  }
+
+  filter_manager_->destroyFilters();
+}
+
 TEST_F(FilterManagerTest, IdleTimerResets) {
   initialize();
 

@@ -156,6 +156,10 @@ private:
       still_alive_.reset();
     }
 
+    const envoy::config::bootstrap::v3::DumpStateConfig* dumpStateConfig() const override {
+      return filter_manager_.dumpStateConfig();
+    }
+
     void log(AccessLog::AccessLogType type);
     void completeRequest();
 

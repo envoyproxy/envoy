@@ -152,6 +152,11 @@ public:
    * @returns the number of attempts (e.g. retries) performed for this stream.
    */
   virtual uint32_t attemptCount() const PURE;
+
+  /*
+   * @returns the dump state config from bootstrap.
+   */
+  virtual const envoy::config::bootstrap::v3::DumpStateConfig* dumpStateConfig() const PURE;
 };
 
 } // namespace Router

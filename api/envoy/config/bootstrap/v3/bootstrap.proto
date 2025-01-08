@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 42]
+// [#next-free-field: 43]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -415,6 +415,66 @@ message Bootstrap {
   // Optional configuration for memory allocation manager.
   // Memory releasing is only supported for `tcmalloc allocator <https://github.com/google/tcmalloc>`_.
   MemoryAllocatorManager memory_allocator_manager = 41;
+
+  // Optional configuration for controlling what state gets included in the state dumps after unexpected termination.
+  // This allows operators to selectively enable/disable certain types of information from being included in state
+  // dumps for security or performance reasons.
+  //
+  // If not specified, all state will be dumped (default behavior).
+  //
+  // This can be used to:
+  // * Completely disable dumping of certain types of request or response data.
+  // * Specify an allow list of specific headers that should be included.
+  // * Control dumping of stream info state.
+  //
+  DumpStateConfig dump_state_config = 42;
+}
+
+message DumpStateConfig {
+  // Configuration for controlling what state gets dumped when the ``dumpState()`` function is called. This allows
+  // selectively enabling/disabling certain types of information from being included in state dumps, which can be useful
+  // for security or performance reasons.
+  message DumpConfig {
+    // Configures how this type of state should be dumped.
+    oneof config {
+      option (validate.required) = true;
+
+      // When set to ``true``, completely disables dumping of this type of state information. This provides a simple way
+      // to completely exclude certain data from dumps.
+      bool disabled = 1;
+
+      // Provides an allow-list of specific headers that should be included in dumps. Only headers in this list will be
+      // dumped and the remaining will be excluded. This provides granular control over exactly which headers appear in
+      // the dumps.
+      HeaderList allowed_headers = 2;
+    }
+
+    // List of specific headers that should be included in dumps when using an allow-list.
+    message HeaderList {
+      // The list of header names that should be included in the dumps. Any headers not in this list will be excluded
+      // from dumps. Header names should match the exact header key.
+      repeated string headers = 1;
+    }
+  }
+
+  // Controls dumping of HTTP request headers. When not specified, all request headers will be dumped.
+  // Can be disabled entirely or limited to specific headers via allow-list.
+  DumpConfig request_headers = 1;
+
+  // Controls dumping of HTTP request trailers. When not specified, all request trailers will be dumped.
+  // Can be disabled entirely or limited to specific trailers via allow-list.
+  DumpConfig request_trailers = 2;
+
+  // Controls dumping of HTTP response headers. When not specified, all response headers will be dumped.
+  // Can be disabled entirely or limited to specific headers via allow-list.
+  DumpConfig response_headers = 3;
+
+  // Controls dumping of HTTP response trailers. When not specified, all response trailers will be dumped.
+  // Can be disabled entirely or limited to specific trailers via allow-list.
+  DumpConfig response_trailers = 4;
+
+  // Controls dumping of stream info state. When not specified, all stream info will be dumped.
+  DumpConfig stream_info = 5;
 }
 
 // Administration interface :ref:`operations documentation
