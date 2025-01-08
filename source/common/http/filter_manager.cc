@@ -344,13 +344,17 @@ bool ActiveStreamDecoderFilter::canContinue() {
   // continue to further filters. A concrete example of this is a filter buffering data, the
   // last data frame comes in and the filter continues, but the final buffering takes the stream
   // over the high watermark such that a 413 is returned.
-  return !parent_.stopDecoderFilterChain() && !parent_.state_.recreated_stream_;
+  return !parent_.stopDecoderFilterChain()
 }
 
 bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
-  // continue if a local reply has been sent.
-  return !parent_.state_.encoder_filter_chain_complete_ && !parent_.state_.recreated_stream_;
+  // continue if a local reply has been sent or ActiveStreamDecoderFilter::recreateStream() is
+  // called, etc.
+  return !parent_.state_.encoder_filter_chain_complete_ &&
+         (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.filter_chain_aborted_can_not_continue") ||
+          !parent_.stopEncoderFilterChain());
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
