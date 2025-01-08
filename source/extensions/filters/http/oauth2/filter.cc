@@ -41,7 +41,7 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly";
+constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly{}";
 constexpr const char* CookieDomainFormatString = ";domain={}";
 
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
@@ -60,6 +60,9 @@ constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oauth.missing_credential
 constexpr absl::string_view SIGN_OUT = "oauth.sign_out";
 constexpr absl::string_view DEFAULT_AUTH_SCOPE = "user";
 
+constexpr absl::string_view SameSiteLax = ";SameSite=Lax";
+constexpr absl::string_view SameSiteStrict = ";SameSite=Strict";
+constexpr absl::string_view SameSiteNone = ";SameSite=None";
 constexpr absl::string_view HmacPayloadSeparator = "\n";
 
 template <class T>
@@ -127,6 +130,22 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
   default:
     return AuthType::UrlEncodedBody;
   }
+}
+
+// Helper function to get SameSite attribute string
+std::string getSameSiteString(envoy::extensions::filters::http::oauth2::v3::CookieConfig::SameSite same_site) {
+    switch (same_site) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::extensions::filters::http::oauth2::v3::CookieConfig::STRICT:
+        return std::string(SameSiteStrict);
+    case envoy::extensions::filters::http::oauth2::v3::CookieConfig::LAX:
+        return std::string(SameSiteLax);
+    case envoy::extensions::filters::http::oauth2::v3::CookieConfig::NONE:
+        return std::string(SameSiteNone);
+    case envoy::extensions::filters::http::oauth2::v3::CookieConfig::DISABLED:
+    default:
+        return EMPTY_STRING;
+    }
 }
 
 Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
@@ -240,14 +259,38 @@ FilterConfig::FilterConfig(
       auth_type_(getAuthType(proto_config.auth_type())),
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
-          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)),
+      PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
       disable_id_token_set_cookie_(proto_config.disable_id_token_set_cookie()),
       disable_access_token_set_cookie_(proto_config.disable_access_token_set_cookie()),
-      disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()) {
-  if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
+      disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()),
+      bearer_token_cookie_settings_(
+          (proto_config.has_cookie_configs() && proto_config.cookie_configs().has_bearer_token_cookie_config()) ?
+          CookieSettings(proto_config.cookie_configs().bearer_token_cookie_config()) :
+          CookieSettings()),
+      hmac_cookie_settings_(
+          (proto_config.has_cookie_configs() && proto_config.cookie_configs().has_oauth_hmac_cookie_config()) ?
+          CookieSettings(proto_config.cookie_configs().oauth_hmac_cookie_config()) :
+          CookieSettings()),
+      expires_cookie_settings_(
+          (proto_config.has_cookie_configs() && proto_config.cookie_configs().has_oauth_expires_cookie_config()) ?
+          CookieSettings(proto_config.cookie_configs().oauth_expires_cookie_config()) :
+          CookieSettings()),
+      id_token_cookie_settings_(
+          (proto_config.has_cookie_configs() && proto_config.cookie_configs().has_id_token_cookie_config()) ?
+          CookieSettings(proto_config.cookie_configs().id_token_cookie_config()) :
+          CookieSettings()),
+      refresh_token_cookie_settings_(
+          (proto_config.has_cookie_configs() && proto_config.cookie_configs().has_refresh_token_cookie_config()) ?
+          CookieSettings(proto_config.cookie_configs().refresh_token_cookie_config()) :
+          CookieSettings()),
+      nonce_cookie_settings_(
+          (proto_config.has_cookie_configs() && proto_config.cookie_configs().has_oauth_nonce_cookie_config()) ?
+          CookieSettings(proto_config.cookie_configs().oauth_nonce_cookie_config()) :
+          CookieSettings()){
+        if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
                                      oauth_token_endpoint_.cluster()));
@@ -550,9 +593,14 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
       cookie_tail_http_only = absl::StrCat(
           fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
     }
+    
+    // Add oauth_nonce_ cookie same site settings
+    std::string oauth_nonce_cookie_tail = fmt::format(cookie_tail_http_only,
+    getSameSiteString(config_->nonceCookieSettings().same_site_));
+
     response_headers->addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(config_->cookieNames().oauth_nonce_, "=", csrf_token, cookie_tail_http_only));
+        absl::StrCat(config_->cookieNames().oauth_nonce_, "=", csrf_token, oauth_nonce_cookie_tail));
   }
 
   // Validate the CSRF token HMAC if the CSRF token cookie exists.
@@ -817,17 +865,28 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
 
   const CookieNames& cookie_names = config_->cookieNames();
 
+  // Add oauth_hmac_ cookie same site settings
+  std::string oauth_hmac_cookie_tail = fmt::format(cookie_tail_http_only,
+    getSameSiteString(config_->hmacCookieSettings().same_site_));
+
   headers.addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat(cookie_names.oauth_hmac_, "=", encoded_token, cookie_tail_http_only));
+      absl::StrCat(cookie_names.oauth_hmac_, "=", encoded_token, oauth_hmac_cookie_tail));
+
+  // Add oauth_expires_ cookie same site settings
+  std::string oauth_expires_cookie_tail = fmt::format(cookie_tail_http_only,
+  getSameSiteString(config_->expiresCookieSettings().same_site_));
+
   headers.addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_, cookie_tail_http_only));
+      absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_, oauth_expires_cookie_tail));
 
   if (!access_token_.empty()) {
+    std::string access_token_cookie_tail = fmt::format(cookie_tail_http_only,
+    getSameSiteString(config_->bearerTokenCookieSettings().same_site_));
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail_http_only));
+        absl::StrCat(cookie_names.bearer_token_, "=", access_token_, access_token_cookie_tail));
   }
 
   if (!id_token_.empty()) {
@@ -838,9 +897,12 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
           absl::StrCat(fmt::format(CookieDomainFormatString, config_->cookieDomain()),
                        id_token_cookie_tail_http_only);
     }
+    std::string id_token_cookie_tail = fmt::format(id_token_cookie_tail_http_only,
+    getSameSiteString(config_->idTokenCookieSettings().same_site_));
+
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.id_token_, "=", id_token_, id_token_cookie_tail_http_only));
+        absl::StrCat(cookie_names.id_token_, "=", id_token_, id_token_cookie_tail));
   }
 
   if (!refresh_token_.empty()) {
@@ -851,9 +913,13 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
           absl::StrCat(fmt::format(CookieDomainFormatString, config_->cookieDomain()),
                        refresh_token_cookie_tail_http_only);
     }
+
+    std::string refresh_token_cookie_tail = fmt::format(refresh_token_cookie_tail_http_only,
+    getSameSiteString(config_->refreshTokenCookieSettings().same_site_));
+
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
-                                         refresh_token_cookie_tail_http_only));
+                                         refresh_token_cookie_tail));
   }
 }
 
