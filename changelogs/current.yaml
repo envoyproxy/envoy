@@ -434,6 +434,14 @@ new_features:
   change: |
     Added :ref:`routeName() <config_http_filters_lua_stream_info_route_name>` API to the Stream Info Object to get the
     name of the route matched by the filter chain.
+- area: oauth2
+  change: |
+    Add the option to specify samesite cookie attribute value for oauth2 supported cookies.
+    To specify samesite attribute, choose one of the value from ``strict``,``lax`` or ``none``. if not specified,
+    a default value of ``disabled`` will be assigned and there will be no samesite value in cookie. see
+    :ref:`apply_on_stream_done <envoy_v3_api_field_extensions.filters.http.oauth2.v3.CookieConfigs>` and
+    :ref:`apply_on_stream_done <envoy_v3_api_field_extensions.filters.http.oauth2.v3.CookieConfig>
+    for more details.
 
 deprecated:
 - area: rbac
