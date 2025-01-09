@@ -175,7 +175,7 @@ public:
     // Default constructor
     CookieSettings() 
         : same_site_(envoy::extensions::filters::http::oauth2::v3::CookieConfig::DISABLED) {}
-        
+
     const envoy::extensions::filters::http::oauth2::v3::CookieConfig::SameSite same_site_;
   };
 
@@ -355,6 +355,7 @@ private:
                                             const std::chrono::seconds& expires_in) const;
   std::string getExpiresTimeForIdToken(const std::string& id_token,
                                        const std::chrono::seconds& expires_in) const;
+  std::string BuildCookieTail(int cookie_type) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
