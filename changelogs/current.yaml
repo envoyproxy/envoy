@@ -49,7 +49,7 @@ minor_behavior_changes:
     will always keep the value type in the JSON output. For example, the ``duration`` field will always be rendered as a number
     instead of a string.
     This behavior change could be disabled temporarily by setting the runtime
-    ``envoy.reloadable_features.logging_with_fast_json_formatter`` to false.
+    ``envoy.reloadable_features.logging_with_fast_json_formatter`` to ``false``.
 - area: xds
   change: |
     A minor delta-xDS optimization that avoids copying resources when ingesting them was introduced.
