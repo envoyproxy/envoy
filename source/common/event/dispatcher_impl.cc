@@ -12,7 +12,6 @@
 #include "envoy/network/client_connection_factory.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
-#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"

@@ -124,6 +124,10 @@ private:
                     });
     }
 
+    void setName(const std::string& name) {
+      name_ = name;
+    }
+
     /**
      * Add an ActiveListener into the list.
      */
@@ -168,7 +172,7 @@ private:
   const std::string per_handler_stat_prefix_;
   // Declare before its users ActiveListenerDetails.
   std::atomic<uint64_t> num_handler_connections_{};
-  absl::flat_hash_map<uint64_t, std::shared_ptr<ActiveListenerDetails>> listener_map_by_tag_;
+  absl::flat_hash_map<uint64_t, std::unique_ptr<ActiveListenerDetails>> listener_map_by_tag_;
   absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>
       tcp_listener_map_by_address_;
   absl::flat_hash_map<std::string, std::shared_ptr<PerAddressActiveListenerDetails>>

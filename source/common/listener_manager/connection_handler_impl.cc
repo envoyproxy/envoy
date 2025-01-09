@@ -51,7 +51,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     return;
   }
 
-  auto details = std::make_shared<ActiveListenerDetails>();
+  auto details = std::make_unique<ActiveListenerDetails>();
   if (config.internalListenerConfig().has_value()) {
     // Ensure the this ConnectionHandlerImpl link to the thread local registry. Ideally this step
     // should be done only once. However, an extra phase and interface is overkill.
@@ -170,8 +170,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
           per_address_details->address_->envoyInternalAddress()->addressId(), per_address_details);
     }
   }
-  details->name_ = config.name();
-  listener_map_by_tag_.emplace(config.listenerTag(), details);
+  details->setName(config.name());
+  listener_map_by_tag_.emplace(config.listenerTag(), std::move(details));
 }
 
 void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {

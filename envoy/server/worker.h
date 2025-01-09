@@ -93,7 +93,6 @@ public:
   virtual void stopListener(Network::ListenerConfig& listener,
                             const Network::ExtraShutdownListenerOptions& options,
                             std::function<void()> completion) PURE;
-
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;
