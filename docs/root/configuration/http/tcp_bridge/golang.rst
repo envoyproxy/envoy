@@ -1,9 +1,9 @@
-.. _config_tcp_bridges_golang_http_tcp_bridge:
+.. _config_http_tcp_bridge_golang:
 
-Golang HTTP-TCP Bridge
+Golang Http Tcp Bridge
 ======================
 
-This bridge enables an HTTP client to connect to a TCP server via a Golang plugin, facilitating **Protocol Convert** from HTTP to any RPC protocol in Envoy.
+This bridge enables an Http client to connect to a Tcp server via a Golang plugin, facilitating **Protocol Convert** from Http to any Rpc protocol in Envoy.
 
 Notice: the bridge is designed for sync data flow between go and c, so **DO NOT** use goroutine in go side.
 
@@ -69,8 +69,8 @@ A prebuilt Golang Http Tcp Bridge  ``my_plugin.so`` might be configured as follo
 .. literalinclude:: /_configs/go/golang-http-tcp-bridge.yaml
    :language: yaml
    :linenos:
-   :lines: 42-48
-   :lineno-start: 43
+   :lines: 38-44
+   :lineno-start: 39
    :emphasize-lines: 2-7
    :caption: :download:`golang-http-tcp-bridge.yaml </_configs/go/golang-http-tcp-bridge.yaml>`
 
@@ -84,8 +84,8 @@ Below is a very simple example of how such a plugin might be configured in Envoy
 .. literalinclude:: /_configs/go/golang-http-tcp-bridge-with-config.yaml
    :language: yaml
    :linenos:
-   :lines: 42-54
-   :lineno-start: 43
+   :lines: 38-50
+   :lineno-start: 39
    :emphasize-lines: 8-13
    :caption: :download:`golang-http-tcp-bridge-with-config.yaml </_configs/go/golang-http-tcp-bridge-with-config.yaml>`
 

@@ -1,21 +1,9 @@
-#include <chrono>
-#include <memory>
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/config/core/v3/proxy_protocol.pb.h"
-#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
-#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
-#include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
-#include "test/integration/filters/add_header_filter.pb.h"
-#include "test/integration/filters/stop_and_continue_filter_config.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
-#include "test/integration/tcp_tunneling_integration.h"
 
 #include "contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha/golang.pb.h"
-#include "contrib/golang/upstreams/http/tcp/source/config.h"
-#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
@@ -78,8 +66,7 @@ public:
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
 
-  const std::string PANIC_MSG{"error happened in golang http-tcp bridge\r\n"};
-
+  // golang bridge names
   const std::string STREAMING{"streaming"};
   const std::string BUFFERED{"buffered"};
   const std::string LOCAL_REPLY{"local_reply"};
@@ -87,6 +74,9 @@ public:
   const std::string PROPERTY{"property"};
   const std::string PANIC{"panic"};
   const std::string SELF_HALF_CLOSE{"self_half_close"};
+
+  // msg for golang bridge test
+  const std::string PANIC_MSG{"error happened in golang http-tcp bridge\r\n"};
 };
 
 // TODO(duxin40): add test for HTTP2.

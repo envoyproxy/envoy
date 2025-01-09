@@ -26,10 +26,6 @@ static_resources:
                   prefix: "/mytest.service"
                 route:
                   cluster: local_service
-                  upgrade_configs:
-                  - upgrade_type: "CONNECT"
-                    connect_config:
-                      allow_post: true
 
   clusters:
   - name: local_service
