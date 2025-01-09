@@ -62,3 +62,28 @@ fn test_header_callbacks_filter_on_request_headers() {
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   );
 }
+
+#[test]
+fn test_header_callbacks_on_request_headers_local_resp() {
+  let mut f = SendResponseFilter {};
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  envoy_filter
+    .expect_send_response()
+    .withf(|status_code, headers, body| {
+      *status_code == 200
+        && *headers
+          == vec![
+            ("header1", "value1".as_bytes()),
+            ("header2", "value2".as_bytes()),
+          ]
+        && *body == Some(b"Hello, World!")
+    })
+    .once()
+    .return_const(());
+
+  assert_eq!(
+    f.on_request_headers(envoy_filter, false),
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  );
+}
