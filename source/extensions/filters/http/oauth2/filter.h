@@ -173,7 +173,7 @@ public:
         : same_site_(config.same_site()) {}
 
     // Default constructor
-    CookieSettings() 
+    CookieSettings()
         : same_site_(envoy::extensions::filters::http::oauth2::v3::CookieConfig::DISABLED) {}
 
     const envoy::extensions::filters::http::oauth2::v3::CookieConfig::SameSite same_site_;
@@ -183,9 +183,10 @@ public:
   const CookieSettings& hmacCookieSettings() const { return hmac_cookie_settings_; }
   const CookieSettings& expiresCookieSettings() const { return expires_cookie_settings_; }
   const CookieSettings& idTokenCookieSettings() const { return id_token_cookie_settings_; }
-  const CookieSettings& refreshTokenCookieSettings() const { return refresh_token_cookie_settings_; }
+  const CookieSettings& refreshTokenCookieSettings() const {
+    return refresh_token_cookie_settings_;
+  }
   const CookieSettings& nonceCookieSettings() const { return nonce_cookie_settings_; }
-
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
