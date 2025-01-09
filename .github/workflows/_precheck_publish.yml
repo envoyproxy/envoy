@@ -45,7 +45,7 @@ jobs:
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
       rbe: ${{ matrix.rbe }}
       request: ${{ inputs.request }}
-      runs-on: ${{ matrix.runs-on || 'ubuntu-24.04' }}
+      runs-on: ${{ matrix.runs-on || fromJSON(inputs.request).config.ci.agent-ubuntu  }}
       timeout-minutes: ${{ matrix.timeout-minutes || 120 }}
       error-match: |
         ERROR

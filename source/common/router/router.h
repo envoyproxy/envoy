@@ -243,11 +243,10 @@ protected:
 
 public:
   bool createFilterChain(
-      Http::FilterChainManager& manager, bool only_create_if_configured = false,
+      Http::FilterChainManager& manager,
       const Http::FilterChainOptions& options = Http::EmptyFilterChainOptions{}) const override {
     // Currently there is no default filter chain, so only_create_if_configured true doesn't make
     // sense.
-    ASSERT(!only_create_if_configured);
     if (upstream_http_filter_factories_.empty()) {
       return false;
     }
@@ -331,6 +330,7 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
+
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   Http::FilterMetadataStatus decodeMetadata(Http::MetadataMap& metadata_map) override;
@@ -430,10 +430,6 @@ public:
     return callbacks_->upstreamOverrideHost();
   }
 
-  void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks> callbacks) override {
-    orca_load_report_callbacks_ = callbacks;
-  }
-
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie
@@ -508,11 +504,11 @@ private:
 
   void onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Counter& error_counter,
                              const std::string& response_code_details);
-  Stats::StatName upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
+  Stats::StatName upstreamZone(Upstream::HostDescriptionOptConstRef upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code,
                           const Http::ResponseHeaderMap& response_headers,
-                          Upstream::HostDescriptionConstSharedPtr upstream_host, bool dropped);
-  void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionConstSharedPtr upstream_host,
+                          Upstream::HostDescriptionOptConstRef upstream_host, bool dropped);
+  void chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionOptConstRef upstream_host,
                           bool dropped);
   void chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request);
   void cleanup();
@@ -616,7 +612,6 @@ private:
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
-  std::weak_ptr<OrcaLoadReportCallbacks> orca_load_report_callbacks_;
   bool grpc_request_ : 1;
   bool exclude_http_code_stats_ : 1;
   bool downstream_response_started_ : 1;

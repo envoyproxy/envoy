@@ -641,6 +641,11 @@ public:
   virtual const CorsPolicy* corsPolicy() const PURE;
 
   /**
+   * @return const std::string& the name of the virtual host.
+   */
+  virtual const std::string& name() const PURE;
+
+  /**
    * @return the stat-name of the virtual host.
    */
   virtual Stats::StatName statName() const PURE;
@@ -1600,12 +1605,11 @@ public:
    * @param options for creating the transport socket
    * @return may be null
    */
-  virtual GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                        GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-                        Upstream::ResourcePriority priority,
-                        absl::optional<Http::Protocol> downstream_protocol,
-                        Upstream::LoadBalancerContext* ctx) const PURE;
+  virtual GenericConnPoolPtr createGenericConnPool(
+      Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
+      GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
+      Upstream::ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
+      Upstream::LoadBalancerContext* ctx) const PURE;
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;

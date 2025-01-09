@@ -1226,6 +1226,13 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
   case OGHTTP2_RST_STREAM_FRAME_TYPE: {
     ENVOY_CONN_LOG(debug, "sent reset code={}", connection_, error_code);
     stats_.tx_reset_.inc();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events") &&
+        stream != nullptr && !stream->local_end_stream_sent_) {
+      // The RST_STREAM may preempt further DATA frames, and serves as the
+      // notification of the end of the stream.
+      stream->onResetEncoded(error_code);
+      stream->local_end_stream_sent_ = true;
+    }
     break;
   }
 
@@ -1793,8 +1800,8 @@ bool ConnectionImpl::Http2Visitor::OnBeginDataForStream(Http2StreamId stream_id,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
-  ENVOY_CONN_LOG(debug, "Http2Visitor: remaining data payload: {}, end_stream: {}",
-                 connection_->connection_, remaining_data_payload_,
+  ENVOY_CONN_LOG(debug, "Http2Visitor: remaining data payload: {}, stream_id: {}, end_stream: {}",
+                 connection_->connection_, remaining_data_payload_, stream_id,
                  bool(current_frame_.flags & FLAG_END_STREAM));
   return true;
 }
@@ -1810,8 +1817,8 @@ bool ConnectionImpl::Http2Visitor::OnDataPaddingLength(Http2StreamId stream_id,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
-  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, end_stream: {}",
-                 connection_->connection_, remaining_data_payload_,
+  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, stream_id: {}, end_stream: {}",
+                 connection_->connection_, remaining_data_payload_, stream_id,
                  bool(current_frame_.flags & FLAG_END_STREAM));
   return true;
 }
@@ -1829,8 +1836,8 @@ bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
-  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, end_stream: {}",
-                 connection_->connection_, remaining_data_payload_,
+  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, stream_id: {}, end_stream: {}",
+                 connection_->connection_, remaining_data_payload_, stream_id,
                  bool(current_frame_.flags & FLAG_END_STREAM));
   return result == 0;
 }
@@ -1857,7 +1864,7 @@ bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id,
                                                  Http2ErrorCode error_code) {
   Status status = connection_->onStreamClose(stream_id, static_cast<uint32_t>(error_code));
   if (stream_close_listener_) {
-    ENVOY_CONN_LOG(trace, "Http2Visitor invoking stream close listener for {}",
+    ENVOY_CONN_LOG(trace, "Http2Visitor invoking stream close listener for stream {}",
                    connection_->connection_, stream_id);
     stream_close_listener_(stream_id);
   }

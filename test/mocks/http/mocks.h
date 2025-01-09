@@ -138,6 +138,15 @@ public:
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
 };
 
+class MockCodecEventCallbacks : public CodecEventCallbacks {
+public:
+  MockCodecEventCallbacks();
+  ~MockCodecEventCallbacks();
+
+  MOCK_METHOD(void, onCodecEncodeComplete, ());
+  MOCK_METHOD(void, onCodecLowLevelReset, ());
+};
+
 class MockServerConnection : public ServerConnection {
 public:
   MockServerConnection();
@@ -202,8 +211,7 @@ public:
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(FilterChainManager& manager, bool,
-                         const FilterChainOptions&) const override {
+  bool createFilterChain(FilterChainManager& manager, const FilterChainOptions&) const override {
     return createFilterChain(manager);
   }
   MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));

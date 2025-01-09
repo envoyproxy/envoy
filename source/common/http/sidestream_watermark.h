@@ -33,19 +33,9 @@ public:
     }
   }
 
-  void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
-    if (decode_callback_ != nullptr) {
-      // Sidestream subscribes to downstream watermark events.
-      decode_callback_->addDownstreamWatermarkCallbacks(callbacks);
-    }
-  }
+  void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) final {}
 
-  void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
-    if (decode_callback_ != nullptr) {
-      // Sidestream stops subscribing to downstream watermark events.
-      decode_callback_->removeDownstreamWatermarkCallbacks(callbacks);
-    }
-  }
+  void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) final {}
 
   /**
    * The set function needs to be called by stream decoder filter before side stream connection is

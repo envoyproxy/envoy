@@ -140,7 +140,6 @@ paths:
     - source/common/grpc/async_client_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/common/local_reply/local_reply.cc
-    - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
     - source/server/hot_restarting_parent.cc
     - source/common/io/io_uring_worker_impl.cc
@@ -170,8 +169,6 @@ paths:
     - source/extensions/filters/http/adaptive_concurrency/controller
     - source/extensions/filters/http/admission_control
     - source/extensions/filters/http/aws_lambda
-    - source/extensions/filters/http/aws_request_signing
-    - source/extensions/filters/http/bandwidth_limit
     - source/extensions/filters/http/basic_auth
     - source/extensions/filters/http/cache
     - source/extensions/filters/http/cdn_loop
@@ -182,16 +179,15 @@ paths:
     - source/extensions/filters/http/file_system_buffer
     - source/extensions/filters/http/gcp_authn
     - source/extensions/filters/http/grpc_field_extraction
+    - source/extensions/filters/http/grpc_json_reverse_transcoder
     - source/extensions/filters/http/grpc_json_transcoder
     - source/extensions/filters/http/grpc_stats
-    - source/extensions/filters/http/header_mutation
     - source/extensions/filters/http/header_to_metadata
     - source/extensions/filters/http/health_check
     - source/extensions/filters/http/ip_tagging
     - source/extensions/filters/http/json_to_metadata
     - source/extensions/filters/http/jwt_authn
     - source/extensions/filters/http/local_ratelimit
-    - source/extensions/filters/http/oauth2
     - source/extensions/filters/http/file_system_buffer
     - source/extensions/filters/http/header_to_metadata
     - source/extensions/filters/http/on_demand
@@ -204,7 +200,18 @@ paths:
     - source/extensions/filters/http/ratelimit
     - source/extensions/filters/http/oauth2
     - source/extensions/filters/http/wasm
-    - source/extensions/filters/network
+    - source/extensions/filters/network/dubbo_proxy
+    - source/extensions/filters/network/rbac
+    - source/extensions/filters/network/sni_dynamic_forward_proxy
+    - source/extensions/filters/network/common
+    - source/extensions/filters/network/redis_proxy
+    - source/extensions/filters/network/zookeeper_proxy
+    - source/extensions/filters/network/ext_authz
+    - source/extensions/filters/network/mongo_proxy
+    - source/extensions/filters/network/thrift_proxy
+    - source/extensions/filters/network/direct_response
+    - source/extensions/filters/network/generic_proxy
+    - source/extensions/filters/network/ratelimit
     - source/extensions/filters/common
     - source/extensions/filters/udp
     - source/extensions/filters/listener
@@ -453,6 +460,7 @@ visibility_excludes:
 - source/extensions/clusters/static/
 - source/extensions/clusters/original_dst/
 - source/extensions/clusters/logical_dns/
+- source/extensions/clusters/dns/
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD

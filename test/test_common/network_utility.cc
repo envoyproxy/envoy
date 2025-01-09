@@ -267,6 +267,33 @@ void UdpSyncPeer::recv(Network::UdpRecvData& datagram) {
   received_datagrams_.pop_front();
 }
 
+sockaddr_storage getV6SockAddr(const std::string& ip, uint32_t port) {
+  sockaddr_storage ss;
+  auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
+  memset(ipv6_addr, 0, sizeof(sockaddr_in6));
+  ipv6_addr->sin6_family = AF_INET6;
+  inet_pton(AF_INET6, ip.c_str(), &ipv6_addr->sin6_addr);
+  ipv6_addr->sin6_port = htons(port);
+  return ss;
+}
+
+sockaddr_storage getV4SockAddr(const std::string& ip, uint32_t port) {
+  sockaddr_storage ss;
+  auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
+  memset(ipv4_addr, 0, sizeof(sockaddr_in));
+  ipv4_addr->sin_family = AF_INET;
+  inet_pton(AF_INET, ip.c_str(), &ipv4_addr->sin_addr);
+  ipv4_addr->sin_port = htons(port);
+  return ss;
+}
+
+socklen_t getSockAddrLen(const sockaddr_storage& ss) {
+  if (ss.ss_family == AF_INET6) {
+    return sizeof(sockaddr_in6);
+  }
+  return sizeof(sockaddr_in);
+}
+
 } // namespace Test
 } // namespace Network
 } // namespace Envoy

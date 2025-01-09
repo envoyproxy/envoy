@@ -37,42 +37,42 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 }
 } // namespace
 
-Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   if (!proto.has_config()) {
-    throw EnvoyException("config must be present for global config");
+    return absl::InvalidArgumentError("config must be present for global config");
   }
 
   const auto& proto_config = proto.config();
   const auto& credentials = proto_config.credentials();
 
-  const auto& token_secret = credentials.token_secret();
+  const auto& client_secret = credentials.token_secret();
   const auto& hmac_secret = credentials.hmac_secret();
 
   auto& cluster_manager = context.serverFactoryContext().clusterManager();
   auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
   auto& transport_socket_factory = context.getTransportSocketFactoryContext();
-  auto secret_provider_token_secret = secretsProvider(
-      token_secret, secret_manager, transport_socket_factory, context.initManager());
-  if (secret_provider_token_secret == nullptr) {
-    throw EnvoyException("invalid token secret configuration");
+  auto secret_provider_client_secret = secretsProvider(
+      client_secret, secret_manager, transport_socket_factory, context.initManager());
+  if (secret_provider_client_secret == nullptr) {
+    return absl::InvalidArgumentError("invalid token secret configuration");
   }
   auto secret_provider_hmac_secret =
       secretsProvider(hmac_secret, secret_manager, transport_socket_factory, context.initManager());
   if (secret_provider_hmac_secret == nullptr) {
-    throw EnvoyException("invalid HMAC secret configuration");
+    return absl::InvalidArgumentError("invalid HMAC secret configuration");
   }
 
   if (proto_config.preserve_authorization_header() && proto_config.forward_bearer_token()) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         "invalid combination of forward_bearer_token and preserve_authorization_header "
         "configuration. If forward_bearer_token is set to true, then "
         "preserve_authorization_header must be false");
   }
 
   auto secret_reader = std::make_shared<SDSSecretReader>(
-      std::move(secret_provider_token_secret), std::move(secret_provider_hmac_secret),
+      std::move(secret_provider_client_secret), std::move(secret_provider_hmac_secret),
       context.serverFactoryContext().threadLocal(), context.serverFactoryContext().api());
   auto config = std::make_shared<FilterConfig>(proto_config, context.serverFactoryContext(),
                                                secret_reader, context.scope(), stats_prefix);
@@ -83,7 +83,8 @@ Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
             std::make_unique<OAuth2ClientImpl>(cluster_manager, config->oauthTokenEndpoint(),
                                                config->retryPolicy(), config->defaultExpiresIn());
         callbacks.addStreamFilter(std::make_shared<OAuth2Filter>(
-            config, std::move(oauth_client), context.serverFactoryContext().timeSource()));
+            config, std::move(oauth_client), context.serverFactoryContext().timeSource(),
+            context.serverFactoryContext().api().randomGenerator()));
       };
 }
 
