@@ -28,7 +28,7 @@ behavior_changes:
     but also means shadowing may take place for requests which are canceled mid-stream. This behavior change can be
     temporarily reverted by flipping  ``envoy.reloadable_features.streaming_shadow`` to false.
 - area: http
-  chane: |
+  change: |
     If the ``encoder_filter_chain_aborted_`` status bit of the HTTP filter manager is set to true, the encode filter chain
     cannot be continued, thus preventing unexpected logic from being triggered in scenarios such as
     ``ActiveStreamDecoderFilter::recreateStream()`` is called. This behavior change can be temporarily reverted by flipping
