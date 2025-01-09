@@ -198,6 +198,31 @@ bool envoy_dynamic_module_callback_http_get_response_trailers(
   return getHeadersImpl(filter->response_trailers_, result_headers);
 }
 
+void envoy_dynamic_module_callback_http_send_response(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
+    envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
+    envoy_dynamic_module_type_buffer_module_ptr body_ptr, size_t body_length) {
+  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+
+  std::function<void(ResponseHeaderMap & headers)> modify_headers = nullptr;
+  if (headers_vector != nullptr && headers_vector_size != 0) {
+    modify_headers = [headers_vector, headers_vector_size](ResponseHeaderMap& headers) {
+      for (size_t i = 0; i < headers_vector_size; i++) {
+        const auto& header = &headers_vector[i];
+        const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
+        const absl::string_view value(static_cast<const char*>(header->value_ptr),
+                                      header->value_length);
+        headers.addCopy(Http::LowerCaseString(key), value);
+      }
+    };
+  }
+  const absl::string_view body =
+      body_ptr ? absl::string_view(static_cast<const char*>(body_ptr), body_length) : "";
+
+  filter->sendLocalReply(static_cast<Http::Code>(status_code), body, modify_headers, 0,
+                         "dynamic_module");
+}
+
 /**
  * Helper to get the metadata namespace from the stream info.
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
