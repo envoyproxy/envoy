@@ -206,7 +206,7 @@ bool validateCsrfTokenHmac(const std::string& hmac_secret, const std::string& cs
 }
 
 // Generates a PKCE code verifier with 32 octets of randomness.
-// This follows recommendations in RFC 7636
+// This follows recommendations in RFC 7636: https://datatracker.ietf.org/doc/html/rfc7636#section-7.1
 std::string generateCodeVerifier(Random::RandomGenerator& random) {
   // Allocate memory to hold two uint64_t values
   size_t totalSize = 4 * sizeof(uint64_t);
