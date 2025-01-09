@@ -35,8 +35,6 @@ using SPIFFEConfig = envoy::extensions::transport_sockets::tls::v3::SPIFFECertVa
 
 absl::StatusOr<std::shared_ptr<SpiffeData>>
 SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) {
-  Json::ObjectSharedPtr parsed_json_bundle;
-
   ENVOY_LOG(info, "Parsing trust_bundles");
 
   auto json_parse_result = Envoy::Json::Factory::loadFromString(trust_bundle_mapping_str);
@@ -44,7 +42,7 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
     return absl::InvalidArgumentError("Invalid JSON found in SPIFFE bundle");
   }
 
-  parsed_json_bundle = json_parse_result.value();
+  Json::ObjectSharedPtr parsed_json_bundle = json_parse_result.value();
 
   std::shared_ptr<SpiffeData> spiffe_data = std::make_shared<SpiffeData>();
 
@@ -150,7 +148,7 @@ void SPIFFEValidator::initializeCertificateRefresh(
           updateSpiffeData(*new_trust_bundle);
         } else {
           ENVOY_LOG(error, "Failed to load SPIFFE bundle map from '{}': '{}'",
-                    trust_bundle_file_name_, new_trust_bundle.status());
+                    trust_bundle_file_name_, new_trust_bundle.status().message());
         }
         return absl::OkStatus();
       }));
@@ -181,8 +179,6 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
     }
   }
 
-  const auto n_trust_domains = message.trust_domains().size();
-
   // If a trust bundle map is provided, use that...
   if (message.has_trust_bundles()) {
     std::string trust_bundles_str = THROW_OR_RETURN_VALUE(
@@ -207,7 +203,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 
   // User configured "trust_domains", not "trust_bundles"
   spiffe_data_ = std::make_shared<SpiffeData>();
-  spiffe_data_->trust_bundle_stores_.reserve(n_trust_domains);
+  spiffe_data_->trust_bundle_stores_.reserve(message.trust_domains().size());
   for (auto& domain : message.trust_domains()) {
     if (spiffe_data_->trust_bundle_stores_.find(domain.name()) !=
         spiffe_data_->trust_bundle_stores_.end()) {
