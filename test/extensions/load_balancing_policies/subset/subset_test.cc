@@ -2334,7 +2334,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
   envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config;
   rr_config.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
-  child_lb_config_ = child_factory->loadConfig(server_context_, rr_config);
+  child_lb_config_ = child_factory->loadConfig(server_context_, rr_config).value();
   initLbConfigAndLB();
 
   TestLoadBalancerContext context({{"version", "1.1"}});
@@ -2372,7 +2372,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
   envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config;
   rr_config.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
-  child_lb_config_ = child_factory->loadConfig(server_context_, rr_config);
+  child_lb_config_ = child_factory->loadConfig(server_context_, rr_config).value();
   initLbConfigAndLB();
 
   TestLoadBalancerContext context({{"version", "1.1"}});
@@ -2421,7 +2421,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
   envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin rr_config;
   rr_config.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
-  child_lb_config_ = child_factory->loadConfig(server_context_, rr_config);
+  child_lb_config_ = child_factory->loadConfig(server_context_, rr_config).value();
   initLbConfigAndLB();
 
   TestLoadBalancerContext context({{"version", "1.0"}});

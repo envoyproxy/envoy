@@ -230,6 +230,12 @@ int StreamInfoWrapper::luaRequestedServerName(lua_State* state) {
   return 1;
 }
 
+int StreamInfoWrapper::luaRouteName(lua_State* state) {
+  const std::string& route_name = stream_info_.getRouteName();
+  lua_pushlstring(state, route_name.data(), route_name.length());
+  return 1;
+}
+
 DynamicMetadataMapIterator::DynamicMetadataMapIterator(DynamicMetadataMapWrapper& parent)
     : parent_{parent}, current_{parent_.streamInfo().dynamicMetadata().filter_metadata().begin()} {}
 
