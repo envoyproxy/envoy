@@ -54,6 +54,7 @@ public:
   MOCK_METHOD(const std::string&, postPath, (), (const));
   MOCK_METHOD(Http::HeaderEvaluator&, headerEvaluator, (), (const));
   MOCK_METHOD(uint32_t, maxConnectAttempts, (), (const));
+  MOCK_METHOD(const BackOffStrategyPtr&, backoffStrategy, (), (const));
   MOCK_METHOD(bool, bufferEnabled, (), (const));
   MOCK_METHOD(uint32_t, maxBufferedDatagrams, (), (const));
   MOCK_METHOD(uint64_t, maxBufferedBytes, (), (const));
@@ -90,6 +91,14 @@ public:
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, onUpstreamData, (Buffer::Instance & data, bool end_stream));
+};
+
+class MockHttpUpstream : public HttpUpstream {
+public:
+  ~MockHttpUpstream() override;
+
+  MOCK_METHOD(void, encodeData, (Buffer::Instance & data));
+  MOCK_METHOD(void, onDownstreamEvent, (Network::ConnectionEvent event));
 };
 
 class MockHttpStreamCallbacks : public HttpStreamCallbacks {

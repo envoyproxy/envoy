@@ -94,11 +94,15 @@ envoy.clusters.aggregate:
   - envoy.clusters
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
+  type_urls:
+  - envoy.extensions.clusters.aggregate.v3.ClusterConfig
 envoy.clusters.dynamic_forward_proxy:
   categories:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream
   status: stable
+  type_urls:
+  - envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
 envoy.clusters.static:
   categories:
   - envoy.clusters
@@ -109,6 +113,13 @@ envoy.clusters.strict_dns:
   - envoy.clusters
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.clusters.dns:
+  categories:
+  - envoy.clusters
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.clusters.dns.v3.DnsCluster
 envoy.clusters.original_dst:
   categories:
   - envoy.clusters
@@ -124,6 +135,8 @@ envoy.clusters.redis:
   - envoy.clusters
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
+  type_urls:
+  - envoy.extensions.clusters.redis.v3.RedisClusterConfig
 envoy.clusters.logical_dns:
   categories:
   - envoy.clusters
@@ -1388,8 +1401,8 @@ envoy.upstream.local_address_selector.default_local_address_selector:
 envoy.wasm.runtime.null:
   categories:
   - envoy.wasm.runtime
-  security_posture: unknown
-  status: alpha
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.wasm.runtime.v8:
   categories:
   - envoy.wasm.runtime

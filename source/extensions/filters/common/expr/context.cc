@@ -438,6 +438,21 @@ const XDSLookupValues& XDSLookupValues::get() {
              return CelProtoWrapper::CreateMessage(&wrapper.info_->route()->metadata(),
                                                    &wrapper.arena_);
            }},
+          {VirtualHostName,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr || !wrapper.info_->route()) {
+               return {};
+             }
+             return CelValue::CreateString(&wrapper.info_->route()->virtualHost().name());
+           }},
+          {VirtualHostMetadata,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr || !wrapper.info_->route()) {
+               return {};
+             }
+             return CelProtoWrapper::CreateMessage(
+                 &wrapper.info_->route()->virtualHost().metadata(), &wrapper.arena_);
+           }},
           {UpstreamHostMetadata,
            [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
              if (wrapper.info_ == nullptr) {

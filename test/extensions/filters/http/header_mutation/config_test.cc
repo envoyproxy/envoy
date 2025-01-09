@@ -16,15 +16,14 @@ namespace HeaderMutation {
 namespace {
 
 TEST(FactoryTest, FactoryTest) {
-
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
-
+  testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
   auto* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
           "envoy.filters.http.header_mutation");
   ASSERT_NE(factory, nullptr);
 
-  const std::string config = R"EOF(
+  {
+    const std::string config = R"EOF(
   mutations:
     request_mutations:
     - remove: "flag-header"
@@ -33,6 +32,13 @@ TEST(FactoryTest, FactoryTest) {
           key: "flag-header"
           value: "%REQ(ANOTHER-FLAG-HEADER)%"
         append_action: APPEND_IF_EXISTS_OR_ADD
+    query_parameter_mutations:
+    - remove: "flag-query"
+    - append:
+        record:
+          key: "flag-query"
+          value: "%REQ(ANOTHER-FLAG-QUERY)%"
+        action: APPEND_IF_EXISTS_OR_ADD
     response_mutations:
     - remove: "flag-header"
     - append:
@@ -42,32 +48,125 @@ TEST(FactoryTest, FactoryTest) {
         append_action: APPEND_IF_EXISTS_OR_ADD
   )EOF";
 
-  PerRouteProtoConfig per_route_proto_config;
-  TestUtility::loadFromYaml(config, per_route_proto_config);
-  ProtoConfig proto_config;
-  TestUtility::loadFromYaml(config, proto_config);
+    PerRouteProtoConfig per_route_proto_config;
+    TestUtility::loadFromYaml(config, per_route_proto_config);
+    ProtoConfig proto_config;
+    TestUtility::loadFromYaml(config, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
+    auto cb =
+        factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context).value();
+    Http::MockFilterChainFactoryCallbacks filter_callbacks;
+    EXPECT_CALL(filter_callbacks, addStreamFilter(_));
+    cb(filter_callbacks);
 
-  auto cb =
-      factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context).value();
-  Http::MockFilterChainFactoryCallbacks filter_callbacks;
-  EXPECT_CALL(filter_callbacks, addStreamFilter(_));
-  cb(filter_callbacks);
+    EXPECT_NE(nullptr, factory
+                           ->createRouteSpecificFilterConfig(
+                               per_route_proto_config, mock_factory_context.server_factory_context_,
+                               mock_factory_context.messageValidationVisitor())
+                           .value());
+  }
 
-  EXPECT_NE(nullptr, factory
-                         ->createRouteSpecificFilterConfig(
-                             per_route_proto_config, mock_factory_context.server_factory_context_,
-                             mock_factory_context.messageValidationVisitor())
-                         .value());
+  {
+    const std::string config = R"EOF(
+  mutations:
+    query_parameter_mutations:
+    - remove: ""
+  )EOF";
+
+    ProtoConfig proto_config;
+    TestUtility::loadFromYaml(config, proto_config);
+
+    auto cb_or_error =
+        factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
+    EXPECT_FALSE(cb_or_error.status().ok());
+    EXPECT_EQ("One of 'append'/'remove' must be specified.", cb_or_error.status().message());
+  }
+
+  {
+    const std::string config = R"EOF(
+  mutations:
+    query_parameter_mutations:
+    - remove: "another-key"
+      append:
+        record:
+          key: "key"
+          value: "value"
+  )EOF";
+
+    ProtoConfig proto_config;
+    TestUtility::loadFromYaml(config, proto_config);
+
+    auto cb_or_error =
+        factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
+    EXPECT_FALSE(cb_or_error.status().ok());
+    EXPECT_EQ("Only one of 'append'/'remove can be specified.", cb_or_error.status().message());
+  }
+
+  {
+    const std::string config = R"EOF(
+  mutations:
+    query_parameter_mutations:
+    - append: {}
+  )EOF";
+
+    ProtoConfig proto_config;
+    TestUtility::loadFromYaml(config, proto_config);
+
+    auto cb_or_error =
+        factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
+    EXPECT_FALSE(cb_or_error.status().ok());
+    EXPECT_EQ("No record specified for append mutation.", cb_or_error.status().message());
+  }
+  {
+    const std::string config = R"EOF(
+  mutations:
+    query_parameter_mutations:
+    - append:
+        record:
+          key: "key"
+          value: 123
+  )EOF";
+
+    ProtoConfig proto_config;
+    TestUtility::loadFromYaml(config, proto_config);
+
+    auto cb_or_error =
+        factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
+    EXPECT_FALSE(cb_or_error.status().ok());
+    EXPECT_EQ("Only string value is allowed for record value.", cb_or_error.status().message());
+  }
+  {
+    const std::string config = R"EOF(
+  mutations:
+    query_parameter_mutations:
+    - append:
+        record:
+          key: "key"
+  )EOF";
+
+    ProtoConfig proto_config;
+    TestUtility::loadFromYaml(config, proto_config);
+
+    auto cb_or_error =
+        factory->createFilterFactoryFromProto(proto_config, "test", mock_factory_context);
+    EXPECT_FALSE(cb_or_error.status().ok());
+    EXPECT_EQ("Only string value is allowed for record value.", cb_or_error.status().message());
+  }
 }
 
 TEST(FactoryTest, UpstreamFactoryTest) {
+  auto* factory =
+      Registry::FactoryRegistry<Server::Configuration::UpstreamHttpFilterConfigFactory>::getFactory(
+          "envoy.filters.http.header_mutation");
+  ASSERT_NE(factory, nullptr);
+}
+
+TEST(FactoryTest, QueryParameterMutationsTest) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
 
   auto* factory =
-      Registry::FactoryRegistry<Server::Configuration::UpstreamHttpFilterConfigFactory>::getFactory(
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
           "envoy.filters.http.header_mutation");
   ASSERT_NE(factory, nullptr);
 }

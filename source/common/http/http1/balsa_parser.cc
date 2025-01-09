@@ -360,7 +360,10 @@ void BalsaParser::HeaderDone() {
 void BalsaParser::ContinueHeaderDone() {}
 
 void BalsaParser::MessageDone() {
-  if (status_ == ParserStatus::Error) {
+  if (status_ == ParserStatus::Error ||
+      // In the case of early 1xx, MessageDone() can be called twice in a row.
+      // The !first_byte_processed_ check is to make this function idempotent.
+      (wait_for_first_byte_before_msg_done_ && !first_byte_processed_)) {
     return;
   }
   status_ = convertResult(connection_->onMessageComplete());

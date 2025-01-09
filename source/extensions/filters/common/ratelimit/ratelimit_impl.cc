@@ -54,23 +54,27 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
       new_limit->set_requests_per_unit(descriptor.limit_.value().requests_per_unit_);
       new_limit->set_unit(descriptor.limit_.value().unit_);
     }
+    if (descriptor.hits_addend_.has_value()) {
+      new_descriptor->mutable_hits_addend()->set_value(descriptor.hits_addend_.value());
+    }
   }
 }
 
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
-                           uint32_t hits_addend) {
+                           Tracing::Span& parent_span,
+                           OptRef<const StreamInfo::StreamInfo> stream_info, uint32_t hits_addend) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
   envoy::service::ratelimit::v3::RateLimitRequest request;
   createRequest(request, domain, descriptors, hits_addend);
 
-  request_ =
-      async_client_->send(service_method_, request, *this, parent_span,
-                          Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
-                              Http::AsyncClient::ParentContext{&stream_info}));
+  auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout_);
+  if (stream_info.has_value()) {
+    options.setParentContext(Http::AsyncClient::ParentContext{stream_info.ptr()});
+  }
+  request_ = async_client_->send(service_method_, request, *this, parent_span, options);
 }
 
 void GrpcClientImpl::onSuccess(
@@ -107,10 +111,13 @@ void GrpcClientImpl::onSuccess(
       response->has_dynamic_metadata()
           ? std::make_unique<ProtobufWkt::Struct>(response->dynamic_metadata())
           : nullptr;
-  callbacks_->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
+  // The rate limit requests applied on stream-done will destroy the client inside the complete
+  // callback, so we release the callback here to make the destructor happy.
+  auto call_backs = callbacks_;
+  callbacks_ = nullptr;
+  call_backs->complete(status, std::move(descriptor_statuses), std::move(response_headers_to_add),
                        std::move(request_headers_to_add), response->raw_body(),
                        std::move(dynamic_metadata));
-  callbacks_ = nullptr;
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string& msg,
@@ -118,8 +125,11 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), debug,
                       "rate limit fail, status={} msg={}", status, msg);
-  callbacks_->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
+  // The rate limit requests applied on stream-done will destroy the client inside the complete
+  // callback, so we release the callback here to make the destructor happy.
+  auto call_backs = callbacks_;
   callbacks_ = nullptr;
+  call_backs->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
 }
 
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
