@@ -857,6 +857,10 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
     factory = &config_->router_context_.genericConnPoolFactory();
   }
 
+  if (!message) {
+    message = factory->createEmptyConfigProto();
+  }
+
   using UpstreamProtocol = Envoy::Router::GenericConnPoolFactory::UpstreamProtocol;
   UpstreamProtocol upstream_protocol = UpstreamProtocol::HTTP;
   if (route_entry_->connectConfig().has_value()) {

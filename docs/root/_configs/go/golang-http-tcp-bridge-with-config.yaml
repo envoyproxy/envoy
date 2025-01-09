@@ -36,19 +36,17 @@ static_resources:
     connect_timeout: 5s
     type: strict_dns
     lb_policy: round_robin
-
-    ## =========== Here is config for golang tcp upstream filter =========== START ##
-
     upstream_config:
       name: envoy.upstreams.http.tcp.golang
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.tcp.golang.v3alpha.Config
-        library_id: http2dubbo-by-golang-extension
-        library_path: /Users/duxin/cpp/src/envoy/contrib/golang/upstreams/http/tcp/test/test_data/http2dubbo-example/envoy/libgolang.so
-        plugin_name: http2dubbo-by-golang-extension
-
-      ## =========== Here is config for golang tcp upstream filter =========== END ##
-
+        library_id: my-configurable-bridge-id
+        library_path: "lib/my_configurable_bridge.so"
+        plugin_name: my_configurable_bridge
+        plugin_config:
+          "@type": type.googleapis.com/xds.type.v3.TypedStruct
+          value:
+            foo: "bar"
     load_assignment:
       cluster_name: local_service
       endpoints:

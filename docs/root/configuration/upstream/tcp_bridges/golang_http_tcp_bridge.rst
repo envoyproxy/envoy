@@ -1,7 +1,7 @@
 .. _config_tcp_bridges_golang_http_tcp_bridge:
 
 Golang HTTP-TCP Bridge
-======
+======================
 
 This bridge enables an HTTP client to connect to a TCP server via a Golang plugin, facilitating **Protocol Convert** from HTTP to any RPC protocol in Envoy.
 
@@ -22,9 +22,9 @@ Developing a Go plugin
 Envoy's Golang HTTP-TCP Bridge plugin must implement the :repo:`TcpUpstreamFilter API <contrib/golang/common/go/api/filter.go>`.
 
 Here is the introduction about the TcpUpstreamFilter API:
-* EncodeHeaders: get http1 request headers and decide whether to directly send rpc frame to tcp server.
-* EncodeData: get http1 request body and convert it to rpc frame, then send that to tcp server. and you can control whether to half-close upstream conn by Envoy.
-* OnUpstreamData: aggregate and verify multi rpc frame from tcp server, then convert complete rpc frame to http1 body, finally construct http1 response headers to http1 client.
+* EncodeHeaders: get http request headers and decide whether to directly send rpc frame to tcp server.
+* EncodeData: get http request body and convert it to rpc frame, then send that to tcp server. and you can control whether to half-close upstream conn by Envoy.
+* OnUpstreamData: aggregate and verify multi rpc frame from tcp server, then convert complete rpc frame to http body, finally construct http response with headers to http client.
 
 .. attention::
   The Go plugin API is not yet stable, you are **strongly** recommended to use the same version of Go plugin SDK and Envoy.
@@ -66,13 +66,13 @@ Configuration
 
 A prebuilt Golang Http Tcp Bridge  ``my_plugin.so`` might be configured as follows:
 
-.. literalinclude:: /_configs/go/golang-tcp-upstream.yaml
+.. literalinclude:: /_configs/go/golang-http-tcp-bridge.yaml
    :language: yaml
    :linenos:
    :lines: 42-48
    :lineno-start: 43
    :emphasize-lines: 2-7
-   :caption: :download:`golang-tcp-upstream.yaml </_configs/go/golang-tcp-upstream.yaml>`
+   :caption: :download:`golang-http-tcp-bridge.yaml </_configs/go/golang-http-tcp-bridge.yaml>`
 
 Extensible plugin configuration
 -------------------------------
@@ -81,13 +81,13 @@ Envoy's Go plugins can specify and use their own configuration.
 
 Below is a very simple example of how such a plugin might be configured in Envoy:
 
-.. literalinclude:: /_configs/go/golang-tcp-upstream-with-config.yaml
+.. literalinclude:: /_configs/go/golang-http-tcp-bridge-with-config.yaml
    :language: yaml
    :linenos:
    :lines: 42-54
    :lineno-start: 43
    :emphasize-lines: 8-13
-   :caption: :download:`golang-tcp-upstream-with-config.yaml </_configs/go/golang-tcp-upstream-with-config.yaml>`
+   :caption: :download:`golang-http-tcp-bridge-with-config.yaml </_configs/go/golang-http-tcp-bridge-with-config.yaml>`
 
 See the :repo:`HttpTcpBridge API <contrib/golang/common/go/api/filter.go>`
 for more information about how the plugin's configuration data can be accessed.

@@ -113,8 +113,7 @@ void TcpConnPool::onPoolReady(Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& co
 HttpTcpBridge::HttpTcpBridge(Router::UpstreamToDownstream* upstream_request,
                              Envoy::Tcp::ConnectionPool::ConnectionDataPtr&& upstream,
                              Dso::HttpTcpBridgeDsoPtr dynamic_lib, BridgeConfigSharedPtr config)
-    : encoding_state_(*this),
-      decoding_state_(*this),
+    : encoding_state_(*this), decoding_state_(*this),
       route_entry_(upstream_request->route().routeEntry()), upstream_request_(upstream_request),
       upstream_conn_data_(std::move(upstream)), dynamic_lib_(dynamic_lib) {
 
@@ -150,7 +149,7 @@ Envoy::Http::Status HttpTcpBridge::encodeHeaders(const Envoy::Http::RequestHeade
 
   // init response headers here since go side may return EndStream status.
   initResponse();
-  
+
   encoding_state_.req_headers = &headers;
   encoding_state_.setFilterState(FilterState::ProcessingHeader);
   Buffer::OwnedImpl buffer;
@@ -238,8 +237,7 @@ void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
   GoUint64 go_status = dynamic_lib_->envoyGoHttpTcpBridgeOnUpstreamData(
       s, end_stream ? 1 : 0, (*decoding_state_.resp_headers).size(),
-      (*decoding_state_.resp_headers).byteSize(), reinterpret_cast<uint64_t>(&data),
-      data.length());
+      (*decoding_state_.resp_headers).byteSize(), reinterpret_cast<uint64_t>(&data), data.length());
   decoding_state_.setFilterState(FilterState::Done);
 
   switch (static_cast<HttpTcpBridgeStatus>(go_status)) {

@@ -196,7 +196,7 @@ private:
 
   // anchor a string temporarily, make sure it won't be freed before copied to Go.
   std::string str_value_;
-  bool upstream_conn_self_half_close_ {false};
+  bool upstream_conn_self_half_close_{false};
 };
 
 } // namespace Golang

@@ -58,7 +58,7 @@ enum class HttpTcpBridgeStatus {
    * encodeHeaders: will go to encodeData, go side in encodeData will streaming get each_data_piece.
    *
    * encodeData: streaming send data to upstream, go side get each_data_piece, may be called
-   * multipled times. 
+   * multipled times.
    *
    * onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data
    * and headers to downstream streaming.
@@ -72,10 +72,10 @@ enum class HttpTcpBridgeStatus {
    * Here is the specific explanation in different funcs:
    *
    * encodeHeaders: will go to encodeData, encodeData will buffer whole data, go side in encodeData
-   * get whole data one-off. 
+   * get whole data one-off.
    *
    * encodeData: buffer further whole data, go side in encodeData get whole
-   * data one-off. (Be careful: cannot be used when end_stream=true) 
+   * data one-off. (Be careful: cannot be used when end_stream=true)
    *
    * onUpstreamData: every data
    * trigger will call go side, and go side get whloe buffered data ever since at every time.

@@ -2,6 +2,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/protobuf/utility.h"
+
 #include "upstream_request.h"
 
 namespace Envoy {

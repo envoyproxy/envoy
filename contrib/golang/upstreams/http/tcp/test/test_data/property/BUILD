@@ -5,8 +5,8 @@ licenses(["notice"])  # Apache 2
 go_binary(
     name = "bridge.so",
     srcs = [
-        "config.go",
         "bridge.go",
+        "config.go",
     ],
     out = "bridge.so",
     cgo = True,
@@ -14,8 +14,8 @@ go_binary(
     linkmode = "c-shared",
     visibility = ["//visibility:public"],
     deps = [
-        "//contrib/golang/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp:http_tcp_bridge",
         "//contrib/golang/common/go/api",
+        "//contrib/golang/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp:http_tcp_bridge",
         "@com_github_cncf_xds_go//xds/type/v3:type",
         "@org_golang_google_protobuf//types/known/anypb",
         "@org_golang_google_protobuf//types/known/structpb",
