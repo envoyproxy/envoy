@@ -40,8 +40,7 @@ constexpr const char* UrlBodyTemplateWithoutCredentialsForRefreshToken =
 } // namespace
 
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
-                                           const std::string& client_id,
-                                           const std::string& secret,
+                                           const std::string& client_id, const std::string& secret,
                                            const std::string& cb_url,
                                            const std::string& code_verifier, AuthType auth_type) {
   ASSERT(state_ == OAuthState::Idle);

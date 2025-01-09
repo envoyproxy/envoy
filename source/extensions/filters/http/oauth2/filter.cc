@@ -494,10 +494,10 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   std::string code_verifier =
       Http::Utility::parseCookieValue(headers, config_->cookieNames().code_verifier_);
   if (code_verifier.empty()) {
-      ENVOY_LOG(error, "code_verifier is missing in the request");
-      sendUnauthorizedResponse();
-      return Http::FilterHeadersStatus::StopIteration;
-    }
+    ENVOY_LOG(error, "code verifier cookie is missing in the request");
+    sendUnauthorizedResponse();
+    return Http::FilterHeadersStatus::StopIteration;
+  }
 
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
                                      redirect_uri, code_verifier, config_->authType());
@@ -566,7 +566,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   bool csrf_token_cookie_exists = !csrf_token.empty();
   // Set the CSRF token cookie if it does not exist.
   if (!csrf_token_cookie_exists) {
-        // Generate a CSRF token to prevent CSRF attacks.
+    // Generate a CSRF token to prevent CSRF attacks.
     csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
     // Expire the CSRF token cookie in 10 minutes.
     // This should be enough time for the user to complete the OAuth flow.
@@ -610,9 +610,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     cookie_tail_http_only = absl::StrCat(
         fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
   }
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      absl::StrCat(config_->cookieNames().code_verifier_, "=", code_verifier, cookie_tail_http_only));
+  response_headers->addReferenceKey(Http::Headers::get().SetCookie,
+                                    absl::StrCat(config_->cookieNames().code_verifier_, "=",
+                                                 code_verifier, cookie_tail_http_only));
 
   const std::string code_challenge = generateCodeChallenge(code_verifier);
   query_params.overwrite(queryParamsCodeChallenge, code_challenge);
@@ -664,6 +664,10 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
       absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_nonce_),
+                   cookie_domain));
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().code_verifier_),
                    cookie_domain));
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);

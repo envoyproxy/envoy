@@ -90,11 +90,13 @@ struct CookieNames {
                   cookie_names)
       : CookieNames(cookie_names.bearer_token(), cookie_names.oauth_hmac(),
                     cookie_names.oauth_expires(), cookie_names.id_token(),
-                    cookie_names.refresh_token(), cookie_names.oauth_nonce(),cookie_names.code_verifier()) {}
+                    cookie_names.refresh_token(), cookie_names.oauth_nonce(),
+                    cookie_names.code_verifier()) {}
 
   CookieNames(const std::string& bearer_token, const std::string& oauth_hmac,
               const std::string& oauth_expires, const std::string& id_token,
-              const std::string& refresh_token, const std::string& oauth_nonce,const std::string& code_verifier)
+              const std::string& refresh_token, const std::string& oauth_nonce,
+              const std::string& code_verifier)
       : bearer_token_(bearer_token.empty() ? BearerToken : bearer_token),
         oauth_hmac_(oauth_hmac.empty() ? OauthHMAC : oauth_hmac),
         oauth_expires_(oauth_expires.empty() ? OauthExpires : oauth_expires),
