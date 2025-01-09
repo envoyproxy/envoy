@@ -48,7 +48,7 @@ message CookieConfig {
   CookieType type = 1;
 
   // The value used for the SameSite cookie attribute. If not specified, 
-  // defaults to DISABLED which means no SameSite attribute will be set.
+  // defaults to DISABLED which means SameSite value will be missing.
   SameSite same_site = 2;
 }
 
