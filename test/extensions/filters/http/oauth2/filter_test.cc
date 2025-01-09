@@ -2978,7 +2978,6 @@ TEST_F(OAuth2Test, CSRFSameSiteWithCookieDomain) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(first_request_headers, false));
-
 }
 
 } // namespace Oauth2

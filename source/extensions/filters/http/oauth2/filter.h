@@ -174,7 +174,8 @@ public:
 
     // Default constructor
     CookieSettings()
-        : same_site_(envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::CookieConfig_SameSite_DISABLED) {}
+        : same_site_(envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                         CookieConfig_SameSite_DISABLED) {}
 
     const envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite same_site_;
   };
