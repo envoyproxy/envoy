@@ -59,6 +59,19 @@ void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadat
   }
 }
 
+// Utility function to find the first set auth header, based on the candidate headers in configuration
+absl::optional<absl::string_view> get_first_auth_header(
+    const Http::RequestHeaderMap& headers,
+    const std::vector<std::string>& header_names) {
+  for (const auto& header_name : header_names) {
+    const auto header = headers.get(Http::LowerCaseString(header_name));
+    if (!header.empty()) {
+      return header[0]->value().getStringView();
+    }
+  }
+  return absl::nullopt;
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
@@ -120,7 +133,9 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       response_cache_max_size_(config.response_cache_max_size() != 0 ? config.response_cache_max_size() : 100),
       response_cache_ttl_(config.response_cache_ttl() != 0 ? config.response_cache_ttl() : 10),
-      cache_(response_cache_max_size_, response_cache_ttl_), // response cache
+      response_cache_header_names_(config.response_cache_header_names().begin(),
+                                   config.response_cache_header_names().end()), // Initialize header names
+      response_cache_(response_cache_max_size_, response_cache_ttl_), // response cache
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
       ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
       ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
@@ -281,12 +296,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Try reading response from the response cache
-  const auto auth_header = headers.get(Http::LowerCaseString("x-verkada-auth"));
+  const auto auth_header = get_first_auth_header(headers, config_->responseCacheHeaderNames());
 
-  if (!auth_header.empty()) {
-    const std::string auth_header_str(auth_header[0]->value().getStringView());
+  if (auth_header.has_value()) {
+    const std::string auth_header_str(auth_header.value());
     // Retrieve the HTTP status code from the cache
-    auto cached_status_code = config_->resp_cache().Get(auth_header_str.c_str());
+    auto cached_status_code = config_->responseCache().Get(auth_header_str.c_str());
     if (cached_status_code.has_value()) {
       ENVOY_STREAM_LOG(info, "Cache HIT for token {}: HTTP status {}", 
                        *decoder_callbacks_, auth_header_str, *cached_status_code);
@@ -304,6 +319,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
         return Http::FilterHeadersStatus::StopIteration;
       }
+    } else {
+      ENVOY_STREAM_LOG(info, "Cache miss for auth token {}. Will call external authz.", 
+                     *decoder_callbacks_, auth_header_str);
     }
   } else {
     ENVOY_STREAM_LOG(info, "Cannot check cache because auth_header is empty", *decoder_callbacks_);
@@ -333,7 +351,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Initiate a call to the authorization server since we are not disabled.
-  ENVOY_STREAM_LOG(info, "Cache miss.  Call external authorization service.", *decoder_callbacks_);
   initiateCall(headers);
   return filter_return_ == FilterReturn::StopDecoding
              ? Http::FilterHeadersStatus::StopAllIterationAndWatermark
@@ -507,15 +524,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   // Extract the actual HTTP status code
   const int http_status_code = static_cast<uint16_t>(response->status_code); // Assuming this static cast is safe because http status code should be <= 0xffff
 
-  // Log the response status
-  //ENVOY_LOG(info, "ext_authz response status: {}", http_status_code);
-  // ENVOY_STREAM_LOG(info, "ex_authx got response status code'{}'", *decoder_callbacks_, http_status_code);
-  // If x-verkada-auth header exists, cache the response status code
-  const auto auth_header = request_headers_->get(Http::LowerCaseString("x-verkada-auth"));
-  if (!auth_header.empty()) {
-    const std::string auth_header_str(auth_header[0]->value().getStringView());
+  // If auth header exists, cache the response status code
+  const auto auth_header = get_first_auth_header(*request_headers_, config_->responseCacheHeaderNames());
+  if (auth_header.has_value()) {
+    const std::string auth_header_str(auth_header.value());
     ENVOY_LOG(info, "Caching response: {} with HTTP status: {}", auth_header_str, http_status_code);
-    config_->resp_cache().Insert(auth_header_str.c_str(), http_status_code); // Store the HTTP status code
+    config_->responseCache().Insert(auth_header_str.c_str(), http_status_code); // Store the HTTP status code
   }
 
   updateLoggingInfo();
