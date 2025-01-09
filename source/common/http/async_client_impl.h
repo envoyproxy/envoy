@@ -106,8 +106,10 @@ public:
   create(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
          const AsyncClient::StreamOptions& options) {
     absl::Status creation_status = absl::OkStatus();
-    return std::unique_ptr<AsyncStreamImpl>(
+    std::unique_ptr<AsyncStreamImpl> stream = std::unique_ptr<AsyncStreamImpl>(
         new AsyncStreamImpl(parent, callbacks, options, creation_status));
+    RETURN_IF_NOT_OK(creation_status);
+    return stream;
   }
 
   ~AsyncStreamImpl() override {

@@ -95,7 +95,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   callbacks_->streamInfo().setDynamicMetadata(kBucketMetadataNamespace, bucket_log);
 
   std::shared_ptr<CachedBucket> cached_bucket = client_->getBucket(bucket_id);
-  if (cached_bucket) {
+  if (cached_bucket != nullptr) {
     // Found the cached bucket entry.
     return processCachedBucket(*cached_bucket);
   }
@@ -162,14 +162,14 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   // Initialize the data pointer on first use and reuse it for subsequent
   // requests. This avoids creating the data object for every request, which
   // is expensive.
-  if (!data_ptr_) {
-    if (!callbacks_) {
+  if (data_ptr_ == nullptr) {
+    if (callbacks_ == nullptr) {
       return absl::InternalError("Filter callback has not been initialized successfully yet.");
     }
     data_ptr_ = std::make_unique<Http::Matching::HttpMatchingDataImpl>(callbacks_->streamInfo());
   }
 
-  if (!matcher_) {
+  if (matcher_ == nullptr) {
     return absl::InternalError("Matcher tree has not been initialized yet.");
   }
   // Populate the request header.
