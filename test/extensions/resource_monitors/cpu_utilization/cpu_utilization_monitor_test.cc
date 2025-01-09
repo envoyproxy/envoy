@@ -24,13 +24,6 @@ public:
   MOCK_METHOD(CpuTimes, getCpuTimes, ());
 };
 
-class MockContainerStatsReader : public CgroupStatsReader {
-public:
-  MockContainerStatsReader() = default;
-
-  MOCK_METHOD(CpuTimes, getCgroupStats, ());
-};
-
 class ResourcePressure : public Server::ResourceUpdateCallbacks {
 public:
   void onSuccess(const Server::ResourceUsage& usage) override {
@@ -116,8 +109,8 @@ TEST(ContainerCpuUsageMonitorTest, ComputesCorrectUsage) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
-  auto stats_reader = std::make_unique<MockContainerStatsReader>();
-  EXPECT_CALL(*stats_reader, getCgroupStats())
+  auto stats_reader = std::make_unique<MockCpuStatsReader>();
+  EXPECT_CALL(*stats_reader, getCpuTimes())
       .WillOnce(Return(CpuTimes{true, 1101, 1001.1}))
       .WillOnce(Return(CpuTimes{true, 1102, 1002.1}))
       .WillOnce(Return(CpuTimes{true, 1103, 1003.1}));
@@ -139,8 +132,8 @@ TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsDenominator) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
-  auto stats_reader = std::make_unique<MockContainerStatsReader>();
-  EXPECT_CALL(*stats_reader, getCgroupStats())
+  auto stats_reader = std::make_unique<MockCpuStatsReader>();
+  EXPECT_CALL(*stats_reader, getCpuTimes())
       .WillOnce(Return(CpuTimes{true, 1000, 100.01}))
       .WillOnce(Return(CpuTimes{true, 1001, 100.01}));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
@@ -153,8 +146,8 @@ TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsNumerator) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
-  auto stats_reader = std::make_unique<MockContainerStatsReader>();
-  EXPECT_CALL(*stats_reader, getCgroupStats())
+  auto stats_reader = std::make_unique<MockCpuStatsReader>();
+  EXPECT_CALL(*stats_reader, getCpuTimes())
       .WillOnce(Return(CpuTimes{true, 1000, 101.01}))
       .WillOnce(Return(CpuTimes{true, 999, 101.02}));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
@@ -167,8 +160,8 @@ TEST(ContainerCpuUtilizationMonitorTest, ReportsError) {
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
   config.set_mode(
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
-  auto stats_reader = std::make_unique<MockContainerStatsReader>();
-  EXPECT_CALL(*stats_reader, getCgroupStats())
+  auto stats_reader = std::make_unique<MockCpuStatsReader>();
+  EXPECT_CALL(*stats_reader, getCpuTimes())
       .WillOnce(Return(CpuTimes{false, 0, 0}))
       .WillOnce(Return(CpuTimes{false, 0, 0}))
       .WillOnce(Return(CpuTimes{false, 0, 200}));

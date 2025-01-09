@@ -11,10 +11,27 @@ namespace CpuUtilizationMonitor {
 constexpr uint64_t NUMBER_OF_CPU_TIMES_TO_PARSE =
     4; // we are interested in user, nice, system and idle times.
 
-LinuxCpuStatsReader::LinuxCpuStatsReader(const std::string& cpu_stats_filename)
-    : cpu_stats_filename_(cpu_stats_filename) {}
+LinuxCpuStatsReader::LinuxCpuStatsReader(envoy::extensions::resource_monitors::cpu_utilization::v3::
+                                             CpuUtilizationConfig::UtilizationComputeStrategy mode,
+                                         const std::string& cpu_stats_filename,
+                                         const std::string& linux_cgroup_cpu_allocated_file,
+                                         const std::string& linux_cgroup_cpu_times_file,
+                                         const std::string& linux_uptime_file)
+    : mode_(mode), cpu_stats_filename_(cpu_stats_filename),
+      linux_cgroup_cpu_allocated_file_(linux_cgroup_cpu_allocated_file),
+      linux_cgroup_cpu_times_file_(linux_cgroup_cpu_times_file),
+      linux_uptime_file_(linux_uptime_file) {}
 
 CpuTimes LinuxCpuStatsReader::getCpuTimes() {
+  if (mode_ ==
+      envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER) {
+    return getContainerCpuTimes();
+  }
+  return getHostCpuTimes();
+}
+
+CpuTimes LinuxCpuStatsReader::getHostCpuTimes() {
+  // Existing logic for reading host CPU times.
   std::ifstream cpu_stats_file;
   cpu_stats_file.open(cpu_stats_filename_);
   if (!cpu_stats_file.is_open()) {
@@ -47,14 +64,7 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
   return {true, work_time, total_time};
 }
 
-LinuxContainerCpuStatsReader::LinuxContainerCpuStatsReader(
-    const std::string& linux_cgroup_cpu_allocated_file,
-    const std::string& linux_cgroup_cpu_times_file, const std::string& linux_uptime_file)
-    : linux_cgroup_cpu_allocated_file_(linux_cgroup_cpu_allocated_file),
-      linux_cgroup_cpu_times_file_(linux_cgroup_cpu_times_file),
-      linux_uptime_file_(linux_uptime_file) {}
-
-CpuTimes LinuxContainerCpuStatsReader::getCgroupStats() {
+CpuTimes LinuxCpuStatsReader::getContainerCpuTimes() {
   std::ifstream cpu_allocated_file, cpu_times_file, linux_uptime_file;
   double cpu_allocated_value, cpu_times_value, linux_uptime_value;
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/common/time.h"
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
 #include "envoy/server/resource_monitor.h"
 
@@ -18,17 +17,12 @@ public:
       const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
       std::unique_ptr<CpuStatsReader> cpu_stats_reader);
 
-  CpuUtilizationMonitor(
-      const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
-      std::unique_ptr<CgroupStatsReader> cgroup_stats_reader);
-
   void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
 private:
   double utilization_ = 0.0;
   CpuTimes previous_cpu_times_;
   std::unique_ptr<CpuStatsReader> cpu_stats_reader_;
-  std::unique_ptr<CgroupStatsReader> cgroup_stats_reader_;
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::
       UtilizationComputeStrategy mode_;
 };

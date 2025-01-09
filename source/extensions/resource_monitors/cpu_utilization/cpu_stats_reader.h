@@ -29,13 +29,6 @@ public:
   virtual CpuTimes getCpuTimes() PURE;
 };
 
-class CgroupStatsReader {
-public:
-  CgroupStatsReader() = default;
-  virtual ~CgroupStatsReader() = default;
-  virtual CpuTimes getCgroupStats() PURE;
-};
-
 } // namespace CpuUtilizationMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions
