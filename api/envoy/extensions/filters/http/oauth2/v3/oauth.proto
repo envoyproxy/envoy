@@ -29,12 +29,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message CookieConfig {
   enum CookieType {
     UNSPECIFIED = 0;
-    BEARER_TOKEN = 1;    // Defaults to "BearerToken"
-    OAUTH_HMAC = 2;      // Defaults to "OauthHMAC"
-    OAUTH_EXPIRES = 3;   // Defaults to "OauthExpires"
-    ID_TOKEN = 4;        // Defaults to "IdToken"
-    REFRESH_TOKEN = 5;   // Defaults to "RefreshToken"
-    OAUTH_NONCE = 6;     // Defaults to "OauthNonce"
+    BEARER_TOKEN = 1;
+    OAUTH_HMAC = 2;
+    OAUTH_EXPIRES = 3;
+    ID_TOKEN = 4;
+    REFRESH_TOKEN = 5;
+    OAUTH_NONCE = 6;
   }
 
   enum SameSite {
