@@ -27,11 +27,7 @@
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 
 // For response cache
-#include "source/extensions/filters/http/ext_authz/ttl_cache.h"
-#include "source/extensions/filters/http/ext_authz/caches/cache.hpp"
-#include "source/extensions/filters/http/ext_authz/caches/cache_policy.hpp"
-#include "source/extensions/filters/http/ext_authz/caches/lru_cache_policy.hpp"
-using ttl_cache_t = TTLCache<std::string, int, caches::LRUCachePolicy>;
+#include "source/extensions/filters/http/ext_authz/fifo_cache.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -138,8 +134,7 @@ public:
 
   bool headersAsBytes() const { return encode_raw_headers_; }
 
-  ttl_cache_t& resp_cache() { return cache_; }
-  //const ttl_cache_t& resp_cache() const { return cache_; }
+  fifo_cache::FIFOEvictionCache& resp_cache() { return cache_; }
 
   Filters::Common::MutationRules::CheckResult
   checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
@@ -283,9 +278,9 @@ private:
 
   // Fields for response cache configuration
   uint32_t response_cache_max_size_;
-  std::chrono::seconds response_cache_ttl_;
+  uint32_t response_cache_ttl_;
   // Response cache
-  ttl_cache_t cache_;
+  fifo_cache::FIFOEvictionCache cache_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats

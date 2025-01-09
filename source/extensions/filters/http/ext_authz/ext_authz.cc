@@ -285,11 +285,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   if (!auth_header.empty()) {
     const std::string auth_header_str(auth_header[0]->value().getStringView());
-    // ENVOY_STREAM_LOG(info, "Checking cache for header {}", *decoder_callbacks_, auth_header_str);
-
     // Retrieve the HTTP status code from the cache
-    auto cached_status_code = config_->resp_cache().Get(auth_header_str);
-    if (cached_status_code) {
+    auto cached_status_code = config_->resp_cache().Get(auth_header_str.c_str());
+    if (cached_status_code.has_value()) {
       ENVOY_STREAM_LOG(info, "Cache HIT for token {}: HTTP status {}", 
                        *decoder_callbacks_, auth_header_str, *cached_status_code);
 
@@ -507,7 +505,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   // Extract the actual HTTP status code
-  const int http_status_code = static_cast<int>(response->status_code);
+  const int http_status_code = static_cast<uint16_t>(response->status_code); // Assuming this static cast is safe because http status code should be <= 0xffff
 
   // Log the response status
   //ENVOY_LOG(info, "ext_authz response status: {}", http_status_code);
@@ -516,8 +514,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   const auto auth_header = request_headers_->get(Http::LowerCaseString("x-verkada-auth"));
   if (!auth_header.empty()) {
     const std::string auth_header_str(auth_header[0]->value().getStringView());
-    //ENVOY_LOG(info, "Caching response: {} with HTTP status: {}", auth_header_str, http_status_code);
-    config_->resp_cache().Put(auth_header_str, http_status_code); // Store the HTTP status code
+    ENVOY_LOG(info, "Caching response: {} with HTTP status: {}", auth_header_str, http_status_code);
+    config_->resp_cache().Insert(auth_header_str.c_str(), http_status_code); // Store the HTTP status code
   }
 
   updateLoggingInfo();
