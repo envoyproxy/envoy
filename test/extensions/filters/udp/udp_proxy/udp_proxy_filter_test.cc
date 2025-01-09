@@ -453,6 +453,8 @@ use_original_src_ip: true
                                                                     ENVOY_SOCKET_IPV6_TRANSPARENT};
   inline static const std::string upstream_ip_address_ = "20.0.0.1:443";
   inline static const std::string peer_ip_address_ = "10.0.0.1:1000";
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> upstream_host_{
+      new NiceMock<Upstream::MockHostDescription>()};
 };
 
 class UdpProxyFilterIpv6Test : public UdpProxyFilterTest {
@@ -1878,7 +1880,7 @@ tunneling_config:
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.downstream_connection_info_provider_->setConnectionID(0);
-  Upstream::HostDescriptionConstSharedPtr upstream_host;
+  auto host = std::static_pointer_cast<const Envoy::Upstream::HostDescription>(upstream_host_);
   Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
 
   auto session = filter_->createTunnelingSession();
@@ -1899,7 +1901,7 @@ tunneling_config:
   }));
 
   session->onNewSession();
-  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host,
+  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, host,
                          address_provider, nullptr);
 }
 
@@ -1928,7 +1930,7 @@ tunneling_config:
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.downstream_connection_info_provider_->setConnectionID(0);
-  Upstream::HostDescriptionConstSharedPtr upstream_host;
+  auto host = std::static_pointer_cast<const Envoy::Upstream::HostDescription>(upstream_host_);
   Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
 
   auto session = filter_->createTunnelingSession();
@@ -1963,8 +1965,100 @@ tunneling_config:
       }));
 
   session->onNewSession();
-  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host,
+  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, host,
                          address_provider, nullptr);
+}
+
+TEST_F(UdpProxyFilterTest, TunnelingSessionOutlierDetectionConnectSuccessFinal) {
+  Event::MockTimer* idle_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  )EOF"),
+        true);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_connection_info_provider_->setConnectionID(0);
+  auto* upstream = new NiceMock<SessionFilters::MockHttpUpstream>();
+  auto host = std::static_pointer_cast<const Envoy::Upstream::HostDescription>(upstream_host_);
+  Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
+
+  auto session = filter_->createTunnelingSession();
+  session->onNewSession();
+
+  EXPECT_CALL(upstream_host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal, _));
+  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, host,
+                         address_provider, nullptr);
+}
+
+TEST_F(UdpProxyFilterTest, TunnelingSessionOutlierDetectionConnectFailed) {
+  Event::MockTimer* idle_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  )EOF"),
+        true);
+
+  auto session = filter_->createTunnelingSession();
+  session->onNewSession();
+
+  EXPECT_CALL(upstream_host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  session->onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "",
+                           upstream_host_);
+}
+
+TEST_F(UdpProxyFilterTest, TunnelingSessionOutlierDetectionTimeout) {
+  Event::MockTimer* idle_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  )EOF"),
+        true);
+
+  auto session = filter_->createTunnelingSession();
+  session->onNewSession();
+
+  EXPECT_CALL(upstream_host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  session->onStreamFailure(ConnectionPool::PoolFailureReason::Timeout, "", upstream_host_);
 }
 
 using MockUdpTunnelingConfig = SessionFilters::MockUdpTunnelingConfig;

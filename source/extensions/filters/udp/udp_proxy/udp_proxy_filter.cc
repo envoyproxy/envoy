@@ -1032,7 +1032,7 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
 
 void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
-    Upstream::HostDescriptionConstSharedPtr) {
+    Upstream::HostDescriptionConstSharedPtr host) {
   ENVOY_LOG(debug, "Failed to create upstream stream: {}", failure_reason);
 
   conn_pool_.reset();
@@ -1045,12 +1045,14 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
     udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
+    host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     if (connecting_) {
       udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
     }
+    host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   }
@@ -1058,7 +1060,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
 
 void UdpProxyFilter::TunnelingActiveSession::onStreamReady(StreamInfo::StreamInfo* upstream_info,
                                                            std::unique_ptr<HttpUpstream>&& upstream,
-                                                           Upstream::HostDescriptionConstSharedPtr&,
+                                                           Upstream::HostDescriptionConstSharedPtr& host,
                                                            const Network::ConnectionInfoProvider&,
                                                            Ssl::ConnectionInfoConstSharedPtr) {
   // TODO(ohadvano): save the host description to host_ field. This requires refactoring because
@@ -1072,6 +1074,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamReady(StreamInfo::StreamInf
   connecting_ = false;
   can_send_upstream_ = true;
   cluster_->cluster_stats_.sess_tunnel_success_.inc();
+  host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
   if (filter_.config_->flushAccessLogOnTunnelConnected()) {
     fillSessionStreamInfo();
