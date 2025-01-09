@@ -424,6 +424,10 @@ new_features:
     Added support for :ref:`backoff_options
     <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.UdpTunnelingConfig.RetryOptions.backoff_options>`
     to configure the backoff strategy for UDP proxy retries when tunneling over HTTP.
+- area: lua
+  change: |
+    Added :ref:`routeName() <config_http_filters_lua_stream_info_route_name>` API to the Stream Info Object to get the
+    name of the route matched by the filter chain.
 
 deprecated:
 - area: rbac
