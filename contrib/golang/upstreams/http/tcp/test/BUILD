@@ -33,5 +33,6 @@ envoy_cc_test(
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
         "@envoy_api//contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
