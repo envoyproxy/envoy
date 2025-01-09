@@ -408,7 +408,15 @@ new_features:
   change: |
     Add the option to reduce the rate limit budget based on request/response contexts on stream done.
     See :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` for more details.
-
+- area: oauth2
+  change: |
+    Add the option to specify samesite cookie attribute value for oauth2 supported cookies.
+    To specify samesite attribute, choose one of the value from ``strict``, ``lax`` or ``none``. if not specified, 
+    a default value of ``disabled`` will be assigned and there will be no samesite value in cookie. see 
+    :ref:`apply_on_stream_done <envoy_v3_api_field_extensions.filters.http.oauth2.v3.CookieConfigs>` and 
+    :ref:`apply_on_stream_done <envoy_v3_api_field_extensions.filters.http.oauth2.v3.CookieConfig>
+    for more details.
+    
 deprecated:
 - area: rbac
   change: |
