@@ -124,7 +124,25 @@ public:
             int default_refresh_token_expires_in = 0, bool preserve_authorization_header = false,
             bool disable_id_token_set_cookie = false, bool set_cookie_domain = false,
             bool disable_access_token_set_cookie = false,
-            bool disable_refresh_token_set_cookie = false) {
+            bool disable_refresh_token_set_cookie = false,
+            ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite bearer_samesite =
+                ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                    CookieConfig_SameSite_DISABLED,
+            ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite hmac_samesite = 
+                ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                    CookieConfig_SameSite_DISABLED,
+            ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite expires_samesite =
+                ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                    CookieConfig_SameSite_DISABLED,
+            ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite id_token_samesite = 
+                ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                    CookieConfig_SameSite_DISABLED,
+            ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite refresh_token_samesite = 
+                ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                    CookieConfig_SameSite_DISABLED,
+            ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite nonce_samesite = 
+                ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                    CookieConfig_SameSite_DISABLED) {
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -170,6 +188,39 @@ public:
     if (set_cookie_domain) {
       credentials->set_cookie_domain("example.com");
     }
+
+    // Initialize CookieConfigs
+    auto* cookie_configs = p.mutable_cookie_configs();
+    
+    // Bearer Token Cookie Config
+    auto* bearer_config = cookie_configs->mutable_bearer_token_cookie_config();
+    bearer_config->set_type(envoy::extensions::filters::http::oauth2::v3::CookieConfig::BEARER_TOKEN);
+    bearer_config->set_same_site(bearer_samesite);
+
+    // HMAC Cookie Config, Set samesite to DISABLED by default
+    auto* hmac_config = cookie_configs->mutable_oauth_hmac_cookie_config();
+    hmac_config->set_type(envoy::extensions::filters::http::oauth2::v3::CookieConfig::OAUTH_HMAC);
+    hmac_config->set_same_site(hmac_samesite);
+
+    // Expires Cookie Config, Set samesite to DISABLED by default
+    auto* expires_config = cookie_configs->mutable_oauth_expires_cookie_config();
+    expires_config->set_type(envoy::extensions::filters::http::oauth2::v3::CookieConfig::OAUTH_EXPIRES);
+    expires_config->set_same_site(expires_samesite);
+
+    // ID Token Cookie Config, Set samesite to DISABLED by default
+    auto* id_token_config = cookie_configs->mutable_id_token_cookie_config();
+    id_token_config->set_type(envoy::extensions::filters::http::oauth2::v3::CookieConfig::ID_TOKEN);
+    id_token_config->set_same_site(id_token_samesite);
+
+    // Refresh Token Cookie Config, Set samesite to DISABLED by default
+    auto* refresh_token_config = cookie_configs->mutable_refresh_token_cookie_config();
+    refresh_token_config->set_type(envoy::extensions::filters::http::oauth2::v3::CookieConfig::REFRESH_TOKEN);
+    refresh_token_config->set_same_site(refresh_token_samesite);
+
+    // OAuth Nonce Cookie Config, Set samesite to DISABLED by default
+    auto* oauth_nonce_config = cookie_configs->mutable_oauth_nonce_cookie_config();
+    oauth_nonce_config->set_type(envoy::extensions::filters::http::oauth2::v3::CookieConfig::OAUTH_NONCE);
+    oauth_nonce_config->set_same_site(nonce_samesite);
 
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
@@ -2674,6 +2725,221 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
   EXPECT_EQ(cookies.at("BearerToken"), "accessToken");
   EXPECT_EQ(cookies.at("IdToken"), "idToken");
   EXPECT_EQ(cookies.at("RefreshToken"), "refreshToken");
+}
+
+// Test all cookies with STRICT SameSite
+TEST_F(OAuth2Test, AllCookiesStrictSameSite) {
+  using SameSite = envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite;
+  init(getConfig(true, true, 
+                 envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, false, false, false,
+                 SameSite::CookieConfig_SameSite_STRICT,
+                 SameSite::CookieConfig_SameSite_STRICT,
+                 SameSite::CookieConfig_SameSite_STRICT,
+                 SameSite::CookieConfig_SameSite_STRICT,
+                 SameSite::CookieConfig_SameSite_STRICT,
+                 SameSite::CookieConfig_SameSite_STRICT));
+  oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
+  TestScopedRuntime scoped_runtime;
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_signout"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+    {Http::Headers::get().Status.get(), "302"},
+    {Http::Headers::get().SetCookie.get(),
+    "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+    {Http::Headers::get().SetCookie.get(),
+    "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+    {Http::Headers::get().SetCookie.get(),
+    "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+    {Http::Headers::get().SetCookie.get(),
+    "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+    {Http::Headers::get().SetCookie.get(),
+    "RefreshToken=some-refresh-token;path=/;Max-Age=604800;secure;HttpOnly;SameSite=Strict"},
+    {Http::Headers::get().Location.get(),""},
+};
+
+  filter_->decodeHeaders(request_headers, false);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                 std::chrono::seconds(600));
+}
+
+// Test all cookies with NONE SameSite
+TEST_F(OAuth2Test, AllCookiesNoneSameSite) {
+  using SameSite = envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite;
+  init(getConfig(true, true, 
+                 envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, false, false, false,
+                 SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_NONE));
+  oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
+  TestScopedRuntime scoped_runtime;
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_signout"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+    {Http::Headers::get().Status.get(), "302"},
+    {Http::Headers::get().SetCookie.get(),
+    "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+    {Http::Headers::get().SetCookie.get(),
+    "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+    {Http::Headers::get().SetCookie.get(),
+    "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+    {Http::Headers::get().SetCookie.get(),
+    "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+    {Http::Headers::get().SetCookie.get(),
+    "RefreshToken=some-refresh-token;path=/;Max-Age=604800;secure;HttpOnly;SameSite=None"},
+    {Http::Headers::get().Location.get(),""},
+  };
+
+  filter_->decodeHeaders(request_headers, false);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                 std::chrono::seconds(600));
+}
+
+// Test all cookies with LAX SameSite
+TEST_F(OAuth2Test, AllCookiesLaxSameSite) {
+  using SameSite = envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite;
+  init(getConfig(true, true, 
+                 envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, false, false, false,
+                 SameSite::CookieConfig_SameSite_LAX,
+                 SameSite::CookieConfig_SameSite_LAX,
+                 SameSite::CookieConfig_SameSite_LAX,
+                 SameSite::CookieConfig_SameSite_LAX,
+                 SameSite::CookieConfig_SameSite_LAX,
+                 SameSite::CookieConfig_SameSite_LAX));
+  oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
+  TestScopedRuntime scoped_runtime;
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_signout"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+    {Http::Headers::get().Status.get(), "302"},
+    {Http::Headers::get().SetCookie.get(),
+    "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+    {Http::Headers::get().SetCookie.get(),
+    "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+    {Http::Headers::get().SetCookie.get(),
+    "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+    {Http::Headers::get().SetCookie.get(),
+    "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+    {Http::Headers::get().SetCookie.get(),
+    "RefreshToken=some-refresh-token;path=/;Max-Age=604800;secure;HttpOnly;SameSite=Lax"},
+    {Http::Headers::get().Location.get(),""},
+  };
+
+  filter_->decodeHeaders(request_headers, false);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                 std::chrono::seconds(600));
+}
+
+// Test mixed SameSite configurations with some disabled
+TEST_F(OAuth2Test, MixedCookieSameSiteWithDisabled) {
+  using SameSite = envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite;
+  init(getConfig(true, true, 
+                 envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, false, false, false,
+                 SameSite::CookieConfig_SameSite_STRICT,
+                 SameSite::CookieConfig_SameSite_LAX,
+                 SameSite::CookieConfig_SameSite_DISABLED,
+                 SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_STRICT,
+                 SameSite::CookieConfig_SameSite_DISABLED));
+  oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
+  TestScopedRuntime scoped_runtime;
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_signout"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+    {Http::Headers::get().Status.get(), "302"},
+    {Http::Headers::get().SetCookie.get(),
+    "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+    {Http::Headers::get().SetCookie.get(),
+    "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly"},
+    {Http::Headers::get().SetCookie.get(),
+    "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+    {Http::Headers::get().SetCookie.get(),
+    "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+    {Http::Headers::get().SetCookie.get(),
+    "RefreshToken=some-refresh-token;path=/;Max-Age=604800;secure;HttpOnly;SameSite=Strict"},
+    {Http::Headers::get().Location.get(),""},
+  };
+
+  filter_->decodeHeaders(request_headers, false);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                 std::chrono::seconds(600));
+}
+
+// Test mixed SameSite configurations without disabled
+TEST_F(OAuth2Test, MixedCookieSameSiteWithoutDisabled) {
+  using SameSite = envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite;
+  init(getConfig(true, true, 
+                 envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, false, false, false,
+                 SameSite::CookieConfig_SameSite_STRICT,
+                 SameSite::CookieConfig_SameSite_LAX,
+                 SameSite::CookieConfig_SameSite_NONE,
+                 SameSite::CookieConfig_SameSite_STRICT,
+                 SameSite::CookieConfig_SameSite_LAX,
+                 SameSite::CookieConfig_SameSite_NONE));
+  oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
+  TestScopedRuntime scoped_runtime;
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+  Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_signout"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+    {Http::Headers::get().Status.get(), "302"},
+    {Http::Headers::get().SetCookie.get(),
+    "OauthHMAC=" + oauthHMAC + "path=/;Max-Age=600;secure;HttpOnly;SameSite=Lax"},
+    {Http::Headers::get().SetCookie.get(),
+    "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly;SameSite=None"},
+    {Http::Headers::get().SetCookie.get(),
+    "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+    {Http::Headers::get().SetCookie.get(),
+    "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+    {Http::Headers::get().SetCookie.get(),
+    "RefreshToken=some-refresh-token;path=/;Max-Age=604800;secure;HttpOnly;SameSite=Lax"},
+    {Http::Headers::get().Location.get(),""},
+  };
+
+  filter_->decodeHeaders(request_headers, false);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  filter_->onGetAccessTokenSuccess("access_code", "some-id-token", "some-refresh-token",
+                                 std::chrono::seconds(600));
 }
 
 } // namespace Oauth2
