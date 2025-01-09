@@ -1880,7 +1880,6 @@ tunneling_config:
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.downstream_connection_info_provider_->setConnectionID(0);
-  auto host = std::static_pointer_cast<const Envoy::Upstream::HostDescription>(upstream_host_);
   Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
 
   auto session = filter_->createTunnelingSession();
@@ -1901,7 +1900,7 @@ tunneling_config:
   }));
 
   session->onNewSession();
-  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, host,
+  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host_,
                          address_provider, nullptr);
 }
 
@@ -1930,7 +1929,6 @@ tunneling_config:
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.downstream_connection_info_provider_->setConnectionID(0);
-  auto host = std::static_pointer_cast<const Envoy::Upstream::HostDescription>(upstream_host_);
   Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
 
   auto session = filter_->createTunnelingSession();
@@ -1965,7 +1963,7 @@ tunneling_config:
       }));
 
   session->onNewSession();
-  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, host,
+  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host_,
                          address_provider, nullptr);
 }
 
@@ -1992,7 +1990,6 @@ tunneling_config:
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.downstream_connection_info_provider_->setConnectionID(0);
   auto* upstream = new NiceMock<SessionFilters::MockHttpUpstream>();
-  auto host = std::static_pointer_cast<const Envoy::Upstream::HostDescription>(upstream_host_);
   Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
 
   auto session = filter_->createTunnelingSession();
@@ -2000,7 +1997,7 @@ tunneling_config:
 
   EXPECT_CALL(upstream_host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal, _));
-  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, host,
+  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host_,
                          address_provider, nullptr);
 }
 

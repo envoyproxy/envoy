@@ -203,7 +203,7 @@ public:
    * @param ssl_info supplies the ssl information of the upstream connection.
    */
   virtual void onStreamReady(StreamInfo::StreamInfo* info, std::unique_ptr<HttpUpstream>&& upstream,
-                             Upstream::HostDescriptionConstSharedPtr& host,
+                             Upstream::HostDescriptionConstSharedPtr host,
                              const Network::ConnectionInfoProvider& address_provider,
                              Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
 
@@ -754,7 +754,7 @@ protected:
 
     // HttpStreamCallbacks
     void onStreamReady(StreamInfo::StreamInfo*, std::unique_ptr<HttpUpstream>&&,
-                       Upstream::HostDescriptionConstSharedPtr&,
+                       Upstream::HostDescriptionConstSharedPtr,
                        const Network::ConnectionInfoProvider&,
                        Ssl::ConnectionInfoConstSharedPtr) override;
 

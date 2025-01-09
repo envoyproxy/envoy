@@ -1060,7 +1060,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
 
 void UdpProxyFilter::TunnelingActiveSession::onStreamReady(
     StreamInfo::StreamInfo* upstream_info, std::unique_ptr<HttpUpstream>&& upstream,
-    Upstream::HostDescriptionConstSharedPtr& host, const Network::ConnectionInfoProvider&,
+    Upstream::HostDescriptionConstSharedPtr host, const Network::ConnectionInfoProvider&,
     Ssl::ConnectionInfoConstSharedPtr) {
   // TODO(ohadvano): save the host description to host_ field. This requires refactoring because
   // currently host_ is of type HostConstSharedPtr and not HostDescriptionConstSharedPtr.

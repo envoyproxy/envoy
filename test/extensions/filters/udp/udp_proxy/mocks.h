@@ -107,7 +107,7 @@ public:
 
   MOCK_METHOD(void, onStreamReady,
               (StreamInfo::StreamInfo * info, std::unique_ptr<HttpUpstream>&& upstream,
-               Upstream::HostDescriptionConstSharedPtr& host,
+               Upstream::HostDescriptionConstSharedPtr host,
                const Network::ConnectionInfoProvider& address_provider,
                Ssl::ConnectionInfoConstSharedPtr ssl_info));
   MOCK_METHOD(void, onStreamFailure,
