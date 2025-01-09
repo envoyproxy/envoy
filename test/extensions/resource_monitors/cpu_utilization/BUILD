@@ -33,6 +33,7 @@ envoy_extension_cc_test(
         "//source/extensions/resource_monitors/cpu_utilization:linux_cpu_stats_reader",
         "//test/test_common:environment_lib",
         "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg_cc_proto",
     ],
 )
 

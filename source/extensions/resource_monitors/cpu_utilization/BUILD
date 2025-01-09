@@ -35,6 +35,7 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        "//envoy/server:resource_monitor_config_interface",
         "//source/common/common:logger_lib",
         "@com_google_absl//absl/strings",
         "@envoy_api//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg_cc_proto",
