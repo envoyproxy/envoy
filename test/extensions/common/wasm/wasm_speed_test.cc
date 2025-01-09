@@ -21,7 +21,7 @@ namespace Envoy {
 
 void bmWasmSpeedTest(benchmark::State& state) {
   Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Context logging_state(spdlog::level::warn,
+  Envoy::Logger::Context::init(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm).set_level(spdlog::level::off);
   Envoy::Stats::IsolatedStoreImpl stats_store;
@@ -59,6 +59,8 @@ void bmWasmSpeedTest(benchmark::State& state) {
       thread->join();
     }
   }
+
+  Envoy::Logger::Context::reset();
 }
 
 BENCHMARK(bmWasmSpeedTest);

@@ -200,8 +200,8 @@ public:
 
 static void priorityAndLocalityWeighted(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Context logging_state(spdlog::level::warn,
-                                       Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+  Envoy::Logger::Context::init(spdlog::level::warn, Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock,
+                               false);
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(2));
     // if we've been instructed to skip tests, only run once no matter the argument:
@@ -209,6 +209,7 @@ static void priorityAndLocalityWeighted(State& state) {
 
     speed_test.priorityAndLocalityWeightedHelper(state.range(0), endpoints, true);
   }
+  Envoy::Logger::Context::reset();
 }
 
 BENCHMARK(priorityAndLocalityWeighted)
@@ -217,8 +218,8 @@ BENCHMARK(priorityAndLocalityWeighted)
 
 static void duplicateUpdate(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Context logging_state(spdlog::level::warn,
-                                       Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+  Envoy::Logger::Context::init(spdlog::level::warn, Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock,
+                               false);
 
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
@@ -227,14 +228,15 @@ static void duplicateUpdate(State& state) {
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
   }
+  Envoy::Logger::Context::reset();
 }
 
 BENCHMARK(duplicateUpdate)->Ranges({{1, 100000}, {false, true}})->Unit(benchmark::kMillisecond);
 
 static void healthOnlyUpdate(State& state) {
   Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Context logging_state(spdlog::level::warn,
-                                       Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
+  Envoy::Logger::Context::init(spdlog::level::warn, Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock,
+                               false);
   for (auto _ : state) { // NOLINT: Silences warning about dead store
     Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(1));
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
@@ -242,6 +244,7 @@ static void healthOnlyUpdate(State& state) {
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, false);
   }
+  Envoy::Logger::Context::reset();
 }
 
 BENCHMARK(healthOnlyUpdate)->Ranges({{1, 100000}, {false, true}})->Unit(benchmark::kMillisecond);

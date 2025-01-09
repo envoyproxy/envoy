@@ -46,8 +46,7 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
   // shutdown hook (see
   // https://github.com/llvm-mirror/compiler-rt/blob/master/lib/fuzzer/FuzzerInterface.h).
   static auto* lock = new Thread::MutexBasicLockable();
-  static auto* logging_context =
-      new Logger::Context(log_level_, TestEnvironment::getOptions().logFormat(), *lock, false);
+  Logger::Context::init(log_level_, TestEnvironment::getOptions().logFormat(), *lock, false);
   UNREFERENCED_PARAMETER(logging_context);
 
   // Suppress all libprotobuf non-fatal logging as long as this object exists.
@@ -77,6 +76,7 @@ void runCleanupHooks() {
     delete cleanup_hooks;
     cleanup_hooks = nullptr;
   }
+  Envoy::Logger::Context::reset();
 }
 
 } // namespace Fuzz

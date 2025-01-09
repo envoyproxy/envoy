@@ -78,7 +78,6 @@ protected:
   ThreadLocal::InstanceImplPtr tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
   Stats::ThreadLocalStoreImplPtr stats_store_;
-  std::unique_ptr<Logger::Context> logging_context_;
   std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
   std::unique_ptr<Server::Instance> server_;
 

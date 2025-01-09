@@ -24,12 +24,9 @@ public:
   // We weight the first weighted_subset_percent of hosts with weight.
   BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0,
              bool attach_metadata = false);
+  virtual ~BaseTester();
 
   Envoy::Thread::MutexBasicLockable lock_;
-  // Reduce default log level to warn while running this benchmark to avoid problems due to
-  // excessive debug logging in upstream_impl.cc
-  Envoy::Logger::Context logging_context_{spdlog::level::warn,
-                                          Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock_, false};
 
   Upstream::PrioritySetImpl priority_set_;
   Upstream::PrioritySetImpl local_priority_set_;

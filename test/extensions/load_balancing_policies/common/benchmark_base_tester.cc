@@ -5,6 +5,11 @@ namespace Upstream {
 
 BaseTester::BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uint32_t weight,
                        bool attach_metadata) {
+  // Reduce default log level to warn while running this benchmark to avoid problems due to
+  // excessive debug logging in upstream_impl.cc
+  Envoy::Logger::Context::init(spdlog::level::warn, Envoy::Logger::Logger::DEFAULT_LOG_FORMAT,
+                               lock_, false);
+
   Upstream::HostVector hosts;
   ASSERT(num_hosts < 65536);
   for (uint64_t i = 0; i < num_hosts; i++) {
@@ -35,6 +40,8 @@ BaseTester::BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uin
       0, Upstream::HostSetImpl::partitionHosts(updated_hosts, hosts_per_locality), {}, hosts, {},
       random_.random(), absl::nullopt);
 }
+
+BaseTester::~BaseTester() { Envoy::Logger::Context::reset(); }
 
 } // namespace Upstream
 } // namespace Envoy

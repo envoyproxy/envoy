@@ -73,8 +73,7 @@ int main(int argc, char** argv) {
 
   // Reduce logs so benchmark output is readable.
   Envoy::Thread::MutexBasicLockable lock;
-  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
-                                  lock, false};
+  Logger::Context::init(spdlog::level::warn, Logger::Context::getFineGrainLogFormat(), lock, false);
 
   skip_expensive_benchmarks = skip_switch.getValue();
 

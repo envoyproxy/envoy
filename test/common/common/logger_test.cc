@@ -883,6 +883,63 @@ TEST(TaggedLogTest, TestTaggedLogWithJsonFormatMultipleJFlags) {
   object.logTaggedMessageWithPreCreatedTags();
 }
 
+class LoggerContextTest : public testing::Test {};
+
+TEST_F(LoggerContextTest, ContextInitAndReset) {
+  Context::reset();
+
+  auto lock_a = Thread::MutexBasicLockable();
+  // The first init() call should succeed.
+  EXPECT_TRUE(Context::init(spdlog::level::level_enum::info, Logger::DEFAULT_LOG_FORMAT, lock_a,
+                            true, true));
+  auto lock_b = Thread::MutexBasicLockable();
+  // The second init() call should be ignored.
+  EXPECT_FALSE(Context::init(spdlog::level::level_enum::critical, Logger::DEFAULT_LOG_FORMAT,
+                             lock_b, true, true));
+  EXPECT_EQ(Context::instance()->getFineGrainDefaultLevel(), spdlog::level::level_enum::info);
+
+  // reset() will clear the global Context.
+  Context::reset();
+  auto lock_c = Thread::MutexBasicLockable();
+  EXPECT_TRUE(Context::init(spdlog::level::level_enum::critical, Logger::DEFAULT_LOG_FORMAT, lock_c,
+                            true, true));
+  // Now the Context should have a log level of critical.
+  EXPECT_EQ(Context::instance()->getFineGrainDefaultLevel(), spdlog::level::level_enum::critical);
+}
+
+TEST_F(LoggerContextTest, ContextInThreads) {
+  Context::reset();
+
+  auto lock_a = Thread::MutexBasicLockable();
+  EXPECT_TRUE(Context::init(spdlog::level::level_enum::warn, Logger::DEFAULT_LOG_FORMAT, lock_a,
+                            true, true));
+
+  std::vector<std::thread> threads;
+  for (int i = 0; i < 10; ++i) {
+    threads.emplace_back(std::thread([iter = i]() {
+      if (iter % 2 == 0) {
+        auto lock_b = Thread::MutexBasicLockable();
+        Context::init(spdlog::level::level_enum::info, Logger::DEFAULT_LOG_FORMAT, lock_b, true,
+                      true);
+      } else {
+        Context::reset();
+      }
+    }));
+  }
+
+  for (auto& thread : threads) {
+    if (thread.joinable()) {
+      thread.join();
+    }
+  }
+
+  Context::reset();
+  auto lock_c = Thread::MutexBasicLockable();
+  Context::init(spdlog::level::level_enum::critical, Logger::DEFAULT_LOG_FORMAT, lock_c, true,
+                true);
+  EXPECT_EQ(Context::instance()->getFineGrainDefaultLevel(), spdlog::level::level_enum::critical);
+}
+
 } // namespace
 } // namespace Logger
 } // namespace Envoy

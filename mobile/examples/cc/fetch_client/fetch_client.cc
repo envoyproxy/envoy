@@ -18,12 +18,12 @@
 namespace Envoy {
 
 Fetch::Fetch()
-    : logging_context_(spdlog::level::level_enum::info, Envoy::Logger::Logger::DEFAULT_LOG_FORMAT,
-                       lock_, false),
-      stats_allocator_(symbol_table_), store_root_(stats_allocator_),
+    : stats_allocator_(symbol_table_), store_root_(stats_allocator_),
       api_(std::make_unique<Envoy::Api::Impl>(platform_impl_.threadFactory(), store_root_,
                                               time_system_, platform_impl_.fileSystem(),
                                               random_generator_, bootstrap_)) {
+  Envoy::Logger::Context::init(spdlog::level::level_enum::info,
+                               Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock_, false);
   Envoy::Event::Libevent::Global::initialize();
 }
 
