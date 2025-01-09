@@ -134,16 +134,21 @@ getAuthType(envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType 
 
 // Helper function to get SameSite attribute string from proto enum.
 std::string
-getSameSiteString(envoy::extensions::filters::http::oauth2::v3::CookieConfig::SameSite same_site) {
+getSameSiteString(envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite same_site) {
   switch (same_site) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::extensions::filters::http::oauth2::v3::CookieConfig::STRICT:
+  case envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+      CookieConfig_SameSite_STRICT:
     return std::string(SameSiteStrict);
-  case envoy::extensions::filters::http::oauth2::v3::CookieConfig::LAX:
+  case envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+      CookieConfig_SameSite_LAX:
     return std::string(SameSiteLax);
-  case envoy::extensions::filters::http::oauth2::v3::CookieConfig::NONE:
+  case envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+      CookieConfig_SameSite_NONE:
     return std::string(SameSiteNone);
-  case envoy::extensions::filters::http::oauth2::v3::CookieConfig::DISABLED:
+  case envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+      CookieConfig_SameSite_DISABLED:
+    return EMPTY_STRING;
   default:
     return EMPTY_STRING;
   }
@@ -595,7 +600,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     // Expire the CSRF token cookie in 10 minutes.
     // This should be enough time for the user to complete the OAuth flow.
     std::string csrf_expires = std::to_string(10 * 60);
-    std::string same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
+    std::string same_site = getSameSiteString(config_->nonceCookieSettings().same_site_);
     std::string cookie_tail_http_only =
         fmt::format(CookieTailHttpOnlyFormatString, csrf_expires, same_site);
     if (!config_->cookieDomain().empty()) {
@@ -787,10 +792,6 @@ std::string OAuth2Filter::BuildCookieTail(int cookie_type) const {
 
   switch (cookie_type) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case 0: // UNSPECIFIED TYPE
-    ENVOY_LOG(debug,
-              "The CookieType is not specified. It must be set to one of the supported types");
-    break;
   case 1: // BEARER_TOKEN TYPE
     same_site = getSameSiteString(config_->bearerTokenCookieSettings().same_site_);
     break;
