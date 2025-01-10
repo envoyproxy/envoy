@@ -26,21 +26,23 @@ namespace CpuUtilizationMonitor {
 constexpr double DAMPENING_ALPHA = 0.05;
 
 CpuUtilizationMonitor::CpuUtilizationMonitor(
-    const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
+    const envoy::extensions::resource_monitors::cpu_utilization::v3::
+        CpuUtilizationConfig& /*config*/,
     std::unique_ptr<CpuStatsReader> cpu_stats_reader)
-    : cpu_stats_reader_(std::move(cpu_stats_reader)), mode_(config.mode()) {
+    : cpu_stats_reader_(std::move(cpu_stats_reader)) {
   previous_cpu_times_ = cpu_stats_reader_->getCpuTimes();
 }
 
 void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   CpuTimes cpu_times = cpu_stats_reader_->getCpuTimes();
+  ;
   if (!cpu_times.is_valid) {
     const auto& error = EnvoyException("Can't open file to read CPU utilization");
     callbacks.onFailure(error);
     return;
   }
   const double work_over_period = cpu_times.work_time - previous_cpu_times_.work_time;
-  const double total_over_period = cpu_times.total_time - previous_cpu_times_.total_time;
+  const int64_t total_over_period = cpu_times.total_time - previous_cpu_times_.total_time;
   if (work_over_period < 0 || total_over_period <= 0) {
     const auto& error = EnvoyException(
         fmt::format("Erroneous CPU stats calculation. Work_over_period='{}' cannot "
@@ -49,7 +51,7 @@ void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks&
     callbacks.onFailure(error);
     return;
   }
-  const double current_utilization = work_over_period / total_over_period;
+  const double current_utilization = (work_over_period) / total_over_period;
   ENVOY_LOG_MISC(trace, "Prev work={}, Cur work={}, Prev Total={}, Cur Total={}",
                  previous_cpu_times_.work_time, cpu_times.work_time, previous_cpu_times_.total_time,
                  cpu_times.total_time);

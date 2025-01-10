@@ -1,7 +1,10 @@
 #include "source/extensions/resource_monitors/cpu_utilization/linux_cpu_stats_reader.h"
 
 #include <algorithm>
+#include <chrono>
 #include <vector>
+
+#include "envoy/common/time.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,27 +14,10 @@ namespace CpuUtilizationMonitor {
 constexpr uint64_t NUMBER_OF_CPU_TIMES_TO_PARSE =
     4; // we are interested in user, nice, system and idle times.
 
-LinuxCpuStatsReader::LinuxCpuStatsReader(envoy::extensions::resource_monitors::cpu_utilization::v3::
-                                             CpuUtilizationConfig::UtilizationComputeStrategy mode,
-                                         const std::string& cpu_stats_filename,
-                                         const std::string& linux_cgroup_cpu_allocated_file,
-                                         const std::string& linux_cgroup_cpu_times_file,
-                                         const std::string& linux_uptime_file)
-    : mode_(mode), cpu_stats_filename_(cpu_stats_filename),
-      linux_cgroup_cpu_allocated_file_(linux_cgroup_cpu_allocated_file),
-      linux_cgroup_cpu_times_file_(linux_cgroup_cpu_times_file),
-      linux_uptime_file_(linux_uptime_file) {}
+LinuxCpuStatsReader::LinuxCpuStatsReader(const std::string& cpu_stats_filename)
+    : cpu_stats_filename_(cpu_stats_filename) {}
 
 CpuTimes LinuxCpuStatsReader::getCpuTimes() {
-  if (mode_ ==
-      envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER) {
-    return getContainerCpuTimes();
-  }
-  return getHostCpuTimes();
-}
-
-CpuTimes LinuxCpuStatsReader::getHostCpuTimes() {
-  // Existing logic for reading host CPU times.
   std::ifstream cpu_stats_file;
   cpu_stats_file.open(cpu_stats_filename_);
   if (!cpu_stats_file.is_open()) {
@@ -58,15 +44,20 @@ CpuTimes LinuxCpuStatsReader::getHostCpuTimes() {
     times[i] = time;
   }
 
-  double work_time, total_time;
-  work_time = times[0] + times[1] + times[2]; // user + nice + system
-  total_time = work_time + times[3];          // idle
-  return {true, work_time, total_time};
+  uint64_t work_time = times[0] + times[1] + times[2]; // user + nice + system
+  uint64_t total_time = work_time + times[3];          // idle
+  return {true, static_cast<double>(work_time), total_time};
 }
 
-CpuTimes LinuxCpuStatsReader::getContainerCpuTimes() {
-  std::ifstream cpu_allocated_file, cpu_times_file, linux_uptime_file;
-  double cpu_allocated_value, cpu_times_value, linux_uptime_value;
+LinuxContainerCpuStatsReader::LinuxContainerCpuStatsReader(
+    TimeSource& time_source, const std::string& linux_cgroup_cpu_allocated_file,
+    const std::string& linux_cgroup_cpu_times_file)
+    : time_source_(time_source), linux_cgroup_cpu_allocated_file_(linux_cgroup_cpu_allocated_file),
+      linux_cgroup_cpu_times_file_(linux_cgroup_cpu_times_file) {}
+
+CpuTimes LinuxContainerCpuStatsReader::getCpuTimes() {
+  std::ifstream cpu_allocated_file, cpu_times_file;
+  double cpu_allocated_value, cpu_times_value;
 
   cpu_allocated_file.open(linux_cgroup_cpu_allocated_file_);
   if (!cpu_allocated_file.is_open()) {
@@ -79,12 +70,6 @@ CpuTimes LinuxCpuStatsReader::getContainerCpuTimes() {
   if (!cpu_times_file.is_open()) {
     ENVOY_LOG_MISC(error, "Can't open linux cpu usage seconds file {}",
                    linux_cgroup_cpu_times_file_);
-    return {false, 0, 0};
-  }
-
-  linux_uptime_file.open(linux_uptime_file_);
-  if (!linux_uptime_file.is_open()) {
-    ENVOY_LOG_MISC(error, "Can't open linux uptime file {}", linux_uptime_file_);
     return {false, 0, 0};
   }
 
@@ -102,13 +87,11 @@ CpuTimes LinuxCpuStatsReader::getContainerCpuTimes() {
     return {false, 0, 0};
   }
 
-  linux_uptime_file >> linux_uptime_value; // First value of /proc/uptime is uptime in seconds
-  if (!linux_uptime_file) {
-    ENVOY_LOG_MISC(error, "Unexpected format in linux proc uptime file {}", linux_uptime_file_);
-    return {false, 0, 0};
-  }
-
-  return {true, cpu_times_value / (cpu_allocated_value * 1000000), linux_uptime_value};
+  const uint64_t current_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                    time_source_.monotonicTime().time_since_epoch())
+                                    .count();
+  return {true, cpu_times_value / (cpu_allocated_value * 1000000),
+          current_time}; // cpu_times is in nanoseconds and cpu_allocated shares is in millicores
 }
 
 } // namespace CpuUtilizationMonitor

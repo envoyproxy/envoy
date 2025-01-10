@@ -111,9 +111,9 @@ TEST(ContainerCpuUsageMonitorTest, ComputesCorrectUsage) {
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, 1101, 1001.1}))
-      .WillOnce(Return(CpuTimes{true, 1102, 1002.1}))
-      .WillOnce(Return(CpuTimes{true, 1103, 1003.1}));
+      .WillOnce(Return(CpuTimes{true, 1101, 1001}))
+      .WillOnce(Return(CpuTimes{true, 1102, 1002}))
+      .WillOnce(Return(CpuTimes{true, 1103, 1003}));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
 
   ResourcePressure resource;
@@ -134,8 +134,8 @@ TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsDenominator) {
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, 1000, 100.01}))
-      .WillOnce(Return(CpuTimes{true, 1001, 100.01}));
+      .WillOnce(Return(CpuTimes{true, 1000, 100}))
+      .WillOnce(Return(CpuTimes{true, 1001, 99}));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);
@@ -148,8 +148,8 @@ TEST(ContainerCpuUsageMonitorTest, GetsErroneousStatsNumerator) {
       envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   auto stats_reader = std::make_unique<MockCpuStatsReader>();
   EXPECT_CALL(*stats_reader, getCpuTimes())
-      .WillOnce(Return(CpuTimes{true, 1000, 101.01}))
-      .WillOnce(Return(CpuTimes{true, 999, 101.02}));
+      .WillOnce(Return(CpuTimes{true, 1000, 101}))
+      .WillOnce(Return(CpuTimes{true, 999, 102}));
   auto monitor = std::make_unique<CpuUtilizationMonitor>(config, std::move(stats_reader));
   ResourcePressure resource;
   monitor->updateResourceUsage(resource);

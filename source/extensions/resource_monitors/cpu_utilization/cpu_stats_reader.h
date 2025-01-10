@@ -18,8 +18,9 @@ namespace CpuUtilizationMonitor {
 
 struct CpuTimes {
   bool is_valid;
-  double work_time;
-  double total_time;
+  double work_time; // For container cpu mode, to support normalisation of cgroup cpu usage stat per
+                    // cpu core by diving with available cpu limit
+  uint64_t total_time;
 };
 
 class CpuStatsReader {
