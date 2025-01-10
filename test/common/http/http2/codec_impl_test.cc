@@ -4448,15 +4448,16 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
   scoped_runtime_.mergeValues({{"envoy.reloadable_features.validate_upstream_headers", "false"}});
   stream_error_on_invalid_http_messaging_ = true;
   initialize();
-  if (http2_implementation_ == Http2Impl::Oghttp2) {
-    // oghttp2 fails this test for now.
-    return;
-  }
 
   // Change one character in the header value and verify that codec correctly
   // accepts or rejects based on the table above.
   std::string header_value{"aaaaaaaa"};
   for (int i = 0; i <= 0xff; ++i) {
+    if (i == 0 && http2_implementation_ == Http2Impl::Oghttp2) {
+      // oghttp2 fails this specific case for now.
+      return;
+    }
+
     TestRequestHeaderMapImpl request_headers;
     HttpTestUtility::addDefaultHeaders(request_headers);
     header_value[2] = static_cast<char>(i);
