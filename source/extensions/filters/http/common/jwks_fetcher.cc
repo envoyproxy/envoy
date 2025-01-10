@@ -55,7 +55,7 @@ public:
       return;
     }
 
-    Http::RequestMessagePtr message = Http::Utility::prepareHeaders(remote_jwks_.http_uri());
+    Http::RequestMessagePtr message = Http::Utility::prepareHeaders(remote_jwks_.http_uri(), true);
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
     message->headers().setReferenceUserAgent(Http::Headers::get().UserAgentValues.GoBrowser);
     ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", remote_jwks_.http_uri().uri());
