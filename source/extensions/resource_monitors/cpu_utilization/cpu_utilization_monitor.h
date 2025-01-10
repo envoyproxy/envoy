@@ -17,6 +17,7 @@ public:
   CpuUtilizationMonitor(
       const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
       std::unique_ptr<CpuStatsReader> cpu_stats_reader);
+
   void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
 private:

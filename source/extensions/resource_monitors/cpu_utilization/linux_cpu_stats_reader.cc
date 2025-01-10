@@ -44,8 +44,9 @@ CpuTimes LinuxCpuStatsReader::getCpuTimes() {
     times[i] = time;
   }
 
-  uint64_t work_time = times[0] + times[1] + times[2]; // user + nice + system
-  uint64_t total_time = work_time + times[3];          // idle
+  uint64_t work_time, total_time;
+  work_time = times[0] + times[1] + times[2]; // user + nice + system
+  total_time = work_time + times[3];          // idle
   return {true, static_cast<double>(work_time), total_time};
 }
 
