@@ -90,7 +90,7 @@ minor_behavior_changes:
     the nonce.
 - area: oauth2
   change: |
-    Introduced PKCE(Proof Key for Code Exchange) support for OAuth2 authorization code flow. 
+    Introduced PKCE(Proof Key for Code Exchange) support for OAuth2 authorization code flow.
 - area: quic
   change: |
     Enable UDP GRO in QUIC client connections by default. This behavior can be reverted by setting
