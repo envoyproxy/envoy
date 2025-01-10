@@ -14,8 +14,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: CPU utilization]
 // [#extension: envoy.resource_monitors.cpu_utilization]
 
-// The CPU utilization resource monitor reports the Envoy process the, CPU Utilization
-// are used to calculate the usage.
+// The CPU utilization resource monitors and reports CPU usage across different platforms.
 message CpuUtilizationConfig {
   enum UtilizationComputeStrategy {
     // Reports CPU Utilization of Host machine
