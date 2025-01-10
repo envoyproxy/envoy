@@ -108,7 +108,7 @@ public:
   MockAsyncClientFactory();
   ~MockAsyncClientFactory() override;
 
-  MOCK_METHOD(RawAsyncClientPtr, createUncachedRawAsyncClient, ());
+  MOCK_METHOD(absl::StatusOr<RawAsyncClientPtr>, createUncachedRawAsyncClient, ());
 };
 
 class MockAsyncClientManager : public AsyncClientManager {

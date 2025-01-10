@@ -366,7 +366,7 @@ public:
     config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
 
     fillServiceWideInitialMetadata(config);
-    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
+    return *AsyncClientImpl::create(cm_, config, dispatcher_->timeSource());
   }
 
   virtual envoy::config::core::v3::GrpcService createGoogleGrpcConfig() {

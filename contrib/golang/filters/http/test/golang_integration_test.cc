@@ -90,9 +90,9 @@ public:
     addFakeUpstream(Http::CodecType::HTTP1);
   }
 
-  std::string genSoPath(std::string name) {
+  std::string genSoPath() {
     return TestEnvironment::substitute(
-        "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/" + name + "/filter.so");
+        "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/plugins.so");
   }
 
   void initializeConfig(const std::string& lib_id, const std::string& lib_path,
@@ -132,7 +132,7 @@ typed_config:
       set: foo
 )EOF";
 
-    auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), so_id);
+    auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(), so_id);
     config_helper_.prependFilter(yaml_string);
     if (with_injected_metadata_validator) {
       config_helper_.prependFilter("{ name: validate-dynamic-metadata }");
@@ -289,7 +289,7 @@ typed_config:
 )EOF";
 
     auto so_id = ADDDATA;
-    auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(so_id), so_id);
+    auto yaml_string = absl::StrFormat(yaml_fmt, so_id, genSoPath(), so_id);
     config_helper_.prependFilter(yaml_string);
     config_helper_.skipPortUsageValidation();
 
@@ -817,7 +817,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(GolangIntegrationTest, Echo) {
-  initializeConfig(ECHO, genSoPath(ECHO), ECHO);
+  initializeConfig(ECHO, genSoPath(), ECHO);
   initialize();
   registerTestServerPorts({"http"});
 
@@ -843,7 +843,7 @@ TEST_P(GolangIntegrationTest, Echo) {
 }
 
 TEST_P(GolangIntegrationTest, Passthrough) {
-  initializeConfig(PASSTHROUGH, genSoPath(PASSTHROUGH), PASSTHROUGH);
+  initializeConfig(PASSTHROUGH, genSoPath(), PASSTHROUGH);
   initialize();
   registerTestServerPorts({"http"});
 
@@ -880,7 +880,7 @@ TEST_P(GolangIntegrationTest, Passthrough) {
 }
 
 TEST_P(GolangIntegrationTest, PluginNotFound) {
-  initializeConfig(ECHO, genSoPath(ECHO), PASSTHROUGH);
+  initializeConfig(ECHO, genSoPath(), PASSTHROUGH);
   initialize();
   registerTestServerPorts({"http"});
 
@@ -904,7 +904,7 @@ TEST_P(GolangIntegrationTest, BufferResetAfterDrain) { testBufferApi("ResetAfter
 TEST_P(GolangIntegrationTest, BufferLen) { testBufferApi("Len"); }
 
 TEST_P(GolangIntegrationTest, Property) {
-  initializePropertyConfig(PROPERTY, genSoPath(PROPERTY), PROPERTY);
+  initializePropertyConfig(PROPERTY, genSoPath(), PROPERTY);
   initialize();
   registerTestServerPorts({"http"});
 

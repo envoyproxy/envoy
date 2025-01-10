@@ -1,0 +1,65 @@
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+    status: HEADER_STOP_ALL_ITERATION_AND_BUFFER
+  }
+}
+actions {
+  stream_action {
+    request {
+      data {
+        status: DATA_STOP_ITERATION_NO_BUFFER
+      }
+    }
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":path"
+        value: "/"
+      }
+    }
+    status: HEADER_STOP_ALL_ITERATION_AND_BUFFER
+  }
+}
+actions {
+  stream_action {
+    request {
+      trailers {
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 5
+    request {
+      trailers {
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    request {
+      continue_decoding {
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    stream_id: 5
+    request {
+      continue_decoding {
+      }
+    }
+  }
+}

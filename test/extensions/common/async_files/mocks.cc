@@ -56,6 +56,13 @@ MockAsyncFileContext::MockAsyncFileContext(std::shared_ptr<MockAsyncFileManager>
                                      std::unique_ptr<MockAsyncFileAction>(
                                          new TypedMockAsyncFileAction(std::move(on_complete))));
           });
+  ON_CALL(*this, truncate(_, _, _))
+      .WillByDefault([this](Event::Dispatcher* dispatcher, size_t,
+                            absl::AnyInvocable<void(absl::Status)> on_complete) {
+        return manager_->enqueue(dispatcher,
+                                 std::unique_ptr<MockAsyncFileAction>(
+                                     new TypedMockAsyncFileAction(std::move(on_complete))));
+      });
 };
 
 MockAsyncFileManager::MockAsyncFileManager() {
