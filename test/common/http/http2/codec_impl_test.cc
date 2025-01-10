@@ -4455,7 +4455,7 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
   for (int i = 0; i <= 0xff; ++i) {
     if (i == 0 && http2_implementation_ == Http2Impl::Oghttp2) {
       // oghttp2 fails this specific case for now.
-      return;
+      continue;
     }
 
     TestRequestHeaderMapImpl request_headers;
