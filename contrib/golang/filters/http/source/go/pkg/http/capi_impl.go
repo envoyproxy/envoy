@@ -230,6 +230,12 @@ func (c *httpCApiImpl) HttpDrainBuffer(s unsafe.Pointer, bufferPtr uint64, lengt
 	handleCApiStatus(res)
 }
 
+func (c *httpCApiImpl) HttpFlushBuffer(s unsafe.Pointer, bufferPtr uint64, wait bool) {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpFlushBuffer(unsafe.Pointer(state.processState), C.uint64_t(bufferPtr), C.bool(wait))
+	handleCApiStatus(res)
+}
+
 func (c *httpCApiImpl) HttpSetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action api.BufferAction) {
 	state := (*processState)(s)
 	c.httpSetBufferHelper(state, bufferPtr, unsafe.Pointer(unsafe.StringData(value)), C.int(len(value)), action)

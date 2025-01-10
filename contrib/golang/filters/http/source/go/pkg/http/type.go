@@ -435,6 +435,15 @@ func (b *httpBuffer) Reset() {
 	b.Drain(b.Len())
 }
 
+func (b *httpBuffer) Flush(wait bool) {
+	if b.length == 0 {
+		return
+	}
+
+	cAPI.HttpFlushBuffer(unsafe.Pointer(b.state), b.envoyBufferInstance, wait)
+	b.length = 0
+}
+
 func (b *httpBuffer) String() string {
 	if b.length == 0 {
 		return ""

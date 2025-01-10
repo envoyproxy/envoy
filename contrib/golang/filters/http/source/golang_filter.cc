@@ -791,6 +791,41 @@ CAPIStatus Filter::drainBuffer(ProcessorState& state, Buffer::Instance* buffer, 
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::flushBuffer(ProcessorState& state, Buffer::Instance* buffer, bool wait) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (!state.doDataList.checkExisting(buffer)) {
+    ENVOY_LOG(debug, "invoking cgo api at invalid state: {}", __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  auto data_to_write = std::make_shared<Buffer::OwnedImpl>();
+  data_to_write->add(*buffer);
+  buffer->drain(buffer->length());
+
+  auto weak_ptr = weak_from_this();
+  state.getDispatcher().post([this, &state, weak_ptr, data_to_write, wait] {
+    if (!weak_ptr.expired() && !hasDestroyed()) {
+      ENVOY_LOG(debug, "golang filter inject data to filter chain, length: {}, wait: {}",
+                data_to_write->length(), wait);
+      state.injectDataToFilterChain(*data_to_write.get(), false);
+      // TODO: handle wait
+    } else {
+      ENVOY_LOG(debug, "golang filter has gone or destroyed in flushBuffer event");
+    }
+  });
+
+  return CAPIStatus::CAPIOK;
+}
+
 CAPIStatus Filter::setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
                                    absl::string_view& value, bufferAction action) {
   // lock until this function return since it may running in a Go thread.

@@ -91,6 +91,7 @@ CAPIStatus envoyGoFilterHttpGetBuffer(void* s, uint64_t buffer, void* value);
 CAPIStatus envoyGoFilterHttpDrainBuffer(void* s, uint64_t buffer, uint64_t length);
 CAPIStatus envoyGoFilterHttpSetBufferHelper(void* s, uint64_t buffer, void* data, int length,
                                             bufferAction action);
+CAPIStatus envoyGoFilterHttpFlushBuffer(void* s, uint64_t buffer, bool wait);
 
 CAPIStatus envoyGoFilterHttpCopyTrailers(void* s, void* strs, void* buf);
 CAPIStatus envoyGoFilterHttpSetTrailer(void* s, void* key_data, int key_len, void* value,

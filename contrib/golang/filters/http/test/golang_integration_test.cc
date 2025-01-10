@@ -810,6 +810,7 @@ typed_config:
   const std::string METRIC{"metric"};
   const std::string ACTION{"action"};
   const std::string ADDDATA{"add_data"};
+  const std::string BUFFERFLUSH{"buffer_flush"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -1345,6 +1346,116 @@ TEST_P(GolangIntegrationTest, AddDataBufferAllDataAndAsync) {
 
   // bar added in trailers
   auto body = "foobar";
+  EXPECT_EQ(body, response->body());
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, BufferFlush_InBufferedDownstreamRequest) {
+  initializeBasicFilter(BUFFERFLUSH, "test.com");
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test?bufferingly_decode"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, false);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  codec_client_->sendData(request_encoder, "To ", false);
+  codec_client_->sendData(request_encoder, "be, ", true);
+
+  waitForNextUpstreamRequest();
+
+  auto body = "To be, or not to be, that is the question";
+  EXPECT_EQ(body, upstream_request_->body().toString());
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, BufferFlush_InNonBufferedDownstreamRequest) {
+  initializeBasicFilter(BUFFERFLUSH, "test.com");
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test?nonbufferingly_decode"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, false);
+  Http::RequestEncoder& request_encoder = encoder_decoder.first;
+  codec_client_->sendData(request_encoder, "To be, ", false);
+  timeSystem().advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
+  codec_client_->sendData(request_encoder, "that is ", true);
+
+  waitForNextUpstreamRequest();
+
+  auto body = "To be, or not to be, that is the question";
+  EXPECT_EQ(body, upstream_request_->body().toString());
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, BufferFlush_InBufferedUpstreamResponse) {
+  initializeBasicFilter(BUFFERFLUSH, "test.com");
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test?bufferingly_encode"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+  };
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data("To ");
+  upstream_request_->encodeData(response_data, false);
+  Buffer::OwnedImpl response_data2("be, ");
+  upstream_request_->encodeData(response_data2, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  auto body = "To be, or not to be, that is the question";
+  EXPECT_EQ(body, response->body());
+
+  cleanup();
+}
+
+TEST_P(GolangIntegrationTest, BufferFlush_InNonBufferedUpstreamResponse) {
+  initializeBasicFilter(BUFFERFLUSH, "test.com");
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test?nonbufferingly_encode"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "test.com"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+  };
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data("To be, ");
+  upstream_request_->encodeData(response_data, false);
+  timeSystem().advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
+  Buffer::OwnedImpl response_data2("that is ");
+  upstream_request_->encodeData(response_data2, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  auto body = "To be, or not to be, that is the question";
   EXPECT_EQ(body, response->body());
 
   cleanup();
