@@ -439,8 +439,7 @@ new_features:
     Add the option to specify samesite cookie attribute value for oauth2 supported cookies.
     To specify samesite attribute, choose one of the value from ``strict``,``lax`` or ``none``. if not specified,
     a default value of ``disabled`` will be assigned and there will be no samesite value in cookie. see
-    :ref:`apply_on_stream_done <envoy_v3_api_field_extensions.filters.http.oauth2.v3.CookieConfigs>` and
-    :ref:`apply_on_stream_done <envoy_v3_api_field_extensions.filters.http.oauth2.v3.CookieConfig>
+    :ref:`apply_on_stream_done <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.cookie_configs>`
     for more details.
 
 deprecated:

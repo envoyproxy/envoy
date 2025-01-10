@@ -197,29 +197,29 @@ public:
         envoy::extensions::filters::http::oauth2::v3::CookieConfig::BEARER_TOKEN);
     bearer_config->set_same_site(bearer_samesite);
 
-    // HMAC Cookie Config, Set samesite to DISABLED by default
+    // HMAC Cookie Config, Set Samesite to DISABLED by default
     auto* hmac_config = cookie_configs->mutable_oauth_hmac_cookie_config();
     hmac_config->set_type(envoy::extensions::filters::http::oauth2::v3::CookieConfig::OAUTH_HMAC);
     hmac_config->set_same_site(hmac_samesite);
 
-    // Expires Cookie Config, Set samesite to DISABLED by default
+    // Expires Cookie Config, Set Samesite to DISABLED by default
     auto* expires_config = cookie_configs->mutable_oauth_expires_cookie_config();
     expires_config->set_type(
         envoy::extensions::filters::http::oauth2::v3::CookieConfig::OAUTH_EXPIRES);
     expires_config->set_same_site(expires_samesite);
 
-    // ID Token Cookie Config, Set samesite to DISABLED by default
+    // ID Token Cookie Config, Set Samesite to DISABLED by default
     auto* id_token_config = cookie_configs->mutable_id_token_cookie_config();
     id_token_config->set_type(envoy::extensions::filters::http::oauth2::v3::CookieConfig::ID_TOKEN);
     id_token_config->set_same_site(id_token_samesite);
 
-    // Refresh Token Cookie Config, Set samesite to DISABLED by default
+    // Refresh Token Cookie Config, Set Samesite to DISABLED by default
     auto* refresh_token_config = cookie_configs->mutable_refresh_token_cookie_config();
     refresh_token_config->set_type(
         envoy::extensions::filters::http::oauth2::v3::CookieConfig::REFRESH_TOKEN);
     refresh_token_config->set_same_site(refresh_token_samesite);
 
-    // OAuth Nonce Cookie Config, Set samesite to DISABLED by default
+    // OAuth Nonce Cookie Config, Set Samesite to DISABLED by default
     auto* oauth_nonce_config = cookie_configs->mutable_oauth_nonce_cookie_config();
     oauth_nonce_config->set_type(
         envoy::extensions::filters::http::oauth2::v3::CookieConfig::OAUTH_NONCE);
