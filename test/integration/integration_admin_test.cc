@@ -485,7 +485,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
-// Validates that the "inboundonly&graceful" only drains inbound listeners.
+// Validates that the inbound only query param only drains inbound listeners when graceful is set.
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulConnectionCloseForInbound) {
   if (downstreamProtocol() != Http::CodecType::HTTP1) {
     // Connection: close is HTTP1 only
@@ -515,7 +515,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulConnectionCloseForInbo
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
-// Validates that the "inboundonly&graceful" only drains inbound listeners.
+// Validates that the inbound only query param only drains inbound listeners when graceful is set.
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulNoConnectionCloseForOutbound) {
   if (downstreamProtocol() != Http::CodecType::HTTP1) {
     // Connection: close is HTTP1 only
