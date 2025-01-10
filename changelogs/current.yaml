@@ -36,6 +36,12 @@ bug_fixes:
   change: |
     Fixed OAuth2 credential injector to send scope (if specified) to authorization server when requesting new access
     token using ``client_credentials`` flow.
+- area: http
+  change: |
+    Fixed the jwks fetcher to set the :scheme pseudo header according to the uri ('http' or 'https').
+    Before the :scheme header was always 'http'.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
