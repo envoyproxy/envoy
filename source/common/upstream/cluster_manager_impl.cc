@@ -108,6 +108,21 @@ bool isBlockingAdsCluster(const envoy::config::bootstrap::v3::Bootstrap& bootstr
   return blocking_ads_cluster;
 }
 
+absl::Status createClients(Grpc::AsyncClientFactoryPtr& primary_factory,
+                           Grpc::AsyncClientFactoryPtr& failover_factory,
+                           Grpc::RawAsyncClientPtr& primary_client,
+                           Grpc::RawAsyncClientPtr& failover_client) {
+  absl::StatusOr<Grpc::RawAsyncClientPtr> success = primary_factory->createUncachedRawAsyncClient();
+  RETURN_IF_NOT_OK_REF(success.status());
+  primary_client = std::move(*success);
+  if (failover_factory) {
+    success = failover_factory->createUncachedRawAsyncClient();
+    RETURN_IF_NOT_OK_REF(success.status());
+    failover_client = std::move(*success);
+  }
+  return absl::OkStatus();
+}
+
 } // namespace
 
 void ClusterManagerInitHelper::addCluster(ClusterManagerCluster& cm_cluster) {
@@ -471,12 +486,15 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
         RETURN_IF_NOT_OK_REF(factory_failover_or_error.status());
         factory_failover = std::move(factory_failover_or_error.value());
       }
-      ads_mux_ = factory->create(
-          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
-          factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr,
-          dispatcher_, random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
-          std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
+      Grpc::RawAsyncClientPtr primary_client;
+      Grpc::RawAsyncClientPtr failover_client;
+      RETURN_IF_NOT_OK(createClients(factory_primary_or_error.value(), factory_failover,
+                                     primary_client, failover_client));
+      ads_mux_ =
+          factory->create(std::move(primary_client), std::move(failover_client), dispatcher_,
+                          random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
+                          std::move(custom_config_validators), std::move(backoff_strategy),
+                          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
     } else {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       RETURN_IF_NOT_OK(status);
@@ -502,10 +520,13 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
         RETURN_IF_NOT_OK_REF(factory_failover_or_error.status());
         factory_failover = std::move(factory_failover_or_error.value());
       }
+      Grpc::RawAsyncClientPtr primary_client;
+      Grpc::RawAsyncClientPtr failover_client;
+      RETURN_IF_NOT_OK(createClients(factory_primary_or_error.value(), factory_failover,
+                                     primary_client, failover_client));
       ads_mux_ = factory->create(
-          factory_primary_or_error.value()->createUncachedRawAsyncClient(),
-          factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr,
-          dispatcher_, random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
+          std::move(primary_client), std::move(failover_client), dispatcher_, random_,
+          *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
           std::move(custom_config_validators), std::move(backoff_strategy),
           makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, use_eds_cache);
     }
@@ -648,10 +669,10 @@ ClusterManagerImpl::replaceAdsMux(const envoy::config::core::v3::ApiConfigSource
     RETURN_IF_NOT_OK_REF(factory_failover_or_error.status());
     factory_failover = std::move(factory_failover_or_error.value());
   }
-  Grpc::RawAsyncClientPtr primary_client =
-      factory_primary_or_error.value()->createUncachedRawAsyncClient();
-  Grpc::RawAsyncClientPtr failover_client =
-      factory_failover ? factory_failover->createUncachedRawAsyncClient() : nullptr;
+  Grpc::RawAsyncClientPtr primary_client;
+  Grpc::RawAsyncClientPtr failover_client;
+  RETURN_IF_NOT_OK(createClients(factory_primary_or_error.value(), factory_failover, primary_client,
+                                 failover_client));
 
   // Primary client must not be null, as the primary xDS source must be a valid one.
   // The failover_client may be null (no failover defined).
@@ -676,9 +697,11 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
         *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0);
     RETURN_IF_NOT_OK_REF(factory_or_error.status());
+    absl::StatusOr<Grpc::RawAsyncClientPtr> client_or_error =
+        factory_or_error.value()->createUncachedRawAsyncClient();
+    RETURN_IF_NOT_OK_REF(client_or_error.status());
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, *this, *stats_.rootScope(),
-        factory_or_error.value()->createUncachedRawAsyncClient(), dispatcher_);
+        local_info_, *this, *stats_.rootScope(), std::move(*client_or_error), dispatcher_);
   }
   return absl::OkStatus();
 }
