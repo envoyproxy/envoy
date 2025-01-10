@@ -100,13 +100,13 @@ TEST(LinuxContainerCpuStatsReader, ReadsCgroupContainerStats) {
   const std::string temp_path_cpu_allocated =
       TestEnvironment::temporaryPath("cgroup_cpu_allocated_stats");
   AtomicFileUpdater file_updater_cpu_allocated(temp_path_cpu_allocated);
-  const std::string mock_contents_cpu_allocated = R"EOF(1000
+  const std::string mock_contents_cpu_allocated = R"EOF(2048
 )EOF";
   file_updater_cpu_allocated.update(mock_contents_cpu_allocated);
 
   const std::string temp_path_cpu_times = TestEnvironment::temporaryPath("cgroup_cpu_times_stats");
   AtomicFileUpdater file_updater_cpu_times(temp_path_cpu_times);
-  const std::string mock_contents_cpu_times = R"EOF(10000000000
+  const std::string mock_contents_cpu_times = R"EOF(1000
 )EOF";
   file_updater_cpu_times.update(mock_contents_cpu_times);
 
@@ -119,7 +119,7 @@ TEST(LinuxContainerCpuStatsReader, ReadsCgroupContainerStats) {
                                               .count();
   const int64_t time_diff_ns = current_monotonic_time - envoy_container_stats.total_time;
 
-  EXPECT_EQ(envoy_container_stats.work_time, 10);
+  EXPECT_EQ(envoy_container_stats.work_time, 500);
   EXPECT_GT(time_diff_ns, 0);
 }
 

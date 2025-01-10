@@ -91,8 +91,8 @@ CpuTimes LinuxContainerCpuStatsReader::getCpuTimes() {
   const uint64_t current_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                     time_source_.monotonicTime().time_since_epoch())
                                     .count();
-  return {true, cpu_times_value / (cpu_allocated_value * 1000000),
-          current_time}; // cpu_times is in nanoseconds and cpu_allocated shares is in Millicores
+  return {true, (cpu_times_value * 1024) / cpu_allocated_value,
+          current_time}; // cpu_times_value is in nanoseconds and cpu_allocated shares is in Millicores
 }
 
 } // namespace CpuUtilizationMonitor
