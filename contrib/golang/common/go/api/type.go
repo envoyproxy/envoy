@@ -254,6 +254,9 @@ type BufferInstance interface {
 
 	// Append append the contents of the string data to the buffer.
 	AppendString(s string) error
+
+	// TODO: Currently we only support wait=false
+	Flush(wait bool)
 }
 
 //*************** BufferInstance end **************//

@@ -38,6 +38,7 @@ type HttpCAPI interface {
 	HttpDrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64)
 	HttpSetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
 	HttpSetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
+	HttpFlushBuffer(s unsafe.Pointer, bufferPtr uint64, wait bool)
 
 	HttpCopyTrailers(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
 	HttpSetTrailer(s unsafe.Pointer, key string, value string, add bool)

@@ -57,6 +57,7 @@ envoy_cc_test(
         "//contrib/golang/filters/http/test/test_data/add_data:filter.so",
         "//contrib/golang/filters/http/test/test_data/basic:filter.so",
         "//contrib/golang/filters/http/test/test_data/buffer:filter.so",
+        "//contrib/golang/filters/http/test/test_data/buffer_flush:filter.so",
         "//contrib/golang/filters/http/test/test_data/echo:filter.so",
         "//contrib/golang/filters/http/test/test_data/metric:filter.so",
         "//contrib/golang/filters/http/test/test_data/passthrough:filter.so",

@@ -209,6 +209,14 @@ CAPIStatus envoyGoFilterHttpDrainBuffer(void* s, uint64_t buffer_ptr, uint64_t l
       });
 }
 
+CAPIStatus envoyGoFilterHttpFlushBuffer(void* s, uint64_t buffer_ptr, bool wait) {
+  return envoyGoFilterProcessStateHandlerWrapper(
+      s, [buffer_ptr, wait](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
+        auto buffer = reinterpret_cast<Buffer::Instance*>(buffer_ptr);
+        return filter->flushBuffer(state, buffer, wait);
+      });
+}
+
 CAPIStatus envoyGoFilterHttpSetBufferHelper(void* s, uint64_t buffer_ptr, void* data, int length,
                                             bufferAction action) {
   return envoyGoFilterProcessStateHandlerWrapper(

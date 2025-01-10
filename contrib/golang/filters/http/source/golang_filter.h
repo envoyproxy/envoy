@@ -278,6 +278,7 @@ public:
   CAPIStatus removeHeader(ProcessorState& state, absl::string_view key);
   CAPIStatus copyBuffer(ProcessorState& state, Buffer::Instance* buffer, char* data);
   CAPIStatus drainBuffer(ProcessorState& state, Buffer::Instance* buffer, uint64_t length);
+  CAPIStatus flushBuffer(ProcessorState& state, Buffer::Instance* buffer, bool wait);
   CAPIStatus setBufferHelper(ProcessorState& state, Buffer::Instance* buffer,
                              absl::string_view& value, bufferAction action);
   CAPIStatus copyTrailers(ProcessorState& state, GoString* go_strs, char* go_buf);
