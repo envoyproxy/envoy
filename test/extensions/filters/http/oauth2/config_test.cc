@@ -306,7 +306,7 @@ config:
       same_site: LAX
     oauth_hmac_cookie_config:
       same_site: STRICT
-    oauth_expires_cookie_config: 
+    oauth_expires_cookie_config:
       same_site: NONE
     id_token_cookie_config:
       same_site: STRICT
