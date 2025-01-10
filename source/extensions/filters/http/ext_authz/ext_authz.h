@@ -134,7 +134,7 @@ public:
 
   bool headersAsBytes() const { return encode_raw_headers_; }
 
-  fifo_cache::FIFOEvictionCache& responseCache() { return response_cache_; }
+  FIFOEvictionCache& responseCache() { return response_cache_; }
 
   const std::vector<std::string>& responseCacheHeaderNames() const {
     return response_cache_header_names_;
@@ -285,7 +285,7 @@ private:
   uint32_t response_cache_ttl_;
   std::vector<std::string> response_cache_header_names_; // New field for header names
   // Response cache
-  fifo_cache::FIFOEvictionCache response_cache_;
+  FIFOEvictionCache response_cache_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats

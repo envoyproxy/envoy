@@ -313,7 +313,9 @@ message ExtAuthz {
 
   // Configuration parameters for ext_authz response cache
   uint32 response_cache_max_size = 30;
+
   uint32 response_cache_ttl = 31;
+
   // Array of header names. ext_authz will use the first header that appears in the HTTP request as the cache key.
   repeated string response_cache_header_names = 32;
 }
