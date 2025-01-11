@@ -18,6 +18,7 @@ envoy_cc_library(
     hdrs = ["aws_request_signing_filter.h"],
     deps = [
         "//envoy/http:filter_interface",
+        "//source/common/common:cancel_wrapper_lib",
         "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:region_provider_impl_lib",
         "//source/extensions/common/aws:sigv4_signer_impl_lib",
