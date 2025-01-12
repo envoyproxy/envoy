@@ -362,20 +362,26 @@ TEST_F(RateLimitPolicyEntryTest, MaskedRemoteAddressIpv4) {
 actions:
 - masked_remote_address:
     v4_prefix_mask_len: 16
+hits_addend:
+  format: "%REQ(x-test-hits-addend)%"
   )EOF";
 
   setupTest(yaml);
 
+  header_.addCopy("x-test-hits-addend", "1234");
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   EXPECT_THAT(
       std::vector<Envoy::RateLimit::Descriptor>({{{{"masked_remote_address", "10.0.0.0/16"}}}}),
       testing::ContainerEq(descriptors_));
+  EXPECT_EQ(1234, descriptors_[0].hits_addend_);
 }
 
 TEST_F(RateLimitPolicyEntryIpv6Test, MaskedRemoteAddressIpv6Default) {
   const std::string yaml = R"EOF(
 actions:
 - masked_remote_address: {}
+hits_addend:
+  number: 1234
   )EOF";
 
   setupTest(yaml);
@@ -384,6 +390,7 @@ actions:
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
                   {{{{"masked_remote_address", "2001:abcd:ef01:2345:6789:abcd:ef01:234/128"}}}}),
               testing::ContainerEq(descriptors_));
+  EXPECT_EQ(1234, descriptors_[0].hits_addend_);
 }
 
 TEST_F(RateLimitPolicyEntryIpv6Test, MaskedRemoteAddressIpv6) {

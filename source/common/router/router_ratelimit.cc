@@ -12,6 +12,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -263,12 +264,80 @@ QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
   return ret;
 }
 
+absl::Status resolveHitsAddendSource(const envoy::config::route::v3::RateLimit::HitsAddend& config,
+                                     Formatter::FormatterProviderPtr& hits_addend_provider,
+                                     absl::optional<uint64_t>& hits_addend) {
+  if (!config.format().empty()) {
+    // Ensure only format or number is set.
+    if (config.has_number()) {
+      return absl::InvalidArgumentError("hits_addend must contain either a format or a number");
+    }
+
+    auto providers_or = Formatter::SubstitutionFormatParser::parse(config.format());
+    if (!providers_or.ok()) {
+      return providers_or.status();
+    }
+    if (providers_or->size() != 1) {
+      return absl::InvalidArgumentError("hits_addend format must contain exactly one substitution");
+    }
+    hits_addend_provider = std::move(providers_or.value()[0]);
+  } else if (config.has_number()) {
+    hits_addend = config.number().value();
+  } else {
+    return absl::InvalidArgumentError("hits_addend must contain either a format or a number");
+  }
+  return absl::OkStatus();
+}
+
+constexpr double MAX_HITS_ADDEND = 1000000000;
+
+absl::StatusOr<uint64_t>
+getHitsAddendViaProvider(const Formatter::FormatterProvider& hits_addend_provider,
+                         const Http::RequestHeaderMap& headers,
+                         const StreamInfo::StreamInfo& stream_info) {
+
+  const ProtobufWkt::Value hits_addend_value =
+      hits_addend_provider.formatValueWithContext({&headers}, stream_info);
+
+  double hits_addend = 0;
+  if (hits_addend_value.has_number_value()) {
+    hits_addend = hits_addend_value.number_value();
+  } else if (hits_addend_value.has_string_value()) {
+    // Attempt to parse the string as a double.
+    const auto success = absl::SimpleAtod(hits_addend_value.string_value(), &hits_addend);
+    if (!success) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to parse hits_addend: ", hits_addend_value.DebugString()));
+    }
+  } else {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Only string or number type is allowed for hits_addend.format: ",
+                     hits_addend_value.DebugString()));
+  }
+
+  // Check value range.
+  if (hits_addend < 0 || hits_addend > MAX_HITS_ADDEND) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("hits_addend out of range [0, ", MAX_HITS_ADDEND, "]: ", hits_addend));
+  }
+  return static_cast<uint64_t>(hits_addend);
+}
+
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config,
     Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : disable_key_(config.disable_key()),
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))),
       apply_on_stream_done_(config.apply_on_stream_done()) {
+
+  if (config.has_hits_addend()) {
+    creation_status =
+        resolveHitsAddendSource(config.hits_addend(), hits_addend_provider_, hits_addend_);
+    if (!creation_status.ok()) {
+      return;
+    }
+  }
+
   for (const auto& action : config.actions()) {
     switch (action.action_specifier_case()) {
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kSourceCluster:
@@ -361,6 +430,20 @@ void RateLimitPolicyEntryImpl::populateDescriptors(std::vector<RateLimit::Descri
 
   if (limit_override_) {
     limit_override_.value()->populateOverride(descriptor, &info.dynamicMetadata());
+  }
+
+  // Populate hits_addend if set.
+  if (hits_addend_provider_ != nullptr) {
+    const auto hits_addend_or =
+        Router::getHitsAddendViaProvider(*hits_addend_provider_, headers, info);
+    if (!hits_addend_or.ok()) {
+      ENVOY_LOG_EVERY_POW_2(warn, "Failed to get hits_addend: {}",
+                            hits_addend_or.status().message());
+      return;
+    }
+    descriptor.hits_addend_ = hits_addend_or.value();
+  } else if (hits_addend_.has_value()) {
+    descriptor.hits_addend_ = hits_addend_.value();
   }
 
   if (result) {

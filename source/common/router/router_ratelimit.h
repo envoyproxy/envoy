@@ -7,6 +7,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
@@ -237,10 +238,28 @@ private:
   Matcher::DataInputPtr<Http::HttpMatchingData> data_input_;
 };
 
+/**
+ * Resolve hits addend source from configuration. It sets either hits_addend_provider or hits_addend
+ * based on the configuration.
+ */
+absl::Status
+resolveHitsAddendSource(const envoy::config::route::v3::RateLimit::HitsAddend& hits_addend_config,
+                        Formatter::FormatterProviderPtr& hits_addend_provider,
+                        absl::optional<uint64_t>& hits_addend);
+
+/**
+ * Get hits addend value from hits_addend_provider.
+ */
+absl::StatusOr<uint64_t>
+getHitsAddendViaProvider(const Formatter::FormatterProvider& hits_addend_provider,
+                         const Http::RequestHeaderMap& headers,
+                         const StreamInfo::StreamInfo& stream_info);
+
 /*
  * Implementation of RateLimitPolicyEntry that holds the action for the configuration.
  */
-class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
+class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry,
+                                 Logger::Loggable<Envoy::Logger::Id::config> {
 public:
   RateLimitPolicyEntryImpl(const envoy::config::route::v3::RateLimit& config,
                            Server::Configuration::CommonFactoryContext& context,
@@ -264,6 +283,8 @@ private:
   std::vector<RateLimit::DescriptorProducerPtr> actions_;
   absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
   const bool apply_on_stream_done_ = false;
+  Formatter::FormatterProviderPtr hits_addend_provider_ = nullptr;
+  absl::optional<uint64_t> hits_addend_ = absl::nullopt;
 };
 
 /**

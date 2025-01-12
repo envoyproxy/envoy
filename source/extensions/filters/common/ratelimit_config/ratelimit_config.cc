@@ -10,35 +10,14 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-constexpr double MAX_HITS_ADDEND = 1000000000;
-
 RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
                                  Server::Configuration::CommonFactoryContext& context,
                                  absl::Status& creation_status, bool no_limit)
     : apply_on_stream_done_(config.apply_on_stream_done()) {
   if (config.has_hits_addend()) {
-    if (!config.hits_addend().format().empty()) {
-      // Ensure only format or number is set.
-      if (config.hits_addend().has_number()) {
-        creation_status =
-            absl::InvalidArgumentError("hits_addend must contain either a format or a number");
-        return;
-      }
-
-      auto providers_or_error =
-          Formatter::SubstitutionFormatParser::parse(config.hits_addend().format());
-      SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
-      if (providers_or_error->size() != 1) {
-        creation_status =
-            absl::InvalidArgumentError("hits_addend format must contain exactly one substitution");
-        return;
-      }
-      hits_addend_provider_ = std::move(providers_or_error.value()[0]);
-    } else if (config.hits_addend().has_number()) {
-      hits_addend_ = config.hits_addend().number().value();
-    } else {
-      creation_status =
-          absl::InvalidArgumentError("hits_addend must contain either a format or a number");
+    creation_status =
+        Router::resolveHitsAddendSource(config.hits_addend(), hits_addend_provider_, hits_addend_);
+    if (!creation_status.ok()) {
       return;
     }
   }
@@ -144,34 +123,14 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
 
   // Populate hits_addend if set.
   if (hits_addend_provider_ != nullptr) {
-    const ProtobufWkt::Value hits_addend_value =
-        hits_addend_provider_->formatValueWithContext({&headers}, stream_info);
-
-    double hits_addend = 0;
-    bool success = true;
-
-    if (hits_addend_value.has_number_value()) {
-      hits_addend = hits_addend_value.number_value();
-    } else if (hits_addend_value.has_string_value()) {
-      // Attempt to parse the string as a double.
-      success = absl::SimpleAtod(hits_addend_value.string_value(), &hits_addend);
-    } else {
-      // Only number and string values are allowed.
-      success = false;
-    }
-
-    // Check value range.
-    if (hits_addend < 0 || hits_addend > MAX_HITS_ADDEND) {
-      success = false;
-    }
-
-    if (success) {
-      descriptor.hits_addend_ = static_cast<uint64_t>(hits_addend);
-    } else {
-      ENVOY_LOG_EVERY_POW_2(warn, "Invalid hits_addend: {}", hits_addend_value.DebugString());
+    const auto hits_addend_or =
+        Router::getHitsAddendViaProvider(*hits_addend_provider_, headers, stream_info);
+    if (!hits_addend_or.ok()) {
+      ENVOY_LOG_EVERY_POW_2(warn, "Failed to get hits_addend: {}",
+                            hits_addend_or.status().message());
       return;
     }
-
+    descriptor.hits_addend_ = hits_addend_or.value();
   } else if (hits_addend_.has_value()) {
     descriptor.hits_addend_ = hits_addend_.value();
   }
