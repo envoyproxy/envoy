@@ -21,9 +21,9 @@ namespace HttpFilters {
 namespace Golang {
 namespace {
 
-std::string genSoPath(std::string name) {
+std::string genSoPath() {
   return TestEnvironment::substitute(
-      "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/" + name + "/filter.so");
+      "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/plugins.so");
 }
 
 void cleanup() { Dso::DsoManager<Dso::HttpFilterDsoImpl>::cleanUpForTest(); }
@@ -55,7 +55,7 @@ TEST(GolangFilterConfigTest, GolangFilterWithValidConfig) {
   )EOF";
 
   const std::string PASSTHROUGH{"passthrough"};
-  auto yaml_string = absl::StrFormat(yaml_fmt, PASSTHROUGH, genSoPath(PASSTHROUGH));
+  auto yaml_string = absl::StrFormat(yaml_fmt, PASSTHROUGH, genSoPath());
   envoy::extensions::filters::http::golang::v3alpha::Config proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -84,7 +84,7 @@ TEST(GolangFilterConfigTest, GolangFilterWithNilPluginConfig) {
   )EOF";
 
   const std::string PASSTHROUGH{"passthrough"};
-  auto yaml_string = absl::StrFormat(yaml_fmt, PASSTHROUGH, genSoPath(PASSTHROUGH));
+  auto yaml_string = absl::StrFormat(yaml_fmt, PASSTHROUGH, genSoPath());
   envoy::extensions::filters::http::golang::v3alpha::Config proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
