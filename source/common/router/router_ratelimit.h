@@ -7,7 +7,10 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+
+#ifdef ENVOY_STATIC_EXTENSION_REGISTRATION
 #include "envoy/formatter/substitution_formatter.h"
+#endif
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"

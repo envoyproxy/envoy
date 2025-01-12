@@ -7,7 +7,6 @@ load(
     "envoy_cc_library",
     "envoy_package",
 )
-load(":envoy_select.bzl", "envoy_select_static_extension_registration")
 
 licenses(["notice"])  # Apache 2
 
@@ -432,11 +431,14 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
-    ] + envoy_select_static_extension_registration([
-        # See the comments in the header file.
-        "//source/common/formatter:formatter_extension_lib",
-        "//source/common/formatter:substitution_formatter_lib",
-    ]),
+    ] + select({
+        "//bazel:disable_static_extension_registration": [],
+        "//conditions:default": [
+            # See the comments in the header file.
+            "//source/common/formatter:formatter_extension_lib",
+            "//source/common/formatter:substitution_formatter_lib",
+        ],
+    }),
 )
 
 envoy_cc_library(
