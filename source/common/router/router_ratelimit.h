@@ -238,6 +238,13 @@ private:
   Matcher::DataInputPtr<Http::HttpMatchingData> data_input_;
 };
 
+// This requires the formatter to be resolved at runtime which currently uses excetions.
+// Therefore, it cannot be supported in the Envoy mobile for now.
+// Moreover, to make the hits_addend meaningful, the formatter should be able to access
+// the static registry of formatters which is also not supported in the Envoy mobile.
+//
+// TODO(mathetake): revisit after removing exceptions from formatters.
+#ifdef ENVOY_STATIC_EXTENSION_REGISTRATION
 /**
  * Resolve hits addend source from configuration. It sets either hits_addend_provider or hits_addend
  * based on the configuration.
@@ -254,6 +261,7 @@ absl::StatusOr<uint64_t>
 getHitsAddendViaProvider(const Formatter::FormatterProvider& hits_addend_provider,
                          const Http::RequestHeaderMap& headers,
                          const StreamInfo::StreamInfo& stream_info);
+#endif
 
 /*
  * Implementation of RateLimitPolicyEntry that holds the action for the configuration.

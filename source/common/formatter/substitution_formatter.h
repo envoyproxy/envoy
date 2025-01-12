@@ -13,7 +13,11 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/common/utility.h"
+
+#ifdef ENVOY_STATIC_EXTENSION_REGISTRATION // See the comments in the header file around
+                                           // resolveHitsAddendSource.
 #include "source/common/formatter/http_formatter_context.h"
+#endif
 #include "source/common/json/json_loader.h"
 #include "source/common/json/json_streamer.h"
 #include "source/common/json/json_utility.h"

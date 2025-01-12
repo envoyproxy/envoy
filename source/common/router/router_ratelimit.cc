@@ -264,6 +264,7 @@ QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
   return ret;
 }
 
+#ifdef ENVOY_STATIC_EXTENSION_REGISTRATION
 absl::Status resolveHitsAddendSource(const envoy::config::route::v3::RateLimit::HitsAddend& config,
                                      Formatter::FormatterProviderPtr& hits_addend_provider,
                                      absl::optional<uint64_t>& hits_addend) {
@@ -322,6 +323,7 @@ getHitsAddendViaProvider(const Formatter::FormatterProvider& hits_addend_provide
   }
   return static_cast<uint64_t>(hits_addend);
 }
+#endif
 
 RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config,
@@ -330,6 +332,8 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))),
       apply_on_stream_done_(config.apply_on_stream_done()) {
 
+#ifdef ENVOY_STATIC_EXTENSION_REGISTRATION // See the comments in the header file around
+                                           // resolveHitsAddendSource.
   if (config.has_hits_addend()) {
     creation_status =
         resolveHitsAddendSource(config.hits_addend(), hits_addend_provider_, hits_addend_);
@@ -337,6 +341,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       return;
     }
   }
+#endif
 
   for (const auto& action : config.actions()) {
     switch (action.action_specifier_case()) {
@@ -432,6 +437,8 @@ void RateLimitPolicyEntryImpl::populateDescriptors(std::vector<RateLimit::Descri
     limit_override_.value()->populateOverride(descriptor, &info.dynamicMetadata());
   }
 
+#ifdef ENVOY_STATIC_EXTENSION_REGISTRATION // See the comments in the header file around
+                                           // resolveHitsAddendSource.
   // Populate hits_addend if set.
   if (hits_addend_provider_ != nullptr) {
     const auto hits_addend_or =
@@ -445,6 +452,7 @@ void RateLimitPolicyEntryImpl::populateDescriptors(std::vector<RateLimit::Descri
   } else if (hits_addend_.has_value()) {
     descriptor.hits_addend_ = hits_addend_.value();
   }
+#endif
 
   if (result) {
     descriptors.emplace_back(descriptor);
