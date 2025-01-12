@@ -238,12 +238,13 @@ private:
   Matcher::DataInputPtr<Http::HttpMatchingData> data_input_;
 };
 
-// This requires the formatter to be resolved at runtime which currently uses excetions.
-// Therefore, it cannot be supported in the Envoy mobile for now.
-// Moreover, to make the hits_addend meaningful, the formatter should be able to access
-// the static registry of formatters which is also not supported in the Envoy mobile.
+// This requires the formatter to be resolved which currently uses exceptions, so it cannot be
+// supported in mobile for now. Moreover, to make the hits_addend meaningful, the formatter should
+// be able to access the static registry of formatters which is also not supported in the Envoy
+// mobile.
 //
-// TODO(mathetake): revisit after removing exceptions from formatters.
+// TODO(mathetake): revisit after removing exceptions from formatters. Maybe deprecate the ratelimit
+// from the router would be a better solution.
 #ifdef ENVOY_STATIC_EXTENSION_REGISTRATION
 /**
  * Resolve hits addend source from configuration. It sets either hits_addend_provider or hits_addend
