@@ -13,6 +13,7 @@
 #include "envoy/network/listener.h"
 
 #include "source/common/listener_manager/active_stream_listener_base.h"
+#include "source/common/listener_manager/active_tcp_socket.h"
 #include "source/server/active_listener_base.h"
 
 

@@ -32,6 +32,7 @@ envoy_cc_library(
         "//envoy/network:filter_interface",
         "//envoy/network:listener_interface",
         "//source/common/listener_manager:active_stream_listener_base",
+        "//source/common/listener_manager:active_tcp_socket",
         "//source/server:active_listener_base",
     ],
 )
