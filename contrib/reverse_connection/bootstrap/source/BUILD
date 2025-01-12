@@ -76,28 +76,3 @@ envoy_cc_extension(
     ],
     alwayslink = 1,
 )
-
-envoy_cc_library(
-    name = "conn_pool_lib",
-    srcs = ["conn_pool.cc"],
-    hdrs = ["conn_pool.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":reversed_connection_lib",
-        "//envoy/event:dispatcher_interface",
-        "//source/common/http:codec_client_lib",
-        "//source/common/network:connection_impl",
-        "//source/common/http/http2:conn_pool_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "reversed_connection_lib",
-    srcs = ["reversed_connection_impl.cc"],
-    hdrs = ["reversed_connection_impl.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":reverse_conn_global_registry",
-        "//source/common/network:connection_impl",
-    ],
-)

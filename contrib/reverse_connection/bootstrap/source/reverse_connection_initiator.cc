@@ -260,6 +260,7 @@ void ReverseConnectionInitiator::reverseConnectionDone(const std::string& error,
   if (remote_cluster_id.empty()) {
     ENVOY_LOG(error, "Reverse connection failed: Internal Error: socket -> remote cluster mapping "
                      "not present. Ignoring message");
+    rc_conn_to_host_map_.erase(connectionKey);
     return;
   }
   ENVOY_LOG(debug,

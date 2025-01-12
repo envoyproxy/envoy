@@ -43,6 +43,9 @@ public:
   // Returns a reference to the connection handler.
   Network::ConnectionHandler* connectionHandler() const;
 
+  // Sets the connection handler.
+  void setConnectionHandler(Network::ConnectionHandler& conn_handler);
+
   // Returns a reference to the cluster manager.
   Upstream::ClusterManager& clusterManager() const;
 

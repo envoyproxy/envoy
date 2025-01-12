@@ -28,6 +28,10 @@ Network::ConnectionHandler* ReverseConnectionManager::connectionHandler() const 
   return conn_handler_;
 }
 
+void ReverseConnectionManager::setConnectionHandler(Network::ConnectionHandler& conn_handler) {
+  conn_handler_ = &conn_handler;
+}
+
 Upstream::ClusterManager& ReverseConnectionManager::clusterManager() const {
   return cluster_manager_;
 }
@@ -92,7 +96,7 @@ void ReverseConnectionManager::registerRCInitiators(
   // The conn handler needs to be set once for the thread local RCManager.
   if (conn_handler_ == nullptr) {
     ENVOY_LOG(debug, "RCManager: Setting connection handler for the first time");
-    conn_handler_ = &conn_handler;
+    setConnectionHandler(conn_handler);
   }
   const std::string& src_node_id =
       listener_ref.reverseConnectionListenerConfig()->getReverseConnParams()->src_node_id_;

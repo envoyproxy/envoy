@@ -55,6 +55,9 @@ using RCInitiatorStatsPtr = std::unique_ptr<RCInitiatorStats>;
  * unique listener.
  */
 class ReverseConnectionInitiator : Logger::Loggable<Logger::Id::main> {
+
+friend class ReverseConnectionInitiatorTest;
+
 public:
   // Parameters used by the current initiator during their cycle.
   struct ReverseConnectionOptions {
