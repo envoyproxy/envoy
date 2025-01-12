@@ -12,7 +12,11 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
+
+#ifdef ENVOY_STATIC_EXTENSION_REGISTRATION // See the comments in the header file around
+                                           // resolveHitsAddendSource.
 #include "source/common/formatter/substitution_formatter.h"
+#endif
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
