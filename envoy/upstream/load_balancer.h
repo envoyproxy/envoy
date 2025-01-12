@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/router/router.h"
 #include "envoy/stream_info/stream_info.h"
@@ -24,6 +25,8 @@ class ConnectionLifetimeCallbacks;
 } // namespace ConnectionPool
 } // namespace Http
 namespace Upstream {
+
+using ClusterProto = envoy::config::cluster::v3::Cluster;
 
 /**
  * Context information passed to a load balancer to use when choosing a host. Not all load
@@ -278,15 +281,32 @@ public:
   /**
    * This method is used to validate and create load balancer config from typed proto config.
    *
-   * @return LoadBalancerConfigPtr a new load balancer config.
+   * @return LoadBalancerConfigPtr a new load balancer config or error.
    *
    * @param factory_context supplies the load balancer factory context.
    * @param config supplies the typed proto config of the load balancer. A dynamic_cast could
    *        be performed on the config to the expected proto type.
    */
-  virtual LoadBalancerConfigPtr
+  virtual absl::StatusOr<LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext& factory_context,
              const Protobuf::Message& config) PURE;
+
+  /**
+   * This method is used to validate and create load balancer config from legacy proto config.
+   * This method is only used for backwards compatibility with the legacy cluster config.
+   *
+   * @return LoadBalancerConfigPtr a new load balancer config or error.
+   *
+   * @param factory_context supplies the load balancer factory context.
+   * @param cluster supplies the legacy proto config of the cluster.
+   */
+  virtual absl::StatusOr<LoadBalancerConfigPtr>
+  loadLegacy(Server::Configuration::ServerFactoryContext& factory_context,
+             const ClusterProto& cluster) {
+    UNREFERENCED_PARAMETER(cluster);
+    UNREFERENCED_PARAMETER(factory_context);
+    return nullptr;
+  }
 
   std::string category() const override { return "envoy.load_balancing_policies"; }
 };

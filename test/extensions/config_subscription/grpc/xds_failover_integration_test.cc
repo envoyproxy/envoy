@@ -183,14 +183,6 @@ public:
     RELEASE_ASSERT(result, result.message());
   }
 
-  // Waits for a failover source connected and immediately disconnects.
-  void failoverConnectionFailure() {
-    AssertionResult result = xds_upstream_->waitForHttpConnection(*dispatcher_, xds_connection_);
-    RELEASE_ASSERT(result, result.message());
-    result = xds_connection_->close();
-    RELEASE_ASSERT(result, result.message());
-  }
-
   envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name) {
     return ConfigHelper::buildClusterLoadAssignment(
