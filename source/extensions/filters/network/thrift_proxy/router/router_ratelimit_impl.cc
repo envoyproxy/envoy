@@ -102,9 +102,6 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kDestinationCluster:
       actions_.emplace_back(new DestinationClusterAction());
       break;
-    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kQueryParameters:
-      throw EnvoyException("Query parameter rate limiting is not supported for Thrift");
-      break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRequestHeaders:
       actions_.emplace_back(new RequestHeadersAction(action.request_headers()));
       break;

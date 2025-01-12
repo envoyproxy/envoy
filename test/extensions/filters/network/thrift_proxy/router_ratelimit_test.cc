@@ -607,8 +607,7 @@ actions:
       descriptor_key: my_param
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException,
-                            "Query parameter rate limiting is not supported for Thrift");
+  EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException, "unsupported RateLimit Action 12");
 }
 
 } // namespace
