@@ -766,7 +766,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   ASSERT(config_.clusterManager());
   xds_manager_ =
       std::make_unique<Config::XdsManagerImpl>(*config_.clusterManager(), validation_context_);
-  listener_manager_->setClusterManagerForWorkers(config_.clusterManager());
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.

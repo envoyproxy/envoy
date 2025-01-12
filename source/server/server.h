@@ -34,7 +34,6 @@
 #include "source/common/http/context_impl.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/memory/stats.h"
-#include "source/common/network/connection_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
