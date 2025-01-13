@@ -19,7 +19,7 @@ ActiveLookupRequest::ActiveLookupRequest(const Http::RequestHeaderMap& request_h
                                          bool ignore_request_cache_control_header)
     : upstream_request_factory_(std::move(upstream_request_factory)), dispatcher_(dispatcher),
       key_(CacheHeadersUtils::makeKey(request_headers, cluster_name)),
-      request_headers_(createHeaderMap<Http::RequestHeaderMapImpl>(request_headers)),
+      request_headers_(Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers)),
       vary_allow_list_(vary_allow_list), timestamp_(timestamp) {
   if (!ignore_request_cache_control_header) {
     initializeRequestCacheControl(request_headers);
