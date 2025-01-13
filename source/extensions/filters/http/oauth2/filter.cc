@@ -149,8 +149,6 @@ getSameSiteString(envoy::extensions::filters::http::oauth2::v3::CookieConfig_Sam
   case envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
       CookieConfig_SameSite_DISABLED:
     return EMPTY_STRING;
-  default:
-    return EMPTY_STRING;
   }
 }
 
@@ -811,10 +809,6 @@ std::string OAuth2Filter::BuildCookieTail(int cookie_type) const {
     break;
   case 6: // OAUTH_NONCE TYPE
     same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
-    break;
-  default:
-    ENVOY_LOG(debug,
-              "The CookieType is not supported. It must be set to one of the supported types");
     break;
   }
 
