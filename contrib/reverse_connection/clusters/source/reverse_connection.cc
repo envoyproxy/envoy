@@ -28,7 +28,7 @@ Upstream::HostConstSharedPtr RevConCluster::LoadBalancer::chooseHost(Upstream::L
   // Check if host_id is already set for the upstream cluster. If it is, use
   // that host_id.
   if (!parent_->default_host_id_.empty()) {
-    return parent_->checkAndCreateHost(absl::string_view(parent_->default_host_id_));
+    return parent_->checkAndCreateHost(parent_->default_host_id_);
   }
 
   // Check if downstream headers are present, if yes use it to get host_id.
@@ -47,7 +47,7 @@ Upstream::HostConstSharedPtr RevConCluster::LoadBalancer::chooseHost(Upstream::L
               Http::Headers::get().EnvoyDstClusterUUID.get());
     return nullptr;
   }
-  absl::string_view host_id = parent_->getHostIdValue(context->downstreamHeaders());
+  const std::string host_id = std::string(parent_->getHostIdValue(context->downstreamHeaders()));
   if (host_id.empty()) {
     ENVOY_LOG(debug, "Found no header match for incoming request");
     return nullptr;
@@ -55,7 +55,7 @@ Upstream::HostConstSharedPtr RevConCluster::LoadBalancer::chooseHost(Upstream::L
   return parent_->checkAndCreateHost(host_id);
 }
 
-Upstream::HostSharedPtr RevConCluster::checkAndCreateHost(const absl::string_view host_id) {
+Upstream::HostSharedPtr RevConCluster::checkAndCreateHost(const std::string host_id) {
   host_map_lock_.ReaderLock();
   // Check if host_id is already present in host_map_ or not. This ensures,
   // that envoy reuses a conn_pool_container for an endpoint.
@@ -73,12 +73,14 @@ Upstream::HostSharedPtr RevConCluster::checkAndCreateHost(const absl::string_vie
   // saying found malformed IPv4 address.
   Network::Address::InstanceConstSharedPtr host_ip_port(
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 0, nullptr));
-  Upstream::HostSharedPtr host(std::make_shared<Upstream::HostImpl>(
-      info(), absl::StrCat(info()->name(), static_cast<std::string>(host_id)),
-      std::move(host_ip_port), nullptr /* metadata */, nullptr, 1 /* initial_weight */,
-      envoy::config::core::v3::Locality().default_instance(),
-      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
-      0 /* priority */, envoy::config::core::v3::UNKNOWN, time_source_));
+  Upstream::HostSharedPtr host(std::shared_ptr<Upstream::HostImpl>(THROW_OR_RETURN_VALUE(
+      Upstream::HostImpl::create(
+        info(), absl::StrCat(info()->name(), static_cast<std::string>(host_id)),
+        std::move(host_ip_port), nullptr /* metadata */, nullptr, 1 /* initial_weight */,
+        envoy::config::core::v3::Locality().default_instance(),
+        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
+        0 /* priority */, envoy::config::core::v3::UNKNOWN, time_source_),
+      std::unique_ptr<Upstream::HostImpl>)));
   host->setHostId(host_id);
   ENVOY_LOG(trace, "Created a host {} for {}.", *host, host_id);
 

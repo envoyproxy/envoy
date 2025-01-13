@@ -84,7 +84,7 @@ private:
 
   // Checks if a host exists for a given `host_id` and if not it creates and caches
   // that host to the map.
-  Upstream::HostSharedPtr checkAndCreateHost(const absl::string_view host_id);
+  Upstream::HostSharedPtr checkAndCreateHost(const std::string host_id);
 
   // Checks if the request headers contain any header that hold host_id value.
   // If such header is present, it return that header value.
