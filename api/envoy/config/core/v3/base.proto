@@ -5,6 +5,7 @@ package envoy.config.core.v3;
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/http_uri.proto";
+import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/semantic_version.proto";
 
@@ -374,6 +375,12 @@ message KeyValueAppend {
   // Describes the action taken to append/overwrite the given value for an existing
   // key or to only add this key if it's absent.
   KeyValueAppendAction action = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // Match and rewrite the value. If value matchs the regex ``pattern``, then the value will
+  // be rewritten according to the ``substitution``
+  // If the value doesn't match the ``pattern``, then the whole update will be ignored.
+  // [#not-implemented-hide:]
+  type.matcher.v3.RegexMatchAndSubstitute rewrite = 4;
 }
 
 // Key/value pair to append or remove.
@@ -426,6 +433,7 @@ message HeaderValue {
 }
 
 // Header name/value pair plus option to control append behavior.
+// [#next-free-field: 6]
 message HeaderValueOption {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HeaderValueOption";
@@ -478,6 +486,12 @@ message HeaderValueOption {
   // Is the header value allowed to be empty? If false (default), custom headers with empty values are dropped,
   // otherwise they are added.
   bool keep_empty_value = 4;
+
+  // Match and rewrite the value. If value matchs the regex ``pattern``, then the value will
+  // be rewritten according to the ``substitution``
+  // If the value doesn't match the ``pattern``, then the whole update will be ignored.
+  // [#not-implemented-hide:]
+  type.matcher.v3.RegexMatchAndSubstitute rewrite = 5;
 }
 
 // Wrapper for a set of headers.
