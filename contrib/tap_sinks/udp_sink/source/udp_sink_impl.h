@@ -20,14 +20,6 @@ namespace TapCommon = Extensions::Common::Tap;
 class UdpTapSink : public TapCommon::Sink {
 public:
   UdpTapSink(const envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink& config);
-  // below one is only for UT because
-  // it can't control return value of writePacket if not add below function.
-  UdpTapSink(Network::UdpPacketWriterPtr&& utUdpPacketWriter)
-      : udp_packet_writer_(std::move(utUdpPacketWriter)) {
-    std::string utUdpServerAddress("127.0.0.1");
-    udp_server_address_ =
-        Network::Utility::parseInternetAddressNoThrow(utUdpServerAddress, 8080, false);
-  }
   ~UdpTapSink();
 
   // Sink
@@ -56,6 +48,8 @@ private:
   Network::Address::InstanceConstSharedPtr udp_server_address_ = nullptr;
   // UDP client socket.
   Network::SocketPtr udp_socket_ = nullptr;
+
+protected:
   // UDP client writer created with client socket.
   Network::UdpPacketWriterPtr udp_packet_writer_ = nullptr;
 };
