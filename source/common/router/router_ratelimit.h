@@ -296,10 +296,10 @@ private:
   absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
   const bool apply_on_stream_done_ = false;
 
-  #ifdef ENVOY_STATIC_EXTENSION_REGISTRATION
+#ifdef ENVOY_STATIC_EXTENSION_REGISTRATION
   Formatter::FormatterProviderPtr hits_addend_provider_ = nullptr;
   absl::optional<uint64_t> hits_addend_ = absl::nullopt;
-  #endif
+#endif
 };
 
 /**

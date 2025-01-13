@@ -6,6 +6,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.validate.h"
 
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -1244,6 +1245,30 @@ TEST_F(RateLimitPolicyEntryTest, RequestMatchInputSkip) {
 
   rate_limit_entry_->populateDescriptors(descriptors_, "service_cluster", header_, stream_info_);
   EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST(GetHitsAddendViaProvider, ErrorsNotNumberString) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  auto provider = Envoy::Formatter::SubstitutionFormatParser::parse("'some-string'").value();
+  Http::TestRequestHeaderMapImpl header{{}};
+  auto result = getHitsAddendViaProvider(*provider[0], header, stream_info);
+  EXPECT_TRUE(!result.ok());
+  EXPECT_THAT(
+      result.status().message(),
+      testing::HasSubstr("Failed to parse hits_addend: string_value: \"\\'some-string\\'\"\n"));
+}
+
+TEST(GetHitsAddendViaProvider, ErrorNotStringOrNumber) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  auto provider =
+      Envoy::Formatter::SubstitutionFormatParser::parse("%DYNAMIC_METADATA(test)%").value();
+  Http::TestRequestHeaderMapImpl header{{}};
+  auto result = getHitsAddendViaProvider(*provider[0], header, stream_info);
+  EXPECT_TRUE(!result.ok());
+  EXPECT_THAT(
+      result.status().message(),
+      testing::HasSubstr(
+          "Only string or number type is allowed for hits_addend.format: null_value: NULL_VALUE"));
 }
 
 } // namespace
