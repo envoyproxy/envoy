@@ -84,6 +84,7 @@ build:mobile-dbg-ios --config=ios
 # Default flags for Android tests
 build:mobile-test-android --define=static_extension_registration=disabled
 build:mobile-android --android_crosstool_top=@androidndk//:toolchain
+build:mobile-android --noincompatible_enable_android_toolchain_resolution
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -112,14 +113,12 @@ build:mobile-remote-release-clang-android --config=mobile-remote-release-clang
 build:mobile-remote-release-clang-android --android_platforms=//:android_x86_64
 build:mobile-remote-release-clang-android --linkopt=-fuse-ld=lld
 build:mobile-remote-release-clang-android --config=mobile-android
-build:mobile-remote-release-clang-android --noincompatible_enable_android_toolchain_resolution
-build:mobile-remote-release-clang-android --fat_apk_cpu x86_64
+build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
 
 build:mobile-remote-release-clang-android-publish --config=mobile-remote-release-clang
 build:mobile-remote-release-clang-android-publish --config=mobile-release-android
 build:mobile-remote-release-clang-android-publish --android_platforms=//:android_x86_32,//:android_x86_64,//:android_armv7,//:android_arm64
 build:mobile-remote-release-clang-android-publish --linkopt=-fuse-ld=lld
-build:mobile-remote-release-clang-android-publish --noincompatible_enable_android_toolchain_resolution
 build:mobile-remote-release-clang-android-publish --fat_apk_cpu=x86,x86_64,armeabi-v7a,arm64-v8a
 
 # Compile releases optimizing for size (eg -Os, etc).

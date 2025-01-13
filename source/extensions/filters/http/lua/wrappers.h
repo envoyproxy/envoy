@@ -274,7 +274,8 @@ public:
             {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
             {"downstreamRemoteAddress", static_luaDownstreamRemoteAddress},
             {"downstreamSslConnection", static_luaDownstreamSslConnection},
-            {"requestedServerName", static_luaRequestedServerName}};
+            {"requestedServerName", static_luaRequestedServerName},
+            {"routeName", static_luaRouteName}};
   }
 
 private:
@@ -327,6 +328,12 @@ private:
    * @return requested server name (e.g. SNI in TLS), if any.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRequestedServerName);
+
+  /**
+   * Get the name of the route matched by the filter chain
+   * @return matched route name or an empty string if no route was matched
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRouteName);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {
