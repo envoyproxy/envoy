@@ -32,7 +32,6 @@ using SanMatcherPtr = std::unique_ptr<SanMatcher>;
 
 class StringSanMatcher : public SanMatcher {
 public:
-  using StringMatcherImpl = Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>;
   bool match(const GENERAL_NAME* general_name) const override;
   ~StringSanMatcher() override = default;
 
@@ -50,7 +49,7 @@ public:
 
 private:
   const int general_name_type_;
-  const StringMatcherImpl matcher_;
+  const Envoy::Matchers::StringMatcherImpl matcher_;
   bssl::UniquePtr<ASN1_OBJECT> general_name_oid_;
 };
 
