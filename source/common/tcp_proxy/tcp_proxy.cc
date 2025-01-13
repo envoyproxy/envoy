@@ -153,11 +153,11 @@ Config::SharedConfig::SharedConfig(
         std::make_unique<OnDemandConfig>(config.on_demand(), context, *stats_scope_);
   }
 
-  if (config.has_retry_options() && config.retry_options().has_backoff_options()) {
+  if (config.has_backoff_options()) {
     const uint64_t base_interval_ms =
-        PROTOBUF_GET_MS_REQUIRED(config.retry_options().backoff_options(), base_interval);
-    const uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(
-        config.retry_options().backoff_options(), max_interval, base_interval_ms * 10);
+        PROTOBUF_GET_MS_REQUIRED(config.backoff_options(), base_interval);
+    const uint64_t max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(config.backoff_options(), max_interval, base_interval_ms * 10);
 
     if (max_interval_ms < base_interval_ms) {
       throw EnvoyException(
@@ -171,16 +171,11 @@ Config::SharedConfig::SharedConfig(
 
 Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config,
                Server::Configuration::FactoryContext& context)
-    : upstream_drain_manager_slot_(context.serverFactoryContext().threadLocal().allocateSlot()),
+    : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
+      upstream_drain_manager_slot_(context.serverFactoryContext().threadLocal().allocateSlot()),
       shared_config_(std::make_shared<SharedConfig>(config, context)),
       random_generator_(context.serverFactoryContext().api().randomGenerator()),
       regex_engine_(context.serverFactoryContext().regexEngine()) {
-  max_connect_attempts_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1);
-  if (config.has_retry_options()) {
-    max_connect_attempts_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-        config.retry_options(), max_connect_attempts, max_connect_attempts_);
-  }
-
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     ThreadLocal::ThreadLocalObjectSharedPtr drain_manager =
         std::make_shared<UpstreamDrainManager>();

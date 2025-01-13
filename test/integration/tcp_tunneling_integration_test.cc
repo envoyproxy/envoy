@@ -1477,7 +1477,7 @@ TEST_P(TcpTunnelingIntegrationTest, CopyInvalidResponseHeadersWithRetry) {
     proxy_config.set_cluster("cluster_0");
     proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
     proxy_config.mutable_tunneling_config()->set_propagate_response_headers(true);
-    proxy_config.mutable_retry_options()->mutable_max_connect_attempts()->set_value(2);
+    proxy_config.mutable_max_connect_attempts()->set_value(2);
 
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
@@ -1679,7 +1679,7 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamConnectingDownstreamDisconnect) {
 
     // Enable retries. The crash is due to retrying after the downstream connection is closed,
     // which can't occur if retries are not enabled.
-    proxy_config.mutable_retry_options()->mutable_max_connect_attempts()->set_value(2);
+    proxy_config.mutable_max_connect_attempts()->set_value(2);
 
     auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
     for (auto& listener : *listeners) {
@@ -2121,7 +2121,7 @@ TEST_P(TcpTunnelingIntegrationTest,
     proxy_config.set_stat_prefix("tcp_stats");
     proxy_config.set_cluster("cluster_0");
     proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
-    proxy_config.mutable_retry_options()->mutable_max_connect_attempts()->set_value(2);
+    proxy_config.mutable_max_connect_attempts()->set_value(2);
 
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
@@ -2187,11 +2187,8 @@ TEST_P(TcpTunnelingIntegrationTest,
     proxy_config.set_stat_prefix("tcp_stats");
     proxy_config.set_cluster("cluster_0");
     proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
-    proxy_config.mutable_retry_options()->mutable_max_connect_attempts()->set_value(2);
-    proxy_config.mutable_retry_options()
-        ->mutable_backoff_options()
-        ->mutable_base_interval()
-        ->set_nanos(10000000);
+    proxy_config.mutable_max_connect_attempts()->set_value(2);
+    proxy_config.mutable_backoff_options()->mutable_base_interval()->set_nanos(10000000);
 
     envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
     access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
