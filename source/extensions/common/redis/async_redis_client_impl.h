@@ -22,7 +22,8 @@ public:
   void onRespValue(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
 
   Tcp::AsyncTcpClientPtr client_;
-  std::function<void(std::string)> callback_;
+  // callback registered by user of RedisAsyncClient.
+  std::function<void(bool, std::string)> callback_;
 
   NetworkFilters::Common::Redis::EncoderImpl encoder_;
   NetworkFilters::Common::Redis::DecoderImpl decoder_;

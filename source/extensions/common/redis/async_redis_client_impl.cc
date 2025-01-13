@@ -18,11 +18,11 @@ void RedisAsyncClient::onData(Buffer::Instance& buf, bool) {
 }
 
 void RedisAsyncClient::onRespValue(NetworkFilters::Common::Redis::RespValuePtr&& value) {
-  std::cout << value->toString() << "\n";
+//  std::cout << value->toString() << "\n";
   if (value->type() == NetworkFilters::Common::Redis::RespType::Null) {
-    callback_(std::string("not-found-error"));
+    callback_(false, "");//std::string("not-found-error"));
   } else {
-    callback_(value->toString());
+    callback_(true, value->toString());
   }
 
   value.reset();
