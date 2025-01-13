@@ -357,6 +357,8 @@ public:
 
   void drainConnections(DrainConnectionsHostPredicate predicate) override;
 
+  absl::Status checkActiveCluster(const std::string& cluster) override;
+
   absl::Status checkActiveStaticCluster(const std::string& cluster) override;
 
   // Upstream::MissingClusterNotifier

@@ -519,7 +519,7 @@ TEST_F(FluentdAccessLogTest, UnknownCluster) {
   (*record->mutable_fields())["Message"].set_string_value("SomeValue");
 
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_,
-              checkActiveStaticCluster("unknown"))
+              checkActiveCluster("unknown"))
       .WillOnce(Return(absl::InvalidArgumentError("no cluster")));
 
   EXPECT_THROW_WITH_MESSAGE(

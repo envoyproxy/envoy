@@ -1278,6 +1278,14 @@ void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicat
   });
 }
 
+absl::Status ClusterManagerImpl::checkActiveCluster(const std::string& cluster) {
+  const auto& it = active_clusters_.find(cluster);
+  if (it == active_clusters_.end()) {
+    return absl::InvalidArgumentError(fmt::format("Unknown gRPC client cluster '{}'", cluster));
+  }
+  return absl::OkStatus();
+}
+
 absl::Status ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
   const auto& it = active_clusters_.find(cluster);
   if (it == active_clusters_.end()) {

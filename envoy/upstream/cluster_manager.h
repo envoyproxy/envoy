@@ -486,6 +486,12 @@ public:
   virtual void drainConnections(DrainConnectionsHostPredicate predicate) PURE;
 
   /**
+   * Check if the cluster is active, and if not, return an error
+   * @param cluster, the cluster to check.
+   */
+  virtual absl::Status checkActiveCluster(const std::string& cluster) PURE;
+
+  /**
    * Check if the cluster is active and statically configured, and if not, return an error
    * @param cluster, the cluster to check.
    */
