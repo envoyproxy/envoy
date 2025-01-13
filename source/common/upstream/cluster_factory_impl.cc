@@ -41,8 +41,6 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
     case envoy::config::cluster::v3::Cluster::EDS:
       cluster_type = "envoy.cluster.eds";
       break;
-    case envoy::config::cluster::v3::Cluster::REVERSE_CONNECTION:
-      cluster_type = "envoy.cluster.reverse_connection";
     }
   } else {
     cluster_type = cluster.cluster_type().name();

@@ -227,7 +227,7 @@ public:
   absl::optional<MonotonicTime> lastHcPassTime() const override { return last_hc_pass_time_; }
 
   const absl::string_view getHostId() const override { return host_id_; }
-  void setHostId(const absl::string_view host_id) override { host_id_ = host_id; }
+  void setHostId(const std::string host_id) override { host_id_ = host_id; }
 
   void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
     health_checker_ = std::move(health_checker);
@@ -277,7 +277,7 @@ private:
   const MonotonicTime creation_time_;
   absl::optional<MonotonicTime> last_hc_pass_time_;
   // This field is needed to fetch socket from rc_handler for reverse connection.
-  absl::string_view host_id_;
+  std::string host_id_;
 };
 
 /**

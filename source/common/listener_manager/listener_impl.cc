@@ -603,10 +603,8 @@ ListenerImpl::buildReverseConnectionListener(const envoy::config::listener::v3::
             config.reverse_connection_listener_config().DebugString());
 
   if (!config.has_reverse_connection_listener_config()) {
-    return absl::InvalidArgumentError(
-        fmt::format("error adding listener named '{}': reverse connection listener config is "
-                    "missing",
-                    config.name()));
+    ENVOY_LOG(info, "Listener: {}; Reverse connection listener config is not present. Listener will bind to port", config.name());
+    return absl::OkStatus();
   }
   // Reverse connection listener should not bind to port.
   bind_to_port_ = false;
@@ -620,7 +618,7 @@ ListenerImpl::buildReverseConnectionListener(const envoy::config::listener::v3::
   if (reverse_conn_registry == nullptr) {
     ENVOY_LOG(error, "Cannot build reverse conn listener name: {} tag: {}. Reverse conn registry not found",
               config.name(), listener_tag_);
-    return;
+    return absl::OkStatus();
   }
   auto config_or_error =
       reverse_conn_registry->fromAnyConfig(config.reverse_connection_listener_config());

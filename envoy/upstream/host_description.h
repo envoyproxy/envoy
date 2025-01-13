@@ -244,7 +244,7 @@ public:
   /*
    * Set the current host-id.
    */
-  virtual void setHostId(const absl::string_view host_id) PURE;
+  virtual void setHostId(const std::string host_id) PURE;
 
   /**
    * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
