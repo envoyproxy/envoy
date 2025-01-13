@@ -1618,11 +1618,12 @@ TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
   FakeUpstreamPtr& upstream = fake_upstreams_[0];
   FakeRawConnectionPtr fake_upstream_conn;
 
-  roundtripToUpstreamStep(upstream, makeBulkStringArray({"multi"}), "+OK\r\n", redis_client,
-                          fake_upstream_conn, "", "");
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
 
-  roundtripToUpstreamStep(upstream, makeBulkStringArray({"del", "b"}), "+QUEUED\r\n", redis_client,
-                          fake_upstream_conn, "", "");
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"del", "b"})));
+  expectUpstreamRequestResponse(upstream,
+                                makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"del", "b"}),
+                                "+QUEUED\r\n", fake_upstream_conn, "", "");
 
   roundtripToUpstreamStep(upstream, makeBulkStringArray({"del", "a"}),
                           "-ERR MOVED 15495 0.0.0.0:6379\r\n", redis_client, fake_upstream_conn, "",
