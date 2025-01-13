@@ -138,6 +138,15 @@ public:
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
 };
 
+class MockCodecEventCallbacks : public CodecEventCallbacks {
+public:
+  MockCodecEventCallbacks();
+  ~MockCodecEventCallbacks();
+
+  MOCK_METHOD(void, onCodecEncodeComplete, ());
+  MOCK_METHOD(void, onCodecLowLevelReset, ());
+};
+
 class MockServerConnection : public ServerConnection {
 public:
   MockServerConnection();
