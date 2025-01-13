@@ -279,6 +279,12 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   latchTime(decoder_callbacks_, DNS_START);
   const bool is_proxying = isProxying();
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_fail_on_empty_host")) {
+    if (headers.Host()->value().getStringView().empty()) {
+      onDnsResolutionFail("no_host");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+  }
   auto result = config_->cache().loadDnsCacheEntryWithForceRefresh(
       headers.Host()->value().getStringView(), default_port, is_proxying, force_cache_refresh,
       *this);
