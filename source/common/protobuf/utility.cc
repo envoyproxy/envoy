@@ -943,8 +943,8 @@ absl::Status MessageUtil::loadFromFile(const std::string& path, Protobuf::Messag
     loadFromJson(contents, message, validation_visitor);
   }
 #else
-  return absl::InvalidArgumentError("Unable to parse file \"" + path + "\" (type " +
-                                    message.GetTypeName() + ")");
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unable to parse file \"", path, "\" (type ", message.GetTypeName(), ")"));
 #endif
   return absl::OkStatus();
 }
