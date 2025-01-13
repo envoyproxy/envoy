@@ -59,8 +59,12 @@ public:
     ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
   }
 
+  // msg for golang bridge test
+  const std::string data_to_upstream_{"data-to-upstream-value"};
+  const std::string panic_msg_{"error happened in golang http-tcp bridge\r\n"};
+
   Http::TestRequestHeaderMapImpl request_headers_{
-      {":method", "POST"}, {":authority", "golang.bridge.com:80"}, {":path", "/"}};
+      {":method", "POST"}, {":authority", "golang.bridge.com:80"}, {":path", "/"}, {"data-to-upstream", data_to_upstream_}};
 
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
@@ -68,14 +72,12 @@ public:
   // golang bridge names
   const std::string STREAMING{"streaming"};
   const std::string BUFFERED{"buffered"};
+  const std::string ADD_DATA{"add_data"};
   const std::string LOCAL_REPLY{"local_reply"};
   const std::string HEADER_OP{"header_op"};
   const std::string PROPERTY{"property"};
   const std::string PANIC{"panic"};
   const std::string SELF_HALF_CLOSE{"self_half_close"};
-
-  // msg for golang bridge test
-  const std::string PANIC_MSG{"error happened in golang http-tcp bridge\r\n"};
 };
 
 // TODO(duxin40): add test for HTTP2.
@@ -122,6 +124,17 @@ TEST_P(GolangBridgeIntegrationTest, Buffered) {
   std::string expected_resp_body = "buffered-tcp-to-http:tcp_resp-1tcp_resp-2-end";
   response_->waitForBodyData(expected_resp_body.size());
   EXPECT_EQ(expected_resp_body, response_->body());
+}
+
+TEST_P(GolangBridgeIntegrationTest, ADD_DATA_Encode_Headers) {
+
+  initializeConfig(ADD_DATA);
+  setUpConnection(true);
+
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForData(
+      FakeRawConnection::waitForInexactMatch(data_to_upstream_.c_str())));
+
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(GolangBridgeIntegrationTest, LOCAL_REPLY_Encode_Headers) {
@@ -175,9 +188,9 @@ TEST_P(GolangBridgeIntegrationTest, PANIC_Encode_Headers) {
   initializeConfig(PANIC);
   setUpConnection(true);
 
-  std::string expected_resp_body = PANIC_MSG;
-  response_->waitForBodyData(PANIC_MSG.size());
-  EXPECT_EQ(PANIC_MSG, response_->body());
+  std::string expected_resp_body = panic_msg_;
+  response_->waitForBodyData(panic_msg_.size());
+  EXPECT_EQ(panic_msg_, response_->body());
 }
 
 TEST_P(GolangBridgeIntegrationTest, PANIC_Encode_Data) {
@@ -187,7 +200,7 @@ TEST_P(GolangBridgeIntegrationTest, PANIC_Encode_Data) {
 
   codec_client_->sendData(*request_encoder_, "http_data-1", true);
 
-  std::string expected_resp_body = PANIC_MSG;
+  std::string expected_resp_body = panic_msg_;
   response_->waitForBodyData(expected_resp_body.size());
   EXPECT_EQ(expected_resp_body, response_->body());
 }
@@ -200,7 +213,7 @@ TEST_P(GolangBridgeIntegrationTest, PANIC_On_Upstream_Data) {
   codec_client_->sendData(*request_encoder_, "http_data-1", false);
   ASSERT_TRUE(fake_raw_upstream_connection_->write("tcp_resp-1", false));
 
-  std::string expected_resp_body = PANIC_MSG;
+  std::string expected_resp_body = panic_msg_;
   response_->waitForBodyData(expected_resp_body.size());
   EXPECT_EQ(expected_resp_body, response_->body());
 }

@@ -15,6 +15,7 @@ go_binary(
     deps = [
         "//contrib/golang/common/go/api",
         "//contrib/golang/upstreams/http/tcp/source/go/pkg/upstreams/http/tcp:http_tcp_bridge",
+        "//contrib/golang/upstreams/http/tcp/test/test_data/add_data",
         "//contrib/golang/upstreams/http/tcp/test/test_data/buffered",
         "//contrib/golang/upstreams/http/tcp/test/test_data/header_op",
         "//contrib/golang/upstreams/http/tcp/test/test_data/local_reply",

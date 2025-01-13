@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "example.com/test-data/add_data"
 	_ "example.com/test-data/buffered"
 	_ "example.com/test-data/header_op"
 	_ "example.com/test-data/local_reply"
