@@ -1,4 +1,4 @@
-package main
+package buffered
 
 import (
 	"google.golang.org/protobuf/types/known/anypb"
@@ -39,5 +39,3 @@ func filterFactory(c interface{}, callbacks api.HttpTcpBridgeCallbackHandler) ap
 		config:    conf,
 	}
 }
-
-func main() {}

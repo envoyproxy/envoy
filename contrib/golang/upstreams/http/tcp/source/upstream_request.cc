@@ -163,7 +163,10 @@ Envoy::Http::Status HttpTcpBridge::encodeHeaders(const Envoy::Http::RequestHeade
   ENVOY_LOG(debug, "golang http-tcp bridge encodeHeaders, state: {}", encoding_state_.stateStr());
 
   if (encoding_state_.filterState() == FilterState::EndStream) {
+    // send resp to downstream, which means terminate the request when error happens in Golang side.
     // TODO(duxin40): use golang to specify status-code when EndStream.
+    ENVOY_LOG(warn, "golang http-tcp bridge encodeHeaders, send resp to downstream");
+
     end_stream = true;
     sendDataToDownstream(buffer, end_stream);
     return Envoy::Http::okStatus();
@@ -273,6 +276,7 @@ void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     // https://www.envoyproxy.io/docs/envoy/latest/intro/life_of_a_request#:~:text=socket%20via%20SslSocket%3A%3A-,doRead,-().%20The%20transport
 
     if (end_stream) {
+      // we will catch this unexpected behaviour from users in Golang side, this should not happens.
       PANIC(fmt::format(
           "golang http-tcp bridge onUpstreamData unexpected go_tatus when end_stream is true: {}",
           int(go_status)));
@@ -321,7 +325,10 @@ void HttpTcpBridge::encodeDataGo(Buffer::Instance& data, bool end_stream) {
   ENVOY_LOG(debug, "golang http-tcp bridge encodeDataGo, state: {}", encoding_state_.stateStr());
 
   if (encoding_state_.filterState() == FilterState::EndStream) {
+    // send resp to downstream, which means terminate the request when error happens in Golang side.
     // TODO(duxin40): use golang to specify status-code when EndStream.
+    ENVOY_LOG(warn, "golang http-tcp bridge encodeDataGo, send resp to downstream");
+
     end_stream = true;
     sendDataToDownstream(data, end_stream);
     return;

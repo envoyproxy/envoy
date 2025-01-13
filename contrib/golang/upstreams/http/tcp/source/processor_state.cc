@@ -72,7 +72,7 @@ void EncodingProcessorState::handleHeaderGolangStatus(HttpTcpBridgeStatus status
     break;
 
   case HttpTcpBridgeStatus::HttpTcpBridgeEndStream:
-    // end stream, send resp to downstream.
+    // will send resp to downstream, which means terminate the request when error happens.
 
     setFilterState(FilterState::EndStream);
     break;
@@ -119,6 +119,7 @@ void EncodingProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus st
     // buffer further whole data, go side in encodeData get whole data one-off.
 
     if (end_stream) {
+      // we will catch this unexpected behaviour from users in Golang side, this should not happens.
       PANIC(fmt::format("golang http-tcp bridge handleDataGolangStatus unexpected go_tatus when "
                         "end_stream is true: {}",
                         int(status)));
@@ -127,7 +128,7 @@ void EncodingProcessorState::handleDataGolangStatus(const HttpTcpBridgeStatus st
     break;
 
   case HttpTcpBridgeStatus::HttpTcpBridgeEndStream:
-    // end stream, send resp to downstream.
+    // will send resp to downstream, which means terminate the request when error happens.
 
     setFilterState(FilterState::EndStream);
     break;

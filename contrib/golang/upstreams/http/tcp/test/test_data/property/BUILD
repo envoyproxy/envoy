@@ -1,17 +1,15 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 licenses(["notice"])  # Apache 2
 
-go_binary(
-    name = "bridge.so",
+go_library(
+    name = "property",
     srcs = [
         "bridge.go",
         "config.go",
     ],
-    out = "bridge.so",
     cgo = True,
-    importpath = "github.com/envoyproxy/envoy/contrib/golang/upstreams/http/tcp/test/test_data/property",
-    linkmode = "c-shared",
+    importpath = "example.com/test-data/property",
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/golang/common/go/api",

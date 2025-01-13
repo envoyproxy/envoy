@@ -181,67 +181,7 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "gomod"
-  directory: "/contrib/golang/upstreams/http/tcp/test/test_data/buffered"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/upstreams/http/tcp/test/test_data/header_op"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/upstreams/http/tcp/test/test_data/local_reply"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/upstreams/http/tcp/test/test_data/panic"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/upstreams/http/tcp/test/test_data/property"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/upstreams/http/tcp/test/test_data/self_half_close"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/upstreams/http/tcp/test/test_data/streaming"
+  directory: "/contrib/golang/upstreams/http/tcp/test/test_data"
   groups:
     contrib-golang:
       patterns:

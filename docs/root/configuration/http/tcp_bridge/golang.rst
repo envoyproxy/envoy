@@ -3,9 +3,9 @@
 Golang Http Tcp Bridge
 ======================
 
-This bridge enables an Http client to connect to a Tcp server via a Golang plugin, facilitating **Protocol Convert** from Http to any Rpc protocol in Envoy.
+This bridge enables an Http client to connect to a Tcp server via a Golang plugin, facilitating **Protocol Convert** from Http to any RPC protocol in Envoy.
 
-Notice: the bridge is designed for sync data flow between go and c, so **DO NOT** use goroutine in go side.
+Notice: the bridge is designed for sync-data-flow between go and c, so when you create new goroutines, **DO NOT** touch the request in these goroutines, they could be background goroutines.
 
 The Bridge allows `Golang <https://go.dev/>`_ to be run during both the request
 and response flows of upstream.

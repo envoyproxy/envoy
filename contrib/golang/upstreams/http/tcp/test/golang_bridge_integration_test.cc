@@ -12,10 +12,9 @@ class GolangBridgeIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   GolangBridgeIntegrationTest() { enableHalfClose(true); }
 
-  std::string genSoPath(std::string name) {
+  std::string genSoPath() {
     return TestEnvironment::substitute(
-        "{{ test_rundir }}/contrib/golang/upstreams/http/tcp/test/test_data/" + name +
-        "/bridge.so");
+        "{{ test_rundir }}/contrib/golang/upstreams/http/tcp/test/test_data/bridges.so");
   }
 
   void initialize() override {
@@ -43,7 +42,7 @@ public:
 
           envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config proto_config;
           proto_config.set_library_id(bridge_name);
-          proto_config.set_library_path(genSoPath(bridge_name));
+          proto_config.set_library_path(genSoPath());
           proto_config.set_plugin_name(bridge_name);
 
           cluster->mutable_upstream_config()->mutable_typed_config()->PackFrom(proto_config);

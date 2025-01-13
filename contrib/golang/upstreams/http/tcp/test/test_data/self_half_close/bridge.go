@@ -1,4 +1,4 @@
-package main
+package self_half_close
 
 import (
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"

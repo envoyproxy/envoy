@@ -58,6 +58,7 @@ func (f *requestMap) StoreReq(key *C.httpRequest, req *httpRequest) error {
 	return nil
 }
 
+// TODO(duxin40): introduce the worker_id as PR#31987 to improve the performance when there are large envoy workers.
 func (f *requestMap) GetReq(key *C.httpRequest) *httpRequest {
 	if v, ok := f.requests.Load(key); ok {
 		return v.(*httpRequest)
@@ -172,7 +173,12 @@ func envoyGoHttpTcpBridgeOnEncodeData(s *C.processState, endStream, buffer, leng
 		}
 	}()
 
-	return uint64(filter.EncodeData(buf, endStream == uint64(api.EndStream)))
+	status = uint64(filter.EncodeData(buf, endStream == uint64(api.EndStream)))
+	if status == uint64(api.HttpTcpBridgeStopAndBuffer) && endStream == uint64(api.EndStream) {
+		panic("encodeData: HttpTcpBridgeStopAndBuffer is not allowed when endStream is true")
+	}
+
+	return
 }
 
 //export envoyGoHttpTcpBridgeOnUpstreamData
@@ -205,7 +211,12 @@ func envoyGoHttpTcpBridgeOnUpstreamData(s *C.processState, endStream, headerNum,
 		}
 	}()
 
-	return uint64(filter.OnUpstreamData(header, buf, endStream == uint64(api.EndStream)))
+	status = uint64(filter.OnUpstreamData(header, buf, endStream == uint64(api.EndStream)))
+	if status == uint64(api.HttpTcpBridgeStopAndBuffer) && endStream == uint64(api.EndStream) {
+		panic("onUpstreamData: HttpTcpBridgeStopAndBuffer is not allowed when endStream is true")
+	}
+
+	return
 }
 
 //export envoyGoHttpTcpBridgeOnDestroy

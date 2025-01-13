@@ -118,8 +118,10 @@ private:
  *  The bridge enables an HTTP client to connect to a TCP server via a Golang plugin, facilitating
  * Protocol Convert from HTTP to any RPC protocol in Envoy.
  *
- *  Notice: the bridge is designed for sync-data-flow between go and c, so DO NOT use goroutine in
- * go side.
+ *  Notice: the bridge is designed for sync-data-flow between go and c, so when you create new
+ * goroutines, **DO NOT** touch the request in these goroutines, they could be background
+ * goroutines.
+ *
  *
  */
 class HttpTcpBridge : public Router::GenericUpstream,
