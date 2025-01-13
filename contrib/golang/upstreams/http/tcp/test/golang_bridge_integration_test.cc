@@ -63,8 +63,10 @@ public:
   const std::string data_to_upstream_{"data-to-upstream-value"};
   const std::string panic_msg_{"error happened in golang http-tcp bridge\r\n"};
 
-  Http::TestRequestHeaderMapImpl request_headers_{
-      {":method", "POST"}, {":authority", "golang.bridge.com:80"}, {":path", "/"}, {"data-to-upstream", data_to_upstream_}};
+  Http::TestRequestHeaderMapImpl request_headers_{{":method", "POST"},
+                                                  {":authority", "golang.bridge.com:80"},
+                                                  {":path", "/"},
+                                                  {"data-to-upstream", data_to_upstream_}};
 
   FakeRawConnectionPtr fake_raw_upstream_connection_;
   IntegrationStreamDecoderPtr response_;
