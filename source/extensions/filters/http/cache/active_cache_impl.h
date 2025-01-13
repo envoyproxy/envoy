@@ -87,8 +87,8 @@ private:
     // Vary state means the cache entry includes headers and the request must be
     // re-keyed onto the appropriate variation key.
     Vary,
-    // NotCacheable state means this key is considered non-cachable. Client should pass through.
-    // If the passed-through response turns out to be cachable (i.e. upstream has changed
+    // NotCacheable state means this key is considered non-cacheable. Client should pass through.
+    // If the passed-through response turns out to be cacheable (i.e. upstream has changed
     // cache headers), client should update state to Writing, or, if state is already changed,
     // client should abort the new upstream request and use the shared one.
     NotCacheable

@@ -590,7 +590,7 @@ TEST_F(ActiveCacheTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAgain
   ASSERT_THAT(captured_lookup_callbacks_.size(), Eq(2));
   // Cache miss again.
   consumeCallback(captured_lookup_callbacks_[1])(LookupResult{});
-  // Should be the original request, the two pass-throughs, and the new request.
+  // Should be the original request, the two that pass-through, and the new request.
   ASSERT_THAT(fake_upstream_get_headers_callbacks_.size(), Eq(4));
   EXPECT_CALL(
       *mock_http_cache_,
