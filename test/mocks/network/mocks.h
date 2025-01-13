@@ -589,7 +589,7 @@ public:
   MOCK_METHOD(const std::string&, statPrefix, (), (const));
   MOCK_METHOD(Network::LocalRevConnRegistry&, reverseConnRegistry, (), (const));
   MOCK_METHOD(void, saveUpstreamConnection,
-              (Network::ConnectionSocketPtr & upstream_socket, uint64_t listener_tag));
+              (Network::ConnectionSocketPtr&& upstream_socket, uint64_t listener_tag));
 
   uint64_t num_handler_connections_{};
 };

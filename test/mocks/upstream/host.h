@@ -182,6 +182,8 @@ public:
               (), (const));
   MOCK_METHOD(HealthCheckHostMonitor&, healthChecker, (), (const));
   MOCK_METHOD(void, healthFlagClear, (HealthFlag flag));
+  MOCK_METHOD(const absl::string_view, getHostId, (), (const));
+  MOCK_METHOD(void, setHostId, (const std::string host_id));
   MOCK_METHOD(bool, healthFlagGet, (HealthFlag flag), (const));
   MOCK_METHOD(void, healthFlagSet, (HealthFlag flag));
   MOCK_METHOD(uint32_t, healthFlagsGetAll, (), (const));
