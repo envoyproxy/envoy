@@ -137,11 +137,28 @@ private:
   const bool isReturnOkForwritePacket_;
 };
 
+class UtSpecialUdpTapSink : public UdpTapSink {
+public:
+  UtSpecialUdpTapSink(const envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink& config)
+      : UdpTapSink(config) {}
+  ~UtSpecialUdpTapSink() {}
+  void replaceOrigUdpPacketWriter(Network::UdpPacketWriterPtr&& utUdpPacketWriter) {
+    udp_packet_writer_ = std::move(utUdpPacketWriter);
+  }
+};
+
 TEST_F(UdpTapSinkTest, TestSubmitTraceSendOk) {
   // Construct UdpTapSink object
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  socket_address->set_port_value(8080);
+  socket_address->set_address("127.0.0.1");
+  UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
   std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
       std::make_unique<MockUdpPacketWriterNew>(true);
-  UdpTapSink loc_udp_tap_sink(std::move(local_UdpPacketWriter));
+  loc_udp_tap_sink.replaceOrigUdpPacketWriter(std::move(local_UdpPacketWriter));
 
   // Create UdpTapSinkHandle
   TapCommon::PerTapSinkHandlePtr local_handle =
@@ -155,9 +172,16 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOk) {
 
 TEST_F(UdpTapSinkTest, TestSubmitTraceSendNotOk) {
   // Construct UdpTapSink object
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  socket_address->set_port_value(8080);
+  socket_address->set_address("127.0.0.1");
+  UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
   std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
       std::make_unique<MockUdpPacketWriterNew>(false);
-  UdpTapSink loc_udp_tap_sink(std::move(local_UdpPacketWriter));
+  loc_udp_tap_sink.replaceOrigUdpPacketWriter(std::move(local_UdpPacketWriter));
 
   // Create UdpTapSinkHandle
   TapCommon::PerTapSinkHandlePtr local_handle =
@@ -168,6 +192,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendNotOk) {
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
 }
+
 } // namespace UDP
 } // namespace TapSinks
 } // namespace Extensions

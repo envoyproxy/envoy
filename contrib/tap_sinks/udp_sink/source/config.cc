@@ -27,9 +27,7 @@ UdpTapSinkFactory::createHttpSinkPtr(const Protobuf::Message& config,
   return std::make_unique<UdpTapSink>(
       MessageUtil::downcastAndValidate<
           const envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink&>(
-          config, http_context.serverFactoryContext()
-                      .messageValidationContext()
-                      .staticValidationVisitor()));
+          config, http_context.messageValidationVisitor()));
 }
 
 REGISTER_FACTORY(UdpTapSinkFactory, TapCommon::TapSinkFactory);

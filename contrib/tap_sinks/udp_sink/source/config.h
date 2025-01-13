@@ -14,7 +14,6 @@ namespace TapCommon = Extensions::Common::Tap;
 class UdpTapSinkFactory : public TapCommon::TapSinkFactory {
 public:
   ~UdpTapSinkFactory() override = default;
-  std::string category() const override { return "envoy.tap.sinks.udp"; }
   std::string name() const override { return "envoy.tap.sinks.udp"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink>();
