@@ -20,6 +20,8 @@ fn new_http_filter_config_fn<EHF: EnvoyHttpFilter>(
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
+    "send_response" => Some(Box::new(SendResponseFilterConfig {})),
+    "passthrough" => Some(Box::new(PassthroughHttpFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
     // TODO: add various configs for body, etc.
     _ => panic!("Unknown filter name: {}", name),
@@ -228,6 +230,52 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
   }
 }
 
+/// A HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the `send_response()`
+/// callback
+struct SendResponseFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SendResponseFilterConfig {
+  fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(SendResponseFilter {})
+  }
+}
+
+/// A no-op HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`]
+/// as well as the [`Drop`] to test the cleanup of the filter.
+struct SendResponseFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
+  fn on_request_headers(
+    &mut self,
+    mut envoy_filter: EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter.send_response(
+      200,
+      vec![
+        ("header1", "value1".as_bytes()),
+        ("header2", "value2".as_bytes()),
+      ],
+      Some(b"Hello, World!"),
+    );
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+}
+
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`], but simply passes through to
+/// the default implementation.
+struct PassthroughHttpFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for PassthroughHttpFilterConfig {
+  fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(PassthroughHttpFilter {})
+  }
+}
+
+struct PassthroughHttpFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PassthroughHttpFilter {}
 
 /// A HTTP filter configuration that implements
 /// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the dynamic metadata related

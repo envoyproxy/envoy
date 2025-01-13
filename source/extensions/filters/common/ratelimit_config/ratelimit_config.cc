@@ -64,6 +64,9 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
     case ProtoRateLimit::Action::ActionSpecifierCase::kDestinationCluster:
       actions_.emplace_back(new Envoy::Router::DestinationClusterAction());
       break;
+    case ProtoRateLimit::Action::ActionSpecifierCase::kQueryParameters:
+      actions_.emplace_back(new Envoy::Router::QueryParametersAction(action.query_parameters()));
+      break;
     case ProtoRateLimit::Action::ActionSpecifierCase::kRequestHeaders:
       actions_.emplace_back(new Envoy::Router::RequestHeadersAction(action.request_headers()));
       break;

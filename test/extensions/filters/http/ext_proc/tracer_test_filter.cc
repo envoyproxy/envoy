@@ -20,10 +20,10 @@ const Tracing::TraceContextHandler& traceParentHeader() {
 
 struct ExpectedSpan {
   std::string operation_name;
-  bool sampled;
-  bool context_injected;
+  bool sampled{false};
+  bool context_injected{false};
   std::map<std::string, std::string> tags;
-  bool tested;
+  bool tested{false};
 };
 
 using ExpectedSpansSharedPtr = std::shared_ptr<std::vector<ExpectedSpan>>;
@@ -116,9 +116,9 @@ private:
   ExpectedSpansSharedPtr expected_spans_;
 
   std::map<std::string, std::string> tags_;
-  bool context_injected_;
-  bool sampled_;
-  bool finished_;
+  bool context_injected_{false};
+  bool sampled_{false};
+  bool finished_{false};
 };
 
 class Driver : public Tracing::Driver, Logger::Loggable<Logger::Id::tracing> {

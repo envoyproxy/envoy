@@ -36,6 +36,7 @@ envoy_cc_library(
         "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_response_trailers",
         "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_response_trailers_count",
         "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_set_response_trailer",
+        "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_send_response",
         "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_set_dynamic_metadata_number",
         "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_dynamic_metadata_number",
         "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_set_dynamic_metadata_string",
