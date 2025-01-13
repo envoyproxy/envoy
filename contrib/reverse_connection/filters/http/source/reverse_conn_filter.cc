@@ -198,9 +198,8 @@ Http::FilterHeadersStatus ReverseConnFilter::getReverseConnectionInfo() {
   // Send the reverse connection count filtered by node or cluster ID.
   if (!send_all_rc_info) {
     std::string response = fmt::format("{{\"available_connections\":{}}}", num_sockets);
-    try {
-      Json::Factory::loadFromString(response);
-    } catch (EnvoyException& e) {
+    absl::StatusOr<Json::ObjectSharedPtr> response_or_error= Json::Factory::loadFromString(response);
+    if (!response_or_error.ok()) {
       decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError,
                                          "failed to form valid json response", nullptr,
                                          absl::nullopt, "");
