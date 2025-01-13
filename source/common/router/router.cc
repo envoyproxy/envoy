@@ -1064,7 +1064,6 @@ void Filter::maybeDoShadowing() {
     if (shadow_trailers_) {
       request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
     }
-
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(timeout_.global_timeout_)
                        .setParentSpan(callbacks_->activeSpan())
