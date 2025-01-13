@@ -815,7 +815,10 @@ message RouteAction {
     // value, the request will be mirrored.
     core.v3.RuntimeFractionalPercent runtime_fraction = 3;
 
-    // Determines if the trace span should be sampled. Defaults to true.
+    // Specifies whether the trace span for the shadow request should be sampled. If this field is not explicitly set,
+    // the shadow request will inherit the sampling decision of its parent span. This ensures consistency with the trace
+    // sampling policy of the original request and prevents oversampling, especially in scenarios where runtime sampling
+    // is disabled.
     google.protobuf.BoolValue trace_sampled = 4;
 
     // Disables appending the ``-shadow`` suffix to the shadowed ``Host`` header. Defaults to ``false``.
