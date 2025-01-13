@@ -92,34 +92,17 @@ private:
     std::chrono::steady_clock::time_point expiration_time;
   };
 
+  // Remove first 0.1% of max_cache_size objects.
+  // We may want to implement a more sophisticated eviction policy in the future.
   void Evict() {
-    if (cache_items_map.size() > 0) {
-      // Select a random subset of items
-      std::vector<const char*> keys;
-      for (const auto& pair : cache_items_map) {
-        keys.push_back(pair.first);
-      }
-      std::default_random_engine rng(std::random_device{}());
-      std::shuffle(keys.begin(), keys.end(), rng);
-
-      // Sort the subset by TTL
-      std::sort(keys.begin(), keys.begin() + std::min(keys.size(), size_t(10)),
-                [this](const char* lhs, const char* rhs) {
-                  return cache_items_map[lhs].expiration_time <
-                         cache_items_map[rhs].expiration_time;
-                });
-
-      // Evict the items with the nearest TTL
-      for (size_t i = 0; i < std::min(keys.size(), size_t(3)); ++i) {
-        auto it = cache_items_map.find(keys[i]);
-        if (it != cache_items_map.end()) {
-          free(const_cast<char*>(it->first));
-          cache_items_map.erase(it);
-        }
-      }
+    size_t items_to_remove = max_cache_size / 1000;
+    for (auto it = cache_items_map.begin(); it != cache_items_map.end() && items_to_remove > 0;) {
+      auto to_delete = it++;
+      free(const_cast<char*>(to_delete->first));
+      cache_items_map.erase(to_delete);
+      --items_to_remove;
     }
   }
-
   struct CharPtrHash {
     std::size_t operator()(const char* str) const {
       std::size_t hash = 0;
