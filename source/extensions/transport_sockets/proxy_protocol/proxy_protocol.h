@@ -43,6 +43,11 @@ private:
   void generateHeader();
   void generateHeaderV1();
   void generateHeaderV2();
+  void processHostLevelTLVs(std::vector<Envoy::Network::ProxyProtocolTLV>& custom_tlvs,
+                            absl::flat_hash_set<uint8_t>& processed_tlv_types) const;
+  void processConfigLevelTLVs(std::vector<Envoy::Network::ProxyProtocolTLV>& custom_tlvs,
+                              absl::flat_hash_set<uint8_t>& processed_tlv_types) const;
+  std::vector<Envoy::Network::ProxyProtocolTLV> processCustomTLVs();
   Network::IoResult writeHeader();
 
   Network::TransportSocketOptionsConstSharedPtr options_;
@@ -52,6 +57,7 @@ private:
   const UpstreamProxyProtocolStats& stats_;
   const bool pass_all_tlvs_;
   absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
+  std::vector<Envoy::Network::ProxyProtocolTLV> added_tlvs_{};
 };
 
 class UpstreamProxyProtocolSocketFactory : public PassthroughFactory {
