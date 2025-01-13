@@ -1872,7 +1872,7 @@ message VirtualCluster {
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 12]
+  // [#next-free-field: 13]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -1932,6 +1932,34 @@ message RateLimit {
       // If set to true, Envoy skips the descriptor while calling rate limiting service
       // when header is not present in the request. By default it skips calling the
       // rate limiting service if this header is not present in the request.
+      bool skip_if_absent = 3;
+    }
+
+    // The following descriptor entry is appended when a query parameter contains a key that matches the
+    // ``query_parameter_name``:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<query_parameter_value_queried_from_query_parameter>")
+    message QueryParameters {
+      // The name of the query parameter to use for rate limiting. Value of this query parameter is used to populate
+      // the value of the descriptor entry for the descriptor_key.
+      string query_parameter_name = 1 [(validate.rules).string = {min_len: 1}];
+
+      // The key to use when creating the rate limit descriptor entry. his descriptor key will be used to identify the
+      // rate limit rule in the rate limiting service.
+      string descriptor_key = 2 [(validate.rules).string = {min_len: 1}];
+
+      // Controls the behavior when the specified query parameter is not present in the request.
+      //
+      // If set to ``true`` (default is ``false``):
+      // - The rate limiting service will **NOT** be called for this descriptor.
+      // - Useful when the query parameter is optional and you want to skip rate limiting.
+      //
+      // If set to ``false``:
+      // - The rate limiting service will be called.
+      // - Useful when you want to enforce rate limiting even if the query parameter is missing.
+      //
       bool skip_if_absent = 3;
     }
 
@@ -2110,6 +2138,9 @@ message RateLimit {
 
       // Rate limit on request headers.
       RequestHeaders request_headers = 3;
+
+      // Rate limit on query parameters.
+      QueryParameters query_parameters = 12;
 
       // Rate limit on remote address.
       RemoteAddress remote_address = 4;

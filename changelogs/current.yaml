@@ -438,6 +438,12 @@ new_features:
   change: |
     Added :ref:`routeName() <config_http_filters_lua_stream_info_route_name>` API to the Stream Info Object to get the
     name of the route matched by the filter chain.
+- area: ratelimit
+  change: |
+    added support for query parameter rate limiting via the :ref:`query_parameters
+    <envoy_v3_api_field_config.route.v3.RateLimit.Action.query_parameters>` action across HTTP and Thrift. This allows
+    rate limiting based on specific query parameter values, with option to control the behavior when the query parameter
+    is absent.
 
 deprecated:
 - area: rbac

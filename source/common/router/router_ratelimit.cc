@@ -208,6 +208,32 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
   return skip_if_absent_;
 }
 
+QueryParametersAction::QueryParametersAction(
+    const envoy::config::route::v3::RateLimit::Action::QueryParameters& action)
+    : query_param_name_(action.query_parameter_name()),
+      descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "query_param"),
+      skip_if_absent_(action.skip_if_absent()) {}
+
+bool QueryParametersAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                               const std::string&,
+                                               const Http::RequestHeaderMap& headers,
+                                               const StreamInfo::StreamInfo&) const {
+  Http::Utility::QueryParamsMulti query_parameters =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+
+  const absl::optional<std::string> query_param_value =
+      query_parameters.getFirstValue(query_param_name_);
+
+  // If query parameter is not present and ``skip_if_absent`` is ``true``, skip this descriptor.
+  // If ``skip_if_absent`` is ``false``, do not call rate limiting service.
+  if (!query_param_value.has_value()) {
+    return skip_if_absent_;
+  }
+
+  descriptor_entry = {descriptor_key_, query_param_value.value()};
+  return true;
+}
+
 HeaderValueMatchAction::HeaderValueMatchAction(
     const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
     Server::Configuration::CommonFactoryContext& context)
@@ -276,6 +302,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kDestinationCluster:
       actions_.emplace_back(new DestinationClusterAction());
+      break;
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kQueryParameters:
+      actions_.emplace_back(new QueryParametersAction(action.query_parameters()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRequestHeaders:
       actions_.emplace_back(new RequestHeadersAction(action.request_headers()));
