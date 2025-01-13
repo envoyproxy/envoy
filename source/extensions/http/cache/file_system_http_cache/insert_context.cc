@@ -2,6 +2,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.h"
+#include "source/extensions/http/cache/file_system_http_cache/cache_file_reader.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
 #include "source/extensions/http/cache/file_system_http_cache/lookup_context.h"
 
@@ -11,290 +12,215 @@ namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
 
-namespace {
-std::string writeFailureMessage(absl::string_view kind, absl::StatusOr<size_t> result,
-                                size_t wanted) {
-  if (result.ok()) {
-    return fmt::format("incomplete write of {} - wrote {}, expected {}", kind, result.value(),
-                       wanted);
-  } else {
-    return fmt::format("write failed of {}: {}", kind, result.status());
-  }
-}
-} // namespace
+// Arbitrary 128K fragments to balance memory usage and speed.
+static constexpr size_t MaxInsertFragmentSize = 128 * 1024;
 
-FileInsertContext::FileInsertContext(std::shared_ptr<FileSystemHttpCache> cache,
-                                     std::unique_ptr<FileLookupContext> lookup_context)
-    : lookup_context_(std::move(lookup_context)), key_(lookup_context_->lookup().key()),
-      cache_(std::move(cache)) {}
+using Common::AsyncFiles::AsyncFileHandle;
+using Common::AsyncFiles::AsyncFileManager;
 
-void FileInsertContext::insertHeaders(const Http::ResponseHeaderMap& response_headers,
-                                      const ResponseMetadata& metadata,
-                                      InsertCallback insert_complete, bool end_stream) {
-  ASSERT(dispatcher()->isThreadSafe());
-  callback_in_flight_ = std::move(insert_complete);
-  const VaryAllowList& vary_allow_list = lookup_context_->lookup().varyAllowList();
-  const Http::RequestHeaderMap& request_headers = lookup_context_->lookup().requestHeaders();
-  if (VaryHeaderUtils::hasVary(response_headers)) {
-    auto vary_header_values = VaryHeaderUtils::getVaryValues(response_headers);
-    Key old_key = key_;
-    const auto vary_identifier =
-        VaryHeaderUtils::createVaryIdentifier(vary_allow_list, vary_header_values, request_headers);
-    if (vary_identifier.has_value()) {
-      key_.add_custom_fields(vary_identifier.value());
-    } else {
-      // No error for this cancel, it's just an entry that's ineligible for insertion.
-      cancelInsert();
-      return;
-    }
-    cleanup_ =
-        cache_->setCacheEntryToVary(*dispatcher(), old_key, response_headers, key_, cleanup_);
-  } else {
-    cleanup_ = cache_->maybeStartWritingEntry(key_);
-  }
-  if (!cleanup_) {
-    // No error for this cancel, someone else just got there first.
-    cancelInsert();
-    return;
-  }
-  cache_file_header_proto_ = makeCacheFileHeaderProto(key_, response_headers, metadata);
-  end_stream_after_headers_ = end_stream;
-  createFile();
+void FileInsertContext::begin(Event::Dispatcher& dispatcher, Key key, std::string filepath,
+                              Http::ResponseHeaderMapPtr headers, ResponseMetadata metadata,
+                              HttpSourcePtr source, std::shared_ptr<CacheProgressReceiver> progress,
+                              std::shared_ptr<CacheShared> stat_recorder,
+                              AsyncFileManager& file_manager) {
+  auto p = new FileInsertContext(dispatcher, std::move(key), std::move(filepath),
+                                 std::move(headers), std::move(metadata), std::move(source),
+                                 std::move(progress), std::move(stat_recorder));
+  p->createFile(file_manager);
 }
 
-void FileInsertContext::createFile() {
-  ASSERT(dispatcher()->isThreadSafe());
-  ASSERT(!cancel_action_in_flight_);
-  ASSERT(callback_in_flight_ != nullptr);
-  cancel_action_in_flight_ = cache_->asyncFileManager()->createAnonymousFile(
-      dispatcher(), cache_->cachePath(), [this](absl::StatusOr<AsyncFileHandle> open_result) {
-        cancel_action_in_flight_ = nullptr;
-        if (!open_result.ok()) {
-          cancelInsert("failed to create anonymous file");
-          return;
+FileInsertContext::FileInsertContext(Event::Dispatcher& dispatcher, Key key, std::string filepath,
+                                     Http::ResponseHeaderMapPtr headers, ResponseMetadata metadata,
+                                     HttpSourcePtr source,
+                                     std::shared_ptr<CacheProgressReceiver> progress,
+                                     std::shared_ptr<CacheShared> stat_recorder)
+    : dispatcher_(dispatcher), filepath_(std::move(filepath)),
+      cache_file_header_proto_(makeCacheFileHeaderProto(key, *headers, metadata)),
+      headers_(std::move(headers)), source_(std::move(source)),
+      progress_receiver_(std::move(progress)), stat_recorder_(std::move(stat_recorder)) {}
+
+void FileInsertContext::fail() {
+  progress_receiver_->onInsertFailed();
+  if (file_handle_) {
+    auto queued = file_handle_->close(nullptr, [](absl::Status) {});
+    ASSERT(queued.ok());
+  }
+  delete this;
+}
+
+void FileInsertContext::complete() {
+  auto queued = file_handle_->close(nullptr, [](absl::Status) {});
+  ASSERT(queued.ok());
+  delete this;
+}
+
+void FileInsertContext::createFile(AsyncFileManager& file_manager) {
+  absl::string_view cache_path = absl::string_view{filepath_};
+  cache_path = absl::string_view{cache_path.begin(), cache_path.rfind('/') + 1};
+  file_manager.createAnonymousFile(&dispatcher_, cache_path,
+                                   [this](absl::StatusOr<AsyncFileHandle> open_result) -> void {
+                                     if (!open_result.ok()) {
+                                       return fail();
+                                     }
+                                     file_handle_ = std::move(open_result.value());
+                                     dupFile();
+                                   });
+}
+
+void FileInsertContext::dupFile() {
+  auto queued =
+      file_handle_->duplicate(&dispatcher_, [this](absl::StatusOr<AsyncFileHandle> dup_result) {
+        if (!dup_result.ok()) {
+          return fail();
         }
-        file_handle_ = std::move(open_result.value());
+        bool end_stream = source_ == nullptr;
+        progress_receiver_->onHeadersInserted(
+            std::make_unique<CacheFileReader>(std::move(dup_result.value())), std::move(headers_),
+            end_stream);
         writeEmptyHeaderBlock();
       });
+  ASSERT(queued.ok(), queued.status().ToString());
 }
 
 void FileInsertContext::writeEmptyHeaderBlock() {
-  ASSERT(dispatcher()->isThreadSafe());
-  ASSERT(!cancel_action_in_flight_);
-  ASSERT(callback_in_flight_ != nullptr);
   Buffer::OwnedImpl unset_header;
   header_block_.serializeToBuffer(unset_header);
   // Write an empty header block.
   auto queued = file_handle_->write(
-      dispatcher(), unset_header, 0, [this](absl::StatusOr<size_t> write_result) {
-        cancel_action_in_flight_ = nullptr;
+      &dispatcher_, unset_header, 0, [this](absl::StatusOr<size_t> write_result) {
         if (!write_result.ok() || write_result.value() != CacheFileFixedBlock::size()) {
-          cancelInsert(
-              writeFailureMessage("empty header block", write_result, CacheFileFixedBlock::size()));
-          return;
+          return source_ ? fail() : complete();
         }
-        writeHeaderProto();
-      });
-  ASSERT(queued.ok(), queued.status().ToString());
-  cancel_action_in_flight_ = std::move(queued.value());
-}
-
-void FileInsertContext::succeedCurrentAction() {
-  ASSERT(!cancel_action_in_flight_);
-  ASSERT(callback_in_flight_ != nullptr);
-  auto cb = std::move(callback_in_flight_);
-  callback_in_flight_ = nullptr;
-  cb(true);
-}
-
-void FileInsertContext::writeHeaderProto() {
-  ASSERT(dispatcher()->isThreadSafe());
-  ASSERT(!cancel_action_in_flight_);
-  ASSERT(callback_in_flight_ != nullptr);
-  auto buf = bufferFromProto(cache_file_header_proto_);
-  auto sz = buf.length();
-  auto queued =
-      file_handle_->write(dispatcher(), buf, header_block_.offsetToHeaders(),
-                          [this, sz](absl::StatusOr<size_t> write_result) {
-                            cancel_action_in_flight_ = nullptr;
-                            if (!write_result.ok() || write_result.value() != sz) {
-                              cancelInsert(writeFailureMessage("headers", write_result, sz));
-                              return;
-                            }
-                            header_block_.setHeadersSize(sz);
-                            if (end_stream_after_headers_) {
-                              commit();
-                              return;
-                            }
-                            succeedCurrentAction();
-                          });
-  ASSERT(queued.ok(), queued.status().ToString());
-  cancel_action_in_flight_ = std::move(queued.value());
-}
-
-void FileInsertContext::insertBody(const Buffer::Instance& fragment,
-                                   InsertCallback ready_for_next_fragment, bool end_stream) {
-  ASSERT(dispatcher()->isThreadSafe());
-  ASSERT(!cancel_action_in_flight_, "should be no actions in flight when receiving new data");
-  ASSERT(!callback_in_flight_);
-  if (!cleanup_) {
-    // Already cancelled, do nothing, return failure.
-    std::move(ready_for_next_fragment)(false);
-    return;
-  }
-  callback_in_flight_ = std::move(ready_for_next_fragment);
-  size_t sz = fragment.length();
-  Buffer::OwnedImpl consumable_fragment(fragment);
-  auto queued = file_handle_->write(
-      dispatcher(), consumable_fragment, header_block_.offsetToBody() + header_block_.bodySize(),
-      [this, sz, end_stream](absl::StatusOr<size_t> write_result) {
-        cancel_action_in_flight_ = nullptr;
-        if (!write_result.ok() || write_result.value() != sz) {
-          cancelInsert(writeFailureMessage("body chunk", write_result, sz));
-          return;
-        }
-        header_block_.setBodySize(header_block_.bodySize() + sz);
-        if (end_stream) {
-          commit();
+        if (source_) {
+          getBody();
         } else {
-          succeedCurrentAction();
+          writeHeaders();
         }
       });
   ASSERT(queued.ok(), queued.status().ToString());
-  cancel_action_in_flight_ = std::move(queued.value());
 }
 
-void FileInsertContext::insertTrailers(const Http::ResponseTrailerMap& trailers,
-                                       InsertCallback insert_complete) {
-  ASSERT(dispatcher()->isThreadSafe());
-  ASSERT(!cancel_action_in_flight_, "should be no actions in flight when receiving new data");
-  ASSERT(!callback_in_flight_);
-  if (!cleanup_) {
-    // Already cancelled, do nothing, return failure.
-    std::move(insert_complete)(false);
-    return;
-  }
-  callback_in_flight_ = std::move(insert_complete);
-  CacheFileTrailer file_trailer = makeCacheFileTrailerProto(trailers);
-  Buffer::OwnedImpl consumable_buffer = bufferFromProto(file_trailer);
-  size_t sz = consumable_buffer.length();
-  auto queued =
-      file_handle_->write(dispatcher(), consumable_buffer, header_block_.offsetToTrailers(),
-                          [this, sz](absl::StatusOr<size_t> write_result) {
-                            cancel_action_in_flight_ = nullptr;
-                            if (!write_result.ok() || write_result.value() != sz) {
-                              cancelInsert(writeFailureMessage("trailer chunk", write_result, sz));
-                              return;
-                            }
-                            header_block_.setTrailersSize(sz);
-                            commit();
-                          });
+void FileInsertContext::getBody() {
+  ASSERT(source_);
+  source_->getBody(AdjustedByteRange(read_pos_, read_pos_ + MaxInsertFragmentSize),
+                   [this](Buffer::InstancePtr buf, EndStream end_stream) {
+                     if (end_stream == EndStream::Reset) {
+                       return fail();
+                     }
+                     if (buf == nullptr) {
+                       if (end_stream == EndStream::End) {
+                         progress_receiver_->onBodyInserted(AdjustedByteRange(0, read_pos_), true);
+                         writeHeaders();
+                       } else {
+                         getTrailers();
+                       }
+                     } else {
+                       read_pos_ += buf->length();
+                       onBody(std::move(buf), end_stream == EndStream::End);
+                     }
+                   });
+}
+
+void FileInsertContext::onBody(Buffer::InstancePtr buf, bool end_stream) {
+  ASSERT(buf);
+  size_t len = buf->length();
+  auto queued = file_handle_->write(
+      &dispatcher_, *buf, header_block_.offsetToBody() + header_block_.bodySize(),
+      [this, len, end_stream](absl::StatusOr<size_t> write_result) {
+        if (!write_result.ok() || write_result.value() != len) {
+          return fail();
+        }
+        progress_receiver_->onBodyInserted(
+            AdjustedByteRange(header_block_.bodySize(), header_block_.bodySize() + len),
+            end_stream);
+        header_block_.setBodySize(header_block_.bodySize() + len);
+        if (end_stream) {
+          writeHeaders();
+        } else {
+          getBody();
+        }
+      });
   ASSERT(queued.ok(), queued.status().ToString());
-  cancel_action_in_flight_ = std::move(queued.value());
 }
 
-void FileInsertContext::onDestroy() {
-  lookup_context_->onDestroy();
-  cancelInsert("InsertContext destroyed prematurely");
+void FileInsertContext::getTrailers() {
+  source_->getTrailers([this](Http::ResponseTrailerMapPtr trailers, EndStream end_stream) {
+    if (end_stream == EndStream::Reset) {
+      return fail();
+    }
+    onTrailers(std::move(trailers));
+  });
+}
+
+void FileInsertContext::onTrailers(Http::ResponseTrailerMapPtr trailers) {
+  CacheFileTrailer trailer_proto = makeCacheFileTrailerProto(*trailers);
+  progress_receiver_->onTrailersInserted(std::move(trailers));
+  Buffer::OwnedImpl trailer_buffer = bufferFromProto(trailer_proto);
+  header_block_.setTrailersSize(trailer_buffer.length());
+  auto queued = file_handle_->write(&dispatcher_, trailer_buffer, header_block_.offsetToTrailers(),
+                                    [this](absl::StatusOr<size_t> write_result) {
+                                      if (!write_result.ok() ||
+                                          write_result.value() != header_block_.trailerSize()) {
+                                        // We've already told the client that the write worked, and
+                                        // it already has the data they need, so we can act like it
+                                        // was complete until the next lookup, even though the file
+                                        // didn't actually get linked.
+                                        return complete();
+                                      }
+                                      writeHeaders();
+                                    });
+  ASSERT(queued.ok(), queued.status().ToString());
+}
+
+void FileInsertContext::writeHeaders() {
+  Buffer::OwnedImpl header_buffer = bufferFromProto(cache_file_header_proto_);
+  header_block_.setHeadersSize(header_buffer.length());
+  auto queued = file_handle_->write(&dispatcher_, header_buffer, header_block_.offsetToHeaders(),
+                                    [this](absl::StatusOr<size_t> write_result) {
+                                      if (!write_result.ok() ||
+                                          write_result.value() != header_block_.headerSize()) {
+                                        // We've already told the client that the write worked, and
+                                        // it already has the data they need, so we can act like it
+                                        // was complete until the next lookup, even though the file
+                                        // didn't actually get linked.
+                                        return complete();
+                                      }
+                                      commit();
+                                    });
+  ASSERT(queued.ok(), queued.status().ToString());
 }
 
 void FileInsertContext::commit() {
-  ASSERT(dispatcher()->isThreadSafe());
-  ASSERT(!cancel_action_in_flight_);
-  ASSERT(callback_in_flight_ != nullptr);
-  // Write the file header block now that we know the sizes of the pieces.
+  // now that the header block knows the size of all the pieces, overwrite it in the file.
   Buffer::OwnedImpl block_buffer;
   header_block_.serializeToBuffer(block_buffer);
   auto queued = file_handle_->write(
-      dispatcher(), block_buffer, 0, [this](absl::StatusOr<size_t> write_result) {
-        cancel_action_in_flight_ = nullptr;
+      &dispatcher_, block_buffer, 0, [this](absl::StatusOr<size_t> write_result) {
         if (!write_result.ok() || write_result.value() != CacheFileFixedBlock::size()) {
-          cancelInsert(
-              writeFailureMessage("header block", write_result, CacheFileFixedBlock::size()));
-          return;
+          // We've already told the client that the write worked, and it already
+          // has the data they need, so we can act like it was complete until
+          // the next lookup, even though the file didn't actually get linked.
+          return complete();
         }
-        commitMeasureExisting();
+        createHardLink();
       });
   ASSERT(queued.ok(), queued.status().ToString());
-  cancel_action_in_flight_ = std::move(queued.value());
 }
 
-std::string FileInsertContext::pathAndFilename() {
-  return absl::StrCat(cache_->cachePath(), cache_->generateFilename(key_));
-}
-
-void FileInsertContext::commitMeasureExisting() {
-  ASSERT(!cancel_action_in_flight_);
-  ASSERT(callback_in_flight_ != nullptr);
-  cancel_action_in_flight_ = cache_->asyncFileManager()->stat(
-      dispatcher(), pathAndFilename(), [this](absl::StatusOr<struct stat> stat_result) {
-        cancel_action_in_flight_ = nullptr;
-        if (stat_result.ok()) {
-          commitUnlinkExisting(stat_result.value().st_size);
-        } else {
-          commitUnlinkExisting(0);
-        }
-      });
-}
-
-void FileInsertContext::commitUnlinkExisting(size_t file_size) {
-  ASSERT(!cancel_action_in_flight_);
-  ASSERT(callback_in_flight_ != nullptr);
-  cancel_action_in_flight_ = cache_->asyncFileManager()->unlink(
-      dispatcher(), pathAndFilename(), [this, file_size](absl::Status unlink_result) {
-        cancel_action_in_flight_ = nullptr;
-        if (unlink_result.ok()) {
-          cache_->trackFileRemoved(file_size);
-        }
-        commitCreateHardLink();
-      });
-}
-
-void FileInsertContext::commitCreateHardLink() {
-  ASSERT(!cancel_action_in_flight_);
-  ASSERT(callback_in_flight_ != nullptr);
-  auto queued = file_handle_->createHardLink(
-      dispatcher(), pathAndFilename(), [this](absl::Status link_result) {
-        cancel_action_in_flight_ = nullptr;
+void FileInsertContext::createHardLink() {
+  auto queued =
+      file_handle_->createHardLink(&dispatcher_, filepath_, [this](absl::Status link_result) {
         if (!link_result.ok()) {
-          cancelInsert(absl::StrCat("failed to link file (", link_result.ToString(),
-                                    "): ", pathAndFilename()));
-          return;
+          ENVOY_LOG(error, "failed to link file {}: {}", filepath_, link_result);
+          return complete();
         }
-        ENVOY_LOG(debug, "created cache file {}", cache_->generateFilename(key_));
-        succeedCurrentAction();
+        ENVOY_LOG(debug, "created cache file {}", filepath_);
         uint64_t file_size = header_block_.offsetToTrailers() + header_block_.trailerSize();
-        cache_->trackFileAdded(file_size);
-        // By clearing cleanup before destructor, we prevent logging an error.
-        cleanup_ = nullptr;
+        stat_recorder_->trackFileAdded(file_size);
+        complete();
       });
   ASSERT(queued.ok(), queued.status().ToString());
-  cancel_action_in_flight_ = std::move(queued.value());
 }
-
-void FileInsertContext::cancelInsert(absl::string_view error) {
-  if (cancel_action_in_flight_) {
-    cancel_action_in_flight_();
-    cancel_action_in_flight_ = nullptr;
-  }
-  if (callback_in_flight_) {
-    callback_in_flight_(false);
-    callback_in_flight_ = nullptr;
-  }
-  if (cleanup_) {
-    cleanup_ = nullptr;
-    if (!error.empty()) {
-      ENVOY_LOG(warn, "FileSystemHttpCache: {}", error);
-    }
-  }
-  if (file_handle_) {
-    auto close_status = file_handle_->close(nullptr, [](absl::Status) {});
-    ASSERT(close_status.ok());
-    file_handle_ = nullptr;
-  }
-}
-
-Event::Dispatcher* FileInsertContext::dispatcher() const { return lookup_context_->dispatcher(); }
 
 } // namespace FileSystemHttpCache
 } // namespace Cache

@@ -11,9 +11,14 @@ envoy_package()
 
 envoy_cc_test_library(
     name = "mocks",
+    srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//source/extensions/filters/http/cache:active_cache_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",
+        "//source/extensions/filters/http/cache:http_source_interface",
+        "//source/extensions/filters/http/cache:stats",
+        "//test/test_common:printers_lib",
     ],
 )
 
@@ -33,12 +38,13 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "cache_filter_logging_info_test",
-    srcs = ["cache_filter_logging_info_test.cc"],
+    name = "stats_test",
+    srcs = ["stats_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = "6gig",
     deps = [
-        "//source/extensions/filters/http/cache:cache_filter_logging_info_lib",
+        "//source/extensions/filters/http/cache:stats",
+        "//test/mocks/server:factory_context_mocks",
     ],
 )
 
@@ -59,12 +65,6 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/cache:http_cache_lib",
-        "//source/extensions/http/cache/simple_http_cache:config",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/server:factory_context_mocks",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_runtime_lib",
-        "//test/test_common:utility_lib",
     ],
 )
 
@@ -80,6 +80,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "upstream_request_test",
+    srcs = ["upstream_request_test.cc"],
+    extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/http/cache:upstream_request_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "cache_filter_test",
     srcs = ["cache_filter_test.cc"],
     extension_names = ["envoy.filters.http.cache"],
@@ -87,8 +99,7 @@ envoy_extension_cc_test(
     deps = [
         ":mocks",
         "//source/extensions/filters/http/cache:cache_filter_lib",
-        "//source/extensions/filters/http/cache:cache_filter_logging_info_lib",
-        "//source/extensions/http/cache/simple_http_cache:config",
+        "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
@@ -106,6 +117,21 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/cache:cacheability_utils_lib",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "active_cache_test",
+    srcs = ["active_cache_test.cc"],
+    extension_names = ["envoy.filters.http.cache"],
+    rbe_pool = "6gig",
+    deps = [
+        ":mocks",
+        "//source/extensions/filters/http/cache:active_cache_impl_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -161,6 +187,7 @@ envoy_extension_cc_test_library(
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = "6gig",
     deps = [
+        ":mocks",
         "//source/extensions/filters/http/cache:cache_headers_utils_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",
         "//test/mocks/server:factory_context_mocks",

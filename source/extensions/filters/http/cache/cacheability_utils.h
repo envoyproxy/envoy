@@ -4,6 +4,8 @@
 #include "source/common/http/headers.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -13,7 +15,7 @@ namespace CacheabilityUtils {
 // This does not depend on cache-control headers as
 // request cache-control headers only decide whether
 // validation is required and whether the response can be cached.
-bool canServeRequestFromCache(const Http::RequestHeaderMap& headers);
+absl::Status canServeRequestFromCache(const Http::RequestHeaderMap& headers);
 
 // Checks if a response can be stored in cache.
 // Note that if a request is not cacheable according to 'canServeRequestFromCache'

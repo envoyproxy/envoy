@@ -7,8 +7,10 @@
 
 #include "envoy/http/header_map.h"
 
+#include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 
 #include "absl/algorithm/container.h"
@@ -230,6 +232,67 @@ Seconds CacheHeadersUtils::calculateAge(const Http::ResponseHeaderMap& response_
   const SystemTime::duration current_age = corrected_initial_age + resident_time;
 
   return std::chrono::duration_cast<Seconds>(current_age);
+}
+
+void CacheHeadersUtils::injectValidationHeaders(
+    Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& old_response_headers) {
+  const Http::HeaderEntry* etag_header = old_response_headers.getInline(CacheCustomHeaders::etag());
+  const Http::HeaderEntry* last_modified_header =
+      old_response_headers.getInline(CacheCustomHeaders::lastModified());
+
+  if (etag_header) {
+    absl::string_view etag = etag_header->value().getStringView();
+    request_headers.setInline(CacheCustomHeaders::ifNoneMatch(), etag);
+  }
+  if (DateUtil::timePointValid(CacheHeadersUtils::httpTime(last_modified_header))) {
+    // Valid Last-Modified header exists.
+    absl::string_view last_modified = last_modified_header->value().getStringView();
+    request_headers.setInline(CacheCustomHeaders::ifModifiedSince(), last_modified);
+  } else {
+    // Either Last-Modified is missing or invalid, fallback to Date.
+    // A correct behaviour according to:
+    // https://httpwg.org/specs/rfc7232.html#header.if-modified-since
+    absl::string_view date = old_response_headers.getDateValue();
+    request_headers.setInline(CacheCustomHeaders::ifModifiedSince(), date);
+  }
+}
+
+// TODO(yosrym93): Write a test that exercises this when SimpleHttpCache implements updateHeaders
+bool CacheHeadersUtils::shouldUpdateCachedEntry(const Http::ResponseHeaderMap& new_headers,
+                                                const Http::ResponseHeaderMap& old_headers) {
+  ASSERT(Http::Utility::getResponseStatus(new_headers) == enumToInt(Http::Code::NotModified),
+         "shouldUpdateCachedEntry must only be called with 304 responses");
+
+  // According to: https://httpwg.org/specs/rfc7234.html#freshening.responses,
+  // and assuming a single cached response per key:
+  // If the 304 response contains a strong validator (etag) that does not match the cached response,
+  // the cached response should not be updated.
+  const Http::HeaderEntry* response_etag = new_headers.getInline(CacheCustomHeaders::etag());
+  const Http::HeaderEntry* cached_etag = old_headers.getInline(CacheCustomHeaders::etag());
+  return !response_etag || (cached_etag && cached_etag->value().getStringView() ==
+                                               response_etag->value().getStringView());
+}
+
+Key CacheHeadersUtils::makeKey(const Http::RequestHeaderMap& request_headers,
+                               absl::string_view cluster_name) {
+  ASSERT(request_headers.Path(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
+                                 "with null Path.");
+  ASSERT(request_headers.Host(), "Can't form cache lookup key for malformed Http::RequestHeaderMap "
+                                 "with null Host.");
+  Key key;
+  absl::string_view scheme = request_headers.getSchemeValue();
+  ASSERT(Http::Utility::schemeIsValid(scheme));
+  // TODO(toddmgreer): Let config determine whether to include scheme, host, and
+  // query params.
+  key.set_cluster_name(cluster_name);
+  key.set_host(std::string(request_headers.getHostValue()));
+  key.set_path(std::string(request_headers.getPathValue()));
+  if (Http::Utility::schemeIsHttp(scheme)) {
+    key.set_scheme(Key::HTTP);
+  } else if (Http::Utility::schemeIsHttps(scheme)) {
+    key.set_scheme(Key::HTTPS);
+  }
+  return key;
 }
 
 absl::optional<uint64_t> CacheHeadersUtils::readAndRemoveLeadingDigits(absl::string_view& str) {

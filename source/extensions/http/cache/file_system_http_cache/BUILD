@@ -20,6 +20,7 @@ envoy_cc_extension(
     name = "config",
     srcs = [
         "cache_eviction_thread.cc",
+        "cache_file_reader.cc",
         "config.cc",
         "file_system_http_cache.cc",
         "insert_context.cc",
@@ -28,6 +29,7 @@ envoy_cc_extension(
     ],
     hdrs = [
         "cache_eviction_thread.h",
+        "cache_file_reader.h",
         "file_system_http_cache.h",
         "insert_context.h",
         "lookup_context.h",
@@ -48,6 +50,7 @@ envoy_cc_extension(
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
         "//source/extensions/common/async_files",
+        "//source/extensions/filters/http/cache:active_cache_impl_lib",
         "//source/extensions/filters/http/cache:http_cache_lib",
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/strings",

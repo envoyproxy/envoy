@@ -30,11 +30,7 @@ namespace FileSystemHttpCache {
   GAUGE(size_limit_bytes, NeverImport)                                                             \
   GAUGE(size_limit_count, NeverImport)                                                             \
   STATNAME(cache)                                                                                  \
-  STATNAME(cache_path)                                                                             \
-  STATNAME(event)                                                                                  \
-  STATNAME(event_type)                                                                             \
-  STATNAME(hit)                                                                                    \
-  STATNAME(miss)
+  STATNAME(cache_path)
 // TODO(ravenblack): Add other stats from DESIGN.md
 
 #define COUNTER_HELPER_(NAME)                                                                      \
@@ -51,31 +47,19 @@ struct CacheStats {
   CacheStats(const CacheStatNames& stat_names, Envoy::Stats::Scope& scope,
              Stats::StatName cache_path)
       : stat_names_(stat_names), prefix_(stat_names_.cache_), cache_path_(cache_path),
-        tags_({{stat_names_.cache_path_, cache_path_}}),
-        tags_hit_(
-            {{stat_names_.cache_path_, cache_path_}, {stat_names_.event_type_, stat_names_.hit_}}),
-        tags_miss_(
-            {{stat_names_.cache_path_, cache_path_}, {stat_names_.event_type_, stat_names_.miss_}})
+        tags_({{stat_names_.cache_path_, cache_path_}})
             ALL_CACHE_STATS(COUNTER_HELPER_, GAUGE_HELPER_, HISTOGRAM_HELPER_, TEXT_READOUT_HELPER_,
-                            STATNAME_HELPER_),
-        cache_hit_(Envoy::Stats::Utility::counterFromStatNames(scope, {prefix_, stat_names.event_},
-                                                               tags_hit_)),
-        cache_miss_(Envoy::Stats::Utility::counterFromStatNames(scope, {prefix_, stat_names.event_},
-                                                                tags_miss_)) {}
+                            STATNAME_HELPER_) {}
 
 private:
   const CacheStatNames& stat_names_;
   const Stats::StatName prefix_;
   const Stats::StatName cache_path_;
   Stats::StatNameTagVector tags_;
-  Stats::StatNameTagVector tags_hit_;
-  Stats::StatNameTagVector tags_miss_;
 
 public:
   ALL_CACHE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,
                   GENERATE_TEXT_READOUT_STRUCT, GENERATE_STATNAME_STRUCT);
-  Stats::Counter& cache_hit_;
-  Stats::Counter& cache_miss_;
 };
 
 CacheStats generateStats(CacheStatNames& stat_names, Stats::Scope& scope,

@@ -17,61 +17,8 @@ namespace HttpFilters {
 namespace Cache {
 namespace FileSystemHttpCache {
 
-// Copying in 128K chunks is an arbitrary choice for a reasonable balance of performance and
-// memory usage. Since UpdateHeaders is unlikely to be a common operation it is most likely
-// not worthwhile to carefully tune this.
-const size_t FileSystemHttpCache::max_update_headers_copy_chunk_size_ = 128 * 1024;
-
 const CacheStats& FileSystemHttpCache::stats() const { return shared_->stats_; }
 const ConfigProto& FileSystemHttpCache::config() const { return shared_->config_; }
-
-void FileSystemHttpCache::writeVaryNodeToDisk(Event::Dispatcher& dispatcher, const Key& key,
-                                              const Http::ResponseHeaderMap& response_headers,
-                                              std::shared_ptr<Cleanup> cleanup) {
-  auto vary_values = VaryHeaderUtils::getVaryValues(response_headers);
-  auto headers = std::make_shared<CacheFileHeader>();
-  auto h = headers->add_headers();
-  h->set_key("vary");
-  h->set_value(absl::StrJoin(vary_values, ","));
-  std::string filename = absl::StrCat(cachePath(), generateFilename(key));
-  async_file_manager_->createAnonymousFile(
-      &dispatcher, cachePath(),
-      [headers, filename = std::move(filename), cleanup,
-       dispatcher = &dispatcher](absl::StatusOr<AsyncFileHandle> open_result) {
-        if (!open_result.ok()) {
-          ENVOY_LOG(warn, "writing vary node, failed to createAnonymousFile: {}",
-                    open_result.status());
-          return;
-        }
-        auto file_handle = std::move(open_result.value());
-        CacheFileFixedBlock block;
-        auto buf = bufferFromProto(*headers);
-        block.setHeadersSize(buf.length());
-        Buffer::OwnedImpl buf2;
-        block.serializeToBuffer(buf2);
-        buf2.add(buf);
-        size_t sz = buf2.length();
-        auto queued = file_handle->write(
-            dispatcher, buf2, 0,
-            [dispatcher, file_handle, cleanup, sz,
-             filename = std::move(filename)](absl::StatusOr<size_t> write_result) {
-              if (!write_result.ok() || write_result.value() != sz) {
-                ENVOY_LOG(warn, "writing vary node, failed to write: {}", write_result.status());
-                file_handle->close(nullptr, [](absl::Status) {}).IgnoreError();
-                return;
-              }
-              auto queued = file_handle->createHardLink(
-                  dispatcher, filename, [cleanup, file_handle](absl::Status link_result) {
-                    if (!link_result.ok()) {
-                      ENVOY_LOG(warn, "writing vary node, failed to link: {}", link_result);
-                    }
-                    file_handle->close(nullptr, [](absl::Status) {}).IgnoreError();
-                  });
-              ASSERT(queued.ok());
-            });
-        ASSERT(queued.ok());
-      });
-}
 
 absl::string_view FileSystemHttpCache::name() {
   return "envoy.extensions.http.cache.file_system_http_cache";
@@ -83,7 +30,7 @@ FileSystemHttpCache::FileSystemHttpCache(
     Stats::Scope& stats_scope)
     : owner_(owner), async_file_manager_(async_file_manager),
       shared_(std::make_shared<CacheShared>(config, stats_scope)),
-      cache_eviction_thread_(cache_eviction_thread) {
+      cache_eviction_thread_(cache_eviction_thread), cache_info_(CacheInfo{name()}) {
   cache_eviction_thread_.addCache(shared_);
 }
 
@@ -96,271 +43,199 @@ FileSystemHttpCache::~FileSystemHttpCache() { cache_eviction_thread_.removeCache
 CacheInfo FileSystemHttpCache::cacheInfo() const {
   CacheInfo info;
   info.name_ = name();
-  info.supports_range_requests_ = true;
   return info;
 }
 
-absl::optional<Key>
-FileSystemHttpCache::makeVaryKey(const Key& base, const VaryAllowList& vary_allow_list,
-                                 const absl::btree_set<absl::string_view>& vary_header_values,
-                                 const Http::RequestHeaderMap& request_headers) {
-  const absl::optional<std::string> vary_identifier =
-      VaryHeaderUtils::createVaryIdentifier(vary_allow_list, vary_header_values, request_headers);
-  if (!vary_identifier.has_value()) {
-    // Skip the insert if we are unable to create a vary key.
-    return absl::nullopt;
-  }
-  Key vary_key = base;
-  vary_key.add_custom_fields(vary_identifier.value());
-  return vary_key;
+void FileSystemHttpCache::lookup(LookupRequest&& lookup, LookupCallback&& callback) {
+  std::string filepath = absl::StrCat(cachePath(), generateFilename(lookup.key()));
+  async_file_manager_->openExistingFile(
+      &lookup.dispatcher(), filepath, Common::AsyncFiles::AsyncFileManager::Mode::ReadOnly,
+      [&dispatcher = lookup.dispatcher(),
+       callback = std::move(callback)](absl::StatusOr<AsyncFileHandle> open_result) mutable {
+        if (!open_result.ok()) {
+          if (open_result.status().code() == absl::StatusCode::kNotFound) {
+            return callback(LookupResult{});
+          }
+          ENVOY_LOG(debug, "open file failed: {}", open_result.status());
+          return callback(open_result.status());
+        }
+        FileLookupContext::begin(dispatcher, std::move(open_result.value()), std::move(callback));
+      });
 }
 
-LookupContextPtr FileSystemHttpCache::makeLookupContext(LookupRequest&& lookup,
-                                                        Http::StreamFilterCallbacks& callbacks) {
-  return std::make_unique<FileLookupContext>(callbacks.dispatcher(), *this, std::move(lookup));
+void FileSystemHttpCache::insert(Event::Dispatcher& dispatcher, Key key,
+                                 Http::ResponseHeaderMapPtr headers, ResponseMetadata metadata,
+                                 HttpSourcePtr source,
+                                 std::shared_ptr<CacheProgressReceiver> progress) {
+  std::string filepath = absl::StrCat(cachePath(), generateFilename(key));
+  FileInsertContext::begin(dispatcher, std::move(key), std::move(filepath), std::move(headers),
+                           std::move(metadata), std::move(source), std::move(progress), shared_,
+                           *async_file_manager_);
 }
 
 // Helper class to reduce the lambda depth of updateHeaders.
 class HeaderUpdateContext : public Logger::Loggable<Logger::Id::cache_filter> {
 public:
-  HeaderUpdateContext(Event::Dispatcher& dispatcher, const FileSystemHttpCache& cache,
-                      const Key& key, std::shared_ptr<Cleanup> cleanup,
-                      const Http::ResponseHeaderMap& response_headers,
-                      const ResponseMetadata& metadata, UpdateHeadersCallback on_complete)
-      : dispatcher_(dispatcher),
-        filepath_(absl::StrCat(cache.cachePath(), cache.generateFilename(key))),
-        cache_path_(cache.cachePath()), cleanup_(cleanup),
-        async_file_manager_(cache.asyncFileManager()),
-        response_headers_(Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers)),
-        response_metadata_(metadata), on_complete_(std::move(on_complete)) {}
-
-  void begin(std::shared_ptr<HeaderUpdateContext> ctx) {
-    async_file_manager_->openExistingFile(
-        dispatcher(), filepath_, Common::AsyncFiles::AsyncFileManager::Mode::ReadOnly,
-        [ctx = std::move(ctx), this](absl::StatusOr<AsyncFileHandle> open_result) {
-          if (!open_result.ok()) {
-            fail("failed to open", open_result.status());
-            return;
-          }
-          read_handle_ = std::move(open_result.value());
-          unlinkOriginal(std::move(ctx));
-        });
-  }
-
-  ~HeaderUpdateContext() {
-    // For chaining the close actions in a file thread, the closes must be chained sequentially.
-    // write_handle_ can only be set if read_handle_ is set, so this ordering is safe.
-    if (read_handle_) {
-      read_handle_
-          ->close(dispatcher(),
-                  [write_handle = write_handle_](absl::Status) {
-                    if (write_handle) {
-                      write_handle->close(nullptr, [](absl::Status) {}).IgnoreError();
-                    }
-                  })
-          .IgnoreError();
-    }
+  static void begin(Event::Dispatcher& dispatcher, AsyncFileHandle handle,
+                    Buffer::InstancePtr new_headers) {
+    auto p = new HeaderUpdateContext(dispatcher, std::move(handle), std::move(new_headers));
+    p->readHeaderBlock();
   }
 
 private:
-  void unlinkOriginal(std::shared_ptr<HeaderUpdateContext> ctx) {
-    async_file_manager_->unlink(
-        dispatcher(), filepath_, [ctx = std::move(ctx), this](absl::Status unlink_result) {
-          if (!unlink_result.ok()) {
-            ENVOY_LOG(warn, "file_system_http_cache: {} for update cache file {}: {}",
-                      "unlink failed", filepath_, unlink_result);
-            // But keep going, because unlink might have failed because the file was already
-            // deleted after we opened it. Worth a try to replace it!
-          }
-          readHeaderBlock(std::move(ctx));
-        });
-  }
-  void readHeaderBlock(std::shared_ptr<HeaderUpdateContext> ctx) {
-    auto queued = read_handle_->read(
-        dispatcher(), 0, CacheFileFixedBlock::size(),
-        [ctx = std::move(ctx), this](absl::StatusOr<Buffer::InstancePtr> read_result) {
-          if (!read_result.ok() || read_result.value()->length() != CacheFileFixedBlock::size()) {
-            fail("failed to read header block", read_result.status());
-            return;
+  HeaderUpdateContext(Event::Dispatcher& dispatcher, AsyncFileHandle handle,
+                      Buffer::InstancePtr new_headers)
+      : dispatcher_(dispatcher), handle_(std::move(handle)), new_headers_(std::move(new_headers)) {}
+
+  void readHeaderBlock() {
+    auto queued = handle_->read(
+        &dispatcher_, 0, CacheFileFixedBlock::size(),
+        [this](absl::StatusOr<Buffer::InstancePtr> read_result) {
+          if (!read_result.ok()) {
+            return fail("failed to read header block", read_result.status());
+          } else if (read_result.value()->length() != CacheFileFixedBlock::size()) {
+            return fail(
+                "incomplete read of header block",
+                absl::AbortedError(absl::StrCat("read ", read_result.value()->length(),
+                                                ", expected ", CacheFileFixedBlock::size())));
           }
           header_block_.populateFromStringView(read_result.value()->toString());
-          readHeaders(std::move(ctx));
+          truncateOldHeaders();
         });
     ASSERT(queued.ok());
   }
-  void readHeaders(std::shared_ptr<HeaderUpdateContext> ctx) {
-    auto queued = read_handle_->read(
-        dispatcher(), header_block_.offsetToHeaders(), header_block_.headerSize(),
-        [ctx = std::move(ctx), this](absl::StatusOr<Buffer::InstancePtr> read_result) {
-          if (!read_result.ok() || read_result.value()->length() != header_block_.headerSize()) {
-            fail("failed to read headers", read_result.status());
-            return;
+
+  void truncateOldHeaders() {
+    auto queued = handle_->truncate(&dispatcher_, header_block_.offsetToHeaders(),
+                                    [this](absl::Status truncate_result) {
+                                      if (!truncate_result.ok()) {
+                                        return fail("failed to truncate headers", truncate_result);
+                                      }
+                                      overwriteHeaderBlock();
+                                    });
+    ASSERT(queued.ok());
+  }
+
+  void overwriteHeaderBlock() {
+    size_t len = new_headers_->length();
+    header_block_.setHeadersSize(len);
+    Buffer::OwnedImpl write_buf;
+    header_block_.serializeToBuffer(write_buf);
+    auto queued =
+        handle_->write(&dispatcher_, write_buf, 0, [this](absl::StatusOr<size_t> write_result) {
+          if (!write_result.ok()) {
+            return fail("overwriting headers failed", write_result.status());
+          } else if (write_result.value() != CacheFileFixedBlock::size()) {
+            return fail(
+                "overwriting headers failed",
+                absl::AbortedError(absl::StrCat("wrote ", write_result.value(), ", expected ",
+                                                CacheFileFixedBlock::size())));
           }
-          header_proto_ = makeCacheFileHeaderProto(*read_result.value());
-          if (header_proto_.headers_size() == 1 && header_proto_.headers(0).key() == "vary") {
-            // TODO(ravenblack): do we need to handle vary entries here? How
-            // did we get to updateHeaders on a vary entry rather than the
-            // variant? Just abort for now.
-            // (The entry was deleted at this point, so we should eventually get
-            // back into a usable state even if this is a valid event.)
-            fail("not implemented updating vary header", absl::OkStatus());
-            return;
-          }
-          header_proto_ = mergeProtoWithHeadersAndMetadata(header_proto_, *response_headers_,
-                                                           response_metadata_);
-          size_t new_header_size = headerProtoSize(header_proto_);
-          header_size_difference_ = header_block_.headerSize() - new_header_size;
-          header_block_.setHeadersSize(new_header_size);
-          startWriting(std::move(ctx));
+          writeNewHeaders();
         });
     ASSERT(queued.ok());
   }
-  void startWriting(std::shared_ptr<HeaderUpdateContext> ctx) {
-    async_file_manager_->createAnonymousFile(
-        dispatcher(), cache_path_,
-        [ctx = std::move(ctx), this](absl::StatusOr<AsyncFileHandle> create_result) {
-          if (!create_result.ok()) {
-            fail("failed to open new cache file", create_result.status());
-            return;
-          }
-          write_handle_ = std::move(create_result.value());
-          writeHeaderBlockAndHeaders(std::move(ctx));
-        });
-  }
-  void writeHeaderBlockAndHeaders(std::shared_ptr<HeaderUpdateContext> ctx) {
-    Buffer::OwnedImpl buf;
-    header_block_.serializeToBuffer(buf);
-    buf.add(bufferFromProto(header_proto_));
-    auto sz = buf.length();
-    auto queued = write_handle_->write(
-        dispatcher(), buf, 0,
-        [ctx = std::move(ctx), sz, this](absl::StatusOr<size_t> write_result) {
-          if (!write_result.ok() || write_result.value() != sz) {
-            fail("failed to write header block and headers", write_result.status());
-            return;
-          }
-          copyBodyAndTrailers(std::move(ctx), header_block_.offsetToBody());
-        });
+
+  void writeNewHeaders() {
+    size_t len = new_headers_->length();
+    auto queued =
+        handle_->write(&dispatcher_, *new_headers_, header_block_.offsetToHeaders(),
+                       [this, len](absl::StatusOr<size_t> write_result) {
+                         if (!write_result.ok()) {
+                           return fail("failed to write new headers", write_result.status());
+                         } else if (write_result.value() != len) {
+                           return fail("incomplete write of new headers",
+                                       absl::AbortedError(absl::StrCat(
+                                           "wrote ", write_result.value(), ", expected ", len)));
+                         }
+                         finish();
+                       });
     ASSERT(queued.ok());
   }
-  void copyBodyAndTrailers(std::shared_ptr<HeaderUpdateContext> ctx, off_t offset) {
-    size_t sz = header_block_.offsetToEnd() - offset;
-    if (sz == 0) {
-      linkNewFile(ctx);
-      return;
-    }
-    sz = std::min(sz, FileSystemHttpCache::max_update_headers_copy_chunk_size_);
-    auto queued = read_handle_->read(
-        dispatcher(), offset + header_size_difference_, sz,
-        [ctx = std::move(ctx), offset, sz, this](absl::StatusOr<Buffer::InstancePtr> read_result) {
-          if (!read_result.ok() || read_result.value()->length() != sz) {
-            fail("failed to read body chunk", read_result.status());
-            return;
-          }
-          auto queued = write_handle_->write(
-              dispatcher(), *read_result.value(), offset,
-              [ctx = std::move(ctx), offset, sz, this](absl::StatusOr<size_t> write_result) {
-                if (!write_result.ok() || write_result.value() != sz) {
-                  fail("failed to write body chunk", write_result.status());
-                  return;
-                }
-                copyBodyAndTrailers(std::move(ctx), offset + sz);
-              });
-          ASSERT(queued.ok());
-        });
-    ASSERT(queued.ok());
-  }
-  void linkNewFile(std::shared_ptr<HeaderUpdateContext> ctx) {
-    auto queued = write_handle_->createHardLink(
-        dispatcher(), filepath_, [ctx = std::move(ctx), this](absl::Status link_result) {
-          if (!link_result.ok()) {
-            fail("failed to link new cache file", link_result);
-            return;
-          }
-          std::move(on_complete_)(true);
-        });
-    ASSERT(queued.ok());
-  }
+
   void fail(absl::string_view msg, absl::Status status) {
-    ENVOY_LOG(warn, "file_system_http_cache: {} for update cache file {}: {}", msg, filepath_,
-              status);
-    std::move(on_complete_)(false);
+    ENVOY_LOG(error, "{}: {}", msg, status);
+    finish();
   }
-  Event::Dispatcher* dispatcher() { return &dispatcher_; }
+
+  void finish() {
+    auto close_status = handle_->close(nullptr, [](absl::Status) {});
+    ASSERT(close_status.ok());
+    delete this;
+  }
+
   Event::Dispatcher& dispatcher_;
-  std::string filepath_;
-  std::string cache_path_;
-  std::shared_ptr<Cleanup> cleanup_;
-  std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager_;
-  Http::ResponseHeaderMapPtr response_headers_;
-  ResponseMetadata response_metadata_;
+  AsyncFileHandle handle_;
+  Buffer::InstancePtr new_headers_;
   CacheFileFixedBlock header_block_;
-  off_t header_size_difference_;
-  CacheFileHeader header_proto_;
-  AsyncFileHandle read_handle_;
-  AsyncFileHandle write_handle_;
-  UpdateHeadersCallback on_complete_;
 };
 
-void FileSystemHttpCache::updateHeaders(const LookupContext& base_lookup_context,
-                                        const Http::ResponseHeaderMap& response_headers,
-                                        const ResponseMetadata& metadata,
-                                        UpdateHeadersCallback on_complete) {
-  const FileLookupContext& lookup_context =
-      dynamic_cast<const FileLookupContext&>(base_lookup_context);
-  const Key& key = lookup_context.key();
-  auto cleanup = maybeStartWritingEntry(key);
-  if (!cleanup) {
-    return;
-  }
-  auto ctx =
-      std::make_shared<HeaderUpdateContext>(*lookup_context.dispatcher(), *this, key, cleanup,
-                                            response_headers, metadata, std::move(on_complete));
-  ctx->begin(ctx);
+/**
+ * Replaces the headers of a cache entry.
+ *
+ * In order to avoid a race in which the wrong size of headers is read by
+ * one instance while headers are being updated by another instance, the
+ * update is performed by:
+ * 1. truncate the file so there are no headers.
+ * 2. update the size of the headers in the header block.
+ * 3. write the new headers.
+ *
+ * This way, if another instance tries to read headers when they are briefly
+ * not present, that read will fail to get the expected size, and it will be
+ * treated as a cache miss rather than providing a "mixed" (corrupted) read.
+ *
+ * Most of the time the cache is not reading headers from the file as they
+ * are cached in memory, so even this race should be extremely rare.
+ */
+void FileSystemHttpCache::updateHeaders(Event::Dispatcher& dispatcher, const Key& key,
+                                        const Http::ResponseHeaderMap& updated_headers,
+                                        const ResponseMetadata& updated_metadata) {
+  std::string filepath = absl::StrCat(cachePath(), generateFilename(key));
+  CacheFileHeader header_proto = makeCacheFileHeaderProto(key, updated_headers, updated_metadata);
+  Buffer::InstancePtr header_buffer = std::make_unique<Buffer::OwnedImpl>();
+  Buffer::OwnedImpl tmp = bufferFromProto(header_proto);
+  header_buffer->move(tmp);
+  async_file_manager_->openExistingFile(
+      &dispatcher, filepath, Common::AsyncFiles::AsyncFileManager::Mode::ReadWrite,
+      [&dispatcher = dispatcher, header_buffer = std::move(header_buffer)](
+          absl::StatusOr<AsyncFileHandle> open_result) mutable {
+        if (!open_result.ok()) {
+          ENVOY_LOG(debug, "open file for updateHeaders failed: {}", open_result.status());
+          return;
+        }
+        HeaderUpdateContext::begin(dispatcher, open_result.value(), std::move(header_buffer));
+      });
+}
+
+void FileSystemHttpCache::evict(Event::Dispatcher& dispatcher, const Key& key) {
+  std::string filepath = absl::StrCat(cachePath(), generateFilename(key));
+  async_file_manager_->stat(&dispatcher, filepath,
+                            [file_manager = async_file_manager_, &dispatcher, filepath,
+                             stats = shared_](absl::StatusOr<struct stat> stat_result) {
+                              if (!stat_result.ok()) {
+                                return;
+                              }
+                              off_t sz = stat_result.value().st_size;
+                              file_manager->unlink(&dispatcher, filepath,
+                                                   [sz, stats](absl::Status unlink_result) {
+                                                     if (!unlink_result.ok()) {
+                                                       return;
+                                                     }
+                                                     stats->trackFileRemoved(sz);
+                                                   });
+                            });
+}
+
+void FileSystemHttpCache::touch(const Key&, SystemTime) {
+  // Reading from a file counts as a touch for stat purposes, so no
+  // need to update timestamps directly.
 }
 
 absl::string_view FileSystemHttpCache::cachePath() const { return shared_->cachePath(); }
 
-bool FileSystemHttpCache::workInProgress(const Key& key) {
-  absl::MutexLock lock(&cache_mu_);
-  return entries_being_written_.contains(key);
-}
-
-std::shared_ptr<Cleanup> FileSystemHttpCache::maybeStartWritingEntry(const Key& key) {
-  absl::MutexLock lock(&cache_mu_);
-  if (!entries_being_written_.emplace(key).second) {
-    return nullptr;
-  }
-  return std::make_shared<Cleanup>([this, key]() {
-    absl::MutexLock lock(&cache_mu_);
-    entries_being_written_.erase(key);
-  });
-}
-
-std::shared_ptr<Cleanup>
-FileSystemHttpCache::setCacheEntryToVary(Event::Dispatcher& dispatcher, const Key& key,
-                                         const Http::ResponseHeaderMap& response_headers,
-                                         const Key& varied_key, std::shared_ptr<Cleanup> cleanup) {
-  writeVaryNodeToDisk(dispatcher, key, response_headers, cleanup);
-  return maybeStartWritingEntry(varied_key);
-}
-
 std::string FileSystemHttpCache::generateFilename(const Key& key) const {
   // TODO(ravenblack): Add support for directory tree structure.
   return absl::StrCat("cache-", stableHashKey(key));
-}
-
-InsertContextPtr FileSystemHttpCache::makeInsertContext(LookupContextPtr&& lookup_context,
-                                                        Http::StreamFilterCallbacks&) {
-  auto file_lookup_context = std::unique_ptr<FileLookupContext>(
-      dynamic_cast<FileLookupContext*>(lookup_context.release()));
-  ASSERT(file_lookup_context);
-  if (file_lookup_context->workInProgress()) {
-    auto ret = std::make_unique<DontInsertContext>(*file_lookup_context->dispatcher());
-    file_lookup_context->onDestroy();
-    return ret;
-  }
-  return std::make_unique<FileInsertContext>(shared_from_this(), std::move(file_lookup_context));
 }
 
 void FileSystemHttpCache::trackFileAdded(uint64_t file_size) {

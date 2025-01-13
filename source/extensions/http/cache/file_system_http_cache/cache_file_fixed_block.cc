@@ -18,8 +18,8 @@ constexpr std::array<char, 4> ExpectedFileId = {'C', 'A', 'C', 'H'};
 // The expected next four bytes of the header - if cacheVersionId() doesn't match
 // ExpectedCacheVersionId then the file is from an incompatible cache version and should
 // be removed from the cache.
-// Next 4 bytes of file should be "0000".
-constexpr std::array<char, 4> ExpectedCacheVersionId = {'0', '0', '0', '0'};
+// Next 4 bytes of file should be "0001".
+constexpr std::array<char, 4> ExpectedCacheVersionId = {'0', '0', '0', '1'};
 
 } // namespace
 

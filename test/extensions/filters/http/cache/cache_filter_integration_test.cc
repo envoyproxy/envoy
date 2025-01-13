@@ -12,8 +12,29 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
+using testing::AllOf;
+using testing::Eq;
+using testing::HasSubstr;
+using testing::Pointee;
+using testing::Property;
+
+MATCHER_P(GetResultHasValue, matcher, "") {
+  if (!ExplainMatchResult(Property("size", &Http::HeaderMap::GetResult::size, 1), arg,
+                          result_listener)) {
+    return false;
+  }
+  return ExplainMatchResult(matcher, arg[0]->value().getStringView(), result_listener);
+}
+
+MATCHER_P2(HasHeader, key, matcher, "") {
+  *result_listener << arg;
+  return ExplainMatchResult(GetResultHasValue(matcher),
+                            arg.get(::Envoy::Http::LowerCaseString(std::string(key))),
+                            result_listener);
+}
+
 // TODO(toddmgreer): Expand integration test to include age header values,
-// expiration, range headers, HEAD requests, trailers, config customizations,
+// expiration, HEAD requests, config customizations,
 // cache-control headers, and conditional header fields, as they are
 // implemented.
 
@@ -65,14 +86,23 @@ public:
     return response;
   }
 
+  IntegrationStreamDecoderPtr sendHeaderOnlyRequest(const Http::TestRequestHeaderMapImpl& headers) {
+    IntegrationStreamDecoderPtr response_decoder = codec_client_->makeHeaderOnlyRequest(headers);
+    return response_decoder;
+  }
+
+  void awaitResponse(IntegrationStreamDecoderPtr& response_decoder) {
+    EXPECT_TRUE(response_decoder->waitForEndStream());
+    EXPECT_TRUE(response_decoder->complete());
+  }
+
   IntegrationStreamDecoderPtr sendHeaderOnlyRequestAwaitResponse(
       const Http::TestRequestHeaderMapImpl& headers,
       std::function<void()> simulate_upstream = []() {}) {
-    IntegrationStreamDecoderPtr response_decoder = codec_client_->makeHeaderOnlyRequest(headers);
+    IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequest(headers);
     simulate_upstream();
     // Wait for the response to be read by the codec client.
-    EXPECT_TRUE(response_decoder->waitForEndStream());
-    EXPECT_TRUE(response_decoder->complete());
+    awaitResponse(response_decoder);
     return response_decoder;
   }
 
@@ -80,10 +110,10 @@ public:
   std::function<void()> simulateUpstreamResponse(
       const Http::TestResponseHeaderMapImpl& headers, OptRef<const std::string> body,
       OptRef<const Http::TestResponseTrailerMapImpl> trailers, bool split_body = false) {
-    return [this, headers = std::move(headers), body = std::move(body),
-            trailers = std::move(trailers), split_body]() {
+    return [this, &headers, body = std::move(body), trailers = std::move(trailers),
+            split_body]() mutable {
       waitForNextUpstreamRequest();
-      upstream_request_->encodeHeaders(headers, /*end_stream=*/!body);
+      upstream_request_->encodeHeaders(headers, /*end_stream=*/!body && !trailers.has_value());
       if (body.has_value()) {
         if (split_body) {
           upstream_request_->encodeData(body.ref().substr(0, body.ref().size() / 2), false);
@@ -110,8 +140,8 @@ public:
            "@type": "type.googleapis.com/envoy.extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
     )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
-  OptRef<const std::string> empty_body_;
-  OptRef<const Http::TestResponseTrailerMapImpl> empty_trailers_;
+  OptRef<const std::string> no_body_;
+  OptRef<const Http::TestResponseTrailerMapImpl> no_trailers_;
 };
 
 // TODO(#26236): Fix test suite for HTTP/3.
@@ -133,12 +163,12 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
   // use split_body to cover multipart body responses.
   {
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, makeOptRef(response_body),
-                                                  empty_trailers_, true));
+        request_headers,
+        simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_, true));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
   }
 
   // Advance time, to verify the original date header is preserved.
@@ -155,8 +185,115 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
-                testing::HasSubstr("RFCF cache.response_from_cache_filter"));
+                HasSubstr("RFCF cache.response_from_cache_filter"));
   }
+}
+
+TEST_P(CacheIntegrationTest, ParallelRequestsShareInsert) {
+  initializeFilter(default_config);
+
+  // Include test name and params in URL to make each test's requests unique.
+  const Http::TestRequestHeaderMapImpl request_headers =
+      httpRequestHeader("GET", /*authority=*/"ParallelRequestsShareInsert");
+  const std::string response_body(42, 'a');
+  Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(response_body);
+  // Send three requests.
+  auto codec_client_2 = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto codec_client_3 = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationStreamDecoderPtr response_decoder1 =
+      codec_client_->makeHeaderOnlyRequest(request_headers);
+  IntegrationStreamDecoderPtr response_decoder2 =
+      codec_client_2->makeHeaderOnlyRequest(request_headers);
+  IntegrationStreamDecoderPtr response_decoder3 =
+      codec_client_3->makeHeaderOnlyRequest(request_headers);
+  // Use split_body to cover multipart body responses.
+  simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_, true)();
+  awaitResponse(response_decoder1);
+  awaitResponse(response_decoder2);
+  awaitResponse(response_decoder3);
+  EXPECT_THAT(response_decoder1->headers(), IsSupersetOfHeaders(response_headers));
+  EXPECT_THAT(response_decoder2->headers(), IsSupersetOfHeaders(response_headers));
+  EXPECT_THAT(response_decoder3->headers(), IsSupersetOfHeaders(response_headers));
+  // Two of the responses should have an age, and one should not.
+  // Which of the requests get the age header depends on the order of
+  // parallel request resolution, which is not relevant to this test.
+  EXPECT_THAT(response_decoder1->headers().get(Http::CustomHeaders::get().Age).size() +
+                  response_decoder2->headers().get(Http::CustomHeaders::get().Age).size() +
+                  response_decoder3->headers().get(Http::CustomHeaders::get().Age).size(),
+              Eq(2));
+  EXPECT_EQ(response_decoder1->body(), response_body);
+  EXPECT_EQ(response_decoder2->body(), response_body);
+  EXPECT_EQ(response_decoder3->body(), response_body);
+  codec_client_2->close();
+  codec_client_3->close();
+  // Advance time to force a log flush.
+  simTime().advanceTimeWait(Seconds(1));
+
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true),
+              HasSubstr("RFCF cache.insert_via_upstream"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1, true),
+              HasSubstr("RFCF cache.response_from_cache_filter"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 2, true),
+              HasSubstr("RFCF cache.response_from_cache_filter"));
+}
+
+TEST_P(CacheIntegrationTest, ParallelRangeRequestsShareInsertAndGetDistinctResponses) {
+  initializeFilter(default_config);
+
+  // Include test name and params in URL to make each test's requests unique.
+  Http::TestRequestHeaderMapImpl request_headers =
+      httpRequestHeader("GET", /*authority=*/"ParallelRequestsShareInsert");
+  Http::TestRequestHeaderMapImpl request_headers_2 = request_headers;
+  Http::TestRequestHeaderMapImpl request_headers_3 = request_headers;
+  request_headers.setReference(Http::Headers::get().Range, "bytes=0-4");
+  request_headers_2.setReference(Http::Headers::get().Range, "bytes=5-9");
+  request_headers_3.setReference(Http::Headers::get().Range, "bytes=3-6");
+  const std::string response_body("helloworld");
+  Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(response_body);
+  // Send three requests.
+  auto codec_client_2 = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto codec_client_3 = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationStreamDecoderPtr response_decoder1 =
+      codec_client_->makeHeaderOnlyRequest(request_headers);
+  IntegrationStreamDecoderPtr response_decoder2 =
+      codec_client_2->makeHeaderOnlyRequest(request_headers_2);
+  IntegrationStreamDecoderPtr response_decoder3 =
+      codec_client_3->makeHeaderOnlyRequest(request_headers_3);
+  // Use split_body to cover multipart body responses.
+  simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_, true)();
+  awaitResponse(response_decoder1);
+  awaitResponse(response_decoder2);
+  awaitResponse(response_decoder3);
+  EXPECT_THAT(response_decoder1->headers(),
+              AllOf(HasHeader("content-range", "bytes 0-4/10"), HasHeader("content-length", "5"),
+                    HasHeader(":status", "206")));
+  EXPECT_THAT(response_decoder2->headers(),
+              AllOf(HasHeader("content-range", "bytes 5-9/10"), HasHeader("content-length", "5"),
+                    HasHeader(":status", "206")));
+  EXPECT_THAT(response_decoder3->headers(),
+              AllOf(HasHeader("content-range", "bytes 3-6/10"), HasHeader("content-length", "4"),
+                    HasHeader(":status", "206")));
+  // Two of the responses should have an age, and one should not.
+  // Which of the requests get the age header depends on the order of
+  // parallel request resolution, which is not relevant to this test.
+  EXPECT_THAT(response_decoder1->headers().get(Http::CustomHeaders::get().Age).size() +
+                  response_decoder2->headers().get(Http::CustomHeaders::get().Age).size() +
+                  response_decoder3->headers().get(Http::CustomHeaders::get().Age).size(),
+              Eq(2));
+  EXPECT_EQ(response_decoder1->body(), "hello");
+  EXPECT_EQ(response_decoder2->body(), "world");
+  EXPECT_EQ(response_decoder3->body(), "lowo");
+  codec_client_2->close();
+  codec_client_3->close();
+  // Advance time to force a log flush.
+  simTime().advanceTimeWait(Seconds(1));
+
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true),
+              HasSubstr("RFCF cache.insert_via_upstream"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1, true),
+              HasSubstr("RFCF cache.response_from_cache_filter"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 2, true),
+              HasSubstr("RFCF cache.response_from_cache_filter"));
 }
 
 TEST_P(CacheIntegrationTest, ExpiredValidated) {
@@ -173,11 +310,16 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
   {
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers,
-        simulateUpstreamResponse(response_headers, makeOptRef(response_body), empty_trailers_));
+        simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
-    EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
+    EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0)
+        << "age="
+        << response_decoder->headers()
+               .get(Http::CustomHeaders::get().Age)[0]
+               ->value()
+               .getStringView();
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
   }
 
   // Advance time for the cached response to be stale (expired)
@@ -211,9 +353,14 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     // A response that has been validated should not contain an Age header as it is equivalent to
     // a freshly served response from the origin, unless the 304 response has an Age header, which
     // means it was served by an upstream cache.
-    EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
+    EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0)
+        << "age="
+        << response_decoder->headers()
+               .get(Http::CustomHeaders::get().Age)[0]
+               ->value()
+               .getStringView();
+    ;
   }
-
   // Advance time to get a fresh cached response
   simTime().advanceTimeWait(Seconds(1));
 
@@ -228,7 +375,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 2),
-                testing::HasSubstr("RFCF cache.response_from_cache_filter"));
+                HasSubstr("RFCF cache.response_from_cache_filter"));
   }
 }
 
@@ -246,11 +393,11 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
         response_body, /*cache_control=*/"max-age=10", /*extra_headers=*/{{"etag", "a1"}});
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers,
-        simulateUpstreamResponse(response_headers, makeOptRef(response_body), empty_trailers_));
+        simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
   }
 
   // Advance time for the cached response to be stale (expired)
@@ -285,7 +432,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("via_upstream"));
   }
 }
 
@@ -322,8 +469,6 @@ TEST_P(CacheIntegrationTest, GetRequestWithBodyAndTrailers) {
   }
 }
 
-// Send the same GET request with body and trailers twice, then check that the response
-// doesn't have an age header, to confirm that it wasn't served from cache.
 TEST_P(CacheIntegrationTest, GetRequestWithResponseTrailers) {
   initializeFilterWithTrailersEnabled(default_config);
   // Include test name and params in URL to make each test's requests unique.
@@ -344,8 +489,8 @@ TEST_P(CacheIntegrationTest, GetRequestWithResponseTrailers) {
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
-    ASSERT_TRUE(response_decoder->trailers() != nullptr);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(response_decoder->trailers(), Pointee(IsSupersetOfHeaders(response_trailers)));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
   }
 
   // Advance time, to verify the original date header is preserved.
@@ -358,10 +503,10 @@ TEST_P(CacheIntegrationTest, GetRequestWithResponseTrailers) {
     EXPECT_THAT(response_decoder->headers(),
                 HeaderHasValueRef(Http::CustomHeaders::get().Age, "10"));
     EXPECT_EQ(response_decoder->body(), response_body);
-    ASSERT_TRUE(response_decoder->trailers() != nullptr);
+    EXPECT_THAT(response_decoder->trailers(), Pointee(IsSupersetOfHeaders(response_trailers)));
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
-                testing::HasSubstr("RFCF cache.response_from_cache_filter"));
+                HasSubstr("RFCF cache.response_from_cache_filter"));
   }
 }
 
@@ -370,7 +515,7 @@ TEST_P(CacheIntegrationTest, ServeHeadRequest) {
 
   // Include test name and params in URL to make each test's requests unique.
   const Http::TestRequestHeaderMapImpl request_headers =
-      httpRequestHeader("HEAD", "ServeHeadRequest");
+      httpRequestHeader(Http::Headers::get().MethodValues.Head, "ServeHeadRequest");
   const std::string response_body(42, 'a');
   Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(response_body);
 
@@ -378,11 +523,11 @@ TEST_P(CacheIntegrationTest, ServeHeadRequest) {
   {
     // Since it is a head request, no need to encodeData => the response_body is absl::nullopt.
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, empty_body_, empty_trailers_));
+        request_headers, simulateUpstreamResponse(response_headers, no_body_, no_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body().size(), 0);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
   }
 
   // Advance time, to verify the original date header is preserved.
@@ -393,13 +538,13 @@ TEST_P(CacheIntegrationTest, ServeHeadRequest) {
   {
     // Since it is a head request, no need to encodeData => the response_body is empty.
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, empty_body_, empty_trailers_));
+        request_headers, simulateUpstreamResponse(response_headers, no_body_, no_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body().size(), 0);
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("via_upstream"));
   }
 }
 
@@ -416,11 +561,11 @@ TEST_P(CacheIntegrationTest, ServeHeadFromCacheAfterGetRequest) {
         httpRequestHeader("GET", /*authority=*/"ServeHeadFromCacheAfterGetRequest");
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers,
-        simulateUpstreamResponse(response_headers, makeOptRef(response_body), empty_trailers_));
+        simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
   }
   // Advance time, to verify the original date header is preserved.
   simTime().advanceTimeWait(Seconds(10));
@@ -439,7 +584,7 @@ TEST_P(CacheIntegrationTest, ServeHeadFromCacheAfterGetRequest) {
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
-                testing::HasSubstr("RFCF cache.response_from_cache_filter"));
+                HasSubstr("RFCF cache.response_from_cache_filter"));
   }
 }
 
@@ -456,11 +601,11 @@ TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
         httpRequestHeader("HEAD", "ServeGetFromUpstreamAfterHeadRequest");
     // No need to encode the data, therefore response_body is empty.
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, empty_body_, empty_trailers_));
+        request_headers, simulateUpstreamResponse(response_headers, no_body_, no_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body().size(), 0);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
   }
 
   // Send GET request, and get response from upstream.
@@ -470,7 +615,7 @@ TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
         httpRequestHeader("GET", /*authority=*/"ServeGetFromUpstreamAfterHeadRequest");
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers,
-        simulateUpstreamResponse(response_headers, makeOptRef(response_body), empty_trailers_));
+        simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
@@ -478,7 +623,7 @@ TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
 
-    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("via_upstream"));
   }
 }
 
@@ -497,11 +642,11 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead304WithValidation) {
 
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers,
-        simulateUpstreamResponse(response_headers, makeOptRef(response_body), empty_trailers_));
+        simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
   }
   // Advance time for the cached response to be stale (expired)
   // Also to make sure response date header gets updated with the 304 date
@@ -544,7 +689,7 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead304WithValidation) {
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
-                testing::HasSubstr("RFCF cache.response_from_cache_filter"));
+                HasSubstr("RFCF cache.response_from_cache_filter"));
   }
 }
 
@@ -562,11 +707,11 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead200WithValidation) {
 
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers,
-        simulateUpstreamResponse(response_headers, makeOptRef(response_body), empty_trailers_));
+        simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
   }
 
   // Advance time for the cached response to be stale (expired)
@@ -603,7 +748,7 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead200WithValidation) {
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), testing::HasSubstr("- via_upstream"));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("via_upstream"));
   }
 }
 

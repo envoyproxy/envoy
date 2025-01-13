@@ -103,8 +103,8 @@ public:
     auto action =
         dynamic_cast<TypedMockAsyncFileAction<absl::AnyInvocable<void(T)>>*>(entry.action_.get());
     ASSERT_TRUE(action != nullptr)
-        << "mismatched type for nextActionCompletes: action is " << action->describe()
-        << ", nextActionCompletes was given " << typeid(T).name();
+        << "mismatched type for nextActionCompletes: nextActionCompletes was given "
+        << typeid(T).name();
     if (entry.dispatcher_) {
       entry.dispatcher_->post([action = std::move(entry.action_), state = std::move(entry.state_),
                                result = std::move(result)]() mutable {

@@ -6,6 +6,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/common/async_files/async_file_manager_factory.h"
+#include "source/extensions/filters/http/cache/active_cache.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 #include "source/extensions/http/cache/file_system_http_cache/cache_eviction_thread.h"
 #include "source/extensions/http/cache/file_system_http_cache/file_system_http_cache.h"
@@ -47,10 +48,10 @@ public:
       : async_file_manager_factory_(async_file_manager_factory),
         cache_eviction_thread_(thread_factory) {}
 
-  std::shared_ptr<FileSystemHttpCache> get(std::shared_ptr<CacheSingleton> singleton,
-                                           const ConfigProto& non_normalized_config,
-                                           Stats::Scope& stats_scope) {
-    std::shared_ptr<FileSystemHttpCache> cache;
+  std::shared_ptr<ActiveCache> get(std::shared_ptr<CacheSingleton> singleton,
+                                   const ConfigProto& non_normalized_config,
+                                   Server::Configuration::FactoryContext& context) {
+    std::shared_ptr<ActiveCache> cache;
     ConfigProto config = normalizeConfig(non_normalized_config);
     auto key = config.cache_path();
     absl::MutexLock lock(&mu_);
@@ -61,14 +62,20 @@ public:
     if (!cache) {
       std::shared_ptr<Common::AsyncFiles::AsyncFileManager> async_file_manager =
           async_file_manager_factory_->getAsyncFileManager(config.manager_config());
-      cache = std::make_shared<FileSystemHttpCache>(singleton, cache_eviction_thread_,
-                                                    std::move(config),
-                                                    std::move(async_file_manager), stats_scope);
+      std::unique_ptr<FileSystemHttpCache> fs_cache = std::make_unique<FileSystemHttpCache>(
+          singleton, cache_eviction_thread_, std::move(config), std::move(async_file_manager),
+          context.scope());
+      cache = ActiveCache::create(context.serverFactoryContext().timeSource(), std::move(fs_cache));
       caches_[key] = cache;
-    } else if (!Protobuf::util::MessageDifferencer::Equals(cache->config(), config)) {
-      throw EnvoyException(
-          fmt::format("mismatched FileSystemHttpCacheConfig with same path\n{}\nvs.\n{}",
-                      cache->config().DebugString(), config.DebugString()));
+    } else {
+      // Check that the config of the cache found in the lookup table for the given path
+      // has the same config as the config being added.
+      FileSystemHttpCache& fs_cache = static_cast<FileSystemHttpCache&>(cache->cache());
+      if (!Protobuf::util::MessageDifferencer::Equals(fs_cache.config(), config)) {
+        throw EnvoyException(
+            fmt::format("mismatched FileSystemHttpCacheConfig with same path\n{}\nvs.\n{}",
+                        fs_cache.config().DebugString(), config.DebugString()));
+      }
     }
     return cache;
   }
@@ -81,7 +88,7 @@ private:
   // that config of cache. The caches each keep shared_ptrs to this singleton, which keeps the
   // singleton from being destroyed unless it's no longer keeping track of any caches.
   // (The singleton shared_ptr is *only* held by cache instances.)
-  absl::flat_hash_map<std::string, std::weak_ptr<FileSystemHttpCache>> caches_ ABSL_GUARDED_BY(mu_);
+  absl::flat_hash_map<std::string, std::weak_ptr<ActiveCache>> caches_ ABSL_GUARDED_BY(mu_);
 };
 
 SINGLETON_MANAGER_REGISTRATION(file_system_http_cache_singleton);
@@ -95,7 +102,7 @@ public:
     return std::make_unique<ConfigProto>();
   }
   // From HttpCacheFactory
-  std::shared_ptr<HttpCache>
+  std::shared_ptr<ActiveCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& filter_config,
            Server::Configuration::FactoryContext& context) override {
     ConfigProto config;
@@ -108,7 +115,7 @@ public:
                       &context.serverFactoryContext().singletonManager()),
                   context.serverFactoryContext().api().threadFactory());
             });
-    return caches->get(caches, config, context.scope());
+    return caches->get(caches, config, context);
   }
 };
 

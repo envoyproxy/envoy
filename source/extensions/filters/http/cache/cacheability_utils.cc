@@ -31,7 +31,7 @@ const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
 }
 } // namespace
 
-bool CacheabilityUtils::canServeRequestFromCache(const Http::RequestHeaderMap& headers) {
+absl::Status CacheabilityUtils::canServeRequestFromCache(const Http::RequestHeaderMap& headers) {
   const absl::string_view method = headers.getMethodValue();
   const Http::HeaderValues& header_values = Http::Headers::get();
 
@@ -45,16 +45,31 @@ bool CacheabilityUtils::canServeRequestFromCache(const Http::RequestHeaderMap& h
   // header fields can be ignored by caches and intermediaries.
   for (auto conditional_header : conditionalHeaders()) {
     if (!headers.get(*conditional_header).empty()) {
-      return false;
+      return absl::InvalidArgumentError(*conditional_header);
     }
   }
 
   // TODO(toddmgreer): Also serve HEAD requests from cache.
   // Cache-related headers are checked in HttpCache::LookupRequest.
-  return headers.Path() && headers.Host() &&
-         !headers.getInline(CacheCustomHeaders::authorization()) &&
-         (method == header_values.MethodValues.Get || method == header_values.MethodValues.Head) &&
-         Http::Utility::schemeIsValid(headers.getSchemeValue());
+  if (!headers.Path()) {
+    return absl::InvalidArgumentError("no path");
+  }
+  if (!headers.Host()) {
+    return absl::InvalidArgumentError("no host");
+  }
+  if (headers.getInline(CacheCustomHeaders::authorization())) {
+    return absl::InvalidArgumentError("authorization");
+  }
+  if (method.empty()) {
+    return absl::InvalidArgumentError("no method");
+  }
+  if (method != header_values.MethodValues.Get && method != header_values.MethodValues.Head) {
+    return absl::InvalidArgumentError(method);
+  }
+  if (!Http::Utility::schemeIsValid(headers.getSchemeValue())) {
+    return absl::InvalidArgumentError("scheme");
+  }
+  return absl::OkStatus();
 }
 
 bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers,

@@ -97,6 +97,13 @@ ResponseMetadata metadataFromHeaderProto(const CacheFileHeader& header);
  */
 CacheFileHeader makeCacheFileHeaderProto(Buffer::Instance& buffer);
 
+/**
+ * Deserializes a CacheFileTrailer message from a Buffer.
+ * @param buffer the buffer containing a serialized CacheFileTrailer message.
+ * @return the deserialized CacheFileTrailer message.
+ */
+CacheFileTrailer makeCacheFileTrailerProto(Buffer::Instance& buffer);
+
 } // namespace FileSystemHttpCache
 } // namespace Cache
 } // namespace HttpFilters

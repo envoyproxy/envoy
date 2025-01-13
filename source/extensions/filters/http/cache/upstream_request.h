@@ -1,82 +1,29 @@
 #pragma once
 
-#include "source/common/common/logger.h"
-#include "source/extensions/filters/http/cache/cache_filter_logging_info.h"
-#include "source/extensions/filters/http/cache/cache_insert_queue.h"
+#include "source/extensions/filters/http/cache/http_source.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-class CacheFilter;
-class CacheFilterConfig;
-enum class FilterState;
-
-class UpstreamRequest : public Logger::Loggable<Logger::Id::cache_filter>,
-                        public Http::AsyncClient::StreamCallbacks,
-                        public InsertQueueCallbacks {
+// UpstreamRequest acts as a bridge between the "pull" operations preferred by
+// the cache filter (getHeaders/getBody/getTrailers) and the "push" operations
+// preferred by most of envoy (encodeHeaders etc. being called by the source).
+//
+// In order to bridge the two, UpstreamRequest must act as a buffer; on a get*
+// request it calls back only when the buffer has [some of] the requested data
+// in it; if the buffer gets overfull, watermark events are triggered on the
+// upstream. The client side should only send get* requests when it is ready for
+// more data, so the downstream is automatically resilient to OOM.
+// TODO(#33319): AsyncClient::Stream does not currently support watermark events.
+class UpstreamRequestFactory {
 public:
-  void sendHeaders(Http::RequestHeaderMap& request_headers);
-  // Called by filter_ when filter_ is destroyed first.
-  // UpstreamRequest will make no more calls to filter_ once disconnectFilter
-  // has been called.
-  void disconnectFilter();
-
-  // StreamCallbacks
-  void onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
-  void onData(Buffer::Instance& data, bool end_stream) override;
-  void onTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
-  void onComplete() override;
-  void onReset() override;
-
-  // InsertQueueCallbacks
-  void insertQueueOverHighWatermark() override;
-  void insertQueueUnderLowWatermark() override;
-  void insertQueueAborted() override;
-
-  static UpstreamRequest* create(CacheFilter* filter, LookupContextPtr lookup,
-                                 LookupResultPtr lookup_result, std::shared_ptr<HttpCache> cache,
-                                 Http::AsyncClient& async_client,
-                                 const Http::AsyncClient::StreamOptions& options);
-  UpstreamRequest(CacheFilter* filter, LookupContextPtr lookup, LookupResultPtr lookup_result,
-                  std::shared_ptr<HttpCache> cache, Http::AsyncClient& async_client,
-                  const Http::AsyncClient::StreamOptions& options);
-  ~UpstreamRequest() override;
-
-private:
-  // Precondition: lookup_result_ points to a cache lookup result that requires validation.
-  //               filter_state_ is ValidatingCachedResponse.
-  // Serves a validated cached response after updating it with a 304 response.
-  void processSuccessfulValidation(Http::ResponseHeaderMapPtr response_headers);
-
-  // Updates the filter state belonging to the UpstreamRequest, and the one belonging to
-  // the filter if it has not been destroyed.
-  void setFilterState(FilterState fs);
-
-  // Updates the insert status belonging to the filter, if it has not been destroyed.
-  void setInsertStatus(InsertStatus is);
-
-  // If an error occurs while the stream is active, abort will reset the stream, which
-  // in turn provokes the rest of the destruction process.
-  void abort();
-
-  // Precondition: lookup_result_ points to a cache lookup result that requires validation.
-  //               filter_state_ is ValidatingCachedResponse.
-  // Checks if a cached entry should be updated with a 304 response.
-  bool shouldUpdateCachedEntry(const Http::ResponseHeaderMap& response_headers) const;
-
-  CacheFilter* filter_ = nullptr;
-  LookupContextPtr lookup_;
-  LookupResultPtr lookup_result_;
-  bool is_head_request_;
-  bool request_allows_inserts_;
-  std::shared_ptr<const CacheFilterConfig> config_;
-  FilterState filter_state_;
-  std::shared_ptr<HttpCache> cache_;
-  Http::AsyncClient::Stream* stream_ = nullptr;
-  std::unique_ptr<CacheInsertQueue> insert_queue_;
+  virtual HttpSourcePtr create(Http::RequestHeaderMap& request_headers) PURE;
+  virtual ~UpstreamRequestFactory() = default;
 };
+
+using UpstreamRequestFactoryPtr = std::unique_ptr<UpstreamRequestFactory>;
 
 } // namespace Cache
 } // namespace HttpFilters
