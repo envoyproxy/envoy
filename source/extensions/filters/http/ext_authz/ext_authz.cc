@@ -59,20 +59,6 @@ void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadat
   }
 }
 
-// Utility function to find the first set auth header, based on the candidate headers in
-// configuration
-absl::optional<absl::string_view>
-get_first_auth_header(const Http::RequestHeaderMap& headers,
-                      const std::vector<std::string>& header_names) {
-  for (const auto& header_name : header_names) {
-    const auto header = headers.get(Http::LowerCaseString(header_name));
-    if (!header.empty()) {
-      return header[0]->value().getStringView();
-    }
-  }
-  return absl::nullopt;
-}
-
 } // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
@@ -135,9 +121,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       response_cache_max_size_(
           config.response_cache_max_size() != 0 ? config.response_cache_max_size() : 100),
       response_cache_ttl_(config.response_cache_ttl() != 0 ? config.response_cache_ttl() : 10),
-      response_cache_header_names_(
-          config.response_cache_header_names().begin(),
-          config.response_cache_header_names().end()), // Initialize header names
+      response_cache_header_name_(Http::LowerCaseString(config.response_cache_header_name())),
       response_cache_(response_cache_max_size_, response_cache_ttl_,
                       factory_context.timeSource()), // response cache
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
@@ -300,10 +284,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Try reading response from the response cache
-  const auto auth_header = get_first_auth_header(headers, config_->responseCacheHeaderNames());
-
-  if (auth_header.has_value()) {
-    const std::string auth_header_str(auth_header.value());
+  const auto auth_header = headers.get(config_->responseCacheHeaderName());
+  if (!auth_header.empty()) {
+    const std::string auth_header_str(auth_header[0]->value().getStringView());
     // Retrieve the HTTP status code from the cache
     auto cached_status_code = config_->responseCache().Get(auth_header_str.c_str());
     if (cached_status_code.has_value()) {
@@ -531,10 +514,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                                     // http status code should be <= 0xffff
 
   // If auth header exists, cache the response status code
-  const auto auth_header =
-      get_first_auth_header(*request_headers_, config_->responseCacheHeaderNames());
-  if (auth_header.has_value()) {
-    const std::string auth_header_str(auth_header.value());
+  const auto auth_header = request_headers_->get(config_->responseCacheHeaderName());
+  if (!auth_header.empty()) {
+    const std::string auth_header_str(auth_header[0]->value().getStringView());
     ENVOY_LOG(info, "Caching response: {} with HTTP status: {}", auth_header_str, http_status_code);
     config_->responseCache().Insert(auth_header_str.c_str(),
                                     http_status_code); // Store the HTTP status code

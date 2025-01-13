@@ -136,8 +136,8 @@ public:
 
   FIFOEvictionCache& responseCache() { return response_cache_; }
 
-  const std::vector<std::string>& responseCacheHeaderNames() const {
-    return response_cache_header_names_;
+  const Envoy::Http::LowerCaseString& responseCacheHeaderName() const {
+    return response_cache_header_name_;
   }
 
   Filters::Common::MutationRules::CheckResult
@@ -283,7 +283,7 @@ private:
   // Fields for response cache configuration
   uint32_t response_cache_max_size_;
   uint32_t response_cache_ttl_;
-  std::vector<std::string> response_cache_header_names_; // New field for header names
+  Envoy::Http::LowerCaseString response_cache_header_name_; // New field for header names
   // Response cache
   FIFOEvictionCache response_cache_;
 

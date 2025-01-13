@@ -317,7 +317,7 @@ message ExtAuthz {
   uint32 response_cache_ttl = 31;
 
   // Array of header names. ext_authz will use the first header that appears in the HTTP request as the cache key.
-  repeated string response_cache_header_names = 32;
+  string response_cache_header_name = 32;
 }
 
 // Configuration for buffering the request data.
