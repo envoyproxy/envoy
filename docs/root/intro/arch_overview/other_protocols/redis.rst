@@ -114,12 +114,14 @@ Transactions
 ------------
 
 Transactions (MULTI) are supported. Their use is no different from regular Redis: you start a transaction with MULTI,
-and you execute it with EXEC. Within the transaction only commands that are supported by Envoy (see below) and are single-key
-commands are supported, i.e. MGET and MSET are not supported. The DISCARD command is supported.
+and you execute it with EXEC. Within the transaction, from the list of commands supported by Envoy (see below), only single-key
+commands (e.g. GET, SET), multi-key commands (e.g. DEL, MSET) and transaction commands (e.g. WATCH, UNWATCH, DISCARD, EXEC) are supported.
+
 
 When working in Redis Cluster mode, Envoy will relay all the commands in the transaction to the node handling the first
-key-based command in the transaction. It is the user's responsibility to ensure that all keys in the transaction are mapped
-to the same hashslot, as commands will not be redirected.
+key-based command in the transaction. If this command is multi-key, it will send it to the server corresponding to the first key
+in the command. It is the user's responsibility to ensure that all keys in the transaction are mapped to the same hashslot, as
+commands will not be redirected.
 
 Supported commands
 ------------------

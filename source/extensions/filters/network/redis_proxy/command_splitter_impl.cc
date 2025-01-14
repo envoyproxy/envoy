@@ -570,8 +570,11 @@ SplitRequestPtr TransactionRequest::create(Router& router,
 
   // Within transactions we only support simple commands.
   // So if this is not a transaction command or a simple command, it is an error.
+  // We also support multi-key commands, but will leave it to the client to handle the case where
+  // the keys provided are not from the same shard.
   if (Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0 &&
-      Common::Redis::SupportedCommands::simpleCommands().count(command_name) == 0) {
+      Common::Redis::SupportedCommands::simpleCommands().count(command_name) == 0 &&
+      Common::Redis::SupportedCommands::multiKeyCommands().count(command_name) == 0) {
     callbacks.onResponse(Common::Redis::Utility::makeError(
         fmt::format("'{}' command is not supported within transaction",
                     incoming_request->asArray()[0].asString())));

@@ -454,6 +454,9 @@ new_features:
 - area: access log
   change: |
     Added new command-line flag :option:`--skip-deprecated-logs`.
+- area: redis
+  change: |
+    Added support for multi-key commands on transactions.
 
 deprecated:
 - area: rbac
