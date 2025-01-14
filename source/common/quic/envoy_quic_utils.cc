@@ -98,6 +98,8 @@ quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetRea
     return quic::QUIC_STREAM_CANCELLED;
   case Http::StreamResetReason::ProtocolError:
     return quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR;
+  case Http::StreamResetReason::RemoteResetNoError:
+    return quic::QUIC_STREAM_NO_ERROR;
   case Http::StreamResetReason::Overflow:
     IS_ENVOY_BUG("Resource overflow shouldn't be propergated to QUIC network stack");
     break;
@@ -120,11 +122,16 @@ Http::StreamResetReason quicRstErrorToEnvoyLocalResetReason(quic::QuicRstStreamE
     return Http::StreamResetReason::LocalRefusedStreamReset;
   case quic::QUIC_STREAM_CONNECTION_ERROR:
     return Http::StreamResetReason::LocalConnectionFailure;
-  case quic::QUIC_STREAM_NO_ERROR:
   case quic::QUIC_STREAM_EXCESSIVE_LOAD:
   case quic::QUIC_HEADERS_TOO_LARGE:
   case quic::QUIC_STREAM_REQUEST_REJECTED:
     return Http::StreamResetReason::LocalReset;
+  case quic::QUIC_STREAM_NO_ERROR:
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+      return Http::StreamResetReason::RemoteResetNoError;
+    } else {
+      return Http::StreamResetReason::LocalReset;
+    }
   case quic::QUIC_STREAM_CANCELLED:
     return Http::StreamResetReason::OverloadManager;
   default:
@@ -140,12 +147,17 @@ Http::StreamResetReason quicRstErrorToEnvoyRemoteResetReason(quic::QuicRstStream
     return Http::StreamResetReason::ConnectionTermination;
   case quic::QUIC_STREAM_CONNECT_ERROR:
     return Http::StreamResetReason::ConnectError;
-  case quic::QUIC_STREAM_NO_ERROR:
   case quic::QUIC_STREAM_REQUEST_REJECTED:
   case quic::QUIC_STREAM_UNKNOWN_APPLICATION_ERROR_CODE:
   case quic::QUIC_STREAM_EXCESSIVE_LOAD:
   case quic::QUIC_HEADERS_TOO_LARGE:
     return Http::StreamResetReason::RemoteReset;
+  case quic::QUIC_STREAM_NO_ERROR:
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reset_with_error")) {
+      return Http::StreamResetReason::RemoteResetNoError;
+    } else {
+      return Http::StreamResetReason::RemoteReset;
+    }
   case quic::QUIC_STREAM_CANCELLED:
     return Http::StreamResetReason::OverloadManager;
   case quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR:

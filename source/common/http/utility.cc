@@ -1098,6 +1098,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "overload manager reset";
   case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
     return "HTTP/1 premature upstream half close";
+  case Http::StreamResetReason::RemoteResetNoError:
+    return "remote reset no error";
   }
 
   return "";
