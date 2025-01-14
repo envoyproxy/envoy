@@ -809,7 +809,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_)
               .setDiscardResponseBody(true)
               .setFilterConfig(config_)
-              .setMetadataMatchCriteria(route_->routeEntry()->metadataMatchCriteria());
+              .setMatchingRoute(route_);
       if (end_stream) {
         // This is a header-only request, and can be dispatched immediately to the shadow
         // without waiting.
@@ -1073,7 +1073,7 @@ void Filter::maybeDoShadowing() {
                        .setIsShadow(true)
                        .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
                        .setFilterConfig(config_)
-                       .setMetadataMatchCriteria(route_->routeEntry()->metadataMatchCriteria());
+                       .setMatchingRoute(route_);
     config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
                                    options);
   }

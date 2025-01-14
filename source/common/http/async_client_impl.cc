@@ -135,7 +135,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       parent_.cluster_->name(),
       retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
       parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy,
-      options.metadata_match);
+      options.matching_route->routeEntry()->metadataMatchCriteria());
   SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
   route_ = std::move(*route_or_error);
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);

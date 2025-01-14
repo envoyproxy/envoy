@@ -379,14 +379,13 @@ public:
       sampled_ = sampled;
       return *this;
     }
-    StreamOptions&
-    setMetadataMatchCriteria(const Envoy::Router::MetadataMatchCriteria* metadata_match) {
-      this->metadata_match = metadata_match;
-      return *this;
-    }
-
     StreamOptions& setSidestreamWatermarkCallbacks(SidestreamWatermarkCallbacks* callbacks) {
       sidestream_watermark_callbacks = callbacks;
+      return *this;
+    }
+    StreamOptions&
+    setMatchingRoute(Envoy::Router::RouteConstSharedPtr route) {
+      matching_route = route;
       return *this;
     }
 
@@ -451,6 +450,8 @@ public:
     Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
     // MetadataMatchCriteria to be associated to the new stream
     const Envoy::Router::MetadataMatchCriteria* metadata_match;
+    // Matching route to be associated with new stream
+    Envoy::Router::RouteConstSharedPtr matching_route;
   };
 
   /**
