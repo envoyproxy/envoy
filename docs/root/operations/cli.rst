@@ -348,6 +348,13 @@ following are the command line options that Envoy supports.
     small portion of the fleet (staging, canary, etc.) in order to monitor for unknown,
     deprecated, or work-in-progress usage.
 
+.. option:: --skip-deprecated-logs
+
+  *(optional)* This option disables the logging of deprecated field warnings during Protobuf message validation.
+  When enabled, deprecated fields will be silently ignored without generating log messages, which can be useful
+  for reducing log verbosity in production environments. By default, deprecated warnings are logged. The suppression
+  of these warnings is only activated when this CLI option is explicitly used.
+
 .. option:: --disable-extensions <extension list>
 
   *(optional)* This flag disabled the provided list of comma-separated extension names. Disabled
