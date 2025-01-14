@@ -376,7 +376,7 @@ message KeyValueAppend {
   // key or to only add this key if it's absent.
   KeyValueAppendAction action = 2 [(validate.rules).enum = {defined_only: true}];
 
-  // Match and rewrite the value. If value matchs the regex ``pattern``, then the value will
+  // Match and rewrite the value. If value matches the regex ``pattern``, then the value will
   // be rewritten according to the ``substitution``
   // If the value doesn't match the ``pattern``, then the whole update will be ignored.
   // [#not-implemented-hide:]
@@ -487,7 +487,7 @@ message HeaderValueOption {
   // otherwise they are added.
   bool keep_empty_value = 4;
 
-  // Match and rewrite the value. If value matchs the regex ``pattern``, then the value will
+  // Match and rewrite the value. If value matches the regex ``pattern``, then the value will
   // be rewritten according to the ``substitution``
   // If the value doesn't match the ``pattern``, then the whole update will be ignored.
   // [#not-implemented-hide:]
