@@ -69,8 +69,9 @@ public:
       throw EnvoyException(
           fmt::format("Didn't find a registered implementation for type: '{}'", type));
     }
-    ON_CALL(context_.server_factory_context_.api_, threadFactory())
-        .WillByDefault([]() -> Thread::ThreadFactory& { return Thread::threadFactoryForTest(); });
+    ON_CALL(context_.api_, threadFactory()).WillByDefault([]() -> Thread::ThreadFactory& {
+      return Thread::threadFactoryForTest();
+    });
   }
 
   void initCache() { cache_ = http_cache_factory_->getCache(cacheConfig(testConfig()), context_); }
@@ -104,7 +105,7 @@ protected:
   FileSystemHttpCache* cache() { return dynamic_cast<FileSystemHttpCache*>(&cache_->cache()); }
   ::Envoy::TestEnvironment env_;
   std::string cache_path_;
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::shared_ptr<ActiveCache> cache_;
   HttpCacheFactory* http_cache_factory_;
 };
@@ -267,8 +268,7 @@ public:
 class FileSystemHttpCacheTestWithMockFiles : public FileSystemHttpCacheTest {
 public:
   FileSystemHttpCacheTestWithMockFiles() {
-    ON_CALL(context_.server_factory_context_, singletonManager())
-        .WillByDefault(ReturnRef(mock_singleton_manager_));
+    ON_CALL(context_, singletonManager()).WillByDefault(ReturnRef(mock_singleton_manager_));
     ON_CALL(mock_singleton_manager_, get(HasSubstr("async_file_manager_factory_singleton"), _, _))
         .WillByDefault(Return(mock_async_file_manager_factory_));
     ON_CALL(*mock_async_file_manager_factory_, getAsyncFileManager(_, _))
@@ -668,9 +668,10 @@ TEST(Registration, GetCacheFromFactory) {
       "envoy.extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig");
   ASSERT_NE(factory, nullptr);
   envoy::extensions::filters::http::cache::v3::CacheConfig cache_config;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ON_CALL(factory_context.server_factory_context_.api_, threadFactory())
-      .WillByDefault([]() -> Thread::ThreadFactory& { return Thread::threadFactoryForTest(); });
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  ON_CALL(factory_context.api_, threadFactory()).WillByDefault([]() -> Thread::ThreadFactory& {
+    return Thread::threadFactoryForTest();
+  });
   TestUtility::loadFromYaml(std::string(yaml_config), cache_config);
   EXPECT_EQ(factory->getCache(cache_config, factory_context)->cacheInfo().name_,
             "envoy.extensions.http.cache.file_system_http_cache");

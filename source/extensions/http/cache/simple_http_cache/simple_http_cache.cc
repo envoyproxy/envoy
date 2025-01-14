@@ -228,11 +228,10 @@ public:
   // From HttpCacheFactory
   std::shared_ptr<ActiveCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig&,
-           Server::Configuration::FactoryContext& context) override {
-    return context.serverFactoryContext().singletonManager().getTyped<ActiveCache>(
+           Server::Configuration::ServerFactoryContext& context) override {
+    return context.singletonManager().getTyped<ActiveCache>(
         SINGLETON_MANAGER_REGISTERED_NAME(simple_http_cache_singleton), [&context]() {
-          return ActiveCache::create(context.serverFactoryContext().timeSource(),
-                                     std::make_unique<SimpleHttpCache>());
+          return ActiveCache::create(context.timeSource(), std::make_unique<SimpleHttpCache>());
         });
   }
 
