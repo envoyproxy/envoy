@@ -416,6 +416,12 @@ new_features:
 - area: grpc-json
   change: |
     Added a new http filter for :ref:`gRPC to JSON transcoding <config_http_filters_grpc_json_reverse_transcoder>`.
+- area: matchers
+  change: |
+    Added new filter state matcher ip_range to
+    :ref:`FilterStateMatcher <envoy_v3_api_msg_type.matcher.v3.FilterStateMatcher>` which attempts to
+    cast the filter state object to an IP and match it against a list of CidrRanges. To support
+    this, also added an :ref:`AddressMatcher <envoy_v3_api_msg_type.matcher.v3.AddressMatcher>`.
 - area: attributes
   change: |
     Added new ``xds.virtual_host_name`` and ``xds.virtual_host_metadata`` attributes support. See
