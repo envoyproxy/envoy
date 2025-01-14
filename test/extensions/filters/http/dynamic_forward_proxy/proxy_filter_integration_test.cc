@@ -505,11 +505,11 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
               HasSubstr("dns_resolution_failure{resolve_timeout}"));
 }
 
+// TODO(yanavlasov) Enable per #26642
+#ifndef ENVOY_ENABLE_UHV
 TEST_P(ProxyFilterIntegrationTest, FailOnEmptyHostHeader) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initializeWithArgs();
-  upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
-  autonomous_upstream_ = true;
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", ""}};
@@ -520,6 +520,7 @@ TEST_P(ProxyFilterIntegrationTest, FailOnEmptyHostHeader) {
   EXPECT_EQ("400", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("empty_host_header"));
 }
+#endif
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
