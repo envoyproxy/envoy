@@ -1045,14 +1045,20 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
     udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
-    host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
+      host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
+    }
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     if (connecting_) {
       udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
     }
-    host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
+      host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
+    }
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   }
@@ -1073,7 +1079,10 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamReady(
   connecting_ = false;
   can_send_upstream_ = true;
   cluster_->cluster_stats_.sess_tunnel_success_.inc();
-  host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
+    host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
+  }
 
   if (filter_.config_->flushAccessLogOnTunnelConnected()) {
     fillSessionStreamInfo();
