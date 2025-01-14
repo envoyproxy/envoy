@@ -55,11 +55,11 @@ FROM envoy AS envoy-tools
 ARG TARGETPLATFORM
 ENV TARGETPLATFORM="${TARGETPLATFORM:-linux/amd64}"
 COPY --chown=0:0 --chmod=755 \
-    "${TARGETPLATFORM}/schema_validator_tool" "${TARGETPLATFORM}/router_check_tool" /usr/local/bin/
+    "${TARGETPLATFORM}/schema_validator_tool" "${TARGETPLATFORM}/router_check_tool" "${TARGETPLATFORM}/config_load_check_tool" /usr/local/bin/
 
 
 # STAGE: envoy-distroless
-FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:2a803cc873dc1a69a33087ee10c75755367dd2c259219893504680480ad563f0 AS envoy-distroless
+FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:e9554da0d9569cfa21023ee8d2624d7326d80791b49b7c71b08a8b4e8d206129 AS envoy-distroless
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]
