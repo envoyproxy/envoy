@@ -323,6 +323,7 @@ envoy_cc_library(
     deps = [
         ":utility_lib",
         "//envoy/common:matchers_interface",
+        "//source/common/common:filter_state_object_matchers_lib",
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:utility_lib",
@@ -331,6 +332,19 @@ envoy_cc_library(
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_state_object_matchers_lib",
+    srcs = ["filter_state_object_matchers.cc"],
+    hdrs = ["filter_state_object_matchers.h"],
+    deps = [
+        "//envoy/common:exception_lib",
+        "//envoy/common:matchers_interface",
+        "//envoy/common:pure_lib",
+        "//source/common/network:cidr_range_interface",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
