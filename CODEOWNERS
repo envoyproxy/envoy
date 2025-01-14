@@ -69,6 +69,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/tracers/skywalking @wbpcode @Shikugawa
 # tracers.opentelemetry extension
 /*/extensions/tracers/opentelemetry @alexanderellis @yanavlasov
+# tracers.fluentd extension
+/*/extensions/tracers/fluentd @kevintan250 @wbpcode
 # quic extension
 /*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # UDP packet writer
