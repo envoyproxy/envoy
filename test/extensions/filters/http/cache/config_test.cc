@@ -4,7 +4,6 @@
 #include "source/extensions/filters/http/cache/config.h"
 
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -14,8 +13,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 namespace {
-
-using StatusHelpers::StatusIs;
 
 class CacheFilterFactoryTest : public ::testing::Test {
 protected:
@@ -49,15 +46,17 @@ TEST_F(CacheFilterFactoryTest, Disabled) {
 }
 
 TEST_F(CacheFilterFactoryTest, NoTypedConfig) {
-  EXPECT_THAT(factory_.createFilterFactoryFromProto(config_, "stats", context_),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THROW(
+      factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
+      EnvoyException);
 }
 
 TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
   config_.mutable_typed_config()->PackFrom(
       envoy::extensions::filters::http::cache::v3::CacheConfig());
-  EXPECT_THAT(factory_.createFilterFactoryFromProto(config_, "stats", context_),
-              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THROW(
+      factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
+      EnvoyException);
 }
 
 } // namespace

@@ -11,15 +11,14 @@ namespace HttpFilters {
 namespace Cache {
 
 class CacheFilterFactory
-    : public Common::DualFactoryBase<envoy::extensions::filters::http::cache::v3::CacheConfig> {
+    : public Common::FactoryBase<envoy::extensions::filters::http::cache::v3::CacheConfig> {
 public:
-  CacheFilterFactory() : DualFactoryBase("envoy.filters.http.cache") {}
+  CacheFilterFactory() : FactoryBase("envoy.filters.http.cache") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-      const std::string& stats_prefix, DualInfo,
-      Server::Configuration::ServerFactoryContext& context) override;
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Cache

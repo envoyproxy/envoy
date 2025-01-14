@@ -81,7 +81,6 @@ TEST_F(UpstreamRequestTest, HeadersEndStreamWorksAndPreventsReset) {
   EXPECT_CALL(header_cb, Call(HeaderMapEqualIgnoreOrder(&response_headers_), EndStream::End));
   http_callbacks_->onHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(response_headers_),
                              true);
-  http_callbacks_->onComplete();
 }
 
 TEST_F(UpstreamRequestTest, ResetBeforeBodyRequestedDeliversResetToCallback) {
@@ -104,14 +103,12 @@ TEST_F(UpstreamRequestTest, BodyRequestedThenArrivedDeliversBody) {
   upstream_request_->getBody(AdjustedByteRange{0, 5}, body_cb.AsStdFunction());
   EXPECT_CALL(body_cb, Call(Pointee(BufferStringEqual("hello")), EndStream::End));
   http_callbacks_->onData(data, true);
-  http_callbacks_->onComplete();
 }
 
 TEST_F(UpstreamRequestTest, BodyArrivedThenOversizedRequestedDeliversBody) {
   Buffer::OwnedImpl data{"hello"};
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb;
   http_callbacks_->onData(data, true);
-  http_callbacks_->onComplete();
   EXPECT_CALL(body_cb, Call(Pointee(BufferStringEqual("hello")), EndStream::End));
   upstream_request_->getBody(AdjustedByteRange{0, 99}, body_cb.AsStdFunction());
 }
@@ -121,7 +118,6 @@ TEST_F(UpstreamRequestTest, BodyArrivedThenRequestedInPiecesDeliversBody) {
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb1;
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb2;
   http_callbacks_->onData(data, true);
-  http_callbacks_->onComplete();
   EXPECT_CALL(body_cb1, Call(Pointee(BufferStringEqual("hel")), EndStream::More));
   upstream_request_->getBody(AdjustedByteRange{0, 3}, body_cb1.AsStdFunction());
   EXPECT_CALL(body_cb2, Call(Pointee(BufferStringEqual("lo")), EndStream::End));
@@ -135,7 +131,6 @@ TEST_F(UpstreamRequestTest, BodyAlternatingActionsDeliversBody) {
   upstream_request_->getBody(AdjustedByteRange{0, 3}, body_cb1.AsStdFunction());
   EXPECT_CALL(body_cb1, Call(Pointee(BufferStringEqual("hel")), EndStream::More));
   http_callbacks_->onData(data, true);
-  http_callbacks_->onComplete();
   EXPECT_CALL(body_cb2, Call(Pointee(BufferStringEqual("lo")), EndStream::End));
   upstream_request_->getBody(AdjustedByteRange{3, 5}, body_cb2.AsStdFunction());
 }
@@ -151,7 +146,6 @@ TEST_F(UpstreamRequestTest, BodyInMultiplePiecesDeliversBody) {
   http_callbacks_->onData(data1, false);
   http_callbacks_->onData(data2, false);
   http_callbacks_->onData(data3, true);
-  http_callbacks_->onComplete();
   EXPECT_CALL(body_cb2, Call(Pointee(BufferStringEqual("therebanana")), EndStream::End));
   upstream_request_->getBody(AdjustedByteRange{5, 99}, body_cb2.AsStdFunction());
 }
@@ -167,7 +161,6 @@ TEST_F(UpstreamRequestTest, RequestingMoreBodyAfterCompletionReturnsNull) {
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb1;
   MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb2;
   http_callbacks_->onData(data, true);
-  http_callbacks_->onComplete();
   EXPECT_CALL(body_cb1, Call(Pointee(BufferStringEqual("hello")), EndStream::End));
   upstream_request_->getBody(AdjustedByteRange{0, 99}, body_cb1.AsStdFunction());
   EXPECT_CALL(body_cb2, Call(IsNull(), EndStream::End));
@@ -183,7 +176,6 @@ TEST_F(UpstreamRequestTest, RequestingMoreBodyAfterTrailersResumesAndEventuallyR
   http_callbacks_->onData(data, false);
   http_callbacks_->onTrailers(
       std::make_unique<Http::TestResponseTrailerMapImpl>(response_trailers_));
-  http_callbacks_->onComplete();
   EXPECT_CALL(body_cb1, Call(Pointee(BufferStringEqual("hel")), EndStream::More));
   upstream_request_->getBody(AdjustedByteRange{0, 3}, body_cb1.AsStdFunction());
   EXPECT_CALL(body_cb2, Call(Pointee(BufferStringEqual("lo")), EndStream::More));
@@ -212,7 +204,6 @@ TEST_F(UpstreamRequestTest, TrailersArrivedThenRequestedDeliversTrailers) {
   MockFunction<void(Http::ResponseTrailerMapPtr, EndStream)> trailer_cb;
   http_callbacks_->onTrailers(
       std::make_unique<Http::TestResponseTrailerMapImpl>(response_trailers_));
-  http_callbacks_->onComplete();
   EXPECT_CALL(trailer_cb, Call(HeaderMapEqualIgnoreOrder(&response_trailers_), EndStream::End));
   upstream_request_->getTrailers(trailer_cb.AsStdFunction());
 }
@@ -223,7 +214,6 @@ TEST_F(UpstreamRequestTest, TrailersRequestedThenArrivedDeliversTrailers) {
   EXPECT_CALL(trailer_cb, Call(HeaderMapEqualIgnoreOrder(&response_trailers_), EndStream::End));
   http_callbacks_->onTrailers(
       std::make_unique<Http::TestResponseTrailerMapImpl>(response_trailers_));
-  http_callbacks_->onComplete();
 }
 
 } // namespace

@@ -9,20 +9,19 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactoryFromProtoTyped(
+Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-    const std::string& /*stats_prefix*/, DualInfo,
-    Server::Configuration::ServerFactoryContext& context) {
+    const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& context) {
   std::shared_ptr<ActiveCache> cache;
   if (!config.disabled().value()) {
     if (!config.has_typed_config()) {
-      return absl::InvalidArgumentError("at least one of typed_config or disabled must be set");
+      throw EnvoyException("at least one of typed_config or disabled must be set");
     }
     const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
     HttpCacheFactory* const http_cache_factory =
         Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(type);
     if (http_cache_factory == nullptr) {
-      return absl::InvalidArgumentError(
+      throw EnvoyException(
           fmt::format("Didn't find a registered implementation for type: '{}'", type));
     }
 
@@ -34,17 +33,13 @@ absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactoryFro
   }
 
   return [config = std::make_shared<CacheFilterConfig>(config, std::move(cache), std::move(stats),
-                                                       context)](
+                                                       context.serverFactoryContext())](
              Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CacheFilter>(config));
   };
 }
 
-using UpstreamCacheFilterFactory = CacheFilterFactory;
-
 REGISTER_FACTORY(CacheFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
-REGISTER_FACTORY(UpstreamCacheFilterFactory,
-                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace Cache
 } // namespace HttpFilters
