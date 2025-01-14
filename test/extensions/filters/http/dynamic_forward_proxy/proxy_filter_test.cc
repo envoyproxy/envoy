@@ -169,7 +169,7 @@ TEST_F(ProxyFilterTest, HttpsDefaultPort) {
   filter_->onDestroy();
 }
 
-TEST_F(ProxyFilterTest, NoAuthorityHeader) {
+TEST_F(ProxyFilterTest, EmptyHostHeader) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
   InSequence s;
