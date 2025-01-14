@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 33]
+// [#next-free-field: 35]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -318,6 +318,13 @@ message ExtAuthz {
 
   // Array of header names. ext_authz will use the first header that appears in the HTTP request as the cache key.
   string response_cache_header_name = 32;
+
+  // Response cache eviction takes two parameters:
+  //   1. Eviction candidate ratio: The fraction of the cache to read for potential eviction
+  //   2. Eviction threshold ratio: Evict items with TTL lower than X% of the average TTL
+  double response_cache_eviction_candidate_ratio = 33;
+
+  double response_cache_eviction_threshold_ratio = 34;
 }
 
 // Configuration for buffering the request data.
