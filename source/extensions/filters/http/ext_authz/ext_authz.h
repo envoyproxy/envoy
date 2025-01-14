@@ -285,6 +285,8 @@ private:
   uint32_t response_cache_ttl_;
   Envoy::Http::LowerCaseString response_cache_header_name_; // New field for header names
   // Response cache
+  double response_cache_eviction_candidate_ratio_;
+  double response_cache_eviction_threshold_ratio_;
   FIFOEvictionCache response_cache_;
 
 public:

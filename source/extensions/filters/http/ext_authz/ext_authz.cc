@@ -121,8 +121,18 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       response_cache_max_size_(
           config.response_cache_max_size() != 0 ? config.response_cache_max_size() : 100),
       response_cache_ttl_(config.response_cache_ttl() != 0 ? config.response_cache_ttl() : 10),
-      response_cache_header_name_(Http::LowerCaseString(config.response_cache_header_name())),
+      response_cache_header_name_(config.response_cache_header_name()),
+      response_cache_eviction_candidate_ratio_(
+          config.response_cache_eviction_candidate_ratio() != 0
+              ? config.response_cache_eviction_candidate_ratio()
+              : 0.01),
+      response_cache_eviction_threshold_ratio_(
+          config.response_cache_eviction_threshold_ratio() != 0
+              ? config.response_cache_eviction_threshold_ratio()
+              : 0.5),
       response_cache_(response_cache_max_size_, response_cache_ttl_,
+                      response_cache_eviction_candidate_ratio_,
+                      response_cache_eviction_threshold_ratio_,
                       factory_context.timeSource()), // response cache
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
       ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
@@ -287,6 +297,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const auto auth_header = headers.get(config_->responseCacheHeaderName());
   if (!auth_header.empty()) {
     const std::string auth_header_str(auth_header[0]->value().getStringView());
+
+    // Fill cache for testing
+    // TODO: do ifndef
+    if (auth_header_str == "magic_fill_cache_for_testing") {
+      for (std::size_t i = 0; i < config_->responseCache().getMaxCacheSize() - 10; ++i) {
+        std::string test_key = "test_key_" + std::to_string(i);
+        config_->responseCache().Insert(test_key.c_str(), 200);
+      }
+    } else if (auth_header_str == "magic_fill_cache_for_testing_1000") {
+      for (std::size_t i = 0; i < 1000; ++i) {
+        std::string test_key = "test_key_" + std::to_string(i);
+        config_->responseCache().Insert(test_key.c_str(), 200);
+      }
+    }
+
     // Retrieve the HTTP status code from the cache
     auto cached_status_code = config_->responseCache().Get(auth_header_str.c_str());
     if (cached_status_code.has_value()) {
@@ -311,7 +336,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                        *decoder_callbacks_, auth_header_str);
     }
   } else {
-    ENVOY_STREAM_LOG(info, "Cannot check cache because auth_header is empty", *decoder_callbacks_);
+    ENVOY_STREAM_LOG(info, "Cannot check cache because auth_header is empty. Expected header: {}",
+                     *decoder_callbacks_, config_->responseCacheHeaderName().get());
   }
 
   request_headers_ = &headers;
