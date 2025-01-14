@@ -34,6 +34,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/grpc_json_transcoder:94.0" # TODO(#28232)
 "source/extensions/filters/http/ip_tagging:90.6"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
+"source/extensions/filters/http/oauth2:96.4"
 "source/extensions/filters/listener/original_src:92.1"
 "source/extensions/filters/network/mongo_proxy:96.1"
 "source/extensions/filters/network/sni_cluster:88.9"
