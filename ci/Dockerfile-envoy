@@ -55,7 +55,7 @@ FROM envoy AS envoy-tools
 ARG TARGETPLATFORM
 ENV TARGETPLATFORM="${TARGETPLATFORM:-linux/amd64}"
 COPY --chown=0:0 --chmod=755 \
-    "${TARGETPLATFORM}/schema_validator_tool" "${TARGETPLATFORM}/router_check_tool" /usr/local/bin/
+    "${TARGETPLATFORM}/schema_validator_tool" "${TARGETPLATFORM}/router_check_tool" "${TARGETPLATFORM}/config_load_check_tool" /usr/local/bin/
 
 
 # STAGE: envoy-distroless
