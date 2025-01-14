@@ -1,4 +1,4 @@
-package main
+package action
 
 import (
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
@@ -16,5 +16,3 @@ func filterFactory(c interface{}, callbacks api.FilterCallbackHandler) api.Strea
 		callbacks: callbacks,
 	}
 }
-
-func main() {}

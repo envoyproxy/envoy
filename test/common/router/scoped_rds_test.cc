@@ -1352,7 +1352,6 @@ scoped_routes:
 $1
 )EOF";
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   const auto resource = parseScopedRouteConfigurationFromYaml(R"EOF(
 name: dynamic-foo
 route_configuration_name: dynamic-foo-route-config

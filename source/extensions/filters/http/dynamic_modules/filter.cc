@@ -1,7 +1,5 @@
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
-#include "envoy/server/filter_config.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -79,6 +77,13 @@ FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap&
 
 FilterMetadataStatus DynamicModuleHttpFilter::encodeMetadata(MetadataMap&) {
   return FilterMetadataStatus::Continue;
+}
+
+void DynamicModuleHttpFilter::sendLocalReply(
+    Code code, absl::string_view body,
+    std::function<void(ResponseHeaderMap& headers)> modify_headers,
+    const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
+  decoder_callbacks_->sendLocalReply(code, body, modify_headers, grpc_status, details);
 }
 
 void DynamicModuleHttpFilter::encodeComplete(){};
