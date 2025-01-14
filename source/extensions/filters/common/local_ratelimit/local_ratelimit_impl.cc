@@ -207,6 +207,11 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     new_descriptor.entries_.reserve(descriptor.entries_size());
     for (const auto& entry : descriptor.entries()) {
       if (entry.value().empty()) {
+        if (!(Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets"))) {
+          throw EnvoyException("local_rate_limiting_with_dynamic_buckets is disabled. Local rate "
+                               "descriptor value cannot be empty");
+        }
         if (per_connection) {
           throw EnvoyException(
               "local rate descriptor value cannot be empty in per connection rate limit mode");
@@ -241,8 +246,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     }
     if (wildcard_found) {
       DynamicDescriptorSharedPtr dynamic_descriptor = std::make_shared<DynamicDescriptor>(
-          per_descriptor_token_bucket, (lru_size == 0 ? 20 : lru_size), dispatcher.timeSource(),
-          *this);
+          per_descriptor_token_bucket, lru_size, dispatcher.timeSource(), *this);
       dynamic_descriptors_.addDescriptor(std::move(new_descriptor), std::move(dynamic_descriptor));
       continue;
     }
@@ -285,17 +289,17 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
 
   // In most cases the request descriptors has only few elements. We use a inlined vector to
   // avoid heap allocation.
-  absl::InlinedVector<RateLimitTokenBucket*, 8> matched_descriptors;
+  absl::InlinedVector<RateLimitTokenBucketSharedPtr, 8> matched_descriptors;
 
   // Find all matched descriptors.
   for (const auto& request_descriptor : request_descriptors) {
     auto iter = descriptors_.find(request_descriptor);
     if (iter != descriptors_.end()) {
-      matched_descriptors.push_back(iter->second.get());
+      matched_descriptors.push_back(iter->second);
     } else {
       auto token_bucket = dynamic_descriptors_.getBucket(request_descriptor);
       if (token_bucket != nullptr) {
-        matched_descriptors.push_back(token_bucket.get());
+        matched_descriptors.push_back(token_bucket);
       }
     }
   }
@@ -304,7 +308,7 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
     // Sort the matched descriptors by token bucket fill rate to ensure the descriptor with the
     // smallest fill rate is consumed first.
     std::sort(matched_descriptors.begin(), matched_descriptors.end(),
-              [](const RateLimitTokenBucket* lhs, const RateLimitTokenBucket* rhs) {
+              [](const RateLimitTokenBucketSharedPtr lhs, const RateLimitTokenBucketSharedPtr rhs) {
                 return lhs->fillRate() < rhs->fillRate();
               });
   }
@@ -313,11 +317,11 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
       share_provider_ != nullptr ? share_provider_->getTokensShareFactor() : 1.0;
 
   // See if the request is forbidden by any of the matched descriptors.
-  for (auto descriptor : matched_descriptors) {
+  for (const auto& descriptor : matched_descriptors) {
     if (!descriptor->consume(share_factor)) {
       // If the request is forbidden by a descriptor, return the result and the descriptor
       // token bucket.
-      return {false, makeOptRefFromPtr<TokenBucketContext>(descriptor)};
+      return {false, std::shared_ptr<TokenBucketContext>(descriptor)};
     } else {
       ENVOY_LOG(trace,
                 "request allowed by descriptor with fill rate: {}, maxToken: {}, remainingToken {}",
@@ -330,26 +334,25 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
     if (const bool result = default_token_bucket_->consume(share_factor); !result) {
       // If the request is forbidden by the default token bucket, return the result and the
       // default token bucket.
-      return {false, makeOptRefFromPtr<TokenBucketContext>(default_token_bucket_.get())};
+      return {false, std::shared_ptr<TokenBucketContext>(default_token_bucket_)};
     }
 
     // If the request is allowed then return the result the token bucket. The descriptor
     // token bucket will be selected as priority if it exists.
-    return {true, makeOptRefFromPtr<TokenBucketContext>(matched_descriptors.empty()
-                                                            ? default_token_bucket_.get()
-                                                            : matched_descriptors[0])};
+    return {true, matched_descriptors.empty() ? default_token_bucket_ : matched_descriptors[0]};
   };
 
   ASSERT(!matched_descriptors.empty());
-  return {true, makeOptRefFromPtr<TokenBucketContext>(matched_descriptors[0])};
+  std::shared_ptr<TokenBucketContext> bucket_context =
+      std::shared_ptr<TokenBucketContext>(matched_descriptors[0]);
+  return {true, bucket_context};
 }
 
 // Compare the request descriptor entries with the user descriptor entries. If all non-empty user
-// descriptor values match the request descriptor values, return true and fill the new descriptor
+// descriptor values match the request descriptor values, return true
 bool DynamicDescriptorMap::compareDescriptorEntries(
     const std::vector<RateLimit::DescriptorEntry>& request_entries,
-    const std::vector<RateLimit::DescriptorEntry>& user_entries,
-    std::vector<RateLimit::DescriptorEntry>& new_descriptor_entries) {
+    const std::vector<RateLimit::DescriptorEntry>& user_entries) {
   // Check for equality of sizes
   if (request_entries.size() != user_entries.size()) {
     return false;
@@ -371,7 +374,6 @@ bool DynamicDescriptorMap::compareDescriptorEntries(
     if (user_entries[i].value_.empty()) {
       has_empty_value = true;
     }
-    new_descriptor_entries.push_back({request_entries[i].key_, request_entries[i].value_});
   }
   return has_empty_value;
 }
@@ -392,11 +394,9 @@ DynamicDescriptorMap::getBucket(RateLimit::LocalDescriptor request_descriptor) {
     if (user_descriptor.entries_.size() != request_descriptor.entries_.size()) {
       continue;
     }
-    RateLimit::LocalDescriptor new_descriptor;
     bool wildcard_found = false;
-    new_descriptor.entries_.reserve(user_descriptor.entries_.size());
-    wildcard_found = compareDescriptorEntries(request_descriptor.entries_, user_descriptor.entries_,
-                                              new_descriptor.entries_);
+    wildcard_found =
+        compareDescriptorEntries(request_descriptor.entries_, user_descriptor.entries_);
 
     if (!wildcard_found) {
       continue;
@@ -426,10 +426,12 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::LocalDescriptor& request_
   absl::WriterMutexLock lock(&dyn_desc_lock_);
   auto iter = dynamic_descriptors_.find(request_descriptor);
   if (iter != dynamic_descriptors_.end()) {
-    lru_list_.splice(lru_list_.begin(), lru_list_, iter->second.second);
+    if (iter->second.second != lru_list_.begin()) {
+      lru_list_.splice(lru_list_.begin(), lru_list_, iter->second.second);
+    }
     return iter->second.first;
   }
-  // add a new descriptor to the set along with its toekn bucket
+  // add a new descriptor to the set along with its token bucket
   RateLimitTokenBucketSharedPtr per_descriptor_token_bucket;
   if (no_timer_based_rate_limit_token_bucket_) {
     ENVOY_LOG(trace, "creating atomic token bucket for dynamic descriptor");
@@ -451,15 +453,18 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::LocalDescriptor& request_
 
   ENVOY_LOG(trace, "DynamicDescriptor::addorGetDescriptor: adding dynamic descriptor: {}",
             request_descriptor.toString());
-  // add this bucket to cache.
-  // After updating cache, make a copy of the cache and update the tls with the new cache.
+  lru_list_.emplace_front(request_descriptor);
   auto result = dynamic_descriptors_.emplace(
       request_descriptor, std::pair(per_descriptor_token_bucket, lru_list_.begin()));
-  lru_list_.emplace_front(request_descriptor);
   if (lru_list_.size() >= lru_size_) {
+    ENVOY_LOG(trace,
+              "DynamicDescriptor::addorGetDescriptor: lru_size({}) overflow. Removing dynamic "
+              "descriptor: {}",
+              lru_size_, lru_list_.back().toString());
     dynamic_descriptors_.erase(lru_list_.back());
     lru_list_.pop_back();
   }
+  ASSERT(lru_list_.size() == dynamic_descriptors_.size());
   return result.first->second.first;
 }
 

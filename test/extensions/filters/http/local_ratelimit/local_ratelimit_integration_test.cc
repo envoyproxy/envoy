@@ -1,6 +1,7 @@
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -376,6 +377,9 @@ INSTANTIATE_TEST_SUITE_P(
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DynamicDesciptorsBasicTest) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
   initializeFilter(fmt::format(filter_config_with_blank_value_descriptor_, "false"));
   // filter is adding dynamic descriptors based on the request header
   // 'x-envoy-downstream-service-cluster' and the token bucket is set to 1 token per fill interval

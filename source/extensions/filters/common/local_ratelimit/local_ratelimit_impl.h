@@ -65,8 +65,7 @@ public:
 
 private:
   bool compareDescriptorEntries(const std::vector<RateLimit::DescriptorEntry>& request_entries,
-                                const std::vector<RateLimit::DescriptorEntry>& user_entries,
-                                std::vector<RateLimit::DescriptorEntry>& new_descriptor_entries);
+                                const std::vector<RateLimit::DescriptorEntry>& user_entries);
   RateLimit::LocalDescriptor::Map<DynamicDescriptorSharedPtr> user_descriptors_;
 };
 
@@ -198,7 +197,7 @@ class LocalRateLimiterImpl : public Logger::Loggable<Logger::Id::rate_limit_quot
 public:
   struct Result {
     bool allowed{};
-    OptRef<const TokenBucketContext> token_bucket_context{};
+    std::shared_ptr<const TokenBucketContext> token_bucket_context{};
   };
 
   LocalRateLimiterImpl(

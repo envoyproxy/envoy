@@ -107,11 +107,14 @@ FilterConfig::FilterConfig(
 
     share_provider = share_provider_manager_->getShareProvider(config.local_cluster_rate_limit());
   }
+  uint32_t max_dynamic_descriptors = 20;
+  if (config.has_max_dynamic_descriptors()) {
+    max_dynamic_descriptors = config.max_dynamic_descriptors().value();
+  }
 
   rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
       fill_interval_, max_tokens_, tokens_per_fill_, dispatcher_, descriptors_,
-      always_consume_default_token_bucket_, std::move(share_provider),
-      config.dynamic_descripters_lru_cache_limit(),
+      always_consume_default_token_bucket_, std::move(share_provider), max_dynamic_descriptors,
       config.local_rate_limit_per_downstream_connection());
 }
 
@@ -199,7 +202,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   // We can never assume the decodeHeaders() was called before encodeHeaders().
-  if (used_config_->enableXRateLimitHeaders() && token_bucket_context_.has_value()) {
+  if (used_config_->enableXRateLimitHeaders() && token_bucket_context_) {
     headers.addReferenceKey(
         HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
         token_bucket_context_->maxTokens());
