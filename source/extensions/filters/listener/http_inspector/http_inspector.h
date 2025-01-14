@@ -54,7 +54,8 @@ public:
 
   const HttpInspectorStats& stats() const { return stats_; }
 
-  static constexpr uint32_t MAX_INSPECT_SIZE = 8192;
+  static constexpr uint32_t DEFAULT_INITIAL_BUFFER_SIZE = 8 * 1024;
+  static constexpr uint32_t MAX_INSPECT_SIZE = 64 * 1024;
 
 private:
   HttpInspectorStats stats_;
@@ -108,7 +109,7 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
 
-  size_t maxReadBytes() const override { return Config::MAX_INSPECT_SIZE; }
+  size_t maxReadBytes() const override { return requested_read_bytes_; }
 
 private:
   static const absl::string_view HTTP2_CONNECTION_PREFACE;
@@ -126,6 +127,7 @@ private:
   std::unique_ptr<Http::Http1::Parser> parser_;
   NoOpParserCallbacks no_op_callbacks_;
   ssize_t nread_ = 0;
+  size_t requested_read_bytes_ = 0;
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
 };
 
