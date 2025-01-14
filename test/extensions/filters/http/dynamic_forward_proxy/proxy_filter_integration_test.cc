@@ -594,8 +594,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
-  // With UVH enabled, the suspicious host will set to an empty host resulting in a bad request
-  // (400).
+  // The suspicious host will be set to an empty host resulting in a bad request (400).
   EXPECT_EQ("400", response->headers().getStatusValue());
   std::string access_log = waitForAccessLog(access_log_name_);
   EXPECT_THAT(access_log, HasSubstr("empty_host_header"));
