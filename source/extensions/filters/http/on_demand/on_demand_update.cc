@@ -6,6 +6,7 @@
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/utility.h"
+#include "source/common/upstream/od_cds_api_impl.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -59,12 +60,14 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
   }
   Upstream::OdCdsApiHandlePtr odcds;
   if (odcds_config->resources_locator().empty()) {
-    odcds = cm.allocateOdCdsApi(odcds_config->source(), absl::nullopt, validation_visitor);
+    odcds = cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create, odcds_config->source(),
+                                absl::nullopt, validation_visitor);
   } else {
     auto locator = THROW_OR_RETURN_VALUE(
         Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator()),
         xds::core::v3::ResourceLocator);
-    odcds = cm.allocateOdCdsApi(odcds_config->source(), locator, validation_visitor);
+    odcds = cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create, odcds_config->source(), locator,
+                                validation_visitor);
   }
   // If changing the default timeout, please update the documentation in on_demand.proto too.
   auto timeout =

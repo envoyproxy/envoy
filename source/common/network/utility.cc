@@ -394,7 +394,10 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(Socket& sock) {
       status =
           sock.getSocketOption(opt_tp.level(), opt_tp.option(), &is_tp, &flag_len).return_value_;
       if (status == 0 && is_tp) {
-        return sock.ioHandle().localAddress();
+        auto address_or_error = sock.ioHandle().localAddress();
+        if (address_or_error.status().ok()) {
+          return *address_or_error;
+        }
       }
     }
     return nullptr;

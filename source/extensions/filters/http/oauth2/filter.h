@@ -40,22 +40,28 @@ class SecretReader {
 public:
   virtual ~SecretReader() = default;
   virtual const std::string& clientSecret() const PURE;
-  virtual const std::string& tokenSecret() const PURE;
+  virtual const std::string& hmacSecret() const PURE;
 };
 
 class SDSSecretReader : public SecretReader {
 public:
   SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr&& client_secret_provider,
-                  Secret::GenericSecretConfigProviderSharedPtr&& token_secret_provider,
+                  Secret::GenericSecretConfigProviderSharedPtr&& hmac_secret_provider,
                   ThreadLocal::SlotAllocator& tls, Api::Api& api)
-      : client_secret_(std::move(client_secret_provider), tls, api),
-        token_secret_(std::move(token_secret_provider), tls, api) {}
-  const std::string& clientSecret() const override { return client_secret_.secret(); }
-  const std::string& tokenSecret() const override { return token_secret_.secret(); }
+      : client_secret_(
+            THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                      std::move(client_secret_provider), tls, api),
+                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)),
+        hmac_secret_(
+            THROW_OR_RETURN_VALUE(Secret::ThreadLocalGenericSecretProvider::create(
+                                      std::move(hmac_secret_provider), tls, api),
+                                  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>)) {}
+  const std::string& clientSecret() const override { return client_secret_->secret(); }
+  const std::string& hmacSecret() const override { return hmac_secret_->secret(); }
 
 private:
-  Secret::ThreadLocalGenericSecretProvider client_secret_;
-  Secret::ThreadLocalGenericSecretProvider token_secret_;
+  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> client_secret_;
+  std::unique_ptr<Secret::ThreadLocalGenericSecretProvider> hmac_secret_;
 };
 
 /**
@@ -125,10 +131,10 @@ public:
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
   bool preserveAuthorizationHeader() const { return preserve_authorization_header_; }
-  const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& passThroughMatchers() const {
     return pass_through_header_matchers_;
   }
-  const std::vector<Http::HeaderUtility::HeaderData>& denyRedirectMatchers() const {
+  const std::vector<Http::HeaderUtility::HeaderDataPtr>& denyRedirectMatchers() const {
     return deny_redirect_header_matchers_;
   }
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
@@ -140,7 +146,7 @@ public:
   const Matchers::PathMatcher& redirectPathMatcher() const { return redirect_matcher_; }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
-  std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
+  std::string hmacSecret() const { return secret_reader_->hmacSecret(); }
   FilterStats& stats() { return stats_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
   const CookieNames& cookieNames() const { return cookie_names_; }
@@ -160,6 +166,8 @@ public:
     }
     return makeOptRef(retry_policy_.value());
   }
+  bool shouldUseRefreshToken(
+      const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -177,8 +185,8 @@ private:
   FilterStats stats_;
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
-  const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
-  const std::vector<Http::HeaderUtility::HeaderData> deny_redirect_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> pass_through_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> deny_redirect_header_matchers_;
   const CookieNames cookie_names_;
   const std::string cookie_domain_;
   const AuthType auth_type_;
@@ -260,7 +268,7 @@ class OAuth2Filter : public Http::PassThroughFilter,
                      Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
-               TimeSource& time_source);
+               TimeSource& time_source, Random::RandomGenerator& random);
 
   // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -285,7 +293,6 @@ public:
   void finishRefreshAccessTokenFlow();
   void updateTokens(const std::string& access_token, const std::string& id_token,
                     const std::string& refresh_token, std::chrono::seconds expires_in);
-  bool validateNonce(const Http::RequestHeaderMap& headers, const std::string& nonce);
 
 private:
   friend class OAuth2Test;
@@ -309,12 +316,13 @@ private:
   std::unique_ptr<OAuth2Client> oauth_client_;
   FilterConfigSharedPtr config_;
   TimeSource& time_source_;
+  Random::RandomGenerator& random_;
 
   // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
   // connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
   bool canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const;
-  void redirectToOAuthServer(Http::RequestHeaderMap& headers) const;
+  void redirectToOAuthServer(Http::RequestHeaderMap& headers);
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
 
@@ -327,6 +335,8 @@ private:
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
                                                  const absl::string_view path_str);
+  bool validateCsrfToken(const Http::RequestHeaderMap& headers,
+                         const std::string& csrf_token) const;
 };
 
 } // namespace Oauth2

@@ -1,3 +1,4 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
@@ -12,6 +13,7 @@ load(
     "envoy_copts",
     "envoy_external_dep_path",
     "envoy_linkstatic",
+    "repo_label",
 )
 load(":envoy_mobile_defines.bzl", "envoy_mobile_defines")
 load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
@@ -20,27 +22,14 @@ load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
 # SelectorValue values have to match the attribute type. See
 # https://github.com/bazelbuild/bazel/issues/2273.
 def tcmalloc_external_deps(repository):
-    return select({
-        repository + "//bazel:disable_tcmalloc": [],
-        repository + "//bazel:disable_tcmalloc_on_linux_x86_64": [],
-        repository + "//bazel:disable_tcmalloc_on_linux_aarch64": [],
-        repository + "//bazel:debug_tcmalloc": [repository + "//bazel/foreign_cc:gperftools"],
-        repository + "//bazel:debug_tcmalloc_on_linux_x86_64": [repository + "//bazel/foreign_cc:gperftools"],
-        repository + "//bazel:debug_tcmalloc_on_linux_aarch64": [repository + "//bazel/foreign_cc:gperftools"],
-        repository + "//bazel:gperftools_tcmalloc": [repository + "//bazel/foreign_cc:gperftools"],
-        repository + "//bazel:gperftools_tcmalloc_on_linux_x86_64": [repository + "//bazel/foreign_cc:gperftools"],
-        repository + "//bazel:gperftools_tcmalloc_on_linux_aarch64": [repository + "//bazel/foreign_cc:gperftools"],
-        repository + "//bazel:linux_x86_64": [
-            "@com_github_google_tcmalloc//tcmalloc",
-            "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
-            "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
-        ],
-        repository + "//bazel:linux_aarch64": [
-            "@com_github_google_tcmalloc//tcmalloc",
-            "@com_github_google_tcmalloc//tcmalloc:profile_marshaler",
-            "@com_github_google_tcmalloc//tcmalloc:malloc_extension",
-        ],
-        "//conditions:default": [repository + "//bazel/foreign_cc:gperftools"],
+    _repo = repo_label(repository)
+    return selects.with_or({
+        _repo("//bazel:disable_tcmalloc"): [],
+        (
+            _repo("//bazel:debug_tcmalloc"),
+            _repo("//bazel:gperftools_tcmalloc"),
+        ): [_repo("//bazel/foreign_cc:gperftools")],
+        "//conditions:default": [_repo("//bazel:tcmalloc_all_libs")],
     })
 
 # Envoy C++ library targets that need no transformations or additional dependencies before being
@@ -223,12 +212,12 @@ def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
     )
 
 # Envoy proto targets should be specified with this function.
-def envoy_proto_library(name, **kwargs):
+def envoy_proto_library(name, visibility = ["//visibility:public"], **kwargs):
     api_cc_py_proto_library(
         name,
         # Avoid generating .so, we don't need it, can interfere with builds
         # such as OSS-Fuzz.
         linkstatic = 1,
-        visibility = ["//visibility:public"],
+        visibility = visibility,
         **kwargs
     )

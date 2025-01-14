@@ -146,7 +146,9 @@ public:
   void encodeBodyAndTrailers();
 
   // Getters and setters
-  Upstream::HostDescriptionConstSharedPtr& upstreamHost() { return upstream_host_; }
+  Upstream::HostDescriptionOptConstRef upstreamHost() {
+    return makeOptRefFromPtr(upstream_host_.get());
+  }
   void outlierDetectionTimeoutRecorded(bool recorded) {
     outlier_detection_timeout_recorded_ = recorded;
   }
@@ -232,7 +234,6 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   // Tracks the number of times the flow of data from downstream has been disabled.
   uint32_t downstream_data_disabled_{};
-  bool calling_encode_headers_ : 1;
   bool upstream_canary_ : 1;
   bool router_sent_end_stream_ : 1;
   bool encode_trailers_ : 1;
@@ -339,15 +340,13 @@ public:
   void disarmRequestTimeout() override {}
   void resetIdleTimer() override {}
   void onLocalReply(Http::Code) override {}
+  void sendGoAwayAndClose() override {}
   // Upgrade filter chains not supported.
   const Router::RouteEntry::UpgradeMap* upgradeMap() override { return nullptr; }
 
   // Unsupported functions.
   void recreateStream(StreamInfo::FilterStateSharedPtr) override {
     IS_ENVOY_BUG("recreateStream called from upstream HTTP filter");
-  }
-  void upgradeFilterChainCreated() override {
-    IS_ENVOY_BUG("upgradeFilterChainCreated called from upstream HTTP filter");
   }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {*this}; }
 

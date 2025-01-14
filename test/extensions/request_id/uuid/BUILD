@@ -12,7 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/common:random_generator_lib",
         "//source/extensions/request_id/uuid:config",

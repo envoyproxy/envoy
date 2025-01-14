@@ -52,8 +52,8 @@ public:
               (int level, int optname, void* optval, socklen_t* optlen));
   MOCK_METHOD(Api::SysCallIntResult, setBlocking, (bool blocking));
   MOCK_METHOD(absl::optional<int>, domain, ());
-  MOCK_METHOD(Address::InstanceConstSharedPtr, localAddress, ());
-  MOCK_METHOD(Address::InstanceConstSharedPtr, peerAddress, ());
+  MOCK_METHOD(absl::StatusOr<Address::InstanceConstSharedPtr>, localAddress, ());
+  MOCK_METHOD(absl::StatusOr<Address::InstanceConstSharedPtr>, peerAddress, ());
   MOCK_METHOD(IoHandlePtr, duplicate, ());
   MOCK_METHOD(void, createFileEvent_,
               (Event::Dispatcher & dispatcher, Event::FileReadyCb cb,

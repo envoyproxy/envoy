@@ -39,6 +39,7 @@
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/listener_factory_context.h"
 
 #if defined(ENVOY_ENABLE_QUIC)
 #include "source/common/quic/active_quic_listener.h"
@@ -231,9 +232,7 @@ public:
     RELEASE_ASSERT(false, "initialize if this is needed");
     return *stream_info_;
   }
-  std::list<AccessLog::InstanceSharedPtr> accessLogHandlers() override {
-    return access_log_handlers_;
-  }
+  AccessLog::InstanceSharedPtrVector accessLogHandlers() override { return access_log_handlers_; }
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -268,7 +267,7 @@ private:
   Http::MetadataMap metadata_map_;
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   std::shared_ptr<StreamInfo::StreamInfo> stream_info_;
-  std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
+  AccessLog::InstanceSharedPtrVector access_log_handlers_;
   bool received_data_{false};
   bool grpc_stream_started_{false};
   Http::ServerHeaderValidatorPtr header_validator_;
@@ -510,9 +509,11 @@ public:
   // Update the maximum number of concurrent streams.
   void updateConcurrentStreams(uint64_t max_streams);
 
+  // Wait for the first occurrence of data, and strip the leading data up to the first occurrence.
+  // The out parameter will contain the stripped pieces.
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
-  waitForInexactRawData(const char* data, std::string* out = nullptr,
+  waitForInexactRawData(absl::string_view data, std::string& out,
                         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   void writeRawData(absl::string_view data);
@@ -866,7 +867,7 @@ private:
         if (context_ == nullptr) {
           // Only initialize this when needed to avoid slowing down non-QUIC integration tests.
           context_ = std::make_unique<
-              testing::NiceMock<Server::Configuration::MockServerFactoryContext>>();
+              testing::NiceMock<Server::Configuration::MockListenerFactoryContext>>();
         }
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
             parent_.quic_options_, 1, parent_.quic_stat_names_, parent_.validation_visitor_,
@@ -905,7 +906,7 @@ private:
       return connection_balancer_;
     }
     bool shouldBypassOverloadManager() const override { return false; }
-    const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
+    const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
       return empty_access_logs_;
     }
     const Network::ListenerInfoConstSharedPtr& listenerInfo() const override {
@@ -928,10 +929,10 @@ private:
     const std::string name_;
     Network::NopConnectionBalancerImpl connection_balancer_;
     BasicResourceLimitImpl connection_resource_;
-    const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
+    const AccessLog::InstanceSharedPtrVector empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
     const Network::ListenerInfoConstSharedPtr listener_info_;
-    std::unique_ptr<Server::Configuration::MockServerFactoryContext> context_;
+    std::unique_ptr<Server::Configuration::MockListenerFactoryContext> context_;
   };
 
   void threadRoutine();

@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cstdint>
 #include <iterator>
-#include <list>
 #include <map>
 #include <memory>
 #include <regex>
@@ -280,6 +279,7 @@ public:
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
+  const std::string& name() const override { return name_; }
   Stats::StatName statName() const override { return stat_name_storage_.statName(); }
   const RateLimitPolicy& rateLimitPolicy() const override {
     if (rate_limit_policy_ != nullptr) {
@@ -360,6 +360,7 @@ private:
                              scope.scopeFromStatName(stat_names.other_), stat_names) {}
   };
 
+  const std::string name_;
   const Stats::StatNameManagedStorage stat_name_storage_;
   Stats::ScopeSharedPtr vcluster_scope_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
@@ -508,7 +509,7 @@ public:
   const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
-  bool traceSampled() const override { return trace_sampled_; }
+  absl::optional<bool> traceSampled() const override { return trace_sampled_; }
   bool disableShadowHostSuffixAppend() const override { return disable_shadow_host_suffix_append_; }
 
 private:
@@ -518,7 +519,7 @@ private:
   const Http::LowerCaseString cluster_header_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
-  bool trace_sampled_;
+  absl::optional<bool> trace_sampled_;
   const bool disable_shadow_host_suffix_append_;
 };
 
@@ -539,8 +540,9 @@ public:
   bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout_; }
 
 private:
-  const uint32_t initial_requests_;
   const envoy::type::v3::FractionalPercent additional_request_chance_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  const uint32_t initial_requests_;
   const bool hedge_on_per_try_timeout_;
 };
 using DefaultHedgePolicy = ConstSingleton<HedgePolicyImpl>;
@@ -997,8 +999,8 @@ public:
            ProtobufMessage::ValidationVisitor& validator,
            const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
 
-    uint64_t clusterWeight() const {
-      return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
+    uint64_t clusterWeight(Runtime::Loader& loader) const {
+      return loader.snapshot().getInteger(runtime_key_, cluster_weight_);
     }
 
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
@@ -1067,7 +1069,6 @@ public:
                          const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
 
     const std::string runtime_key_;
-    Runtime::Loader& loader_;
     const uint64_t cluster_weight_;
     MetadataMatchCriteriaConstPtr cluster_metadata_match_criteria_;
     HeaderParserPtr request_headers_parser_;
@@ -1612,7 +1613,7 @@ public:
   }
 
   // Router::CommonConfig
-  const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
+  const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;
   }
   const std::string& name() const override { return name_; }
@@ -1636,7 +1637,7 @@ private:
   CommonConfigImpl(const envoy::config::route::v3::RouteConfiguration& config,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
-  std::list<Http::LowerCaseString> internal_only_headers_;
+  std::vector<Http::LowerCaseString> internal_only_headers_;
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   const std::string name_;
@@ -1676,7 +1677,7 @@ public:
   RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info,
                             uint64_t random_value) const override;
-  const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
+  const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return shared_config_->internalOnlyHeaders();
   }
   const std::string& name() const override { return shared_config_->name(); }
@@ -1727,7 +1728,7 @@ public:
     return nullptr;
   }
 
-  const std::list<Http::LowerCaseString>& internalOnlyHeaders() const override {
+  const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return internal_only_headers_;
   }
 
@@ -1739,7 +1740,7 @@ public:
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
 
 private:
-  std::list<Http::LowerCaseString> internal_only_headers_;
+  std::vector<Http::LowerCaseString> internal_only_headers_;
   const std::string name_;
 };
 

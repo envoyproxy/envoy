@@ -22,7 +22,7 @@ envoy_extension_cc_test(
     name = "envoy_deterministic_connection_id_generator_test",
     srcs = ["envoy_deterministic_connection_id_generator_test.cc"],
     extension_names = ["envoy.quic.deterministic_connection_id_generator"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     tags = ["nofips"],
     deps = [
         ":matchers",

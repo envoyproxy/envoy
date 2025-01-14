@@ -120,19 +120,27 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/config:datasource_lib",
         "//source/common/http:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/tracing:http_tracer_lib",
         "@com_google_absl//absl/time",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
 
 envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
-    hdrs = ["utility.h"],
+    hdrs = [
+        "credentials_provider.h",
+        "signer.h",
+        "signer_base_impl.h",
+        "utility.h",
+    ],
     copts = envoy_select_boringssl(
         [
             "-DENVOY_SSL_FIPS",
@@ -170,5 +178,6 @@ envoy_cc_library(
         ":region_provider_interface",
         ":utility_lib",
         "//source/common/common:logger_lib",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )

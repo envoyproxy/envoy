@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <list>
 #include <map>
 #include <memory>
 #include <string>
@@ -251,6 +250,7 @@ public:
                const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info),
               (const));
+  MOCK_METHOD(bool, applyOnStreamDone, (), (const));
 
   uint64_t stage_{};
   std::string disable_key_;
@@ -547,7 +547,7 @@ public:
                const Envoy::StreamInfo::StreamInfo&, uint64_t random_value),
               (const));
 
-  MOCK_METHOD(const std::list<Http::LowerCaseString>&, internalOnlyHeaders, (), (const));
+  MOCK_METHOD(const std::vector<Http::LowerCaseString>&, internalOnlyHeaders, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(bool, usesVhds, (), (const));
   MOCK_METHOD(bool, mostSpecificHeaderMutationsWins, (), (const));
@@ -556,7 +556,7 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
 
   std::shared_ptr<MockRoute> route_;
-  std::list<Http::LowerCaseString> internal_only_headers_;
+  std::vector<Http::LowerCaseString> internal_only_headers_;
   std::string name_{"fake_config"};
   envoy::config::core::v3::Metadata metadata_;
   MockRouteMetadata typed_metadata_;

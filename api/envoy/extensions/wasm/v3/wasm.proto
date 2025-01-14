@@ -2,10 +2,12 @@ syntax = "proto3";
 
 package envoy.extensions.wasm.v3;
 
+import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/any.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.wasm.v3";
@@ -16,6 +18,33 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Wasm]
 // [#extension: envoy.bootstrap.wasm]
+
+// If there is a fatal error on the VM (e.g. exception, abort()), then the policy will be applied.
+enum FailurePolicy {
+  // No policy is specified. The default policy will be used. The default policy is ``FAIL_CLOSED``.
+  UNSPECIFIED = 0;
+
+  // New plugin instance will be created for the new request if the VM is failed. Note this only
+  // be applied to the following failures:
+  //
+  // * ``proxy_wasm::FailState::RuntimeError``
+  //
+  // This will fallback to the ``FAIL_CLOSED`` for all other failures.
+  FAIL_RELOAD = 1;
+
+  // All plugins associated with the VM will return an HTTP 503 error.
+  FAIL_CLOSED = 2;
+
+  // All plugins associated with the VM will be ignored and the filter chain will continue. This
+  // makes sense when the plugin is optional.
+  FAIL_OPEN = 3;
+}
+
+message ReloadConfig {
+  // Backoff strategy for the VM failure reload. If not specified, the default 1s base interval
+  // will be applied.
+  config.core.v3.BackoffStrategy backoff = 1;
+}
 
 // Configuration for restricting Proxy-Wasm capabilities available to modules.
 message CapabilityRestrictionConfig {
@@ -114,7 +143,7 @@ message EnvironmentVariables {
 }
 
 // Base Configuration for Wasm Plugins e.g. filters and services.
-// [#next-free-field: 7]
+// [#next-free-field: 9]
 message PluginConfig {
   // A unique name for a filters/services in a VM for use in identifying the filter/service if
   // multiple filters/services are handled by the same ``vm_id`` and ``root_id`` and for
@@ -144,7 +173,14 @@ message PluginConfig {
   // or fail open (if 'fail_open' is set to true) by bypassing the filter. Note: when on_start or on_configure return false
   // during xDS updates the xDS configuration will be rejected and when on_start or on_configuration return false on initial
   // startup the proxy will not start.
-  bool fail_open = 5;
+  // This field is deprecated in favor of the ``failure_policy`` field.
+  bool fail_open = 5 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // The failure policy for the plugin.
+  FailurePolicy failure_policy = 7;
+
+  // Reload configuration. This is only applied when ``failure_policy`` is set to ``FAIL_RELOAD``.
+  ReloadConfig reload_config = 8;
 
   // Configuration for restricting Proxy-Wasm capabilities available to modules.
   CapabilityRestrictionConfig capability_restriction_config = 6;

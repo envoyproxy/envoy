@@ -137,7 +137,7 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
   auto cvc_config =
       Ssl::CertificateValidationContextConfigImpl::create(
           *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(),
-          *api_)
+          false, *api_)
           .value();
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -530,9 +530,9 @@ validation_context:
   EXPECT_TRUE(secret_context.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources_2.refvec_, "validation-context-v1")
                   .ok());
-  auto cert_validation_context =
-      Ssl::CertificateValidationContextConfigImpl::create(*context_secret_provider->secret(), *api_)
-          .value();
+  auto cert_validation_context = Ssl::CertificateValidationContextConfigImpl::create(
+                                     *context_secret_provider->secret(), false, *api_)
+                                     .value();
   EXPECT_EQ("DUMMY_INLINE_STRING_TRUSTED_CA", cert_validation_context->caCert());
   const std::string updated_config_dump = R"EOF(
 dynamic_active_secrets:
@@ -1152,7 +1152,7 @@ TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
   auto cvc_config =
       Ssl::CertificateValidationContextConfigImpl::create(
           *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(),
-          *api_)
+          false, *api_)
           .value();
   EXPECT_EQ(cvc_config->subjectAltNameMatchers().size(), 4);
   EXPECT_EQ("example.foo", cvc_config->subjectAltNameMatchers()[0].matcher().exact());

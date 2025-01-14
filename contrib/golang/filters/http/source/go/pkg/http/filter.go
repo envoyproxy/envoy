@@ -167,6 +167,10 @@ func (s *processState) RecoverPanic() {
 	}
 }
 
+func (s *processState) AddData(data []byte, isStreaming bool) {
+	cAPI.HttpAddData(unsafe.Pointer(s), data, isStreaming)
+}
+
 func (r *httpRequest) StreamInfo() api.StreamInfo {
 	return &r.streamInfo
 }
@@ -237,7 +241,11 @@ func (r *httpRequest) recoverPanic() {
 }
 
 func (r *httpRequest) ClearRouteCache() {
-	cAPI.ClearRouteCache(unsafe.Pointer(r))
+	cAPI.ClearRouteCache(unsafe.Pointer(r), false)
+}
+
+func (r *httpRequest) RefreshRouteCache() {
+	cAPI.ClearRouteCache(unsafe.Pointer(r), true)
 }
 
 func (r *httpRequest) Continue(status api.StatusType) {

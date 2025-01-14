@@ -128,8 +128,10 @@ xds_matcher:
   envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute config;
   TestUtility::loadFromYamlAndValidate(yaml, config);
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
-      factory.createRouteSpecificFilterConfig(config, server_factory_context,
-                                              ProtobufMessage::getNullValidationVisitor());
+      factory
+          .createRouteSpecificFilterConfig(config, server_factory_context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
   EXPECT_TRUE(route_config.get());
 }
 
@@ -296,7 +298,7 @@ struct TestAction : Matcher::ActionBase<ProtobufWkt::StringValue> {};
 template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
 createMatchingTree(const std::string& name, const std::string& value) {
-  auto tree = std::make_shared<Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>>(
+  auto tree = *Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>::create(
       std::make_unique<InputType>(name), absl::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
@@ -306,7 +308,7 @@ createMatchingTree(const std::string& name, const std::string& value) {
 }
 
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> createRequestAndResponseMatchingTree() {
-  auto tree = std::make_shared<Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>>(
+  auto tree = *Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>::create(
       std::make_unique<Envoy::Http::Matching::HttpResponseHeadersDataInput>("match-header"),
       absl::nullopt);
 
@@ -365,7 +367,7 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionDecodingHeaders) {
 template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
 createMatchTreeWithOnNoMatch(const std::string& name, const std::string& value) {
-  auto tree = std::make_shared<Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>>(
+  auto tree = *Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>::create(
       std::make_unique<InputType>(name),
       Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
           []() { return std::make_unique<ActionType>(); }, nullptr});

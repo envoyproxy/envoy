@@ -209,8 +209,8 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
     // Data structure is deduced from the file extension. If the data is not read an exception
     // is thrown. If no table can be read, the filter will refer all queries to an external
     // DNS server, if configured, otherwise all queries will be responded to with Name Error.
-    MessageUtil::loadFromFile(datasource.filename(), table,
-                              ProtobufMessage::getNullValidationVisitor(), api_);
+    THROW_IF_NOT_OK(MessageUtil::loadFromFile(datasource.filename(), table,
+                                              ProtobufMessage::getNullValidationVisitor(), api_));
     data_source_loaded = true;
   }
   END_TRY catch (const EnvoyException& e) {

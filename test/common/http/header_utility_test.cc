@@ -198,143 +198,6 @@ TEST(GetAllOfHeaderAsStringTest, All) {
   }
 }
 
-class HeaderDataConstructorTest : public ::testing::Test {
-public:
-  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-};
-
-TEST_F(HeaderDataConstructorTest, NoSpecifierSet) {
-  const std::string yaml = R"EOF(
-name: test-header
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml), context_);
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Present, header_data.header_match_type_);
-}
-
-TEST_F(HeaderDataConstructorTest, DEPRECATED_FEATURE_TEST(ExactMatchSpecifier)) {
-  const std::string yaml = R"EOF(
-name: test-header
-exact_match: value
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml), context_);
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value, header_data.header_match_type_);
-  EXPECT_EQ("value", header_data.value_);
-}
-
-TEST_F(HeaderDataConstructorTest, RangeMatchSpecifier) {
-  const std::string yaml = R"EOF(
-name: test-header
-range_match:
-  start: 0
-  end: -10
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml), context_);
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Range, header_data.header_match_type_);
-  EXPECT_EQ("", header_data.value_);
-  EXPECT_EQ(0, header_data.range_.start());
-  EXPECT_EQ(-10, header_data.range_.end());
-}
-
-TEST_F(HeaderDataConstructorTest, PresentMatchSpecifier) {
-  const std::string yaml = R"EOF(
-name: test-header
-present_match: true
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml), context_);
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Present, header_data.header_match_type_);
-  EXPECT_EQ("", header_data.value_);
-}
-
-TEST_F(HeaderDataConstructorTest, DEPRECATED_FEATURE_TEST(PrefixMatchSpecifier)) {
-  const std::string yaml = R"EOF(
-name: test-header
-prefix_match: value
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml), context_);
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Prefix, header_data.header_match_type_);
-  EXPECT_EQ("value", header_data.value_);
-}
-
-TEST_F(HeaderDataConstructorTest, DEPRECATED_FEATURE_TEST(SuffixMatchSpecifier)) {
-  const std::string yaml = R"EOF(
-name: test-header
-suffix_match: value
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml), context_);
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Suffix, header_data.header_match_type_);
-  EXPECT_EQ("value", header_data.value_);
-}
-
-TEST_F(HeaderDataConstructorTest, DEPRECATED_FEATURE_TEST(ContainsMatchSpecifier)) {
-  const std::string yaml = R"EOF(
-name: test-header
-contains_match: somevalueinside
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml), context_);
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Contains, header_data.header_match_type_);
-  EXPECT_EQ("somevalueinside", header_data.value_);
-}
-
-TEST_F(HeaderDataConstructorTest, StringMatchSpecifier) {
-  const std::string yaml = R"EOF(
-name: test-header
-string_match:
-  exact: value
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml), context_);
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::StringMatch, header_data.header_match_type_);
-  EXPECT_TRUE(header_data.string_match_->match("value"));
-}
-
-TEST_F(HeaderDataConstructorTest, InvertMatchSpecifier) {
-  const std::string yaml = R"EOF(
-name: test-header
-string_match:
-  exact: value
-invert_match: true
-)EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml), context_);
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::StringMatch, header_data.header_match_type_);
-  EXPECT_TRUE(header_data.string_match_->match("value"));
-  EXPECT_EQ(true, header_data.invert_match_);
-}
-
 class MatchHeadersTest : public ::testing::Test {
 public:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -353,7 +216,7 @@ string_match:
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
 
   headers.addCopy("match-header", "a");
@@ -364,12 +227,12 @@ string_match:
   // With two "match-header" we now logically have "a,b" as the value, so the regex will not match.
   EXPECT_FALSE(HeaderUtility::matchHeaders(headers, header_data));
 
-  header_data[0] = std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(R"EOF(
+  header_data[0] = HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(R"EOF(
 name: match-header
 string_match:
   exact: a,b
   )EOF"),
-                                                               context_);
+                                                   context_);
   // Make sure that an exact match on "a,b" does in fact work.
   EXPECT_TRUE(HeaderUtility::matchHeaders(headers, header_data));
 }
@@ -393,9 +256,9 @@ name: match-header-B
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yamlA), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yamlA), context_));
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yamlB), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yamlB), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers_1, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers_2, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers_1, header_data));
@@ -413,7 +276,7 @@ name: match-header
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -429,7 +292,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -446,7 +309,7 @@ exact_match: match-value
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -465,7 +328,7 @@ invert_match: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -486,7 +349,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -505,7 +368,7 @@ safe_regex_match:
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -526,7 +389,7 @@ invert_match: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -549,7 +412,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -570,7 +433,7 @@ range_match:
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -593,7 +456,7 @@ invert_match: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -618,7 +481,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -638,7 +501,7 @@ present_match: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -659,7 +522,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -679,7 +542,7 @@ present_match: false
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_FALSE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -700,7 +563,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_FALSE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -721,7 +584,7 @@ invert_match: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -743,7 +606,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_FALSE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -764,7 +627,7 @@ invert_match: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_FALSE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -786,7 +649,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -803,7 +666,7 @@ prefix_match: value
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -821,7 +684,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -839,7 +702,7 @@ invert_match: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -858,7 +721,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -875,7 +738,7 @@ suffix_match: value
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -893,7 +756,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -911,7 +774,7 @@ invert_match: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -930,7 +793,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -947,7 +810,7 @@ contains_match: onevalue
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -965,7 +828,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -983,7 +846,7 @@ invert_match: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(matching_headers, header_data));
 }
@@ -1002,7 +865,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -1020,7 +883,7 @@ string_match:
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -1040,7 +903,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(empty_headers, header_data));
@@ -1060,7 +923,7 @@ string_match:
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers_1, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers_2, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
@@ -1082,7 +945,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers_1, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers_2, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
@@ -1103,7 +966,7 @@ invert_match: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
@@ -1124,7 +987,7 @@ treat_missing_header_as_empty: true
 
   std::vector<HeaderUtility::HeaderDataPtr> header_data;
   header_data.push_back(
-      std::make_unique<HeaderUtility::HeaderData>(parseHeaderMatcherFromYaml(yaml), context_));
+      HeaderUtility::createHeaderData(parseHeaderMatcherFromYaml(yaml), context_));
   EXPECT_TRUE(HeaderUtility::matchHeaders(matching_headers, header_data));
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
   EXPECT_TRUE(HeaderUtility::matchHeaders(empty_headers, header_data));

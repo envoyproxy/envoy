@@ -1,33 +1,20 @@
 **Summary of changes**:
 
-* Added new `access_log` command operators to retrieve upstream connection information.
-* Enhanced ext_authz to be configured to ignore dynamic metadata in ext_authz responses.
-* Ext_authz: added a block list for headers that should never be send to the external auth service.
-* Ext_authz: added the ability to configure what decoder header mutations are allowed from the ext_authz with the option to fail if disallowed mutations are requested.
-* Ext_proc support for observability mode which is "Send and Go" mode that can be used by external processor to observe Envoy data and status.
-* Added support for flow control in Envoy gRPC side stream.
-* TCP Healthchecks can now leverage ProxyProtocol.
-* Hot restart: Added new command-line flag to skip hot restart stats transfer.
-* HTTP: Added the ability when request mirroring to disable appending of the `-shadow` suffix to the shadowed `host`/`authority` header.
-* HTTP: Added the ability to set the downstream request `:scheme` to match the upstream transport protocol.
-* HTTP: Envoy now supports proxying `104` headers from upstream.
-* Added the ability to bypass the overload manager for a listener.
-* Added support for local cluster rate limit shared across all Envoy instances in the local cluster.
-* Added Filter State Input for matching HTTP input based on filter state objects.
-* Oauth: Added an option to disable setting the ID Token cookie.
-* OpenTelemetry enhancements to support extension formatter and stats prefix configuration for the OpenTelemetry logger.
-* QUIC stream reset errors are now captured in transport failure reason. Added support for QUIC server preferred address when there is a DNAT between the client and Envoy.
-* Added support for Redis inline commands, Bloom 1.0.0 commands, among other commands.
-* Added a new retry policy: `reset-before-request`.
-* Added support for dynamic direct response for files.
-* Added TLS support to match against `OtherName` SAN-type under `match_typed_subject_alt_names`.
-* Upstream: Added a new field to `LocalityLbEndpoints`, `LocalityLbEndpoints.Metadata`, that may be used for transport socket matching groups of endpoints.
-* Update WASM filter to support use as an upstream filter.
-* Disabled OpenCensus by default as it is no longer maintained upstream.
-* Ext_proc support for `route_cache_action` which specifies the route action to be taken when an external processor response is received in response to request headers.
-* Golang: Move `Continue`, `SendLocalReply` and `RecoverPanic` to `DecoderFilterCallbacks` and `EncoderFilterCallbacks`, to support full-duplex processing.
-* Http2 uses Oghttp2 by default.
-* Added a "happy eyeballs" feature to HTTP/3 upstream, where it assuming happy eyeballs sorting results in alternating address families will attempt the first v4 and v6 address before giving up on HTTP/3.
-* Populate typed metadata by default in ProxyProtocol listener.
-* Datadog: Disabled remote configuration by default.
-* Reject invalid runtime YAML instead of supporting corner cases of bad YAML.
+[CVE-2024-25629](https://github.com/c-ares/c-ares/security/advisories/GHSA-mg26-v6qh-x48q): Out of bounds read in c-ares (DNS)
+
+* RFC1918 addresses are no longer considered to be internal addresses by default. This addresses a security issue for Envoy's in multi-tenant mesh environments.
+* http: Shadow requests are now streamed in parallel with the original request.
+* tracing: Removed support for (long deprecated) opencensus tracing extension.
+* wasm: The route cache will *not* be cleared by default if a wasm extension modifies the request headers and the ABI version of wasm extension is larger than 0.2.1.
+* wasm: Remove previously deprecated xDS attributes from `get_property`, use `xds` attributes instead.
+* access_log: New implementation of the JSON formatter is enabled by default.
+* csrf: Increase the statistics counter `missing_source_origin` only for requests with a missing source origin.
+* dns: added nameserver rotation and query timeouts/retries to the c-ares resolver.
+* formatter: NaN and Infinity values of float will be serialized to `null` and `"inf"` respectively in the metadata (`DYNAMIC_METADATA`, `CLUSTER_METADATA`, etc.) formatters.
+* http: Local replies now traverse the filter chain if 1xx headers have been sent to the client.
+* oauth2: `use_refresh_token` is now enabled by default.
+* oauth2: Implement the Signed Double-Submit Cookie pattern.
+* quic: Enable UDP GRO in QUIC client connections by default.
+* sds: Relaxed the backing cluster validation for Secret Discovery Service (SDS).
+* tls: added support for P-384 and P-521 curves for server certificates, improved upstream SNI and SAN validation support.
+* wasm: added wasm VM reload support and support for plugins writtin in Go.

@@ -12,8 +12,8 @@
 extern "C" {
 #endif
 
-void registerAppleProxyResolver() {
-  auto resolver = std::make_unique<Envoy::Network::AppleProxyResolver>();
+void registerAppleProxyResolver(int refresh_interval_secs) {
+  auto resolver = std::make_unique<Envoy::Network::AppleProxyResolver>(refresh_interval_secs);
   resolver->start();
 
   auto api = std::make_unique<Envoy::Network::ProxyResolverApi>();

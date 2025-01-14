@@ -31,16 +31,15 @@ public:
                     LocalRateLimiterImpl& parent);
   ~DynamicDescriptor() = default;
   // add a new user configured descriptor to the set.
-  RateLimitTokenBucketSharedPtr
-  addOrGetDescriptor(const RateLimit::LocalDescriptor& request_descriptor);
+  RateLimitTokenBucketSharedPtr addOrGetDescriptor(const RateLimit::Descriptor& request_descriptor);
   void onFillTimer(uint64_t refill_counter, double factor);
 
 private:
   RateLimitTokenBucketSharedPtr parent_token_bucket_;
-  using LruList = std::list<RateLimit::LocalDescriptor>;
+  using LruList = std::list<RateLimit::Descriptor>;
 
   mutable absl::Mutex dyn_desc_lock_;
-  RateLimit::LocalDescriptor::Map<std::pair<RateLimitTokenBucketSharedPtr, LruList::iterator>>
+  RateLimit::Descriptor::Map<std::pair<RateLimitTokenBucketSharedPtr, LruList::iterator>>
       dynamic_descriptors_ ABSL_GUARDED_BY(dyn_desc_lock_);
 
   LruList lru_list_;
@@ -60,7 +59,7 @@ public:
   void addDescriptor(const RateLimit::LocalDescriptor& descriptor,
                      DynamicDescriptorSharedPtr dynamic_descriptor);
   // pass request_descriptors to the dynamic descriptor set to get the token bucket.
-  RateLimitTokenBucketSharedPtr getBucket(RateLimit::LocalDescriptor);
+  RateLimitTokenBucketSharedPtr getBucket(const RateLimit::Descriptor);
   void onFillTimer(uint64_t refill_counter, double factor);
 
 private:
@@ -109,51 +108,35 @@ class TokenBucketContext {
 public:
   virtual ~TokenBucketContext() = default;
 
-  virtual uint32_t maxTokens() const PURE;
-  virtual uint32_t remainingTokens() const PURE;
+  virtual uint64_t maxTokens() const PURE;
+  virtual uint64_t remainingTokens() const PURE;
   virtual absl::optional<int64_t> remainingFillInterval() const PURE;
 };
 
 class RateLimitTokenBucket : public TokenBucketContext {
 public:
-  virtual bool consume(double factor = 1.0) PURE;
+  virtual bool consume(double factor = 1.0, uint64_t tokens = 1) PURE;
   virtual void onFillTimer(uint64_t refill_counter, double factor = 1.0) PURE;
   virtual std::chrono::milliseconds fillInterval() const PURE;
   virtual double fillRate() const PURE;
   virtual uint64_t multiplier() const { return 1; }
 };
 
-class ThreadLocalDynamicDescriptorsCache : public ThreadLocal::ThreadLocalObject {
-public:
-  ThreadLocalDynamicDescriptorsCache(
-      RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr> cache)
-      : dynamic_descriptors_(cache) {}
-
-  const RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr> cache() const {
-    return dynamic_descriptors_;
-  };
-
-private:
-  RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr> dynamic_descriptors_;
-};
-using ThreadLocalDynamicDescriptorsCacheSharedPtr =
-    std::shared_ptr<ThreadLocalDynamicDescriptorsCache>;
-
 // Token bucket that implements based on the periodic timer.
 class TimerTokenBucket : public RateLimitTokenBucket {
 public:
-  TimerTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill,
+  TimerTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                    std::chrono::milliseconds fill_interval, uint64_t multiplier,
                    LocalRateLimiterImpl& parent);
 
   // RateLimitTokenBucket
-  bool consume(double factor) override;
+  bool consume(double factor = 1.0, uint64_t tokens = 1) override;
   void onFillTimer(uint64_t refill_counter, double factor) override;
   std::chrono::milliseconds fillInterval() const override { return fill_interval_; }
   double fillRate() const override { return fill_rate_; }
   uint64_t multiplier() const override { return multiplier_; }
-  uint32_t maxTokens() const override { return max_tokens_; }
-  uint32_t remainingTokens() const override { return tokens_.load(); }
+  uint64_t maxTokens() const override { return max_tokens_; }
+  uint64_t remainingTokens() const override { return tokens_.load(); }
   absl::optional<int64_t> remainingFillInterval() const override;
 
   // Descriptor refill interval is a multiple of the timer refill interval.
@@ -162,11 +145,11 @@ public:
   // the global timer, the descriptor is refilled.
   const uint64_t multiplier_{};
   LocalRateLimiterImpl& parent_;
-  std::atomic<uint32_t> tokens_{};
+  std::atomic<uint64_t> tokens_{};
   std::atomic<MonotonicTime> fill_time_{};
 
-  const uint32_t max_tokens_{};
-  const uint32_t tokens_per_fill_{};
+  const uint64_t max_tokens_{};
+  const uint64_t tokens_per_fill_{};
   const std::chrono::milliseconds fill_interval_{};
   const double fill_rate_{};
 };
@@ -174,17 +157,17 @@ public:
 class AtomicTokenBucket : public RateLimitTokenBucket,
                           public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
-  AtomicTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill,
+  AtomicTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                     std::chrono::milliseconds fill_interval, TimeSource& time_source);
 
   // RateLimitTokenBucket
-  bool consume(double factor) override;
+  bool consume(double factor = 1.0, uint64_t tokens = 1) override;
   void onFillTimer(uint64_t, double) override {}
   std::chrono::milliseconds fillInterval() const override { return fill_interval_; }
   double fillRate() const override { return token_bucket_.fillRate(); }
-  uint32_t maxTokens() const override { return static_cast<uint32_t>(token_bucket_.maxTokens()); }
-  uint32_t remainingTokens() const override {
-    return static_cast<uint32_t>(token_bucket_.remainingTokens());
+  uint64_t maxTokens() const override { return static_cast<uint64_t>(token_bucket_.maxTokens()); }
+  uint64_t remainingTokens() const override {
+    return static_cast<uint64_t>(token_bucket_.remainingTokens());
   }
   absl::optional<int64_t> remainingFillInterval() const override { return {}; }
 
@@ -201,8 +184,8 @@ public:
   };
 
   LocalRateLimiterImpl(
-      const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
-      const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
+      const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
+      const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
       bool always_consume_default_token_bucket = true,
@@ -210,7 +193,7 @@ public:
       bool per_connection = false);
   ~LocalRateLimiterImpl();
 
-  Result requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
+  Result requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors);
 
 private:
   void onFillTimer();

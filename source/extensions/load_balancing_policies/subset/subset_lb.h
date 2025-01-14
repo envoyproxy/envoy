@@ -109,7 +109,7 @@ private:
 
     void triggerCallbacks() {
       for (size_t i = 0; i < hostSetsPerPriority().size(); ++i) {
-        runReferenceUpdateCallbacks(i, {}, {});
+        THROW_IF_NOT_OK(runReferenceUpdateCallbacks(i, {}, {}));
       }
     }
 
@@ -118,7 +118,7 @@ private:
                       uint64_t seed) {
       reinterpret_cast<HostSubsetImpl*>(host_sets_[priority].get())
           ->update(matching_hosts, hosts_added, hosts_removed, seed);
-      runUpdateCallbacks(hosts_added, hosts_removed);
+      THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
     }
 
     // Thread aware LB if applicable.
@@ -171,7 +171,7 @@ public:
     const Network::Connection* downstreamConnection() const override {
       return wrapped_->downstreamConnection();
     }
-    const StreamInfo::StreamInfo* requestStreamInfo() const override {
+    StreamInfo::StreamInfo* requestStreamInfo() const override {
       return wrapped_->requestStreamInfo();
     }
     const Http::RequestHeaderMap* downstreamHeaders() const override {
@@ -198,10 +198,6 @@ public:
 
     absl::optional<OverrideHost> overrideHostToSelect() const override {
       return wrapped_->overrideHostToSelect();
-    }
-
-    void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks> callbacks) override {
-      wrapped_->setOrcaLoadReportCallbacks(callbacks);
     }
 
   private:

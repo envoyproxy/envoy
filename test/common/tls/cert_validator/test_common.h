@@ -105,6 +105,7 @@ public:
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
 
   absl::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
+  bool autoSniSanMatch() const override { return auto_sni_san_match_; }
 
 private:
   bool allow_expired_certificate_{false};
@@ -115,6 +116,7 @@ private:
   const std::string ca_cert_;
   const std::string ca_cert_path_{"TEST_CA_CERT_PATH"};
   const absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
+  const bool auto_sni_san_match_{false};
 };
 
 } // namespace Tls

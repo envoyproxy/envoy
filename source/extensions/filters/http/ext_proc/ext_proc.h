@@ -401,7 +401,7 @@ public:
                         config->untypedReceivingMetadataNamespaces()) {}
 
   const FilterConfig& config() const { return *config_; }
-  const envoy::config::core::v3::GrpcService& grpc_service_config() const {
+  const envoy::config::core::v3::GrpcService& grpcServiceConfig() const {
     return config_with_hash_key_.config();
   }
 
@@ -424,7 +424,7 @@ public:
 
   void encodeComplete() override {
     if (config_->observabilityMode()) {
-      logGrpcStreamInfo();
+      logStreamInfo();
     }
   }
 
@@ -433,7 +433,8 @@ public:
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
   void onGrpcError(Grpc::Status::GrpcStatus error) override;
   void onGrpcClose() override;
-  void logGrpcStreamInfo() override;
+  void logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info);
+  void logStreamInfo() override;
 
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
@@ -469,7 +470,19 @@ private:
 
   // Return a pair of whether to terminate returning the current result.
   std::pair<bool, Http::FilterDataStatus> sendStreamChunk(ProcessorState& state);
+
+  Http::FilterDataStatus handleDataBufferedMode(ProcessorState& state, Buffer::Instance& data,
+                                                bool end_stream);
+  Http::FilterDataStatus handleDataStreamedModeBase(ProcessorState& state, Buffer::Instance& data,
+                                                    bool end_stream);
+  Http::FilterDataStatus handleDataStreamedMode(ProcessorState& state, Buffer::Instance& data,
+                                                bool end_stream);
+  Http::FilterDataStatus handleDataFullDuplexStreamedMode(ProcessorState& state,
+                                                          Buffer::Instance& data, bool end_stream);
+  Http::FilterDataStatus handleDataBufferedPartialMode(ProcessorState& state,
+                                                       Buffer::Instance& data, bool end_stream);
   Http::FilterDataStatus onData(ProcessorState& state, Buffer::Instance& data, bool end_stream);
+
   Http::FilterTrailersStatus onTrailers(ProcessorState& state, Http::HeaderMap& trailers);
   void setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
                           const envoy::service::ext_proc::v3::ProcessingResponse& response);

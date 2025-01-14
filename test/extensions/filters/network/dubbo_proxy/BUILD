@@ -17,7 +17,7 @@ envoy_cc_mock(
     name = "mocks_lib",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
@@ -47,7 +47,7 @@ envoy_extension_cc_test(
     name = "hessian_utils_test",
     srcs = ["hessian_utils_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:byte_order_lib",
@@ -61,7 +61,7 @@ envoy_extension_cc_test(
     name = "message_impl_test",
     srcs = ["message_impl_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/dubbo_proxy:message_lib",
         "//test/test_common:printers_lib",
@@ -73,7 +73,7 @@ envoy_extension_cc_test(
     name = "dubbo_protocol_impl_test",
     srcs = ["dubbo_protocol_impl_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -86,7 +86,7 @@ envoy_extension_cc_test(
     name = "dubbo_hessian2_serializer_impl_test",
     srcs = ["dubbo_hessian2_serializer_impl_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -100,7 +100,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -117,7 +117,7 @@ envoy_extension_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy:serializer_interface",
@@ -128,7 +128,7 @@ envoy_extension_cc_test(
     name = "route_matcher_test",
     srcs = ["route_matcher_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:route_matcher",
@@ -141,7 +141,7 @@ envoy_extension_cc_test(
     name = "router_test",
     srcs = ["router_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -159,7 +159,7 @@ envoy_extension_cc_test(
     name = "app_exception_test",
     srcs = ["app_exception_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -175,7 +175,7 @@ envoy_extension_cc_test(
     name = "heartbeat_response_test",
     srcs = ["heartbeat_response_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -190,7 +190,7 @@ envoy_extension_cc_test(
     name = "router_filter_config_test",
     srcs = ["router_filter_config_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:config",
@@ -203,7 +203,7 @@ envoy_extension_cc_test(
     name = "decoder_test",
     srcs = ["decoder_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks_lib",
         ":utility_lib",
@@ -216,7 +216,7 @@ envoy_extension_cc_test(
     name = "conn_manager_test",
     srcs = ["conn_manager_test.cc"],
     extension_names = ["envoy.filters.network.dubbo_proxy"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":mocks_lib",
         ":utility_lib",

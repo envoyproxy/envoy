@@ -87,10 +87,9 @@ public:
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   Runtime::Loader& runtime() { return runtime_; }
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
-  requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const;
+  requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) const;
   bool enabled() const;
   bool enforced() const;
-  ThreadLocal::SlotAllocator& tls() { return tls_; }
   LocalRateLimitStats& stats() const { return stats_; }
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
   const Router::HeaderParser& requestHeadersParser() const { return *request_headers_parser_; }
@@ -165,7 +164,6 @@ private:
   const envoy::extensions::common::ratelimit::v3::VhRateLimitsOptions vh_rate_limits_;
   const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
-  ThreadLocal::SlotAllocator& tls_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -189,15 +187,15 @@ public:
 private:
   friend class FilterTest;
 
-  void populateDescriptors(std::vector<RateLimit::LocalDescriptor>& descriptors,
+  void populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
   void populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
-                           std::vector<RateLimit::LocalDescriptor>& descriptors,
+                           std::vector<RateLimit::Descriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
   VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
-  requestAllowed(absl::Span<const RateLimit::LocalDescriptor> request_descriptors);
+  requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors);
 
   FilterConfigSharedPtr config_;
   // Actual config used for the current request. Is config_ by default, but can be overridden by

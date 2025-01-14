@@ -24,8 +24,9 @@ using AsyncStreamImplPtr = std::unique_ptr<AsyncStreamImpl>;
 
 class AsyncClientImpl final : public RawAsyncClient {
 public:
-  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
-                  TimeSource& time_source);
+  static absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
+  create(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
+         TimeSource& time_source);
   ~AsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -41,6 +42,10 @@ public:
   const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() {
     return retry_policy_;
   }
+
+protected:
+  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
+                  TimeSource& time_source, absl::Status& creation_status);
 
 private:
   const uint32_t max_recv_message_length_;
@@ -93,7 +98,12 @@ public:
     stream_->setWatermarkCallbacks(callbacks);
   }
 
-  void removeWatermarkCallbacks() override { stream_->removeWatermarkCallbacks(); }
+  void removeWatermarkCallbacks() override {
+    if (options_.sidestream_watermark_callbacks != nullptr) {
+      stream_->removeWatermarkCallbacks();
+      options_.sidestream_watermark_callbacks = nullptr;
+    }
+  }
 
 protected:
   Upstream::ClusterInfoConstSharedPtr cluster_info_;

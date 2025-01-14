@@ -12,6 +12,14 @@ namespace OpenTelemetry {
 constexpr absl::string_view kServiceNameKey = "service.name";
 constexpr absl::string_view kDefaultServiceName = "unknown_service:envoy";
 
+constexpr absl::string_view kTelemetrySdkLanguageKey = "telemetry.sdk.language";
+constexpr absl::string_view kDefaultTelemetrySdkLanguage = "cpp";
+
+constexpr absl::string_view kTelemetrySdkNameKey = "telemetry.sdk.name";
+constexpr absl::string_view kDefaultTelemetrySdkName = "envoy";
+
+constexpr absl::string_view kTelemetrySdkVersionKey = "telemetry.sdk.version";
+
 class ResourceProvider : public Logger::Loggable<Logger::Id::tracing> {
 public:
   virtual ~ResourceProvider() = default;

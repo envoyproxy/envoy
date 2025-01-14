@@ -19,30 +19,96 @@ TEST(UUIDRequestIDExtensionTest, SetRequestID) {
   testing::StrictMock<Random::MockRandomGenerator> random;
   UUIDRequestIDExtension uuid_utils(envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig(),
                                     random);
-  Http::TestRequestHeaderMapImpl request_headers;
 
-  EXPECT_CALL(random, uuid()).WillOnce(Return("first-request-id"));
-  uuid_utils.set(request_headers, true);
-  EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+  {
+    // edge_request: true, keep_external_id: false.
 
-  EXPECT_CALL(random, uuid()).WillOnce(Return("second-request-id"));
-  uuid_utils.set(request_headers, true);
-  EXPECT_EQ("second-request-id", request_headers.get_(Http::Headers::get().RequestId));
+    Http::TestRequestHeaderMapImpl request_headers;
+
+    // Without request ID.
+    EXPECT_CALL(random, uuid()).WillOnce(Return("first-request-id"));
+    uuid_utils.set(request_headers, true, false);
+    EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+
+    // With request ID. Previous one will be overwritten.
+    EXPECT_CALL(random, uuid()).WillOnce(Return("second-request-id"));
+    uuid_utils.set(request_headers, true, false);
+    EXPECT_EQ("second-request-id", request_headers.get_(Http::Headers::get().RequestId));
+  }
+
+  {
+    // edge_request: true, keep_external_id: true.
+
+    Http::TestRequestHeaderMapImpl request_headers;
+
+    // Without request ID.
+    EXPECT_CALL(random, uuid()).WillOnce(Return("first-request-id"));
+    uuid_utils.set(request_headers, true, true);
+    EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+
+    // With request ID. Previous one will be kept.
+    EXPECT_CALL(random, uuid()).Times(0);
+    uuid_utils.set(request_headers, true, true);
+    EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+  }
+
+  {
+    // edge_request: false, keep_external_id: false.
+
+    Http::TestRequestHeaderMapImpl request_headers;
+
+    // Without request ID.
+    EXPECT_CALL(random, uuid()).WillOnce(Return("first-request-id"));
+    uuid_utils.set(request_headers, false, false);
+    EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+
+    // With request ID. Previous one will be kept.
+    EXPECT_CALL(random, uuid()).Times(0);
+    uuid_utils.set(request_headers, false, false);
+    EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+  }
+
+  {
+    // edge_request: false, keep_external_id: true.
+
+    Http::TestRequestHeaderMapImpl request_headers;
+
+    // Without request ID.
+    EXPECT_CALL(random, uuid()).WillOnce(Return("first-request-id"));
+    uuid_utils.set(request_headers, false, true);
+    EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+
+    // With request ID. Previous one will be kept.
+    EXPECT_CALL(random, uuid()).Times(0);
+    uuid_utils.set(request_headers, false, true);
+    EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+  }
 }
 
-TEST(UUIDRequestIDExtensionTest, EnsureRequestID) {
-  testing::StrictMock<Random::MockRandomGenerator> random;
+TEST(UUIDRequestIDExtensionTest, ClearExternalTraceReason) {
+  testing::NiceMock<Random::MockRandomGenerator> random;
   UUIDRequestIDExtension uuid_utils(envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig(),
                                     random);
-  Http::TestRequestHeaderMapImpl request_headers;
 
-  EXPECT_CALL(random, uuid()).WillOnce(Return("first-request-id"));
-  uuid_utils.set(request_headers, false);
-  EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+  std::string uuid_with_trace_reason = random.uuid_;
+
+  uuid_with_trace_reason[14] = 'b'; // 'b' means TRACE_CLIENT.
+
+  // edge_request: true, keep_external_id: true.
+
+  Http::TestRequestHeaderMapImpl request_headers{{
+      "x-request-id",
+      uuid_with_trace_reason,
+  }};
+
+  std::string expected_uuid_with_trace_reason = uuid_with_trace_reason;
+  expected_uuid_with_trace_reason[14] = '4'; // 'b' means NO_TRACE.
 
   EXPECT_CALL(random, uuid()).Times(0);
-  uuid_utils.set(request_headers, false);
-  EXPECT_EQ("first-request-id", request_headers.get_(Http::Headers::get().RequestId));
+  uuid_utils.set(request_headers, true, true);
+
+  // External request ID will be kept but the trace reason will be cleared.
+  EXPECT_EQ(expected_uuid_with_trace_reason, request_headers.get_(Http::Headers::get().RequestId));
 }
 
 TEST(UUIDRequestIDExtensionTest, PreserveRequestIDInResponse) {
@@ -194,15 +260,18 @@ TEST(UUIDRequestIDExtensionTest, SetTraceStatusPackingDisabled) {
   config.mutable_pack_trace_reason()->set_value(false);
   UUIDRequestIDExtension uuid_utils(config, random);
 
+  std::string uuid_with_trace_reason = random.uuid();
+  uuid_with_trace_reason[14] = 'b'; // 'b' means TRACE_CLIENT.
+
   Http::TestRequestHeaderMapImpl request_headers;
-  request_headers.setRequestId(random.uuid());
-  const std::string request_id = std::string(request_headers.getRequestIdValue());
+  request_headers.setRequestId(uuid_with_trace_reason);
+
   EXPECT_EQ(Tracing::Reason::NotTraceable, uuid_utils.getTraceReason(request_headers));
-  EXPECT_EQ(request_id, request_headers.getRequestIdValue());
+  EXPECT_EQ(uuid_with_trace_reason, request_headers.getRequestIdValue());
 
   uuid_utils.setTraceReason(request_headers, Tracing::Reason::Sampling);
   EXPECT_EQ(Tracing::Reason::NotTraceable, uuid_utils.getTraceReason(request_headers));
-  EXPECT_EQ(request_id, request_headers.getRequestIdValue());
+  EXPECT_EQ(uuid_with_trace_reason, request_headers.getRequestIdValue());
 }
 
 } // namespace RequestId

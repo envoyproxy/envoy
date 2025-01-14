@@ -6,37 +6,45 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
+
+#include "source/common/common/dns_utils.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
+#include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 
 namespace Envoy {
 namespace Upstream {
 
 absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>>
 StrictDnsClusterImpl::create(const envoy::config::cluster::v3::Cluster& cluster,
+                             const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
                              ClusterFactoryContext& context,
                              Network::DnsResolverSharedPtr dns_resolver) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<StrictDnsClusterImpl>(
-      new StrictDnsClusterImpl(cluster, context, dns_resolver, creation_status));
+  auto ret = std::unique_ptr<StrictDnsClusterImpl>(new StrictDnsClusterImpl(
+      cluster, dns_cluster, context, std::move(dns_resolver), creation_status));
 
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
-StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                           ClusterFactoryContext& context,
-                                           Network::DnsResolverSharedPtr dns_resolver,
-                                           absl::Status& creation_status)
+StrictDnsClusterImpl::StrictDnsClusterImpl(
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
+    ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
+    absl::Status& creation_status)
     : BaseDynamicClusterImpl(cluster, context, creation_status),
       load_assignment_(cluster.load_assignment()),
       local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
-      dns_refresh_rate_ms_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      dns_jitter_ms_(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_jitter, 0)),
-      respect_dns_ttl_(cluster.respect_dns_ttl()) {
-  failure_backoff_strategy_ =
-      Config::Utility::prepareDnsRefreshStrategy<envoy::config::cluster::v3::Cluster>(
-          cluster, dns_refresh_rate_ms_.count(),
-          context.serverFactoryContext().api().randomGenerator());
+      dns_refresh_rate_ms_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_refresh_rate, 5000))),
+      dns_jitter_ms_(PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_jitter, 0)),
+      respect_dns_ttl_(dns_cluster.respect_dns_ttl()),
+      dns_lookup_family_(
+          Envoy::DnsUtils::getDnsLookupFamilyFromEnum(dns_cluster.dns_lookup_family())) {
+  failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
+      dns_cluster, dns_refresh_rate_ms_.count(),
+      context.serverFactoryContext().api().randomGenerator());
 
   std::list<ResolveTargetPtr> resolve_targets;
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
@@ -55,7 +63,6 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::config::cluster::v3::Clu
     }
   }
   resolve_targets_ = std::move(resolve_targets);
-  dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
@@ -148,15 +155,19 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               continue;
             }
 
-            new_hosts.emplace_back(new HostImpl(
-                parent_.info_, hostname_, address,
-                // TODO(zyfjeff): Created through metadata shared pool
-                std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
-                std::make_shared<const envoy::config::core::v3::Metadata>(
-                    locality_lb_endpoints_.metadata()),
-                lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
-                lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
-                lb_endpoint_.health_status(), parent_.time_source_));
+            new_hosts.emplace_back(THROW_OR_RETURN_VALUE(
+                HostImpl::create(parent_.info_, hostname_, address,
+                                 // TODO(zyfjeff): Created through metadata shared pool
+                                 std::make_shared<const envoy::config::core::v3::Metadata>(
+                                     lb_endpoint_.metadata()),
+                                 std::make_shared<const envoy::config::core::v3::Metadata>(
+                                     locality_lb_endpoints_.metadata()),
+                                 lb_endpoint_.load_balancing_weight().value(),
+                                 locality_lb_endpoints_.locality(),
+                                 lb_endpoint_.endpoint().health_check_config(),
+                                 locality_lb_endpoints_.priority(), lb_endpoint_.health_status(),
+                                 parent_.time_source_),
+                std::unique_ptr<HostImpl>));
             all_new_hosts.emplace(address->asString());
             ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
           }
@@ -193,8 +204,14 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                    final_refresh_rate.count() > 0);
           }
           if (parent_.dns_jitter_ms_.count() > 0) {
-            final_refresh_rate +=
-                std::chrono::milliseconds(parent_.random_.random()) % parent_.dns_jitter_ms_;
+            // Note that `parent_.random_.random()` returns a uint64 while
+            // `parent_.dns_jitter_ms_.count()` returns a signed long that gets cast into a uint64.
+            // Thus, the modulo of the two will be a positive as long as
+            // `parent_dns_jitter_ms_.count()` is positive.
+            // It is important that this be positive, otherwise `final_refresh_rate` could be
+            // negative causing Envoy to crash.
+            final_refresh_rate += std::chrono::milliseconds(parent_.random_.random() %
+                                                            parent_.dns_jitter_ms_.count());
           }
 
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address_,
@@ -219,12 +236,16 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 StrictDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                           ClusterFactoryContext& context) {
+                                           Upstream::ClusterFactoryContext& context) {
+  absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>> cluster_or_error;
   auto dns_resolver_or_error = selectDnsResolver(cluster, context);
   RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
-  auto cluster_or_error =
-      StrictDnsClusterImpl::create(cluster, context, std::move(dns_resolver_or_error.value()));
+  envoy::extensions::clusters::dns::v3::DnsCluster proto_config_legacy{};
+  createDnsClusterFromLegacyFields(cluster, proto_config_legacy);
+  cluster_or_error = StrictDnsClusterImpl::create(cluster, proto_config_legacy, context,
+                                                  std::move(*dns_resolver_or_error));
+
   RETURN_IF_NOT_OK(cluster_or_error.status());
   return std::make_pair(std::shared_ptr<StrictDnsClusterImpl>(std::move(*cluster_or_error)),
                         nullptr);

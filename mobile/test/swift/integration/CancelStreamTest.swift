@@ -53,7 +53,7 @@ final class CancelStreamTests: XCTestCase {
     let runExpectation = self.expectation(description: "Run called with expected cancellation")
     let filterExpectation = self.expectation(description: "Filter called with cancellation")
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)

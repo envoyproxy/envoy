@@ -798,6 +798,80 @@ TEST_F(DnsCacheImplTest, ResolveFailure) {
              1 /* added */, 1 /* removed */, 0 /* num hosts */);
 }
 
+TEST_F(DnsCacheImplTest, ResolveFailureAfterResolveSuccess) {
+  *config_.mutable_dns_refresh_rate() = Protobuf::util::TimeUtil::SecondsToDuration(2);
+  *config_.mutable_dns_min_refresh_rate() = Protobuf::util::TimeUtil::SecondsToDuration(1);
+  initialize();
+  InSequence s;
+
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+  Event::MockTimer* resolve_timer =
+      new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
+  Event::MockTimer* timeout_timer =
+      new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
+  EXPECT_EQ(absl::nullopt, result.host_info_);
+
+  checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(
+      update_callbacks_,
+      onDnsHostAddOrUpdate("foo.com:80", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(callbacks,
+              onLoadDnsCacheComplete(DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(update_callbacks_,
+              onDnsResolutionComplete("foo.com:80",
+                                      DnsHostInfoEquals("10.0.0.1:80", "foo.com", false),
+                                      Network::DnsResolver::ResolutionStatus::Completed));
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(dns_ttl_), _));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
+             TestUtility::makeDnsResponse({"10.0.0.1"}));
+
+  checkStats(1 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  // Resolve failure.
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  resolve_timer->invokeCallback();
+
+  checkStats(2 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(update_callbacks_, onDnsHostAddOrUpdate(_, _)).Times(0);
+  EXPECT_CALL(callbacks, onLoadDnsCacheComplete(_)).Times(0);
+  EXPECT_CALL(update_callbacks_,
+              onDnsResolutionComplete("foo.com:80",
+                                      DnsHostInfoEquals("10.0.0.1:80", "foo.com", false),
+                                      Network::DnsResolver::ResolutionStatus::Failure));
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(2000),
+                                          _)); // 2000(dns_refresh_rate) and not 6000(ttl)
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Failure, "", TestUtility::makeDnsResponse({}));
+  checkStats(2 /* attempt */, 1 /* success */, 1 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
+  // during this period but it's good enough for the test.
+  simTime().advanceTimeWait(std::chrono::milliseconds(600001));
+  // Because resolution succeed for the host in the first attempt, onDnsHostAddOrUpdate was
+  // called. Therefore, onDnsHostRemove should be called also.
+  EXPECT_CALL(update_callbacks_, onDnsHostRemove("foo.com:80"));
+  resolve_timer->invokeCallback();
+  // DnsCacheImpl state is updated accordingly: the host is removed.
+  checkStats(2 /* attempt */, 1 /* success */, 1 /* failure */, 1 /* address changed */,
+             1 /* added */, 1 /* removed */, 0 /* num hosts */);
+}
+
 TEST_F(DnsCacheImplTest, ResolveFailureWithFailureRefreshRate) {
   *config_.mutable_dns_failure_refresh_rate()->mutable_base_interval() =
       Protobuf::util::TimeUtil::SecondsToDuration(7);
@@ -850,6 +924,84 @@ TEST_F(DnsCacheImplTest, ResolveFailureWithFailureRefreshRate) {
   resolve_timer->invokeCallback();
   // DnsCacheImpl state is updated accordingly: the host is removed.
   checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
+             1 /* added */, 1 /* removed */, 0 /* num hosts */);
+}
+
+TEST_F(DnsCacheImplTest, ResolveFailureAfterResolveSuccessWithFailureRefreshRate) {
+  *config_.mutable_dns_failure_refresh_rate()->mutable_base_interval() =
+      Protobuf::util::TimeUtil::SecondsToDuration(2);
+  *config_.mutable_dns_failure_refresh_rate()->mutable_max_interval() =
+      Protobuf::util::TimeUtil::SecondsToDuration(5);
+  initialize();
+  InSequence s;
+
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+  Event::MockTimer* resolve_timer =
+      new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
+  Event::MockTimer* timeout_timer =
+      new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
+  EXPECT_EQ(absl::nullopt, result.host_info_);
+
+  checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(
+      update_callbacks_,
+      onDnsHostAddOrUpdate("foo.com:80", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(callbacks,
+              onLoadDnsCacheComplete(DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(update_callbacks_,
+              onDnsResolutionComplete("foo.com:80",
+                                      DnsHostInfoEquals("10.0.0.1:80", "foo.com", false),
+                                      Network::DnsResolver::ResolutionStatus::Completed));
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(dns_ttl_), _));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
+             TestUtility::makeDnsResponse({"10.0.0.1"}));
+
+  checkStats(1 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  // Resolve failure.
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  resolve_timer->invokeCallback();
+
+  checkStats(2 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(update_callbacks_, onDnsHostAddOrUpdate(_, _)).Times(0);
+  EXPECT_CALL(callbacks, onLoadDnsCacheComplete(_)).Times(0);
+  EXPECT_CALL(update_callbacks_,
+              onDnsResolutionComplete("foo.com:80",
+                                      DnsHostInfoEquals("10.0.0.1:80", "foo.com", false),
+                                      Network::DnsResolver::ResolutionStatus::Failure));
+  ON_CALL(context_.server_factory_context_.api_.random_, random()).WillByDefault(Return(5000));
+  EXPECT_CALL(*resolve_timer,
+              enableTimer(std::chrono::milliseconds(1000),
+                          _)); // 5000 % 2000(base_interval) and not 5000 % 6000(ttl)
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Failure, "", TestUtility::makeDnsResponse({}));
+  checkStats(2 /* attempt */, 1 /* success */, 1 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  // Re-resolve with ~5m passed. This is not realistic as we would have re-resolved many times
+  // during this period but it's good enough for the test.
+  simTime().advanceTimeWait(std::chrono::milliseconds(600001));
+  // Because resolution succeed for the host in the first attempt, onDnsHostAddOrUpdate was
+  // called. Therefore, onDnsHostRemove should be called also.
+  EXPECT_CALL(update_callbacks_, onDnsHostRemove("foo.com:80"));
+  resolve_timer->invokeCallback();
+  // DnsCacheImpl state is updated accordingly: the host is removed.
+  checkStats(2 /* attempt */, 1 /* success */, 1 /* failure */, 1 /* address changed */,
              1 /* added */, 1 /* removed */, 0 /* num hosts */);
 }
 
@@ -1924,6 +2076,156 @@ TEST(NoramlizeHost, NormalizeHost) {
 
   EXPECT_EQ("[fc00::1]:443", DnsHostInfo::normalizeHostForDfp("[fc00::1]:443", 80));
   EXPECT_EQ("[fc00::1]:80", DnsHostInfo::normalizeHostForDfp("[fc00::1]", 80));
+}
+
+TEST_F(DnsCacheImplTest, SingleAddressCache) {
+  auto* time_source = new NiceMock<MockTimeSystem>();
+  context_.server_factory_context_.dispatcher_.time_system_.reset(time_source);
+
+  MockKeyValueStoreFactory factory;
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<
+        envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>();
+  }));
+
+  MockKeyValueStore* store{};
+  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce(Invoke([&store]() {
+    auto ret = std::make_unique<NiceMock<MockKeyValueStore>>();
+    store = ret.get();
+
+    // Set up store with single address entry
+    EXPECT_CALL(*store, iterate(_)).WillOnce(Invoke([](KeyValueStore::ConstIterateCb fn) -> void {
+      fn("foo.com:80", "10.0.0.1:80|60|0");
+    }));
+
+    return ret;
+  }));
+
+  Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
+  auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
+  key_value_config->set_name("mock_key_value_store_factory");
+  key_value_config->mutable_typed_config()->PackFrom(
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig());
+
+  initialize();
+  ASSERT(store != nullptr);
+
+  // This will trigger the code path for a single address without address_list
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
+  ASSERT_NE(absl::nullopt, result.host_info_);
+  EXPECT_EQ(1, result.host_info_.value()->addressList().size());
+}
+
+TEST_F(DnsCacheImplTest, CacheLoadParsingErrors) {
+  auto* time_source = new NiceMock<MockTimeSystem>();
+  context_.server_factory_context_.dispatcher_.time_system_.reset(time_source);
+
+  // Configure the cache
+  MockKeyValueStoreFactory factory;
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<
+        envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>();
+  }));
+
+  MockKeyValueStore* store{};
+  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce(Invoke([&store]() {
+    auto ret = std::make_unique<NiceMock<MockKeyValueStore>>();
+    store = ret.get();
+
+    // Test different malformed cache entries
+    EXPECT_CALL(*store, iterate(_)).WillOnce(Invoke([](KeyValueStore::ConstIterateCb fn) -> void {
+      // Test wrong number of tokens (only 2 instead of 3)
+      EXPECT_LOG_CONTAINS("warning", "Incorrect number of tokens in the cache line",
+                          fn("foo.com:80", "10.0.0.1:80|6"));
+
+      // Test invalid TTL
+      EXPECT_LOG_CONTAINS("warning", "is not a valid ttl", fn("bar.com:80", "10.0.0.1:80|abc|0"));
+
+      // Test empty response list
+      fn("foobar.com:80", "");
+    }));
+
+    return ret;
+  }));
+
+  Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
+  auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
+  key_value_config->set_name("mock_key_value_store_factory");
+  key_value_config->mutable_typed_config()->PackFrom(
+      envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig());
+
+  // Create the timers but let NiceMock handle all the expectations
+  new NiceMock<Event::MockTimer>(&context_.server_factory_context_.dispatcher_);
+  new NiceMock<Event::MockTimer>(&context_.server_factory_context_.dispatcher_);
+
+  initialize();
+  ASSERT(store != nullptr);
+
+  // Verify loading an entry triggers resolution since cache entries were invalid
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+
+  // Initial load attempt fails due to cache error
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+}
+
+TEST_F(DnsCacheImplTest, IterateHostMap) {
+  initialize();
+  InSequence s;
+
+  // Add multiple hosts
+  const std::vector<std::pair<std::string, uint32_t>> hosts = {
+      {"foo.com", 80}, {"bar.com", 443}, {"baz.com", 8080}};
+
+  std::vector<Network::DnsResolver::ResolveCb> resolve_cbs;
+  resolve_cbs.reserve(hosts.size());
+
+  // Setup resolution for all hosts
+  for (const auto& host : hosts) {
+    MockLoadDnsCacheEntryCallbacks callbacks;
+    Network::DnsResolver::ResolveCb resolve_cb;
+    EXPECT_CALL(*resolver_, resolve(host.first, _, _))
+        .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+
+    auto result = dns_cache_->loadDnsCacheEntry(host.first, host.second, false, callbacks);
+    EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+    resolve_cbs.push_back(resolve_cb);
+  }
+
+  // Resolve all hosts
+  for (size_t i = 0; i < hosts.size(); i++) {
+    const auto& host = hosts[i];
+    const std::string address = fmt::format("10.0.{}.{}:{}", i, i, host.second);
+
+    EXPECT_CALL(update_callbacks_,
+                onDnsHostAddOrUpdate(fmt::format("{}:{}", host.first, host.second),
+                                     DnsHostInfoEquals(address, host.first, false)));
+    EXPECT_CALL(update_callbacks_,
+                onDnsResolutionComplete(fmt::format("{}:{}", host.first, host.second),
+                                        DnsHostInfoEquals(address, host.first, false),
+                                        Network::DnsResolver::ResolutionStatus::Completed));
+
+    resolve_cbs[i](Network::DnsResolver::ResolutionStatus::Completed, "",
+                   TestUtility::makeDnsResponse({fmt::format("10.0.{}.{}", i, i)}));
+  }
+
+  // Verify iteration
+  std::set<std::string> iterated_hosts;
+  dns_cache_->iterateHostMap([&](absl::string_view host, const DnsHostInfoSharedPtr& info) {
+    iterated_hosts.insert(std::string(host));
+    EXPECT_NE(nullptr, info);
+  });
+
+  EXPECT_EQ(hosts.size(), iterated_hosts.size());
+  for (const auto& host : hosts) {
+    EXPECT_EQ(1, iterated_hosts.count(fmt::format("{}:{}", host.first, host.second)));
+  }
 }
 
 } // namespace

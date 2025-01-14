@@ -71,9 +71,13 @@ GlobalStats ClientSslAuthConfig::generateStats(Stats::Scope& scope, const std::s
 
 void ClientSslAuthConfig::parseResponse(const Http::ResponseMessage& message) {
   AllowedPrincipalsSharedPtr new_principals(new AllowedPrincipals());
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(message.bodyAsString());
-  for (const Json::ObjectSharedPtr& certificate : loader->getObjectArray("certificates")) {
-    new_principals->add(certificate->getString("fingerprint_sha256"));
+  Json::ObjectSharedPtr loader = THROW_OR_RETURN_VALUE(
+      Json::Factory::loadFromString(message.bodyAsString()), Json::ObjectSharedPtr);
+  auto array = THROW_OR_RETURN_VALUE(loader->getObjectArray("certificates"),
+                                     std::vector<Json::ObjectSharedPtr>);
+  for (const Json::ObjectSharedPtr& certificate : array) {
+    new_principals->add(
+        THROW_OR_RETURN_VALUE(certificate->getString("fingerprint_sha256"), std::string));
   }
 
   tls_->set([new_principals](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {

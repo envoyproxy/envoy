@@ -80,19 +80,24 @@ public:
     // Send the request headers from the client, wait until they are received
     // upstream. When they are received, send the default response headers from
     // upstream and wait until they are received at by client.
-    IntegrationStreamDecoderPtr response = sendRequestAndWaitForResponse(
-        request_headers, 0, default_response_headers_, 0, upstream_indices);
+    Result result = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0,
+                                                  upstream_indices);
 
     // Verify the proxied request was received upstream, as expected.
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
     // Verify the proxied response was received downstream, as expected.
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().getStatusValue());
-    EXPECT_EQ(0U, response->body().size());
+    EXPECT_TRUE(result.response->complete());
+    EXPECT_EQ("200", result.response->headers().getStatusValue());
+    EXPECT_EQ(0U, result.response->body().size());
 
     // Perform the clean-up.
     cleanupUpstreamAndDownstream();
+
+    // Make sure Envoy saw upstream connection close.
+    std::string target_name =
+        absl::StrFormat("cluster.cluster_%d.upstream_cx_active", result.upstream_index.value());
+    test_server_->waitForGaugeEq(target_name, 0);
   }
 
 private:

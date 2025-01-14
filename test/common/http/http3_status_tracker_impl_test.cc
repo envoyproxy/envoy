@@ -173,6 +173,23 @@ TEST_F(Http3StatusTrackerImplTest, MarkFailedRecentlyAndThenBroken) {
   EXPECT_FALSE(tracker_.hasHttp3FailedRecently());
 }
 
+TEST_F(Http3StatusTrackerImplTest, MarkPendingAndThenBroken) {
+  tracker_.markHttp3Pending();
+  EXPECT_TRUE(tracker_.isHttp3Pending());
+  EXPECT_FALSE(tracker_.isHttp3Broken());
+  EXPECT_FALSE(tracker_.isHttp3Confirmed());
+  EXPECT_FALSE(tracker_.hasHttp3FailedRecently());
+
+  EXPECT_CALL(*timer_, enabled()).WillOnce(Return(false));
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(1 * 1000), nullptr));
+  tracker_.markHttp3Broken();
+
+  EXPECT_TRUE(tracker_.isHttp3Broken());
+  EXPECT_FALSE(tracker_.isHttp3Pending());
+  EXPECT_FALSE(tracker_.isHttp3Confirmed());
+  EXPECT_FALSE(tracker_.hasHttp3FailedRecently());
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy

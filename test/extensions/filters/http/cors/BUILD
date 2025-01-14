@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "cors_filter_test",
     srcs = ["cors_filter_test.cc"],
     extension_names = ["envoy.filters.http.cors"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/cors:config",
@@ -33,7 +33,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["cors_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.cors"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",

@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "health_check_test",
     srcs = ["health_check_test.cc"],
     extension_names = ["envoy.filters.http.health_check"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_utility_lib",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.health_check"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/health_check:config",
         "//test/mocks/server:factory_context_mocks",
@@ -47,7 +47,7 @@ envoy_extension_cc_test(
         "health_check_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.health_check"],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",

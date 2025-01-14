@@ -202,6 +202,13 @@ int StreamInfoWrapper::luaDownstreamLocalAddress(lua_State* state) {
   return 1;
 }
 
+int StreamInfoWrapper::luaDownstreamDirectLocalAddress(lua_State* state) {
+  const std::string& local_address =
+      stream_info_.downstreamAddressProvider().directLocalAddress()->asString();
+  lua_pushlstring(state, local_address.data(), local_address.size());
+  return 1;
+}
+
 int StreamInfoWrapper::luaDownstreamDirectRemoteAddress(lua_State* state) {
   const std::string& direct_remote_address =
       stream_info_.downstreamAddressProvider().directRemoteAddress()->asString();
@@ -220,6 +227,12 @@ int StreamInfoWrapper::luaRequestedServerName(lua_State* state) {
   absl::string_view requested_serve_name =
       stream_info_.downstreamAddressProvider().requestedServerName();
   lua_pushlstring(state, requested_serve_name.data(), requested_serve_name.size());
+  return 1;
+}
+
+int StreamInfoWrapper::luaRouteName(lua_State* state) {
+  const std::string& route_name = stream_info_.getRouteName();
+  lua_pushlstring(state, route_name.data(), route_name.length());
   return 1;
 }
 

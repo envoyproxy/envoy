@@ -704,7 +704,12 @@ public:
   decodeResources(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                   const std::string& version, const std::string& name_field = "name") {
     TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
-    return Config::DecodedResourcesWrapper(resource_decoder, resources, version);
+    std::unique_ptr<Config::DecodedResourcesWrapper> tmp_wrapper =
+        *Config::DecodedResourcesWrapper::create(resource_decoder, resources, version);
+    Config::DecodedResourcesWrapper ret;
+    ret.owned_resources_ = std::move(tmp_wrapper->owned_resources_);
+    ret.refvec_ = std::move(tmp_wrapper->refvec_);
+    return ret;
   }
 
   template <class MessageType>
@@ -802,7 +807,8 @@ public:
   }
 
   static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
-    MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
+    THROW_IF_NOT_OK(MessageUtil::loadFromFile(path, message,
+                                              ProtobufMessage::getStrictValidationVisitor(), api));
   }
 
   static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
@@ -1212,10 +1218,16 @@ ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system
 class MessageTrackedObject : public ScopeTrackedObject {
 public:
   MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
+  MessageTrackedObject(absl::string_view sv, const StreamInfo::StreamInfo& tracked_stream)
+      : sv_(sv), tracked_stream_(tracked_stream) {}
+
+  OptRef<const StreamInfo::StreamInfo> trackedStream() const override { return tracked_stream_; }
+
   void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
 
 private:
   absl::string_view sv_;
+  OptRef<const StreamInfo::StreamInfo> tracked_stream_;
 };
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {

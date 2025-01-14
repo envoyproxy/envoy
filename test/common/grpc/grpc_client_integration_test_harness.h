@@ -347,7 +347,9 @@ public:
     http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, api_->randomGenerator(),
                                                     host_ptr_, Upstream::ResourcePriority::Default,
                                                     nullptr, nullptr, state_);
-    EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_))
+        .WillRepeatedly(Return(cm_.thread_local_cluster_.lb_.host_));
+    EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, cm_,
@@ -364,7 +366,7 @@ public:
     config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
 
     fillServiceWideInitialMetadata(config);
-    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
+    return *AsyncClientImpl::create(cm_, config, dispatcher_->timeSource());
   }
 
   virtual envoy::config::core::v3::GrpcService createGoogleGrpcConfig() {
@@ -495,6 +497,9 @@ public:
     options.setMetadata(m);
     options.setSendInternal(send_internal_header_stream_option_);
     options.setSendXff(send_xff_header_stream_option_);
+    if (watermark_callbacks_ != nullptr) {
+      options.setSidestreamWatermarkCallbacks(watermark_callbacks_);
+    }
     stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream, options);
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
@@ -562,6 +567,7 @@ public:
   bool send_xff_header_stream_option_{true};
   // Connection buffer limits, 0 means default limit from config is used.
   uint32_t connection_buffer_limits_{0};
+  testing::NiceMock<Http::MockSidestreamWatermarkCallbacks>* watermark_callbacks_{nullptr};
 };
 
 // The integration test for Envoy gRPC and Google gRPC. It uses `TestRealTimeSystem`.

@@ -652,6 +652,50 @@ TEST_F(LuaStreamInfoWrapperTest, DontFinishIterationForDynamicMetadata) {
       "[string \"...\"]:6: cannot create a second iterator before completing the first");
 }
 
+// Test for getting the route name
+TEST_F(LuaStreamInfoWrapperTest, GetRouteName) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      testPrint(object:routeName())
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  std::string route_name = "test_route";
+  ON_CALL(stream_info, getRouteName()).WillByDefault(testing::ReturnRef(route_name));
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("test_route"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for empty route name
+TEST_F(LuaStreamInfoWrapperTest, GetEmptyRouteName) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      testPrint(object:routeName())
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  std::string empty_route;
+  ON_CALL(stream_info, getRouteName()).WillByDefault(testing::ReturnRef(empty_route));
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint(""));
+  start("callMe");
+  wrapper.reset();
+}
+
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters

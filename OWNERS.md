@@ -49,6 +49,8 @@ routing PRs, questions, etc. to the right place.
   * Load balancing, GeoIP, overload manager, security.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
   * ext_proc, data plane, flow control, CEL.
+* Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
+  * Overload manager, security, logging, wasm, data plane.
 
 # Envoy mobile maintainers
 
@@ -83,6 +85,7 @@ without further review.
 * Kevin Baichoo ([KBaichoo](https://github.com/KBaichoo)) (envoy@kevinbaichoo.com)
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
 * Kirtimaan Rajshiva ([krajshiva](https://github.com/krajshiva))
+* Yanjun Xiang ([yanjunxiang-google](https://github.com/yanjunxiang-google)) (yanjunxiang@google.com)
 
 # Emeritus maintainers
 

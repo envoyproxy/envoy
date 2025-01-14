@@ -17,7 +17,7 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/tls/cert_validator:cert_validator_lib",
         "//test/common/tls:ssl_test_utils",
@@ -33,7 +33,7 @@ envoy_cc_test(
     srcs = [
         "factory_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/tls/cert_validator:cert_validator_lib",
         "//test/common/tls/cert_validator:test_common",
@@ -56,7 +56,7 @@ envoy_cc_test(
     srcs = [
         "san_matcher_test.cc",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/common/tls/cert_validator:cert_validator_lib",
@@ -81,7 +81,7 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
         "//test/config/integration/certs",
     ],
-    rbe_pool = "2core",
+    rbe_pool = "6gig",
     deps = [
         ":default_validator_integration_test_lib",
         "//test/integration:http_integration_lib",

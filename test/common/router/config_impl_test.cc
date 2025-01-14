@@ -1,7 +1,6 @@
 #include <chrono>
 #include <cstdint>
 #include <fstream>
-#include <list>
 #include <map>
 #include <memory>
 #include <string>
@@ -2022,7 +2021,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
     }
   }
 
-  EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
+  EXPECT_THAT(std::vector<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
               ContainerEq(config.internalOnlyHeaders()));
 }
 
@@ -9328,25 +9327,9 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
   Http::TestRequestHeaderMapImpl headers = genPathlessHeaders("example.com", "CONNECT");
 
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "true"}});
-
-    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                          creation_status_);
-    EXPECT_FALSE(config.route(headers, 0)->routeEntry()->connectConfig());
-  }
-
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "false"}});
-
-    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                          creation_status_);
-    EXPECT_TRUE(config.route(headers, 0)->routeEntry()->connectConfig());
-  }
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_FALSE(config.route(headers, 0)->routeEntry()->connectConfig());
 }
 
 TEST_F(RouteConfigurationV2, ConnectTerminate) {
@@ -9367,25 +9350,9 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters({"some-cluster"}, {});
   Http::TestRequestHeaderMapImpl headers = genPathlessHeaders("example.com", "CONNECT");
 
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "true"}});
-
-    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                          creation_status_);
-    EXPECT_TRUE(config.route(headers, 0)->routeEntry()->connectConfig());
-  }
-
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.http_route_connect_proxy_by_default", "false"}});
-
-    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                          creation_status_);
-    EXPECT_TRUE(config.route(headers, 0)->routeEntry()->connectConfig());
-  }
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_TRUE(config.route(headers, 0)->routeEntry()->connectConfig());
 }
 
 // Verifies that we're creating a new instance of the retry plugins on each call instead of
@@ -10609,7 +10576,7 @@ public:
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
     }
     std::set<std::string> configTypes() override { return {"google.protobuf.Timestamp"}; }
-    Router::RouteSpecificFilterConfigConstSharedPtr
+    absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
     createRouteSpecificFilterConfig(const Protobuf::Message& message,
                                     Server::Configuration::ServerFactoryContext&,
                                     ProtobufMessage::ValidationVisitor&) override {
@@ -11573,6 +11540,80 @@ virtual_hosts:
   EXPECT_EQ(&config.shadowPolicies(), &shared_config.shadowPolicies());
   EXPECT_EQ(config.ignorePathParametersInPathMatching(),
             shared_config.ignorePathParametersInPathMatching());
+}
+
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithTraceSampled) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains: ["*"]
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+      # Policy with explicit trace_sampled set to false
+      - cluster: some_cluster
+        trace_sampled: false
+      # Policy with explicit trace_sampled set to true
+      - cluster: some_cluster2
+        trace_sampled: true
+      # Policy with no trace_sampled specified
+      - cluster: some_cluster3
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www2", "some_cluster", "some_cluster2", "some_cluster3"}, {});
+
+  // Test with runtime flag disabled (old behavior)
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.shadow_policy_inherit_trace_sampling", "false"}});
+
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                          creation_status_);
+
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.databricks.com", "/foo", "GET");
+    const auto& shadow_policies = config.route(headers, 0)->routeEntry()->shadowPolicies();
+
+    // First policy should have trace sampled = false
+    EXPECT_TRUE(shadow_policies[0]->traceSampled().has_value());
+    EXPECT_FALSE(shadow_policies[0]->traceSampled().value());
+
+    // Second policy should have trace sampled = true
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().has_value());
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().value());
+
+    // With flag disabled, unspecified should default to true
+    EXPECT_TRUE(shadow_policies[2]->traceSampled().has_value());
+    EXPECT_TRUE(shadow_policies[2]->traceSampled().value());
+  }
+
+  // Test with runtime flag enabled (new behavior)
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.shadow_policy_inherit_trace_sampling", "true"}});
+
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                          creation_status_);
+
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.databricks.com", "/foo", "GET");
+    const auto& shadow_policies = config.route(headers, 0)->routeEntry()->shadowPolicies();
+
+    // First policy should have trace sampled = false
+    EXPECT_TRUE(shadow_policies[0]->traceSampled().has_value());
+    EXPECT_FALSE(shadow_policies[0]->traceSampled().value());
+
+    // Second policy should have trace sampled = true
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().has_value());
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().value());
+
+    // With flag enabled, unspecified should be nullopt
+    EXPECT_FALSE(shadow_policies[2]->traceSampled().has_value());
+  }
 }
 
 } // namespace

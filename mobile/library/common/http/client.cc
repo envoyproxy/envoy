@@ -552,7 +552,7 @@ void Client::startStream(envoy_stream_t new_stream_handle, EnvoyStreamCallbacks&
 }
 
 void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, bool end_stream,
-                         bool idempotent) {
+                         bool) {
   ASSERT(dispatcher_.isThreadSafe());
   Client::DirectStreamSharedPtr direct_stream =
       getStream(stream, GetStreamFilters::AllowOnlyForOpenStreams);
@@ -597,12 +597,11 @@ void Client::sendHeaders(envoy_stream_t stream, RequestHeaderMapPtr headers, boo
   // a request here:
   // https://github.com/envoyproxy/envoy/blob/c9e3b9d2c453c7fe56a0e3615f0c742ac0d5e768/source/common/router/config_impl.cc#L1091-L1096
   headers->setReferenceForwardedProto(Headers::get().SchemeValues.Https);
-  // When the request is idempotent, it is safe to retry.
-  if (idempotent) {
-    // https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on
-    headers->addCopy(Headers::get().EnvoyRetryOn,
-                     Headers::get().EnvoyRetryOnValues.Http3PostConnectFailure);
-  }
+  // Aggressively retry HTTP/3 requests, even non-safe requests. This is
+  // standard client side logic akin to what Cronet does.
+  // https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter#x-envoy-retry-on
+  headers->addCopy(Headers::get().EnvoyRetryOn,
+                   Headers::get().EnvoyRetryOnValues.Http3PostConnectFailure);
   ENVOY_LOG(debug, "[S{}] request headers for stream (end_stream={}):\n{}", stream, end_stream,
             *headers);
   request_decoder->decodeHeaders(std::move(headers), end_stream);

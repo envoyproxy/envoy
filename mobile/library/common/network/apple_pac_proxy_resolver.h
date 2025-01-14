@@ -27,13 +27,13 @@ public:
   /**
    * Resolves proxy for a given URL using proxy auto configuration file that's hosted at a given
    * URL.
-   * @param target_url A request URL to resolve the proxy for.
    * @param proxy_autoconfiguration_file_url A URL at which a proxy configuration file is hosted.
+   * @param target_url A request URL to resolve the proxy for.
    * @param proxy_resolution_completed A function that's called with result proxies as its
    * arguments when proxy resolution completes.
    */
-  void resolveProxies(const std::string& target_url,
-                      const std::string& proxy_autoconfiguration_file_url,
+  void resolveProxies(const std::string& proxy_autoconfiguration_file_url,
+                      const std::string& target_url,
                       ProxySettingsResolvedCallback proxy_resolution_completed);
 
 protected:

@@ -10,6 +10,7 @@
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
+#include "envoy/config/xds_manager.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/context.h"
@@ -309,6 +310,17 @@ public:
    */
   virtual void
   setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) PURE;
+
+  /**
+   * @return Envoy's xDS manager.
+   */
+  virtual Config::XdsManager& xdsManager() PURE;
+};
+
+// Pick a class HdsDelegate inherits from
+class HdsDelegateApi : public Logger::Loggable<Logger::Id::upstream> {
+public:
+  virtual ~HdsDelegateApi() = default;
 };
 
 } // namespace Server

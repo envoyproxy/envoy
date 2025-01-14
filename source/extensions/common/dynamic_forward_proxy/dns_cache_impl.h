@@ -74,7 +74,8 @@ public:
 
 private:
   DnsCacheImpl(Server::Configuration::GenericFactoryContext& context,
-               const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
+               const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
+               Network::DnsResolverSharedPtr&& resolver);
   struct LoadDnsCacheEntryHandleImpl
       : public LoadDnsCacheEntryHandle,
         RaiiMapOfListElement<std::string, LoadDnsCacheEntryHandleImpl*> {
@@ -224,7 +225,8 @@ private:
                      absl::string_view details, std::list<Network::DnsResponse>&& response,
                      absl::optional<MonotonicTime> resolution_time = {},
                      bool is_proxy_lookup = false, bool is_timeout = false);
-  void runAddUpdateCallbacks(const std::string& host, const DnsHostInfoSharedPtr& host_info);
+  absl::Status runAddUpdateCallbacks(const std::string& host,
+                                     const DnsHostInfoSharedPtr& host_info);
   void runResolutionCompleteCallbacks(const std::string& host,
                                       const DnsHostInfoSharedPtr& host_info,
                                       Network::DnsResolver::ResolutionStatus status);

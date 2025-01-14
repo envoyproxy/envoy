@@ -207,6 +207,63 @@ INSTANTIATE_TEST_SUITE_P(ParameterizedFilterConfig, HttpFilterTestParam,
                          testing::Combine(testing::Bool(), testing::Bool()),
                          HttpFilterTestParam::ParamsToString);
 
+class ExtAuthzLoggingInfoTest
+    : public testing::TestWithParam<
+          std::tuple<std::string /* field_name */, absl::optional<uint64_t> /* value */>> {
+public:
+  ExtAuthzLoggingInfoTest() : logging_info_({}) {}
+
+  void SetUp() override {
+    std::string fieldName = std::get<0>(GetParam());
+    absl::optional<uint64_t> optional = std::get<1>(GetParam());
+    if (optional.has_value()) {
+      if (fieldName == "latency_us") {
+        logging_info_.setLatency(std::chrono::microseconds(optional.value()));
+      }
+      if (fieldName == "bytesSent") {
+        logging_info_.setBytesSent(optional.value());
+      }
+      if (fieldName == "bytesReceived") {
+        logging_info_.setBytesReceived(optional.value());
+      }
+    }
+  }
+
+  void test() {
+    ASSERT_TRUE(logging_info_.hasFieldSupport());
+    absl::optional<uint64_t> optional = std::get<1>(GetParam());
+    if (optional.has_value()) {
+      EXPECT_THAT(logging_info_.getField(std::get<0>(GetParam())),
+                  testing::VariantWith<int64_t>(optional.value()));
+    } else {
+      EXPECT_THAT(logging_info_.getField(std::get<0>(GetParam())),
+                  testing::VariantWith<absl::monostate>(absl::monostate{}));
+    }
+  }
+
+  static std::string ParamsToString(
+      const testing::TestParamInfo<std::tuple<std::string, absl::optional<uint64_t>>>& info) {
+    return absl::StrCat(std::get<1>(info.param).has_value() ? "" : "no_", std::get<0>(info.param),
+                        std::get<1>(info.param).has_value()
+                            ? absl::StrCat("_", std::to_string(std::get<1>(info.param).value()))
+                            : "");
+  }
+
+  ExtAuthzLoggingInfo logging_info_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    ExtAuthzLoggingInfoTestValid, ExtAuthzLoggingInfoTest,
+    testing::Combine(testing::Values("latency_us", "bytesSent", "bytesReceived"),
+                     testing::Values(absl::optional<uint64_t>{}, absl::optional<uint64_t>{0},
+                                     absl::optional<uint64_t>{1})),
+    ExtAuthzLoggingInfoTest::ParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(ExtAuthzLoggingInfoTestInvalid, ExtAuthzLoggingInfoTest,
+                         testing::Values(std::make_tuple("wrong_property_name",
+                                                         absl::optional<uint64_t>{})),
+                         ExtAuthzLoggingInfoTest::ParamsToString);
+
 class EmitFilterStateTest
     : public HttpFilterTestBase<testing::TestWithParam<
           std::tuple<bool /*http_client*/, bool /*emit_stats*/, bool /*emit_filter_metadata*/>>> {
@@ -242,17 +299,13 @@ public:
     auto upstream_cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     stream_info_->upstream_cluster_info_ = upstream_cluster_info;
 
-    absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata = absl::nullopt;
-    if (std::get<2>(GetParam())) {
-      filter_metadata = Envoy::ProtobufWkt::Struct();
-      *(*filter_metadata->mutable_fields())["foo"].mutable_string_value() = "bar";
+    if (std::get<1>(GetParam())) {
+      expected_output_.setLatency(std::chrono::milliseconds(1));
+      expected_output_.setUpstreamHost(upstream_host);
+      expected_output_.setClusterInfo(upstream_cluster_info);
+      expected_output_.setBytesSent(123);
+      expected_output_.setBytesReceived(456);
     }
-
-    expected_output_.setLatency(std::chrono::milliseconds(1));
-    expected_output_.setUpstreamHost(upstream_host);
-    expected_output_.setClusterInfo(upstream_cluster_info);
-    expected_output_.setBytesSent(123);
-    expected_output_.setBytesReceived(456);
   }
 
   static std::string
@@ -268,6 +321,13 @@ public:
 
     prepareCheck();
 
+    auto& filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+    absl::optional<ExtAuthzLoggingInfo> preexisting_data_copy =
+        filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName)
+            ? absl::make_optional(
+                  *filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName))
+            : absl::nullopt;
+
     // ext_authz makes a single call to the external auth service once it sees the end of stream.
     EXPECT_CALL(*client_, check(_, _, _, _))
         .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
@@ -279,33 +339,43 @@ public:
         }));
 
     EXPECT_CALL(*client_, streamInfo()).WillRepeatedly(Return(stream_info_.get()));
-
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter_->decodeHeaders(request_headers_, true));
 
     request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 
-    auto filter_state = decoder_filter_callbacks_.streamInfo().filterState();
+    // Will exist if stats or filter metadata is emitted or if there was preexisting logging info.
+    bool expect_logging_info =
+        (std::get<1>(GetParam()) || std::get<2>(GetParam()) || preexisting_data_copy);
 
-    // Will exist if either of stats or filter metadata is emitted or both.
-    ASSERT_EQ(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName),
-              std::get<1>(GetParam()) || std::get<2>(GetParam()));
+    ASSERT_EQ(filter_state->hasData<ExtAuthzLoggingInfo>(FilterConfigName), expect_logging_info);
 
-    if (std::get<1>(GetParam())) {
-      auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-
-      EXPECT_EQ(actual->latency(), expected_output_.latency());
-      EXPECT_EQ(actual->upstreamHost(), expected_output_.upstreamHost());
-      EXPECT_EQ(actual->clusterInfo(), expected_output_.clusterInfo());
-      EXPECT_EQ(actual->bytesSent(), expected_output_.bytesSent());
-      EXPECT_EQ(actual->bytesReceived(), expected_output_.bytesReceived());
+    if (!expect_logging_info) {
+      return;
     }
 
-    if (std::get<2>(GetParam())) {
-      auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
-      ASSERT_TRUE(actual->filterMetadata().has_value());
-      EXPECT_EQ(actual->filterMetadata()->DebugString(),
-                expected_output_.filterMetadata()->DebugString());
+    auto actual = filter_state->getDataReadOnly<ExtAuthzLoggingInfo>(FilterConfigName);
+    ASSERT_NE(actual, nullptr);
+    if (preexisting_data_copy) {
+      expectEq(*actual, *preexisting_data_copy);
+      EXPECT_EQ((std::get<1>(GetParam()) || std::get<2>(GetParam())) ? 1U : 0U,
+                config_->stats().filter_state_name_collision_.value());
+      return;
+    }
+
+    expectEq(*actual, expected_output_);
+  }
+
+  static void expectEq(const ExtAuthzLoggingInfo& actual, const ExtAuthzLoggingInfo& expected) {
+    EXPECT_EQ(actual.latency(), expected.latency());
+    EXPECT_EQ(actual.upstreamHost(), expected.upstreamHost());
+    EXPECT_EQ(actual.clusterInfo(), expected.clusterInfo());
+    EXPECT_EQ(actual.bytesSent(), expected.bytesSent());
+    EXPECT_EQ(actual.bytesReceived(), expected.bytesReceived());
+
+    ASSERT_EQ(actual.filterMetadata().has_value(), expected.filterMetadata().has_value());
+    if (expected.filterMetadata().has_value()) {
+      EXPECT_EQ(actual.filterMetadata()->DebugString(), expected.filterMetadata()->DebugString());
     }
   }
 
@@ -4015,6 +4085,43 @@ TEST_P(EmitFilterStateTest, NullUpstreamHost) {
 
   test(response);
 }
+
+// hasData<ExtAuthzLoggingInfo>() will return false, setData() will succeed because this is
+// mutable, thus getMutableData<ExtAuthzLoggingInfo> will not be nullptr and the naming collision
+// is silently ignored.
+TEST_P(EmitFilterStateTest, PreexistingFilterStateDifferentTypeMutable) {
+  class TestObject : public Envoy::StreamInfo::FilterState::Object {};
+  decoder_filter_callbacks_.stream_info_.filter_state_->setData(
+      FilterConfigName,
+      // This will not cast to ExtAuthzLoggingInfo, so when the filter tries to
+      // getMutableData<ExtAuthzLoggingInfo>(...), it will return nullptr.
+      std::make_shared<TestObject>(), Envoy::StreamInfo::FilterState::StateType::Mutable,
+      Envoy::StreamInfo::FilterState::LifeSpan::Request);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  test(response);
+}
+
+// hasData<ExtAuthzLoggingInfo>() will return true so the filter will not try to override the data.
+TEST_P(EmitFilterStateTest, PreexistingFilterStateSameTypeMutable) {
+  class TestObject : public Envoy::StreamInfo::FilterState::Object {};
+  decoder_filter_callbacks_.stream_info_.filter_state_->setData(
+      FilterConfigName,
+      // This will not cast to ExtAuthzLoggingInfo, so when the filter tries to
+      // getMutableData<ExtAuthzLoggingInfo>(...), it will return nullptr.
+      std::make_shared<ExtAuthzLoggingInfo>(absl::nullopt),
+      Envoy::StreamInfo::FilterState::StateType::Mutable,
+      Envoy::StreamInfo::FilterState::LifeSpan::Request);
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+
+  test(response);
+}
+
+TEST_P(ExtAuthzLoggingInfoTest, FieldTest) { test(); }
 
 } // namespace
 } // namespace ExtAuthz

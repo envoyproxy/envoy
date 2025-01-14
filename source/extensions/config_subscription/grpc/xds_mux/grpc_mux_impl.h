@@ -107,8 +107,7 @@ public:
 
   absl::Status
   updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
-                  Grpc::RawAsyncClientPtr&& failover_async_client,
-                  CustomConfigValidatorsPtr&& custom_config_validators, Stats::Scope& scope,
+                  Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
                   BackOffStrategyPtr&& backoff_strategy,
                   const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
 
@@ -162,7 +161,9 @@ protected:
   WatchMap& watchMapFor(const std::string& type_url);
   void handleEstablishedStream();
   void handleStreamEstablishmentFailure(bool next_attempt_may_send_initial_resource_version);
-  void genericHandleResponse(const std::string& type_url, const RS& response_proto,
+  // May modify the order of the resources in response_proto to put all the
+  // non-heartbeat resources first.
+  void genericHandleResponse(const std::string& type_url, RS& response_proto,
                              ControlPlaneStats& control_plane_stats);
   void trySendDiscoveryRequests();
   bool skipSubsequentNode() const { return skip_subsequent_node_; }
@@ -299,8 +300,8 @@ public:
                                    SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
                                    const SubscriptionOptions&) override;
 
-  absl::Status updateMuxSource(Grpc::RawAsyncClientPtr&&, Grpc::RawAsyncClientPtr&&,
-                               CustomConfigValidatorsPtr&&, Stats::Scope&, BackOffStrategyPtr&&,
+  absl::Status updateMuxSource(Grpc::RawAsyncClientPtr&&, Grpc::RawAsyncClientPtr&&, Stats::Scope&,
+                               BackOffStrategyPtr&&,
                                const envoy::config::core::v3::ApiConfigSource&) override {
     return absl::UnimplementedError("");
   }
