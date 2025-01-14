@@ -36,9 +36,7 @@ message CookieConfig {
   }
 
   // The value used for the SameSite cookie attribute.
-  SameSite same_site = 1 [(validate.rules).enum = {
-    defined_only: true
-  }];
+  SameSite same_site = 1 [(validate.rules).enum = {defined_only: true}];
 }
 
 // [#next-free-field: 7]
