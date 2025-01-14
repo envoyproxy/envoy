@@ -87,16 +87,9 @@ public:
   std::string additionallyAllowedCharactersInUrlPath() {
     // All codecs allow the following characters that are outside of RFC "<>[]^`{}\|
     std::string additionally_allowed_characters(R"--("<>[]^`{}\|)--");
-    if (downstream_protocol_ == Http::CodecType::HTTP3) {
-      // In addition H/3 allows TAB and SPACE in path
-      additionally_allowed_characters += +"\t ";
-    } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
+    if (downstream_protocol_ == Http::CodecType::HTTP2) {
       // Both nghttp2 and oghttp2 allow extended ASCII >= 0x80 in path
       additionally_allowed_characters += generateExtendedAsciiString();
-      if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-        // In addition H/2 oghttp2 allows TAB and SPACE in path
-        additionally_allowed_characters += +"\t ";
-      }
     }
     return additionally_allowed_characters;
   }
