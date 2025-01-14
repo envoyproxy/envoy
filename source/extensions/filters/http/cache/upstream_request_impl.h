@@ -18,7 +18,7 @@ class UpstreamRequestImpl : public Logger::Loggable<Logger::Id::cache_filter>,
                             public Http::AsyncClient::StreamCallbacks {
 public:
   // Called from the factory.
-  void sendHeaders(Http::RequestHeaderMap& request_headers);
+  void postHeaders(Event::Dispatcher& dispatcher, Http::RequestHeaderMap& request_headers);
   // HttpSource.
   void getHeaders(GetHeadersCallback&& cb) override;
   // Though range is an argument here, only the length is used by UpstreamRequest
@@ -77,13 +77,15 @@ private:
 
 class UpstreamRequestImplFactory : public UpstreamRequestFactory {
 public:
-  UpstreamRequestImplFactory(Http::AsyncClient& async_client,
+  UpstreamRequestImplFactory(Event::Dispatcher& dispatcher, Http::AsyncClient& async_client,
                              Http::AsyncClient::StreamOptions stream_options)
-      : async_client_(async_client), stream_options_(std::move(stream_options)) {}
+      : dispatcher_(dispatcher), async_client_(async_client),
+        stream_options_(std::move(stream_options)) {}
 
   HttpSourcePtr create(Http::RequestHeaderMap& request_headers) override;
 
 private:
+  Event::Dispatcher& dispatcher_;
   Http::AsyncClient& async_client_;
   Http::AsyncClient::StreamOptions stream_options_;
 };

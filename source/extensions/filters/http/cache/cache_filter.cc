@@ -130,8 +130,8 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
     sendNoClusterResponse(*cluster_name);
     return Http::FilterHeadersStatus::StopIteration;
   }
-  auto upstream_request_factory =
-      std::make_unique<UpstreamRequestImplFactory>(*async_client, config_->upstreamOptions());
+  auto upstream_request_factory = std::make_unique<UpstreamRequestImplFactory>(
+      decoder_callbacks_->dispatcher(), *async_client, config_->upstreamOptions());
   auto lookup_request = std::make_unique<ActiveLookupRequest>(
       headers, std::move(upstream_request_factory), *cluster_name, decoder_callbacks_->dispatcher(),
       config_->timeSource().systemTime(), config_->varyAllowList(),

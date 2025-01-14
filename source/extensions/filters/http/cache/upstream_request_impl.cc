@@ -11,7 +11,7 @@ HttpSourcePtr UpstreamRequestImplFactory::create(Http::RequestHeaderMap& request
   // Can't use make_unique because the constructor is private.
   auto ret =
       std::unique_ptr<UpstreamRequestImpl>(new UpstreamRequestImpl(async_client_, stream_options_));
-  ret->sendHeaders(request_headers);
+  ret->postHeaders(dispatcher_, request_headers);
   return ret;
 }
 
@@ -151,22 +151,25 @@ UpstreamRequestImpl::~UpstreamRequestImpl() {
   }
 }
 
-void UpstreamRequestImpl::sendHeaders(Http::RequestHeaderMap& request_headers) {
+void UpstreamRequestImpl::postHeaders(Event::Dispatcher& dispatcher,
+                                      Http::RequestHeaderMap& request_headers) {
   // UpstreamRequest must take a copy of the headers as the upstream request may
   // still use the reference provided to it after the original reference has moved.
   request_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers);
-  // If this request had a body or trailers, CacheFilter::decodeHeaders
-  // would have bypassed cache lookup and insertion, so this class wouldn't
-  // be instantiated. So end_stream will always be true.
-  stream_->sendHeaders(*request_headers_, /*end_stream=*/true);
-  absl::optional<absl::string_view> range_header = RangeUtils::getRangeHeader(request_headers);
-  if (range_header) {
-    absl::optional<std::vector<RawByteRange>> ranges =
-        RangeUtils::parseRangeHeader(range_header.value(), 1);
-    if (ranges) {
-      stream_pos_ = ranges.value().front().firstBytePos();
+  dispatcher.post([this]() {
+    // If this request had a body or trailers, CacheFilter::decodeHeaders
+    // would have bypassed cache lookup and insertion, so this class wouldn't
+    // be instantiated. So end_stream will always be true.
+    stream_->sendHeaders(*request_headers_, /*end_stream=*/true);
+    absl::optional<absl::string_view> range_header = RangeUtils::getRangeHeader(*request_headers_);
+    if (range_header) {
+      absl::optional<std::vector<RawByteRange>> ranges =
+          RangeUtils::parseRangeHeader(range_header.value(), 1);
+      if (ranges) {
+        stream_pos_ = ranges.value().front().firstBytePos();
+      }
     }
-  }
+  });
 }
 
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };

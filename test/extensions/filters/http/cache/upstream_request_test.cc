@@ -27,7 +27,10 @@ class UpstreamRequestTest : public ::testing::Test {
     EXPECT_CALL(http_stream_, sendHeaders(HeaderMapEqualRef(&request_headers_), true));
     Http::AsyncClient::StreamOptions options;
     options.setBufferLimit(1024);
-    upstream_request_ = UpstreamRequestImplFactory(async_client_, options).create(request_headers_);
+    Event::MockDispatcher dispatcher;
+    EXPECT_CALL(dispatcher, post).WillOnce([](Event::PostCb cb) { cb(); });
+    upstream_request_ =
+        UpstreamRequestImplFactory(dispatcher, async_client_, options).create(request_headers_);
   }
 
 protected:
