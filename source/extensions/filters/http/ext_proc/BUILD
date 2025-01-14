@@ -34,7 +34,7 @@ envoy_cc_library(
         ":client_interface",
         ":matching_utils_lib",
         ":mutation_utils_lib",
-        ":on_receive_message_decorator_interface",
+        ":on_processing_response_interface",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
@@ -144,8 +144,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "on_receive_message_decorator_interface",
-    hdrs = ["on_receive_message_decorator.h"],
+    name = "on_processing_response_interface",
+    hdrs = ["on_processing_response.h"],
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/config:typed_config_interface",

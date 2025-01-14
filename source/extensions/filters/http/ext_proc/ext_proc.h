@@ -26,7 +26,7 @@
 #include "source/extensions/filters/http/ext_proc/client.h"
 #include "source/extensions/filters/http/ext_proc/client_base.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
-#include "source/extensions/filters/http/ext_proc/on_receive_message_decorator.h"
+#include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
 namespace Envoy {
@@ -281,7 +281,7 @@ public:
     return grpc_service_;
   }
 
-  std::unique_ptr<OnReceiveMessageDecorator> createOnReceiveMessageDecorator() const;
+  std::unique_ptr<OnProcessingResponse> createOnProcessingResponse() const;
 
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
@@ -289,8 +289,7 @@ private:
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
-  static std::function<std::unique_ptr<OnReceiveMessageDecorator>()>
-  createOnReceiveMessageDecoratorCb(
+  static std::function<std::unique_ptr<OnProcessingResponse>()> createOnProcessingResponseCb(
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
       Envoy::Server::Configuration::CommonFactoryContext& context);
   const bool failure_mode_allow_;
@@ -327,8 +326,8 @@ private:
 
   const ImmediateMutationChecker immediate_mutation_checker_;
 
-  const std::function<std::unique_ptr<OnReceiveMessageDecorator>()>
-      on_receive_message_decorator_factory_cb_ = nullptr;
+  const std::function<std::unique_ptr<OnProcessingResponse>()> on_processing_response_factory_cb_ =
+      nullptr;
 
   ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
 };
@@ -410,7 +409,7 @@ public:
                         config->untypedForwardingMetadataNamespaces(),
                         config->typedForwardingMetadataNamespaces(),
                         config->untypedReceivingMetadataNamespaces()),
-        on_receive_message_decorator_(config->createOnReceiveMessageDecorator()) {}
+        on_processing_response_(config->createOnProcessingResponse()) {}
 
   const FilterConfig& config() const { return *config_; }
   const envoy::config::core::v3::GrpcService& grpcServiceConfig() const {
@@ -538,7 +537,7 @@ private:
   // when it's time to send the first message.
   ExternalProcessorStream* stream_ = nullptr;
 
-  std::unique_ptr<OnReceiveMessageDecorator> on_receive_message_decorator_;
+  std::unique_ptr<OnProcessingResponse> on_processing_response_;
 
   // Set to true when no more messages need to be sent to the processor.
   // This happens when the processor has closed the stream, or when it has

@@ -332,7 +332,8 @@ message ExternalProcessor {
 
   // Decorator to introduce custom logic that runs after a message received from
   // the External Processor is processed.
-  config.core.v3.TypedExtensionConfig on_receive_message_decorator = 23;
+  // [#extension-category: envoy.http.ext_proc.on_processing_response]
+  config.core.v3.TypedExtensionConfig on_processing_response = 23;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.

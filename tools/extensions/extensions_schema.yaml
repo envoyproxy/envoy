@@ -142,6 +142,7 @@ categories:
 - envoy.router.cluster_specifier_plugin
 - envoy.tracers.opentelemetry.resource_detectors
 - envoy.tracers.opentelemetry.samplers
+- envoy.http.ext_proc.on_processing_response
 
 status_values:
 - name: stable

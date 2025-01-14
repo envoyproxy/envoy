@@ -14,7 +14,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
-#include "source/extensions/filters/http/ext_proc/on_receive_message_decorator.h"
+#include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -229,7 +229,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
-      on_receive_message_decorator_factory_cb_(createOnReceiveMessageDecoratorCb(config, context)),
+      on_processing_response_factory_cb_(createOnProcessingResponseCb(config, context)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
 
   if (config.disable_clear_route_cache()) {
@@ -1242,26 +1242,50 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleHeadersResponse(response->request_headers());
+    if (on_processing_response_ != nullptr) {
+      on_processing_response_->afterProcessingRequestHeaders(*response, processing_status,
+                                                             decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
+    if (on_processing_response_ != nullptr) {
+      on_processing_response_->afterProcessingResponseHeaders(*response, processing_status,
+                                                              decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
+    if (on_processing_response_ != nullptr) {
+      on_processing_response_->afterProcessingRequestBody(*response, processing_status,
+                                                          decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kResponseBody:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
+    if (on_processing_response_ != nullptr) {
+      on_processing_response_->afterProcessingResponseBody(*response, processing_status,
+                                                           decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleTrailersResponse(response->request_trailers());
+    if (on_processing_response_ != nullptr) {
+      on_processing_response_->afterProcessingRequestTrailers(*response, processing_status,
+                                                              decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kResponseTrailers:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
+    if (on_processing_response_ != nullptr) {
+      on_processing_response_->afterProcessingResponseTrailers(*response, processing_status,
+                                                               decoder_callbacks_->streamInfo());
+    }
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
     if (config_->disableImmediateResponse()) {
@@ -1287,11 +1311,6 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
               static_cast<int>(response->response_case()));
     processing_status = absl::FailedPreconditionError("unhandled message");
     break;
-  }
-
-  if (on_receive_message_decorator_ != nullptr) {
-    on_receive_message_decorator_->onReceiveMessage(*response, processing_status,
-                                                    decoder_callbacks_->streamInfo());
   }
 
   if (processing_status.ok()) {
@@ -1561,32 +1580,31 @@ std::string responseCaseToString(const ProcessingResponse::ResponseCase response
   }
 }
 
-std::function<std::unique_ptr<OnReceiveMessageDecorator>()>
-FilterConfig::createOnReceiveMessageDecoratorCb(
+std::function<std::unique_ptr<OnProcessingResponse>()> FilterConfig::createOnProcessingResponseCb(
     const ExternalProcessor& config, Envoy::Server::Configuration::CommonFactoryContext& context) {
-  if (!config.has_on_receive_message_decorator()) {
+  if (!config.has_on_processing_response()) {
     return nullptr;
   }
-  auto& factory = Envoy::Config::Utility::getAndCheckFactory<OnReceiveMessageDecoratorFactory>(
-      config.on_receive_message_decorator());
-  auto decorator_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      config.on_receive_message_decorator().typed_config(), context.messageValidationVisitor(),
-      factory);
-  if (decorator_config == nullptr) {
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<OnProcessingResponseFactory>(
+      config.on_processing_response());
+  auto on_processing_response_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.on_processing_response().typed_config(), context.messageValidationVisitor(), factory);
+  if (on_processing_response_config == nullptr) {
     return nullptr;
   }
-  std::shared_ptr<const Protobuf::Message> shared_decorator_config = std::move(decorator_config);
-  return [&factory, shared_decorator_config,
-          &context]() -> std::unique_ptr<OnReceiveMessageDecorator> {
-    return factory.createDecorator(*shared_decorator_config, context);
+  std::shared_ptr<const Protobuf::Message> shared_on_processing_response_config =
+      std::move(on_processing_response_config);
+  return [&factory, shared_on_processing_response_config,
+          &context]() -> std::unique_ptr<OnProcessingResponse> {
+    return factory.createOnProcessingResponse(*shared_on_processing_response_config, context);
   };
 }
 
-std::unique_ptr<OnReceiveMessageDecorator> FilterConfig::createOnReceiveMessageDecorator() const {
-  if (on_receive_message_decorator_factory_cb_ == nullptr) {
+std::unique_ptr<OnProcessingResponse> FilterConfig::createOnProcessingResponse() const {
+  if (on_processing_response_factory_cb_ == nullptr) {
     return nullptr;
   }
-  return on_receive_message_decorator_factory_cb_();
+  return on_processing_response_factory_cb_();
 }
 
 } // namespace ExternalProcessing
