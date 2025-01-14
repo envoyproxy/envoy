@@ -413,3 +413,4 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /contrib/dlb @mattklein123 @daixiang0
 /contrib/qat/ @giantcroc @soulxu
 /contrib/generic_proxy/ @wbpcode @UNOWNED
+/contrib/tap_sinks/ @coolg92003 @yiyibaoguo

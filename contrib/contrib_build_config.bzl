@@ -37,6 +37,12 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.sip.router":                                 "//contrib/sip_proxy/filters/network/source/router:config",
 
     #
+    # Tap sinks
+    #
+
+    "envoy.tap_sinks.udp_sink":                          "//contrib/tap_sinks/udp_sink/source:config",
+
+    #
     # Private key providers
     #
 

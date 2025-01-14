@@ -113,6 +113,15 @@ envoy.regex_engines.hyperscan:
   - envoy.regex_engines
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tap_sinks.udp_sink:
+  categories:
+  - envoy.filters.http
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.tap_sinks.udp_sink.v3alpha.UdpSink
 envoy.xds_delegates.kv_store:
   categories:
   - envoy.xds_delegates
