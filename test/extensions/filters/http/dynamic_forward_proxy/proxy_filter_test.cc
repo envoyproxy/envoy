@@ -184,9 +184,8 @@ TEST_F(ProxyFilterTest, EmptyHostHeader) {
 
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(_, _, _, _)).Times(0);
   Http::TestRequestHeaderMapImpl request_headers{{":authority", ""}};
-  EXPECT_CALL(callbacks_,
-              sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS resolution failure"), _, _,
-                             Eq("dns_resolution_failure{no_host}")));
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::BadRequest, Eq("Empty host header"), _, _,
+                                         Eq("empty_host_header")));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,

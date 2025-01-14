@@ -517,8 +517,8 @@ TEST_P(ProxyFilterIntegrationTest, FailOnEmptyHostHeader) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("dns_resolution_failure{no_host}"));
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("empty_host_header"));
 }
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
@@ -587,7 +587,18 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) { requestWithUnknow
 // TODO(yanavlasov) Enable per #26642
 #ifndef ENVOY_ENABLE_UHV
 TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
-  requestWithUnknownDomainTest("", "\x00\x00.google.com");
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initializeWithArgs(1024, 1024, "", "");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("\x00\x00.google.com");
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  // With UVH enabled, the suspicious host will set to an empty host resulting in a bad request (400).
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  std::string access_log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(access_log, HasSubstr("empty_host_header"));
+  EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
 }
 #endif
 
