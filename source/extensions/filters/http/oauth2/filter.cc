@@ -21,7 +21,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/escaping.h"
-#include "absl/strings/match.h"
+#include "absl/strings/match.h"π
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
@@ -150,6 +150,8 @@ getSameSiteString(envoy::extensions::filters::http::oauth2::v3::CookieConfig_Sam
       CookieConfig_SameSite_DISABLED:
     return EMPTY_STRING;
   }
+  IS_ENVOY_BUG("unexpected same_site enum value");
+  return EMPTY_STRING;
 }
 
 Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
