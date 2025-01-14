@@ -50,7 +50,7 @@ void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks&
     callbacks.onFailure(error);
     return;
   }
-  const double current_utilization = (work_over_period) / total_over_period;
+  const double current_utilization = work_over_period / total_over_period;
   ENVOY_LOG_MISC(trace, "Prev work={}, Cur work={}, Prev Total={}, Cur Total={}",
                  previous_cpu_times_.work_time, cpu_times.work_time, previous_cpu_times_.total_time,
                  cpu_times.total_time);
