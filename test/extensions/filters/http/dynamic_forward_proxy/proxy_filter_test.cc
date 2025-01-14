@@ -8,6 +8,7 @@
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/basic_resource_limit.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -111,6 +112,7 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_{{":authority", "foo"}};
   NiceMock<Upstream::MockBasicResourceLimit> pending_requests_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 // Default port 80 if upstream TLS not configured.
@@ -730,6 +732,114 @@ TEST_F(ProxySettingsProxyFilterTest, HttpWithProxySettings) {
             mock_filter_->decodeHeaders(request_headers_, false));
 
   mock_filter_->onDestroy();
+}
+
+// Tests that DNS resolution is skipped for IP addresses
+TEST_F(ProxyFilterTest, SkipDnsForIpAddress) {
+  InSequence s;
+
+  // Configure filter to save upstream address
+  envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
+  proto_config.set_save_upstream_address(true);
+
+  EXPECT_CALL(*dns_cache_manager_, getCache(_));
+  ON_CALL(stream_info_, timeSource())
+      .WillByDefault(testing::ReturnRef(factory_context_.server_factory_context_.timeSource()));
+
+  Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
+      *factory_context_.server_factory_context_.singleton_manager_);
+  filter_config_ = std::make_shared<ProxyFilterConfig>(
+      proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+      this->get(), cluster_store_factory, factory_context_);
+  filter_ = std::make_unique<ProxyFilter>(filter_config_);
+  filter_->setDecoderFilterCallbacks(callbacks_);
+
+  const std::string test_ip = "1.2.3.4";
+  Http::TestRequestHeaderMapImpl ip_headers{{":authority", test_ip}};
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(_, _, _, _)).Times(0);
+  EXPECT_CALL(callbacks_, streamInfo()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(stream_info_));
+
+  // Should continue the filter chain immediately
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(ip_headers, false));
+
+  // Verify that the correct IP address was stored in filter state
+  const auto& filter_state = callbacks_.streamInfo().filterState();
+  EXPECT_TRUE(
+      filter_state->hasData<StreamInfo::UpstreamAddress>(StreamInfo::UpstreamAddress::key()));
+
+  const auto* address = filter_state->getDataReadOnly<StreamInfo::UpstreamAddress>(
+      StreamInfo::UpstreamAddress::key());
+  EXPECT_EQ(address->address_->ip()->addressAsString(), test_ip);
+
+  filter_->onDestroy();
+}
+
+// Tests that DNS resolution is skipped for IPv6 addresses
+TEST_F(ProxyFilterTest, SkipDnsForIpv6Address) {
+  InSequence s;
+
+  // Configure filter to save upstream address
+  envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
+  proto_config.set_save_upstream_address(true);
+
+  EXPECT_CALL(*dns_cache_manager_, getCache(_));
+  ON_CALL(stream_info_, timeSource())
+      .WillByDefault(testing::ReturnRef(factory_context_.server_factory_context_.timeSource()));
+
+  Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
+      *factory_context_.server_factory_context_.singleton_manager_);
+  filter_config_ = std::make_shared<ProxyFilterConfig>(
+      proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+      this->get(), cluster_store_factory, factory_context_);
+  filter_ = std::make_unique<ProxyFilter>(filter_config_);
+  filter_->setDecoderFilterCallbacks(callbacks_);
+
+  const std::string test_ip = "[::1]";
+  Http::TestRequestHeaderMapImpl ip_headers{{":authority", test_ip}};
+
+  // Mock the route configuration that would be used
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  auto route_entry = std::make_shared<NiceMock<Router::MockRouteEntry>>();
+  const std::string cluster_name = "fake_cluster";
+
+  ON_CALL(callbacks_, route()).WillByDefault(Return(route));
+  ON_CALL(*route, routeEntry()).WillByDefault(Return(route_entry.get()));
+  ON_CALL(*route_entry, clusterName()).WillByDefault(testing::ReturnRef(cluster_name));
+
+  // Set up the cluster expectations
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(cluster_name))
+      .WillOnce(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+
+  // Should skip DNS for IP addresses
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_()).Times(0);
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(_, _, _, _)).Times(0);
+
+  EXPECT_CALL(callbacks_, streamInfo()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(stream_info_));
+
+  auto result = filter_->decodeHeaders(ip_headers, false);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
+
+  const auto& filter_state = callbacks_.streamInfo().filterState();
+  ASSERT_TRUE(
+      filter_state->hasData<StreamInfo::UpstreamAddress>(StreamInfo::UpstreamAddress::key()));
+
+  const auto* address = filter_state->getDataReadOnly<StreamInfo::UpstreamAddress>(
+      StreamInfo::UpstreamAddress::key());
+  ASSERT_NE(nullptr, address);
+  ASSERT_NE(nullptr, address->address_);
+  EXPECT_EQ(address->address_->ip()->addressAsString(), "::1");
+
+  filter_->onDestroy();
 }
 
 } // namespace

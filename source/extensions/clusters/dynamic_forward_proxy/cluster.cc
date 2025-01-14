@@ -392,6 +392,71 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     }
   }
 
+  // Parse the host and check if it's an IP address
+  const auto host_attributes = Http::Utility::parseAuthority(raw_host);
+  if (host_attributes.is_ip_address_) {
+    auto host = std::string(host_attributes.host_);
+    auto resolved_port = host_attributes.port_.value_or(port);
+
+    auto address = Network::Utility::parseInternetAddressNoThrow(host);
+    if (address != nullptr) {
+      ENVOY_LOG(debug, "Authority is an IP. Creating direct logical host. Host: {} Port: {}", host,
+                resolved_port);
+
+      // Create a logical host for the IP address
+      auto host_address = Network::Utility::parseInternetAddressNoThrow(host, resolved_port);
+      if (!host_address) {
+        return nullptr;
+      }
+
+      // Create a host key that matches the DNS cache format
+      std::string host_key =
+          Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, resolved_port);
+
+      // Check if we already have a host for this IP
+      {
+        absl::ReaderMutexLock lock{&cluster_.host_map_lock_};
+        auto existing_host = cluster_.host_map_.find(host_key);
+        if (existing_host != cluster_.host_map_.end()) {
+          return existing_host->second.logical_host_;
+        }
+      }
+
+      // Create new logical host for the IP
+      auto new_host_or_error = Upstream::LogicalHost::create(
+          cluster_.info(), host_key, host_address, {host_address},
+          cluster_.dummy_locality_lb_endpoint_, cluster_.dummy_lb_endpoint_, nullptr,
+          cluster_.time_source_);
+
+      if (!new_host_or_error.ok()) {
+        ENVOY_LOG(debug, "Failed to create logical host for IP address: {}",
+                  new_host_or_error.status().message());
+        return nullptr;
+      }
+
+      // Add the new host to the host map
+      Upstream::LogicalHostSharedPtr new_host(new_host_or_error->release());
+      {
+        absl::WriterMutexLock lock{&cluster_.host_map_lock_};
+
+        // Double-check no race condition occurred
+        auto existing_host = cluster_.host_map_.find(host_key);
+        if (existing_host != cluster_.host_map_.end()) {
+          return existing_host->second.logical_host_;
+        }
+
+        // Insert the new host into the map
+        auto result = const_cast<HostInfoMap&>(cluster_.host_map_)
+                          .emplace(host_key, HostInfo(nullptr, new_host));
+        if (!result.second) {
+          return result.first->second.logical_host_;
+        }
+
+        return new_host;
+      }
+    }
+  }
+
   if (raw_host.empty()) {
     ENVOY_LOG(debug, "host empty");
     return nullptr;

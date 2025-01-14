@@ -474,6 +474,37 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithTrace) {
               HasSubstr("dns_resolution_failure{resolve_timeout:"));
 }
 
+// Test that DNS resolution is skipped for IP address hosts
+TEST_P(ProxyFilterIntegrationTest, SkipDnsForIpHost) {
+  upstream_tls_ = false;
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Format authority header based on IP version
+  const std::string authority =
+      (GetParam() == Network::Address::IpVersion::v4)
+          ? fmt::format("127.0.0.1:{}", fake_upstreams_[0]->localAddress()->ip()->port())
+          : fmt::format("[::1]:{}", fake_upstreams_[0]->localAddress()->ip()->port());
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", authority}};
+
+  // Send request and verify response
+  auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify response code
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // No DNS queries should have been made
+  EXPECT_EQ(0, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+  EXPECT_EQ(0, test_server_->counter("dns_cache.foo.host_added")->value());
+}
+
 TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);

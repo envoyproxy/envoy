@@ -752,6 +752,94 @@ TEST(ObjectFactory, DynamicPort) {
   ASSERT_EQ(nullptr, factory->createFromBytes("blah"));
 }
 
+// Test sequential host updates
+TEST_F(ClusterTest, SequentialHostUpdates) {
+  initialize(default_yaml_config_, false);
+
+  const std::string host_key = "host1:0";
+
+  // Initial host creation
+  makeTestHost(host_key, "1.2.3.4");
+  {
+    EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+    EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate(host_key, host_map_[host_key]).ok());
+    EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+    EXPECT_EQ("1.2.3.4:0",
+              cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+  }
+
+  // Update existing host with new address
+  Network::Address::InstanceConstSharedPtr new_address =
+      Network::Utility::parseInternetAddressNoThrow("2.3.4.5");
+  EXPECT_CALL(*host_map_[host_key], address()).WillRepeatedly(Return(new_address));
+
+  std::vector<Network::Address::InstanceConstSharedPtr> new_address_list{new_address};
+  EXPECT_CALL(*host_map_[host_key], addressList()).WillRepeatedly(Return(new_address_list));
+
+  {
+    EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate(host_key, host_map_[host_key]).ok());
+    EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+    EXPECT_EQ("2.3.4.5:0",
+              cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+  }
+}
+
+// Test max sub clusters enforcement
+TEST_F(ClusterTest, MaxSubClustersLimit) {
+  initialize(sub_cluster_yaml_config_, false);
+
+  const int max_clusters = 1024; // From config
+  std::vector<std::string> created_clusters;
+
+  // Create max_clusters
+  for (int i = 0; i < max_clusters; i++) {
+    std::string name = absl::StrCat("cluster_", i);
+    std::string host = absl::StrCat("host_", i);
+    auto result = cluster_->createSubClusterConfig(name, host, 80);
+    EXPECT_TRUE(result.first);
+    EXPECT_TRUE(result.second.has_value());
+    created_clusters.push_back(name);
+  }
+
+  // Attempt to create one more - should fail
+  auto result = cluster_->createSubClusterConfig("overflow", "host", 80);
+  EXPECT_FALSE(result.first);
+  EXPECT_FALSE(result.second.has_value());
+
+  // Verify all created clusters still exist
+  for (const auto& name : created_clusters) {
+    EXPECT_TRUE(cluster_->touch(name));
+  }
+}
+
+// Test sub-cluster management with mock time
+TEST_F(ClusterTest, SubClusterLifecycle) {
+  initialize(sub_cluster_yaml_config_, false);
+
+  const std::string cluster_name = "test_cluster";
+  const std::string host = "test.host";
+  const int port = 80;
+
+  // Create sub cluster
+  {
+    auto result = cluster_->createSubClusterConfig(cluster_name, host, port);
+    EXPECT_TRUE(result.first);
+    EXPECT_TRUE(result.second.has_value());
+  }
+
+  // Verify it exists and can be touched
+  EXPECT_TRUE(cluster_->touch(cluster_name));
+
+  // Advance simulated time past the TTL
+  server_context_.timeSystem().advanceTimeWait(std::chrono::milliseconds(300001));
+
+  // Check idle cleanup
+  cluster_->checkIdleSubCluster();
+
+  // Verify cluster was removed
+  EXPECT_FALSE(cluster_->touch(cluster_name));
+}
+
 } // namespace DynamicForwardProxy
 } // namespace Clusters
 } // namespace Extensions
