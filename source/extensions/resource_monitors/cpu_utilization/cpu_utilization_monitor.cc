@@ -35,7 +35,6 @@ CpuUtilizationMonitor::CpuUtilizationMonitor(
 
 void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   CpuTimes cpu_times = cpu_stats_reader_->getCpuTimes();
-  ;
   if (!cpu_times.is_valid) {
     const auto& error = EnvoyException("Can't open file to read CPU utilization");
     callbacks.onFailure(error);

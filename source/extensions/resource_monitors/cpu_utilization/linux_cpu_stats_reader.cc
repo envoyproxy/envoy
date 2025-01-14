@@ -13,6 +13,7 @@ namespace CpuUtilizationMonitor {
 
 constexpr uint64_t NUMBER_OF_CPU_TIMES_TO_PARSE =
     4; // we are interested in user, nice, system and idle times.
+constexpr uint64_t CONTAINER_MILLICORES_PER_CORE = 1000;
 
 LinuxCpuStatsReader::LinuxCpuStatsReader(const std::string& cpu_stats_filename)
     : cpu_stats_filename_(cpu_stats_filename) {}
@@ -91,7 +92,7 @@ CpuTimes LinuxContainerCpuStatsReader::getCpuTimes() {
   const uint64_t current_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                     time_source_.monotonicTime().time_since_epoch())
                                     .count();
-  return {true, (cpu_times_value * 1024) / cpu_allocated_value,
+  return {true, (cpu_times_value * CONTAINER_MILLICORES_PER_CORE) / cpu_allocated_value,
           current_time}; // cpu_times is in nanoseconds and cpu_allocated shares is in Millicores
 }
 

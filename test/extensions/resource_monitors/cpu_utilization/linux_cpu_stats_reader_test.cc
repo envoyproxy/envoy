@@ -100,7 +100,7 @@ TEST(LinuxContainerCpuStatsReader, ReadsCgroupContainerStats) {
   const std::string temp_path_cpu_allocated =
       TestEnvironment::temporaryPath("cgroup_cpu_allocated_stats");
   AtomicFileUpdater file_updater_cpu_allocated(temp_path_cpu_allocated);
-  const std::string mock_contents_cpu_allocated = R"EOF(2048
+  const std::string mock_contents_cpu_allocated = R"EOF(2000
 )EOF";
   file_updater_cpu_allocated.update(mock_contents_cpu_allocated);
 
