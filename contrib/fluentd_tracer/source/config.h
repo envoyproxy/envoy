@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/trace/v3/fluentd.pb.h"
-#include "envoy/config/trace/v3/fluentd.pb.validate.h"
+#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.h"
+#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.validate.h"
 
 #include "source/extensions/tracers/common/factory_base.h"
 #include "source/extensions/tracers/fluentd/fluentd_tracer_impl.h"
@@ -14,7 +14,7 @@ namespace Fluentd {
 /**
  * Config registration for the Fluentd tracer. @see TracerFactory.
  */
-class FluentdTracerFactory : public Common::FactoryBase<envoy::config::trace::v3::FluentdConfig> {
+class FluentdTracerFactory : public Common::FactoryBase<envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig> {
 public:
   FluentdTracerFactory();
 
@@ -24,7 +24,7 @@ public:
 private:
   // FactoryBase
   Tracing::DriverSharedPtr
-  createTracerDriverTyped(const envoy::config::trace::v3::FluentdConfig& proto_config,
+  createTracerDriverTyped(const envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig& proto_config,
                           Server::Configuration::TracerFactoryContext& context) override;
 };
 

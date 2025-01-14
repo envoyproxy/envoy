@@ -444,7 +444,7 @@ new_features:
 - area: tracing
   change: |
     added support for :ref:`Fluentd <arch_overview_tracing>` tracer to send
-    traces in `Fluentd format
+    traces in `Fluentd format, available as a contrib extension
     <https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1>`_.
 - area: udp_proxy
   change: |

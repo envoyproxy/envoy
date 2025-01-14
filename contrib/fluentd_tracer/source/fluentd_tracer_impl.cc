@@ -1,5 +1,4 @@
-#include "fluentd_tracer_impl.h"
-#include "source/extensions/tracers/fluentd/fluentd_tracer_impl.h"
+#include "contrib/fluentd_tracer/source/fluentd_tracer_impl.h"
 
 #include <cstdint>
 

@@ -1,15 +1,15 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_extension",
+    "envoy_cc_contrib_extension",
     "envoy_cc_library",
-    "envoy_extension_package",
+    "envoy_contrib_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 # Trace driver for Fluentd: https://www.fluentd.org/
 
-envoy_extension_package()
+envoy_contrib_package()
 
 envoy_cc_extension(
     name = "config",
@@ -18,7 +18,7 @@ envoy_cc_extension(
     deps = [
         ":fluentd_tracer_lib",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/tracers/fluentd/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -35,6 +35,6 @@ envoy_cc_library(
         "//source/common/tracing:trace_context_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "@com_github_msgpack_cpp//:msgpack",
-        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/tracers/fluentd/v3alpha:pkg_cc_proto",
     ],
 )

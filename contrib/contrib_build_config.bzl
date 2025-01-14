@@ -83,4 +83,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.router.cluster_specifier_plugin.golang":             "//contrib/golang/router/cluster_specifier/source:config",
+    
+    #
+    # Tracers
+    #
+    
+    "envoy.tracers.fluentd":                                    "//contrib/fluentd_tracer/fluentd:config",
 }
