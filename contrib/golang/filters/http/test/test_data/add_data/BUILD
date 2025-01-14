@@ -1,17 +1,15 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 licenses(["notice"])  # Apache 2
 
-go_binary(
-    name = "filter.so",
+go_library(
+    name = "add_data",
     srcs = [
         "config.go",
         "filter.go",
     ],
-    out = "filter.so",
     cgo = True,
-    importpath = "github.com/envoyproxy/envoy/contrib/golang/filters/http/test/test_data/add_data",
-    linkmode = "c-shared",
+    importpath = "example.com/test-data/add_data",
     visibility = ["//visibility:public"],
     deps = [
         "//contrib/golang/common/go/api",

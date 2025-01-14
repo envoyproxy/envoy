@@ -86,7 +86,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
     : init_manager_(init_manager), live_(false), options_(options),
       validation_context_(options_.allowUnknownStaticFields(),
                           !options.rejectUnknownDynamicFields(),
-                          options.ignoreUnknownDynamicFields()),
+                          options.ignoreUnknownDynamicFields(), options.skipDeprecatedLogs()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),
@@ -840,10 +840,11 @@ void InstanceBase::onRuntimeReady() {
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
           *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
       THROW_IF_NOT_OK_REF(factory_or_error.status());
-      hds_delegate_ =
-          maybeCreateHdsDelegate(serverFactoryContext(), *stats_store_.rootScope(),
-                                 factory_or_error.value()->createUncachedRawAsyncClient(),
-                                 stats_store_, *ssl_context_manager_);
+      hds_delegate_ = maybeCreateHdsDelegate(
+          serverFactoryContext(), *stats_store_.rootScope(),
+          THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),
+                                Grpc::RawAsyncClientPtr),
+          stats_store_, *ssl_context_manager_);
     }
     END_TRY
     CATCH(const EnvoyException& e,
