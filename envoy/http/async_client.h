@@ -383,8 +383,7 @@ public:
       sidestream_watermark_callbacks = callbacks;
       return *this;
     }
-    StreamOptions&
-    setMatchingRoute(Envoy::Router::RouteConstSharedPtr route) {
+    StreamOptions& setMatchingRoute(Envoy::Router::RouteConstSharedPtr route) {
       matching_route = route;
       return *this;
     }
