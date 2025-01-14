@@ -1184,6 +1184,50 @@ TEST(HttpUtility, TestExtractHostPathFromUri) {
   EXPECT_EQ(path, "/:/adsf");
 }
 
+TEST(HttpUtility, TestExtractSchemeHostPathFromUri) {
+  absl::string_view scheme, host, path;
+
+  // FQDN
+  Utility::extractSchemeHostPathFromUri("scheme://dns.name/x/y/z", scheme, host, path);
+  EXPECT_EQ(scheme, "scheme");
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/x/y/z");
+
+  // Just the host part
+  Utility::extractSchemeHostPathFromUri("dns.name", scheme, host, path);
+  EXPECT_EQ(scheme, "");
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/");
+
+  // Just host and path
+  Utility::extractSchemeHostPathFromUri("dns.name/x/y/z", scheme, host, path);
+  EXPECT_EQ(scheme, "");
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/x/y/z");
+
+  // Just the path
+  Utility::extractSchemeHostPathFromUri("/x/y/z", scheme, host, path);
+  EXPECT_EQ(scheme, "");
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/x/y/z");
+
+  // Some invalid URI
+  Utility::extractSchemeHostPathFromUri("scheme://adf-scheme://adf", scheme, host, path);
+  EXPECT_EQ(scheme, "scheme");
+  EXPECT_EQ(host, "adf-scheme:");
+  EXPECT_EQ(path, "//adf");
+
+  Utility::extractSchemeHostPathFromUri("://", scheme, host, path);
+  EXPECT_EQ(scheme, "");
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/");
+
+  Utility::extractSchemeHostPathFromUri("/:/adsf", scheme, host, path);
+  EXPECT_EQ(scheme, "");
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/:/adsf");
+}
+
 TEST(HttpUtility, LocalPathFromFilePath) {
   EXPECT_EQ("/", Utility::localPathFromFilePath(""));
   EXPECT_EQ("c:/", Utility::localPathFromFilePath("c:/"));
