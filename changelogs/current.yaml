@@ -450,6 +450,9 @@ new_features:
     <envoy_v3_api_field_config.route.v3.RateLimit.Action.query_parameters>` action across HTTP and Thrift. This allows
     rate limiting based on specific query parameter values, with option to control the behavior when the query parameter
     is absent.
+- area: access log
+  change: |
+    Added new command-line flag :option:`--skip-deprecated-logs`.
 
 deprecated:
 - area: rbac
