@@ -46,9 +46,6 @@ void UpstreamRequestImpl::getHeaders(GetHeadersCallback&& cb) {
 void UpstreamRequestImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   headers_ = std::move(headers);
   end_stream_after_headers_ = end_stream;
-  if (end_stream) {
-    stream_ = nullptr;
-  }
   return maybeDeliverHeaders();
 }
 
@@ -74,9 +71,6 @@ void UpstreamRequestImpl::getBody(AdjustedByteRange range, GetBodyCallback&& cb)
 
 void UpstreamRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
   end_stream_after_body_ = end_stream;
-  if (end_stream) {
-    stream_ = nullptr;
-  }
   body_buffer_.move(data);
   return maybeDeliverBody();
 }
@@ -124,7 +118,6 @@ void UpstreamRequestImpl::getTrailers(GetTrailersCallback&& cb) {
 
 void UpstreamRequestImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   trailers_ = std::move(trailers);
-  stream_ = nullptr;
   return maybeDeliverTrailers();
 }
 
