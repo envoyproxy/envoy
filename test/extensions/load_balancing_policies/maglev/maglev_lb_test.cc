@@ -6,6 +6,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
@@ -75,7 +76,8 @@ public:
 
   // Just use this as parameters of create() method but thread aware load balancer will not use it.
   NiceMock<MockPrioritySet> worker_priority_set_;
-  LoadBalancerParams lb_params_{worker_priority_set_, {}};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  LoadBalancerParams lb_params_{worker_priority_set_, {}, dispatcher_};
 
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
@@ -92,7 +94,7 @@ public:
 // Works correctly without any hosts.
 TEST_F(MaglevLoadBalancerTest, NoHost) {
   init(7);
-  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr).host);
 };
 
 // Test for thread aware load balancer destructed before load balancer factory. After CDS removes a
@@ -156,7 +158,7 @@ TEST_F(MaglevLoadBalancerTest, Basic) {
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
-              lb->chooseHost(&context));
+              lb->chooseHost(&context).host);
   }
 }
 
@@ -191,7 +193,7 @@ TEST_F(MaglevLoadBalancerTest, BasicWithHostName) {
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
-              lb->chooseHost(&context));
+              lb->chooseHost(&context).host);
   }
 }
 
@@ -226,7 +228,7 @@ TEST_F(MaglevLoadBalancerTest, BasicWithMetadataHashKey) {
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
-              lb->chooseHost(&context));
+              lb->chooseHost(&context).host);
   }
 }
 
@@ -258,23 +260,23 @@ TEST_F(MaglevLoadBalancerTest, BasicWithRetryHostPredicate) {
   {
     // Confirm that i=3 is selected by the hash.
     TestLoadBalancerContext context(10);
-    EXPECT_EQ(host_set_.hosts_[1], lb->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[1], lb->chooseHost(&context).host);
   }
   {
     // First attempt succeeds even when retry count is > 0.
     TestLoadBalancerContext context(10, 2, [](const Host&) { return false; });
-    EXPECT_EQ(host_set_.hosts_[1], lb->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[1], lb->chooseHost(&context).host);
   }
   {
     // Second attempt chooses a different host in the ring.
     TestLoadBalancerContext context(
         10, 2, [&](const Host& host) { return &host == host_set_.hosts_[1].get(); });
-    EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[0], lb->chooseHost(&context).host);
   }
   {
     // Exhausted retries return the last checked host.
     TestLoadBalancerContext context(10, 2, [](const Host&) { return true; });
-    EXPECT_EQ(host_set_.hosts_[5], lb->chooseHost(&context));
+    EXPECT_EQ(host_set_.hosts_[5], lb->chooseHost(&context).host);
   }
 }
 
@@ -307,7 +309,7 @@ TEST_F(MaglevLoadBalancerTest, BasicStability) {
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
-              lb->chooseHost(&context));
+              lb->chooseHost(&context).host);
   }
 
   // Shuffle healthy_hosts_ to check stability of assignments
@@ -319,7 +321,7 @@ TEST_F(MaglevLoadBalancerTest, BasicStability) {
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
-              lb->chooseHost(&context));
+              lb->chooseHost(&context).host);
   }
 }
 
@@ -356,7 +358,7 @@ TEST_F(MaglevLoadBalancerTest, Weighted) {
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
-              lb->chooseHost(&context));
+              lb->chooseHost(&context).host);
   }
 }
 
@@ -404,7 +406,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
-              lb->chooseHost(&context));
+              lb->chooseHost(&context).host);
   }
 }
 
@@ -455,7 +457,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
-              lb->chooseHost(&context));
+              lb->chooseHost(&context).host);
   }
 }
 
@@ -471,7 +473,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedAllZeroLocalityWeights) {
   init(17, true);
   LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   TestLoadBalancerContext context(0);
-  EXPECT_EQ(nullptr, lb->chooseHost(&context));
+  EXPECT_EQ(nullptr, lb->chooseHost(&context).host);
 }
 
 // Validate that when we are in global panic and have localities, we get sane
@@ -518,7 +520,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
   for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
-              lb->chooseHost(&context));
+              lb->chooseHost(&context).host);
   }
 }
 
@@ -553,7 +555,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
   uint32_t counts[1024] = {0};
   for (uint32_t i = 0; i < MaglevTable::DefaultTableSize; ++i) {
     TestLoadBalancerContext context(i);
-    uint32_t port = lb->chooseHost(&context)->address()->ip()->port();
+    uint32_t port = lb->chooseHost(&context).host->address()->ip()->port();
     ++counts[port];
   }
 

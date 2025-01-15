@@ -53,6 +53,8 @@ public:
                             ConfigHelper::httpProxyConfig()),
         is_hash_lb_(GetParam() == envoy::config::cluster::v3::Cluster::RING_HASH ||
                     GetParam() == envoy::config::cluster::v3::Cluster::MAGLEV) {
+    // Subset load balancer does not support async lb.
+    absl::SetFlag(&FLAGS_envoy_reloadable_features_async_host_selection, false);
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
 

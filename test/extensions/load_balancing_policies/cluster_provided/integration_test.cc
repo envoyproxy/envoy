@@ -22,6 +22,7 @@ class ClusterProvidedIntegrationTest : public testing::TestWithParam<Network::Ad
                                        public HttpIntegrationTest {
 public:
   ClusterProvidedIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    absl::SetFlag(&FLAGS_envoy_reloadable_features_async_host_selection, false);
     // Create 3 different upstream server.
     setUpstreamCount(3);
   }
@@ -30,6 +31,7 @@ public:
     config_helper_.addConfigModifier(
         [legacy_api](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
           auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+          cluster_0->clear_load_balancing_policy();
           ASSERT(cluster_0->name() == "cluster_0");
 
           std::string cluster_yaml = R"EOF(

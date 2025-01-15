@@ -145,11 +145,11 @@ absl::Status ThreadAwareLoadBalancerBase::refresh() {
   return absl::OkStatus();
 }
 
-HostConstSharedPtr
+HostSelectionResponse
 ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
   // Make sure we correctly return nullptr for any early chooseHost() calls.
   if (per_priority_state_ == nullptr) {
-    return nullptr;
+    return {nullptr};
   }
 
   HostConstSharedPtr host;
@@ -173,7 +173,8 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
 
   const uint32_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
   for (uint32_t i = 0; i < max_attempts; ++i) {
-    host = per_priority_state->current_lb_->chooseHost(h, i);
+    host = LoadBalancer::onlyAllowSynchronousHostSelection(
+        per_priority_state->current_lb_->chooseHost(h, i));
 
     // If host selection failed or the host is accepted by the filter, return.
     // Otherwise, try again.
@@ -218,7 +219,7 @@ double ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::hostOverload
   return static_cast<double>(host.stats().rq_active_.value()) / slots;
 }
 
-HostConstSharedPtr
+HostSelectionResponse
 ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t hash,
                                                                         uint32_t attempt) const {
 
@@ -237,12 +238,13 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
   // results in more hosts being probed, so use a higher value if you require better performance.
 
   if (normalized_host_weights_.empty()) {
-    return nullptr;
+    return {nullptr};
   }
 
-  HostConstSharedPtr host = hashing_lb_ptr_->chooseHost(hash, attempt);
+  HostConstSharedPtr host =
+      LoadBalancer::onlyAllowSynchronousHostSelection(hashing_lb_ptr_->chooseHost(hash, attempt));
   if (host == nullptr) {
-    return nullptr;
+    return {nullptr};
   }
   const double weight = normalized_host_weights_map_.at(host);
   double overload_factor = hostOverloadFactor(*host, weight);

@@ -15,6 +15,7 @@
 #include "test/benchmark/main.h"
 #include "test/common/upstream/utility.h"
 #include "test/extensions/load_balancing_policies/common/benchmark_base_tester.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/load_balancer.h"
@@ -51,9 +52,9 @@ public:
         factory_context, subset_config_proto, status);
     ASSERT(status.ok());
 
-    lb_ = std::make_unique<Upstream::SubsetLoadBalancer>(*subset_config_, *info_, priority_set_,
-                                                         &local_priority_set_, stats_, stats_scope_,
-                                                         runtime_, random_, simTime());
+    lb_ = std::make_unique<Upstream::SubsetLoadBalancer>(
+        *subset_config_, *info_, priority_set_, &local_priority_set_, dispatcher_, stats_,
+        stats_scope_, runtime_, random_, simTime());
 
     const Upstream::HostVector& hosts = priority_set_.getOrCreateHostSet(0).hosts();
     ASSERT(hosts.size() == num_hosts);
@@ -74,6 +75,7 @@ public:
         host_moved_, {}, random_.random(), absl::nullopt);
   }
 
+  NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<Upstream::SubsetLoadBalancerConfig> subset_config_;
   std::unique_ptr<Upstream::SubsetLoadBalancer> lb_;
   Upstream::HostVectorConstSharedPtr orig_hosts_;

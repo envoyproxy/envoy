@@ -106,7 +106,7 @@ public:
                             per_zone_local_shared),
           {}, empty_vector_, empty_vector_, random_.random(), absl::nullopt);
 
-      HostConstSharedPtr selected = lb.chooseHost(nullptr);
+      HostConstSharedPtr selected = lb.chooseHost(nullptr).host;
       hits[selected->address()->asString()]++;
     }
 

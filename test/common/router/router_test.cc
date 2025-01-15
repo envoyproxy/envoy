@@ -86,7 +86,8 @@ public:
       : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
     ON_CALL(cm_.thread_local_cluster_, chooseHost(_))
-        .WillByDefault(Return(cm_.thread_local_cluster_.lb_.host_));
+        .WillByDefault(
+            Return(Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_}));
   };
 
   void testRequestResponse(bool with_trailers, bool can_use_http3 = true) {

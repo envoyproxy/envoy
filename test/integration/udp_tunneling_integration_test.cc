@@ -338,7 +338,9 @@ TEST_P(ForwardingConnectUdpIntegrationTest, DoNotForwardNonConnectUdp) {
 class UdpTunnelingIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   UdpTunnelingIntegrationTest()
-      : HttpProtocolIntegrationTest(ConfigHelper::baseUdpListenerConfig()) {}
+      : HttpProtocolIntegrationTest(ConfigHelper::baseUdpListenerConfig()) {
+    absl::SetFlag(&FLAGS_envoy_reloadable_features_async_host_selection, false);
+  }
 
   struct BufferOptions {
     uint32_t max_buffered_datagrams_;

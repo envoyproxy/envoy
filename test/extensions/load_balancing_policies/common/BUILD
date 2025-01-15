@@ -19,6 +19,7 @@ envoy_cc_test_library(
         "//source/common/memory:stats_lib",
         "//source/common/upstream:upstream_lib",
         "//test/common/upstream:utility_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",

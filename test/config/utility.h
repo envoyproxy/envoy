@@ -295,6 +295,12 @@ public:
   // Called by finalize to set up the ports.
   void setPorts(const std::vector<uint32_t>& ports, bool override_port_zero = false);
 
+  // Switch from a default of round robin to async round robin.
+  void setAsyncLb();
+
+  // Remove any async lb config present.
+  void clearAsyncLb();
+
   // Set source_address in the bootstrap bind config.
   void setSourceAddress(const std::string& address_string);
 

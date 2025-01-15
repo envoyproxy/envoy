@@ -4,6 +4,7 @@
 
 #include "source/extensions/load_balancing_policies/ring_hash/config.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
@@ -21,6 +22,7 @@ TEST(RingHashConfigTest, Validate) {
   NiceMock<Upstream::MockClusterInfo> cluster_info;
   NiceMock<Upstream::MockPrioritySet> main_thread_priority_set;
   NiceMock<Upstream::MockPrioritySet> thread_local_priority_set;
+  NiceMock<Event::MockDispatcher> dispatcher;
 
   {
     envoy::config::core::v3::TypedExtensionConfig config;
@@ -42,7 +44,8 @@ TEST(RingHashConfigTest, Validate) {
     auto thread_local_lb_factory = thread_aware_lb->factory();
     EXPECT_NE(nullptr, thread_local_lb_factory);
 
-    auto thread_local_lb = thread_local_lb_factory->create({thread_local_priority_set, nullptr});
+    auto thread_local_lb =
+        thread_local_lb_factory->create({thread_local_priority_set, nullptr, dispatcher});
     EXPECT_NE(nullptr, thread_local_lb);
   }
 

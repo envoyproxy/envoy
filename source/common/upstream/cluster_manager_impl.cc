@@ -1247,7 +1247,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
 absl::optional<TcpPoolData>
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
     ResourcePriority priority, LoadBalancerContext* context) {
-  HostConstSharedPtr host = chooseHost(context);
+  HostConstSharedPtr host = LoadBalancer::onlyAllowSynchronousHostSelection(chooseHost(context));
   if (!host) {
     return absl::nullopt;
   }
@@ -1624,7 +1624,9 @@ void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host)
 
 Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConn(
     LoadBalancerContext* context) {
-  HostConstSharedPtr logical_host = chooseHost(context);
+  HostConstSharedPtr logical_host =
+      LoadBalancer::onlyAllowSynchronousHostSelection(chooseHost(context));
+
   if (logical_host) {
     auto conn_info = logical_host->createConnection(
         parent_.thread_local_dispatcher_, nullptr,
@@ -1683,7 +1685,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChange()) {
     ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", name);
-    lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
+    lb_ = lb_factory_->create(
+        {priority_set_, parent_.local_priority_set_, parent_.thread_local_dispatcher_});
   }
 }
 
@@ -2052,7 +2055,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
   ASSERT(lb_factory_ != nullptr);
-  lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
+  lb_ = lb_factory_->create(
+      {priority_set_, parent_.local_priority_set_, parent_.thread_local_dispatcher_});
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainOrCloseConnPools(
@@ -2214,23 +2218,25 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
   }
 }
 
-HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
+HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
     LoadBalancerContext* context) {
   auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
   HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
                                                             override_host_statuses_, context);
   if (host != nullptr) {
-    return host;
+    return {std::move(host)};
   }
+
   if (HostUtility::allowLBChooseHost(context)) {
-    host = lb_->chooseHost(context);
+    Upstream::HostSelectionResponse host_selection = lb_->chooseHost(context);
+    if (host_selection.host || host_selection.cancelable) {
+      return host_selection;
+    }
   }
-  if (host) {
-    return host;
-  }
+
   cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
   ENVOY_LOG(debug, "no healthy host");
-  return nullptr;
+  return {nullptr};
 }
 
 HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(

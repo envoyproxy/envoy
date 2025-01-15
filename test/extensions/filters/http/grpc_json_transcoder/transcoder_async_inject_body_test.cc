@@ -27,6 +27,7 @@ constexpr absl::string_view kTranscoderConfig =
 class TranscoderAsyncBodyInjectionIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void SetUp() override {
+    absl::SetFlag(&FLAGS_envoy_reloadable_features_async_host_selection, false);
     HttpProtocolIntegrationTest::SetUp();
 
     config_helper_.prependFilter(R"EOF(
