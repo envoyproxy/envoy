@@ -17,5 +17,9 @@ new_features:
   change: |
     Added support to monitor Container CPU utilization in Linux K8s environment using existing
     extension <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>.
+- area: lua
+  change: |
+    Added :ref:`virtualClusterName() <config_http_filters_lua_stream_info_virtual_cluster_name>` API to the Stream Info
+    Object to get the name of the virtual cluster matched.
 
 deprecated:
