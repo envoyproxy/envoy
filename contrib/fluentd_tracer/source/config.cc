@@ -32,7 +32,7 @@ FluentdTracerCacheSharedPtr FluentdTracerFactory::getTracerCacheSingleton(
 FluentdTracerFactory::FluentdTracerFactory() : FactoryBase("envoy.tracers.fluentd") {}
 
 Tracing::DriverSharedPtr FluentdTracerFactory::createTracerDriverTyped(
-    const envoy::config::trace::v3alpha::FluentdConfig& proto_config,
+    const envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
   return std::make_shared<Driver>(std::make_shared<FluentdConfig>(proto_config), context,
                                   getTracerCacheSingleton(context.serverFactoryContext()));
