@@ -6,6 +6,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
@@ -75,7 +76,8 @@ public:
 
   // Just use this as parameters of create() method but thread aware load balancer will not use it.
   NiceMock<MockPrioritySet> worker_priority_set_;
-  LoadBalancerParams lb_params_{worker_priority_set_, {}};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  LoadBalancerParams lb_params_{worker_priority_set_, {}, dispatcher_};
 
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};

@@ -9,6 +9,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/conn_pool.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -175,10 +176,11 @@ public:
   Envoy::Common::CallbackHandlePtr member_update_cb_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Network::MockConnection> connection_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
 
   // Just use this as parameters of create() method but thread aware load balancer will not use it.
   NiceMock<Upstream::MockPrioritySet> worker_priority_set_;
-  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}};
+  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}, dispatcher_};
 
   const std::string sub_cluster_yaml_config_ = R"EOF(
 name: name

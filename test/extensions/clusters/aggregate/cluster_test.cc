@@ -6,6 +6,7 @@
 #include "source/extensions/clusters/aggregate/cluster.h"
 
 #include "test/common/upstream/utility.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
@@ -150,10 +151,11 @@ public:
   NiceMock<Upstream::MockThreadLocalCluster> primary_, secondary_;
   Upstream::PrioritySetImpl primary_ps_, secondary_ps_;
   NiceMock<Upstream::MockLoadBalancer> primary_load_balancer_, secondary_load_balancer_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
 
   // Just use this as parameters of create() method but thread aware load balancer will not use it.
   NiceMock<Upstream::MockPrioritySet> worker_priority_set_;
-  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}};
+  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}, dispatcher_};
 
   const std::string default_yaml_config_ = R"EOF(
     name: aggregate_cluster

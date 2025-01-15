@@ -47,7 +47,8 @@ using HostPredicate = std::function<bool(const Host&)>;
 SubsetLoadBalancer::SubsetLoadBalancer(const SubsetLoadBalancerConfig& lb_config,
                                        const Upstream::ClusterInfo& cluster_info,
                                        const PrioritySet& priority_set,
-                                       const PrioritySet* local_priority_set, ClusterLbStats& stats,
+                                       const PrioritySet* local_priority_set,
+                                       Event::Dispatcher& dispatcher, ClusterLbStats& stats,
                                        Stats::Scope& scope, Runtime::Loader& runtime,
                                        Random::RandomGenerator& random, TimeSource& time_source)
     : lb_config_(lb_config), cluster_info_(cluster_info), stats_(stats), scope_(scope),
@@ -58,6 +59,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(const SubsetLoadBalancerConfig& lb_config
                                lb_config_.subsetInfo().defaultSubset().fields().end()),
       subset_selectors_(lb_config_.subsetInfo().subsetSelectors()),
       original_priority_set_(priority_set), original_local_priority_set_(local_priority_set),
+      dispatcher_(dispatcher),
       locality_weight_aware_(lb_config_.subsetInfo().localityWeightAware()),
       scale_locality_weight_(lb_config_.subsetInfo().scaleLocalityWeight()),
       list_as_any_(lb_config_.subsetInfo().listAsAny()),
@@ -711,7 +713,8 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
                                                            bool scale_locality_weight)
     : original_priority_set_(subset_lb.original_priority_set_),
       original_local_priority_set_(subset_lb.original_local_priority_set_),
-      locality_weight_aware_(locality_weight_aware), scale_locality_weight_(scale_locality_weight) {
+      dispatcher_(subset_lb.dispatcher_), locality_weight_aware_(locality_weight_aware),
+      scale_locality_weight_(scale_locality_weight) {
   // Create at least one host set.
   getOrCreateHostSet(0);
 
@@ -720,7 +723,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
                                               subset_lb.random_, subset_lb.time_source_);
   ASSERT(thread_aware_lb_ != nullptr);
   THROW_IF_NOT_OK(thread_aware_lb_->initialize());
-  lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
+  lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_, dispatcher_});
 
   triggerCallbacks();
 }
@@ -864,7 +867,7 @@ void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
   // TODO(mattklein123): See the PrioritySubsetImpl constructor for additional comments on how
   // we can do better here.
   if (thread_aware_lb_ != nullptr && thread_aware_lb_->factory()->recreateOnHostChange()) {
-    lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_});
+    lb_ = thread_aware_lb_->factory()->create({*this, original_local_priority_set_, dispatcher_});
   }
 }
 

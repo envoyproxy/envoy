@@ -41,7 +41,8 @@ TEST(ClientSideWeightedRoundRobinConfigTest, ValidateFail) {
   auto thread_local_lb_factory = thread_aware_lb->factory();
   EXPECT_NE(nullptr, thread_local_lb_factory);
 
-  auto thread_local_lb = thread_local_lb_factory->create({thread_local_priority_set, nullptr});
+  auto thread_local_lb =
+      thread_local_lb_factory->create({thread_local_priority_set, nullptr, mock_thread_dispatcher});
   EXPECT_NE(nullptr, thread_local_lb);
 }
 

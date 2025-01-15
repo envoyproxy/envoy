@@ -19,6 +19,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -342,9 +343,9 @@ public:
         }(),
         Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_),
         std::move(child_lb_config_));
-    lb_ = std::make_shared<SubsetLoadBalancer>(*lb_config_, *info_, priority_set_,
-                                               zone_aware ? &local_priority_set_ : nullptr, stats_,
-                                               *scope_, runtime_, random_, simTime());
+    lb_ = std::make_shared<SubsetLoadBalancer>(
+        *lb_config_, *info_, priority_set_, zone_aware ? &local_priority_set_ : nullptr,
+        dispatcher_, stats_, *scope_, runtime_, random_, simTime());
   }
 
   void init() {
@@ -723,6 +724,7 @@ public:
   Stats::ScopeSharedPtr scope_;
   ClusterLbStatNames stat_names_;
   ClusterLbStats stats_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
   PrioritySetImpl local_priority_set_;
   HostVectorSharedPtr local_hosts_;
   HostsPerLocalitySharedPtr local_hosts_per_locality_;
