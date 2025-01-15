@@ -9,6 +9,8 @@ import "envoy/type/v3/http_status.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -377,7 +379,6 @@ message HeaderMutation {
   repeated string remove_headers = 2;
 }
 
-// [#not-implemented-hide:]
 // The body response message corresponding to FULL_DUPLEX_STREAMED body mode.
 message StreamedBodyResponse {
   // The body response chunk that will be passed to the upstream/downstream by Envoy.
@@ -406,10 +407,10 @@ message BodyMutation {
     // Clear the corresponding body chunk.
     bool clear_body = 2;
 
-    // [#not-implemented-hide:]
     // Must be used when the corresponding ``BodySendMode`` in the
     // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
     // is set to ``FULL_DUPLEX_STREAMED``.
-    StreamedBodyResponse streamed_response = 3;
+    StreamedBodyResponse streamed_response = 3
+        [(xds.annotations.v3.field_status).work_in_progress = true];
   }
 }

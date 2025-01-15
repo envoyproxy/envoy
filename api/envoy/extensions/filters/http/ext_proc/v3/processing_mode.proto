@@ -70,7 +70,6 @@ message ProcessingMode {
     // up to the buffer limit will be sent.
     BUFFERED_PARTIAL = 3;
 
-    // [#not-implemented-hide:]
     // Envoy streams the body to the server in pieces as they arrive.
     //
     // 1) The server may choose to buffer any number chunks of data before processing them.
@@ -99,6 +98,7 @@ message ProcessingMode {
     //   :ref:`StreamedBodyResponse <envoy_v3_api_msg_service.ext_proc.v3.StreamedBodyResponse>`
     //   to Envoy in the body response.
     // * Envoy will stream the body chunks in the responses from the server to the upstream/downstream as they arrive.
+
     FULL_DUPLEX_STREAMED = 4;
   }
 
