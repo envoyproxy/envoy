@@ -28,13 +28,13 @@ envoy_cc_test(
     srcs = ["tracer_integration_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//contrib/fluentd_tracer/source:config",
+        "//contrib/fluentd_tracer/source:fluentd_tracer_lib",
         "//source/common/common:base64_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/runtime:runtime_lib",
-        "//contrib/fluentd_tracer/source:config",
-        "//contrib/fluentd_tracer/source:fluentd_tracer_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -47,7 +47,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//contrib/envoy/extensions/tracers/fluentd/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -61,5 +61,6 @@ envoy_cc_test(
         "//test/mocks/server:tracer_factory_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//contrib/envoy/extensions/tracers/fluentd/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )

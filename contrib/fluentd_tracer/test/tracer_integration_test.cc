@@ -1,7 +1,7 @@
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.h"
+#include "envoy/config/trace/v3/fluentd.pb.h"
 
-#include "contrib/fluentd_tracer/source/config.h"
-#include "contrib/fluentd_tracer/source/fluentd_tracer_impl.h"
+#include "source/extensions/tracers/fluentd/config.h"
+#include "source/extensions/tracers/fluentd/fluentd_tracer_impl.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
@@ -109,6 +109,7 @@ TEST_F(FluentdTracerIntegrationTest, Span) {
   auto baggage = span->getBaggage("test");
   EXPECT_EQ(baggage, "");
 
+  EXPECT_CALL(span, flush());
   span->finishSpan();
 }
 

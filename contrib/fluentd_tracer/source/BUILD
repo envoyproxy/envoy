@@ -11,7 +11,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
-envoy_cc_extension(
+envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],

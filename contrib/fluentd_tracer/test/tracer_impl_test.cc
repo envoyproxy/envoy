@@ -3,8 +3,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/tracing/http_tracer_impl.h"
-#include "contrib/fluentd_tracer/source/config.h"
-#include "contrib/fluentd_tracer/source/fluentd_tracer_impl.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -12,6 +10,8 @@
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
+#include "contrib/fluentd_tracer/source/config.h"
+#include "contrib/fluentd_tracer/source/fluentd_tracer_impl.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "msgpack.hpp"
@@ -84,7 +84,7 @@ public:
   Event::MockTimer* flush_timer_;
   Event::MockTimer* retry_timer_;
   std::unique_ptr<FluentdTracerImpl> tracer_;
-  envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig config_;
+  envoy::config::trace::v3alpha::FluentdConfig config_;
   NiceMock<Random::MockRandomGenerator> random_;
   Event::SimulatedTimeSystem time_system_;
 };
@@ -392,12 +392,12 @@ TEST_F(FluentdTracerCacheImplTest, CreateTracerWhenClusterNotFound) {
       cluster_manager_, context.serverFactoryContext().scope(),
       context.serverFactoryContext().threadLocal());
 
-  envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig config;
+  envoy::config::trace::v3alpha::FluentdConfig config;
   config.set_cluster("test_cluster");
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
   auto tracer = tracer_cache_->getOrCreateTracer(
-      std::make_shared<envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig>(config),
+      std::make_shared<envoy::config::trace::v3alpha::FluentdConfig>(config),
       context.serverFactoryContext().api().randomGenerator(),
       context.serverFactoryContext().timeSource());
   EXPECT_EQ(tracer, nullptr);
@@ -405,12 +405,12 @@ TEST_F(FluentdTracerCacheImplTest, CreateTracerWhenClusterNotFound) {
 
 // Create a new tracer with valid cluster
 TEST_F(FluentdTracerCacheImplTest, CreateNonExistingLogger) {
-  envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig config;
+  envoy::config::trace::v3alpha::FluentdConfig config;
   config.set_cluster("test_cluster");
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
   auto tracer = tracer_cache_->getOrCreateTracer(
-      std::make_shared<envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig>(config),
+      std::make_shared<envoy::config::trace::v3alpha::FluentdConfig>(config),
       context.serverFactoryContext().api().randomGenerator(),
       context.serverFactoryContext().timeSource());
   EXPECT_NE(tracer, nullptr);
@@ -418,18 +418,18 @@ TEST_F(FluentdTracerCacheImplTest, CreateNonExistingLogger) {
 
 // Create a tracer with the same config
 TEST_F(FluentdTracerCacheImplTest, CreateTwoTracersSameHash) {
-  envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig config;
+  envoy::config::trace::v3alpha::FluentdConfig config;
   config.set_cluster("test_cluster");
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
 
   auto tracer1 = tracer_cache_->getOrCreateTracer(
-      std::make_shared<envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig>(config),
+      std::make_shared<envoy::config::trace::v3alpha::FluentdConfig>(config),
       context.serverFactoryContext().api().randomGenerator(),
       context.serverFactoryContext().timeSource());
 
   auto tracer2 = tracer_cache_->getOrCreateTracer(
-      std::make_shared<envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig>(config),
+      std::make_shared<envoy::config::trace::v3alpha::FluentdConfig>(config),
       context.serverFactoryContext().api().randomGenerator(),
       context.serverFactoryContext().timeSource());
 

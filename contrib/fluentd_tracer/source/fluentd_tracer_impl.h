@@ -2,9 +2,6 @@
 
 #include <chrono>
 
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.h"
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.validate.h"
-
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/trace_driver.h"
 
@@ -15,13 +12,15 @@
 #include "source/extensions/tracers/common/factory_base.h"
 
 #include "absl/strings/string_view.h"
+#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.h"
+#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Fluentd {
 
-using FluentdConfig = envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig;
+using FluentdConfig = envoy::config::trace::v3alpha::FluentdConfig;
 using FluentdConfigSharedPtr = std::shared_ptr<FluentdConfig>;
 
 static constexpr uint64_t DefaultBaseBackoffIntervalMs = 500;

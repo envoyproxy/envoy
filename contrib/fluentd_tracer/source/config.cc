@@ -2,12 +2,12 @@
 
 #include <memory>
 
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.h"
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.validate.h"
-
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
+
+#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.h"
+#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.validate.h"
 #include "contrib/fluentd_tracer/source/fluentd_tracer_impl.h"
 
 namespace Envoy {
@@ -32,7 +32,7 @@ FluentdTracerCacheSharedPtr FluentdTracerFactory::getTracerCacheSingleton(
 FluentdTracerFactory::FluentdTracerFactory() : FactoryBase("envoy.tracers.fluentd") {}
 
 Tracing::DriverSharedPtr FluentdTracerFactory::createTracerDriverTyped(
-    const envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig& proto_config,
+    const envoy::config::trace::v3alpha::FluentdConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
   return std::make_shared<Driver>(std::make_shared<FluentdConfig>(proto_config), context,
                                   getTracerCacheSingleton(context.serverFactoryContext()));

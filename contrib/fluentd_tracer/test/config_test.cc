@@ -1,13 +1,12 @@
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.h"
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.validate.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/registry/registry.h"
-
-#include "contrib/fluentd_tracer/source/config.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
 
+#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.h"
+#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.validate.h"
+#include "contrib/fluentd_tracer/source/config.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -34,7 +33,7 @@ TEST(FluentdTracerConfigTest, FluentdTracerMinimalConfig) {
       http:
         name: envoy.tracers.fluentd
         typed_config:
-          "@type": type.googleapis.com/envoy.config.trace.v3.FluentdConfig
+          "@type": type.googleapis.com/envoy.config.trace.v3alpha.FluentdConfig
           cluster: "fake_cluster"
           tag: "fake_tag"
           stat_prefix: "envoy.tracers.fluentd"
@@ -66,7 +65,7 @@ TEST(FluentdTracerConfigTest, FluentdTracerFullConfig) {
       http:
         name: envoy.tracers.fluentd
         typed_config:
-          "@type": type.googleapis.com/envoy.config.trace.v3.FluentdConfig
+          "@type": type.googleapis.com/envoy.config.trace.v3alpha.FluentdConfig
           cluster: "fake_cluster"
           tag: "fake_tag"
           stat_prefix: "envoy.tracers.fluentd"
