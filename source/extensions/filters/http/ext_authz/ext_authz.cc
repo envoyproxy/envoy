@@ -69,7 +69,6 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
       clear_route_cache_(config.clear_route_cache()),
       max_request_bytes_(config.with_request_body().max_request_bytes()),
-
       // `pack_as_bytes_` should be true when configured with the HTTP service because there is no
       // difference to where the body is written in http requests, and a value of false here will
       // cause non UTF-8 body content to be changed when it doesn't need to.
@@ -119,6 +118,22 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       charge_cluster_response_stats_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
+      response_cache_max_size_(
+          config.response_cache_max_size() != 0 ? config.response_cache_max_size() : 100),
+      response_cache_ttl_(config.response_cache_ttl() != 0 ? config.response_cache_ttl() : 10),
+      response_cache_header_name_(Http::LowerCaseString(config.response_cache_header_name())),
+      response_cache_eviction_candidate_ratio_(
+          config.response_cache_eviction_candidate_ratio() != 0
+              ? config.response_cache_eviction_candidate_ratio()
+              : 0.01),
+      response_cache_eviction_threshold_ratio_(
+          config.response_cache_eviction_threshold_ratio() != 0
+              ? config.response_cache_eviction_threshold_ratio()
+              : 0.5),
+      response_cache_(response_cache_max_size_, response_cache_ttl_,
+                      response_cache_eviction_candidate_ratio_,
+                      response_cache_eviction_threshold_ratio_,
+                      factory_context.timeSource()), // response cache
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
       ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
       ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
@@ -276,6 +291,52 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
+  }
+
+  // Try reading response from the response cache
+  const auto auth_header = headers.get(config_->responseCacheHeaderName());
+  if (!auth_header.empty()) {
+    const std::string auth_header_str(auth_header[0]->value().getStringView());
+
+    // Fill cache for testing
+    // TODO: do ifndef
+    if (auth_header_str == "magic_fill_cache_for_testing") {
+      for (std::size_t i = 0; i < config_->responseCache().getMaxCacheSize() - 10; ++i) {
+        std::string test_key = "test_key_" + std::to_string(i);
+        config_->responseCache().Insert(test_key.c_str(), 200);
+      }
+    } else if (auth_header_str == "magic_fill_cache_for_testing_1000") {
+      for (std::size_t i = 0; i < 1000; ++i) {
+        std::string test_key = "test_key_" + std::to_string(i);
+        config_->responseCache().Insert(test_key.c_str(), 200);
+      }
+    }
+
+    // Retrieve the HTTP status code from the cache
+    auto cached_status_code = config_->responseCache().Get(auth_header_str.c_str());
+    if (cached_status_code.has_value()) {
+      ENVOY_STREAM_LOG(info, "Cache HIT for token {}: HTTP status {}", *decoder_callbacks_,
+                       auth_header_str, *cached_status_code);
+
+      if (*cached_status_code >= 200 && *cached_status_code < 300) {
+        // Any 2xx response is a success: let the request proceed
+        return Http::FilterHeadersStatus::Continue;
+      } else {
+        // Non-2xx response: reject the request
+        decoder_callbacks_->streamInfo().setResponseFlag(
+            StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
+        decoder_callbacks_->sendLocalReply(
+            static_cast<Http::Code>(*cached_status_code), "Unauthorized", nullptr, absl::nullopt,
+            Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
+
+        return Http::FilterHeadersStatus::StopIteration;
+      }
+    } else {
+      ENVOY_STREAM_LOG(info, "Cache miss for auth token {}. Will call external authz.",
+                       *decoder_callbacks_, auth_header_str);
+    }
+  } else {
+    ENVOY_STREAM_LOG(info, "Cannot check cache because auth_header is empty", *decoder_callbacks_);
   }
 
   request_headers_ = &headers;
@@ -471,6 +532,20 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   state_ = State::Complete;
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
+
+  // Extract the actual HTTP status code
+  const int http_status_code =
+      static_cast<uint16_t>(response->status_code); // Assuming this static cast is safe because
+                                                    // http status code should be <= 0xffff
+
+  // If auth header exists, cache the response status code
+  const auto auth_header = request_headers_->get(config_->responseCacheHeaderName());
+  if (!auth_header.empty()) {
+    const std::string auth_header_str(auth_header[0]->value().getStringView());
+    ENVOY_LOG(info, "Caching response: {} with HTTP status: {}", auth_header_str, http_status_code);
+    config_->responseCache().Insert(auth_header_str.c_str(),
+                                    http_status_code); // Store the HTTP status code
+  }
 
   updateLoggingInfo();
 

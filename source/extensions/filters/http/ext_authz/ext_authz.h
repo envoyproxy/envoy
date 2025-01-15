@@ -26,6 +26,9 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 
+// For response cache
+#include "source/extensions/filters/http/ext_authz/fifo_cache.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -130,6 +133,12 @@ public:
   bool packAsBytes() const { return pack_as_bytes_; }
 
   bool headersAsBytes() const { return encode_raw_headers_; }
+
+  FIFOEvictionCache& responseCache() { return response_cache_; }
+
+  const Envoy::Http::LowerCaseString& responseCacheHeaderName() const {
+    return response_cache_header_name_;
+  }
 
   Filters::Common::MutationRules::CheckResult
   checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
@@ -270,6 +279,15 @@ private:
 
   Filters::Common::ExtAuthz::MatcherSharedPtr allowed_headers_matcher_;
   Filters::Common::ExtAuthz::MatcherSharedPtr disallowed_headers_matcher_;
+
+  // Fields for response cache configuration
+  uint32_t response_cache_max_size_;
+  uint32_t response_cache_ttl_;
+  Envoy::Http::LowerCaseString response_cache_header_name_; // New field for header names
+  // Response cache
+  double response_cache_eviction_candidate_ratio_;
+  double response_cache_eviction_threshold_ratio_;
+  FIFOEvictionCache response_cache_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
