@@ -865,7 +865,7 @@ protected:
       host_to_sessions_[host].emplace(session);
     }
 
-    Upstream::HostConstSharedPtr
+    Upstream::HostSelectionResponse
     chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address,
                StreamInfo::StreamInfo* stream_info) const;
 

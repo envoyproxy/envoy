@@ -195,9 +195,7 @@ private:
   RequestTrailerMap& addDecodedTrailers() override { PANIC("not implemented"); }
   void addDecodedData(Buffer::Instance&, bool) override {
     // This should only be called if the user has set up buffering. The request is already fully
-    // buffered. Note that this is only called via the async client's internal use of the router
-    // filter which uses this function for buffering.
-    ASSERT(buffered_body_ != nullptr);
+    // buffered so addDecodedData is a no-op.
   }
   MetadataMapVector& addDecodedMetadata() override { PANIC("not implemented"); }
   void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
