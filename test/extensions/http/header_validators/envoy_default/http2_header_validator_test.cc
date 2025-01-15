@@ -799,15 +799,15 @@ std::string generatePercentEncodedExtendedAscii() {
   return encoded_extended_ascii_string;
 }
 
-// H/3 also allows "<>[]^`{}\| space, TAB in :path
-static const std::string AdditionallyAllowedCharactersHttp3 = "\t \"<>[]^`{}\\|";
+// H/3 also allows "<>[]^`{}\| in :path
+static const std::string AdditionallyAllowedCharactersHttp3 = "\"<>[]^`{}\\|";
 
 // H/2 in addition to H/3 also allows extended ASCII in :path
 static const std::string AdditionallyAllowedCharactersHttp2 =
     absl::StrCat(AdditionallyAllowedCharactersHttp3, generateExtendedAsciiString());
 } // namespace
 
-// Validate that H/2 UHV allows additional characters "<>[]^`{}\| space TAB and extended
+// Validate that H/2 UHV allows additional characters "<>[]^`{}\| and extended
 // ASCII and encodes them when path normalization is enabled.
 TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInPathAllowedHttp2) {
   scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
@@ -823,11 +823,11 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInPathAllowedHttp2) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // Note that \ is translated to / and [] remain unencoded
-  EXPECT_EQ(headers.getPathValue(), absl::StrCat("/path/with%09%20%22%3C%3E[]%5E%60%7B%7D/%7C",
+  EXPECT_EQ(headers.getPathValue(), absl::StrCat("/path/with%22%3C%3E[]%5E%60%7B%7D/%7C",
                                                  generatePercentEncodedExtendedAscii()));
 }
 
-// Validate that H/3 UHV allows additional characters "<>[]^`{}\| space TAB
+// Validate that H/3 UHV allows additional characters "<>[]^`{}\|
 // and encodes them when path normalization is enabled.
 TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInPathAllowedHttp3) {
   scoped_runtime_.mergeValues({{"envoy.uhv.allow_non_compliant_characters_in_path", "true"}});
@@ -844,7 +844,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInPathAllowedHttp3) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // Note that \ is translated to / and [] remain unencoded
-  EXPECT_EQ(headers.getPathValue(), "/path/with%09%20%22%3C%3E[]%5E%60%7B%7D/%7C");
+  EXPECT_EQ(headers.getPathValue(), "/path/with%22%3C%3E[]%5E%60%7B%7D/%7C");
 }
 
 // Validate that without path normalization additional characters remain untouched
@@ -860,7 +860,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInPathAllowedWithoutPathNor
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   EXPECT_EQ(headers.getPathValue(),
-            absl::StrCat("/path/with\t \"<>[]^`{}\\|", generateExtendedAsciiString()));
+            absl::StrCat("/path/with\"<>[]^`{}\\|", generateExtendedAsciiString()));
 }
 
 TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInPathAllowedWithoutPathNormalizationHttp3) {
@@ -875,7 +875,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInPathAllowedWithoutPathNor
       {":path", absl::StrCat("/path/with", AdditionallyAllowedCharactersHttp3)}};
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
-  EXPECT_EQ(headers.getPathValue(), "/path/with\t \"<>[]^`{}\\|");
+  EXPECT_EQ(headers.getPathValue(), "/path/with\"<>[]^`{}\\|");
 }
 
 TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInQueryAllowedHttp2) {
@@ -894,7 +894,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInQueryAllowedHttp2) {
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // Additional characters in query always remain untouched
   EXPECT_EQ(headers.getPathValue(),
-            absl::StrCat("/path/with?value=\t \"<>[]^`{}\\|", generateExtendedAsciiString()));
+            absl::StrCat("/path/with?value=\"<>[]^`{}\\|", generateExtendedAsciiString()));
 }
 
 TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInQueryAllowedHttp3) {
@@ -913,7 +913,7 @@ TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInQueryAllowedHttp3) {
   EXPECT_ACCEPT(uhv->validateRequestHeaders(headers));
   EXPECT_ACCEPT(uhv->transformRequestHeaders(headers));
   // Additional characters in query always remain untouched
-  EXPECT_EQ(headers.getPathValue(), "/path/with?value=\t \"<>[]^`{}\\|");
+  EXPECT_EQ(headers.getPathValue(), "/path/with?value=\"<>[]^`{}\\|");
 }
 
 TEST_F(Http2HeaderValidatorTest, AdditionalCharactersInFragmentAllowedHttp2) {

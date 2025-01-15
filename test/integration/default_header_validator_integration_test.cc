@@ -68,14 +68,6 @@ public:
     }
   }
 
-  void enableOghttp2ForFakeUpstream() {
-    // Enable most permissive codec for fake upstreams, so it can accept unencoded TAB and space
-    // from the H/3 downstream
-    envoy::config::core::v3::Http2ProtocolOptions config;
-    config.mutable_use_oghttp2_codec()->set_value(true);
-    mergeOptions(config);
-  }
-
   std::string generateExtendedAsciiString() {
     std::string extended_ascii_string;
     for (uint32_t ascii = 0x80; ascii <= 0xff; ++ascii) {
@@ -87,16 +79,9 @@ public:
   std::string additionallyAllowedCharactersInUrlPath() {
     // All codecs allow the following characters that are outside of RFC "<>[]^`{}\|
     std::string additionally_allowed_characters(R"--("<>[]^`{}\|)--");
-    if (downstream_protocol_ == Http::CodecType::HTTP3) {
-      // In addition H/3 allows TAB and SPACE in path
-      additionally_allowed_characters += +"\t ";
-    } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
+    if (downstream_protocol_ == Http::CodecType::HTTP2) {
       // Both nghttp2 and oghttp2 allow extended ASCII >= 0x80 in path
       additionally_allowed_characters += generateExtendedAsciiString();
-      if (GetParam().http2_implementation == Http2Impl::Oghttp2) {
-        // In addition H/2 oghttp2 allows TAB and SPACE in path
-        additionally_allowed_characters += +"\t ";
-      }
     }
     return additionally_allowed_characters;
   }
@@ -254,7 +239,6 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithoutPathNormali
   }
 #endif
   setupCharacterValidationRuntimeValues();
-  enableOghttp2ForFakeUpstream();
   initialize();
   std::string additionally_allowed_characters = additionallyAllowedCharactersInUrlPath();
   // # and ? will just cause path to be interpreted as having a query or a fragment
@@ -329,7 +313,6 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInQuery) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
-  enableOghttp2ForFakeUpstream();
   initialize();
   std::string additionally_allowed_characters = additionallyAllowedCharactersInUrlPath();
   // Adding fragment separator, since it will just cause the URL to be interpreted as having a
