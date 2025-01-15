@@ -929,7 +929,7 @@ void TunnelingConnectionPoolImpl::onPoolFailure(Http::ConnectionPool::PoolFailur
   // removed by onStreamFailure, which will cause downstream_info_ to be freed.
   downstream_info_.upstreamInfo()->setUpstreamHost(host);
   downstream_info_.upstreamInfo()->setUpstreamTransportFailureReason(failure_reason);
-  callbacks_->onStreamFailure(reason, failure_reason, host);
+  callbacks_->onStreamFailure(reason, failure_reason, *host);
 }
 
 void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_encoder,
@@ -1032,7 +1032,7 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
 
 void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
-    const Upstream::HostDescriptionConstSharedPtr& host) {
+    const Upstream::HostDescription& host) {
   ENVOY_LOG(debug, "Failed to create upstream stream: {}", failure_reason);
 
   conn_pool_.reset();
@@ -1047,7 +1047,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
-      host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
+      host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
     }
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
@@ -1057,17 +1057,18 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     }
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
-      host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
+      host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
     }
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   }
 }
 
-void UdpProxyFilter::TunnelingActiveSession::onStreamReady(
-    StreamInfo::StreamInfo* upstream_info, std::unique_ptr<HttpUpstream>&& upstream,
-    const Upstream::HostDescriptionConstSharedPtr& host, const Network::ConnectionInfoProvider&,
-    Ssl::ConnectionInfoConstSharedPtr) {
+void UdpProxyFilter::TunnelingActiveSession::onStreamReady(StreamInfo::StreamInfo* upstream_info,
+                                                           std::unique_ptr<HttpUpstream>&& upstream,
+                                                           const Upstream::HostDescription& host,
+                                                           const Network::ConnectionInfoProvider&,
+                                                           Ssl::ConnectionInfoConstSharedPtr) {
   // TODO(ohadvano): save the host description to host_ field. This requires refactoring because
   // currently host_ is of type HostConstSharedPtr and not HostDescriptionConstSharedPtr.
   ENVOY_LOG(debug, "Upstream connection [C{}] attached to session ID [S{}]",
@@ -1081,7 +1082,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamReady(
   cluster_->cluster_stats_.sess_tunnel_success_.inc();
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
-    host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
+    host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
   }
 
   if (filter_.config_->flushAccessLogOnTunnelConnected()) {

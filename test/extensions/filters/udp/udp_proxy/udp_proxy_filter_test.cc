@@ -453,8 +453,7 @@ use_original_src_ip: true
                                                                     ENVOY_SOCKET_IPV6_TRANSPARENT};
   inline static const std::string upstream_ip_address_ = "20.0.0.1:443";
   inline static const std::string peer_ip_address_ = "10.0.0.1:1000";
-  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> upstream_host_{
-      new NiceMock<Upstream::MockHostDescription>()};
+  NiceMock<Upstream::MockHostDescription> upstream_host_;
 };
 
 class UdpProxyFilterIpv6Test : public UdpProxyFilterTest {
@@ -1995,7 +1994,7 @@ tunneling_config:
   auto session = filter_->createTunnelingSession();
   session->onNewSession();
 
-  EXPECT_CALL(upstream_host_->outlier_detector_,
+  EXPECT_CALL(upstream_host_.outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal, _));
   session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host_,
                          address_provider, nullptr);
@@ -2024,7 +2023,7 @@ tunneling_config:
   auto session = filter_->createTunnelingSession();
   session->onNewSession();
 
-  EXPECT_CALL(upstream_host_->outlier_detector_,
+  EXPECT_CALL(upstream_host_.outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   session->onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "",
                            upstream_host_);
@@ -2053,7 +2052,7 @@ tunneling_config:
   auto session = filter_->createTunnelingSession();
   session->onNewSession();
 
-  EXPECT_CALL(upstream_host_->outlier_detector_,
+  EXPECT_CALL(upstream_host_.outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   session->onStreamFailure(ConnectionPool::PoolFailureReason::Timeout, "", upstream_host_);
 }
