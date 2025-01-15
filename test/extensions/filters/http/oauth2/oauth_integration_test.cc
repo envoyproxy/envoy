@@ -343,7 +343,8 @@ typed_config:
         {"x-forwarded-proto", "http"},
         {":authority", "authority"},
         {"authority", "Bearer token"},
-        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", csrf_token)}};
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", csrf_token)},
+        {"cookie", absl::StrCat(default_cookie_names_.code_verifier_, "=foo")}};
 
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
@@ -436,8 +437,8 @@ typed_config:
     cleanup();
   }
 
-  const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC",    "OauthExpires",
-                                          "IdToken",     "RefreshToken", "OauthNonce"};
+  const CookieNames default_cookie_names_{"BearerToken",  "OauthHMAC",  "OauthExpires", "IdToken",
+                                          "RefreshToken", "OauthNonce", "CodeVerifier"};
   envoy::config::listener::v3::Listener listener_config_;
   std::string listener_name_{"http"};
   FakeHttpConnectionPtr lds_connection_;

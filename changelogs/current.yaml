@@ -5,6 +5,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: oauth2
+  change: |
+    Introduced PKCE(Proof Key for Code Exchange) support for OAuth2 authorization code flow.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
