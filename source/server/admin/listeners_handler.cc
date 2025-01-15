@@ -29,19 +29,24 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
     return Http::Code::BadRequest;
   }
   if (graceful) {
-    // Ignore calls to /drain_listeners?graceful if the drain sequence has
-    // already started.
-    if (!server_.drainManager().draining()) {
-      auto direction = Network::DrainDirection::All;
-      if (stop_listeners_type == ListenerManager::StopListenersType::InboundOnly) {
-        direction = Network::DrainDirection::InboundOnly;
-      }
+    auto direction = Network::DrainDirection::All;
+    if (stop_listeners_type == ListenerManager::StopListenersType::InboundOnly) {
+      direction = Network::DrainDirection::InboundOnly;
+    }
+    // Ignore calls to /drain_listeners?graceful if a drain sequence has
+    // already started that includes that direction
+    auto already_draining = server_.drainManager().drainDirection() == Network::DrainDirection::All ||
+                            server_.drainManager().drainDirection() == direction;
+    if (!server_.drainManager().draining() && !already_draining) {
       server_.drainManager().startDrainSequence(
           direction, [this, stop_listeners_type, skip_exit]() {
             if (!skip_exit) {
               server_.listenerManager().stopListeners(stop_listeners_type, {});
             }
           });
+    } else {
+      response.add("already draining\n");
+      return Http::Code::NotModified;
     }
   } else {
     server_.listenerManager().stopListeners(stop_listeners_type, {});

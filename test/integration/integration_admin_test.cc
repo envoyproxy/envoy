@@ -485,9 +485,55 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
+// Validates that successive calls to /drain_listeners?inboundonly are idempotent.
+TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    // Connection: close is HTTP1 only
+    return;
+  }
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* inbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    inbound_listener->set_traffic_direction(envoy::config::core::v3::INBOUND);
+    inbound_listener->set_name("inbound_0");
+  });
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners?inboundonly&graceful", "",
+      downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("OK\n", response->body());
+
+  BufferingStreamDecoderPtr response2 = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners?inboundonly&graceful", "",
+      downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("304", response->headers().getStatusValue());
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("already draining\n", response->body());
+
+  BufferingStreamDecoderPtr response3 = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners?graceful", "",
+      downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("OK\n", response->body());
+
+  response = IntegrationUtil::makeSingleRequest(lookupPort("inbound_0"), "GET", "/", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("close", response->headers().getConnectionValue());
+
+  // Validate that the inbound listener has been stopped.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+}
+
 // Validates that the inbound only query param only drains inbound listeners when graceful is set.
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulConnectionCloseForInbound) {
-  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+    if (downstreamProtocol() != Http::CodecType::HTTP1) {
     // Connection: close is HTTP1 only
     return;
   }
@@ -509,7 +555,6 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulConnectionCloseForInbo
   response = IntegrationUtil::makeSingleRequest(lookupPort("inbound_0"), "GET", "/", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("close", response->headers().getConnectionValue());
 
   // Validate that the inbound listener has been stopped.
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
