@@ -85,7 +85,7 @@ INSTANTIATE_TEST_SUITE_P(DeferredClusters, AggregateClusterUpdateTest, testing::
 
 TEST_P(AggregateClusterUpdateTest, NoHealthyUpstream) {
   initialize(default_yaml_config_);
-  EXPECT_EQ(nullptr, cluster_->loadBalancer().chooseHost(nullptr));
+  EXPECT_EQ(nullptr, cluster_->loadBalancer().chooseHost(nullptr).host);
 }
 
 TEST_P(AggregateClusterUpdateTest, BasicFlow) {
@@ -99,7 +99,7 @@ TEST_P(AggregateClusterUpdateTest, BasicFlow) {
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
   auto primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
-  auto host = cluster_->loadBalancer().chooseHost(nullptr);
+  auto host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
@@ -108,7 +108,7 @@ TEST_P(AggregateClusterUpdateTest, BasicFlow) {
       *cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("secondary"), ""));
   auto secondary = cluster_manager_->getThreadLocalCluster("secondary");
   EXPECT_NE(nullptr, secondary);
-  host = cluster_->loadBalancer().chooseHost(nullptr);
+  host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
@@ -117,14 +117,14 @@ TEST_P(AggregateClusterUpdateTest, BasicFlow) {
       *cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("tertiary"), ""));
   auto tertiary = cluster_manager_->getThreadLocalCluster("tertiary");
   EXPECT_NE(nullptr, tertiary);
-  host = cluster_->loadBalancer().chooseHost(nullptr);
+  host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
 
   EXPECT_TRUE(cluster_manager_->removeCluster("primary"));
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("primary"));
-  host = cluster_->loadBalancer().chooseHost(nullptr);
+  host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("secondary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
@@ -133,7 +133,7 @@ TEST_P(AggregateClusterUpdateTest, BasicFlow) {
   EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(Upstream::defaultStaticCluster("primary"), ""));
   primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
-  host = cluster_->loadBalancer().chooseHost(nullptr);
+  host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:11001", host->address()->asString());
@@ -186,22 +186,22 @@ TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
   Upstream::HostConstSharedPtr host;
   for (int i = 0; i < 33; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 33; i < 66; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 66; i < 99; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 99; i < 100; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   EXPECT_TRUE(cluster_manager_->removeCluster("primary"));
@@ -228,24 +228,24 @@ TEST_P(AggregateClusterUpdateTest, LoadBalancingTest) {
   //   Priority 1: 1/3 healthy, 1/3 degraded
   for (int i = 0; i < 33; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    host = cluster_->loadBalancer().chooseHost(nullptr);
-    EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr));
+    host = cluster_->loadBalancer().chooseHost(nullptr).host;
+    EXPECT_EQ(host6, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 33; i < 66; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    host = cluster_->loadBalancer().chooseHost(nullptr);
-    EXPECT_EQ(host9, cluster_->loadBalancer().chooseHost(nullptr));
+    host = cluster_->loadBalancer().chooseHost(nullptr).host;
+    EXPECT_EQ(host9, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 66; i < 99; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host4, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 99; i < 100; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host7, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host7, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 }
 
@@ -288,7 +288,7 @@ TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
   cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
   auto primary = cluster_manager_->getThreadLocalCluster("primary");
   EXPECT_NE(nullptr, primary);
-  auto host = cluster_->loadBalancer().chooseHost(nullptr);
+  auto host = cluster_->loadBalancer().chooseHost(nullptr).host;
   EXPECT_NE(nullptr, host);
   EXPECT_EQ("primary", host->cluster().name());
   EXPECT_EQ("127.0.0.1:80", host->address()->asString());
@@ -312,12 +312,12 @@ TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
 
   for (int i = 0; i < 50; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host3, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 
   for (int i = 50; i < 100; ++i) {
     EXPECT_CALL(factory_.random_, random()).WillRepeatedly(Return(i));
-    EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr));
+    EXPECT_EQ(host1, cluster_->loadBalancer().chooseHost(nullptr).host);
   }
 }
 
