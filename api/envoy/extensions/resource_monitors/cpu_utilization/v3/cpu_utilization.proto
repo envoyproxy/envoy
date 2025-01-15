@@ -20,7 +20,7 @@ message CpuUtilizationConfig {
     // Reports CPU Utilization of the entire Linux Host machine
     HOST = 0;
 
-    // Reports CPU Utilization of Envoy Container using CGROUP stats in K8s environment
+    // Reports CPU Utilization of Envoy Container using CGROUP stats in Linux K8s environment
     CONTAINER = 1;
   }
 
