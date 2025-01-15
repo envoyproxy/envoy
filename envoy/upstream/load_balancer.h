@@ -30,12 +30,14 @@ using ClusterProto = envoy::config::cluster::v3::Cluster;
 
 /*
  * A handle to allow cancelation of asynchronous host selection.
- * If chooseHost returns a HostSelectionResponse with an AsyncHostSelection
+ * If chooseHost returns a HostSelectionResponse with an AsyncHostSelectionHandle
  * handle, and the endpoint does not wish to receive onAsyncHostSelction call,
  * it must call cancel() on the provided handle.
  */
-struct AsyncHostSelection {
-  virtual ~AsyncHostSelection() = default;
+class AsyncHostSelectionHandle {
+public:
+  AsyncHostSelectionHandle& operator=(const AsyncHostSelectionHandle&) = delete;
+  virtual ~AsyncHostSelectionHandle() = default;
   virtual void cancel() PURE;
 };
 
@@ -43,18 +45,18 @@ struct AsyncHostSelection {
  * The response to a LoadBalancer::chooseHost call.
  *
  * chooseHost either returns a host directly or, in the case of asynchronous
- * load balancing, returns an AsyncHostSelection handle.
+ * load balancing, returns an AsyncHostSelectionHandle handle.
  *
- * If it returns a AsyncHostSelection handle, the load balancer guarantees an
+ * If it returns a AsyncHostSelectionHandle handle, the load balancer guarantees an
  * eventual call to LoadBalancerContext::onAsyncHostSelction unless
- * AsyncHostSelection::cancel is called.
+ * AsyncHostSelectionHandle::cancel is called.
  */
 struct HostSelectionResponse {
   HostSelectionResponse(HostConstSharedPtr host,
-                        std::shared_ptr<AsyncHostSelection> cancelable = nullptr)
+                        std::shared_ptr<AsyncHostSelectionHandle> cancelable = nullptr)
       : host(host), cancelable(std::move(cancelable)) {}
   HostConstSharedPtr host;
-  std::shared_ptr<AsyncHostSelection> cancelable;
+  std::shared_ptr<AsyncHostSelectionHandle> cancelable;
 };
 
 /**
@@ -146,7 +148,7 @@ public:
   /* Called by the load balancer when asynchronous host selection completes
    * @param host supplies the upstream host selected
    */
-  virtual void onAsyncHostSelection(HostConstSharedPtr host) PURE;
+  virtual void onAsyncHostSelection(HostConstSharedPtr&& host) PURE;
 };
 
 /**
@@ -184,7 +186,7 @@ public:
    * @param context supplies the load balancer context. Not all load balancers make use of all
    *        context information. Load balancers should be written to assume that context information
    *        is missing and use sensible defaults.
-   * @return a HostSelectionResponse either containing a host, or AsyncHostSelection handle.
+   * @return a HostSelectionResponse either containing a host, or AsyncHostSelectionHandle handle.
    *
    * Please note that asynchronous host selection is not yet fully supported in
    * Envoy. All endpoints will treat asynchronous resolution as host resolution

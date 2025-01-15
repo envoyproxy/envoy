@@ -2222,7 +2222,7 @@ HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cluster
   HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
                                                             override_host_statuses_, context);
   if (host != nullptr) {
-    return {std::move(host), nullptr};
+    return {std::move(host)};
   }
 
   if (HostUtility::allowLBChooseHost(context)) {

@@ -262,8 +262,7 @@ HostSelectionResponse OriginalMaglevTable::chooseHost(uint64_t hash, uint32_t at
     hash ^= ~0ULL - attempt + 1;
   }
 
-  HostConstSharedPtr host = table_[hash % table_size_];
-  return {std::move(host)};
+  return {table_[hash % table_size_]};
 }
 
 HostSelectionResponse CompactMaglevTable::chooseHost(uint64_t hash, uint32_t attempt) const {
@@ -280,8 +279,7 @@ HostSelectionResponse CompactMaglevTable::chooseHost(uint64_t hash, uint32_t att
 
   const uint32_t index = table_.get(hash % table_size_);
   ASSERT(index < host_table_.size(), "Compact MaglevTable index into host table out of range");
-  HostConstSharedPtr host = host_table_[index];
-  return {std::move(host)};
+  return {host_table_[index]};
 }
 
 uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {
