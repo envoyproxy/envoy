@@ -2457,14 +2457,19 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamFailure) {
   setup();
   createNewStream();
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+
   EXPECT_CALL(stream_callbacks_,
               onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "", _));
   pool_->onStreamFailure();
+  pool_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamSuccess) {
   setup();
   createNewStream();
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+
   EXPECT_CALL(stream_callbacks_, onStreamReady(_, _, _, _, _));
   pool_->onStreamSuccess(request_encoder_);
 }
