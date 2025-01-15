@@ -136,4 +136,4 @@ envoy.tracers.fluentd:
   security_posture: unknown
   status: wip
   type_urls:
-  - envoy.config.trace.v3.FluentdConfig
+  - envoy.extensions.tracers.fluentd.v3alpha.FluentdConfig
