@@ -15,8 +15,8 @@ using UpstreamProtocol = Envoy::Router::GenericConnPoolFactory::UpstreamProtocol
 Router::GenericConnPoolPtr GenericGenericConnPoolFactory::createGenericConnPool(
     Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
     UpstreamProtocol upstream_protocol, Upstream::ResourcePriority priority,
-    absl::optional<Envoy::Http::Protocol> downstream_protocol,
-    Upstream::LoadBalancerContext* ctx) const {
+    absl::optional<Envoy::Http::Protocol> downstream_protocol, Upstream::LoadBalancerContext* ctx,
+    const Protobuf::Message&) const {
   Router::GenericConnPoolPtr conn_pool;
   switch (upstream_protocol) {
   case UpstreamProtocol::HTTP:

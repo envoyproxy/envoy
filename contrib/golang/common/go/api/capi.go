@@ -99,6 +99,22 @@ type NetworkCAPI interface {
 	UpstreamInfo(f unsafe.Pointer, infoType int) string
 }
 
+type TcpUpstreamCAPI interface {
+	// Header related
+	CopyHeaders(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
+	SetRespHeader(s unsafe.Pointer, key string, value string, add bool)
+	RemoveRespHeader(s unsafe.Pointer, key string)
+	// Buffer related
+	GetBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64) []byte
+	DrainBuffer(s unsafe.Pointer, bufferPtr uint64, length uint64)
+	SetBufferHelper(s unsafe.Pointer, bufferPtr uint64, value string, action BufferAction)
+	SetBytesBufferHelper(s unsafe.Pointer, bufferPtr uint64, value []byte, action BufferAction)
+	// Get the specified value by key
+	GetStringValue(r unsafe.Pointer, id int) (string, bool)
+
+	SetSelfHalfCloseForUpstreamConn(r unsafe.Pointer, enabled int)
+}
+
 type CommonCAPI interface {
 	Log(level LogType, message string)
 	LogLevel() LogType
