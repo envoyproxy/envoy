@@ -38,21 +38,33 @@ maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& 
 ConfigUtility::QueryParameterMatcher::QueryParameterMatcher(
     const envoy::config::route::v3::QueryParameterMatcher& config,
     Server::Configuration::CommonFactoryContext& context)
-    : name_(config.name()), matcher_(maybeCreateStringMatcher(config, context)) {}
+    : name_(config.name()),
+      present_match_(config.has_present_match() ? absl::make_optional(config.present_match())
+                                                : absl::nullopt),
+      matcher_(maybeCreateStringMatcher(config, context)) {}
 
 bool ConfigUtility::QueryParameterMatcher::matches(
     const Http::Utility::QueryParamsMulti& request_query_params) const {
   // This preserves the legacy behavior of ignoring all but the first value for a given key
   auto data = request_query_params.getFirstValue(name_);
+
+  // If we're doing a present_match, return whether the parameter exists and matches the expected
+  // presence
+  if (present_match_.has_value()) {
+    return data.has_value() == present_match_.value();
+  }
+
+  // If the parameter doesn't exist, no match
   if (!data.has_value()) {
     return false;
   }
 
+  // If there's no matcher, treat it as a present check
   if (!matcher_.has_value()) {
-    // Present check
     return true;
   }
 
+  // Match the value against the string matcher
   return matcher_.value().match(data.value());
 }
 
