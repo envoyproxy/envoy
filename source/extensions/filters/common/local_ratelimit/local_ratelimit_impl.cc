@@ -184,8 +184,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
       time_source_(dispatcher.timeSource()), share_provider_(std::move(shared_provider)),
       always_consume_default_token_bucket_(always_consume_default_token_bucket),
       no_timer_based_rate_limit_token_bucket_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.no_timer_based_rate_limit_token_bucket")),
-      dispatcher_(dispatcher) {
+          "envoy.reloadable_features.no_timer_based_rate_limit_token_bucket")) {
   if (fill_timer_ && fill_interval < std::chrono::milliseconds(50)) {
     throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
   }

@@ -217,7 +217,6 @@ private:
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
   const bool always_consume_default_token_bucket_{};
   const bool no_timer_based_rate_limit_token_bucket_{};
-  Event::Dispatcher& dispatcher_;
 
   friend class LocalRateLimiterImplTest;
   friend class TimerTokenBucket;
