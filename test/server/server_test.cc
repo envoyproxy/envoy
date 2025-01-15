@@ -713,8 +713,10 @@ TEST_P(ServerInstanceImplWorkersTest, DrainCloseAfterWorkersStarted) {
 
   // Now that we are starting to try to call drainClose, we'll start the drain sequence, then
   // wait for that to complete.
-  server_->dispatcher().post(
-      [&] { drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); }); });
+  server_->dispatcher().post([&] {
+    drain_manager.startDrainSequence(Network::DrainDirection::All,
+                                     [&drain_complete]() { drain_complete.Notify(); });
+  });
 
   drain_complete.WaitForNotification();
   drain_thread->join();

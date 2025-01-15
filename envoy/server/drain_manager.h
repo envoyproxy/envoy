@@ -19,7 +19,8 @@ public:
    * @param drain_complete_cb will be invoked once the drain sequence is finished. The parameter is
    * optional and can be an unassigned function.
    */
-  virtual void startDrainSequence(std::function<void()> drain_complete_cb) PURE;
+  virtual void startDrainSequence(Network::DrainDirection direction,
+                                  std::function<void()> drain_complete_cb) PURE;
 
   /**
    * @return whether the drain sequence has started.

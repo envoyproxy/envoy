@@ -52,6 +52,7 @@ public:
 
   // DrainDecision
   bool drainClose() const override;
+  Network::DrainDirection drainDirection() const override;
 
   // Configuration::FactoryContext
   Network::DrainDecision& drainDecision() override;

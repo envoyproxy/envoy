@@ -57,7 +57,8 @@ TEST_F(DrainManagerImplTest, Default) {
   const auto expected_delay = std::chrono::milliseconds(DrainTimeSeconds * 1000);
   EXPECT_CALL(*drain_timer, enableTimer(expected_delay, nullptr));
   ReadyWatcher drain_complete;
-  drain_manager.startDrainSequence([&drain_complete]() -> void { drain_complete.ready(); });
+  drain_manager.startDrainSequence(Network::DrainDirection::All,
+                                   [&drain_complete]() -> void { drain_complete.ready(); });
   EXPECT_CALL(drain_complete, ready());
   drain_timer->invokeCallback();
 }
@@ -80,7 +81,7 @@ TEST_P(DrainManagerImplTest, DrainDeadline) {
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
   // Ensure drainClose() behaviour is determined by the deadline.
-  drain_manager.startDrainSequence([] {});
+  drain_manager.startDrainSequence(Network::DrainDirection::All, [] {});
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
   ON_CALL(server_.api_.random_, random()).WillByDefault(Return(DrainTimeSeconds * 2 - 1));
   ON_CALL(server_.options_, drainTime())
@@ -130,7 +131,7 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   EXPECT_FALSE(drain_manager.drainClose());
   EXPECT_FALSE(drain_manager.draining());
 
-  drain_manager.startDrainSequence([] {});
+  drain_manager.startDrainSequence(Network::DrainDirection::All, [] {});
   EXPECT_TRUE(drain_manager.draining());
 
   if (drain_gradually) {

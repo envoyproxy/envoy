@@ -508,7 +508,8 @@ public:
   void fuzz(const FuzzCase& input) {
     hcm_ = std::make_unique<ConnectionManagerImpl>(
         hcm_config_, drain_close_, random_, hcm_config_->http_context_, runtime_, local_info_,
-        hcm_config_->cm_, overload_manager_, hcm_config_->time_system_);
+        hcm_config_->cm_, overload_manager_, hcm_config_->time_system_,
+        envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
     hcm_->initializeReadFilterCallbacks(filter_callbacks_);
     Buffer::OwnedImpl data;
     hcm_->onData(data, false);

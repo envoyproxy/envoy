@@ -84,6 +84,17 @@ bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
 }
 
+Network::DrainDirection PerFilterChainFactoryContextImpl::drainDirection() const {
+  Network::DrainDirection direction;
+  if (is_draining_.load()) {
+    // If we're draining at a filter chain level, the direction was all
+    direction = Network::DrainDirection::All;
+  } else {
+    direction = parent_context_.drainDecision().drainDirection();
+  }
+  return direction;
+}
+
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }
 
 Init::Manager& PerFilterChainFactoryContextImpl::initManager() { return init_manager_; }
