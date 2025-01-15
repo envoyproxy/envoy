@@ -27,48 +27,55 @@ message RBAC {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rbac.v2.RBAC";
 
-  // Specify the RBAC rules to be applied globally.
-  // If absent, no enforcing RBAC policy will be applied.
-  // If present and empty, DENY.
-  // If both rules and matcher are configured, rules will be ignored.
+  // The primary RBAC policy which will be applied globally, to all the incoming requests.
+  //
+  // * If absent, no RBAC enforcement occurs.
+  // * If set but empty, all requests are denied.
+  //
+  // .. note::
+  //
+  //   When both ``rules`` and ``matcher`` are configured, ``rules`` will be ignored.
+  //
   config.rbac.v3.RBAC rules = 1
       [(udpa.annotations.field_migrate).oneof_promotion = "rules_specifier"];
 
   // If specified, rules will emit stats with the given prefix.
-  // This is useful to distinguish the stat when there are more than 1 RBAC filter configured with
-  // rules.
+  // This is useful for distinguishing metrics when multiple RBAC filters are configured.
   string rules_stat_prefix = 6;
 
-  // The match tree to use when resolving RBAC action for incoming requests. Requests do not
-  // match any matcher will be denied.
-  // If absent, no enforcing RBAC matcher will be applied.
-  // If present and empty, deny all requests.
+  // Match tree for evaluating RBAC actions on incoming requests. Requests not matching any matcher will be denied.
+  //
+  // * If absent, no RBAC enforcement occurs.
+  // * If set but empty, all requests are denied.
+  //
   xds.type.matcher.v3.Matcher matcher = 4 [
     (udpa.annotations.field_migrate).oneof_promotion = "rules_specifier",
     (xds.annotations.v3.field_status).work_in_progress = true
   ];
 
-  // Shadow rules are not enforced by the filter (i.e., returning a 403)
-  // but will emit stats and logs and can be used for rule testing.
-  // If absent, no shadow RBAC policy will be applied.
-  // If both shadow rules and shadow matcher are configured, shadow rules will be ignored.
+  // Shadow policy for testing RBAC rules without enforcing them. These rules generate stats and logs but do not deny
+  // requests. If absent, no shadow RBAC policy will be applied.
+  //
+  // .. note::
+  //
+  //   When both ``shadow_rules`` and ``shadow_matcher`` are configured, ``shadow_rules`` will be ignored.
+  //
   config.rbac.v3.RBAC shadow_rules = 2
       [(udpa.annotations.field_migrate).oneof_promotion = "shadow_rules_specifier"];
 
-  // The match tree to use for emitting stats and logs which can be used for rule testing for
-  // incoming requests.
   // If absent, no shadow matcher will be applied.
+  // Match tree for testing RBAC rules through stats and logs without enforcing them.
+  // If absent, no shadow matching occurs.
   xds.type.matcher.v3.Matcher shadow_matcher = 5 [
     (udpa.annotations.field_migrate).oneof_promotion = "shadow_rules_specifier",
     (xds.annotations.v3.field_status).work_in_progress = true
   ];
 
   // If specified, shadow rules will emit stats with the given prefix.
-  // This is useful to distinguish the stat when there are more than 1 RBAC filter configured with
-  // shadow rules.
+  // This is useful for distinguishing metrics when multiple RBAC filters use shadow rules.
   string shadow_rules_stat_prefix = 3;
 
-  // If track_per_rule_stats is true, counters will be published for each rule and shadow rule.
+  // If ``track_per_rule_stats`` is ``true``, counters will be published for each rule and shadow rule.
   bool track_per_rule_stats = 7;
 }
 
@@ -78,7 +85,7 @@ message RBACPerRoute {
 
   reserved 1;
 
-  // Override the global configuration of the filter with this new config.
-  // If absent, the global RBAC policy will be disabled for this route.
+  // Per-route specific RBAC configuration that overrides the global RBAC configuration.
+  // If absent, RBAC policy will be disabled for this route.
   RBAC rbac = 2;
 }
