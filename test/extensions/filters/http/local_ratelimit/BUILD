@@ -51,7 +51,7 @@ envoy_extension_cc_test(
     ],
     deps = [
         "//source/extensions/filters/http/local_ratelimit:config",
-        "//test/test_common:test_runtime_lib",
         "//test/integration:http_protocol_integration_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
