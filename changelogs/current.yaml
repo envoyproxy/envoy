@@ -219,4 +219,8 @@ new_features:
 - area: access log
   change: |
     Added new command-line flag :option:`--skip-deprecated-logs`.
+- area: resource_monitors
+  change: |
+    Added support to monitor Container CPU utilization in Linux K8s environment using existing
+    extension <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>.
 deprecated:
