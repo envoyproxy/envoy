@@ -18,7 +18,7 @@ public:
       simTime()};
 };
 
-TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
+TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr).host); }
 
 TEST_P(LeastRequestLoadBalancerTest, SingleHostAndPeek) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
@@ -40,20 +40,20 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
   // Host weight is 1.
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-    EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+    EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
   }
 
   // Host weight is 100.
   {
     EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-    EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+    EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
   }
 
   HostVector empty;
   {
     hostSet().runCallbacks(empty, empty);
     EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-    EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+    EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
   }
 
   {
@@ -63,7 +63,7 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
     hostSet().hosts_.clear();
     hostSet().runCallbacks(empty, remove_hosts);
     EXPECT_CALL(random_, random()).WillOnce(Return(0));
-    EXPECT_EQ(nullptr, lb_.chooseHost(nullptr));
+    EXPECT_EQ(nullptr, lb_.chooseHost(nullptr).host);
   }
 }
 
@@ -76,12 +76,12 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(2);
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
 
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(2);
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, PNC) {
@@ -110,15 +110,15 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
 
   // 0 choices configured should default to P2C.
   EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
 
   // 2 choices configured results in P2C.
   EXPECT_CALL(random_, random()).Times(3).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
 
   // 5 choices configured results in P5C.
   EXPECT_CALL(random_, random()).Times(6).WillRepeatedly(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_5.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_5.chooseHost(nullptr).host);
 
   // Verify correct host chosen in P5C scenario.
   EXPECT_CALL(random_, random())
@@ -129,7 +129,7 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
       .WillOnce(Return(3))
       .WillOnce(Return(2))
       .WillOnce(Return(1));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_5.chooseHost(nullptr).host);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, DefaultSelectionMethod) {
@@ -163,7 +163,7 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanOneHostWithLeastRequests) {
                               random_,       1,       lr_lb_config, simTime()};
 
   // With FULL_SCAN we will always choose the host with least number of active requests.
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb.chooseHost(nullptr).host);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
@@ -204,7 +204,7 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
   size_t host_4_counts = 0;
 
   for (size_t i = 0; i < num_selections; ++i) {
-    auto selected_host = lb.chooseHost(nullptr);
+    auto selected_host = lb.chooseHost(nullptr).host;
 
     if (selected_host == hostSet().healthy_hosts_[2]) {
       ++host_2_counts;
@@ -232,35 +232,35 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
 
   // We should see 2:1 ratio for hosts[1] to hosts[0].
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
 
   // Bringing hosts[1] to an active request should yield a 1:1 ratio.
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
 
   // Settings hosts[0] to an active request and hosts[1] to no active requests should yield a 4:1
   // ratio.
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(0);
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
 }
 
 // Validate that the load balancer defaults to an active request bias value of 1.0 if the runtime
@@ -287,35 +287,35 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithInvalidActiveRequestBias
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
 
   // We should see 2:1 ratio for hosts[1] to hosts[0].
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
 
   // Bringing hosts[1] to an active request should yield a 1:1 ratio.
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
 
   // Settings hosts[0] to an active request and hosts[1] to no active requests should yield a 4:1
   // ratio.
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(0);
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias) {
@@ -338,12 +338,12 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias)
 
   // We should see 2:1 ratio for hosts[1] to hosts[0], regardless of the active request count.
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(1);
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
@@ -355,8 +355,8 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
 
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
 
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
 
   // Remove and verify we get other host.
   HostVector empty;
@@ -365,7 +365,7 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
   hostSet().hosts_.erase(hostSet().hosts_.begin() + 1);
   hostSet().healthy_hosts_.erase(hostSet().healthy_hosts_.begin() + 1);
   hostSet().runCallbacks(empty, hosts_removed);
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_.chooseHost(nullptr).host);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, SlowStartWithDefaultParams) {
@@ -428,10 +428,10 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(0);
   // We expect 3:1 ratio, as host2 is in slow start mode and it's weight is scaled with
   // 0.16 factor and host1 weight with 0.5 factor (due to active request bias).
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
 
   // host2 is 40 secs in slow start, the weight is scaled with time factor max(40/60, 0.1) = 0.66.
   simTime().advanceTimeWait(std::chrono::seconds(30));
@@ -440,13 +440,13 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
 
   // We expect 4:3 ratio, as host2 is in slow start mode and it's weight is scaled with
   // 0.66 factor and host1 weight with 0.5 factor.
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
 }
 
 TEST_P(LeastRequestLoadBalancerTest, SlowStartWithActiveHC) {
@@ -499,19 +499,19 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithActiveHC) {
   // request bias and time factor 0.53 * max(pow(0.7, 1.11), 0.1)=0.35. Host2 is 8 seconds in slow
   // start and its weight is scaled with time bias max(pow(0.7, 1.11), 0.1) = 0.78.
 
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
 
   simTime().advanceTimeWait(std::chrono::seconds(1));
   host2->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -523,17 +523,17 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithActiveHC) {
   // We expect 6:5 ratio, as host1 is 8 seconds in slow start, its weight is scaled with active
   // request bias and time factor 0.53 * max(pow(0.8, 1.11), 0.1)=0.41. Host2 is not in slow start
   // and its weight is scaled with active request bias = 0.37.
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
 
   EXPECT_CALL(runtime_.snapshot_, getDouble("aggression", 0.9)).WillRepeatedly(Return(1.0));
   EXPECT_CALL(runtime_.snapshot_, getDouble("ar_bias", 0.9)).WillRepeatedly(Return(1.0));
@@ -550,12 +550,12 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithActiveHC) {
   hostSet().runCallbacks({}, {});
   // We expect 2:1 ratio, as host2 is in slow start mode, its weight is scaled with time factor
   // max(pow(0.5, 1), 0.1)= 0.5. Host1 weight is 1.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew, LeastRequestLoadBalancerTest,

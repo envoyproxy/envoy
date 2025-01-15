@@ -802,7 +802,7 @@ matcher:
 
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{nullptr})));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                    .cluster_.info_->traffic_stats_->upstream_cx_none_healthy_.value());
@@ -1096,7 +1096,7 @@ matcher:
   auto new_host = createHost(new_host_address);
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(new_host));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{new_host})));
   expectSessionCreate(new_host_address);
   test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -1194,7 +1194,7 @@ use_per_packet_load_balancing: true
   auto new_host = createHost(new_host_address);
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(new_host));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{new_host})));
   expectSessionCreate(new_host_address);
   test_sessions_[1].expectWriteToUpstream("hello2", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
@@ -1231,7 +1231,7 @@ use_per_packet_load_balancing: true
 
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{nullptr})));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(0, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
@@ -1265,7 +1265,7 @@ use_per_packet_load_balancing: true
 
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{nullptr})));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -1339,7 +1339,7 @@ use_per_packet_load_balancing: true
   auto new_host = createHost(new_host_address);
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(new_host));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{new_host})));
   expectSessionCreate(new_host_address);
   test_sessions_[1].expectWriteToUpstream("hello2", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
