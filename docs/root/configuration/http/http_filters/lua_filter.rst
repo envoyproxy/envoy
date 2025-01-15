@@ -843,6 +843,27 @@ Example usage:
     request_handle:logInfo("Matched route: " .. route_name)
   end
 
+.. _config_http_filters_lua_stream_info_virtual_cluster_name:
+
+``virtualClusterName()``
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:virtualClusterName()
+
+Returns the name of the virtual cluster matched for the current request. Returns an empty string if no virtual cluster
+was matched.
+
+Example usage:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local virtual_cluster = request_handle:streamInfo():virtualClusterName()
+    request_handle:logInfo("Matched virtual cluster: " .. virtual_cluster)
+  end
+
 .. _config_http_filters_lua_stream_info_downstream_direct_local_address:
 
 ``downstreamDirectLocalAddress()``
