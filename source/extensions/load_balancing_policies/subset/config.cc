@@ -23,7 +23,8 @@ public:
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams params) override {
     return std::make_unique<Upstream::SubsetLoadBalancer>(
         subset_config_, cluster_info_, params.priority_set, params.local_priority_set,
-        cluster_info_.lbStats(), cluster_info_.statsScope(), runtime_, random_, time_source_);
+        params.dispatcher, cluster_info_.lbStats(), cluster_info_.statsScope(), runtime_, random_,
+        time_source_);
   }
   bool recreateOnHostChange() const override { return false; }
 

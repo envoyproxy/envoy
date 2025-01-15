@@ -5,6 +5,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
@@ -81,7 +82,8 @@ public:
 
   // Just use this as parameters of create() method but thread aware load balancer will not use it.
   NiceMock<Upstream::MockPrioritySet> worker_priority_set_;
-  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  Upstream::LoadBalancerParams lb_params_{worker_priority_set_, {}, dispatcher_};
 };
 
 class RedisLoadBalancerContextImplTest : public testing::Test {

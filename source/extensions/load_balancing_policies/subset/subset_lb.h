@@ -36,9 +36,9 @@ class SubsetLoadBalancer : public LoadBalancer, Logger::Loggable<Logger::Id::ups
 public:
   SubsetLoadBalancer(const SubsetLoadBalancerConfig& lb_config,
                      const Upstream::ClusterInfo& cluster_info, const PrioritySet& priority_set,
-                     const PrioritySet* local_priority_set, ClusterLbStats& stats,
-                     Stats::Scope& scope, Runtime::Loader& runtime, Random::RandomGenerator& random,
-                     TimeSource& time_source);
+                     const PrioritySet* local_priority_set, Event::Dispatcher& dispatcher,
+                     ClusterLbStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
+                     Random::RandomGenerator& random, TimeSource& time_source);
   ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
@@ -133,6 +133,7 @@ private:
   private:
     const PrioritySet& original_priority_set_;
     const PrioritySet* original_local_priority_set_{};
+    Event::Dispatcher& dispatcher_;
     const bool locality_weight_aware_;
     const bool scale_locality_weight_;
     bool empty_ = true;
@@ -382,6 +383,7 @@ private:
 
   const PrioritySet& original_priority_set_;
   const PrioritySet* original_local_priority_set_;
+  Event::Dispatcher& dispatcher_;
   Common::CallbackHandlePtr original_priority_set_callback_handle_;
 
   LbSubsetEntryPtr subset_any_;
