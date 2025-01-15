@@ -10,6 +10,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/regex.h"
 #include "source/common/config/datasource.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Router {
@@ -50,7 +51,9 @@ bool ConfigUtility::QueryParameterMatcher::matches(
 
   // If we're doing a present_match, return whether the parameter exists and matches the expected
   // presence
-  if (present_match_.has_value()) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_new_query_param_present_match_behavior") &&
+      present_match_.has_value()) {
     return data.has_value() == present_match_.value();
   }
 

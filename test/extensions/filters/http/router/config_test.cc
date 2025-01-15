@@ -9,6 +9,7 @@
 #include "source/extensions/filters/http/router/config.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -137,6 +138,96 @@ string_match:
   // Test second value matches but first doesn't
   auto second_match_params = Http::Utility::QueryParamsMulti::parseQueryString("?debug=2&debug=1");
   EXPECT_FALSE(matcher.matches(second_match_params));
+}
+
+TEST_F(QueryParameterMatcherTest, PresentMatchTrueWithFeatureEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_query_param_present_match_behavior", "true"}});
+
+  const std::string yaml = R"EOF(
+name: debug
+present_match: true
+)EOF";
+
+  auto matcher = createQueryParamMatcher(yaml);
+
+  auto params = Http::Utility::QueryParamsMulti::parseQueryString("?debug=1");
+  EXPECT_TRUE(matcher.matches(params));
+
+  auto empty_value_params = Http::Utility::QueryParamsMulti::parseQueryString("?debug=");
+  EXPECT_TRUE(matcher.matches(empty_value_params));
+
+  auto no_match_params = Http::Utility::QueryParamsMulti::parseQueryString("?other=1");
+  EXPECT_FALSE(matcher.matches(no_match_params));
+}
+
+TEST_F(QueryParameterMatcherTest, PresentMatchTrueWithFeatureDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_query_param_present_match_behavior", "false"}});
+
+  const std::string yaml = R"EOF(
+name: debug
+present_match: true
+)EOF";
+
+  auto matcher = createQueryParamMatcher(yaml);
+
+  // When feature is disabled, falls back to normal present check behavior
+  auto params = Http::Utility::QueryParamsMulti::parseQueryString("?debug=1");
+  EXPECT_TRUE(matcher.matches(params)); // Param exists, no string matcher -> true
+
+  auto empty_value_params = Http::Utility::QueryParamsMulti::parseQueryString("?debug=");
+  EXPECT_TRUE(matcher.matches(empty_value_params)); // Param exists, no string matcher -> true
+
+  auto no_match_params = Http::Utility::QueryParamsMulti::parseQueryString("?other=1");
+  EXPECT_FALSE(matcher.matches(no_match_params)); // Param doesn't exist -> false
+}
+
+TEST_F(QueryParameterMatcherTest, PresentMatchFalseWithFeatureEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_query_param_present_match_behavior", "true"}});
+
+  const std::string yaml = R"EOF(
+name: debug
+present_match: false
+)EOF";
+
+  auto matcher = createQueryParamMatcher(yaml);
+
+  auto params = Http::Utility::QueryParamsMulti::parseQueryString("?debug=1");
+  EXPECT_FALSE(matcher.matches(params));
+
+  auto empty_value_params = Http::Utility::QueryParamsMulti::parseQueryString("?debug=");
+  EXPECT_FALSE(matcher.matches(empty_value_params));
+
+  auto no_match_params = Http::Utility::QueryParamsMulti::parseQueryString("?other=1");
+  EXPECT_TRUE(matcher.matches(no_match_params));
+}
+
+TEST_F(QueryParameterMatcherTest, PresentMatchFalseWithFeatureDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_query_param_present_match_behavior", "false"}});
+
+  const std::string yaml = R"EOF(
+name: debug
+present_match: false
+)EOF";
+
+  auto matcher = createQueryParamMatcher(yaml);
+
+  // When feature is disabled, falls back to normal present check behavior
+  auto params = Http::Utility::QueryParamsMulti::parseQueryString("?debug=1");
+  EXPECT_TRUE(matcher.matches(params)); // Param exists, no string matcher -> true
+
+  auto empty_value_params = Http::Utility::QueryParamsMulti::parseQueryString("?debug=");
+  EXPECT_TRUE(matcher.matches(empty_value_params)); // Param exists, no string matcher -> true
+
+  auto no_match_params = Http::Utility::QueryParamsMulti::parseQueryString("?other=1");
+  EXPECT_FALSE(matcher.matches(no_match_params)); // Param doesn't exist -> false
 }
 
 TEST(RouterFilterConfigTest, SimpleRouterFilterConfig) {
