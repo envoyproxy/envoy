@@ -8,6 +8,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dfp
+  change:
+    Fixes a bug when loading a DNS cache entry with an empty authority/host header. This fix can be reverted by setting
+    runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` to ``false``.
 - area: router
   change: |
     Fixed query parameter matcher to properly implement
