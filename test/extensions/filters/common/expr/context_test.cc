@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "source/common/network/address_impl.h"
 #include "source/common/network/filter_state_dst_address.h"
 #include "source/common/network/utility.h"
@@ -17,7 +19,6 @@
 #include "test/test_common/utility.h"
 
 #include "absl/time/time.h"
-#include "api/envoy/config/core/v3/base.proto.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
