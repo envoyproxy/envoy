@@ -13,6 +13,10 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: resource_monitors
+  change: |
+    Added support to monitor Container CPU utilization in Linux K8s environment using existing
+    extension <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>.
 - area: lua
   change: |
     Added :ref:`virtualClusterName() <config_http_filters_lua_stream_info_virtual_cluster_name>` API to the Stream Info
