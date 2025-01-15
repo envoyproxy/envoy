@@ -1769,7 +1769,6 @@ TEST_P(TcpProxyTest, PickClusterOnUpstreamFailureNoBackoffOptions) {
   setup(1, conf);
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
-  ;
   EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
 
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);

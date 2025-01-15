@@ -212,6 +212,9 @@ message TcpProxy {
   // giving up. If the parameter is not specified, 1 connection attempt will be made.
   google.protobuf.UInt32Value max_connect_attempts = 7 [(validate.rules).uint32 = {gte: 1}];
 
+  // Sets the backoff strategy. If not set, the retries are performed without backoff.
+  config.core.v3.BackoffStrategy backoff_options = 18;
+
   // Optional configuration for TCP proxy hash policy. If hash_policy is not set, the hash-based
   // load balancing algorithms will select a host randomly. Currently the number of hash policies is
   // limited to 1.
@@ -254,7 +257,4 @@ message TcpProxy {
 
   // Additional access log options for TCP Proxy.
   TcpAccessLogOptions access_log_options = 17;
-
-  // Sets the backoff strategy. If not set, the retries are performed without backoff.
-  config.core.v3.BackoffStrategy backoff_options = 18;
 }
