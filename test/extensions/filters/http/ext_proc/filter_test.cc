@@ -5,6 +5,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/registry/registry.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/common/http/conn_manager_impl.h"
@@ -13,6 +14,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
+#include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/conn_manager_impl_test_base.h"
@@ -30,6 +32,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -5234,6 +5237,221 @@ TEST_F(HttpFilterTest, InvalidResponseContentLength) {
 
   processResponseHeaders(false, absl::nullopt);
   filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, OnProcessingResponseHeaders) {
+  TestOnProcessingResponseFactory factory;
+  Envoy::Registry::InjectFactory<OnProcessingResponseFactory> registration(factory);
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  on_processing_response:
+    name: "abc"
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF");
+
+  request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
+  request_headers_.addCopy(LowerCaseString("x-do-we-want-this"), "no");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(
+      false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& header_resp) {
+        auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
+        auto add1 = headers_mut->add_set_headers();
+        add1->mutable_header()->set_key("x-new-header");
+        add1->mutable_header()->set_raw_value("new");
+        add1->mutable_append()->set_value(false);
+        auto add2 = headers_mut->add_set_headers();
+        add2->mutable_header()->set_key("x-some-other-header");
+        add2->mutable_header()->set_raw_value("no");
+        add2->mutable_append()->set_value(true);
+        *headers_mut->add_remove_headers() = "x-do-we-want-this";
+      });
+
+  // We should now have changed the original header a bit
+  TestRequestHeaderMapImpl expected{{":path", "/"},
+                                    {":method", "POST"},
+                                    {":scheme", "http"},
+                                    {"host", "host"},
+                                    {"x-new-header", "new"},
+                                    {"x-some-other-header", "yes"},
+                                    {"x-some-other-header", "no"}};
+  EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
+
+  ASSERT_TRUE(
+      dynamic_metadata_.filter_metadata().contains("envoy.test.ext_proc.request_headers_response"));
+  const auto& request_headers_struct_metadata =
+      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.request_headers_response");
+  ProtobufWkt::Struct expected_request_headers;
+  TestUtility::loadFromJson(R"EOF(
+{
+  "x-do-we-want-this": "remove",
+  "x-new-header": "new",
+  "x-some-other-header": "no"
+})EOF",
+                            expected_request_headers);
+  EXPECT_TRUE(
+      TestUtility::protoEqual(request_headers_struct_metadata, expected_request_headers, true));
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "3");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, [](const HttpHeaders& response_headers, ProcessingResponse&,
+                                   HeadersResponse& header_resp) {
+    EXPECT_FALSE(response_headers.end_of_stream());
+    TestRequestHeaderMapImpl expected_response{
+        {":status", "200"}, {"content-type", "text/plain"}, {"content-length", "3"}};
+    EXPECT_THAT(response_headers.headers(), HeaderProtosEqual(expected_response));
+
+    auto* resp_headers_mut = header_resp.mutable_response()->mutable_header_mutation();
+    auto* resp_add1 = resp_headers_mut->add_set_headers();
+    resp_add1->mutable_header()->set_key("x-new-header");
+    resp_add1->mutable_header()->set_raw_value("new");
+  });
+
+  // We should now have changed the original header a bit
+  TestRequestHeaderMapImpl final_expected_response{{":status", "200"},
+                                                   {"content-type", "text/plain"},
+                                                   {"content-length", "3"},
+                                                   {"x-new-header", "new"}};
+  EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
+
+  ASSERT_TRUE(dynamic_metadata_.filter_metadata().contains(
+      "envoy.test.ext_proc.response_headers_response"));
+  const auto& response_headers_struct_metadata =
+      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.response_headers_response");
+  ProtobufWkt::Struct expected_response_headers;
+  TestUtility::loadFromJson(R"EOF(
+{
+  "x-new-header": "new",
+})EOF",
+                            expected_response_headers);
+
+  std::cout << response_headers_struct_metadata.DebugString();
+  EXPECT_TRUE(
+      TestUtility::protoEqual(response_headers_struct_metadata, expected_response_headers, true));
+
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
+  Buffer::OwnedImpl empty_data;
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(empty_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, OnProcessingResponseBodies) {
+  TestOnProcessingResponseFactory factory;
+  Envoy::Registry::InjectFactory<OnProcessingResponseFactory> registration(factory);
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SKIP"
+    response_header_mode: "SKIP"
+    request_body_mode: "BUFFERED"
+    response_body_mode: "BUFFERED"
+    request_trailer_mode: "SKIP"
+    response_trailer_mode: "SKIP"
+  on_processing_response:
+    name: "abc"
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.Struct
+  )EOF");
+
+  // Create synthetic HTTP request
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  request_headers_.addCopy(LowerCaseString("content-length"), 100);
+
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  Buffer::OwnedImpl req_data;
+  TestUtility::feedBufferWithRandomCharacters(req_data, 100);
+  Buffer::OwnedImpl buffered_request_data;
+  setUpDecodingBuffering(buffered_request_data, true);
+
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
+
+  processRequestBody([&buffered_request_data](const HttpBody& req_body, ProcessingResponse&,
+                                              BodyResponse& body_resp) {
+    EXPECT_TRUE(req_body.end_of_stream());
+    EXPECT_EQ(buffered_request_data.toString(), req_body.body());
+    auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+    body_mut->set_clear_body(true);
+  });
+  EXPECT_EQ(0, buffered_request_data.length());
+
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  ASSERT_TRUE(
+      dynamic_metadata_.filter_metadata().contains("envoy.test.ext_proc.request_body_response"));
+  const auto& request_body_struct_metadata =
+      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.request_body_response");
+  std::cout << request_body_struct_metadata.DebugString();
+  ProtobufWkt::Struct expected_request_body;
+  TestUtility::loadFromJson(R"EOF(
+{
+  "clear_body": "1"
+})EOF",
+                            expected_request_body);
+
+  EXPECT_TRUE(TestUtility::protoEqual(request_body_struct_metadata, expected_request_body, true));
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers_.addCopy(LowerCaseString("content-length"), "100");
+
+  EXPECT_EQ(Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+
+  Buffer::OwnedImpl resp_data;
+  TestUtility::feedBufferWithRandomCharacters(resp_data, 100);
+  Buffer::OwnedImpl buffered_response_data;
+  setUpEncodingBuffering(buffered_response_data, true);
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(resp_data, true));
+
+  processResponseBody([&buffered_response_data](const HttpBody& req_body, ProcessingResponse&,
+                                                BodyResponse& body_resp) {
+    EXPECT_TRUE(req_body.end_of_stream());
+    EXPECT_EQ(buffered_response_data.toString(), req_body.body());
+    auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+    body_mut->set_body("Hello, World!");
+  });
+  EXPECT_EQ("Hello, World!", buffered_response_data.toString());
+
+  ASSERT_TRUE(
+      dynamic_metadata_.filter_metadata().contains("envoy.test.ext_proc.response_body_response"));
+  const auto& response_body_struct_metadata =
+      dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.response_body_response");
+  ProtobufWkt::Struct expected_response_body;
+  std::cout << response_body_struct_metadata.DebugString();
+  TestUtility::loadFromJson(R"EOF(
+{
+  "body": "Hello, World!"
+})EOF",
+                            expected_response_body);
+  EXPECT_TRUE(TestUtility::protoEqual(response_body_struct_metadata, expected_response_body, true));
+
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
 } // namespace
