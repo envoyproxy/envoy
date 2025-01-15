@@ -236,6 +236,17 @@ int StreamInfoWrapper::luaRouteName(lua_State* state) {
   return 1;
 }
 
+int StreamInfoWrapper::luaVirtualClusterName(lua_State* state) {
+  const absl::optional<std::string>& name = stream_info_.virtualClusterName();
+  if (name.has_value()) {
+    const std::string& virtual_cluster_name = name.value();
+    lua_pushlstring(state, virtual_cluster_name.data(), virtual_cluster_name.length());
+  } else {
+    lua_pushlstring(state, "", 0);
+  }
+  return 1;
+}
+
 DynamicMetadataMapIterator::DynamicMetadataMapIterator(DynamicMetadataMapWrapper& parent)
     : parent_{parent}, current_{parent_.streamInfo().dynamicMetadata().filter_metadata().begin()} {}
 

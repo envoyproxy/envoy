@@ -7,8 +7,10 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/numeric/int128.h"
 #include "absl/strings/string_view.h"
@@ -23,6 +25,7 @@ namespace Address {
 
 class Instance;
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
+using InstanceConstOptRef = OptRef<const Instance>;
 
 /**
  * Interface for an Ipv4 address.
@@ -236,6 +239,19 @@ public:
    * @return SocketInterface to be used with the address.
    */
   virtual const Network::SocketInterface& socketInterface() const PURE;
+};
+
+/*
+ * Used to store Instance in filter state.
+ */
+class InstanceAccessor : public Envoy::StreamInfo::FilterState::Object {
+public:
+  InstanceAccessor(InstanceConstSharedPtr ip) : ip_(std::move(ip)) {}
+
+  InstanceConstOptRef getIp() const { return makeOptRefFromPtr<const Instance>(ip_.get()); }
+
+private:
+  InstanceConstSharedPtr ip_;
 };
 
 } // namespace Address
