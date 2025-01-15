@@ -203,7 +203,7 @@ public:
    * @param ssl_info supplies the ssl information of the upstream connection.
    */
   virtual void onStreamReady(StreamInfo::StreamInfo* info, std::unique_ptr<HttpUpstream>&& upstream,
-                             Upstream::HostDescriptionConstSharedPtr host,
+                             const Upstream::HostDescriptionConstSharedPtr& host,
                              const Network::ConnectionInfoProvider& address_provider,
                              Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
 
@@ -216,7 +216,7 @@ public:
    */
   virtual void onStreamFailure(ConnectionPool::PoolFailureReason reason,
                                absl::string_view failure_reason,
-                               Upstream::HostDescriptionConstSharedPtr host) PURE;
+                               const Upstream::HostDescriptionConstSharedPtr& host) PURE;
 
   /**
    * Called to reset the idle timer.
@@ -754,12 +754,12 @@ protected:
 
     // HttpStreamCallbacks
     void onStreamReady(StreamInfo::StreamInfo*, std::unique_ptr<HttpUpstream>&&,
-                       Upstream::HostDescriptionConstSharedPtr,
+                       const Upstream::HostDescriptionConstSharedPtr&,
                        const Network::ConnectionInfoProvider&,
                        Ssl::ConnectionInfoConstSharedPtr) override;
 
     void onStreamFailure(ConnectionPool::PoolFailureReason, absl::string_view,
-                         Upstream::HostDescriptionConstSharedPtr) override;
+                         const Upstream::HostDescriptionConstSharedPtr&) override;
 
     void resetIdleTimer() override { ActiveSession::resetIdleTimer(); }
 

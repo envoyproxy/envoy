@@ -1032,7 +1032,7 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
 
 void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
-    Upstream::HostDescriptionConstSharedPtr host) {
+    const Upstream::HostDescriptionConstSharedPtr& host) {
   ENVOY_LOG(debug, "Failed to create upstream stream: {}", failure_reason);
 
   conn_pool_.reset();
@@ -1066,7 +1066,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
 
 void UdpProxyFilter::TunnelingActiveSession::onStreamReady(
     StreamInfo::StreamInfo* upstream_info, std::unique_ptr<HttpUpstream>&& upstream,
-    Upstream::HostDescriptionConstSharedPtr host, const Network::ConnectionInfoProvider&,
+    const Upstream::HostDescriptionConstSharedPtr& host, const Network::ConnectionInfoProvider&,
     Ssl::ConnectionInfoConstSharedPtr) {
   // TODO(ohadvano): save the host description to host_ field. This requires refactoring because
   // currently host_ is of type HostConstSharedPtr and not HostDescriptionConstSharedPtr.
