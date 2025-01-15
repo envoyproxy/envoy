@@ -505,6 +505,23 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
               HasSubstr("dns_resolution_failure{resolve_timeout}"));
 }
 
+// TODO(yanavlasov) Enable per #26642
+#ifndef ENVOY_ENABLE_UHV
+TEST_P(ProxyFilterIntegrationTest, FailOnEmptyHostHeader) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", ""}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("empty_host_header"));
+}
+#endif
+
 TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
@@ -571,7 +588,18 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) { requestWithUnknow
 // TODO(yanavlasov) Enable per #26642
 #ifndef ENVOY_ENABLE_UHV
 TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
-  requestWithUnknownDomainTest("", "\x00\x00.google.com");
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initializeWithArgs(1024, 1024, "", "");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("\x00\x00.google.com");
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  // The suspicious host will be set to an empty host resulting in a bad request (400).
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  std::string access_log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(access_log, HasSubstr("empty_host_header"));
+  EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
 }
 #endif
 
