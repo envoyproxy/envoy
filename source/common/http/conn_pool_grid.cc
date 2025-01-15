@@ -24,7 +24,7 @@ absl::string_view describePool(const ConnectionPool::Instance& pool) {
   return pool.protocolDescription();
 }
 
-static constexpr uint32_t kDefaultTimeoutMs = 300;
+static constexpr uint32_t kDefaultTimeoutMs = 10000;
 
 std::string getTargetHostname(const Network::TransportSocketOptionsConstSharedPtr& options,
                               Upstream::HostConstSharedPtr& host) {
