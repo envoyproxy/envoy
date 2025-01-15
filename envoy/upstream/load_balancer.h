@@ -33,6 +33,10 @@ using ClusterProto = envoy::config::cluster::v3::Cluster;
  * If chooseHost returns a HostSelectionResponse with an AsyncHostSelectionHandle
  * handle, and the endpoint does not wish to receive onAsyncHostSelction call,
  * it must call cancel() on the provided handle.
+ *
+ * Please note that the AsyncHostSelectionHandle may be deleted after the
+ * cancel() call. It is up to the implemention of the asynchronous load balancer
+ * to ensure the cancelation state persists until the load balancer checks it.
  */
 class AsyncHostSelectionHandle {
 public:
@@ -53,10 +57,10 @@ public:
  */
 struct HostSelectionResponse {
   HostSelectionResponse(HostConstSharedPtr host,
-                        std::shared_ptr<AsyncHostSelectionHandle> cancelable = nullptr)
+                        std::unique_ptr<AsyncHostSelectionHandle> cancelable = nullptr)
       : host(host), cancelable(std::move(cancelable)) {}
   HostConstSharedPtr host;
-  std::shared_ptr<AsyncHostSelectionHandle> cancelable;
+  std::unique_ptr<AsyncHostSelectionHandle> cancelable;
 };
 
 /**
