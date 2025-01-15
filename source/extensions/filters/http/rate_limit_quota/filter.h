@@ -50,9 +50,11 @@ public:
                        Server::Configuration::FactoryContext& factory_context,
                        std::unique_ptr<RateLimitClient> local_client,
                        Grpc::GrpcServiceConfigWithHashKey config_with_hash_key,
-                       Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher)
+                       Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher,
+                       Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> preview_matcher)
       : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
-        factory_context_(factory_context), matcher_(matcher), client_(std::move(local_client)),
+        factory_context_(factory_context), matcher_(matcher), preview_matcher_(preview_matcher),
+        client_(std::move(local_client)),
         time_source_(factory_context.serverFactoryContext().mainThreadDispatcher().timeSource()) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
@@ -63,7 +65,9 @@ public:
 
   // Perform request matching. It returns the generated bucket ids if the
   // matching succeeded, error status otherwise.
-  absl::StatusOr<Matcher::ActionPtr> requestMatching(const Http::RequestHeaderMap& headers);
+  absl::StatusOr<Matcher::ActionPtr>
+  requestMatching(Matcher::MatchTree<Http::HttpMatchingData>* matcher,
+                  const Http::RequestHeaderMap& headers);
 
   Http::Matching::HttpMatchingDataImpl matchingData() {
     ASSERT(data_ptr_ != nullptr);
@@ -71,7 +75,10 @@ public:
   }
 
 private:
-  Http::FilterHeadersStatus processCachedBucket(CachedBucket& cached_bucket);
+  Http::FilterHeadersStatus executeMatchedAction(const RateLimitOnMatchAction& match_action,
+                                                 bool preview);
+
+  Http::FilterHeadersStatus processCachedBucket(CachedBucket& cached_bucket, bool preview);
   bool shouldAllowRequest(const CachedBucket& cached_bucket);
 
   FilterConfigConstSharedPtr config_;
@@ -80,6 +87,7 @@ private:
   Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
+  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> preview_matcher_;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
 
   // Own a local, filter-specific client to provider functions needed by worker

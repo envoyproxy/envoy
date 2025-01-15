@@ -51,6 +51,7 @@ using ::testing::NiceMock;
 
 enum class MatcherConfigType {
   Valid,
+  ValidLowPriority,
   Invalid,
   Empty,
   NoMatcher,
@@ -65,17 +66,29 @@ public:
     TestUtility::loadFromYaml(std::string(GoogleGrpcConfig), config_);
   }
 
-  void addMatcherConfig(xds::type::matcher::v3::Matcher& matcher) {
-    config_.mutable_bucket_matchers()->MergeFrom(matcher);
-    match_tree_ = matcher_factory_.create(matcher)();
+  void addMatcherConfig(xds::type::matcher::v3::Matcher& matcher, bool preview = false) {
+    // Empty matcher config will not have the bucket matcher configured.
+    auto* config_matchers =
+        preview ? config_.mutable_preview_bucket_matchers() : config_.mutable_bucket_matchers();
+    config_matchers->MergeFrom(matcher);
+
+    if (preview) {
+      preview_match_tree_ = matcher_factory_.create(matcher)();
+    } else {
+      match_tree_ = matcher_factory_.create(matcher)();
+    }
   }
 
-  void addMatcherConfig(MatcherConfigType config_type) {
+  void addMatcherConfig(MatcherConfigType config_type, bool preview = false) {
     // Add the matcher configuration.
     xds::type::matcher::v3::Matcher matcher;
     switch (config_type) {
     case MatcherConfigType::Valid: {
       TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
+      break;
+    }
+    case MatcherConfigType::ValidLowPriority: {
+      TestUtility::loadFromYaml(std::string(ValidLowPriorityMatcherConfig), matcher);
       break;
     }
     case MatcherConfigType::ValidOnNoMatchConfig: {
@@ -101,8 +114,12 @@ public:
 
     // Empty matcher config will not have the bucket matcher configured.
     if (config_type != MatcherConfigType::Empty) {
-      addMatcherConfig(matcher);
+      addMatcherConfig(matcher, preview);
     }
+  }
+
+  void addPreviewMatcherConfig(MatcherConfigType config_type) {
+    addMatcherConfig(config_type, /*preview=*/true);
   }
 
   void createFilter(bool set_callback = true) {
@@ -111,9 +128,9 @@ public:
         Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
     mock_local_client_ = new MockRateLimitClient();
-    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
-                                                     absl::WrapUnique(mock_local_client_),
-                                                     config_with_hash_key, match_tree_);
+    filter_ = std::make_unique<RateLimitQuotaFilter>(
+        filter_config_, context_, absl::WrapUnique(mock_local_client_), config_with_hash_key,
+        match_tree_, preview_match_tree_);
     if (set_callback) {
       filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     }
@@ -139,11 +156,15 @@ public:
       default_headers_.addCopy(pair.first, pair.second);
     }
   }
-
   void verifyRequestMatchingSucceeded(
       const absl::flat_hash_map<std::string, std::string>& expected_bucket_ids) {
+    verifyRequestMatchingSucceeded(expected_bucket_ids, match_tree_);
+  }
+  void verifyRequestMatchingSucceeded(
+      const absl::flat_hash_map<std::string, std::string>& expected_bucket_ids,
+      Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree) {
     // Perform request matching.
-    auto match_result = filter_->requestMatching(default_headers_);
+    auto match_result = filter_->requestMatching(match_tree.get(), default_headers_);
     // Asserts that the request matching succeeded.
     // OK status is expected to be returned even if the exact request matching
     // failed. It is because `on_no_match` field is configured.
@@ -152,9 +173,8 @@ public:
     const RateLimitOnMatchAction* match_action =
         dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
 
-    RateLimitQuotaValidationVisitor visitor = {};
     // Generate the bucket ids.
-    auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
+    auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor_);
     // Asserts that the bucket id generation succeeded and then retrieve the
     // bucket ids.
     ASSERT_TRUE(ret.ok());
@@ -181,6 +201,7 @@ public:
   FilterConfigConstSharedPtr filter_config_;
   FilterConfig config_;
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree_ = nullptr;
+  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> preview_match_tree_ = nullptr;
   std::unique_ptr<RateLimitQuotaFilter> filter_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
@@ -189,7 +210,7 @@ public:
 TEST_F(FilterTest, EmptyMatcherConfig) {
   addMatcherConfig(MatcherConfigType::Empty);
   createFilter();
-  auto match_result = filter_->requestMatching(default_headers_);
+  auto match_result = filter_->requestMatching(match_tree_.get(), default_headers_);
   EXPECT_FALSE(match_result.ok());
   EXPECT_THAT(match_result, StatusIs(absl::StatusCode::kInternal));
   EXPECT_EQ(match_result.status().message(), "Matcher tree has not been initialized yet.");
@@ -218,7 +239,7 @@ TEST_F(FilterTest, RequestMatchingFailed) {
   constructMismatchedRequestHeader();
 
   // Perform request matching.
-  auto match = filter_->requestMatching(default_headers_);
+  auto match = filter_->requestMatching(match_tree_.get(), default_headers_);
   // Not_OK status is expected to be returned because the matching failed due to
   // mismatched inputs.
   EXPECT_FALSE(match.ok());
@@ -231,7 +252,7 @@ TEST_F(FilterTest, RequestMatchingFailedWithEmptyHeader) {
   createFilter();
   Http::TestRequestHeaderMapImpl empty_header = {};
   // Perform request matching.
-  auto match = filter_->requestMatching(empty_header);
+  auto match = filter_->requestMatching(match_tree_.get(), empty_header);
   // Not_OK status is expected to be returned because the matching failed due to
   // empty headers.
   EXPECT_FALSE(match.ok());
@@ -243,7 +264,7 @@ TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {
   addMatcherConfig(MatcherConfigType::Valid);
   createFilter(/*set_callback*/ false);
 
-  auto match = filter_->requestMatching(default_headers_);
+  auto match = filter_->requestMatching(match_tree_.get(), default_headers_);
   EXPECT_FALSE(match.ok());
   EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
   EXPECT_EQ(match.status().message(), "Filter callback has not been initialized successfully yet.");
@@ -270,7 +291,7 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   createFilter();
 
   // Perform request matching.
-  auto match_result = filter_->requestMatching(default_headers_);
+  auto match_result = filter_->requestMatching(match_tree_.get(), default_headers_);
   // Asserts that the request matching succeeded.
   // OK status is expected to be returned even if the exact request matching
   // failed. It is because `on_no_match` field is configured.
@@ -279,9 +300,8 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   const RateLimitOnMatchAction* match_action =
       dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
 
-  RateLimitQuotaValidationVisitor visitor = {};
   // Generate the bucket ids.
-  auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor);
+  auto ret = match_action->generateBucketId(filter_->matchingData(), context_, visitor_);
   // Bucket id generation is expected to fail, which is due to no support for
   // dynamic id generation (i.e., via custom_value with for on_no_match case.
   EXPECT_FALSE(ret.ok());
@@ -634,6 +654,184 @@ TEST_F(FilterTest, DecodeHeaderWithTokenBucketDeny) {
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
   EXPECT_EQ(bucket->quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 1);
   EXPECT_EQ(bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed), 1);
+}
+
+// The preview matcher is configured to allow the request, but the actionable
+// matcher is configured to deny it. The preview matcher should be matched,
+// bucket created, etc but the request should be allowed by the actionable
+// matcher.
+TEST_F(FilterTest, DecodeHeaderWithHighPriotyPreview) {
+  addPreviewMatcherConfig(MatcherConfigType::Valid);
+  addMatcherConfig(MatcherConfigType::ValidLowPriority);
+  createFilter();
+  // Define the key value pairs that is used to build the bucket_id dynamically
+  // via `custom_value` in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+  buildCustomHeader(custom_value_pairs);
+
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({{"name", "prod"}});
+  absl::flat_hash_map<std::string, std::string> expected_preview_bucket_ids(expected_bucket_ids);
+  // The low priority config has a different bucket id intentionally.
+  expected_bucket_ids.insert({{"priority_test", "low_priority"}});
+
+  verifyRequestMatchingSucceeded(expected_bucket_ids);
+  verifyRequestMatchingSucceeded(expected_preview_bucket_ids, preview_match_tree_);
+
+  // Expect request processing to check for an existing bucket, find none, and
+  // go through bucket creation.
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  BucketId preview_bucket_id = bucketIdFromMap(expected_preview_bucket_ids);
+  size_t preview_bucket_id_hash = MessageUtil::hash(preview_bucket_id);
+
+  // Expect the new actionable bucket to fallback to DENY_ALL without a
+  // configured no_assignment_behavior & the preview bucket to fallback to
+  // ALLOW_ALL.
+  BucketAction expected_action;
+  expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::DENY_ALL);
+  *expected_action.mutable_bucket_id() = bucket_id;
+  BucketAction preview_expected_action;
+  preview_expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  *preview_expected_action.mutable_bucket_id() = preview_bucket_id;
+
+  // The bucket creation shouldn't try to include a fallback or
+  // no-assignment-default action as neither is set in the BucketMatcher.
+  EXPECT_CALL(*mock_local_client_, getBucket(preview_bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(preview_bucket_id),
+                           preview_bucket_id_hash, ProtoEq(preview_expected_action),
+                           testing::IsNull(), std::chrono::milliseconds::zero(), true))
+      .WillOnce(Return());
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id), bucket_id_hash,
+                           ProtoEq(expected_action), testing::IsNull(),
+                           std::chrono::milliseconds::zero(), false))
+      .WillOnce(Return());
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
+}
+
+// The preview matcher and actionable matcher are both configured to allow the
+// request. Both matchers will also have the same priority so both the preview &
+// actionable buckets will be evaluated.
+// In this case, the bucket-id is also the same between the two matchers, so the
+// targeted bucket will see 2x allowed requests.
+TEST_F(FilterTest, DecodeHeaderWithEqualPriotyPreview) {
+  addPreviewMatcherConfig(MatcherConfigType::Valid);
+  addMatcherConfig(MatcherConfigType::Valid);
+  createFilter();
+  // Define the key value pairs that is used to build the bucket_id dynamically
+  // via `custom_value` in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+  buildCustomHeader(custom_value_pairs);
+
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({{"name", "prod"}});
+
+  // Both have the same bucket id in this test case.
+  verifyRequestMatchingSucceeded(expected_bucket_ids);
+  verifyRequestMatchingSucceeded(expected_bucket_ids, preview_match_tree_);
+
+  // Expect request processing to check for an existing bucket, find none, and
+  // go through bucket creation.
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+
+  // Expect the new actionable bucket to fallback to DENY_ALL without a
+  // configured no_assignment_behavior & the preview bucket to fallback to
+  // ALLOW_ALL.
+  BucketAction expected_action;
+  expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  *expected_action.mutable_bucket_id() = bucket_id;
+
+  // The bucket creation shouldn't try to include a fallback or
+  // no-assignment-default action as neither is set in the BucketMatcher.
+  // It should be called twice as the preview bucket is also evaluated.
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash))
+      .Times(2)
+      .WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id), bucket_id_hash,
+                           ProtoEq(expected_action), testing::IsNull(),
+                           std::chrono::milliseconds::zero(), true))
+      .Times(2)
+      .WillRepeatedly(Return());
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
+}
+
+// The preview bucket should not be created as the actionable bucket is of a
+// higher priority after each matcher.
+TEST_F(FilterTest, DecodeHeaderWithLowPriotyPreview) {
+  addPreviewMatcherConfig(MatcherConfigType::ValidLowPriority);
+  addMatcherConfig(MatcherConfigType::Valid);
+  createFilter();
+  // Define the key value pairs that is used to build the bucket_id dynamically
+  // via `custom_value` in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+  buildCustomHeader(custom_value_pairs);
+
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({{"name", "prod"}});
+  absl::flat_hash_map<std::string, std::string> expected_preview_bucket_ids(expected_bucket_ids);
+  // The low priority config has a different bucket id intentionally.
+  expected_preview_bucket_ids.insert({{"priority_test", "low_priority"}});
+
+  verifyRequestMatchingSucceeded(expected_bucket_ids);
+  verifyRequestMatchingSucceeded(expected_preview_bucket_ids, preview_match_tree_);
+
+  // Expect request processing to check for an existing bucket, find none, and
+  // go through bucket creation.
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  BucketId preview_bucket_id = bucketIdFromMap(expected_preview_bucket_ids);
+  size_t preview_bucket_id_hash = MessageUtil::hash(preview_bucket_id);
+
+  // Expect the new actionable bucket to fallback to ALLOW_ALL without a
+  // configured no_assignment_behavior & the preview bucket to fallback to
+  // DENY_ALL. The preview bucket should not be created however as it is lower
+  // priority than the actionable bucket.
+  BucketAction expected_action;
+  expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  *expected_action.mutable_bucket_id() = bucket_id;
+  BucketAction preview_expected_action;
+  preview_expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::DENY_ALL);
+  *preview_expected_action.mutable_bucket_id() = preview_bucket_id;
+
+  // The bucket creation shouldn't try to include a fallback or
+  // no-assignment-default action as neither is set in the BucketMatcher.
+  EXPECT_CALL(*mock_local_client_, getBucket(preview_bucket_id_hash)).Times(0);
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(preview_bucket_id),
+                           preview_bucket_id_hash, ProtoEq(preview_expected_action),
+                           testing::IsNull(), std::chrono::milliseconds::zero(), false))
+      .Times(0);
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id), bucket_id_hash,
+                           ProtoEq(expected_action), testing::IsNull(),
+                           std::chrono::milliseconds::zero(), true))
+      .WillOnce(Return());
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }
 
 TEST_F(FilterTest, UnsupportedRequestsPerTimeUnit) {

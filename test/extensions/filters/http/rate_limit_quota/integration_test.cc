@@ -45,6 +45,9 @@ using envoy::service::rate_limit_quota::v3::BucketId;
 using envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse;
 using envoy::service::rate_limit_quota::v3::RateLimitQuotaUsageReports;
 using Protobuf::util::MessageDifferencer;
+using ::xds::type::matcher::v3::Matcher;
+using ValueBuilder = ::envoy::extensions::filters::http::rate_limit_quota::v3::
+    RateLimitQuotaBucketSettings::BucketIdBuilder::ValueBuilder;
 
 MATCHER_P2(ProtoEqIgnoringFieldAndOrdering, expected,
            /* const FieldDescriptor* */ ignored_field, "") {
@@ -68,6 +71,9 @@ struct ConfigOption {
   absl::optional<BlanketRule> no_assignment_blanket_rule = std::nullopt;
   bool unsupported_no_assignment_strategy = false;
   absl::optional<RateLimitStrategy> fallback_rate_limit_strategy = std::nullopt;
+  absl::optional<BucketId> custom_bucket_id = std::nullopt;
+  int64_t priority = 0;
+  absl::optional<Matcher> preview_matcher = std::nullopt;
   int fallback_ttl_sec = 15;
 };
 
@@ -92,90 +98,111 @@ protected:
     }
   }
 
+  void constructMatcher(const ConfigOption& config_option, Matcher& matcher_out) {
+    TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher_out);
+
+    auto* mutable_config = matcher_out.mutable_matcher_list()
+                               ->mutable_matchers(0)
+                               ->mutable_on_match()
+                               ->mutable_action()
+                               ->mutable_typed_config();
+    ASSERT_TRUE(mutable_config->Is<::envoy::extensions::filters::http::rate_limit_quota::v3::
+                                       RateLimitQuotaBucketSettings>());
+
+    auto mutable_bucket_settings = MessageUtil::anyConvert<
+        ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings>(
+        *mutable_config);
+    mutable_bucket_settings.set_priority(config_option.priority);
+
+    if (config_option.custom_bucket_id.has_value()) {
+      auto* bucket_id_builder =
+          mutable_bucket_settings.mutable_bucket_id_builder()->mutable_bucket_id_builder();
+      bucket_id_builder->clear();
+      for (const auto& [key, value] : config_option.custom_bucket_id->bucket()) {
+        ValueBuilder value_builder;
+        value_builder.set_string_value(value);
+        bucket_id_builder->insert({key, value_builder});
+      }
+    }
+
+    // Configure the no_assignment behavior.
+    if (config_option.no_assignment_blanket_rule.has_value()) {
+      mutable_bucket_settings.mutable_no_assignment_behavior()
+          ->mutable_fallback_rate_limit()
+          ->set_blanket_rule(*config_option.no_assignment_blanket_rule);
+    } else if (config_option.unsupported_no_assignment_strategy) {
+      auto* requests_per_time_unit = mutable_bucket_settings.mutable_no_assignment_behavior()
+                                         ->mutable_fallback_rate_limit()
+                                         ->mutable_requests_per_time_unit();
+      requests_per_time_unit->set_requests_per_time_unit(100);
+      requests_per_time_unit->set_time_unit(envoy::type::v3::RateLimitUnit::SECOND);
+    }
+
+    if (config_option.fallback_rate_limit_strategy.has_value()) {
+      *mutable_bucket_settings.mutable_expired_assignment_behavior()
+           ->mutable_fallback_rate_limit() = *config_option.fallback_rate_limit_strategy;
+      mutable_bucket_settings.mutable_expired_assignment_behavior()
+          ->mutable_expired_assignment_behavior_timeout()
+          ->set_seconds(config_option.fallback_ttl_sec);
+    }
+
+    mutable_config->PackFrom(mutable_bucket_settings);
+  }
+
   void initializeConfig(ConfigOption config_option = {}, const std::string& log_format = "") {
-    config_helper_.addConfigModifier([this, config_option, log_format](
-                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for
-      // headers
-      ConfigHelper::setHttp2(
-          *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
+    config_helper_.addConfigModifier(
+        [this, config_option, log_format](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for
+          // headers
+          ConfigHelper::setHttp2(
+              *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
 
-      // Enable access logging for testing dynamic metadata.
-      if (!log_format.empty()) {
-        HttpIntegrationTest::useAccessLog(log_format);
-      }
+          // Enable access logging for testing dynamic metadata.
+          if (!log_format.empty()) {
+            HttpIntegrationTest::useAccessLog(log_format);
+          }
 
-      // Clusters for ExtProc gRPC servers, starting by copying an existing
-      // cluster
-      for (size_t i = 0; i < grpc_upstreams_.size(); ++i) {
-        auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
-        server_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-        std::string cluster_name = absl::StrCat("rlqs_server_", i);
-        server_cluster->set_name(cluster_name);
-        server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
-      }
+          // Clusters for ExtProc gRPC servers, starting by copying an existing
+          // cluster
+          for (size_t i = 0; i < grpc_upstreams_.size(); ++i) {
+            auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
+            server_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+            std::string cluster_name = absl::StrCat("rlqs_server_", i);
+            server_cluster->set_name(cluster_name);
+            server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
+          }
 
-      if (config_option.valid_rlqs_server) {
-        // Load configuration of the server from YAML and use a helper to
-        // add a grpc_service stanza pointing to the cluster that we just
-        // made
-        setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_server_0",
-                       grpc_upstreams_[0]->localAddress());
-      } else {
-        // Set up the gRPC service with wrong cluster name and address.
-        setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_wrong_server",
-                       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
-      }
+          if (config_option.valid_rlqs_server) {
+            // Load configuration of the server from YAML and use a helper to
+            // add a grpc_service stanza pointing to the cluster that we just
+            // made
+            setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_server_0",
+                           grpc_upstreams_[0]->localAddress());
+          } else {
+            // Set up the gRPC service with wrong cluster name and address.
+            setGrpcService(*proto_config_.mutable_rlqs_server(), "rlqs_wrong_server",
+                           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
+          }
 
-      // Set the domain name.
-      proto_config_.set_domain("cloud_12345_67890_rlqs");
+          // Set the domain name.
+          proto_config_.set_domain("cloud_12345_67890_rlqs");
 
-      xds::type::matcher::v3::Matcher matcher;
-      TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
+          xds::type::matcher::v3::Matcher matcher;
+          constructMatcher(config_option, matcher);
 
-      auto* mutable_config = matcher.mutable_matcher_list()
-                                 ->mutable_matchers(0)
-                                 ->mutable_on_match()
-                                 ->mutable_action()
-                                 ->mutable_typed_config();
-      ASSERT_TRUE(mutable_config->Is<::envoy::extensions::filters::http::rate_limit_quota::v3::
-                                         RateLimitQuotaBucketSettings>());
+          proto_config_.mutable_bucket_matchers()->MergeFrom(matcher);
+          if (config_option.preview_matcher.has_value())
+            proto_config_.mutable_preview_bucket_matchers()->MergeFrom(
+                config_option.preview_matcher.value());
 
-      auto mutable_bucket_settings = MessageUtil::anyConvert<
-          ::envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings>(
-          *mutable_config);
-      // Configure the no_assignment behavior.
-      if (config_option.no_assignment_blanket_rule.has_value()) {
-        mutable_bucket_settings.mutable_no_assignment_behavior()
-            ->mutable_fallback_rate_limit()
-            ->set_blanket_rule(*config_option.no_assignment_blanket_rule);
-      } else if (config_option.unsupported_no_assignment_strategy) {
-        auto* requests_per_time_unit = mutable_bucket_settings.mutable_no_assignment_behavior()
-                                           ->mutable_fallback_rate_limit()
-                                           ->mutable_requests_per_time_unit();
-        requests_per_time_unit->set_requests_per_time_unit(100);
-        requests_per_time_unit->set_time_unit(envoy::type::v3::RateLimitUnit::SECOND);
-      }
-
-      if (config_option.fallback_rate_limit_strategy.has_value()) {
-        *mutable_bucket_settings.mutable_expired_assignment_behavior()
-             ->mutable_fallback_rate_limit() = *config_option.fallback_rate_limit_strategy;
-        mutable_bucket_settings.mutable_expired_assignment_behavior()
-            ->mutable_expired_assignment_behavior_timeout()
-            ->set_seconds(config_option.fallback_ttl_sec);
-      }
-
-      mutable_config->PackFrom(mutable_bucket_settings);
-      proto_config_.mutable_bucket_matchers()->MergeFrom(matcher);
-
-      // Construct a configuration proto for our filter and then re-write it
-      // to JSON so that we can add it to the overall config
-      envoy::config::listener::v3::Filter rate_limit_quota_filter;
-      rate_limit_quota_filter.set_name("envoy.filters.http.rate_limit_quota");
-      rate_limit_quota_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.prependFilter(
-          MessageUtil::getJsonStringFromMessageOrError(rate_limit_quota_filter));
-    });
+          // Construct a configuration proto for our filter and then re-write it
+          // to JSON so that we can add it to the overall config
+          envoy::config::listener::v3::Filter rate_limit_quota_filter;
+          rate_limit_quota_filter.set_name("envoy.filters.http.rate_limit_quota");
+          rate_limit_quota_filter.mutable_typed_config()->PackFrom(proto_config_);
+          config_helper_.prependFilter(
+              MessageUtil::getJsonStringFromMessageOrError(rate_limit_quota_filter));
+        });
     setUpstreamProtocol(Http::CodecType::HTTP2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
   }
@@ -659,6 +686,118 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll
       RateLimitQuotaUsageReports::BucketQuotaUsage::GetDescriptor()->FindFieldByName(
           "time_elapsed");
   ASSERT_THAT(reports, ProtoEqIgnoringFieldAndOrdering(expected_reports, time_elapsed_desc));
+}
+
+// Test behaviors when a preview matcher has higher priority than the default
+// matcher. The preview matcher should be matched & its action evaluated, but
+// the resulting deny decision should be ignored. The default matcher's bucket
+// should instead also be evaluated & its allow decision respected.
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestAllowAllPreviewDenyAll) {
+  Matcher preview_matcher;
+  BucketId preview_bucket_id;
+  preview_bucket_id.mutable_bucket()->insert(
+      {{"name", "prod"}, {"environment", "staging"}, {"group", "preview rule"}});
+  constructMatcher(
+      {
+          .no_assignment_blanket_rule = RateLimitStrategy::DENY_ALL,
+          .custom_bucket_id = preview_bucket_id,
+          .priority = 10,
+      },
+      preview_matcher);
+
+  initializeConfig({
+      .no_assignment_blanket_rule = RateLimitStrategy::ALLOW_ALL,
+      .priority = 20,
+      .preview_matcher = preview_matcher,
+  });
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+
+  BucketId actionable_bucket_id;
+  actionable_bucket_id.mutable_bucket()->insert(
+      {{"name", "prod"}, {"environment", "staging"}, {"group", "envoy"}});
+
+  // Expect usage reports for the preview & actionable buckets. The preview rule
+  // should report a blocked query, even though the blocking decision was not
+  // enforced.
+  RateLimitQuotaUsageReports expected_reports;
+  expected_reports.set_domain("cloud_12345_67890_rlqs");
+  auto* preview_usage = expected_reports.add_bucket_quota_usages();
+  preview_usage->set_num_requests_denied(1);
+  preview_usage->mutable_bucket_id()->CopyFrom(preview_bucket_id);
+  auto* actionable_usage = expected_reports.add_bucket_quota_usages();
+  actionable_usage->set_num_requests_allowed(1);
+  actionable_usage->mutable_bucket_id()->CopyFrom(actionable_bucket_id);
+
+  // First request is allowed by the default-open & triggers bucket the
+  // RLQS stream creation.
+  sendClientRequest(&custom_headers);
+
+  // Start the gRPC stream to RLQS server on the first request.
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+  ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+  rlqs_stream_->startGrpcStream();
+
+  // RLQS stream is triggered by first bucket creation.
+  // The first request should be allowed by the no_assignment default-allow,
+  // regardless of the preview deny-all.
+  ASSERT_TRUE(expectAllowedRequest());
+
+  // First usage reports are sent when the RLQS buckets are each hit. This tests
+  // that each bucket triggers an initial usage report by combining them and
+  // validating the composite, so that we don't have to test for ordering.
+  RateLimitQuotaUsageReports combined_reports;
+  for (int i = 0; i < 2; ++i) {
+    RateLimitQuotaUsageReports init_reports;
+    ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, init_reports));
+
+    ASSERT_THAT(init_reports.bucket_quota_usages_size(), 1);
+    if (i == 0) {
+      combined_reports.MergeFrom(init_reports);
+    } else {
+      combined_reports.add_bucket_quota_usages()->MergeFrom(init_reports.bucket_quota_usages(0));
+    }
+  }
+
+  const Protobuf::FieldDescriptor* time_elapsed_desc =
+      RateLimitQuotaUsageReports::BucketQuotaUsage::GetDescriptor()->FindFieldByName(
+          "time_elapsed");
+  ASSERT_THAT(combined_reports,
+              ProtoEqIgnoringFieldAndOrdering(expected_reports, time_elapsed_desc));
+
+  // Build the assignments response.
+  RateLimitQuotaResponse rlqs_response;
+  auto* bucket_action = rlqs_response.add_bucket_action();
+  bucket_action->mutable_bucket_id()->CopyFrom(actionable_bucket_id);
+  auto* quota_assignment = bucket_action->mutable_quota_assignment_action();
+  quota_assignment->mutable_assignment_time_to_live()->set_seconds(120);
+  quota_assignment->mutable_rate_limit_strategy()->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  auto* preview_action = rlqs_response.add_bucket_action();
+  preview_action->mutable_bucket_id()->CopyFrom(preview_bucket_id);
+  auto* preview_assignment = preview_action->mutable_quota_assignment_action();
+  preview_assignment->mutable_assignment_time_to_live()->set_seconds(120);
+  preview_assignment->mutable_rate_limit_strategy()->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+
+  // Send the response from RLQS server & give a little time for assignments to
+  // propagate.
+  rlqs_stream_->sendGrpcMessage(rlqs_response);
+  absl::SleepFor(absl::Seconds(0.5));
+
+  // Send one more request to test the preview matcher hitting a cached bucket.
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectAllowedRequest());
+
+  // Expect the next usage report for the preview bucket to show an allowed
+  // request because of the cached assignment.
+  preview_usage->clear_num_requests_denied();
+  preview_usage->set_num_requests_allowed(1);
+
+  combined_reports.Clear();
+  simTime().advanceTimeWait(std::chrono::seconds(report_interval_sec_));
+  ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, combined_reports));
+  ASSERT_THAT(combined_reports,
+              ProtoEqIgnoringFieldAndOrdering(expected_reports, time_elapsed_desc));
 }
 
 TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementDenyAll) {

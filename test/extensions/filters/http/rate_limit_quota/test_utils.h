@@ -43,6 +43,50 @@ inline constexpr absl::string_view ValidMatcherConfig = R"EOF(
                         "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
                         header_name: group
             reporting_interval: 60s
+            priority: 1
+  )EOF";
+
+inline constexpr absl::string_view ValidLowPriorityMatcherConfig = R"EOF(
+  matcher_list:
+    matchers:
+      # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
+      predicate:
+        single_predicate:
+          input:
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: environment
+            name: "HttpRequestHeaderMatchInput"
+          value_match:
+            exact: staging
+      on_match:
+        action:
+          name: rate_limit_quota
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+            bucket_id_builder:
+              bucket_id_builder:
+                "name":
+                    string_value: "prod"
+                "priority_test":
+                    string_value: "low_priority"
+                "environment":
+                    custom_value:
+                      name: "test_1"
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                        header_name: environment
+                "group":
+                    custom_value:
+                      name: "test_2"
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                        header_name: group
+            reporting_interval: 60s
+            priority: 100
+            no_assignment_behavior:
+              fallback_rate_limit:
+                blanket_rule: DENY_ALL
   )EOF";
 
 inline constexpr absl::string_view InvalidMatcherConfig = R"EOF(
