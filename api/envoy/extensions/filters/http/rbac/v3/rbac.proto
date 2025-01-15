@@ -43,10 +43,8 @@ message RBAC {
   // match any matcher will be denied.
   // If absent, no enforcing RBAC matcher will be applied.
   // If present and empty, deny all requests.
-  xds.type.matcher.v3.Matcher matcher = 4 [
-    (udpa.annotations.field_migrate).oneof_promotion = "rules_specifier",
-    (xds.annotations.v3.field_status).work_in_progress = true
-  ];
+  xds.type.matcher.v3.Matcher matcher = 4
+      [(udpa.annotations.field_migrate).oneof_promotion = "rules_specifier"];
 
   // Shadow rules are not enforced by the filter (i.e., returning a 403)
   // but will emit stats and logs and can be used for rule testing.
