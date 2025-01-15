@@ -68,14 +68,6 @@ public:
     }
   }
 
-  void enableOghttp2ForFakeUpstream() {
-    // Enable most permissive codec for fake upstreams, so it can accept unencoded TAB and space
-    // from the H/3 downstream
-    envoy::config::core::v3::Http2ProtocolOptions config;
-    config.mutable_use_oghttp2_codec()->set_value(true);
-    mergeOptions(config);
-  }
-
   std::string generateExtendedAsciiString() {
     std::string extended_ascii_string;
     for (uint32_t ascii = 0x80; ascii <= 0xff; ++ascii) {
@@ -247,7 +239,6 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInPathWithoutPathNormali
   }
 #endif
   setupCharacterValidationRuntimeValues();
-  enableOghttp2ForFakeUpstream();
   initialize();
   std::string additionally_allowed_characters = additionallyAllowedCharactersInUrlPath();
   // # and ? will just cause path to be interpreted as having a query or a fragment
@@ -322,7 +313,6 @@ TEST_P(DownstreamUhvIntegrationTest, CharacterValidationInQuery) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) -> void { hcm.mutable_normalize_path()->set_value(true); });
-  enableOghttp2ForFakeUpstream();
   initialize();
   std::string additionally_allowed_characters = additionallyAllowedCharactersInUrlPath();
   // Adding fragment separator, since it will just cause the URL to be interpreted as having a
