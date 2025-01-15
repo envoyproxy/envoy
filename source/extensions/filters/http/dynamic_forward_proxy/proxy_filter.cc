@@ -241,6 +241,21 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     return loadDynamicCluster(dfp_cluster, headers, default_port);
   }
 
+  const auto host_attributes =
+      Http::Utility::parseAuthority(headers.Host()->value().getStringView());
+  auto host = std::string(host_attributes.host_);
+  auto port = host_attributes.port_.value_or(default_port);
+
+  if (host_attributes.is_ip_address_) {
+    auto address = Network::Utility::parseInternetAddressNoThrow(host);
+    if (address != nullptr) {
+      ENVOY_STREAM_LOG(debug, "Authority is an IP. Skipping DFP DNS check. Host: {} Port: {}",
+                       *decoder_callbacks_, host, port);
+      addHostAddressToFilterState(Network::Utility::parseInternetAddressNoThrow(host, port));
+      return Http::FilterHeadersStatus::Continue;
+    }
+  }
+
   circuit_breaker_ = config_->cache().canCreateDnsRequest();
 
   if (circuit_breaker_ == nullptr) {
