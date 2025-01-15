@@ -359,6 +359,18 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
              }
              return {};
            }},
+          {UpstreamLocality,
+           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (!wrapper.info_.upstreamInfo().has_value()) {
+               return {};
+             }
+             auto upstream_host = wrapper.info_.upstreamInfo().value().get().upstreamHost();
+             if (upstream_host == nullptr) {
+               return {};
+             }
+             return CelProtoWrapper::CreateMessage(&upstream_host.get()->locality(),
+                                                   &wrapper.arena_);
+           }},
           {UpstreamTransportFailureReason,
            [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
              if (!wrapper.info_.upstreamInfo().has_value()) {
