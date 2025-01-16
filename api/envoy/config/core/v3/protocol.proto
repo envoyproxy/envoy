@@ -634,8 +634,6 @@ message Http2ProtocolOptions {
   google.protobuf.BoolValue use_oghttp2_codec = 16
       [(xds.annotations.v3.field_status).work_in_progress = true];
 
-  // [#not-implemented-hide:] Hiding until Envoy has full metadata support.
-  //
   // Configure the maximum amount of metadata than can be handled per stream. Defaults to 1 MB.
   google.protobuf.UInt64Value max_metadata_size = 17;
 }

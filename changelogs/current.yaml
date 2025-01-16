@@ -43,5 +43,8 @@ new_features:
   change: |
     Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
     :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
+- area: http
+  change: |
+    Added :ref:`<max_metadata_size envoy.config.core.v3.Http2ProtocolOptions.max_metadata_size>` to make HTTP/2 metadata limits configurable.
 
 deprecated:
