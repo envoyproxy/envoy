@@ -12,10 +12,8 @@
 
 #include "source/common/protobuf/protobuf.h"
 
-namespace quic {
-class QuicSocketAddress;
-class QuicReceivedPacket;
-} // namespace quic
+#include "quiche/quic/core/quic_packets.h"
+#include "quiche/quic/platform/api/quic_socket_address.h"
 
 namespace Envoy {
 

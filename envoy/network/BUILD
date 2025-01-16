@@ -119,6 +119,7 @@ envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     deps = [
+        "",
         ":listen_socket_interface",
         ":listener_filter_buffer_interface",
         ":transport_socket_interface",
@@ -127,6 +128,8 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:host_description_interface",
         "//source/common/protobuf",
+        "@com_github_google_quiche//:quic_core_packets_lib",
+        "@com_github_google_quiche//:quic_platform_socket_address",
     ],
 )
 
