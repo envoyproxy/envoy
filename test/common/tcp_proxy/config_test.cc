@@ -683,8 +683,11 @@ public:
   TcpProxyNonDeprecatedConfigRoutingTest() {
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
             chooseHost(_))
-        .WillByDefault(Return(factory_context_.server_factory_context_.cluster_manager_
-                                  .thread_local_cluster_.lb_.host_));
+        .WillByDefault(Invoke([this] {
+          return Upstream::HostSelectionResponse{
+              factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_
+                  .host_};
+        }));
   }
 
   void setup() {
@@ -745,8 +748,11 @@ public:
   void setup(const std::string& yaml) {
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
             chooseHost(_))
-        .WillByDefault(Return(factory_context_.server_factory_context_.cluster_manager_
-                                  .thread_local_cluster_.lb_.host_));
+        .WillByDefault(Invoke([this] {
+          return Upstream::HostSelectionResponse{
+              factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_
+                  .host_};
+        }));
     factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
@@ -798,8 +804,11 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
     mock_connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
     ON_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
             chooseHost(_))
-        .WillByDefault(Return(factory_context_.server_factory_context_.cluster_manager_
-                                  .thread_local_cluster_.lb_.host_));
+        .WillByDefault(Invoke([this] {
+          return Upstream::HostSelectionResponse{
+              factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_
+                  .host_};
+        }));
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                 tcpConnPool(_, _, _))
         .WillOnce(Invoke([](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,

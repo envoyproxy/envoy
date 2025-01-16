@@ -34,6 +34,8 @@ public:
   }
 
   absl::optional<OverrideHost> overrideHostToSelect() const override { return {}; }
+
+  void onAsyncHostSelection(HostConstSharedPtr&&) override {}
 };
 
 } // namespace Upstream

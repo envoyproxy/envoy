@@ -41,7 +41,7 @@ public:
       EXPECT_EQ(hostSet().healthy_hosts_[i], lb_->peekAnotherHost(nullptr));
     }
     for (auto i : picks) {
-      EXPECT_EQ(hostSet().healthy_hosts_[i], lb_->chooseHost(nullptr));
+      EXPECT_EQ(hostSet().healthy_hosts_[i], lb_->chooseHost(nullptr).host);
     }
   }
 
@@ -62,7 +62,7 @@ TEST_P(FailoverTest, BasicFailover) {
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->peekAnotherHost(nullptr));
-  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 // Ensure if all the hosts with priority 0 degraded, the first priority degraded hosts are used.
@@ -73,7 +73,7 @@ TEST_P(FailoverTest, BasicDegradedHosts) {
   init(false);
   // We don't preconnect degraded hosts.
   EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr));
-  EXPECT_EQ(host_set_.degraded_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.degraded_hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 // Ensure if all the hosts with priority 0 degraded, but healthy hosts in the failover, the healthy
@@ -84,7 +84,7 @@ TEST_P(FailoverTest, BasicFailoverDegradedHosts) {
   failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
   init(false);
-  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 // Test that extending the priority set with an existing LB causes the correct updates.
@@ -94,7 +94,7 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
   init(false);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Update the priority set with a new priority level P=2 and ensure the host
   // is chosen
@@ -105,17 +105,17 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSet) {
   HostVector add_hosts;
   add_hosts.push_back(tertiary_host_set_.hosts_[0]);
   tertiary_host_set_.runCallbacks(add_hosts, {});
-  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks(add_hosts, {});
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Remove the healthy host and ensure we fail back over to tertiary_host_set_
   host_set_.healthy_hosts_ = {};
   host_set_.runCallbacks({}, {});
-  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 // Test that extending the priority set with an existing LB causes the correct updates when the
@@ -127,7 +127,7 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
 
   init(false);
   // With both the primary and failover hosts unhealthy, we should select no host.
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 
   // Update the priority set with a new priority level P=2 and ensure the host
   // is chosen
@@ -138,17 +138,17 @@ TEST_P(FailoverTest, PriorityUpdatesWithLocalHostSetDisableOnPanic) {
   HostVector add_hosts;
   add_hosts.push_back(tertiary_host_set_.hosts_[0]);
   tertiary_host_set_.runCallbacks(add_hosts, {});
-  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks(add_hosts, {});
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Remove the healthy host and ensure we fail back over to tertiary_host_set_
   host_set_.healthy_hosts_ = {};
   host_set_.runCallbacks({}, {});
-  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 // Test extending the priority set.
@@ -158,7 +158,7 @@ TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
   init(true);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Update the priority set with a new priority level P=2
   // As it has healthy hosts, it should be selected.
@@ -169,12 +169,12 @@ TEST_P(FailoverTest, ExtendPrioritiesUpdatingPrioritySet) {
   HostVector add_hosts;
   add_hosts.push_back(tertiary_host_set_.hosts_[0]);
   tertiary_host_set_.runCallbacks(add_hosts, {});
-  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks(add_hosts, {});
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
@@ -183,7 +183,7 @@ TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   init(true);
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Update the host set with a new priority level. We should start selecting
   // hosts from that level as it has viable hosts.
@@ -195,13 +195,13 @@ TEST_P(FailoverTest, ExtendPrioritiesWithLocalPrioritySet) {
   HostVector add_hosts;
   add_hosts.push_back(tertiary_host_set_.hosts_[0]);
   tertiary_host_set_.runCallbacks(add_hosts, {});
-  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Update the local hosts. We're not doing locality based routing in this
   // test, but it should at least do no harm.
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info_, "tcp://127.0.0.1:82", simTime())}));
   updateHosts(hosts, HostsPerLocalityImpl::empty());
-  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(tertiary_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 // Verifies that the number of warmed hosts is used to compute priority spillover.
@@ -217,9 +217,9 @@ TEST_P(FailoverTest, PrioritiesWithNotAllWarmedHosts) {
   failover_host_set_.healthy_hosts_ = failover_host_set_.hosts_;
   init(true);
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 // Verifies that we handle zero warmed hosts.
@@ -235,9 +235,9 @@ TEST_P(FailoverTest, PrioritiesWithZeroWarmedHosts) {
 
   init(true);
 
-  EXPECT_EQ(failover_host_set_.hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(failover_host_set_.hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(failover_host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(failover_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(failover_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(failover_host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew, FailoverTest,
@@ -246,14 +246,14 @@ INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew, FailoverTest,
 
 TEST_P(RoundRobinLoadBalancerTest, NoHosts) {
   init(false);
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SingleHost) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   init(false);
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, Normal) {
@@ -266,15 +266,15 @@ TEST_P(RoundRobinLoadBalancerTest, Normal) {
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->peekAnotherHost(nullptr));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->peekAnotherHost(nullptr));
 
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Make sure that if picks get ahead of peeks, peeks resume at the next pick.
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->peekAnotherHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Change host set with no peeks in progress
   hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:82", simTime()));
@@ -291,7 +291,7 @@ TEST_P(RoundRobinLoadBalancerTest, Normal) {
   hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:83", simTime()));
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {hostSet().healthy_hosts_.front()});
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
   peekThenPick({2, 3});
 }
 
@@ -305,10 +305,10 @@ TEST_P(RoundRobinLoadBalancerTest, Seed) {
   hostSet().hosts_ = hostSet().healthy_hosts_;
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
   init(false);
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, Locality) {
@@ -331,22 +331,22 @@ TEST_P(RoundRobinLoadBalancerTest, Locality) {
   init(false, true);
   // chooseHealthyLocality() return value determines which locality we use.
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(1));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(1));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
   // When there is no locality, we RR over all available hosts.
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(absl::optional<uint32_t>()));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(absl::optional<uint32_t>()));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(absl::optional<uint32_t>()));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
@@ -379,9 +379,9 @@ TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
   // Since we're split between healthy and degraded, the LB should call into both
   // chooseHealthyLocality and chooseDegradedLocality.
   EXPECT_CALL(hostSet(), chooseDegradedLocality()).WillOnce(Return(1));
-  EXPECT_EQ(hostSet().degraded_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().degraded_hosts_[0], lb_->chooseHost(nullptr).host);
   EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, Weighted) {
@@ -390,39 +390,39 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   hostSet().hosts_ = hostSet().healthy_hosts_;
   init(false);
   // Initial weights respected.
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
   // Modify weights, we converge on new weighting after one pick cycle.
   hostSet().healthy_hosts_[0]->weight(2);
   hostSet().healthy_hosts_[1]->weight(1);
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
   // Add a host, it should participate in next round of scheduling.
   hostSet().healthy_hosts_.push_back(makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), 3));
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, {});
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
   // Remove last two hosts, add a new one with different weights.
   HostVector removed_hosts = {hostSet().hosts_[1], hostSet().hosts_[2]};
   hostSet().healthy_hosts_.pop_back();
@@ -433,16 +433,16 @@ TEST_P(RoundRobinLoadBalancerTest, Weighted) {
   hostSet().hosts_.push_back(hostSet().healthy_hosts_.back());
   hostSet().healthy_hosts_[0]->weight(1);
   hostSet().runCallbacks({hostSet().healthy_hosts_.back()}, removed_hosts);
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 }
 
 // Validate that the RNG seed influences pick order when weighted RR.
@@ -453,12 +453,12 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedSeed) {
   EXPECT_CALL(random_, random()).WillRepeatedly(Return(1));
   init(false);
   // Initial weights respected.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 }
 
 // Validate that low weighted hosts will be chosen when the LB is created.
@@ -484,7 +484,7 @@ TEST_P(RoundRobinLoadBalancerTest, WeightedInitializationPicksAllHosts) {
     EXPECT_CALL(random_, random()).Times(2).WillRepeatedly(Return(i));
     RoundRobinLoadBalancer lb(priority_set_, local_priority_set_.get(), stats_, runtime_, random_,
                               common_config_, round_robin_lb_config_, simTime());
-    const auto& host = lb.chooseHost(nullptr);
+    const auto& host = lb.chooseHost(nullptr).host;
     host_picked_count_map[host]++;
   }
   // Ensure that the number of times each host was picked is as expected.
@@ -506,9 +506,9 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
                       makeTestHost(info_, "tcp://127.0.0.1:85", simTime())};
 
   init(false);
-  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().hosts_[2], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().hosts_[2], lb_->chooseHost(nullptr).host);
 
   // Take the threshold back above the panic threshold.
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
@@ -517,8 +517,8 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
                               makeTestHost(info_, "tcp://127.0.0.1:83", simTime())};
   hostSet().runCallbacks({}, {});
 
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 
   EXPECT_EQ(3UL, stats_.lb_healthy_panic_.value());
 }
@@ -537,7 +537,7 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
   common_config_.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
 
   init(false);
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 
   // Take the threshold back above the panic threshold.
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
@@ -546,8 +546,8 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanicDisableOnPanic) {
                               makeTestHost(info_, "tcp://127.0.0.1:83", simTime())};
   hostSet().runCallbacks({}, {});
 
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 
   EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
 }
@@ -562,7 +562,7 @@ TEST_P(RoundRobinLoadBalancerTest, DisablePanicMode) {
   init(false);
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(0));
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 }
 
@@ -606,16 +606,16 @@ TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
 
   // Calling chooseHost multiple times always returns host one, since the filter will reject
   // the other host.
-  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
-  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
-  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context).host);
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context).host);
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context).host);
 
   // By setting the retry counter to zero, we effectively disable the filter.
   EXPECT_CALL(context, hostSelectionRetryCount()).WillRepeatedly(Return(0));
 
-  EXPECT_EQ(hostSet().hosts_[1], lb_->chooseHost(&context));
-  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
-  EXPECT_EQ(hostSet().hosts_[1], lb_->chooseHost(&context));
+  EXPECT_EQ(hostSet().hosts_[1], lb_->chooseHost(&context).host);
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context).host);
+  EXPECT_EQ(hostSet().hosts_[1], lb_->chooseHost(&context).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
@@ -651,9 +651,9 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 7))
       .WillRepeatedly(Return(7));
 
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
 
   if (&hostSet() == &host_set_) {
     // Cluster size is computed once at zone aware struct regeneration point.
@@ -666,7 +666,7 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {
       .WillRepeatedly(Return(1));
   // Trigger reload.
   updateHosts(hosts, hosts_per_locality);
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareZonesMismatched) {
@@ -717,9 +717,9 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareZonesMismatched) {
       .WillRepeatedly(Return(2));
 
   // Expect zone-aware routing direct mode when in zone A
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_all_directly_.value());
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(2U, stats_.lb_zone_routing_all_directly_.value());
 
   // Upstream and local hosts when in zone B (no local upstream in B)
@@ -737,10 +737,10 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareZonesMismatched) {
   // Expect zone-aware routing still enabled even though there is no upstream host in zone B
   // Since zone A has no residual, we should always pick an upstream from zone C.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(4999));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
@@ -844,35 +844,35 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareResidualsMismatched) {
 
   // Residual mode traffic will go directly to the upstream in A 37.5% (3/8) of the time
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3749));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(2U, stats_.lb_zone_routing_sampled_.value());
 
   // The other 5/8 of the time, traffic will go to cross-zone upstreams with residual capacity
   // Zone B has no upstream hosts
   // Zone C has a residual capacity of 20.83% (20.84% with rounding error): sampled value 0-2083
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3750)).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(3750)).WillOnce(Return(2083));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
   // Zone D has a residual capacity of 20.83% (20.84% with rounding error): sampled value
   // 2084-4167
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2084));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(4167));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
   // Zone E has a residual capacity of 12.5%: sampled value 4168-5417
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(4168));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(5U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(5417));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(6U, stats_.lb_zone_routing_cross_zone_.value());
   // At sampled value 5418, we loop back to the beginning of the vector and select zone C again
 }
@@ -922,19 +922,19 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareDifferentZoneSize) {
 
   // 2/3 of the time we should get the host in zone B
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(6665));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(2U, stats_.lb_zone_routing_sampled_.value());
 
   // 1/3 of the time we should sample the residuals across zones
   // The only upstream zone with residual capacity is zone C
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(6666)).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(3333));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
@@ -971,15 +971,15 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
   updateHosts(hosts, hosts_per_locality);
 
   // There is only one host in the given zone for zone aware routing.
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_all_directly_.value());
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(2U, stats_.lb_zone_routing_all_directly_.value());
 
   // Disable runtime global zone routing.
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(false));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
@@ -1030,12 +1030,12 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingSmallZone) {
 
   // There is only one host in the given zone for zone aware routing.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_sampled_.value());
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
@@ -1089,22 +1089,22 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareNoMatchingZones) {
   updateHosts(local_hosts, local_hosts_per_locality);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3332));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3333));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(6665));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(6666));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random())
       .WillOnce(Return(0))
       .WillOnce(Return(0))
       .WillOnce(Return(9998)); // Rounding error: 3333 * 3 = 9999 != 10000
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(5U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
@@ -1144,9 +1144,9 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareNotEnoughLocalZones) {
   updateHosts(local_hosts, local_hosts_per_locality);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
   EXPECT_CALL(random_, random()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(0U, stats_.lb_zone_routing_all_directly_.value());
   EXPECT_EQ(0U, stats_.lb_zone_routing_sampled_.value());
   EXPECT_EQ(0U, stats_.lb_zone_routing_cross_zone_.value());
@@ -1188,9 +1188,9 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareNotEnoughUpstreamZones) {
   updateHosts(local_hosts, local_hosts_per_locality);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
   EXPECT_CALL(random_, random()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(0U, stats_.lb_zone_routing_all_directly_.value());
   EXPECT_EQ(0U, stats_.lb_zone_routing_sampled_.value());
   EXPECT_EQ(0U, stats_.lb_zone_routing_cross_zone_.value());
@@ -1274,44 +1274,44 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareEmptyLocalities) {
   updateHosts(local_hosts, local_hosts_per_locality);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(832));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(833));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(3U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random())
       .WillOnce(Return(0))
       .WillOnce(Return(0))
       .WillOnce(Return(2498)); // rounding error
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(4U, stats_.lb_zone_routing_cross_zone_.value());
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(2499));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[4][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[4][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(5U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3331));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[4][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[4][1], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(6U, stats_.lb_zone_routing_cross_zone_.value());
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(3332));
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[6][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[6][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(7U, stats_.lb_zone_routing_cross_zone_.value());
   EXPECT_CALL(random_, random())
       .WillOnce(Return(0))
       .WillOnce(Return(0))
       .WillOnce(Return(4997)); // rounding error
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[6][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[6][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(8U, stats_.lb_zone_routing_cross_zone_.value());
 
   EXPECT_CALL(random_, random())
       .WillOnce(Return(0))
       .WillOnce(Return(0))
       .WillOnce(Return(4998)); // wrap around
-  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[2][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(9U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
@@ -1399,7 +1399,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingOneZone) {
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(true);
   updateHosts(hosts, hosts_per_locality);
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
@@ -1422,8 +1422,8 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNotHealthy) {
   updateHosts(hosts, hosts_per_locality);
 
   // local zone has no healthy hosts, take from the all healthy hosts.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
@@ -1461,7 +1461,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmpty) {
   updateHosts(local_hosts, local_hosts_per_locality);
 
   // Local cluster is not OK, we'll do regular routing.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
   EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
@@ -1506,7 +1506,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingLocalEmptyFailTrafficOnPani
 
   // Local cluster is not OK, we'll do regular routing (and select no host, since we're in global
   // panic).
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
   EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
   EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
@@ -1539,7 +1539,7 @@ TEST_P(RoundRobinLoadBalancerTest, NoZoneAwareRoutingNoLocalLocality) {
   updateHosts(local_hosts, local_hosts_per_locality);
 
   // Local cluster is not OK, we'll do regular routing.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(0U, stats_.lb_healthy_panic_.value());
   EXPECT_EQ(1U, stats_.lb_local_cluster_not_ok_.value());
 }
@@ -1617,11 +1617,11 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
 
   // We expect 4:1 ratio, as host2 is in slow start mode and it's weight is scaled with
   // 0.2 factor.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 
   // host2 is 20 secs in slow start, the weight is scaled with time factor 20 / 60 == 0.33.
   simTime().advanceTimeWait(std::chrono::seconds(8));
@@ -1631,9 +1631,9 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
 
   // We expect 2:1 ratio, as host2 is in slow start mode and it's weight is scaled with
   // 0.33 factor.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 
   // Advance time, so that there are no hosts in slow start.
   simTime().advanceTimeWait(std::chrono::seconds(45));
@@ -1642,10 +1642,10 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   hostSet().runCallbacks(empty, empty);
 
   // Now expect 1:1 ratio.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithActiveHC) {
@@ -1692,19 +1692,19 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithActiveHC) {
   hostSet().runCallbacks({}, {});
   // We expect 3:1 ratio, as host2 is in slow start mode, its weight is scaled with time factor
   // max(6/10, 0.1) = 0.6.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Advance time, so there are no hosts in slow start.
   simTime().advanceTimeWait(std::chrono::seconds(20));
   hostSet().runCallbacks({}, {});
   // We expect 1:1 ratio, as there are no hosts in slow start mode.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 
   // Host1 now re-enters slow start.
   host1->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -1715,12 +1715,12 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithActiveHC) {
   hostSet().runCallbacks({}, {});
   // We expect 2:1 ratio, as host1 is in slow start mode, its weight is scaled with time factor
   // max(5/10, 0.1) = 0.5.
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeAggression) {
@@ -1751,11 +1751,11 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeAggression) {
 
   // We should see 2:1:1 ratio, as hosts 2 and 3 are in slow start, their weights are scaled with
   // max(0.5,0.1)=0.5 factor.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
 
   simTime().advanceTimeWait(std::chrono::seconds(4));
   HostVector hosts_added;
@@ -1772,12 +1772,12 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeAggression) {
 
   // We should see 1:1:1:0 ratio, as host 2 and 3 weight is scaled with max((9/10)^(1/1.5),0.1)=0.93
   // factor, host4 weight is 1*max(0.002,0.1)=0.1.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
 
   // host4 is 9 seconds in slow start, it's weight is scaled with max((9/10)^(1/1.5), 0.1)=0.93
   // factor.
@@ -1786,10 +1786,10 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeAggression) {
 
   // We should see 1:1:1:1 ratio, only host4 is in slow start with weight 0.93, and the rest of
   // hosts are outside of slow start with weight 1.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[3], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitNonLinearAggression) {
@@ -1829,10 +1829,10 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitNonLinearAggression) {
 
   // We expect 3:1 ratio, as host2 is 6 secs in slow start mode and it's weight is scaled with
   // max(pow(0.1, 0.5), 0.1)=0.31 factor.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 
   // host2 is 26 secs in slow start.
   simTime().advanceTimeWait(std::chrono::seconds(20));
@@ -1842,14 +1842,14 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitNonLinearAggression) {
 
   // We still expect 5:3 ratio, as host2 is in slow start mode and it's weight is scaled with
   // max(pow(0.43, 0.5), 0.1)=0.65 factor.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
 
   // Advance time, so that there are no hosts in slow start.
   simTime().advanceTimeWait(std::chrono::seconds(41));
@@ -1858,10 +1858,10 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitNonLinearAggression) {
   hostSet().runCallbacks({}, {});
 
   // Now expect 1:1 ratio.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
@@ -1909,19 +1909,19 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
   // We expect 5:2 ratio, as host2 is in slow start mode and it's weight is scaled with
   // 0.35 factor.
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[1,20/7]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[1,20/7]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[2,20/7]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[2,20/7]
   EXPECT_EQ(hostSet().healthy_hosts_[1],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[3,20/7]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[3,20/7]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[3,40/7]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[3,40/7]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[4,40/7]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[4,40/7]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[5,40/7]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[5,40/7]
   EXPECT_EQ(hostSet().healthy_hosts_[1],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[6,40/7]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[6,40/7]
 
   // host2 is 30 secs in slow start, the weight is scaled with time factor max(30 / 60, 0.35) ==
   // 0.5.
@@ -1933,19 +1933,19 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
   // We expect 2:1 ratio, as host2 is in slow start mode and it's weight is scaled with
   // 0.5 factor.
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[1,2]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[1,2]
   EXPECT_EQ(hostSet().healthy_hosts_[1],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[2,2]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[2,2]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[2,4]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[2,4]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[3,4]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[3,4]
   EXPECT_EQ(hostSet().healthy_hosts_[1],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[4,4]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[4,4]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[4,6]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[4,6]
   EXPECT_EQ(hostSet().healthy_hosts_[0],
-            lb_->chooseHost(nullptr)); // before choose: edf.deadline[host1,host2]=[5,6]
+            lb_->chooseHost(nullptr).host); // before choose: edf.deadline[host1,host2]=[5,6]
 
   // Advance time, so that there are no hosts in slow start.
   simTime().advanceTimeWait(std::chrono::seconds(45));
@@ -1954,10 +1954,10 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWaitMinWeightPercent35) {
   hostSet().runCallbacks(empty, empty);
 
   // Now expect 1:1 ratio.
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
 }
 
 } // namespace
