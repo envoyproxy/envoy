@@ -116,7 +116,8 @@ paths:
     - source/common/upstream/od_cds_api_impl.cc
     - source/common/upstream/cds_api_impl.cc
     - source/common/router/vhds.cc
-    - source/common/rds/rds_route_config_subscription.cc
+    - source/common/rds/common/route_config_provider_manager_impl.h
+    - source/common/rds/route_config_provider_manager.h
     - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
