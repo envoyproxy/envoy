@@ -16,11 +16,10 @@ bug_fixes:
 removed_config_or_runtime:
 - area: dns
   change: |
-    Removed ``envoy.reloadable_features.dns_nodata_noname_is_success`` runtime flag and legacy code paths.
-
+    Removed runtime flag ``envoy.reloadable_features.dns_details`` and legacy code paths.
 - area: dns
   change: |
-    Removed runtime flag ``envoy.reloadable_features.dns_details`` and legacy code paths.
+    Removed ``envoy.reloadable_features.dns_nodata_noname_is_success`` runtime flag and legacy code paths.
 
 new_features:
 - area: lua
