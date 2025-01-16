@@ -18,6 +18,10 @@ removed_config_or_runtime:
   change: |
     Removed ``envoy.reloadable_features.dns_nodata_noname_is_success`` runtime flag and legacy code paths.
 
+- area: dns
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.dns_details`` and legacy code paths.
+
 new_features:
 - area: lua
   change: |
@@ -30,5 +34,9 @@ new_features:
   change: |
     Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
+- area: ext_proc
+  change: |
+    Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
+    :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
 
 deprecated:

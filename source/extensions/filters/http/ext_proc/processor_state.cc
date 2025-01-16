@@ -513,10 +513,8 @@ bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_res
     MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
   }
   bool should_continue = chunk->end_stream;
-  if (chunk_data.length() > 0) {
-    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
-    injectDataToFilterChain(chunk_data, chunk->end_stream);
-  }
+  ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
+  injectDataToFilterChain(chunk_data, chunk->end_stream);
 
   if (queueBelowLowLimit()) {
     clearWatermark();
@@ -536,15 +534,13 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
   const std::string& body = streamed_response.body();
   const bool end_of_stream = streamed_response.end_of_stream();
 
-  if (!body.empty()) {
-    Buffer::OwnedImpl buffer;
-    buffer.add(body);
-    ENVOY_LOG(trace,
-              "Injecting {} bytes of data to filter stream in FULL_DUPLEX_STREAMED mode. "
-              "end_of_stream is {}",
-              buffer.length(), end_of_stream);
-    injectDataToFilterChain(buffer, end_of_stream);
-  }
+  Buffer::OwnedImpl buffer;
+  buffer.add(body);
+  ENVOY_LOG(trace,
+            "Injecting {} bytes of data to filter stream in FULL_DUPLEX_STREAMED mode. "
+            "end_of_stream is {}",
+            buffer.length(), end_of_stream);
+  injectDataToFilterChain(buffer, end_of_stream);
 
   if (end_of_stream) {
     onFinishProcessorCall(Grpc::Status::Ok);
