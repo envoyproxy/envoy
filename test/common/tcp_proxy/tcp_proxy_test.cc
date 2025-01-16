@@ -314,12 +314,12 @@ TEST_P(TcpProxyTest, UpstreamRemoteDisconnect) {
 
 // Test that reconnect is attempted after a local connect failure, backoff options not configured.
 TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailNoBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf = defaultConfig();
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_max_connect_attempts()->set_value(2);
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_max_connect_attempts()->set_value(2);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(2, conf);
+  setup(2, config);
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
   EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
@@ -345,13 +345,13 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailNoBackoffOptions) {
 
 // Test that reconnect is attempted after a local connect failure, backoff options configured.
 TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailWithBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf = defaultConfig();
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
-  conf.mutable_max_connect_attempts()->set_value(2);
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(2);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(2, conf);
+  setup(2, config);
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
       .WillOnce(Return(100));
@@ -379,9 +379,9 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailWithBackoffOptions) {
 // Make sure that the tcp proxy code handles reentrant calls to onPoolFailure, backoff options not
 // configured.
 TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrantNoBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf = defaultConfig();
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_max_connect_attempts()->set_value(2);
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_max_connect_attempts()->set_value(2);
 
   // Set up a call to onPoolFailure from inside the first newConnection call.
   // This simulates a connection failure from under the stack of newStream.
@@ -397,7 +397,7 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrantNoBackoffOptions) 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
   EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
 
-  setup(2, conf);
+  setup(2, config);
 
   // Make sure the last connection pool to be created is the one which gets the
   // cancellation call.
@@ -414,10 +414,10 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrantNoBackoffOptions) 
 // Make sure that the tcp proxy code handles reentrant calls to onPoolFailure, backoff options
 // configured.
 TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrantWithBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf = defaultConfig();
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
-  conf.mutable_max_connect_attempts()->set_value(2);
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(2);
 
   // Set up a call to onPoolFailure from inside the first newConnection call.
   // This simulates a connection failure from under the stack of newStream.
@@ -434,7 +434,7 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrantWithBackoffOptions
       .WillOnce(Return(100));
   EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(100), _));
 
-  setup(2, conf);
+  setup(2, config);
 
   // Make sure the last connection pool to be created is the one which gets the
   // cancellation call.
@@ -450,12 +450,12 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrantWithBackoffOptions
 
 // Test that reconnect is attempted after a remote connect failure, backoff options not configured.
 TEST_P(TcpProxyTest, ConnectAttemptsUpstreamRemoteFailNoBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf = defaultConfig();
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_max_connect_attempts()->set_value(2);
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_max_connect_attempts()->set_value(2);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(2, conf);
+  setup(2, config);
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
   EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
@@ -473,13 +473,13 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamRemoteFailNoBackoffOptions) {
 
 // Test that reconnect is attempted after a remote connect failure, backoff options configured.
 TEST_P(TcpProxyTest, ConnectAttemptsUpstreamRemoteFailWithBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf = defaultConfig();
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
-  conf.mutable_max_connect_attempts()->set_value(2);
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(2);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(2, conf);
+  setup(2, config);
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
       .WillOnce(Return(100));
@@ -498,12 +498,12 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamRemoteFailWithBackoffOptions) {
 
 // Test that reconnect is attempted after a connect timeout, backoff options not configured.
 TEST_P(TcpProxyTest, ConnectAttemptsUpstreamTimeoutNoBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf = defaultConfig();
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_max_connect_attempts()->set_value(2);
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_max_connect_attempts()->set_value(2);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(2, conf);
+  setup(2, config);
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
   EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
@@ -521,13 +521,13 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamTimeoutNoBackoffOptions) {
 
 // Test that reconnect is attempted after a connect timeout, backoff options configured.
 TEST_P(TcpProxyTest, ConnectAttemptsUpstreamTimeoutWithBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf = defaultConfig();
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
-  conf.mutable_max_connect_attempts()->set_value(2);
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(2);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(2, conf);
+  setup(2, config);
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
       .WillOnce(Return(100));
@@ -546,14 +546,14 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamTimeoutWithBackoffOptions) {
 
 // Test that only the configured number of connect attempts occur, backoff options not configured.
 TEST_P(TcpProxyTest, ConnectAttemptsLimitNoBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf =
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
       accessLogConfig("%RESPONSE_FLAGS%");
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_max_connect_attempts()->set_value(3);
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_max_connect_attempts()->set_value(3);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
 
-  setup(3, conf);
+  setup(3, config);
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
@@ -592,15 +592,15 @@ TEST_P(TcpProxyTest, ConnectAttemptsLimitNoBackoffOptions) {
 
 // Test that only the configured number of connect attempts occur, backoff options configured.
 TEST_P(TcpProxyTest, ConnectAttemptsLimitWithBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf =
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
       accessLogConfig("%RESPONSE_FLAGS%");
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
-  conf.mutable_max_connect_attempts()->set_value(3);
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(3);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
 
-  setup(3, conf);
+  setup(3, config);
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
@@ -651,12 +651,12 @@ TEST_P(TcpProxyTest, ConnectedNoOp) {
 // Test that the tcp proxy sends the correct notifications to the outlier detector, backoff options
 // not configured.
 TEST_P(TcpProxyTest, OutlierDetectionNoBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf = defaultConfig();
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_max_connect_attempts()->set_value(3);
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_max_connect_attempts()->set_value(3);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(3, conf);
+  setup(3, config);
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
   EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
@@ -682,13 +682,13 @@ TEST_P(TcpProxyTest, OutlierDetectionNoBackoffOptions) {
 // Test that the tcp proxy sends the correct notifications to the outlier detector, backoff options
 // configured.
 TEST_P(TcpProxyTest, OutlierDetectionWithBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf = defaultConfig();
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
-  conf.mutable_max_connect_attempts()->set_value(3);
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(3);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(3, conf);
+  setup(3, config);
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
       .WillOnce(Return(100));
@@ -1687,13 +1687,12 @@ TEST_P(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
 }
 
 TEST_P(TcpProxyTest, PickClusterOnUpstreamFailureNoBackoffOptions) {
-  auto conf = defaultConfig();
-  set2Cluster(conf);
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_max_connect_attempts()->set_value(2);
+  auto config = defaultConfig();
+  set2Cluster(config);
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_max_connect_attempts()->set_value(2);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  // EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random());
 
   // The random number lead into picking the first one in the weighted clusters.
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(0));
@@ -1702,7 +1701,7 @@ TEST_P(TcpProxyTest, PickClusterOnUpstreamFailureNoBackoffOptions) {
       .WillOnce(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
 
-  setup(1, conf);
+  setup(1, config);
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
   EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
@@ -1725,14 +1724,13 @@ TEST_P(TcpProxyTest, PickClusterOnUpstreamFailureNoBackoffOptions) {
 }
 
 TEST_P(TcpProxyTest, PickClusterOnUpstreamFailureWithBackoffOptions) {
-  auto conf = defaultConfig();
-  set2Cluster(conf);
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
-  conf.mutable_max_connect_attempts()->set_value(2);
+  auto config = defaultConfig();
+  set2Cluster(config);
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(2);
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  // EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random());
 
   // The random number lead into picking the first one in the weighted clusters.
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(0));
@@ -1741,7 +1739,7 @@ TEST_P(TcpProxyTest, PickClusterOnUpstreamFailureWithBackoffOptions) {
       .WillOnce(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
 
-  setup(1, conf);
+  setup(1, config);
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
       .WillOnce(Return(100));
@@ -1767,10 +1765,10 @@ TEST_P(TcpProxyTest, PickClusterOnUpstreamFailureWithBackoffOptions) {
 // Verify that odcds callback does not re-pick cluster. Upstream connect failure does, backoff
 // options not configured.
 TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedClusterNoBackoffOptions) {
-  auto conf = onDemandConfig();
-  set2Cluster(conf);
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_max_connect_attempts()->set_value(2);
+  auto config = onDemandConfig();
+  set2Cluster(config);
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_max_connect_attempts()->set_value(2);
   mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
 
   // The random number lead to select the first one in the weighted clusters.
@@ -1794,7 +1792,7 @@ TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedClusterNoBackoffOptions) 
       }));
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(1, conf);
+  setup(1, config);
 
   // When the on-demand look up callback is invoked, the target cluster should not change.
   // The behavior is verified by checking the random() which is used during cluster re-pick.
@@ -1835,11 +1833,11 @@ TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedClusterNoBackoffOptions) 
 // Verify that odcds callback does not re-pick cluster. Upstream connect failure does, backoff
 // options configured.
 TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedClusterWithBackoffOptions) {
-  auto conf = onDemandConfig();
-  set2Cluster(conf);
-  conf.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
-  conf.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
-  conf.mutable_max_connect_attempts()->set_value(2);
+  auto config = onDemandConfig();
+  set2Cluster(config);
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(2);
   mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
 
   // The random number lead to select the first one in the weighted clusters.
@@ -1863,7 +1861,7 @@ TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedClusterWithBackoffOptions
       }));
 
   Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(1, conf);
+  setup(1, config);
 
   // When the on-demand look up callback is invoked, the target cluster should not change.
   // The behavior is verified by checking the random() which is used during cluster re-pick.
