@@ -155,7 +155,7 @@ build:mobile-remote-ci-common --config=rbe-engflow
 build:mobile-remote-ci-common --jobs=40
 build:mobile-remote-ci-common --verbose_failures
 build:mobile-remote-ci-common --spawn_strategy=remote,sandboxed,local
-build:mobile-remote-ci-common --experimental_ui_max_stdouterr_bytes=20485760
+build:mobile-remote-ci-common --experimental_ui_max_stdouterr_bytes=10485760
 
 #############################################################################
 # mobile-remote-ci-linux: These options are linux-only using GCC by default
