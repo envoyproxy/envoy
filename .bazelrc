@@ -310,7 +310,7 @@ build:rbe-toolchain-asan --linkopt -fuse-ld=lld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
 build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
-build:rbe-toolchain-asan --linkopt='-L/opt/llvm/lib/clang/14.0.0/lib/x86_64-unknown-linux-gnu'
+build:rbe-toolchain-asan --linkopt='-L/opt/llvm/lib/clang/18/lib/x86_64-unknown-linux-gnu'
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 
@@ -560,6 +560,7 @@ common:common-envoy-engflow --grpc_keepalive_timeout=30s
 
 common:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
 common:cache-envoy-engflow --remote_timeout=3600s
+# common:cache-envoy-engflow --remote_instance_name=llvm-18
 common:bes-envoy-engflow --bes_backend=grpcs://mordenite.cluster.engflow.com/
 common:bes-envoy-engflow --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
 common:bes-envoy-engflow --bes_timeout=3600s
