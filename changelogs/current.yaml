@@ -14,7 +14,9 @@ bug_fixes:
     runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` to ``false``.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: dns
+  change: |
+    Removed ``envoy.reloadable_features.dns_nodata_noname_is_success`` runtime flag and legacy code paths.
 
 new_features:
 - area: lua
