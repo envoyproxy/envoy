@@ -894,12 +894,14 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
           return;
         }
 
-        if (Runtime::runtimeFeatureEnabled(
+        if (!config_->backoffStrategy() &&
+            !Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop")) {
-          enableRetryTimer();
-        } else {
           onRetryTimer();
+          return;
         }
+
+        enableRetryTimer();
       }
     } else {
       // TODO(botengyao): propagate RST back to downstream connection if RST is received.
