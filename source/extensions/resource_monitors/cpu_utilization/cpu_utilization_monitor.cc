@@ -40,8 +40,7 @@ void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks&
     callbacks.onFailure(error);
     return;
   }
-
-  const int64_t work_over_period = cpu_times.work_time - previous_cpu_times_.work_time;
+  const double work_over_period = cpu_times.work_time - previous_cpu_times_.work_time;
   const int64_t total_over_period = cpu_times.total_time - previous_cpu_times_.total_time;
   if (work_over_period < 0 || total_over_period <= 0) {
     const auto& error = EnvoyException(
@@ -51,7 +50,7 @@ void CpuUtilizationMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks&
     callbacks.onFailure(error);
     return;
   }
-  const double current_utilization = static_cast<double>(work_over_period) / total_over_period;
+  const double current_utilization = work_over_period / total_over_period;
   ENVOY_LOG_MISC(trace, "Prev work={}, Cur work={}, Prev Total={}, Cur Total={}",
                  previous_cpu_times_.work_time, cpu_times.work_time, previous_cpu_times_.total_time,
                  cpu_times.total_time);

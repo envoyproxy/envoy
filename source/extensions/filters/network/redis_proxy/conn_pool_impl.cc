@@ -291,7 +291,8 @@ uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
   for (uint16_t size = 0;; size++) {
     Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
         size, request, Common::Redis::Client::ReadPolicy::Primary);
-    Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
+    Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+        cluster_->loadBalancer().chooseHost(&lb_context));
     if (!host) {
       return size;
     }
@@ -313,7 +314,8 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
       key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
       transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
 
-  Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
+  Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      cluster_->loadBalancer().chooseHost(&lb_context));
   if (!host) {
     ENVOY_LOG(debug, "host not found: '{}'", key);
     return nullptr;
@@ -336,7 +338,8 @@ InstanceImpl::ThreadLocalPool::makeRequestToShard(uint16_t shard_index, RespVari
       shard_index, getRequest(request),
       transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
 
-  Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
+  Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      cluster_->loadBalancer().chooseHost(&lb_context));
   if (!host) {
     ENVOY_LOG(debug, "host not found: '{}'", shard_index);
     return nullptr;
