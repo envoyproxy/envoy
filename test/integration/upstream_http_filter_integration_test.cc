@@ -61,7 +61,7 @@ public:
         [config](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
-          HttpFilterProto& router_filter = *hcm.mutable_http_filters(0);
+          HttpFilterProto& router_filter = *hcm.mutable_http_filters()->rbegin();
           ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
           envoy::extensions::filters::http::router::v3::Router router;
           router_filter.typed_config().UnpackTo(&router);
@@ -150,6 +150,25 @@ public:
 };
 
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest, BasicSuccess) {
+  addStaticFilter("envoy.test.add_header_upstream", default_header_key_, default_header_value_);
+  addCodecFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  expectHeaderKeyAndValue(headers, default_header_key_, default_header_value_);
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, BasicSuccessOnAsyncClient) {
+  GTEST_SKIP() << "TODO(wbpcode): it is expected that AsyncClient requests pass through both "
+                  "upstream_filters chains, but this test currently passes if the filter is in the "
+                  "cluster chain, and fails if it's in the router chain.";
+  // This filter intercepts the downstream request and reissues it via AsyncClient,
+  // which should bypass the main filter chain and should touch all upstream filters.
+  config_helper_.prependFilter(R"(
+  name: "envoy.test.async_upstream"
+  typed_config:
+      "@type": "type.googleapis.com/test.integration.filters.AsyncUpstreamFilterConfig"
+  )");
   addStaticFilter("envoy.test.add_header_upstream", default_header_key_, default_header_value_);
   addCodecFilter();
   initialize();
