@@ -704,8 +704,8 @@ void Filter::onAsyncHostSelection(Upstream::HostConstSharedPtr&& host) {
   if (!host_selection_cancelable_) {
     ENVOY_STREAM_LOG(debug, "Ignoring asynchronous host selection\n", *callbacks_);
   } else {
-    host_selection_cancelable_ = nullptr;
-    ASSERT(host_selection_cancelable_ == nullptr);
+    std::unique_ptr<Upstream::AsyncHostSelectionHandle> local_scope =
+        std::move(host_selection_cancelable_);
     on_host_selected_(std::move(host));
   }
 }
