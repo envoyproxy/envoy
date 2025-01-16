@@ -15,3 +15,4 @@ Contrib extensions
   dlb/dlb
   qat/qat
   fluentd_tracer/fluentd_tracer
+  tap_sinks/tap_sinks

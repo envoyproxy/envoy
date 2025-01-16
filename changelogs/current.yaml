@@ -8,10 +8,33 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dfp
+  change:
+    Fixes a bug when loading a DNS cache entry with an empty authority/host header. This fix can be reverted by setting
+    runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+- area: dns
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.dns_details`` and legacy code paths.
+
 new_features:
+- area: lua
+  change: |
+    Added :ref:`virtualClusterName() <config_http_filters_lua_stream_info_virtual_cluster_name>` API to the Stream Info
+    Object to get the name of the virtual cluster matched.
+- area: tap
+  change: |
+    Added an UDP extension for tap custom sink.
+- area: udp_proxy
+  change: |
+    Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
+- area: ext_proc
+  change: |
+    Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
+    :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
 
 deprecated:

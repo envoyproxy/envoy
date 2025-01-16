@@ -89,7 +89,7 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
       *time_source};
 
   for (uint64_t i = 0; i < num_requests; i++) {
-    host_hits[lb_.chooseHost(nullptr)]++;
+    host_hits[lb_.chooseHost(nullptr).host]++;
   }
 
   std::vector<double> observed_pcts;
