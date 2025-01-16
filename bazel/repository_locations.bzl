@@ -1330,12 +1330,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         #  - .github/workflows/codeql-daily.yml
         #  - .github/workflows/codeql-push.yml
         #  - https://github.com/envoyproxy/envoy-build-tools/blob/main/build_container/build_container_ubuntu.sh#L84
-        version = "14.0.0",
-        sha256 = "27ab7fcfb21d108093c0be766a9ed5fe18c04e4f74f936069711a312c8ae0377",
+        version = "16.0.0",
+        sha256 = "a43610aba06538324f4143626c392d51883042685a33d22b629afd8658ea344e",
         # Only allow peeking at fuzzer related files for now.
         strip_prefix = "compiler-rt-{version}.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
-        release_date = "2022-03-23",
+        release_date = "2023-03-17",
         use_category = ["test_only"],
         cpe = "cpe:2.3:a:llvm:compiler-rt:*",
         license = "Apache-2.0",
