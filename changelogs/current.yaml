@@ -30,8 +30,8 @@ new_features:
     ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
 - area: dfp
   change: |
-    Added a knob for disabling the DFP resolve timeout by setting ``envoy.enable_dfp_resolve_timeout`` flag to `false`.
-    By default, the flag is set to `true`.
+    Added a knob for disabling the DFP resolve timeout by setting ``envoy.enable_dfp_resolve_timeout`` flag to ``false``.
+    By default, the flag is set to ``true``.
 - area: ext_proc
   change: |
     Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
