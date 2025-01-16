@@ -5,6 +5,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: http2
+  change: |
+    Sets runtime guard ``envoy.reloadable_features.http2_use_oghttp2`` to true by default.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
