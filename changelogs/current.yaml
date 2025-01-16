@@ -23,6 +23,7 @@ new_features:
     ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
 - area: http
   change: |
-    Alpha support for asynchronous load balancing.  See <arch_overview_load_balancing_policies> for details.
+    Alpha support for asynchronous load balancing.  See <arch_overview_load_balancing_policies> for details. Support can
+    be temporarily reverted by setting runtime guard ``envoy.reloadable_features.async_host_selection`` to ``false``.
 
 deprecated:

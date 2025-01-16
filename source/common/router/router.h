@@ -327,6 +327,16 @@ public:
   // Http::StreamFilterBase
   void onDestroy() override;
 
+  // If there's a local reply (e.g. timeout) during host selection, cancel host
+  // selection.
+  Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override {
+    if (host_selection_cancelable_) {
+      host_selection_cancelable_->cancel();
+      host_selection_cancelable_.reset();
+    }
+    return Http::LocalErrorStatus::Continue;
+  }
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;

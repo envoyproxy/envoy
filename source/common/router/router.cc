@@ -701,13 +701,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 // When asynchronous host selection is complete, call the pre-configured on_host_selected_function.
 void Filter::onAsyncHostSelection(Upstream::HostConstSharedPtr&& host) {
   ENVOY_STREAM_LOG(debug, "Completing asynchronous host selection\n", *callbacks_);
-  if (!host_selection_cancelable_) {
-    ENVOY_STREAM_LOG(debug, "Ignoring asynchronous host selection\n", *callbacks_);
-  } else {
-    std::unique_ptr<Upstream::AsyncHostSelectionHandle> local_scope =
-        std::move(host_selection_cancelable_);
-    on_host_selected_(std::move(host));
-  }
+  std::unique_ptr<Upstream::AsyncHostSelectionHandle> local_scope =
+      std::move(host_selection_cancelable_);
+  on_host_selected_(std::move(host));
 }
 
 Http::FilterHeadersStatus Filter::continueDecodeHeaders(
@@ -1634,10 +1630,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
                                UpstreamRequest& upstream_request, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "upstream headers complete: end_stream={}", *callbacks_, end_stream);
 
-  if (host_selection_cancelable_) {
-    ENVOY_STREAM_LOG(debug, "Canceling host selection for stream.", *callbacks_);
-    host_selection_cancelable_->cancel();
-  }
+  ASSERT(!host_selection_cancelable_);
 
   modify_headers_(*headers);
   // When grpc-status appears in response headers, convert grpc-status to HTTP status code

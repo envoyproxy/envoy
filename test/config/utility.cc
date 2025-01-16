@@ -1021,7 +1021,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   finalized_ = true;
 }
 
-void ConfigHelper::setAsyncLb() {
+void ConfigHelper::setAsyncLb(bool hang) {
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
     auto* cluster = bootstrap_.mutable_static_resources()->mutable_clusters(i);
 
@@ -1029,6 +1029,7 @@ void ConfigHelper::setAsyncLb() {
     policy->mutable_typed_extension_config()->set_name(
         "envoy.load_balancing_policies.async_round_robin");
     test::integration::lb::AsyncRoundRobin lb_config;
+    lb_config.set_hang(hang);
     policy->mutable_typed_extension_config()->mutable_typed_config()->PackFrom(lb_config);
   }
 }

@@ -296,7 +296,7 @@ public:
   void setPorts(const std::vector<uint32_t>& ports, bool override_port_zero = false);
 
   // Switch from a default of round robin to async round robin.
-  void setAsyncLb();
+  void setAsyncLb(bool hang = false);
 
   // Set source_address in the bootstrap bind config.
   void setSourceAddress(const std::string& address_string);

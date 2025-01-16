@@ -21,6 +21,13 @@ struct AsyncRoundRobinCreator : public Logger::Loggable<Logger::Id::upstream> {
                                        TimeSource& time_source);
 };
 
+class TypedAsyncRoundRobinLbConfig : public Upstream::LoadBalancerConfig {
+public:
+  TypedAsyncRoundRobinLbConfig(const test::integration::lb::AsyncRoundRobin& lb_config)
+      : lb_config_(lb_config) {}
+  const test::integration::lb::AsyncRoundRobin lb_config_;
+};
+
 // Factory code to create the AsyncRoundRobin LB.
 class AsyncRoundRobinFactory : public Extensions::LoadBalancingPolices::Common::FactoryBase<
                                    test::integration::lb::AsyncRoundRobin, AsyncRoundRobinCreator> {
@@ -28,8 +35,9 @@ public:
   AsyncRoundRobinFactory() : FactoryBase("envoy.load_balancing_policies.async_round_robin") {}
 
   absl::StatusOr<LoadBalancerConfigPtr> loadConfig(Server::Configuration::ServerFactoryContext&,
-                                                   const Protobuf::Message&) override {
-    return Upstream::LoadBalancerConfigPtr{new Upstream::LoadBalancerConfig()};
+                                                   const Protobuf::Message& config) override {
+    const auto& typed_config = dynamic_cast<const test::integration::lb::AsyncRoundRobin&>(config);
+    return Upstream::LoadBalancerConfigPtr{new TypedAsyncRoundRobinLbConfig(typed_config)};
   }
 };
 

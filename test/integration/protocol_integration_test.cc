@@ -5588,4 +5588,16 @@ TEST_P(DownstreamProtocolIntegrationTest, UnknownPseudoHeader) {
   }
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, ConfigureAsyncLbWhenUnsupported) {
+  // Configure the async round robin load balancer but disable async host
+  // selection. This should result in host selection failing.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.async_host_selection", "false");
+  config_helper_.setAsyncLb();
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
 } // namespace Envoy
