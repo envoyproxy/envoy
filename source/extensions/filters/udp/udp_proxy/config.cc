@@ -82,6 +82,21 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
       THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                                 target_substitution_format_config, context),
                             Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
+
+  if (config.has_retry_options() && config.retry_options().has_backoff_options()) {
+    const uint64_t base_interval_ms =
+        PROTOBUF_GET_MS_REQUIRED(config.retry_options().backoff_options(), base_interval);
+    const uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(
+        config.retry_options().backoff_options(), max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException(
+          "max_backoff_interval must be greater or equal to base_backoff_interval");
+    }
+
+    backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+        base_interval_ms, max_interval_ms, context.serverFactoryContext().api().randomGenerator());
+  }
 }
 
 UdpProxyFilterConfigImpl::UdpProxyFilterConfigImpl(

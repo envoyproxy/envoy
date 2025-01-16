@@ -268,7 +268,6 @@ TEST_F(ConfigProviderImplTest, SharedOwnership) {
   // No config protos have been received via the subscription yet.
   EXPECT_FALSE(provider1->configProtoInfoVector<test::common::config::DummyConfig>().has_value());
 
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> untyped_dummy_configs;
   const auto dummy_config = parseDummyConfigFromYaml("a: a dummy config");
 
   DummyConfigSubscription& subscription =

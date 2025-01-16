@@ -1315,6 +1315,92 @@ actions:
   }
 }
 
+TEST_F(RateLimitPolicyTest, QueryParametersBasicMatch) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameters:
+    query_parameter_name: x-parameter-name
+    descriptor_key: my_param
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_param", "test_value"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, QueryParametersSkipIfAbsentFalse) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameters:
+    query_parameter_name: x-parameter-name
+    descriptor_key: my_param
+    skip_if_absent: false
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/no-match"}};
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  EXPECT_TRUE(descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyTest, QueryParametersSkipIfAbsentTrue) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameters:
+    query_parameter_name: x-parameter-name
+    descriptor_key: my_param
+    skip_if_absent: true
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/no-match"}};
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  EXPECT_FALSE(descriptors_.empty());
+}
+
+TEST_F(RateLimitPolicyTest, QueryParametersMultipleValues) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameters:
+    query_parameter_name: x-parameter-name
+    descriptor_key: my_param
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{
+      {":path", "/?x-parameter-name=value1&x-parameter-name=value2"}};
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_param", "value1"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
+TEST_F(RateLimitPolicyTest, QueryParametersUrlEncoding) {
+  const std::string yaml = R"EOF(
+actions:
+- query_parameters:
+    query_parameter_name: test-parameter
+    descriptor_key: my_param
+  )EOF";
+
+  setupTest(yaml);
+  Http::TestRequestHeaderMapImpl header{{":path", "/?test-parameter=hello%20world"}};
+
+  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+
+  EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_param", "hello world"}}}}),
+              testing::ContainerEq(descriptors_));
+}
+
 } // namespace
 } // namespace RateLimit
 } // namespace Common

@@ -1093,6 +1093,8 @@ private:
 
   bool stopDecoderFilterChain() { return state_.decoder_filter_chain_aborted_; }
 
+  bool stopEncoderFilterChain() { return state_.encoder_filter_chain_aborted_; }
+
   bool isTerminalDecoderFilter(const ActiveStreamDecoderFilter& filter) const;
 
   FilterManagerCallbacks& filter_manager_callbacks_;

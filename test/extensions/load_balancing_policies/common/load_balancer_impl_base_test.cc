@@ -24,7 +24,7 @@ public:
   using LoadBalancerBase::percentageDegradedLoad;
   using LoadBalancerBase::percentageLoad;
 
-  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { PANIC("not implemented"); }
+  HostSelectionResponse chooseHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { PANIC("not implemented"); }
 };
