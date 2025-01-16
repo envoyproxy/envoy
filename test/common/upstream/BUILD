@@ -210,7 +210,7 @@ envoy_cc_test(
     srcs = [
         "health_checker_impl_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "4core",
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
