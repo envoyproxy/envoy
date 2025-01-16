@@ -4,6 +4,7 @@
 #include "source/common/network/filter_state_dst_address.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/common/expr/cel_state.h"
@@ -844,7 +845,8 @@ TEST(Context, ConnectionAttributes) {
     auto value = upstream[CelValue::CreateStringView(UpstreamLocality)];
     ASSERT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
-    EXPECT_EQ(&upstream_locality, value.value().MessageOrDie());
+    EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(*value.value().MessageOrDie(),
+                                                           upstream_locality));
   }
 }
 
