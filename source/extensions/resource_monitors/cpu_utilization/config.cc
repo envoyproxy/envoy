@@ -1,5 +1,6 @@
 #include "source/extensions/resource_monitors/cpu_utilization/config.h"
 
+#include "envoy/common/time.h"
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -15,9 +16,15 @@ namespace CpuUtilizationMonitor {
 
 Server::ResourceMonitorPtr CpuUtilizationMonitorFactory::createResourceMonitorFromProtoTyped(
     const envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig& config,
-    Server::Configuration::ResourceMonitorFactoryContext& /*unused_context*/) {
+    Server::Configuration::ResourceMonitorFactoryContext& context) {
   // In the future, the below can be configurable based on the operating system.
-  auto cpu_stats_reader = std::make_unique<LinuxCpuStatsReader>();
+  std::unique_ptr<CpuStatsReader> cpu_stats_reader;
+  if (config.mode() ==
+      envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER) {
+    cpu_stats_reader = std::make_unique<LinuxContainerCpuStatsReader>(context.api().timeSource());
+  } else {
+    cpu_stats_reader = std::make_unique<LinuxCpuStatsReader>();
+  }
   return std::make_unique<CpuUtilizationMonitor>(config, std::move(cpu_stats_reader));
 }
 
