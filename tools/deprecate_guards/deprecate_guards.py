@@ -180,10 +180,11 @@ class GuardDeprecationRunner(runner.Runner):
                 else:
                     self.log.warning(f"Dry run: not creating issue '{title}' for {login}")
                 return
-        except gidgethub.GitHubException:
+        except _github.exceptions.IssueCreateError:
             self.log.warning(
-                f"unable to assign issue {title} to {login}. Add them to the Envoy proxy org"
+                f"Unable to assign issue {title} to {login}. Add them to the Envoy proxy org "
                 "and assign it their way.")
+
         try:
             extra_log = ""
             if login:
@@ -195,7 +196,7 @@ class GuardDeprecationRunner(runner.Runner):
                 self.log.notice(f"Created issue '{title}'{extra_log}")
             else:
                 self.log.warning(f"Dry run: not creating issue '{title}'{extra_log}")
-        except gidgethub.GitHubException as e:
+        except _github.exceptions.IssueCreateError as e:
             self.log.error("Github error while creating issue.\n{e}")
             raise DeprecateGuardsError(e)
 
@@ -247,14 +248,8 @@ class GuardDeprecationRunner(runner.Runner):
         return (f"{runtime_guard} deprecation", change_title, login, f"commit {commit.hexsha}")
 
     async def _login_for(self, commit: git.Commit) -> str | None:
-        # Use the commit author's email to search through users for their login.
-        user_str = commit.author.email.split('@')[0]
-        try:
-            async for user in self.github.getiter(f"/search/users?q={user_str}+in:login"):
-                return user["login"]
-        except gidgethub.BadRequest as e:
-            self.log.error("Failed querying search/users\n{e}")
-            raise e
+        gh_commit = await self.repo.getitem(f"commits/{commit.hexsha}")
+        return gh_commit["author"]["login"]
 
     def _should_flip(self, commit: git.Commit,
                      runtime_guard: str) -> tuple[str, int, git.Commit] | None:
