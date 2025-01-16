@@ -70,6 +70,8 @@ DnsCacheImpl::DnsCacheImpl(
   }
   enable_dfp_dns_trace_ = context.serverFactoryContext().runtime().snapshot().getBoolean(
       "envoy.enable_dfp_dns_trace", false);
+  enable_dfp_resolve_timeout_ = context.serverFactoryContext().runtime().snapshot().getBoolean(
+      "envoy.enable_dfp_resolve_timeout", true);
 }
 
 DnsCacheImpl::~DnsCacheImpl() {
@@ -242,7 +244,11 @@ DnsCacheImpl::PrimaryHostInfo* DnsCacheImpl::createHost(const std::string& host,
                          *this, std::string(host_attributes.host_),
                          host_attributes.port_.value_or(default_port),
                          host_attributes.is_ip_address_, [this, host]() { onReResolveAlarm(host); },
-                         [this, host]() { onResolveTimeout(host); }))
+                         [this, host]() {
+                           if (enable_dfp_resolve_timeout_) {
+                             onResolveTimeout(host);
+                           }
+                         }))
         .first->second.get();
   }
 }
