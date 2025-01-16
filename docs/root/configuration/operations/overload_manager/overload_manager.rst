@@ -367,8 +367,8 @@ mode.
 Some platform owners may choose to install this overload action by default to protect the fleet,
 since it is easier to configure a target CPU utilization percentage than to configure a request rate per
 workload. This supports monitoring both HOST CPU Utilization and K8s Container CPU Utilization.
-By default it's using mode: HOST, to trigger overload actions on Container CPU usage,
-use mode: CONTAINER to set the calculation strategy to evaluate Container CPU stats.
+By default it's using ``mode: HOST``, to trigger overload actions on Container CPU usage,
+use ``mode: CONTAINER`` to set the calculation strategy to evaluate Container CPU stats.
 
 .. literalinclude:: _include/cpu_utilization_monitor_overload.yaml
     :language: yaml
