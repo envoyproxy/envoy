@@ -114,6 +114,7 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
                       bool pass_all_tlvs, const absl::flat_hash_set<uint8_t>& pass_through_tlvs,
                       const std::vector<Envoy::Network::ProxyProtocolTLV>& custom_tlvs) {
   std::vector<Envoy::Network::ProxyProtocolTLV> combined_tlv_vector;
+  std::vector<Envoy::Network::ProxyProtocolTLV> final_tlvs;
   combined_tlv_vector.reserve(custom_tlvs.size() + proxy_proto_data.tlv_vector_.size());
 
   absl::flat_hash_set<uint8_t> seen_types;
@@ -123,6 +124,7 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
     seen_types.insert(tlv.type);
   }
 
+  // Combine TLVs from the proxy_proto_data with the custom TLVs.
   for (const auto& tlv : proxy_proto_data.tlv_vector_) {
     if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
       // Skip any TLV that is not in the set of passthrough TLVs.
@@ -137,15 +139,19 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
     combined_tlv_vector.emplace_back(tlv);
   }
 
+  // Filter out TLVs that would exceed the 65535 limit.
   uint64_t extension_length = 0;
+  bool skipped_tlvs = false;
   for (auto&& tlv : combined_tlv_vector) {
-    extension_length += PROXY_PROTO_V2_TLV_TYPE_LENGTH_LEN + tlv.value.size();
-    if (extension_length > std::numeric_limits<uint16_t>::max()) {
-      ENVOY_LOG_MISC(
-          warn, "Generating Proxy Protocol V2 header: TLVs exceed length limit {}, already got {}",
-          std::numeric_limits<uint16_t>::max(), extension_length);
-      return false;
+    uint64_t new_size = extension_length + PROXY_PROTO_V2_TLV_TYPE_LENGTH_LEN + tlv.value.size();
+    if (new_size > std::numeric_limits<uint16_t>::max()) {
+      ENVOY_LOG_MISC(warn, "Skipping TLV type {} because adding it would exceed the 65535 limit.",
+                     tlv.type);
+      skipped_tlvs = true;
+      continue;
     }
+    extension_length = new_size;
+    final_tlvs.push_back(tlv);
   }
 
   ASSERT(extension_length <= std::numeric_limits<uint16_t>::max());
@@ -170,7 +176,9 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
     out.add(&tlv.value.front(), tlv.value.size());
   }
 
-  return true;
+  // return true if no TLVs were skipped, otherwise false to increment the counter
+  // in the upstream proxy protocol transport socket stats.
+  return !skipped_tlvs;
 }
 
 void generateProxyProtoHeader(const envoy::config::core::v3::ProxyProtocolConfig& config,

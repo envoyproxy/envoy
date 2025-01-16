@@ -618,6 +618,15 @@ TEST_F(ProxyProtocolTest, V2IPV4TLVsExceedLengthLimit) {
   config.mutable_pass_through_tlvs()->set_match_type(ProxyProtocolPassThroughTLVs::INCLUDE_ALL);
   initialize(config, socket_options);
 
+  // expect the counter to be incremented but the output header to be written
+  // without the large TLV.
+  EXPECT_CALL(io_handle_, write(_))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        auto length = buffer.length();
+        buffer.drain(length);
+        return {length, Api::IoError::none()};
+      }));
+
   auto msg = Buffer::OwnedImpl("some data");
   proxy_protocol_socket_->doWrite(msg, false);
   EXPECT_EQ(stats_store_.counter("upstream.proxyprotocol.v2_tlvs_exceed_max_length").value(), 1);

@@ -43,11 +43,10 @@ private:
   void generateHeader();
   void generateHeaderV1();
   void generateHeaderV2();
-  void processHostLevelTLVs(std::vector<Envoy::Network::ProxyProtocolTLV>& custom_tlvs,
-                            absl::flat_hash_set<uint8_t>& processed_tlv_types) const;
-  void processConfigLevelTLVs(std::vector<Envoy::Network::ProxyProtocolTLV>& custom_tlvs,
-                              absl::flat_hash_set<uint8_t>& processed_tlv_types) const;
-  std::vector<Envoy::Network::ProxyProtocolTLV> processCustomTLVs();
+  // Combine host-level and config-level TLVs, with fallback if metadata fails to unpack.
+  // Host-level has precedence over config-level TLVs.
+  // If we fail to parse host metadata, we still read config TLVs.
+  std::vector<Envoy::Network::ProxyProtocolTLV> buildCustomTLVs() const;
   Network::IoResult writeHeader();
 
   Network::TransportSocketOptionsConstSharedPtr options_;
