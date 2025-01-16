@@ -132,8 +132,10 @@ public:
         address())
         .WillByDefault(Return(host_address_));
     ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, chooseHost(_))
-        .WillByDefault(Return(
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_));
+        .WillByDefault(Invoke([this] {
+          return Upstream::HostSelectionResponse{
+              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_};
+        }));
     ON_CALL(
         *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
         locality())
