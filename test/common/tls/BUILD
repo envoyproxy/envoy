@@ -90,7 +90,7 @@ envoy_cc_test(
         "//test/common/tls/test_data:certs",
     ],
     external_deps = ["ssl"],
-    rbe_pool = "6gig",
+    rbe_pool = "4core",
     deps = [
         ":ssl_certs_test_lib",
         ":test_private_key_method_provider_test_lib",

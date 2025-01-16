@@ -17,7 +17,7 @@ envoy_package()
 
 envoy_cc_test(
     name = "config_impl_test",
-    rbe_pool = "6gig",
+    rbe_pool = "4core",
     deps = [":config_impl_test_lib"],
 )
 
@@ -327,7 +327,7 @@ envoy_cc_test(
         "router_test.cc",
         "router_2_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "4core",
     deps = [
         ":router_test_base_lib",
         "//source/common/buffer:buffer_lib",
