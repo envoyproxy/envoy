@@ -576,11 +576,9 @@ TEST_P(TcpProxyTest, ConnectAttemptsLimitNoBackoffOptions) {
   raiseEventUpstreamConnectFailed(1, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   retry_timer->invokeCallback();
 
-  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
-  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
+  // This one should not enable the retry timer.
   timeSystem().advanceTimeWait(std::chrono::microseconds(15));
   raiseEventUpstreamConnectFailed(2, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
-  retry_timer->invokeCallback();
 
   const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
@@ -627,12 +625,9 @@ TEST_P(TcpProxyTest, ConnectAttemptsLimitWithBackoffOptions) {
   raiseEventUpstreamConnectFailed(1, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   retry_timer->invokeCallback();
 
-  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
-      .WillOnce(Return(350));
-  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(350), _));
+  // This one should not enable the retry timer.
   timeSystem().advanceTimeWait(std::chrono::microseconds(15));
   raiseEventUpstreamConnectFailed(2, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
-  retry_timer->invokeCallback();
 
   const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
@@ -774,40 +769,12 @@ TEST_P(TcpProxyTest, DownstreamDisconnectLocal) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
-TEST_P(TcpProxyTest, UpstreamConnectTimeoutNoBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf =
-      accessLogConfig("%RESPONSE_FLAGS%");
-
-  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(1, conf);
+TEST_P(TcpProxyTest, UpstreamConnectTimeout) {
+  setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
-  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
-  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
-  retry_timer->invokeCallback();
 
-  EXPECT_CALL(*retry_timer, disableTimer());
-  filter_.reset();
-  EXPECT_EQ(access_log_data_, "UF,URX");
-}
-
-TEST_P(TcpProxyTest, UpstreamConnectTimeoutWithBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf =
-      accessLogConfig("%RESPONSE_FLAGS%");
-  conf.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
-
-  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(1, conf);
-
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
-  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
-      .WillOnce(Return(100));
-  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(100), _));
-  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
-  retry_timer->invokeCallback();
-
-  EXPECT_CALL(*retry_timer, disableTimer());
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
 }
@@ -1163,52 +1130,18 @@ TEST_P(TcpProxyTest, LocalClosedBeforeUpstreamConnected) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
-TEST_P(TcpProxyTest, UpstreamConnectFailureNoBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf =
-      accessLogConfig("%RESPONSE_FLAGS%");
-
-  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(1, conf);
+TEST_P(TcpProxyTest, UpstreamConnectFailure) {
+  setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
-  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
-  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
   timeSystem().advanceTimeWait(std::chrono::microseconds(20));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
-  retry_timer->invokeCallback();
 
   const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
   ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
   EXPECT_EQ(std::chrono::microseconds(20), upstream_connection_establishment_latency.value());
 
-  EXPECT_CALL(*retry_timer, disableTimer());
-  filter_.reset();
-  EXPECT_EQ(access_log_data_, "UF,URX");
-}
-
-TEST_P(TcpProxyTest, UpstreamConnectFailureWithBackoffOptions) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy conf =
-      accessLogConfig("%RESPONSE_FLAGS%");
-  conf.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
-
-  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-  setup(1, conf);
-
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
-  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
-      .WillOnce(Return(100));
-  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(100), _));
-  timeSystem().advanceTimeWait(std::chrono::microseconds(20));
-  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
-  retry_timer->invokeCallback();
-
-  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
-      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
-  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
-  EXPECT_EQ(std::chrono::microseconds(20), upstream_connection_establishment_latency.value());
-
-  EXPECT_CALL(*retry_timer, disableTimer());
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
 }

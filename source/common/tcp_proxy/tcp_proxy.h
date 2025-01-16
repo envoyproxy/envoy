@@ -618,7 +618,9 @@ protected:
   // The callback upon on demand cluster discovery response.
   void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
 
+  Upstream::ThreadLocalCluster* getThreadLocalCluster();
   bool maybeTunnel(Upstream::ThreadLocalCluster& cluster);
+  void onConnectMaxAttempts();
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
@@ -633,7 +635,7 @@ protected:
   void flushAccessLog(AccessLog::AccessLogType access_log_type);
   void disableAccessLogFlushTimer();
   void onRetryTimer();
-  void resetRetryTimer();
+  void enableRetryTimer();
   void disableRetryTimer();
 
   const ConfigSharedPtr config_;
