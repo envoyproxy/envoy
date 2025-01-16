@@ -64,8 +64,11 @@ public:
   TcpProxyTest() {
     EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
                 chooseHost(_))
-        .WillRepeatedly(Return(factory_context_.server_factory_context_.cluster_manager_
-                                   .thread_local_cluster_.lb_.host_));
+        .WillRepeatedly(Invoke([this] {
+          return Upstream::HostSelectionResponse{
+              factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_
+                  .host_};
+        }));
   }
   using TcpProxyTestBase::setup;
   void setup(uint32_t connections, bool set_redirect_records,

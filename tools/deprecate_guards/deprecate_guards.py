@@ -180,7 +180,7 @@ class GuardDeprecationRunner(runner.Runner):
                 else:
                     self.log.warning(f"Dry run: not creating issue '{title}' for {login}")
                 return
-        except gidgethub.Exception:
+        except gidgethub.GitHubException:
             self.log.warning(
                 f"unable to assign issue {title} to {login}. Add them to the Envoy proxy org"
                 "and assign it their way.")
@@ -195,7 +195,7 @@ class GuardDeprecationRunner(runner.Runner):
                 self.log.notice(f"Created issue '{title}'{extra_log}")
             else:
                 self.log.warning(f"Dry run: not creating issue '{title}'{extra_log}")
-        except gidgethub.Exception as e:
+        except gidgethub.GitHubException as e:
             self.log.error("Github error while creating issue.\n{e}")
             raise DeprecateGuardsError(e)
 

@@ -57,8 +57,9 @@ public:
         .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
     HttpTestUtility::addDefaultHeaders(headers_);
-    ON_CALL(cm_.thread_local_cluster_, chooseHost(_))
-        .WillByDefault(Return(cm_.thread_local_cluster_.lb_.host_));
+    ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
+      return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+    }));
   }
 
   virtual void expectSuccess(AsyncClient::Request* sent_request, uint64_t code) {
