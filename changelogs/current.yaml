@@ -31,6 +31,9 @@ removed_config_or_runtime:
 - area: thread_local
   change: |
     Removed runtime guard  ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads`` and legacy code paths.
+- area: runtime
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.reject_invalid_yaml`` and legacy code paths.
 - area: dns
   change: |
     Removed runtime flag ``envoy.reloadable_features.dns_details`` and legacy code paths.
