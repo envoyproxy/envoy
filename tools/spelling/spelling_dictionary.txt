@@ -639,6 +639,7 @@ chunked
 ci
 ciphersuite
 ciphersuites
+ciphertext
 circllhist
 clientcert
 cloneable
