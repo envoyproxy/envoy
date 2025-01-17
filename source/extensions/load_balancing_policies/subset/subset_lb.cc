@@ -182,7 +182,7 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
   }
 }
 
-HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
+HostSelectionResponse SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (metadata_fallback_policy_ !=
       envoy::config::cluster::v3::
           Cluster_LbSubsetConfig_LbSubsetMetadataFallbackPolicy_FALLBACK_LIST) {
@@ -287,17 +287,17 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostIteration(LoadBalancerContext* 
     return nullptr;
   }
 
-  HostConstSharedPtr host = fallback_subset_->lb_subset_->chooseHost(context);
-  if (host != nullptr) {
+  HostSelectionResponse host_response = fallback_subset_->lb_subset_->chooseHost(context);
+  if (host_response.host || host_response.cancelable) {
     stats_.lb_subsets_fallback_.inc();
-    return host;
+    return host_response.host;
   }
 
   if (panic_mode_subset_ != nullptr) {
-    HostConstSharedPtr host = panic_mode_subset_->lb_subset_->chooseHost(context);
-    if (host != nullptr) {
+    HostSelectionResponse host_response = panic_mode_subset_->lb_subset_->chooseHost(context);
+    if (host_response.host || host_response.cancelable) {
       stats_.lb_subsets_fallback_panic_.inc();
-      return host;
+      return host_response.host;
     }
   }
 
@@ -339,11 +339,13 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
   if (fallback_policy ==
           envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT &&
       subset_any_ != nullptr) {
-    return subset_any_->lb_subset_->chooseHost(context);
+    return Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+        subset_any_->lb_subset_->chooseHost(context));
   } else if (fallback_policy == envoy::config::cluster::v3::Cluster::LbSubsetConfig::
                                     LbSubsetSelector::DEFAULT_SUBSET &&
              subset_default_ != nullptr) {
-    return subset_default_->lb_subset_->chooseHost(context);
+    return Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+        subset_default_->lb_subset_->chooseHost(context));
   } else if (fallback_policy ==
              envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
     ASSERT(fallback_params.fallback_keys_subset_);
@@ -352,7 +354,7 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
     // Perform whole subset load balancing again with reduced metadata match criteria
     return chooseHostIteration(filtered_context.get());
   } else {
-    return nullptr;
+    return {nullptr};
   }
 }
 
@@ -365,19 +367,20 @@ HostConstSharedPtr SubsetLoadBalancer::tryChooseHostFromContext(LoadBalancerCont
   host_chosen = false;
   const Router::MetadataMatchCriteria* match_criteria = context->metadataMatchCriteria();
   if (!match_criteria) {
-    return nullptr;
+    return {nullptr};
   }
 
   // Route has metadata match criteria defined, see if we have a matching subset.
   LbSubsetEntryPtr entry = findSubset(match_criteria->metadataMatchCriteria());
   if (entry == nullptr || !entry->active()) {
     // No matching subset or subset not active: use fallback policy.
-    return nullptr;
+    return {nullptr};
   }
 
   host_chosen = true;
   stats_.lb_subsets_selected_.inc();
-  return entry->lb_subset_->chooseHost(context);
+  return Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      entry->lb_subset_->chooseHost(context));
 }
 
 // Iterates over the given metadata match criteria (which must be lexically sorted by key) and

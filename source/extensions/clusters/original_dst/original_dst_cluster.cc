@@ -29,7 +29,7 @@ OriginalDstClusterHandle::~OriginalDstClusterHandle() {
   dispatcher.post([cluster = std::move(cluster)]() mutable { cluster.reset(); });
 }
 
-HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
+HostSelectionResponse OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
     // Check if filter state override is present, if yes use it before anything else.
     Network::Address::InstanceConstSharedPtr dst_host = filterStateOverrideHost(context);
@@ -91,7 +91,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
             parent->cluster_->addHost(host);
           }
         });
-        return host;
+        return {host};
       } else {
         ENVOY_LOG(debug, "Failed to create host for {}.", dst_addr.asString());
       }
@@ -99,7 +99,7 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
   }
   // TODO(ramaraochavali): add a stat and move this log line to debug.
   ENVOY_LOG(warn, "original_dst_load_balancer: No downstream connection or no original_dst.");
-  return nullptr;
+  return {nullptr};
 }
 
 Network::Address::InstanceConstSharedPtr
