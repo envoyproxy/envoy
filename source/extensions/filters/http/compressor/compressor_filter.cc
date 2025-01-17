@@ -649,6 +649,7 @@ bool CompressorFilter::compressionEnabled(
              : config.compressionEnabled();
 }
 
+// True if request compression is enabled.
 bool CompressorFilter::requestCompressionEnabled(
      const CompressorFilterConfig::RequestDirectionConfig& config,
      const Http::RequestHeaderMap& headers) const {
