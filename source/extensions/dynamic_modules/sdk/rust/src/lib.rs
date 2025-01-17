@@ -842,7 +842,7 @@ fn envoy_dynamic_module_on_http_filter_config_new_impl(
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(config_ptr, 
+  drop_wrapped_c_void_ptr!(config_ptr,
     HttpFilterConfig<EnvoyHttpFilterConfigImpl,EnvoyHttpFilterImpl>);
 }
 
