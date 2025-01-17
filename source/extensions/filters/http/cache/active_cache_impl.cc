@@ -243,6 +243,7 @@ void ActiveCacheEntry::onBodyInserted(AdjustedByteRange range, bool end_stream) 
   body_length_available_ = range.end();
   if (end_stream) {
     insertComplete();
+    ASSERT(trailer_subscribers_.empty(), "should not be trailer requests before body was complete");
   }
   maybeTriggerBodyReadForWaitingSubscriber();
 }

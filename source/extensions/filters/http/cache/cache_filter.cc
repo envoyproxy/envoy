@@ -275,11 +275,8 @@ void CacheFilter::getTrailers() {
 static AdjustedByteRange rangeFromHeaders(Http::ResponseHeaderMap& response_headers) {
   if (Http::Utility::getResponseStatus(response_headers) !=
       static_cast<uint64_t>(Envoy::Http::Code::PartialContent)) {
-    absl::string_view content_length_header = response_headers.getContentLengthValue();
-    uint64_t len;
-    if (!content_length_header.empty() && absl::SimpleAtoi(content_length_header, &len)) {
-      return {0, len};
-    }
+    // Don't use content-length; we can just request *all the body* from
+    // the source and it will tell us when it gets to the end.
     return {0, std::numeric_limits<uint64_t>::max()};
   }
   Http::HeaderMap::GetResult content_range_result =
