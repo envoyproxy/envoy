@@ -110,8 +110,8 @@ public:
     bool enableOnXHeader() const { return enable_on_x_header_; }
 
   private:
-    const bool is_set_;
     const bool enable_on_x_header_;
+    const bool is_set_;
   };
 
   class ResponseDirectionConfig : public DirectionConfig {
