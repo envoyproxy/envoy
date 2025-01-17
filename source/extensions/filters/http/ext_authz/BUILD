@@ -17,7 +17,7 @@ envoy_cc_library(
     srcs = ["ext_authz.cc"],
     hdrs = [
         "ext_authz.h",
-        "fifo_cache.h",
+        "//source/common/resp_cache:resp_cache.h",
     ],
     deps = [
         "//envoy/http:codes_interface",

@@ -19,6 +19,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/resp_cache/resp_cache.h" // For response cache
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
@@ -26,8 +27,7 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 
-// For response cache
-#include "source/extensions/filters/http/ext_authz/fifo_cache.h"
+using Envoy::Common::RespCache::RespCache;
 
 namespace Envoy {
 namespace Extensions {
@@ -134,7 +134,7 @@ public:
 
   bool headersAsBytes() const { return encode_raw_headers_; }
 
-  FIFOEvictionCache& responseCache() { return response_cache_; }
+  RespCache& responseCache() { return response_cache_; }
 
   const Envoy::Http::LowerCaseString& responseCacheHeaderName() const {
     return response_cache_header_name_;
@@ -287,7 +287,7 @@ private:
   // Response cache
   double response_cache_eviction_candidate_ratio_;
   double response_cache_eviction_threshold_ratio_;
-  FIFOEvictionCache response_cache_;
+  RespCache response_cache_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats

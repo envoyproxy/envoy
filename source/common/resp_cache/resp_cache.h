@@ -12,9 +12,8 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
-namespace ExtAuthz {
+namespace Common {
+namespace RespCache {
 
 /**
   A simple cache class with TTL.
@@ -22,16 +21,16 @@ namespace ExtAuthz {
   the order of elements. It restricts stored values to 16-bit unsigned integers, making it
   memory efficient.
  */
-class FIFOEvictionCache {
+class RespCache {
 public:
-  FIFOEvictionCache(std::size_t max_size, int default_ttl_seconds, double eviction_candidate_ratio,
-                    double eviction_threshold_ratio, Envoy::TimeSource& time_source)
+  RespCache(std::size_t max_size, int default_ttl_seconds, double eviction_candidate_ratio,
+            double eviction_threshold_ratio, Envoy::TimeSource& time_source)
       : max_cache_size(max_size), default_ttl_seconds(default_ttl_seconds),
         eviction_candidate_ratio(eviction_candidate_ratio),
         eviction_threshold_ratio(eviction_threshold_ratio),
         random_generator(std::random_device{}()), time_source_(time_source) {}
 
-  ~FIFOEvictionCache() {
+  ~RespCache() {
     for (auto& pair : cache_items_map) {
       free(const_cast<char*>(pair.first));
     }
@@ -205,7 +204,6 @@ private:
   Envoy::TimeSource& time_source_;             // Reference to TimeSource
 };
 
-} // namespace ExtAuthz
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace RespCache
+} // namespace Common
 } // namespace Envoy
