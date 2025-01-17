@@ -36,6 +36,22 @@
 #define ENVOY_SOCKET_IPV6_BOUND_IF Network::SocketOptionName()
 #endif
 
+// Dummy/test option
+#ifdef IP_TTL
+#define ENVOY_SOCKET_IP_TTL ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_TTL)
+#else
+#define ENVOY_SOCKET_IP_TTL Network::SocketOptionName()
+#endif
+
+#ifdef IPV6_UNICAST_HOPS
+#define ENVOY_SOCKET_IPV6_UNICAST_HOPS                                                             \
+  ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_UNICAST_HOPS)
+#else
+#define ENVOY_SOCKET_IPV6_UNICAST_HOPS Network::SocketOptionName()
+#endif
+
+#define DEFAULT_IP_TTL 64
+
 // Prefixes used to prefer well-known interface names.
 #if defined(__APPLE__)
 constexpr absl::string_view WlanPrefix = "en";
