@@ -17,11 +17,11 @@ pub extern "C" fn getSomeVariable() -> i32 {
 
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewHttpFilterConfigFunction`]
 /// signature.
-fn new_nop_http_filter_config_fn<EHF: EnvoyHttpFilter>(
-  _envoy_filter_factory: EnvoyHttpFilterConfig,
+fn new_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
+  _envoy_filter_config: &mut EC,
   name: &str,
   config: &str,
-) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
+) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
   let name = name.to_string();
   let config = config.to_string();
   Some(Box::new(NopHttpFilterConfig { name, config }))
@@ -35,8 +35,10 @@ struct NopHttpFilterConfig {
   config: String,
 }
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for NopHttpFilterConfig {
-  fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter<EHF>> {
+impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
+  for NopHttpFilterConfig
+{
+  fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
     Box::new(NopHttpFilter {
       on_request_headers_called: false,
       on_request_body_called: false,
