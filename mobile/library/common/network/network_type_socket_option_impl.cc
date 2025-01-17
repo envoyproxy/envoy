@@ -14,7 +14,7 @@ NetworkTypeSocketOptionImpl::NetworkTypeSocketOptionImpl(int network_type)
     : optname_(0, 0, "network_type"), network_type_(network_type) {}
 
 bool NetworkTypeSocketOptionImpl::setOption(
-    Socket& socket, envoy::config::core::v3::SocketOption::SocketState state) const {
+    Socket& /*socket*/, envoy::config::core::v3::SocketOption::SocketState /*state*/) const {
   return true;
 }
 
