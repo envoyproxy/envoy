@@ -107,8 +107,11 @@ public:
 
     bool compressionEnabled() const override { return is_set_ && compression_enabled_.enabled(); }
 
+    bool enableOnXHeader() const { return enable_on_x_header_; }
+
   private:
     const bool is_set_;
+    const bool enable_on_x_header_;
   };
 
   class ResponseDirectionConfig : public DirectionConfig {
