@@ -12,6 +12,11 @@ bug_fixes:
   change:
     Fixes a bug when loading a DNS cache entry with an empty authority/host header. This fix can be reverted by setting
     runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` to ``false``.
+- area: tcp_proxy
+  change:
+    Fixes a bug when TCP is tunneled over HTTP and upstream connection closed before response headers received to the stream.
+    The fix is to run the retry logic in a different event loop iteration to allow cleanup of the closed connection before retrying.
+    This fix can be reverted by setting runtime guard ``envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
