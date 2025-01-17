@@ -18,25 +18,12 @@
 
 # Documentation
 
-* If you are modifying the data plane structually, please keep the [Life of a
+* If you are modifying the data plane structurally, please keep the [Life of a
   Request](https://www.envoyproxy.io/docs/envoy/latest/intro/life_of_a_request) documentation up-to-date.
 
 # Deviations from Google C++ style guidelines
 
-* Exceptions are allowed and encouraged where appropriate. When using exceptions, do not add
-  additional error handing that cannot possibly happen in the case an exception is thrown.
-* Do use exceptions for:
-  - Configuration ingestion error handling. Invalid configurations (dynamic and
-    static) should throw meaningful `EnvoyException`s, the configuration
-    ingestion code will catch these.
-  - Constructor failure.
-  - Error handling in deep call stacks, where exceptions provide material
-    improvements to code complexity and readability.
-* Apply caution when using exceptions on the data path for general purpose error
-  handling. Exceptions are not caught on the data path and they should not be
-  used for simple error handling, e.g. with shallow call stacks, where explicit
-  error handling provides a more readable and easier to reason about
-  implementation.
+* Exceptions are allowed on the control plane, though now discouraged in new code. Adding exceptions is disallowed on the data plane.
 * References are always preferred over pointers when the reference cannot be null. This
   includes both const and non-const references.
 * Function names should all use camel case starting with a lower case letter (e.g., `doFoo()`).
@@ -49,9 +36,9 @@
   * `using BarSharedPtr = std::shared_ptr<Bar>;`
   * `using BlahConstSharedPtr = std::shared_ptr<const Blah>;`
   * Regular pointers (e.g. `int* foo`) should not be type aliased.
-* `absl::optional<std::reference_wrapper<T>> is type aliased:
-  * `using FooOptRef = absl::optional<std::reference_wrapper<T>>;`
-  * `using FooOptConstRef = absl::optional<std::reference_wrapper<const T>>;`
+* `absl::optional<std::reference_wrapper<T>>` has a helper class in `envoy/common/optref.h`, and is type aliased:
+  * `using FooOptRef = OptRef<T>;`
+  * `using FooOptConstRef = OptRef<const T>;`
 * If move semantics are intended, prefer specifying function arguments with `&&`.
   E.g., `void onHeaders(Http::HeaderMapPtr&& headers, ...)`. The rationale for this is that it
   forces the caller to specify `std::move(...)` or pass a temporary and makes the intention at
@@ -64,6 +51,8 @@
   raw memory in a test and return it to the production code with the expectation that the
   production code will hold it in a `unique_ptr` and free it. Envoy uses the factory pattern
   quite a bit for these cases. (Search the code for "factory").
+* Prefer explicitly sized integer types, such as uint64_t rather than size_t. In particular, use
+  explicitly sized integers for data that is written to disk or involved in math that might overflow.
 * The Google C++ style guide points out that [non-PoD static and global variables are forbidden](https://google.github.io/styleguide/cppguide.html#Static_and_Global_Variables).
   This _includes_ types such as `std::string`. We encourage the use of the
   advice in the [C++ FAQ on the static initialization
@@ -90,7 +79,7 @@
   NiceMock for mocks whose behavior is not the focus of a test.
 * [Thread
   annotations](https://github.com/abseil/abseil-cpp/blob/master/absl/base/thread_annotations.h),
-  such as `GUARDED_BY`, should be used for shared state guarded by
+  such as `ABSL_GUARDED_BY`, should be used for shared state guarded by
   locks/mutexes.
 * Functions intended to be local to a cc file should be declared in an anonymous namespace,
   rather than using the 'static' keyword. Note that the
@@ -168,7 +157,8 @@ A few general notes on our error handling philosophy:
     debug-only builds) program invariants.
   - `ENVOY_BUG`: logs and increments a stat in release mode, fatal check in debug builds. These
     should be used where it may be useful to detect if an efficient condition is violated in
-    production (and fatal check in debug-only builds).
+    production (and fatal check in debug-only builds). This will also log a stack trace
+    of the previous calls leading up to `ENVOY_BUG`.
 
 * Sub-macros alias the macros above and can be used to annotate specific situations:
   - `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need
@@ -243,8 +233,8 @@ environment. In general, there should be no non-local network access. In additio
 
 Tests should be deterministic. They should not rely on randomness or details
 such as the current time. Instead, mocks such as
-[`MockRandomGenerator`](test/mocks/runtime/mocks.h) and
-[`Mock*TimeSource`](test/mocks/common.h) should be used.
+[`MockRandomGenerator`](test/mocks/common.h) and
+[`SimulatedTimeSystem`](test/test_common/simulated_time_system.h) should be used.
 
 # Google style guides for other languages
 

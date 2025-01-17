@@ -3,6 +3,7 @@
 
 #include "source/common/stats/stats_matcher_impl.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -24,7 +25,8 @@ protected:
     stats_config_.mutable_stats_matcher()->set_reject_all(should_reject);
   }
   void initMatcher() {
-    stats_matcher_impl_ = std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_);
+    stats_matcher_impl_ =
+        std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_);
   }
   void expectAccepted(const std::vector<std::string>& expected_to_pass) {
     for (const auto& stat_name : expected_to_pass) {
@@ -37,6 +39,7 @@ protected:
     }
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   SymbolTableImpl symbol_table_;
   StatNamePool pool_;
   std::unique_ptr<StatsMatcherImpl> stats_matcher_impl_;
@@ -328,6 +331,30 @@ TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchersWithPrefix) {
                 "prefix.foo", "prefix.requests.for.envoy"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+}
+
+TEST_F(StatsMatcherTest, SkipSlowRejectsOnFastReject) {
+  inclusionList()->set_suffix("xyz");
+  initMatcher();
+  StatName stat_name = pool_.add("wxyz");
+  // Verify that we skip the slow check if fast_result is not NoMatch.
+  EXPECT_TRUE(stats_matcher_impl_->slowRejects(StatsMatcher::FastResult::Rejects, stat_name));
+
+  // Verify we don't skip the slow check if fast_result is NoMatch.
+  EXPECT_FALSE(
+      stats_matcher_impl_->slowRejects(stats_matcher_impl_->fastRejects(stat_name), stat_name));
+}
+
+TEST_F(StatsMatcherTest, SkipSlowRejectsOnFastMatches) {
+  exclusionList()->set_suffix("xyz");
+  initMatcher();
+  StatName stat_name = pool_.add("wxyz");
+  // Verify that we skip the slow check if fast_result is not NoMatch.
+  EXPECT_FALSE(stats_matcher_impl_->slowRejects(StatsMatcher::FastResult::Matches, stat_name));
+
+  // Verify we don't skip the slow check if fast_result is NoMatch.
+  EXPECT_TRUE(
+      stats_matcher_impl_->slowRejects(stats_matcher_impl_->fastRejects(stat_name), stat_name));
 }
 
 } // namespace Stats

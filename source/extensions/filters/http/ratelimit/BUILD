@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Ratelimit L7 HTTP filter
-# Public docs: docs/root/configuration/http_filters/rate_limit_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/rate_limit_filter
 
 envoy_extension_package()
 
@@ -20,13 +20,16 @@ envoy_cc_library(
         ":ratelimit_headers_lib",
         "//envoy/http:codes_interface",
         "//envoy/ratelimit:ratelimit_interface",
+        "//envoy/stream_info:uint32_accessor_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/http:codes_lib",
         "//source/common/router:config_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
         "//source/extensions/filters/common/ratelimit:stat_names_lib",
+        "//source/extensions/filters/common/ratelimit_config:ratelimit_config_lib",
         "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
     ],
 )
@@ -38,6 +41,7 @@ envoy_cc_library(
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
+        "//source/extensions/filters/http/common:ratelimit_headers_lib",
     ],
 )
 

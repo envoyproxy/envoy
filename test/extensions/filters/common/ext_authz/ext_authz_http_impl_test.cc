@@ -10,6 +10,7 @@
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/common/ext_authz/test_common.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 
@@ -31,6 +32,12 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 namespace {
+
+struct SendRequestOpts {
+  const std::string body_content = EMPTY_STRING;
+  bool use_raw_body = false;
+  bool encode_raw_headers = false;
+};
 
 class ExtAuthzHttpClientTest : public testing::Test {
 public:
@@ -54,15 +61,6 @@ public:
             timeout: 0.25s
 
           authorization_request:
-            allowed_headers:
-              patterns:
-              - exact: Baz
-                ignore_case: true
-              - prefix: "X-"
-                ignore_case: true
-              - safe_regex:
-                  google_re2: {}
-                  regex: regex-foo.?
             headers_to_add:
             - key: "x-authz-header1"
               value: "value"
@@ -99,15 +97,83 @@ public:
     }
 
     cm_.initializeThreadLocalClusters({"ext_authz"});
-    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
+    return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix, factory_context_);
   }
 
-  Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers) {
+  void dynamicMetadataTest(CheckStatus status, const std::string& http_status) {
+    const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+      authorization_response:
+        dynamic_metadata_from_headers:
+          patterns:
+          - prefix: "X-Metadata-"
+            ignore_case: true
+    failure_mode_allow: true
+    )EOF";
+
+    initialize(yaml);
+    envoy::service::auth::v3::CheckRequest request;
+    client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+    ProtobufWkt::Struct expected_dynamic_metadata;
+    auto* metadata_fields = expected_dynamic_metadata.mutable_fields();
+    (*metadata_fields)["x-metadata-header-0"] = ValueUtil::stringValue("zero");
+    (*metadata_fields)["x-metadata-header-1"] = ValueUtil::stringValue("2");
+    (*metadata_fields)["x-metadata-header-2"] = ValueUtil::stringValue("4");
+
+    // When we call onSuccess() at the bottom of the test we expect that all the
+    // dynamic metadata values that we set above to be present in the authz Response
+    // below.
+    Response authz_response;
+    authz_response.status = status;
+    authz_response.dynamic_metadata = expected_dynamic_metadata;
+    EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                        AuthzResponseNoAttributes(authz_response))));
+
+    const HeaderValueOptionVector http_response_headers = TestCommon::makeHeaderValueOption({
+        {":status", http_status, false},
+        {"bar", "nope", false},
+        {"x-metadata-header-0", "zero", false},
+        {"x-metadata-header-1", "2", false},
+        {"x-foo", "nah", false},
+        {"x-metadata-header-2", "4", false},
+    });
+    Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
+    client_->onSuccess(async_request_, std::move(http_response));
+  }
+
+  Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers,
+                                      SendRequestOpts opts = {}) {
     envoy::service::auth::v3::CheckRequest request{};
-    auto mutable_headers =
-        request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
-    for (const auto& header : headers) {
-      (*mutable_headers)[header.first] = header.second;
+    if (opts.encode_raw_headers) {
+      auto mutable_headers = request.mutable_attributes()
+                                 ->mutable_request()
+                                 ->mutable_http()
+                                 ->mutable_header_map()
+                                 ->mutable_headers();
+      for (const auto& header : headers) {
+        auto* new_header = mutable_headers->Add();
+        new_header->set_key(header.first);
+        new_header->set_raw_value(header.second);
+      }
+    } else {
+      auto mutable_headers =
+          request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
+      for (const auto& header : headers) {
+        (*mutable_headers)[header.first] = header.second;
+      }
+    }
+
+    if (opts.use_raw_body) {
+      *request.mutable_attributes()->mutable_request()->mutable_http()->mutable_raw_body() =
+          opts.body_content;
+    } else {
+      *request.mutable_attributes()->mutable_request()->mutable_http()->mutable_body() =
+          opts.body_content;
     }
 
     Http::RequestMessagePtr message_ptr;
@@ -131,6 +197,7 @@ public:
     return message_ptr;
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
@@ -142,20 +209,21 @@ public:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
+TEST_F(ExtAuthzHttpClientTest, StreamInfo) {
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  EXPECT_EQ(client_->streamInfo(), nullptr);
+  auto check_response = TestCommon::makeMessageResponse(
+      TestCommon::makeHeaderValueOption({{":status", "200", false}}));
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(async_request_, std::move(check_response));
+}
+
 // Test HTTP client config default values.
 TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   const Http::LowerCaseString foo{"foo"};
-  const Http::LowerCaseString baz{"baz"};
   const Http::LowerCaseString bar{"bar"};
   const Http::LowerCaseString alice{"alice"};
-
-  // Check allowed request headers.
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
-  EXPECT_TRUE(
-      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(baz.get()));
 
   // Check allowed client headers.
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Status.get()));
@@ -179,8 +247,8 @@ TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
   EXPECT_EQ(config_->timeout(), std::chrono::milliseconds{250});
 }
 
-// Test default allowed headers in the HTTP client.
-TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
+// Test default allowed client and upstream headers in the HTTP client.
+TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedClientAndUpstreamHeaders) {
   const std::string yaml = R"EOF(
   http_service:
     server_uri:
@@ -192,13 +260,6 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
 
   initialize(yaml);
 
-  // Check allowed request headers.
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
-  EXPECT_TRUE(
-      config_->requestHeaderMatchers()->matches(Http::CustomHeaders::get().Authorization.get()));
-  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
-
   // Check allowed client headers.
   EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
   EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Host.get()));
@@ -208,12 +269,39 @@ TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
       config_->upstreamHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 }
 
+TEST_F(ExtAuthzHttpClientTest, PathPrefixShouldBeSanitized) {
+  auto empty_config = createConfig(EMPTY_STRING, 250, "");
+  EXPECT_TRUE(empty_config->pathPrefix().empty());
+
+  auto slash_prefix_config = createConfig(EMPTY_STRING, 250, "/the_prefix");
+  EXPECT_EQ(slash_prefix_config->pathPrefix(), "/the_prefix");
+
+  EXPECT_THROW_WITH_MESSAGE(createConfig(EMPTY_STRING, 250, "the_prefix"), EnvoyException,
+                            "path_prefix should start with \"/\".");
+}
+
 // Verify client response when the authorization server returns a 200 OK and path_prefix is
 // configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
   Http::RequestMessagePtr message_ptr = sendRequest({{":path", "/foo"}, {"foo", "bar"}});
 
   EXPECT_EQ(message_ptr->headers().getPathValue(), "/bar/foo");
+}
+
+// Verify request body is set correctly when the normal body is empty and raw body is set.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithRawBody) {
+  Http::RequestMessagePtr message_ptr = sendRequest(
+      {{":path", "/foo"}, {"foo", "bar"}}, {/*body_content=*/"raw_body", /*use_raw_body=*/true});
+
+  EXPECT_EQ(message_ptr->bodyAsString(), "raw_body");
+}
+
+// Verify request body is set correctly when the normal body is set and raw body is empty.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithBody) {
+  Http::RequestMessagePtr message_ptr = sendRequest(
+      {{":path", "/foo"}, {"foo", "bar"}}, {/*body_content=*/"body", /*use_raw_body=*/false});
+
+  EXPECT_EQ(message_ptr->bodyAsString(), "body");
 }
 
 // Test the client when a request contains Content-Length greater than 0.
@@ -242,8 +330,6 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZeroWithAllowedHeaders) {
   )EOF";
 
   initialize(yaml);
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
-  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 
   Http::RequestMessagePtr message_ptr =
       sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
@@ -253,33 +339,29 @@ TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZeroWithAllowedHeaders) {
   EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");
 }
 
-// Test the client when a request contains headers in the prefix matchers.
-TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
-  const Http::LowerCaseString regexFood{"regex-food"};
-  const Http::LowerCaseString regexFool{"regex-fool"};
+// Test the client when the config has raw headers enabled. Should read from request's header_map
+// instead of header.
+TEST_F(ExtAuthzHttpClientTest, EncodeRawHeaders) {
+  const std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  encode_raw_headers: true
+  )EOF";
+
+  initialize(yaml);
+
+  SendRequestOpts opts;
+  opts.encode_raw_headers = true;
   Http::RequestMessagePtr message_ptr =
-      sendRequest({{Http::Headers::get().XContentTypeOptions.get(), "foobar"},
-                   {Http::Headers::get().XSquashDebug.get(), "foo"},
-                   {Http::Headers::get().ContentType.get(), "bar"},
-                   {regexFood.get(), "food"},
-                   {regexFool.get(), "fool"}});
+      sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
+                   {Http::Headers::get().Method.get(), std::string{"POST"}}},
+                  opts);
 
-  EXPECT_TRUE(message_ptr->headers().get(Http::Headers::get().ContentType).empty());
-  const auto x_squash = message_ptr->headers().get(Http::Headers::get().XSquashDebug);
-  ASSERT_FALSE(x_squash.empty());
-  EXPECT_EQ(x_squash[0]->value().getStringView(), "foo");
-
-  const auto x_content_type = message_ptr->headers().get(Http::Headers::get().XContentTypeOptions);
-  ASSERT_FALSE(x_content_type.empty());
-  EXPECT_EQ(x_content_type[0]->value().getStringView(), "foobar");
-
-  const auto food = message_ptr->headers().get(regexFood);
-  ASSERT_FALSE(food.empty());
-  EXPECT_EQ(food[0]->value().getStringView(), "food");
-
-  const auto fool = message_ptr->headers().get(regexFool);
-  ASSERT_FALSE(fool.empty());
-  EXPECT_EQ(fool[0]->value().getStringView(), "fool");
+  EXPECT_EQ(message_ptr->headers().getContentLengthValue(), "0");
+  EXPECT_EQ(message_ptr->headers().getMethodValue(), "POST");
 }
 
 // Verify client response when authorization server returns a 200 OK.
@@ -303,7 +385,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
       {{":status", "200", false}, {"x-downstream-ok", "1", false}, {"x-upstream-ok", "1", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::OK, Http::Code::OK, EMPTY_STRING, TestCommon::makeHeaderValueOption({}),
-      TestCommon::makeHeaderValueOption({{"x-downstream-ok", "1", false}}));
+      // By default, the value of envoy.config.core.v3.HeaderValueOption.append is true.
+      TestCommon::makeHeaderValueOption({{"x-downstream-ok", "1", true}}));
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
   auto mutable_headers =
@@ -404,9 +487,10 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
   // and inserted into the authz Response just below.
   Response authz_response;
   authz_response.status = CheckStatus::OK;
-  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me"});
-  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me-too"});
-  authz_response.headers_to_remove.emplace_back(Http::LowerCaseString{"remove-me-also"});
+  authz_response.headers_to_remove.emplace_back("remove-me");
+  authz_response.headers_to_remove.emplace_back("remove-me-too");
+  authz_response.headers_to_remove.emplace_back("remove-me-also");
+  authz_response.headers_to_remove.emplace_back("this is a valid header value but invalid name");
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
 
@@ -414,9 +498,22 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
       {":status", "200", false},
       {"x-envoy-auth-headers-to-remove", " ,remove-me,, ,  remove-me-too , ", false},
       {"x-envoy-auth-headers-to-remove", " remove-me-also ", false},
+      // This should not cause an error in the HTTP client. It should transparently pass it through
+      // to the filter (which will then SKIP the header later).
+      {"x-envoy-auth-headers-to-remove", "this is a valid header value but invalid name", false},
   });
   Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
   client_->onSuccess(async_request_, std::move(http_response));
+}
+
+// Test the client when an OK response is received with dynamic metadata in that OK response.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithDynamicMetadata) {
+  dynamicMetadataTest(CheckStatus::OK, "200");
+}
+
+// Test the client when a denied response is received with dynamic metadata in the denied response.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithDynamicMetadata) {
+  dynamicMetadataTest(CheckStatus::Denied, "403");
 }
 
 // Test the client when a denied response is received.

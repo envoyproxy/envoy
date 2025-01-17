@@ -4,15 +4,17 @@ import argparse
 import json
 import os
 import pathlib
+import platform
 import shlex
 import shutil
 import subprocess
 
-BAZEL_OPTIONS = shlex.split(os.environ.get("BAZEL_BUILD_OPTIONS", ""))
+BAZEL_OPTIONS = shlex.split(os.environ.get("BAZEL_BUILD_OPTION_LIST", ""))
+BAZEL_STARTUP_OPTIONS = shlex.split(os.environ.get("BAZEL_STARTUP_OPTION_LIST", ""))
 
 
 def bazel_info(name, bazel_extra_options=[]):
-    return subprocess.check_output(["bazel", "info", name] + BAZEL_OPTIONS
+    return subprocess.check_output(["bazel", *BAZEL_STARTUP_OPTIONS, "info", name] + BAZEL_OPTIONS
                                    + bazel_extra_options).decode().strip()
 
 
@@ -37,8 +39,8 @@ def binary_path(bazel_bin, target):
 
 
 def build_binary_with_debug_info(target):
-    targets = [target, target + ".dwp"]
-    subprocess.check_call(["bazel", "build", "-c", "dbg"] + BAZEL_OPTIONS + targets)
+    subprocess.check_call(["bazel", *BAZEL_STARTUP_OPTIONS, "build", "-c", "dbg", target]
+                          + BAZEL_OPTIONS)
 
     bazel_bin = bazel_info("bazel-bin", ["-c", "dbg"])
     return binary_path(bazel_bin, target)
@@ -74,7 +76,7 @@ def gdb_config(target, binary, workspace, execroot, arguments):
 
 
 def lldb_config(target, binary, workspace, execroot, arguments):
-    return {
+    cfg = {
         "name": "lldb " + target,
         "program": str(binary),
         "sourceMap": {
@@ -87,6 +89,13 @@ def lldb_config(target, binary, workspace, execroot, arguments):
         "type": "lldb",
         "request": "launch"
     }
+
+    # https://github.com/vadimcn/codelldb/discussions/517
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        cfg["sourceMap"] = {
+            ".": "${workspaceFolder}",
+        }
+    return cfg
 
 
 def add_to_launch_json(target, binary, workspace, execroot, arguments, debugger_type, overwrite):

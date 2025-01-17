@@ -10,20 +10,15 @@ namespace Config {
 
 template <typename Current> struct SubscriptionBase : public Config::SubscriptionCallbacks {
 public:
-  SubscriptionBase(const envoy::config::core::v3::ApiVersion api_version,
-                   ProtobufMessage::ValidationVisitor& validation_visitor,
+  SubscriptionBase(ProtobufMessage::ValidationVisitor& validation_visitor,
                    absl::string_view name_field)
-      : resource_decoder_(validation_visitor, name_field), api_version_(api_version) {}
+      : resource_decoder_(std::make_shared<Config::OpaqueResourceDecoderImpl<Current>>(
+            validation_visitor, name_field)) {}
 
-  std::string getResourceName() const {
-    return Envoy::Config::getResourceName<Current>(api_version_);
-  }
+  std::string getResourceName() const { return Envoy::Config::getResourceName<Current>(); }
 
 protected:
-  Config::OpaqueResourceDecoderImpl<Current> resource_decoder_;
-
-private:
-  const envoy::config::core::v3::ApiVersion api_version_;
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
 };
 
 } // namespace Config

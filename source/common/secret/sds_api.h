@@ -74,11 +74,11 @@ protected:
   Common::CallbackManager<> update_callback_manager_;
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                      const std::string& version_info) override;
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& system_version_info) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                              const std::string& version_info) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   virtual std::vector<std::string> getDataSourceFilenames() PURE;
@@ -92,7 +92,8 @@ protected:
   Api::Api& api_;
 
 private:
-  void validateUpdateSize(int num_resources);
+  absl::Status validateUpdateSize(uint32_t added_resources_num,
+                                  uint32_t removed_resources_num) const;
   void initialize();
   FileContentMap loadFiles();
   uint64_t getHashForFiles(const FileContentMap& files);
@@ -100,14 +101,14 @@ private:
   void onWatchUpdate();
   SdsApiStats generateStats(Stats::Scope& scope);
 
-  Stats::ScopePtr scope_;
+  Stats::ScopeSharedPtr scope_;
   SdsApiStats sds_api_stats_;
 
   const envoy::config::core::v3::ConfigSource sds_config_;
   Config::SubscriptionPtr subscription_;
   const std::string sds_config_name_;
 
-  uint64_t secret_hash_;
+  uint64_t secret_hash_{0};
   uint64_t files_hash_;
   Cleanup clean_up_;
   Config::SubscriptionFactory& subscription_factory_;
@@ -134,16 +135,7 @@ public:
   static TlsCertificateSdsApiSharedPtr
   create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
-         const std::string& sds_config_name, std::function<void()> destructor_cb) {
-    // We need to do this early as we invoke the subscription factory during initialization, which
-    // is too late to throw.
-    Config::Utility::checkLocalInfo("TlsCertificateSdsApi", secret_provider_context.localInfo());
-    return std::make_shared<TlsCertificateSdsApi>(
-        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
-        secret_provider_context.dispatcher().timeSource(),
-        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-  }
+         const std::string& sds_config_name, std::function<void()> destructor_cb);
 
   TlsCertificateSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                        const std::string& sds_config_name,
@@ -159,40 +151,17 @@ public:
     return resolved_tls_certificate_secrets_.get();
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<void(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>)
-      override {
+      std::function<absl::Status(
+          const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>) override {
     return nullptr;
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addUpdateCallback(std::function<void()> callback) override {
-    if (secret()) {
-      callback();
-    }
-    return update_callback_manager_.add(callback);
-  }
+  addUpdateCallback(std::function<absl::Status()> callback) override;
   const Init::Target* initTarget() override { return &init_target_; }
 
 protected:
-  void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    sds_tls_certificate_secrets_ =
-        std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>(
-            secret.tls_certificate());
-    resolved_tls_certificate_secrets_ = nullptr;
-    if (secret.tls_certificate().has_watched_directory()) {
-      watched_directory_ = std::make_unique<Config::WatchedDirectory>(
-          secret.tls_certificate().watched_directory(), dispatcher_);
-    } else {
-      watched_directory_.reset();
-    }
-  }
-  void resolveSecret(const FileContentMap& files) override {
-    resolved_tls_certificate_secrets_ =
-        std::make_unique<envoy::extensions::transport_sockets::tls::v3::TlsCertificate>(
-            *sds_tls_certificate_secrets_);
-    // We replace path based secrets with inlined secrets on update.
-    resolveDataSource(files, *resolved_tls_certificate_secrets_->mutable_certificate_chain());
-    resolveDataSource(files, *resolved_tls_certificate_secrets_->mutable_private_key());
-  }
+  void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
+  void resolveSecret(const FileContentMap& files) override;
   void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) override {}
   std::vector<std::string> getDataSourceFilenames() override;
   Config::WatchedDirectory* getWatchedDirectory() override { return watched_directory_.get(); }
@@ -217,17 +186,7 @@ public:
   static CertificateValidationContextSdsApiSharedPtr
   create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
-         const std::string& sds_config_name, std::function<void()> destructor_cb) {
-    // We need to do this early as we invoke the subscription factory during initialization, which
-    // is too late to throw.
-    Config::Utility::checkLocalInfo("CertificateValidationContextSdsApi",
-                                    secret_provider_context.localInfo());
-    return std::make_shared<CertificateValidationContextSdsApi>(
-        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
-        secret_provider_context.dispatcher().timeSource(),
-        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-  }
+         const std::string& sds_config_name, std::function<void()> destructor_cb);
   CertificateValidationContextSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                                      const std::string& sds_config_name,
                                      Config::SubscriptionFactory& subscription_factory,
@@ -244,48 +203,20 @@ public:
     return resolved_certificate_validation_context_secrets_.get();
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addUpdateCallback(std::function<void()> callback) override {
-    if (secret()) {
-      callback();
-    }
-    return update_callback_manager_.add(callback);
-  }
+  addUpdateCallback(std::function<absl::Status()> callback) override;
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<
-          void(const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>
+      std::function<absl::Status(
+          const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>
           callback) override {
     return validation_callback_manager_.add(callback);
   }
   const Init::Target* initTarget() override { return &init_target_; }
 
 protected:
-  void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    sds_certificate_validation_context_secrets_ = std::make_unique<
-        envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>(
-        secret.validation_context());
-    resolved_certificate_validation_context_secrets_ = nullptr;
-    if (secret.validation_context().has_watched_directory()) {
-      watched_directory_ = std::make_unique<Config::WatchedDirectory>(
-          secret.validation_context().watched_directory(), dispatcher_);
-    } else {
-      watched_directory_.reset();
-    }
-  }
+  void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
+  void resolveSecret(const FileContentMap& files) override;
 
-  void resolveSecret(const FileContentMap& files) override {
-    // Copy existing CertificateValidationContext.
-    resolved_certificate_validation_context_secrets_ = std::make_unique<
-        envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>(
-        *sds_certificate_validation_context_secrets_);
-    // We replace path based secrets with inlined secrets on update.
-    resolveDataSource(files,
-                      *resolved_certificate_validation_context_secrets_->mutable_trusted_ca());
-  }
-
-  void
-  validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    validation_callback_manager_.runCallbacks(secret.validation_context());
-  }
+  void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
   std::vector<std::string> getDataSourceFilenames() override;
   Config::WatchedDirectory* getWatchedDirectory() override { return watched_directory_.get(); }
 
@@ -311,17 +242,7 @@ public:
   static TlsSessionTicketKeysSdsApiSharedPtr
   create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
-         const std::string& sds_config_name, std::function<void()> destructor_cb) {
-    // We need to do this early as we invoke the subscription factory during initialization, which
-    // is too late to throw.
-    Config::Utility::checkLocalInfo("TlsSessionTicketKeysSdsApi",
-                                    secret_provider_context.localInfo());
-    return std::make_shared<TlsSessionTicketKeysSdsApi>(
-        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
-        secret_provider_context.dispatcher().timeSource(),
-        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-  }
+         const std::string& sds_config_name, std::function<void()> destructor_cb);
 
   TlsSessionTicketKeysSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                              const std::string& sds_config_name,
@@ -340,19 +261,11 @@ public:
   }
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addUpdateCallback(std::function<void()> callback) override {
-    if (secret()) {
-      callback();
-    }
-    return update_callback_manager_.add(callback);
-  }
-
+  addUpdateCallback(std::function<absl::Status()> callback) override;
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
       std::function<
-          void(const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>
-          callback) override {
-    return validation_callback_manager_.add(callback);
-  }
+          absl::Status(const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>
+          callback) override;
   const Init::Target* initTarget() override { return &init_target_; }
 
 protected:
@@ -362,10 +275,7 @@ protected:
             secret.session_ticket_keys());
   }
 
-  void
-  validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    validation_callback_manager_.runCallbacks(secret.session_ticket_keys());
-  }
+  void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
   std::vector<std::string> getDataSourceFilenames() override;
   Config::WatchedDirectory* getWatchedDirectory() override { return nullptr; }
 
@@ -384,16 +294,7 @@ public:
   static GenericSecretSdsApiSharedPtr
   create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
-         const std::string& sds_config_name, std::function<void()> destructor_cb) {
-    // We need to do this early as we invoke the subscription factory during initialization, which
-    // is too late to throw.
-    Config::Utility::checkLocalInfo("GenericSecretSdsApi", secret_provider_context.localInfo());
-    return std::make_shared<GenericSecretSdsApi>(
-        sds_config, sds_config_name, secret_provider_context.clusterManager().subscriptionFactory(),
-        secret_provider_context.dispatcher().timeSource(),
-        secret_provider_context.messageValidationVisitor(), secret_provider_context.stats(),
-        destructor_cb, secret_provider_context.dispatcher(), secret_provider_context.api());
-  }
+         const std::string& sds_config_name, std::function<void()> destructor_cb);
 
   GenericSecretSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
                       const std::string& sds_config_name,
@@ -409,12 +310,13 @@ public:
     return generic_secret_.get();
   }
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
-  addUpdateCallback(std::function<void()> callback) override {
+  addUpdateCallback(std::function<absl::Status()> callback) override {
     return update_callback_manager_.add(callback);
   }
-  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr addValidationCallback(
-      std::function<void(const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>
-          callback) override {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addValidationCallback(std::function<absl::Status(
+                            const envoy::extensions::transport_sockets::tls::v3::GenericSecret&)>
+                            callback) override {
     return validation_callback_manager_.add(callback);
   }
   const Init::Target* initTarget() override { return &init_target_; }
@@ -425,10 +327,7 @@ protected:
         std::make_unique<envoy::extensions::transport_sockets::tls::v3::GenericSecret>(
             secret.generic_secret());
   }
-  void
-  validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override {
-    validation_callback_manager_.runCallbacks(secret.generic_secret());
-  }
+  void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
   std::vector<std::string> getDataSourceFilenames() override;
   Config::WatchedDirectory* getWatchedDirectory() override { return nullptr; }
 

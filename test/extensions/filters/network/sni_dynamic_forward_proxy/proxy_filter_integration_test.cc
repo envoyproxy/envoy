@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
-#include "source/extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/tls/client_ssl_socket.h"
+#include "source/common/tls/context_config_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -32,14 +32,17 @@ public:
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
           envoy::config::core::v3::ApiVersion::V3);
-      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
+      bootstrap.mutable_dynamic_resources()
+          ->mutable_cds_config()
+          ->mutable_path_config_source()
+          ->set_path(cds_helper_.cdsPath());
       bootstrap.mutable_static_resources()->clear_clusters();
 
       const std::string filter =
           fmt::format(R"EOF(
-name: envoy.filters.http.dynamic_forward_proxy
+name: envoy.filters.network.sni_dynamic_forward_proxy
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha.FilterConfig
+  "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
@@ -85,7 +88,7 @@ typed_config:
   void createUpstreams() override {
     addFakeUpstream(
         Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_, factory_context_),
-        Http::CodecType::HTTP1);
+        Http::CodecType::HTTP1, /*autonomous_upstream=*/false);
   }
 
   Network::ClientConnectionPtr
@@ -97,7 +100,7 @@ typed_config:
         Ssl::createClientSslTransportSocketFactory(options, context_manager_, *api_);
     return dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),
-        client_transport_socket_factory_ptr->createTransportSocket({}), nullptr);
+        client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
   }
 
   std::string upstream_cert_name_{"server"};

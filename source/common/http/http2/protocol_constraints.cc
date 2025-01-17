@@ -23,8 +23,10 @@ ProtocolConstraints::ProtocolConstraints(
 ProtocolConstraints::ReleasorProc
 ProtocolConstraints::incrementOutboundFrameCount(bool is_outbound_flood_monitored_control_frame) {
   ++outbound_frames_;
+  stats_.outbound_frames_active_.set(outbound_frames_);
   if (is_outbound_flood_monitored_control_frame) {
     ++outbound_control_frames_;
+    stats_.outbound_control_frames_active_.set(outbound_control_frames_);
   }
   return is_outbound_flood_monitored_control_frame ? control_frame_buffer_releasor_
                                                    : frame_buffer_releasor_;
@@ -33,11 +35,13 @@ ProtocolConstraints::incrementOutboundFrameCount(bool is_outbound_flood_monitore
 void ProtocolConstraints::releaseOutboundFrame() {
   ASSERT(outbound_frames_ >= 1);
   --outbound_frames_;
+  stats_.outbound_frames_active_.set(outbound_frames_);
 }
 
 void ProtocolConstraints::releaseOutboundControlFrame() {
   ASSERT(outbound_control_frames_ >= 1);
   --outbound_control_frames_;
+  stats_.outbound_control_frames_active_.set(outbound_control_frames_);
   releaseOutboundFrame();
 }
 
@@ -58,23 +62,22 @@ Status ProtocolConstraints::checkOutboundFrameLimits() {
   return okStatus();
 }
 
-Status ProtocolConstraints::trackInboundFrames(const nghttp2_frame_hd* hd,
-                                               uint32_t padding_length) {
-  switch (hd->type) {
-  case NGHTTP2_HEADERS:
-  case NGHTTP2_CONTINUATION:
-  case NGHTTP2_DATA:
+Status ProtocolConstraints::trackInboundFrame(uint8_t type, bool end_stream, bool is_empty) {
+  switch (type) {
+  case OGHTTP2_HEADERS_FRAME_TYPE:
+  case OGHTTP2_CONTINUATION_FRAME_TYPE:
+  case OGHTTP2_DATA_FRAME_TYPE:
     // Track frames with an empty payload and no end stream flag.
-    if (hd->length - padding_length == 0 && !(hd->flags & NGHTTP2_FLAG_END_STREAM)) {
+    if (is_empty && !end_stream) {
       consecutive_inbound_frames_with_empty_payload_++;
     } else {
       consecutive_inbound_frames_with_empty_payload_ = 0;
     }
     break;
-  case NGHTTP2_PRIORITY:
+  case OGHTTP2_PRIORITY_FRAME_TYPE:
     inbound_priority_frames_++;
     break;
-  case NGHTTP2_WINDOW_UPDATE:
+  case OGHTTP2_WINDOW_UPDATE_FRAME_TYPE:
     inbound_window_update_frames_++;
     break;
   default:

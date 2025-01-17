@@ -10,11 +10,12 @@
 #include "envoy/thread/thread.h"
 
 #include "source/common/common/base_logger.h"
-#include "source/common/common/fancy_logger.h"
+#include "source/common/common/fine_grain_logger.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger_impl.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/non_copyable.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
@@ -25,26 +26,40 @@
 namespace Envoy {
 namespace Logger {
 
-// TODO: find out a way for extensions to register new logger IDs
+#ifdef ENVOY_DISABLE_LOGGING
+const static bool should_log = false;
+#else
+const static bool should_log = true;
+#endif
+
+// TODO: find a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(admin)                                                                                  \
+  FUNCTION(alternate_protocols_cache)                                                              \
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \
   FUNCTION(backtrace)                                                                              \
+  FUNCTION(basic_auth)                                                                             \
   FUNCTION(cache_filter)                                                                           \
   FUNCTION(client)                                                                                 \
   FUNCTION(config)                                                                                 \
   FUNCTION(connection)                                                                             \
   FUNCTION(conn_handler)                                                                           \
+  FUNCTION(compression)                                                                            \
+  FUNCTION(credential_injector)                                                                    \
   FUNCTION(decompression)                                                                          \
+  FUNCTION(dns)                                                                                    \
   FUNCTION(dubbo)                                                                                  \
   FUNCTION(envoy_bug)                                                                              \
   FUNCTION(ext_authz)                                                                              \
+  FUNCTION(ext_proc)                                                                               \
   FUNCTION(rocketmq)                                                                               \
   FUNCTION(file)                                                                                   \
   FUNCTION(filter)                                                                                 \
   FUNCTION(forward_proxy)                                                                          \
+  FUNCTION(geolocation)                                                                            \
   FUNCTION(grpc)                                                                                   \
+  FUNCTION(happy_eyeballs)                                                                         \
   FUNCTION(hc)                                                                                     \
   FUNCTION(health_checker)                                                                         \
   FUNCTION(http)                                                                                   \
@@ -54,15 +69,20 @@ namespace Logger {
   FUNCTION(io)                                                                                     \
   FUNCTION(jwt)                                                                                    \
   FUNCTION(kafka)                                                                                  \
+  FUNCTION(key_value_store)                                                                        \
   FUNCTION(lua)                                                                                    \
   FUNCTION(main)                                                                                   \
   FUNCTION(matcher)                                                                                \
   FUNCTION(misc)                                                                                   \
   FUNCTION(mongo)                                                                                  \
+  FUNCTION(multi_connection)                                                                       \
+  FUNCTION(oauth2)                                                                                 \
   FUNCTION(quic)                                                                                   \
   FUNCTION(quic_stream)                                                                            \
   FUNCTION(pool)                                                                                   \
+  FUNCTION(rate_limit_quota)                                                                       \
   FUNCTION(rbac)                                                                                   \
+  FUNCTION(rds)                                                                                    \
   FUNCTION(redis)                                                                                  \
   FUNCTION(router)                                                                                 \
   FUNCTION(runtime)                                                                                \
@@ -74,7 +94,11 @@ namespace Logger {
   FUNCTION(tracing)                                                                                \
   FUNCTION(upstream)                                                                               \
   FUNCTION(udp)                                                                                    \
-  FUNCTION(wasm)
+  FUNCTION(wasm)                                                                                   \
+  FUNCTION(websocket)                                                                              \
+  FUNCTION(golang)                                                                                 \
+  FUNCTION(stats_sinks)                                                                            \
+  FUNCTION(dynamic_modules)
 
 // clang-format off
 enum class Id {
@@ -105,25 +129,53 @@ public:
   explicit SinkDelegate(DelegatingLogSinkSharedPtr log_sink);
   virtual ~SinkDelegate();
 
-  virtual void log(absl::string_view msg) PURE;
+  /**
+   * Called to log a single log line.
+   * @param formatted_msg The final, formatted message.
+   * @param the original log message, including additional metadata.
+   */
+  virtual void log(absl::string_view msg, const spdlog::details::log_msg& log_msg) PURE;
+
+  /**
+   * Called to log a single log line with a stable name.
+   * @param stable_name stable name of this log line.
+   * @param level the string representation of the log level for this log line.
+   * @param component the component this log was logged via.
+   * @param msg the log line to log.
+   */
+  virtual void logWithStableName(absl::string_view stable_name, absl::string_view level,
+                                 absl::string_view component, absl::string_view msg);
+
+  /**
+   * Called to flush the log sink.
+   */
   virtual void flush() PURE;
 
 protected:
-  // Swap the current log sink delegate for this one. This should be called by the derived class
-  // constructor immediately before returning. This is required to match restoreDelegate(),
-  // otherwise it's possible for the previous delegate to get set in the base class constructor,
-  // the derived class constructor throws, and cleanup becomes broken.
+  // Swap the current thread local log sink delegate for this one. This should be called by the
+  // derived class constructor immediately before returning. This is required to match
+  // restoreTlsDelegate(), otherwise it's possible for the previous delegate to get set in the base
+  // class constructor, the derived class constructor throws, and cleanup becomes broken.
+  void setTlsDelegate();
+
+  // Swap the current *global* log sink delegate for this one. This behaves as setTlsDelegate, but
+  // operates on the global log sink instead of the thread local one.
   void setDelegate();
 
-  // Swap the current log sink (this) for the previous one. This should be called by the derived
-  // class destructor in the body. This is critical as otherwise it's possible for a log message
-  // to get routed to a partially destructed sink.
+  // Swap the current thread local log sink (this) for the previous one. This should be called by
+  // the derived class destructor in the body. This is critical as otherwise it's possible for a log
+  // message to get routed to a partially destructed sink.
+  void restoreTlsDelegate();
+
+  // Swap the current *global* log sink delegate for the previous one. This behaves as
+  // restoreTlsDelegate, but operates on the global sink instead of the thread local one.
   void restoreDelegate();
 
   SinkDelegate* previousDelegate() { return previous_delegate_; }
 
 private:
   SinkDelegate* previous_delegate_{nullptr};
+  SinkDelegate* previous_tls_delegate_{nullptr};
   DelegatingLogSinkSharedPtr log_sink_;
 };
 
@@ -136,7 +188,7 @@ public:
   ~StderrSinkDelegate() override;
 
   // SinkDelegate
-  void log(absl::string_view msg) override;
+  void log(absl::string_view msg, const spdlog::details::log_msg& log_msg) override;
   void flush() override;
 
   bool hasLock() const { return lock_ != nullptr; }
@@ -156,12 +208,11 @@ public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
   void clearLock() { stderr_sink_->clearLock(); }
 
+  void logWithStableName(absl::string_view stable_name, absl::string_view level,
+                         absl::string_view component, absl::string_view message);
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
-  void flush() override {
-    absl::ReaderMutexLock lock(&sink_mutex_);
-    sink_->flush();
-  }
+  void flush() override;
   void set_pattern(const std::string& pattern) override {
     set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
   }
@@ -208,6 +259,9 @@ private:
     absl::ReaderMutexLock lock(&sink_mutex_);
     return sink_;
   }
+  SinkDelegate** tlsSink();
+  void setTlsDelegate(SinkDelegate* sink);
+  SinkDelegate* tlsDelegate();
 
   SinkDelegate* sink_ ABSL_GUARDED_BY(sink_mutex_){nullptr};
   absl::Mutex sink_mutex_;
@@ -217,7 +271,7 @@ private:
   bool should_escape_{false};
 };
 
-enum class LoggerMode { Envoy, Fancy };
+enum class LoggerMode { Envoy, FineGrainLog };
 
 /**
  * Defines a scope for the logging system with the specified lock and log level.
@@ -230,8 +284,8 @@ enum class LoggerMode { Envoy, Fancy };
  * and logging will remain unlocked, the same state it is in prior to
  * instantiating a Context.
  *
- * Settings for Fancy Logger, a file level logger without explicit implementation of
- * Envoy::Logger:Loggable, are integrated here, as they should be updated when
+ * Settings for Fine-Grain Logger, a file level logger without explicit implementation
+ * of Envoy::Logger:Loggable, are integrated here, as they should be updated when
  * context switch occurs.
  */
 class Context {
@@ -243,13 +297,16 @@ public:
   /**
    * Same as before, with boolean returned to use in log macros.
    */
-  static bool useFancyLogger();
+  static bool useFineGrainLogger();
 
-  static void enableFancyLogger();
-  static void disableFancyLogger();
+  // Change the log level for all loggers (fine grained or otherwise) to the level provided.
+  static void changeAllLogLevels(spdlog::level::level_enum level);
 
-  static std::string getFancyLogFormat();
-  static spdlog::level::level_enum getFancyDefaultLevel();
+  static void enableFineGrainLogger();
+  static void disableFineGrainLogger();
+
+  static std::string getFineGrainLogFormat();
+  static spdlog::level::level_enum getFineGrainDefaultLevel();
 
 private:
   void activate();
@@ -261,8 +318,8 @@ private:
   bool enable_fine_grain_logging_;
   Context* const save_context_;
 
-  std::string fancy_log_format_ = "[%Y-%m-%d %T.%e][%t][%l][%n] %v";
-  spdlog::level::level_enum fancy_default_level_ = spdlog::level::info;
+  std::string fine_grain_log_format_;
+  spdlog::level::level_enum fine_grain_default_level_ = spdlog::level::info;
 };
 
 /**
@@ -297,6 +354,16 @@ public:
   static void setLogFormat(const std::string& log_format);
 
   /**
+   * Sets the log format from a struct as a JSON string.
+   */
+  static absl::Status setJsonLogFormat(const Protobuf::Message& log_format_struct);
+
+  /**
+   * @return true if JSON log format was set using setJsonLogFormat.
+   */
+  static bool jsonLogFormatSet() { return json_log_format_set_; }
+
+  /**
    * @return std::vector<Logger>& the installed loggers.
    */
   static std::vector<Logger>& loggers() { return allLoggers(); }
@@ -313,6 +380,8 @@ private:
    * @return std::vector<Logger>& return the installed loggers.
    */
   static std::vector<Logger>& allLoggers();
+
+  static bool json_log_format_set_;
 };
 
 /**
@@ -322,13 +391,38 @@ template <Id id> class Loggable {
 protected:
   /**
    * Do not use this directly, use macros defined below.
+   * See source/docs/logging.md for more details.
    * @return spdlog::logger& the static log instance to use for class local logging.
    */
-  static spdlog::logger& __log_do_not_use_read_comment() {
+  static spdlog::logger& __log_do_not_use_read_comment() { // NOLINT(readability-identifier-naming)
     static spdlog::logger& instance = Registry::getLog(id);
     return instance;
   }
 };
+
+namespace Utility {
+
+constexpr static absl::string_view TagsPrefix = "[Tags: ";
+constexpr static absl::string_view TagsSuffix = "] ";
+constexpr static absl::string_view TagsSuffixForSearch = "\"] ";
+
+/**
+ * Sets the log format for a specific logger.
+ */
+void setLogFormatForLogger(spdlog::logger& logger, const std::string& log_format);
+
+/**
+ * Serializes custom log tags to a string that will be prepended to the log message.
+ * In case JSON logging is enabled, the keys and values will be serialized with JSON escaping.
+ */
+std::string serializeLogTags(const std::map<std::string, std::string>& tags);
+
+/**
+ * Escapes the payload to a JSON string and writes the output to the destination buffer.
+ */
+void escapeMessageJsonString(absl::string_view payload, spdlog::memory_buf_t& dest);
+
+} // namespace Utility
 
 // Contains custom flags to introduce user defined flags in log pattern. Reference:
 // https://github.com/gabime/spdlog#user-defined-flags-in-the-log-pattern.
@@ -372,6 +466,31 @@ public:
   constexpr static char Placeholder = 'j';
 };
 
+class ExtractedTags : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<ExtractedTags>();
+  }
+
+  constexpr static char Placeholder = '*';
+  constexpr static char JsonPropertyDeimilter = ',';
+};
+
+class ExtractedMessage : public spdlog::custom_flag_formatter {
+public:
+  void format(const spdlog::details::log_msg& msg, const std::tm& tm,
+              spdlog::memory_buf_t& dest) override;
+
+  std::unique_ptr<custom_flag_formatter> clone() const override {
+    return spdlog::details::make_unique<ExtractedMessage>();
+  }
+
+  constexpr static char Placeholder = '+';
+};
+
 } // namespace CustomFlagFormatter
 } // namespace Logger
 
@@ -385,12 +504,22 @@ public:
 
 #define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) (ENVOY_SPDLOG_LEVEL(LEVEL) >= (LOGGER).level())
 
-// Compare levels before invoking logger. This is an optimization to avoid
-// executing expressions computing log contents when they would be suppressed.
-// The same filtering will also occur in spdlog::logger.
+/**
+ * Compare levels and use the fine grain logger if fine grain logging is enabled.
+ */
+#define ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)                                          \
+  (Envoy::Logger::Context::useFineGrainLogger()                                                    \
+       ? (ENVOY_SPDLOG_LEVEL(LEVEL) >= (*FINE_GRAIN_LOGGER()).level())                             \
+       : (ENVOY_SPDLOG_LEVEL(LEVEL) >= (LOGGER).level()))
+
+/**
+ * Compare levels before invoking logger. This is an optimization to avoid
+ * executing expressions computing log contents when they would be suppressed.
+ * The same filtering will also occur in spdlog::logger.
+ */
 #define ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ...)                                                 \
   do {                                                                                             \
-    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+    if (Envoy::Logger::should_log && ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                        \
       LOGGER.log(::spdlog::source_loc{__FILE__, __LINE__, __func__}, ENVOY_SPDLOG_LEVEL(LEVEL),    \
                  __VA_ARGS__);                                                                     \
     }                                                                                              \
@@ -399,13 +528,13 @@ public:
 #define ENVOY_LOG_CHECK_LEVEL(LEVEL) ENVOY_LOG_COMP_LEVEL(ENVOY_LOGGER(), LEVEL)
 
 /**
- * Convenience macro to log to a user-specified logger. When fancy logging is used, the specific
- * logger is ignored and instead the file-specific logger is used.
+ * Convenience macro to log to a user-specified logger. When fine-grain logging is used, the
+ * specific logger is ignored and instead the file-specific logger is used.
  */
 #define ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ...)                                                    \
   do {                                                                                             \
-    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
-      FANCY_LOG(LEVEL, ##__VA_ARGS__);                                                             \
+    if (Envoy::Logger::should_log && Envoy::Logger::Context::useFineGrainLogger()) {               \
+      FINE_GRAIN_LOG(LEVEL, ##__VA_ARGS__);                                                        \
     } else {                                                                                       \
       ENVOY_LOG_COMP_AND_LOG(LOGGER, LEVEL, ##__VA_ARGS__);                                        \
     }                                                                                              \
@@ -423,26 +552,130 @@ public:
 #define GET_MISC_LOGGER() ::Envoy::Logger::Registry::getLog(::Envoy::Logger::Id::misc)
 #define ENVOY_LOG_MISC(LEVEL, ...) ENVOY_LOG_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
 
-/**
- * Convenience macros for logging with connection ID.
- */
-#define ENVOY_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                           \
-  ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}] " FORMAT, (CONNECTION).id(), ##__VA_ARGS__)
-
-/**
- * Convenience macros for logging with a stream ID and a connection ID.
- */
-#define ENVOY_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, STREAM, ...)                             \
-  ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "[C{}][S{}] " FORMAT,                                         \
-                      (STREAM).connection() ? (STREAM).connection()->id() : 0,                     \
-                      (STREAM).streamId(), ##__VA_ARGS__)
-
 // TODO(danielhochman): macros(s)/function(s) for logging structures that support iteration.
 
 /**
- * Command line options for log macros: use Fancy Logger or not.
+ * Command line options for log macros: use Fine-Grain Logger or not.
  */
 #define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+#define ENVOY_TAGGED_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, FORMAT, ...)                               \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
+                          ::Envoy::Logger::Utility::serializeLogTags(TAGS), ##__VA_ARGS__);        \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_TAGGED_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, CONNECTION, FORMAT, ...)              \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      std::map<std::string, std::string> log_tags = TAGS;                                          \
+      log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);    \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_TAGGED_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, TAGS, STREAM, FORMAT, ...)                \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      std::map<std::string, std::string> log_tags = TAGS;                                          \
+      log_tags.emplace("ConnectionId",                                                             \
+                       (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0"); \
+      log_tags.emplace("StreamId", std::to_string((STREAM).streamId()));                           \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);    \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_CONN_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, CONNECTION, ...)                           \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
+      std::map<std::string, std::string> log_tags;                                                 \
+      log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);    \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_STREAM_LOG_TO_LOGGER(LOGGER, LEVEL, FORMAT, STREAM, ...)                             \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
+      std::map<std::string, std::string> log_tags;                                                 \
+      log_tags.emplace("ConnectionId",                                                             \
+                       (STREAM).connection() ? std::to_string((STREAM).connection()->id()) : "0"); \
+      log_tags.emplace("StreamId", std::to_string((STREAM).streamId()));                           \
+      ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, "{}" FORMAT,                                              \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);    \
+    }                                                                                              \
+  } while (0)
+
+/**
+ * Log with tags which are a map of key and value strings. When ENVOY_TAGGED_LOG is used, the tags
+ * are serialized and prepended to the log message.
+ * For example, the map {{"key1","val1","key2","val2"}} would be serialized to:
+ * [Tags: "key1":"val1","key2":"val2"]. The serialization pattern is defined by
+ * Envoy::Logger::Utility::serializeLogTags function.
+ */
+#define ENVOY_TAGGED_LOG(LEVEL, TAGS, FORMAT, ...)                                                 \
+  ENVOY_TAGGED_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, FORMAT, ##__VA_ARGS__)
+
+/**
+ * Log with tags which are a map of key and value strings. Has the same operation as
+ * ENVOY_TAGGED_LOG, only this macro will also add the connection ID to the tags, if the provided
+ * tags do not already have a ConnectionId key existing.
+ */
+#define ENVOY_TAGGED_CONN_LOG(LEVEL, TAGS, CONNECTION, FORMAT, ...)                                \
+  ENVOY_TAGGED_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, CONNECTION, FORMAT, ##__VA_ARGS__)
+
+/**
+ * Log with tags which are a map of key and value strings. Has the same operation as
+ * ENVOY_TAGGED_LOG, only this macro will also add the connection and stream ID to the tags,
+ * if the provided tags do not already have a ConnectionId or StreamId keys existing.
+ */
+#define ENVOY_TAGGED_STREAM_LOG(LEVEL, TAGS, STREAM, FORMAT, ...)                                  \
+  ENVOY_TAGGED_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, TAGS, STREAM, FORMAT, ##__VA_ARGS__)
+
+#define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
+  ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);
+
+#define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
+  ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__);
+
+/**
+ * Log with a stable event name. This allows emitting a log line with a stable name in addition to
+ * the standard log line. The stable log line is passed to custom sinks that may want to intercept
+ * these log messages.
+ *
+ * By default these named logs are not handled, but a custom log sink may intercept them by
+ * implementing the logWithStableName function.
+ */
+#define ENVOY_LOG_EVENT(LEVEL, EVENT_NAME, ...)                                                    \
+  ENVOY_LOG_EVENT_TO_LOGGER(ENVOY_LOGGER(), LEVEL, EVENT_NAME, ##__VA_ARGS__)
+
+#define ENVOY_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, ...)                                  \
+  do {                                                                                             \
+    ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                             \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(LOGGER, LEVEL)) {                                       \
+      ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
+                                                              fmt::format(__VA_ARGS__));           \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_CONN_LOG_EVENT(LEVEL, EVENT_NAME, FORMAT, CONNECTION, ...)                           \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL_FINE_GRAIN_IF(ENVOY_LOGGER(), LEVEL)) {                               \
+      std::map<std::string, std::string> log_tags;                                                 \
+      log_tags.emplace("ConnectionId", std::to_string((CONNECTION).id()));                         \
+      ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, "{}" FORMAT,                                      \
+                          ::Envoy::Logger::Utility::serializeLogTags(log_tags), ##__VA_ARGS__);    \
+      ::Envoy::Logger::Registry::getSink()->logWithStableName(                                     \
+          EVENT_NAME, #LEVEL, (ENVOY_LOGGER()).name(),                                             \
+          fmt::format("{}" FORMAT, ::Envoy::Logger::Utility::serializeLogTags(log_tags),           \
+                      ##__VA_ARGS__));                                                             \
+    }                                                                                              \
+  } while (0)
 
 #define ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, N, ...)                                         \
   do {                                                                                             \
@@ -454,19 +687,44 @@ public:
     }                                                                                              \
   } while (0)
 
+#define ENVOY_LOG_FIRST_N_TO_LOGGER_IF(LOGGER, LEVEL, N, CONDITION, ...)                           \
+  do {                                                                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) && (CONDITION)) {                                      \
+      static auto* countdown = new std::atomic<uint64_t>();                                        \
+      if (countdown->fetch_add(1) < N) {                                                           \
+        ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                         \
+      }                                                                                            \
+    }                                                                                              \
+  } while (0)
+
 #define ENVOY_LOG_FIRST_N(LEVEL, N, ...)                                                           \
   ENVOY_LOG_FIRST_N_TO_LOGGER(ENVOY_LOGGER(), LEVEL, N, ##__VA_ARGS__)
+
+#define ENVOY_LOG_FIRST_N_IF(LEVEL, N, CONDITION, ...)                                             \
+  ENVOY_LOG_FIRST_N_TO_LOGGER_IF(ENVOY_LOGGER(), LEVEL, N, (CONDITION), ##__VA_ARGS__)
 
 #define ENVOY_LOG_FIRST_N_MISC(LEVEL, N, ...)                                                      \
   ENVOY_LOG_FIRST_N_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, N, ##__VA_ARGS__)
 
+#define ENVOY_LOG_FIRST_N_MISC_IF(LEVEL, N, CONDITION, ...)                                        \
+  ENVOY_LOG_FIRST_N_TO_LOGGER_IF(GET_MISC_LOGGER(), LEVEL, N, (CONDITION), ##__VA_ARGS__)
+
 #define ENVOY_LOG_ONCE_TO_LOGGER(LOGGER, LEVEL, ...)                                               \
   ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, 1, ##__VA_ARGS__)
 
+#define ENVOY_LOG_ONCE_TO_LOGGER_IF(LOGGER, LEVEL, CONDITION, ...)                                 \
+  ENVOY_LOG_FIRST_N_TO_LOGGER_IF(LOGGER, LEVEL, 1, (CONDITION), ##__VA_ARGS__)
+
 #define ENVOY_LOG_ONCE(LEVEL, ...) ENVOY_LOG_ONCE_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+#define ENVOY_LOG_ONCE_IF(LEVEL, CONDITION, ...)                                                   \
+  ENVOY_LOG_ONCE_TO_LOGGER_IF(ENVOY_LOGGER(), LEVEL, (CONDITION), ##__VA_ARGS__)
 
 #define ENVOY_LOG_ONCE_MISC(LEVEL, ...)                                                            \
   ENVOY_LOG_ONCE_TO_LOGGER(GET_MISC_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+#define ENVOY_LOG_ONCE_MISC_IF(LEVEL, CONDITION, ...)                                              \
+  ENVOY_LOG_ONCE_TO_LOGGER_IF(GET_MISC_LOGGER(), LEVEL, (CONDITION), ##__VA_ARGS__)
 
 #define ENVOY_LOG_EVERY_NTH_TO_LOGGER(LOGGER, LEVEL, N, ...)                                       \
   do {                                                                                             \
@@ -527,28 +785,10 @@ using t_logclock = std::chrono::steady_clock; // NOLINT
 
 #define ENVOY_FLUSH_LOG()                                                                          \
   do {                                                                                             \
-    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
-      FANCY_FLUSH_LOG();                                                                           \
+    if (Envoy::Logger::Context::useFineGrainLogger()) {                                            \
+      FINE_GRAIN_FLUSH_LOG();                                                                      \
     } else {                                                                                       \
       ENVOY_LOGGER().flush();                                                                      \
-    }                                                                                              \
-  } while (0)
-
-#define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
-  do {                                                                                             \
-    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
-      FANCY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);                                    \
-    } else {                                                                                       \
-      ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__);          \
-    }                                                                                              \
-  } while (0)
-
-#define ENVOY_STREAM_LOG(LEVEL, FORMAT, STREAM, ...)                                               \
-  do {                                                                                             \
-    if (Envoy::Logger::Context::useFancyLogger()) {                                                \
-      FANCY_STREAM_LOG(LEVEL, FORMAT, STREAM, ##__VA_ARGS__);                                      \
-    } else {                                                                                       \
-      ENVOY_STREAM_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, STREAM, ##__VA_ARGS__);            \
     }                                                                                              \
   } while (0)
 

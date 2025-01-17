@@ -36,9 +36,10 @@ same or different weights.
   host which has the fewest active requests (`Mitzenmacher et al.
   <https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
   approach is nearly as good as an O(N) full scan). This is also known as P2C (power of two
-  choices). The P2C load balancer has the property that a host with the highest number of active
-  requests in the cluster will never receive new requests. It will be allowed to drain until it is
-  less than or equal to all of the other hosts.
+  choices). The P2C load balancer has the property that host weights will decrease as the number of
+  active requests on those hosts increases. P2C selection is particularly useful for load
+  balancer implementations due to its resistance to
+  `herding behavior <https://en.wikipedia.org/wiki/Thundering_herd_problem>`_.
 * *all weights not equal*:  If two or more hosts in the cluster have different load balancing
   weights, the load balancer shifts into a mode where it uses a weighted round robin schedule in
   which weights are dynamically adjusted based on the host's request load at the time of selection.
@@ -138,10 +139,12 @@ are underrepresented or missing.
 
 In general, when compared to the ring hash ("ketama") algorithm, Maglev has substantially faster
 table lookup build times as well as host selection times (approximately 10x and 5x respectively
-when using a large ring size of 256K entries). The downside of Maglev is that it is not as stable
-as ring hash. More keys will move position when hosts are removed (simulations show approximately
-double the keys will move). With that said, for many applications including Redis, Maglev is very
-likely a superior drop in replacement for ring hash. The advanced reader can use
+when using a large ring size of 256K entries). While Maglev aims for minimal disruption, it is not
+as stable as ring hash when upstream hosts change. More keys will move position when hosts are removed
+(simulations show approximately double the keys will move). The amount of disruption can be minimized
+by increasing the :ref:`table_size<envoy_v3_api_field_config.cluster.v3.Cluster.MaglevLbConfig.table_size>`.
+With that said, for many applications
+including Redis, Maglev is very likely a superior drop in replacement for ring hash. The advanced reader can use
 :repo:`this benchmark </test/common/upstream/load_balancer_benchmark.cc>` to compare ring hash
 versus Maglev with different parameters.
 

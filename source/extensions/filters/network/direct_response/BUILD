@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Direct response L4 network filter.
-# Public docs: docs/root/configuration/network_filters/direct_response_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/direct_response_filter
 
 envoy_extension_package()
 

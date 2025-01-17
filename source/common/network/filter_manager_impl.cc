@@ -5,6 +5,7 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
@@ -41,7 +42,20 @@ bool FilterManagerImpl::initializeReadFilters() {
   if (upstream_filters_.empty()) {
     return false;
   }
-  onContinueReading(nullptr, connection_);
+
+  // Initialize read filters without calling onData() afterwards.
+  // This is called just after an connection has been established and nothing may have been read
+  // yet. onData() will be called separately as data is read from the connection.
+  for (auto& entry : upstream_filters_) {
+    if (entry->filter_ && !entry->initialized_) {
+      entry->initialized_ = true;
+      FilterStatus status = entry->filter_->onNewConnection();
+      if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
+        break;
+      }
+    }
+  }
+
   return true;
 }
 
@@ -86,6 +100,16 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
 void FilterManagerImpl::onRead() {
   ASSERT(!upstream_filters_.empty());
   onContinueReading(nullptr, connection_);
+}
+
+bool FilterManagerImpl::startUpstreamSecureTransport() {
+  for (auto& filter : upstream_filters_) {
+    if (filter->filter_ != nullptr && filter->filter_->startUpstreamSecureTransport()) {
+      // Success. The filter converted upstream's transport socket to secure mode.
+      return true;
+    }
+  }
+  return false;
 }
 
 FilterStatus FilterManagerImpl::onWrite() { return onWrite(nullptr, connection_); }

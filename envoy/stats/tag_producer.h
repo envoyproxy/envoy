@@ -30,6 +30,8 @@ public:
    * @param tags TagVector a set of Stats::Tag.
    */
   virtual std::string produceTags(absl::string_view metric_name, TagVector& tags) const PURE;
+
+  virtual const TagVector& fixedTags() const PURE;
 };
 
 using TagProducerPtr = std::unique_ptr<const TagProducer>;

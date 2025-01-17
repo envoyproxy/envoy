@@ -1,0 +1,6 @@
+date: March 23, 2023
+
+bug_fixes:
+- area: dependency
+  change: |
+    update Wasmtime -> 6.0.1, to resolve CVE-2023-26489, CVE-2023-27477.

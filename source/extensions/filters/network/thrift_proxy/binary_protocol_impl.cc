@@ -7,6 +7,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 namespace Envoy {
@@ -60,6 +61,30 @@ bool BinaryProtocolImpl::readMessageEnd(Buffer::Instance& buffer) {
   return true;
 }
 
+bool BinaryProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& reply_type) {
+  // binary protocol does not transmit struct names so go straight to peek at field begin
+  // FieldType::Stop is encoded as 1 byte.
+  if (buffer.length() < 1) {
+    return false;
+  }
+
+  FieldType type = static_cast<FieldType>(buffer.peekInt<int8_t>());
+  if (type == FieldType::Stop) {
+    // If the first field is stop then response is void success
+    reply_type = ReplyType::Success;
+    return true;
+  }
+
+  if (buffer.length() < 3) {
+    return false;
+  }
+
+  int16_t id = buffer.peekBEInt<int16_t>(1);
+  // successful response struct in field id 0, error (IDL exception) in field id greater than 0
+  reply_type = id == 0 ? ReplyType::Success : ReplyType::Error;
+  return true;
+}
+
 bool BinaryProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string& name) {
   UNREFERENCED_PARAMETER(buffer);
   name.clear(); // binary protocol does not transmit struct names
@@ -88,9 +113,6 @@ bool BinaryProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& n
       return false;
     }
     int16_t id = buffer.peekBEInt<int16_t>(1);
-    if (id < 0) {
-      throw EnvoyException(absl::StrCat("invalid binary protocol field id ", id));
-    }
     field_id = id;
     buffer.drain(3);
   }

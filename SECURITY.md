@@ -48,7 +48,8 @@ necessary and is unlikely to make a public disclosure less damaging.
 
 For each vulnerability a member of the PST will volunteer to lead coordination with the "Fix Team"
 and is responsible for sending disclosure emails to the rest of the community. This lead will be
-referred to as the "Fix Lead."
+referred to as the "Fix Lead." The detailed list of responsibilities is outlined on the
+[Fix Lead Checklist](https://docs.google.com/document/d/1cuU0m9hTQ73Te3i06-8LjQkFVn83IL22FbCoc_4IFEY/edit#heading=h.c6thx0zc0gtz)
 
 The role of Fix Lead should rotate round-robin across the PST.
 
@@ -67,8 +68,9 @@ best protect our users.
 
 If the vulnerability affects the last point release version, e.g. 1.10, then the full security
 release process described in this document will be activated. A security point release will be
-created for 1.10, e.g. 1.10.1, together with a fix to main if necessary. Older point releases,
-e.g. 1.9, are not supported by the Envoy project and will not have any security release created.
+created for each currently supported Envoy version, as described in [stable releases](RELEASES.md#stable-releases),
+together with a fix to main if necessary. Older point releases,
+e.g. 1.5, are not supported by the Envoy project and will not have any security release created.
 
 If a security vulnerability affects only these older versions but not main or the last supported
 point release, the Envoy security team will share this information with the private distributor
@@ -92,6 +94,8 @@ time after cutting a binary release before distribution or rollout, to allow tim
 detect issues during their execution on ClusterFuzz. A soak period of 7 days provides an even stronger
 guarantee, since we will invoke the security release process for medium or higher severity issues
 for these older bugs.
+
+**NOTE:** Contrib extensions are not eligible for Envoy security team coverage.
 
 ### Threat model
 
@@ -153,9 +157,14 @@ holiday periods or end-of-quarter (e.g. impacting downstream Istio releases), wh
 * Three weeks notice will be provided to private distributors from patch
   availability until the embargo deadline.
 
-* Public zero days will be fixed ASAP, but there is no SLO for this, since this
-  will depend on the severity and impact to the organizations backing the Envoy
-  security team.
+* Public zero days which affect the optimized binary will be fixed ASAP, but there is
+  no SLO for this, since this will depend on the severity and impact to the
+  organizations backing the Envoy security team. After a zero day bug fix is in, the
+  PST will kick off point releases unless the bug is deemed unlikely to be encountered
+  in production (e.g. only triggered by trace logs) at which point there will instead be an email
+  to envoy-announce and users can request point releases if they believe they will be affected.
+  Publicly announced bugs which only affect debug binaries will neither trigger point
+  releases nor announce emails.
 
 ### Fix Disclosure Process
 
@@ -332,6 +341,11 @@ use of Envoy should:
           **10** slots. Periodic review (see below) may allow new slots to open, so please continue
           to apply if it seems your organization would otherwise qualify. The security team also
           reserves the right to change this limit in the future.
+       5. Note that in this context "end user" is defined as an organization that *directly*
+          operates Envoy in order to serve traffic for 1st party use cases. The 1st party use case
+          can be either internal or external facing. Critically, vendors of cloud native software
+          and solutions can *also* be end users. Being a vendor does not preclude an organization
+          from being an end user as long as it satisfies the 1st party usage criteria.
 2. Have a user or customer base not limited to your own organization (except for option 3 above).
    We will use the size of the user or customer base as part of the criteria to determine
    eligibility.
@@ -451,22 +465,20 @@ and security team to ensure they still qualify for inclusion on the list.
 
 | Organization  | End User | Last Review |
 |:-------------:|:--------:|:-----------:|
-| Aspen Mesh    | No       | 06/21       |
-| AWS           | No       | 06/21       |
-| Cilium        | No       | 06/21       |
-| Cloud Foundry | No       | 06/21       |
-| Datawire      | No       | 06/21       |
-| Google        | No       | 06/21       |
-| IBM           | No       | 06/21       |
-| Istio         | No       | 06/21       |
-| Microsoft     | No       | 2/21        |
-| Red Hat       | No       | 06/21       |
-| solo.io       | No       | 06/21       |
-| Tetrate       | No       | 06/21       |
-| VMware        | No       | 06/21       |
-| Pinterest     | Yes      | 06/21       |
-| Dropbox       | Yes      | 01/20       |
-| Stripe        | Yes      | 01/20       |
-| Square        | Yes      | 05/21       |
-| Apple         | Yes      | 05/21       |
-| Spotify       | Yes      | 06/21       |
+| AWS           | No       | 07/24       |
+| Cilium        | No       | 07/24       |
+| Cloud Foundry | No       | 07/24       |
+| F5            | No       | 07/24       |
+| Google        | No       | 07/24       |
+| Istio         | No       | 07/24       |
+| Microsoft     | No       | 07/24       |
+| Red Hat       | No       | 07/24       |
+| VMware        | No       | 07/24       |
+| Tetrate       | No       | 07/24       |
+| solo.io       | No       | 07/24       |
+| Pinterest     | Yes      | 07/24       |
+| Dropbox       | Yes      | 07/24       |
+| Apple         | Yes      | 07/24       |
+| Spotify       | Yes      | 02/21       |
+| Netflix       | Yes      | 07/24       |
+| Slack         | Yes      | 07/24       |

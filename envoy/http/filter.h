@@ -11,11 +11,14 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/filter_factory.h"
 #include "envoy/http/header_map.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/router/router.h"
+#include "envoy/router/scopes.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
+#include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/scope_tracked_object_stack.h"
@@ -23,6 +26,9 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+namespace Router {
+class RouteConfigProvider;
+}
 namespace Http {
 
 /**
@@ -104,6 +110,19 @@ enum class FilterHeadersStatus {
 };
 
 /**
+ * Return codes for encode on informative headers filter invocations.
+ */
+enum class Filter1xxHeadersStatus {
+  // Continue filter chain iteration.
+  Continue,
+  // Do not iterate for informative headers on any of the remaining filters in the chain.
+  //
+  // Returning FilterDataStatus::Continue from encodeData() or calling
+  // continueEncoding() MUST be called if continued filter iteration is desired.
+  StopIteration
+};
+
+/**
  * Return codes for encode/decode data filter invocations. The connection manager bases further
  * filter invocations on the return code of the previous filter.
  */
@@ -159,18 +178,27 @@ enum class FilterTrailersStatus {
 
 /**
  * Return codes for encode metadata filter invocations. Metadata currently can not stop filter
- * iteration.
+ * iteration except in the case of local replies.
  */
 enum class FilterMetadataStatus {
-  // Continue filter chain iteration.
+  // Continue filter chain iteration for metadata only. Does not unblock returns of StopIteration*
+  // from (decode|encode)(Headers|Data).
   Continue,
+
+  // Continue filter chain iteration. If headers have not yet been sent to the next filter, they
+  // will be sent first via (decode|encode)Headers().
+  ContinueAll,
+
+  // Stops iteration of the entire filter chain. Only to be used in the case of sending a local
+  // reply from (decode|encode)Metadata.
+  StopIterationForLocalReply,
 };
 
 /**
  * Return codes for onLocalReply filter invocations.
  */
 enum class LocalErrorStatus {
-  // Continue sending the local reply after onLocalError has been sent to all filters.
+  // Continue sending the local reply after onLocalReply has been sent to all filters.
   Continue,
 
   // Continue sending onLocalReply to all filters, but reset the stream once all filters have been
@@ -178,55 +206,122 @@ enum class LocalErrorStatus {
   ContinueAndResetStream,
 };
 
-/**
- * The stream filter callbacks are passed to all filters to use for writing response data and
- * interacting with the underlying stream in general.
- */
-class StreamFilterCallbacks {
+// These are events that upstream HTTP filters can register for, via the addUpstreamCallbacks
+// function.
+class UpstreamCallbacks {
 public:
-  virtual ~StreamFilterCallbacks() = default;
+  virtual ~UpstreamCallbacks() = default;
 
-  /**
-   * @return const Network::Connection* the originating connection, or nullptr if there is none.
-   */
-  virtual const Network::Connection* connection() PURE;
+  // Called when the upstream connection is established and
+  // UpstreamStreamFilterCallbacks::upstream should be available.
+  //
+  // This indicates that data may begin flowing upstream.
+  virtual void onUpstreamConnectionEstablished() PURE;
+};
 
-  /**
-   * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
-   */
-  virtual Event::Dispatcher& dispatcher() PURE;
+// These are filter callbacks specific to upstream HTTP filters, accessible via
+// StreamFilterCallbacks::upstreamCallbacks()
+class UpstreamStreamFilterCallbacks {
+public:
+  virtual ~UpstreamStreamFilterCallbacks() = default;
 
-  /**
-   * Reset the underlying stream.
-   */
-  virtual void resetStream() PURE;
+  // Returns a handle to the upstream stream's stream info.
+  virtual StreamInfo::StreamInfo& upstreamStreamInfo() PURE;
 
-  /**
-   * Returns the route for the current request. The assumption is that the implementation can do
-   * caching where applicable to avoid multiple lookups. If a filter has modified the headers in
-   * a way that affects routing, clearRouteCache() must be called to clear the cache.
-   *
-   * NOTE: In the future we want to split route() into 2 methods, one that just
-   * returns current route and another that actually resolve the route.
-   */
-  virtual Router::RouteConstSharedPtr route() PURE;
+  // Returns a handle to the generic upstream.
+  virtual OptRef<Router::GenericUpstream> upstream() PURE;
 
-  /**
-   * Invokes callback with a matched route, callback can choose to accept this route by returning
-   * Router::RouteMatchStatus::Accept or continue route match from last matched route by returning
-   * Router::RouteMatchStatus::Continue, if there are more routes available.
-   *
-   * Returns route accepted by the callback or nullptr if no match found or none of route is
-   * accepted by the callback.
-   *
-   * NOTE: clearRouteCache() must be called before invoking this method otherwise cached route will
-   * be returned directly to the caller and the callback will not be invoked.
-   *
-   * Currently a route callback's decision is overridden by clearRouteCache() / route() call in the
-   * subsequent filters. We may want to persist callbacks so they always participate in later route
-   * resolution or make it an independent entity like filters that gets called on route resolution.
-   */
-  virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
+  // Dumps state for the upstream request.
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  // Setters and getters to determine if sending body payload is paused on
+  // confirmation of a CONNECT upgrade. These should only be used by the upstream codec filter.
+  // TODO(alyssawilk) after deprecating the classic path, move this logic to the
+  // upstream codec filter and remove these APIs
+  virtual bool pausedForConnect() const PURE;
+  virtual void setPausedForConnect(bool value) PURE;
+
+  // Setters and getters to determine if sending body payload is paused on
+  // confirmation of a WebSocket upgrade. These should only be used by the upstream codec filter.
+  virtual bool pausedForWebsocketUpgrade() const PURE;
+  virtual void setPausedForWebsocketUpgrade(bool value) PURE;
+
+  // Return the upstreamStreamOptions for this stream.
+  virtual const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const PURE;
+
+  // Adds the supplied UpstreamCallbacks to the list of callbacks to be called
+  // as various upstream events occur. Callbacks should persist for the lifetime
+  // of the upstream stream.
+  virtual void addUpstreamCallbacks(UpstreamCallbacks& callbacks) PURE;
+
+  // This should only be called by the UpstreamCodecFilter, and is used to let the
+  // UpstreamCodecFilter supply the interface used by the GenericUpstream to receive
+  // response data from the upstream stream once it is established.
+  virtual void
+  setUpstreamToDownstream(Router::UpstreamToDownstream& upstream_to_downstream_interface) PURE;
+};
+
+/**
+ * RouteConfigUpdatedCallback is used to notify an OnDemandRouteUpdate filter about completion of a
+ * RouteConfig update. The filter (and the associated ActiveStream) where the original on-demand
+ * request was originated can be destroyed before a response to an on-demand update request is
+ * received and updates are propagated. To handle this:
+ *
+ * OnDemandRouteUpdate filter instance holds a RouteConfigUpdatedCallbackSharedPtr to a callback.
+ * Envoy::Router::RdsRouteConfigProviderImpl holds a weak pointer to the RouteConfigUpdatedCallback
+ * above in an Envoy::Router::UpdateOnDemandCallback struct
+ *
+ * In RdsRouteConfigProviderImpl::onConfigUpdate(), before invoking the callback, a check is made to
+ * verify if the callback is still available.
+ */
+using RouteConfigUpdatedCallback = std::function<void(bool)>;
+using RouteConfigUpdatedCallbackSharedPtr = std::shared_ptr<RouteConfigUpdatedCallback>;
+
+// This class allows entities caching a route (e.g.) ActiveStream to delegate route clearing to xDS
+// components.
+class RouteCache {
+public:
+  virtual ~RouteCache() = default;
+
+  // Returns true if the route cache currently has a cached route.
+  virtual bool hasCachedRoute() const PURE;
+  // Forces the route cache to refresh the cached route.
+  virtual void refreshCachedRoute() PURE;
+};
+
+class RouteConfigUpdateRequester {
+public:
+  virtual ~RouteConfigUpdateRequester() = default;
+
+  virtual void
+  requestRouteConfigUpdate(RouteCache& route_cache,
+                           Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb,
+                           absl::optional<Router::ConfigConstSharedPtr> route_config,
+                           Event::Dispatcher& dispatcher, RequestHeaderMap& request_headers) PURE;
+  virtual void
+  requestVhdsUpdate(const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
+                    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+  virtual void
+  requestSrdsUpdate(RouteCache& route_cache, Router::ScopeKeyPtr scope_key,
+                    Event::Dispatcher& thread_local_dispatcher,
+                    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+};
+
+class RouteConfigUpdateRequesterFactory : public Config::UntypedFactory {
+public:
+  // UntypedFactory
+  std::string category() const override { return "envoy.route_config_update_requester"; }
+
+  virtual std::unique_ptr<RouteConfigUpdateRequester>
+  createRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider) PURE;
+  virtual std::unique_ptr<RouteConfigUpdateRequester>
+  createRouteConfigUpdateRequester(Config::ConfigProvider* scoped_route_config_provider,
+                                   OptRef<const Router::ScopeKeyBuilder> scope_key_builder) PURE;
+};
+
+class DownstreamStreamFilterCallbacks {
+public:
+  virtual ~DownstreamStreamFilterCallbacks() = default;
 
   /**
    * Sets the cached route for the current request to the passed-in RouteConstSharedPtr parameter.
@@ -247,18 +342,77 @@ public:
   virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
 
   /**
-   * Returns the clusterInfo for the cached route.
-   * This method is to avoid multiple look ups in the filter chain, it also provides a consistent
-   * view of clusterInfo after a route is picked/repicked.
-   * NOTE: Cached clusterInfo and route will be updated the same time.
+   * Invokes callback with a matched route, callback can choose to accept this route by returning
+   * Router::RouteMatchStatus::Accept or continue route match from last matched route by returning
+   * Router::RouteMatchStatus::Continue, if there are more routes available.
+   *
+   * Returns route accepted by the callback or nullptr if no match found or none of route is
+   * accepted by the callback.
+   *
+   * NOTE: clearRouteCache() must be called before invoking this method otherwise cached route will
+   * be returned directly to the caller and the callback will not be invoked.
+   *
+   * Currently a route callback's decision is overridden by clearRouteCache() / route() call in the
+   * subsequent filters. We may want to persist callbacks so they always participate in later route
+   * resolution or make it an independent entity like filters that gets called on route resolution.
    */
-  virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
+  virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
 
   /**
    * Clears the route cache for the current request. This must be called when a filter has modified
    * the headers in a way that would affect routing.
    */
   virtual void clearRouteCache() PURE;
+
+  /**
+   * Schedules a request for a RouteConfiguration update from the management server.
+   * @param route_config_updated_cb callback to be called when the configuration update has been
+   * propagated to the worker thread.
+   */
+  virtual void
+  requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+};
+
+/**
+ * The stream filter callbacks are passed to all filters to use for writing response data and
+ * interacting with the underlying stream in general.
+ */
+class StreamFilterCallbacks {
+public:
+  virtual ~StreamFilterCallbacks() = default;
+
+  /**
+   * @return OptRef<const Network::Connection> the downstream connection, or nullptr if there is
+   * none.
+   */
+  virtual OptRef<const Network::Connection> connection() PURE;
+
+  /**
+   * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * Reset the underlying stream.
+   */
+  virtual void
+  resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+              absl::string_view transport_failure_reason = "") PURE;
+
+  /**
+   * Returns the route for the current request. The assumption is that the implementation can do
+   * caching where applicable to avoid multiple lookups. If a filter has modified the headers in
+   * a way that affects routing, clearRouteCache() must be called to clear the cache.
+   */
+  virtual Router::RouteConstSharedPtr route() PURE;
+
+  /**
+   * Returns the clusterInfo for the cached route.
+   * This method is to avoid multiple look ups in the filter chain, it also provides a consistent
+   * view of clusterInfo after a route is picked/repicked.
+   * NOTE: Cached clusterInfo and route will be updated the same time.
+   */
+  virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
 
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
@@ -278,9 +432,9 @@ public:
   virtual Tracing::Span& activeSpan() PURE;
 
   /**
-   * @return tracing configuration.
+   * @return tracing configuration if present.
    */
-  virtual const Tracing::Config& tracingConfig() PURE;
+  virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
 
   /**
    * @return the ScopeTrackedObject for this stream.
@@ -301,27 +455,79 @@ public:
    * Called when filter activity indicates that the stream idle timeout should be reset.
    */
   virtual void resetIdleTimer() PURE;
+
+  /**
+   * This is a helper to get the route's per-filter config if it exists, otherwise the virtual
+   * host's. Or nullptr if none of them exist.
+   */
+  virtual const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const PURE;
+
+  /**
+   * Return all the available per route filter configs. The configs is in order of specificity.
+   * That means that the config from a route configuration will be first, then the config from a
+   * virtual host, then the config from a route.
+   */
+  virtual Router::RouteSpecificFilterConfigs perFilterConfigs() const PURE;
+
+  /**
+   * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
+   * absl::nullopt.
+   */
+  virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
+
+  /**
+   * Return a handle to the upstream callbacks. This is valid for upstream HTTP filters, and nullopt
+   * for downstream HTTP filters.
+   */
+  virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() PURE;
+
+  /**
+   * Return a handle to the downstream callbacks. This is valid for downstream HTTP filters, and
+   * nullopt for upstream HTTP filters.
+   */
+  virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() PURE;
+
+  /**
+   * @return absl::string_view the name of the filter as configured in the filter chain.
+   */
+  virtual absl::string_view filterConfigName() const PURE;
+
+  /**
+   * The downstream request headers if present.
+   */
+  virtual RequestHeaderMapOptRef requestHeaders() PURE;
+
+  /**
+   * The downstream request trailers if present.
+   */
+  virtual RequestTrailerMapOptRef requestTrailers() PURE;
+
+  /**
+   * Retrieves a pointer to the continue headers if present.
+   */
+  virtual ResponseHeaderMapOptRef informationalHeaders() PURE;
+
+  /**
+   * Retrieves a pointer to the response headers if present.
+   * Note that response headers might be set multiple times (e.g. if a local reply is issued after
+   * headers have been received but before headers have been encoded), so it is not safe in general
+   * to assume that any set of headers will be valid for the duration of the stream.
+   */
+  virtual ResponseHeaderMapOptRef responseHeaders() PURE;
+
+  /**
+   * Retrieves a pointer to the last response trailers if present.
+   * Note that response headers might be set multiple times (e.g. if a local reply is issued after
+   * headers have been received but before headers have been encoded), so it is not safe in general
+   * to assume that any set of headers will be valid for the duration of the stream.
+   */
+  virtual ResponseTrailerMapOptRef responseTrailers() PURE;
 };
 
 /**
- * RouteConfigUpdatedCallback is used to notify an OnDemandRouteUpdate filter about completion of a
- * RouteConfig update. The filter (and the associated ActiveStream) where the original on-demand
- * request was originated can be destroyed before a response to an on-demand update request is
- * received and updates are propagated. To handle this:
- *
- * OnDemandRouteUpdate filter instance holds a RouteConfigUpdatedCallbackSharedPtr to a callback.
- * Envoy::Router::RdsRouteConfigProviderImpl holds a weak pointer to the RouteConfigUpdatedCallback
- * above in an Envoy::Router::UpdateOnDemandCallback struct
- *
- * In RdsRouteConfigProviderImpl::onConfigUpdate(), before invoking the callback, a check is made to
- * verify if the callback is still available.
- */
-using RouteConfigUpdatedCallback = std::function<void(bool)>;
-using RouteConfigUpdatedCallbackSharedPtr = std::shared_ptr<RouteConfigUpdatedCallback>;
-
-/**
- * Stream decoder filter callbacks add additional callbacks that allow a decoding filter to restart
- * decoding if they decide to hold data (e.g. for buffering or rate limiting).
+ * Stream decoder filter callbacks add additional callbacks that allow a
+ * decoding filter to restart decoding if they decide to hold data (e.g. for
+ * buffering or rate limiting).
  */
 class StreamDecoderFilterCallbacks : public virtual StreamFilterCallbacks {
 public:
@@ -422,7 +628,7 @@ public:
    * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
    * provided parameters.
    *
-   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * If a response has already started (e.g. if the router calls sendLocalReply after encoding
    * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
@@ -439,6 +645,11 @@ public:
                               absl::string_view details) PURE;
 
   /**
+   * Attempt to send GOAWAY and close the connection, and no filter chain will move forward.
+   */
+  virtual void sendGoAwayAndClose() PURE;
+
+  /**
    * Adds decoded metadata. This function can only be called in
    * StreamDecoderFilter::decodeHeaders/Data/Trailers(). Do not call in
    * StreamDecoderFilter::decodeMetadata().
@@ -448,22 +659,19 @@ public:
   virtual MetadataMapVector& addDecodedMetadata() PURE;
 
   /**
-   * Called with 100-Continue headers to be encoded.
+   * Called with 1xx headers to be encoded.
+   *
+   * Currently supported codes for this function include 100.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters will not be proxying
-   * 100-continue and with it split out, can ignore the complexity of multiple encodeHeaders calls.
+   * 1xx headers and with it split out, can ignore the complexity of multiple encodeHeaders calls.
    *
-   * This must not be invoked more than once per request.
+   * This is currently only called once per request but implementations should
+   * handle multiple calls as multiple 1xx headers are legal.
    *
    * @param headers supplies the headers to be encoded.
    */
-  virtual void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
-
-  /**
-   * Returns the 100-Continue headers provided to encode100ContinueHeaders. Returns absl::nullopt if
-   * no headers have been provided yet.
-   */
-  virtual ResponseHeaderMapOptRef continueHeaders() const PURE;
+  virtual void encode1xxHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -482,12 +690,6 @@ public:
                              absl::string_view details) PURE;
 
   /**
-   * Returns the headers provided to encodeHeaders. Returns absl::nullopt if no headers have been
-   * provided yet.
-   */
-  virtual ResponseHeaderMapOptRef responseHeaders() const PURE;
-
-  /**
    * Called with data to be encoded, optionally indicating end of stream.
    * @param data supplies the data to be encoded.
    * @param end_stream supplies whether this is the last data frame.
@@ -499,12 +701,6 @@ public:
    * @param trailers supplies the trailers to encode.
    */
   virtual void encodeTrailers(ResponseTrailerMapPtr&& trailers) PURE;
-
-  /**
-   * Returns the trailers provided to encodeTrailers. Returns absl::nullopt if no headers have been
-   * provided yet.
-   */
-  virtual ResponseTrailerMapOptRef responseTrailers() const PURE;
 
   /**
    * Called with metadata to be encoded.
@@ -548,6 +744,12 @@ public:
 
   /**
    * This routine may be called to change the buffer limit for decoder filters.
+   *
+   * It is recommended (but not required) that filters calling this function should
+   * generally only perform increases to the buffer limit, to avoid potentially
+   * conflicting with the buffer requirements of other filters in the chain, i.e.
+   *
+   * if (desired_limit > decoderBufferLimit()) {setDecoderBufferLimit(desired_limit);}
    *
    * @param limit supplies the desired buffer limit.
    */
@@ -601,24 +803,35 @@ public:
   virtual Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const PURE;
 
   /**
-   * Schedules a request for a RouteConfiguration update from the management server.
-   * @param route_config_updated_cb callback to be called when the configuration update has been
-   * propagated to the worker thread.
+   * Set override host to be used by the upstream load balancing. If the target host exists in the
+   * host list of the routed cluster, the host should be selected first.
+   * @param host The override host address.
    */
-  virtual void
-  requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+  virtual void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) PURE;
+
+  /**
+   * @return absl::optional<absl::string_view> optional override host for the upstream
+   * load balancing.
+   */
+  virtual absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+  upstreamOverrideHost() const PURE;
+
+  /**
+   * @return true if the filter should shed load based on the system pressure, typically memory.
+   */
+  virtual bool shouldLoadShed() const PURE;
 };
 
 /**
  * Common base class for both decoder and encoder filters. Functions here are related to the
  * lifecycle of a filter. Currently the life cycle is as follows:
  * - All filters receive onStreamComplete()
- * - All log handlers receive log()
+ * - All log handlers receive final log()
  * - All filters receive onDestroy()
  *
  * This means:
- * - onStreamComplete can be used to make state changes that are intended to appear in the access
- * logs (like streamInfo().dynamicMetadata() or streamInfo().filterState()).
+ * - onStreamComplete can be used to make state changes that are intended to appear in the final
+ * access logs (like streamInfo().dynamicMetadata() or streamInfo().filterState()).
  * - onDestroy is used to cleanup all pending filter resources like pending http requests and
  * timers.
  */
@@ -627,8 +840,8 @@ public:
   virtual ~StreamFilterBase() = default;
 
   /**
-   * This routine is called before the access log handlers' log() is called. Filters can use this
-   * callback to enrich the data passed in to the log handlers.
+   * This routine is called before the access log handlers' final log() is called. Filters can use
+   * this callback to enrich the data passed in to the log handlers.
    */
   virtual void onStreamComplete() {}
 
@@ -653,6 +866,8 @@ public:
   struct LocalReplyData {
     // The error code which (barring reset) will be sent to the client.
     Http::Code code_;
+    // The gRPC status set in local reply.
+    absl::optional<Grpc::Status::GrpcStatus> grpc_status_;
     // The details of why a local reply is being sent.
     absl::string_view details_;
     // True if a reset will occur rather than the local reply (some prior filter
@@ -674,7 +889,7 @@ public:
    * from onLocalReply, as that has the potential for looping.
    *
    * @param data data associated with the sendLocalReply call.
-   * @param LocalErrorStatus the action to take after onLocalError completes.
+   * @param LocalErrorStatus the action to take after onLocalReply completes.
    */
   virtual LocalErrorStatus onLocalReply(const LocalReplyData&) {
     return LocalErrorStatus::Continue;
@@ -684,7 +899,7 @@ public:
 /**
  * Stream decoder filter interface.
  */
-class StreamDecoderFilter : public StreamFilterBase {
+class StreamDecoderFilter : public virtual StreamFilterBase {
 public:
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -842,7 +1057,7 @@ public:
    * response with a 200 HTTP response code and grpc-status and grpc-message headers mapped from the
    * provided parameters.
    *
-   * If a response has already started (e.g. if the router calls sendSendLocalReply after encoding
+   * If a response has already started (e.g. if the router calls sendLocalReply after encoding
    * headers) this will either ship the reply directly to the downstream codec, or reset the stream.
    *
    * @param response_code supplies the HTTP response code.
@@ -877,6 +1092,12 @@ public:
   /**
    * This routine may be called to change the buffer limit for encoder filters.
    *
+   * It is recommended (but not required) that filters calling this function should
+   * generally only perform increases to the buffer limit, to avoid potentially
+   * conflicting with the buffer requirements of other filters in the chain, i.e.
+   *
+   * if (desired_limit > encoderBufferLimit()) {setEncoderBufferLimit(desired_limit);}
+   *
    * @param limit supplies the desired buffer limit.
    */
   virtual void setEncoderBufferLimit(uint32_t limit) PURE;
@@ -889,33 +1110,27 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t encoderBufferLimit() PURE;
-
-  /**
-   * Return the HTTP/1 stream encoder options if applicable. If the stream is not HTTP/1 returns
-   * absl::nullopt.
-   */
-  virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 };
 
 /**
  * Stream encoder filter interface.
  */
-class StreamEncoderFilter : public StreamFilterBase {
+class StreamEncoderFilter : public virtual StreamFilterBase {
 public:
   /**
-   * Called with 100-continue headers.
+   * Called with supported 1xx headers.
    *
    * This is not folded into encodeHeaders because most Envoy users and filters
-   * will not be proxying 100-continue and with it split out, can ignore the
+   * will not be proxying 1xxs and with it split out, can ignore the
    * complexity of multiple encodeHeaders calls.
    *
    * This will only be invoked once per request.
    *
-   * @param headers supplies the 100-continue response headers to be encoded.
-   * @return FilterHeadersStatus determines how filter chain iteration proceeds.
+   * @param headers supplies the 1xx response headers to be encoded.
+   * @return Filter1xxHeadersStatus determines how filter chain iteration proceeds.
    *
    */
-  virtual FilterHeadersStatus encode100ContinueHeaders(ResponseHeaderMap& headers) PURE;
+  virtual Filter1xxHeadersStatus encode1xxHeaders(ResponseHeaderMap& headers) PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
@@ -984,6 +1199,23 @@ public:
   virtual RequestTrailerMapOptConstRef requestTrailers() const PURE;
   virtual ResponseHeaderMapOptConstRef responseHeaders() const PURE;
   virtual ResponseTrailerMapOptConstRef responseTrailers() const PURE;
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual const Network::ConnectionInfoProvider& connectionInfoProvider() const PURE;
+
+  const StreamInfo::FilterState& filterState() const { return streamInfo().filterState(); }
+  const envoy::config::core::v3::Metadata& metadata() const {
+    return streamInfo().dynamicMetadata();
+  }
+
+  const Network::Address::Instance& localAddress() const {
+    return *connectionInfoProvider().localAddress();
+  }
+
+  const Network::Address::Instance& remoteAddress() const {
+    return *connectionInfoProvider().remoteAddress();
+  }
+
+  Ssl::ConnectionInfoConstSharedPtr ssl() const { return connectionInfoProvider().sslConnection(); }
 };
 
 /**
@@ -1001,28 +1233,10 @@ public:
   virtual void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) PURE;
 
   /**
-   * Add a decoder filter that is used when reading stream data.
-   * @param filter supplies the filter to add.
-   * @param match_tree the MatchTree to associated with this filter.
-   */
-  virtual void
-  addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter,
-                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
-
-  /**
    * Add an encoder filter that is used when writing stream data.
    * @param filter supplies the filter to add.
    */
   virtual void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) PURE;
-
-  /**
-   * Add an encoder filter that is used when writing stream data.
-   * @param filter supplies the filter to add.
-   * @param match_tree the MatchTree to associated with this filter.
-   */
-  virtual void
-  addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter,
-                         Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
 
   /**
    * Add a decoder/encoder filter that is used both when reading and writing stream data.
@@ -1031,61 +1245,16 @@ public:
   virtual void addStreamFilter(Http::StreamFilterSharedPtr filter) PURE;
 
   /**
-   * Add a decoder/encoder filter that is used both when reading and writing stream data.
-   * @param filter supplies the filter to add.
-   * @param match_tree the MatchTree to associated with this filter.
-   */
-  virtual void addStreamFilter(Http::StreamFilterSharedPtr filter,
-                               Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) PURE;
-
-  /**
    * Add an access log handler that is called when the stream is destroyed.
    * @param handler supplies the handler to add.
    */
   virtual void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
-};
-
-/**
- * This function is used to wrap the creation of an HTTP filter chain for new streams as they
- * come in. Filter factories create the function at configuration initialization time, and then
- * they are used at runtime.
- * @param callbacks supplies the callbacks for the stream to install filters to. Typically the
- * function will install a single filter, but it's technically possibly to install more than one
- * if desired.
- */
-using FilterFactoryCb = std::function<void(FilterChainFactoryCallbacks& callbacks)>;
-
-/**
- * A FilterChainFactory is used by a connection manager to create an HTTP level filter chain when a
- * new stream is created on the connection (either locally or remotely). Typically it would be
- * implemented by a configuration engine that would install a set of filters that are able to
- * process an application scenario on top of a stream.
- */
-class FilterChainFactory {
-public:
-  virtual ~FilterChainFactory() = default;
 
   /**
-   * Called when a new HTTP stream is created on the connection.
-   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
-   *                  FilterChainFactoryCallbacks.
+   * Allows filters to access the thread local dispatcher.
+   * @param return the worker thread's dispatcher.
    */
-  virtual void createFilterChain(FilterChainFactoryCallbacks& callbacks) PURE;
-
-  /**
-   * Called when a new upgrade stream is created on the connection.
-   * @param upgrade supplies the upgrade header from downstream
-   * @param per_route_upgrade_map supplies the upgrade map, if any, for this route.
-   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
-   *                  FilterChainFactoryCallbacks.
-   * @return true if upgrades of this type are allowed and the filter chain has been created.
-   *    returns false if this upgrade type is not configured, and no filter chain is created.
-   */
-  using UpgradeMap = std::map<std::string, bool>;
-  virtual bool createUpgradeFilterChain(absl::string_view upgrade,
-                                        const UpgradeMap* per_route_upgrade_map,
-                                        FilterChainFactoryCallbacks& callbacks) PURE;
+  virtual Event::Dispatcher& dispatcher() PURE;
 };
-
 } // namespace Http
 } // namespace Envoy

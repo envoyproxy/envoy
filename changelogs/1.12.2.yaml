@@ -1,0 +1,19 @@
+date: December 10, 2019
+
+changes:
+- area: http
+  change: |
+    fixed CVE-2019-18801 by allocating sufficient memory for request headers.
+- area: http
+  change: |
+    fixed CVE-2019-18802 by implementing stricter validation of HTTP/1 headers.
+- area: http
+  change: |
+    trim LWS at the end of header keys, for correct HTTP/1.1 header parsing.
+- area: http
+  change: |
+    added strict authority checking. This can be reversed temporarily by setting the runtime feature
+    ``envoy.reloadable_features.strict_authority_validation`` to false.
+- area: route config
+  change: |
+    fixed CVE-2019-18838 by checking for presence of host/path headers.

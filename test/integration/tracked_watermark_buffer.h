@@ -30,9 +30,9 @@ public:
         on_delete_(on_delete), on_bind_(on_bind) {}
   ~TrackedWatermarkBuffer() override { on_delete_(this); }
 
-  void setWatermarks(uint32_t watermark) override {
+  void setWatermarks(uint32_t watermark, uint32_t overload) override {
     update_high_watermark_(watermark);
-    WatermarkBuffer::setWatermarks(watermark);
+    WatermarkBuffer::setWatermarks(watermark, overload);
   }
 
   void bindAccount(BufferMemoryAccountSharedPtr account) override {
@@ -61,14 +61,17 @@ private:
 // Factory that tracks how the created buffers are used.
 class TrackedWatermarkBufferFactory : public WatermarkBufferFactory {
 public:
-  TrackedWatermarkBufferFactory() = default;
+  // Use the default minimum tracking threshold.
+  TrackedWatermarkBufferFactory();
+  TrackedWatermarkBufferFactory(uint32_t min_tracking_bytes);
   ~TrackedWatermarkBufferFactory() override;
   // Buffer::WatermarkFactory
   Buffer::InstancePtr createBuffer(std::function<void()> below_low_watermark,
                                    std::function<void()> above_high_watermark,
                                    std::function<void()> above_overflow_watermark) override;
   BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;
-  void unregisterAccount(const BufferMemoryAccountSharedPtr& account, int current_class) override;
+  void unregisterAccount(const BufferMemoryAccountSharedPtr& account,
+                         absl::optional<uint32_t> current_class) override;
 
   // Number of buffers created.
   uint64_t numBuffersCreated() const;

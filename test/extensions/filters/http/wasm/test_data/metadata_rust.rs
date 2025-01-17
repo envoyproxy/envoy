@@ -3,12 +3,11 @@ use proxy_wasm::traits::{Context, HttpContext, RootContext};
 use proxy_wasm::types::*;
 use std::convert::TryFrom;
 
-#[no_mangle]
-pub fn _start() {
+proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
     proxy_wasm::set_root_context(|_| -> Box<dyn RootContext> { Box::new(TestRoot) });
     proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { Box::new(TestStream) });
-}
+}}
 
 struct TestRoot;
 
@@ -16,7 +15,7 @@ impl Context for TestRoot {}
 
 impl RootContext for TestRoot {
     fn on_tick(&mut self) {
-        if let Some(value) = self.get_property(vec!["node", "metadata", "wasm_node_get_key"]) {
+        if let Some(value) = self.get_property(vec!["xds", "node", "metadata", "wasm_node_get_key"]) {
             debug!("onTick {}", String::from_utf8(value).unwrap());
         } else {
             debug!("missing node metadata");
@@ -31,7 +30,7 @@ impl Context for TestStream {}
 impl HttpContext for TestStream {
     fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         if self
-            .get_property(vec!["node", "metadata", "wasm_node_get_key"])
+            .get_property(vec!["xds", "node", "metadata", "wasm_node_get_key"])
             .is_none()
         {
             debug!("missing node metadata");
@@ -60,7 +59,7 @@ impl HttpContext for TestStream {
     }
 
     fn on_http_request_body(&mut self, _: usize, _: bool) -> Action {
-        if let Some(value) = self.get_property(vec!["node", "metadata", "wasm_node_get_key"]) {
+        if let Some(value) = self.get_property(vec!["xds", "node", "metadata", "wasm_node_get_key"]) {
             error!("onBody {}", String::from_utf8(value).unwrap());
         } else {
             debug!("missing node metadata");

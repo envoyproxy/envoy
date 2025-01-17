@@ -14,6 +14,19 @@ namespace Compression {
 namespace Gzip {
 namespace Compressor {
 
+// Default zlib memory level.
+const uint64_t DefaultMemoryLevel = 5;
+
+// Default and maximum compression window size.
+const uint64_t DefaultWindowBits = 12;
+
+// When logical OR'ed to window bits, this sets a gzip header and trailer around the compressed
+// data.
+const uint64_t GzipHeaderValue = 16;
+
+// Default zlib chunk size.
+const uint32_t DefaultChunkSize = 4096;
+
 namespace {
 
 const std::string& gzipStatsPrefix() { CONSTRUCT_ON_FIRST_USE(std::string, "gzip."); }
@@ -57,7 +70,8 @@ public:
 
 private:
   Envoy::Compression::Compressor::CompressorFactoryPtr createCompressorFactoryFromProtoTyped(
-      const envoy::extensions::compression::gzip::compressor::v3::Gzip& config) override;
+      const envoy::extensions::compression::gzip::compressor::v3::Gzip& config,
+      Server::Configuration::FactoryContext& context) override;
 };
 
 DECLARE_FACTORY(GzipCompressorLibraryFactory);

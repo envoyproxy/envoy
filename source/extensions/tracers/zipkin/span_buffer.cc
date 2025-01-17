@@ -48,23 +48,19 @@ SerializerPtr SpanBuffer::makeSerializer(
     const envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion& version,
     const bool shared_span_context) {
   switch (version) {
-  case envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1:
-    return std::make_unique<JsonV1Serializer>();
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+  case envoy::config::trace::v3::ZipkinConfig::DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE:
+    throw EnvoyException(
+        "hidden_envoy_deprecated_HTTP_JSON_V1 has been deprecated. Please use a non-default "
+        "envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion value.");
   case envoy::config::trace::v3::ZipkinConfig::HTTP_JSON:
     return std::make_unique<JsonV2Serializer>(shared_span_context);
   case envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO:
     return std::make_unique<ProtobufSerializer>(shared_span_context);
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::trace::v3::ZipkinConfig::GRPC:
+    PANIC("not handled");
   }
-}
-
-std::string JsonV1Serializer::serialize(const std::vector<Span>& zipkin_spans) {
-  const std::string serialized_elements =
-      absl::StrJoin(zipkin_spans, ",", [](std::string* element, const Span& zipkin_span) {
-        absl::StrAppend(element, zipkin_span.toJson());
-      });
-  return absl::StrCat("[", serialized_elements, "]");
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 JsonV2Serializer::JsonV2Serializer(const bool shared_span_context)
@@ -79,9 +75,13 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
             out, absl::StrJoin(
                      toListOfSpans(zipkin_span, replacements), ",",
                      [&replacement_values](std::string* element, const ProtobufWkt::Struct& span) {
-                       const std::string json = MessageUtil::getJsonStringFromMessageOrDie(
-                           span, /* pretty_print */ false,
-                           /* always_print_primitive_fields */ true);
+                       absl::StatusOr<std::string> json_or_error =
+                           MessageUtil::getJsonStringFromMessage(span, false, true);
+                       ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
+                       if (json_or_error.ok()) {
+                         absl::StrAppend(element, absl::StrReplaceAll(json_or_error.value(),
+                                                                      replacement_values));
+                       }
 
                        // The Zipkin API V2 specification mandates to store timestamp value as int64
                        // https://github.com/openzipkin/zipkin-api/blob/228fabe660f1b5d1e28eac9df41f7d1deed4a1c2/zipkin2-api.yaml#L447-L463
@@ -103,7 +103,6 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
                        // serializing double in protobuf DoubleToBuffer function, and make it
                        // available to be controlled at caller site.
                        // https://github.com/envoyproxy/envoy/issues/10411).
-                       absl::StrAppend(element, absl::StrReplaceAll(json, replacement_values));
                      }));
       });
   return absl::StrCat("[", serialized_elements, "]");

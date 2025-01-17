@@ -1,0 +1,10 @@
+syntax = "proto3";
+package test.protos.allowed;
+
+option java_package = "io.envoyproxy.envoy.protolock";
+option java_outer_classname = "EnvoyProtolock";
+option java_multiple_files = true;
+
+// Common configuration for all tap extensions.
+message AddOptionMessage {
+}

@@ -3,7 +3,6 @@
 #include <chrono>
 
 #include "envoy/stats/scope.h"
-#include "envoy/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Http {
@@ -12,7 +11,7 @@ namespace Http {
  * HTTP response codes.
  * http://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml
  */
-enum class Code {
+enum class Code : uint16_t {
   // clang-format off
   Continue                      = 100,
   SwitchingProtocols            = 101,
@@ -59,6 +58,7 @@ enum class Code {
   UnprocessableEntity           = 422,
   Locked                        = 423,
   FailedDependency              = 424,
+  TooEarly                      = 425,
   UpgradeRequired               = 426,
   PreconditionRequired          = 428,
   TooManyRequests               = 429,

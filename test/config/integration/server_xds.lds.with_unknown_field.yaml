@@ -16,9 +16,11 @@ resources:
         stat_prefix: router
         rds:
           route_config_name: route_config_0
-          transport_api_version: V3
           config_source:
-            resource_api_version: V3
-            path: "{{ rds_json_path }}"
-        http_filters: [{name: envoy.filters.http.router}]
+            path_config_source:
+              path: "{{ rds_json_path }}"
+        http_filters:
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
         foo: bar

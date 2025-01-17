@@ -41,14 +41,17 @@ namespace {
 constexpr auto filter_metadata_key = "com.amazonaws.lambda";
 constexpr auto egress_gateway_metadata_key = "egress_gateway";
 
-void setLambdaHeaders(Http::RequestHeaderMap& headers, absl::string_view function_name,
-                      InvocationMode mode) {
+void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>& arn,
+                      InvocationMode mode, const std::string& host_rewrite) {
   headers.setMethod(Http::Headers::get().MethodValues.Post);
-  headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", function_name));
+  headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", arn->arn()));
   if (mode == InvocationMode::Synchronous) {
     headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "RequestResponse");
   } else {
     headers.setReference(LambdaFilterNames::get().InvocationTypeHeader, "Event");
+  }
+  if (!host_rewrite.empty()) {
+    headers.setHost(host_rewrite);
   }
 }
 
@@ -112,53 +115,43 @@ bool isContentTypeTextual(const Http::RequestOrResponseHeaderMap& headers) {
 
 } // namespace
 
-Filter::Filter(const FilterSettings& settings, const FilterStats& stats,
-               const std::shared_ptr<Extensions::Common::Aws::Signer>& sigv4_signer)
-    : settings_(settings), stats_(stats), sigv4_signer_(sigv4_signer) {}
+// TODO(nbaws) Implement Sigv4a support
+Filter::Filter(const FilterSettingsSharedPtr& settings, const FilterStats& stats, bool is_upstream)
+    : settings_(settings), stats_(stats), is_upstream_(is_upstream) {}
 
-absl::optional<FilterSettings> Filter::getRouteSpecificSettings() const {
-  const auto* settings = Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(
-      "envoy.filters.http.aws_lambda", decoder_callbacks_->route());
-  if (!settings) {
-    return absl::nullopt;
+FilterSettings& Filter::getSettings() {
+  auto* settings = const_cast<FilterSettings*>(
+      Http::Utility::resolveMostSpecificPerFilterConfig<FilterSettings>(decoder_callbacks_));
+  if (settings) {
+    return *settings;
   }
-
-  return *settings;
-}
-
-void Filter::resolveSettings() {
-  if (auto route_settings = getRouteSpecificSettings()) {
-    payload_passthrough_ = route_settings->payloadPassthrough();
-    invocation_mode_ = route_settings->invocationMode();
-    arn_ = std::move(route_settings)->arn();
-  } else {
-    payload_passthrough_ = settings_.payloadPassthrough();
-    invocation_mode_ = settings_.invocationMode();
-  }
+  return *settings_;
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  auto cluster_info_ptr = decoder_callbacks_->clusterInfo();
-  if (!cluster_info_ptr || !isTargetClusterLambdaGateway(*cluster_info_ptr)) {
-    skip_ = true;
-    ENVOY_LOG(trace, "Target cluster does not have the Lambda metadata. Moving on.");
-    return Http::FilterHeadersStatus::Continue;
+  if (!is_upstream_) {
+    auto cluster_info_ptr = decoder_callbacks_->clusterInfo();
+    if (!cluster_info_ptr || !isTargetClusterLambdaGateway(*cluster_info_ptr)) {
+      skip_ = true;
+      ENVOY_LOG(trace, "Target cluster does not have the Lambda metadata. Moving on.");
+      return Http::FilterHeadersStatus::Continue;
+    }
   }
 
-  resolveSettings();
-
-  if (!arn_) {
-    arn_ = settings_.arn();
-  }
+  auto& settings = getSettings();
 
   if (!end_stream) {
     request_headers_ = &headers;
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  if (payload_passthrough_) {
-    setLambdaHeaders(headers, arn_->functionName(), invocation_mode_);
-    sigv4_signer_->signEmptyPayload(headers);
+  if (settings.payloadPassthrough()) {
+    setLambdaHeaders(headers, settings.arn(), settings.invocationMode(), settings.hostRewrite());
+    auto status = settings.signer().signEmptyPayload(headers, settings.arn().region());
+    if (!status.ok()) {
+      ENVOY_LOG(debug, "signing failed: {}", status.message());
+    }
+
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -166,12 +159,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   jsonizeRequest(headers, nullptr, json_buf);
   // We must call setLambdaHeaders *after* the JSON transformation of the request. That way we
   // reflect the actual incoming request headers instead of the overwritten ones.
-  setLambdaHeaders(headers, arn_->functionName(), invocation_mode_);
+  setLambdaHeaders(headers, settings.arn(), settings.invocationMode(), settings.hostRewrite());
   headers.setContentLength(json_buf.length());
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hash = Hex::encode(hashing_util.getSha256Digest(json_buf));
-  sigv4_signer_->sign(headers, hash);
+
+  auto status = settings.signer().sign(headers, hash, settings.arn().region());
+  if (!status.ok()) {
+    ENVOY_LOG(debug, "signing failed: {}", status.message());
+  }
   decoder_callbacks_->addDecodedData(json_buf, false);
   return Http::FilterHeadersStatus::Continue;
 }
@@ -214,7 +211,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
 
-  if (!payload_passthrough_) {
+  auto& settings = getSettings();
+
+  if (!settings.payloadPassthrough()) {
     decoder_callbacks_->modifyDecodingBuffer([this](Buffer::Instance& dec_buf) {
       Buffer::OwnedImpl json_buf;
       jsonizeRequest(*request_headers_, &dec_buf, json_buf);
@@ -226,15 +225,22 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     request_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   }
 
-  setLambdaHeaders(*request_headers_, arn_->functionName(), invocation_mode_);
+  setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(),
+                   settings.hostRewrite());
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
-  sigv4_signer_->sign(*request_headers_, hash);
+
+  auto status = settings.signer().sign(*request_headers_, hash, settings.arn().region());
+  if (!status.ok()) {
+    ENVOY_LOG(debug, "signing failed: {}", status.message());
+  }
   stats().upstream_rq_payload_size_.recordValue(decoding_buffer.length());
   return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {
-  if (skip_ || payload_passthrough_ || invocation_mode_ == InvocationMode::Asynchronous) {
+  auto& settings = getSettings();
+  if (skip_ || settings.payloadPassthrough() ||
+      settings.invocationMode() == InvocationMode::Asynchronous) {
     return Http::FilterDataStatus::Continue;
   }
 
@@ -286,8 +292,9 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
 
   // Wrap the Query String
   if (headers.Path()) {
-    for (auto&& kv_pair : Http::Utility::parseQueryString(headers.getPathValue())) {
-      json_req.mutable_query_string_parameters()->insert({kv_pair.first, kv_pair.second});
+    auto queryParams = Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
+    for (const auto& kv_pair : queryParams.data()) {
+      json_req.mutable_query_string_parameters()->insert({kv_pair.first, kv_pair.second[0]});
     }
   }
 
@@ -312,10 +319,11 @@ void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::I
                                Buffer::Instance& body) {
   using source::extensions::filters::http::aws_lambda::Response;
   Response json_resp;
-  try {
+  TRY_NEEDS_AUDIT {
     MessageUtil::loadFromJson(json_buf.toString(), json_resp,
                               ProtobufMessage::getNullValidationVisitor());
-  } catch (EnvoyException& ex) {
+  }
+  END_TRY catch (EnvoyException& ex) {
     // We would only get here if all of the following are true:
     // 1- Passthrough is set to false
     // 2- Lambda returned a 200 OK
@@ -379,10 +387,10 @@ absl::optional<Arn> parseArn(absl::string_view arn) {
     std::string versioned_function_name = std::string(function_name);
     versioned_function_name.push_back(':');
     versioned_function_name += std::string(parts[7]);
-    return Arn{partition, service, region, account_id, resource_type, versioned_function_name};
+    return Arn{arn, partition, service, region, account_id, resource_type, versioned_function_name};
   }
 
-  return Arn{partition, service, region, account_id, resource_type, function_name};
+  return Arn{arn, partition, service, region, account_id, resource_type, function_name};
 }
 
 FilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {

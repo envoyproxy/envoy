@@ -14,6 +14,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v2alpha";
 option java_outer_classname = "CacheProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/filter/http/cache/v2alpha";
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.cache.v3alpha";
 option (udpa.annotations.file_status).work_in_progress = true;

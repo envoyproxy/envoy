@@ -1,7 +1,7 @@
 #pragma once
 
-#include "source/common/upstream/load_balancer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,7 +10,7 @@ namespace Aggregate {
 
 // AggregateLoadBalancerContext wraps the load balancer context to re-assign priority load
 // according the to host priority selected by the aggregate load balancer.
-class AggregateLoadBalancerContext : public Upstream::LoadBalancerContext {
+class AggregateLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   AggregateLoadBalancerContext(Upstream::LoadBalancerContext* context,
                                Upstream::LoadBalancerBase::HostAvailability host_availability,

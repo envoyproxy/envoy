@@ -14,7 +14,6 @@ health_check_config {
   http_health_check {
     path: "\003"
   }
-  event_log_path: "("
   interval_jitter_percent: 654311422
 }
 actions {

@@ -2,8 +2,8 @@
 
 External Processing
 ===================
-* :ref:`Http filter v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3alpha.ExternalProcessor>`
-* This filter should be configured with the name *envoy.filters.http.ext_proc*
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`
 
 The external processing filter connects an external service, called an "external processor,"
 to the filter chain. The processing service itself implements a gRPC interface that allows
@@ -12,9 +12,9 @@ and modifying the headers, body, and trailers of each message, or by returning a
 
 The protocol itself is based on a bidirectional gRPC stream. Envoy will send the
 external processor
-:ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingRequest>`
+:ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3.ProcessingRequest>`
 messages, and the processor must reply with
-:ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingResponse>`
+:ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>`
 messages.
 
 Configuration options are provided to control which events are sent to the processor.
@@ -26,12 +26,12 @@ stream requests from the proxy.
 
 This filter is a work in progress. Most of the major bits of functionality
 are complete. The updated list of supported features and implementation status may
-be found on the :ref:`reference page <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3alpha.ExternalProcessor>`.
+be found on the :ref:`reference page <envoy_v3_api_msg_extensions.filters.http.ext_proc.v3.ExternalProcessor>`.
 
 Statistics
 ----------
 This filter outputs statistics in the
-*http.<stat_prefix>.ext_proc.* namespace. The :ref:`stat prefix
+``http.<stat_prefix>.ext_proc.`` namespace. The :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager.
 
@@ -48,3 +48,7 @@ The following statistics are supported:
   streams_closed, Counter, The number of streams successfully closed on either end
   streams_failed, Counter, The number of times a stream produced a gRPC error
   failure_mode_allowed, Counter, The number of times an error was ignored due to configuration
+  message_timeouts, Counter, The number of times a message failed to receive a response within the configured timeout
+  rejected_header_mutations, Counter, The number of rejected header mutations
+  clear_route_cache_ignored, Counter, The number of clear cache request that were ignored
+  clear_route_cache_disabled, Counter, The number of clear cache requests that were rejected from being disabled

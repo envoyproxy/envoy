@@ -12,10 +12,10 @@ class FakeResourceMonitorFactory;
 class FakeResourceMonitor : public Server::ResourceMonitor {
 public:
   FakeResourceMonitor(Event::Dispatcher& dispatcher, FakeResourceMonitorFactory& factory)
-      : dispatcher_(dispatcher), factory_(factory), pressure_(0.0) {}
+      : dispatcher_(dispatcher), factory_(factory) {}
   // Server::ResourceMonitor
   ~FakeResourceMonitor() override;
-  void updateResourceUsage(Callbacks& callbacks) override;
+  void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
   void setResourcePressure(double pressure) {
     dispatcher_.post([this, pressure] { pressure_ = pressure; });
@@ -24,7 +24,7 @@ public:
 private:
   Event::Dispatcher& dispatcher_;
   FakeResourceMonitorFactory& factory_;
-  double pressure_;
+  double pressure_{0.0};
 };
 
 class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitorFactory {
@@ -42,7 +42,7 @@ public:
   }
 
   FakeResourceMonitor* monitor() const { return monitor_; }
-  void onMonitorDestroyed(FakeResourceMonitor* monitor);
+  void onMonitorDestroyed();
 
 private:
   FakeResourceMonitor* monitor_{nullptr};

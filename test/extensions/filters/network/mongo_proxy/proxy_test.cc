@@ -60,8 +60,9 @@ public:
 class MongoProxyFilterTest : public testing::Test {
 public:
   MongoProxyFilterTest()
-      : mongo_stats_(std::make_shared<MongoStats>(store_, "test",
-                                                  std::vector<std::string>{"insert", "count"})) {
+      : mongo_stats_(std::make_shared<MongoStats>(*store_.rootScope(), "test",
+                                                  std::vector<std::string>{"insert", "count"})),
+        stream_info_(time_source_) {
     setup();
   }
 
@@ -84,7 +85,7 @@ public:
 
   void initializeFilter(bool emit_dynamic_metadata = false) {
     filter_ = std::make_unique<TestProxyFilter>(
-        "test.", store_, runtime_, access_log_, fault_config_, drain_decision_,
+        "test.", *store_.rootScope(), runtime_, access_log_, fault_config_, drain_decision_,
         dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats_);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
@@ -127,6 +128,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   Envoy::AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
+  NiceMock<MockTimeSystem> time_source_;
   TestStreamInfo stream_info_;
 };
 

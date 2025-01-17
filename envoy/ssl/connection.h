@@ -5,6 +5,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/ssl/parsed_x509_name.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -61,6 +62,29 @@ public:
   virtual const std::string& serialNumberPeerCertificate() const PURE;
 
   /**
+   * @return absl::Span<const std::string> the SHA256 digests of all peer certificates.
+   *         Returns an empty vector if there is no peer certificate which can happen in
+   *         TLS (non mTLS) connections.
+   */
+  virtual absl::Span<const std::string> sha256PeerCertificateChainDigests() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the SHA1 digest of all peer certificates.
+   *         Returns an empty vector if there is no peer certificate which can happen in
+   *         TLS (non mTLS) connections.
+   */
+  virtual absl::Span<const std::string> sha1PeerCertificateChainDigests() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the serial numbers of all peer certificates.
+   *         An empty vector indicates that there were no peer certificates which can happen
+   *         in TLS (non mTLS) connections.
+   *         A vector element with a "" value indicates that the certificate at that index in
+   *         the cert chain did not have a serial number.
+   **/
+  virtual absl::Span<const std::string> serialNumbersPeerCertificates() const PURE;
+
+  /**
    * @return std::string the issuer field of the peer certificate in RFC 2253 format. Returns "" if
    *         there is no peer certificate, or no issuer.
    **/
@@ -71,6 +95,12 @@ public:
    *         there is no peer certificate, or no subject.
    **/
   virtual const std::string& subjectPeerCertificate() const PURE;
+
+  /**
+   * @return the well-known attribute values parsed from subject field of the peer certificate.
+   *         Returns absl::nullopt if there is no peer certificate.
+   **/
+  virtual ParsedX509NameOptConstRef parsedSubjectPeerCertificate() const PURE;
 
   /**
    * @return absl::Span<const std::string> the URIs in the SAN field of the peer certificate.
@@ -102,6 +132,54 @@ public:
    *certificate. Returns {} if there is no local certificate, or no SAN field, or no DNS.
    **/
   virtual absl::Span<const std::string> dnsSansLocalCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the IP entries in the SAN field of the peer certificate.
+   *         Returns {} if there is no peer certificate, or no SAN field, or no IPs.
+   **/
+  virtual absl::Span<const std::string> ipSansPeerCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the IP entries in the SAN field of the local
+   *certificate. Returns {} if there is no local certificate, or no SAN field, or no IPs.
+   **/
+  virtual absl::Span<const std::string> ipSansLocalCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the Email entries in the SAN field of the peer
+   *certificate. Returns {} if there is no peer certificate, or no SAN field, or no Emails.
+   **/
+  virtual absl::Span<const std::string> emailSansPeerCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the Email entries in the SAN field of the local
+   *certificate. Returns {} if there is no local certificate, or no SAN field, or no Emails.
+   **/
+  virtual absl::Span<const std::string> emailSansLocalCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the OtherName entries in the SAN field of the peer
+   *certificate. Returns {} if there is no peer certificate, or no SAN field, or no OtherNames.
+   **/
+  virtual absl::Span<const std::string> othernameSansPeerCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the OtherName entries in the SAN field of the local
+   *certificate. Returns {} if there is no local certificate, or no SAN field, or no OtherNames.
+   **/
+  virtual absl::Span<const std::string> othernameSansLocalCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the OID entries of the peer certificate extensions.
+   *         Returns {} if there is no peer certificate, or no extensions.
+   **/
+  virtual absl::Span<const std::string> oidsPeerCertificate() const PURE;
+
+  /**
+   * @return absl::Span<const std::string> the OID entries of the local certificate extensions.
+   *         Returns {} if there is no local certificate, or no extensions.
+   **/
+  virtual absl::Span<const std::string> oidsLocalCertificate() const PURE;
 
   /**
    * @return absl::optional<SystemTime> the time that the peer certificate was issued and should be
@@ -137,6 +215,16 @@ public:
    *         connection.
    **/
   virtual const std::string& tlsVersion() const PURE;
+
+  /**
+   * @return std::string the protocol negotiated via ALPN.
+   **/
+  virtual const std::string& alpn() const PURE;
+
+  /**
+   * @return std::string the SNI used to establish the connection.
+   **/
+  virtual const std::string& sni() const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;

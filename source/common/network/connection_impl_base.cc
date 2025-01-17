@@ -28,6 +28,10 @@ void ConnectionImplBase::removeConnectionCallbacks(ConnectionCallbacks& callback
   }
 }
 
+OptRef<const StreamInfo::StreamInfo> ConnectionImplBase::trackedStream() const {
+  return streamInfo();
+}
+
 void ConnectionImplBase::hashKey(std::vector<uint8_t>& hash) const { addIdToHashKey(hash, id()); }
 
 void ConnectionImplBase::setConnectionStats(const ConnectionStats& stats) {
@@ -50,8 +54,14 @@ void ConnectionImplBase::initializeDelayedCloseTimer() {
 
 void ConnectionImplBase::raiseConnectionEvent(ConnectionEvent event) {
   for (ConnectionCallbacks* callback : callbacks_) {
-    // TODO(mattklein123): If we close while raising a connected event we should not raise further
-    // connected events.
+    // If a previous connected callback closed the connection, don't raise any further connected
+    // events. There was already recursion raising closed events. We still raise closed events
+    // to further callbacks because such events are typically used for cleanup.
+    if (event != ConnectionEvent::LocalClose && event != ConnectionEvent::RemoteClose &&
+        state() != State::Open) {
+      return;
+    }
+
     if (callback != nullptr) {
       callback->onEvent(event);
     }
@@ -64,7 +74,8 @@ void ConnectionImplBase::onDelayedCloseTimeout() {
   if (connection_stats_ != nullptr && connection_stats_->delayed_close_timeouts_ != nullptr) {
     connection_stats_->delayed_close_timeouts_->inc();
   }
-  closeConnectionImmediately();
+  closeConnectionImmediatelyWithDetails(
+      StreamInfo::LocalCloseReasons::get().TriggeredDelayedCloseTimeout);
 }
 
 } // namespace Network

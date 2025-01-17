@@ -5,7 +5,6 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
-#include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
@@ -13,7 +12,6 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/socket.h"
 #include "envoy/protobuf/message_validator.h"
-#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/dump_state_utils.h"
@@ -23,62 +21,82 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/matching/data_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace Http {
 
 class FilterManager;
-
-class SkipAction : public Matcher::ActionBase<
-                       envoy::extensions::filters::common::matcher::action::v3::SkipFilter> {};
+class DownstreamFilterManager;
 
 struct ActiveStreamFilterBase;
+struct ActiveStreamDecoderFilter;
+struct ActiveStreamEncoderFilter;
+using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;
+using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
 
-using MatchDataUpdateFunc = std::function<void(Matching::HttpMatchingDataImpl&)>;
-/**
- * Manages the shared match state between one or two filters.
- * The need for this class comes from the fact that a single instantiated filter can be wrapped by
- * two different ActiveStreamFilters, one for encoding and one for decoding. Certain match actions
- * should be made visible to both wrappers (e.g. the skip action), while other actions should be
- * sent to the underlying filter exactly once.
- */
-class FilterMatchState {
+constexpr absl::string_view LocalReplyFilterStateKey =
+    "envoy.filters.network.http_connection_manager.local_reply_owner";
+class LocalReplyOwnerObject : public StreamInfo::FilterState::Object {
 public:
-  FilterMatchState(Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree,
-                   Matching::HttpMatchingDataImplSharedPtr matching_data)
-      : match_tree_(std::move(match_tree)), matching_data_(std::move(matching_data)),
-        match_tree_evaluated_(false), skip_filter_(false) {}
+  LocalReplyOwnerObject(const std::string& filter_config_name)
+      : filter_config_name_(filter_config_name) {}
 
-  void evaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func);
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    message->set_value(filter_config_name_);
+    return message;
+  }
 
-  StreamFilterBase* filter_{};
-
-  bool skipFilter() const { return skip_filter_; }
+  absl::optional<std::string> serializeAsString() const override { return filter_config_name_; }
 
 private:
-  Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree_;
-  Matching::HttpMatchingDataImplSharedPtr matching_data_;
-  bool match_tree_evaluated_ : 1;
-  bool skip_filter_ : 1;
+  const std::string filter_config_name_;
 };
 
-using FilterMatchStateSharedPtr = std::shared_ptr<FilterMatchState>;
+// TODO(wbpcode): Rather than allocating every filter with an unique pointer, we could
+// construct the filter in place in the vector. This should reduce the heap allocation and
+// memory fragmentation.
 
-class SkipActionFactory : public Matcher::ActionFactory<Matching::HttpFilterActionContext> {
-public:
-  std::string name() const override { return "skip"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
-                                                 Matching::HttpFilterActionContext&,
-                                                 ProtobufMessage::ValidationVisitor&) override {
-    return []() { return std::make_unique<SkipAction>(); };
-  }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
-  }
+// HTTP decoder filters. If filters are configured in the following order (assume all three
+// filters are both decoder/encoder filters):
+//   http_filters:
+//     - A
+//     - B
+//     - C
+// The decoder filter chain will iterate through filters A, B, C.
+struct StreamDecoderFilters {
+  using Element = ActiveStreamDecoderFilter;
+  using Iterator = std::vector<ActiveStreamDecoderFilterPtr>::iterator;
+
+  Iterator begin() { return entries_.begin(); }
+  Iterator end() { return entries_.end(); }
+
+  std::vector<ActiveStreamDecoderFilterPtr> entries_;
+};
+
+// HTTP encoder filters. If filters are configured in the following order (assume all three
+// filters are both decoder/encoder filters):
+//   http_filters:
+//     - A
+//     - B
+//     - C
+// Unlike the decoder filter, the encoder filter chain will iterate with the
+// reverse order of the configured filters, i.e., C, B, A. This is why we use reverse_iterator
+// here.
+struct StreamEncoderFilters {
+  using Element = ActiveStreamEncoderFilter;
+  using Iterator = std::vector<ActiveStreamEncoderFilterPtr>::reverse_iterator;
+
+  Iterator begin() { return entries_.rbegin(); }
+  Iterator end() { return entries_.rend(); }
+
+  std::vector<ActiveStreamEncoderFilterPtr> entries_;
 };
 
 /**
@@ -90,17 +108,14 @@ public:
  */
 struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                                 Logger::Loggable<Logger::Id::http> {
-  ActiveStreamFilterBase(FilterManager& parent, bool dual_filter,
-                         FilterMatchStateSharedPtr match_state)
+  ActiveStreamFilterBase(FilterManager& parent, FilterContext filter_context)
       : parent_(parent), iteration_state_(IterationState::Continue),
-        filter_match_state_(std::move(match_state)), iterate_from_current_filter_(false),
-        headers_continued_(false), continue_headers_continued_(false), end_stream_(false),
-        dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false) {}
+        filter_context_(std::move(filter_context)) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
   // according to the status returned by filter's callback functions.
-  bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
+  bool commonHandleAfter1xxHeadersCallback(Filter1xxHeadersStatus status);
   bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& end_stream);
   bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                      bool& buffer_was_streaming);
@@ -117,9 +132,9 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual bool canContinue() PURE;
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
-  virtual bool complete() PURE;
-  virtual bool has100Continueheaders() PURE;
-  virtual void do100ContinueHeaders() PURE;
+  virtual bool observedEndStream() PURE;
+  virtual bool has1xxHeaders() PURE;
+  virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
   virtual void doData(bool end_stream) PURE;
   virtual void doTrailers() PURE;
@@ -131,21 +146,30 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual void onMatchCallback(const Matcher::Action& action) PURE;
 
   // Http::StreamFilterCallbacks
-  const Network::Connection* connection() override;
+  OptRef<const Network::Connection> connection() override;
   Event::Dispatcher& dispatcher() override;
-  void resetStream() override;
   Router::RouteConstSharedPtr route() override;
-  Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
-  void setRoute(Router::RouteConstSharedPtr route) override;
+  void resetStream(Http::StreamResetReason reset_reason,
+                   absl::string_view transport_failure_reason) override;
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
-  void clearRouteCache() override;
   uint64_t streamId() const override;
   StreamInfo::StreamInfo& streamInfo() override;
   Tracing::Span& activeSpan() override;
-  Tracing::Config& tracingConfig() override;
+  OptRef<const Tracing::Config> tracingConfig() const override;
   const ScopeTrackedObject& scope() override;
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
   void resetIdleTimer() override;
+  const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override;
+  Router::RouteSpecificFilterConfigs perFilterConfigs() const override;
+  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
+  OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override;
+  OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override;
+  absl::string_view filterConfigName() const override { return filter_context_.config_name; }
+  RequestHeaderMapOptRef requestHeaders() override;
+  RequestTrailerMapOptRef requestTrailers() override;
+  ResponseHeaderMapOptRef informationalHeaders() override;
+  ResponseHeaderMapOptRef responseHeaders() override;
+  ResponseTrailerMapOptRef responseTrailers() override;
 
   // Functions to set or get iteration state.
   bool canIterate() { return iteration_state_ == IterationState::Continue; }
@@ -169,12 +193,13 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
     }
     return saved_response_metadata_.get();
   }
-  bool skipFilter() const { return filter_match_state_ && filter_match_state_->skipFilter(); }
-  void maybeEvaluateMatchTreeWithNewData(MatchDataUpdateFunc update_func) {
-    if (filter_match_state_) {
-      filter_match_state_->evaluateMatchTreeWithNewData(update_func);
-    }
-  }
+
+  Router::RouteConstSharedPtr getRoute() const;
+
+  void sendLocalReply(Code code, absl::string_view body,
+                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details);
 
   // A vector to save metadata when the current filter's [de|en]codeMetadata() can not be called,
   // either because [de|en]codeHeaders() of the current filter returns StopAllIteration or because
@@ -183,7 +208,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   std::unique_ptr<MetadataMapVector> saved_request_metadata_{nullptr};
   std::unique_ptr<MetadataMapVector> saved_response_metadata_{nullptr};
   // The state of iteration.
-  enum class IterationState {
+  enum class IterationState : uint8_t {
     Continue,            // Iteration has not stopped for any frame type.
     StopSingleIteration, // Iteration has stopped for headers, 100-continue, or data.
     StopAllBuffer,       // Iteration has stopped for all frame types, and following data should
@@ -192,42 +217,41 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                          // be buffered until high watermark is reached.
   };
   FilterManager& parent_;
-  IterationState iteration_state_;
+  IterationState iteration_state_{};
 
-  FilterMatchStateSharedPtr filter_match_state_;
+  const FilterContext filter_context_;
+
   // If the filter resumes iteration from a StopAllBuffer/Watermark state, the current filter
   // hasn't parsed data and trailers. As a result, the filter iteration should start with the
   // current filter instead of the next one. If true, filter iteration starts with the current
   // filter. Otherwise, starts with the next filter in the chain.
-  bool iterate_from_current_filter_ : 1;
-  bool headers_continued_ : 1;
-  bool continue_headers_continued_ : 1;
+  bool iterate_from_current_filter_{};
+  bool headers_continued_{};
+  bool continued_1xx_headers_{};
   // If true, end_stream is called for this filter.
-  bool end_stream_ : 1;
-  const bool dual_filter_ : 1;
-  bool decode_headers_called_ : 1;
-  bool encode_headers_called_ : 1;
-
-  friend FilterMatchState;
+  bool end_stream_{};
+  // If true, the filter has processed headers.
+  bool processed_headers_{};
 };
 
 /**
  * Wrapper for a stream decoder filter.
  */
 struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
-                                   public StreamDecoderFilterCallbacks,
-                                   LinkedObject<ActiveStreamDecoderFilter> {
+                                   public StreamDecoderFilterCallbacks {
   ActiveStreamDecoderFilter(FilterManager& parent, StreamDecoderFilterSharedPtr filter,
-                            FilterMatchStateSharedPtr match_state, bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_state)), handle_(filter) {}
+                            FilterContext filter_context)
+      : ActiveStreamFilterBase(parent, std::move(filter_context)), handle_(std::move(filter)) {
+    handle_->setDecoderFilterCallbacks(*this);
+  }
 
   // ActiveStreamFilterBase
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool complete() override;
-  bool has100Continueheaders() override { return false; }
-  void do100ContinueHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  bool observedEndStream() override;
+  bool has1xxHeaders() override { return false; }
+  void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
   void doData(bool end_stream) override;
   void doMetadata() override {
@@ -259,14 +283,11 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
-  void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
-  ResponseHeaderMapOptRef continueHeaders() const override;
+  void encode1xxHeaders(ResponseHeaderMapPtr&& headers) override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
-  ResponseHeaderMapOptRef responseHeaders() const override;
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
-  ResponseTrailerMapOptRef responseTrailers() const override;
   void encodeMetadata(MetadataMapPtr&& metadata_map_ptr) override;
   void onDecoderFilterAboveWriteBufferHighWatermark() override;
   void onDecoderFilterBelowWriteBufferLowWatermark() override;
@@ -281,6 +302,10 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
   Buffer::BufferMemoryAccountSharedPtr account() const override;
+  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
+  bool shouldLoadShed() const override;
+  void sendGoAwayAndClose() override;
 
   // Each decoder filter instance checks if the request passed to the filter is gRPC
   // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()
@@ -293,34 +318,35 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
 
   void requestDataTooLarge();
   void requestDataDrained();
-
-  void requestRouteConfigUpdate(
-      Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-  absl::optional<Router::ConfigConstSharedPtr> routeConfig();
+  // Encoding end_stream by a non-terminal filters (i.e. cache filter) always causes the decoding to
+  // be stopped even if independent half-close is enabled. For simplicity, independent half-close is
+  // enabled only when the terminal filter is encoding the response.
+  void stopDecodingIfNonTerminalFilterEncodedEndStream(bool encoded_end_stream);
+  StreamDecoderFilters::Iterator entry() const { return entry_; }
 
   StreamDecoderFilterSharedPtr handle_;
+  StreamDecoderFilters::Iterator entry_{};
   bool is_grpc_request_{};
 };
-
-using ActiveStreamDecoderFilterPtr = std::unique_ptr<ActiveStreamDecoderFilter>;
 
 /**
  * Wrapper for a stream encoder filter.
  */
 struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
-                                   public StreamEncoderFilterCallbacks,
-                                   LinkedObject<ActiveStreamEncoderFilter> {
+                                   public StreamEncoderFilterCallbacks {
   ActiveStreamEncoderFilter(FilterManager& parent, StreamEncoderFilterSharedPtr filter,
-                            FilterMatchStateSharedPtr match_state, bool dual_filter)
-      : ActiveStreamFilterBase(parent, dual_filter, std::move(match_state)), handle_(filter) {}
+                            FilterContext filter_context)
+      : ActiveStreamFilterBase(parent, std::move(filter_context)), handle_(std::move(filter)) {
+    handle_->setEncoderFilterCallbacks(*this);
+  }
 
   // ActiveStreamFilterBase
-  bool canContinue() override { return true; }
+  bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool complete() override;
-  bool has100Continueheaders() override;
-  void do100ContinueHeaders() override;
+  bool observedEndStream() override;
+  bool has1xxHeaders() override;
+  void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
   void doData(bool end_stream) override;
   void drainSavedResponseMetadata();
@@ -351,15 +377,14 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
-  Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override;
 
   void responseDataTooLarge();
   void responseDataDrained();
+  StreamEncoderFilters::Iterator entry() const { return entry_; }
 
   StreamEncoderFilterSharedPtr handle_;
+  StreamEncoderFilters::Iterator entry_{};
 };
-
-using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
 
 /**
  * Callbacks invoked by the FilterManager to pass filter data/events back to the caller.
@@ -380,7 +405,7 @@ public:
    * chain.
    * @param response_headers the encoded headers.
    */
-  virtual void encode100ContinueHeaders(ResponseHeaderMap& response_headers) PURE;
+  virtual void encode1xxHeaders(ResponseHeaderMap& response_headers) PURE;
 
   /**
    * Called when the provided data has been encoded by all filters in the chain.
@@ -399,7 +424,7 @@ public:
    * Called when the provided metadata has been encoded by all filters in the chain.
    * @param trailers the encoded trailers.
    */
-  virtual void encodeMetadata(MetadataMapVector& metadata) PURE;
+  virtual void encodeMetadata(MetadataMapPtr&& metadata) PURE;
 
   /**
    * Injects request trailers into a stream that originally did not have request trailers.
@@ -407,10 +432,10 @@ public:
   virtual void setRequestTrailers(RequestTrailerMapPtr&& request_trailers) PURE;
 
   /**
-   * Passes ownership of received continue headers to the parent. This may be called multiple times
-   * in the case of multiple upstream calls.
+   * Passes ownership of received informational headers to the parent. This may be called multiple
+   * times in the case of multiple upstream calls.
    */
-  virtual void setContinueHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
+  virtual void setInformationalHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
 
   /**
    * Passes ownership of received response headers to the parent. This may be called multiple times
@@ -425,9 +450,9 @@ public:
   virtual void setResponseTrailers(ResponseTrailerMapPtr&& response_trailers) PURE;
 
   /**
-   * Updates response code stats based on the details in the headers.
+   * Optionally updates response code stats based on the details in the headers.
    */
-  virtual void chargeStats(const ResponseHeaderMap& headers) PURE;
+  virtual void chargeStats(const ResponseHeaderMap& /*headers*/) {}
 
   // TODO(snowp): We should consider moving filter access to headers/trailers to happen via the
   // callbacks instead of via the encode/decode callbacks on the filters.
@@ -443,9 +468,9 @@ public:
   virtual RequestTrailerMapOptRef requestTrailers() PURE;
 
   /**
-   * Retrieves a pointer to the continue headers set via the call to setContinueHeaders.
+   * Retrieves a pointer to the continue headers set via the call to setInformationalHeaders.
    */
-  virtual ResponseHeaderMapOptRef continueHeaders() PURE;
+  virtual ResponseHeaderMapOptRef informationalHeaders() PURE;
 
   /**
    * Retrieves a pointer to the response headers set via the last call to setResponseHeaders.
@@ -468,6 +493,11 @@ public:
   virtual void endStream() PURE;
 
   /**
+   * Attempt to send GOAWAY and close the connection.
+   */
+  virtual void sendGoAwayAndClose() PURE;
+
+  /**
    * Called when the stream write buffer is no longer above the low watermark.
    */
   virtual void onDecoderFilterBelowWriteBufferLowWatermark() PURE;
@@ -476,11 +506,6 @@ public:
    * Called when the stream write buffer is above above the high watermark.
    */
   virtual void onDecoderFilterAboveWriteBufferHighWatermark() PURE;
-
-  /**
-   * Called when the FilterManager creates an Upgrade filter chain.
-   */
-  virtual void upgradeFilterChainCreated() PURE;
 
   /**
    * Called when request activity indicates that the request timeout should be disarmed.
@@ -500,7 +525,9 @@ public:
   /**
    * Called when the stream should be reset.
    */
-  virtual void resetStream() PURE;
+  virtual void
+  resetStream(Http::StreamResetReason reset_reason = Http::StreamResetReason::LocalReset,
+              absl::string_view transport_failure_reason = "") PURE;
 
   /**
    * Returns the upgrade map for the current route entry.
@@ -511,32 +538,6 @@ public:
    * Returns the cluster info for the current route entry.
    */
   virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
-
-  /**
-   * Returns the current route.
-   */
-  virtual Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) PURE;
-
-  /**
-   * Sets the current route.
-   */
-  virtual void setRoute(Router::RouteConstSharedPtr route) PURE;
-
-  /**
-   * Clears the cached route.
-   */
-  virtual void clearRouteCache() PURE;
-
-  /**
-   * Returns the current route configuration.
-   */
-  virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
-
-  /**
-   * Update the current route configuration.
-   */
-  virtual void
-  requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
 
   /**
    * Returns the current active span.
@@ -561,6 +562,11 @@ public:
   virtual Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() PURE;
 
   /**
+   * Returns the UpstreamStreamFilterCallbacks for upstream HTTP filters.
+   */
+  virtual OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() { return {}; }
+
+  /**
    * Called when a local reply is made by the filter manager.
    * @param code the response code of the local reply.
    */
@@ -569,7 +575,7 @@ public:
   /**
    * Returns the tracing configuration to use for this stream.
    */
-  virtual Tracing::Config& tracingConfig() PURE;
+  virtual OptRef<const Tracing::Config> tracingConfig() const PURE;
 
   /**
    * Returns the tracked scope to use for this stream.
@@ -577,19 +583,24 @@ public:
   virtual const ScopeTrackedObject& scope() PURE;
 
   /**
-   * Returns whether internal redirects with request bodies is enabled.
+   * Returns the DownstreamStreamFilterCallbacks for downstream HTTP filters.
    */
-  virtual bool enableInternalRedirectsWithBody() const PURE;
+  virtual OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() { return {}; }
+  /**
+   * Returns if close from the upstream is to be handled with half-close semantics.
+   * This is used for HTTP/1.1 codec.
+   */
+  virtual bool isHalfCloseEnabled() PURE;
 };
 
 /**
  * This class allows the remote address to be overridden for HTTP stream info. This is used for
- * XFF handling. This is required to avoid providing stream info with a non-const address provider.
- * Private inheritance from SocketAddressProvider is used to make sure users get the address
- * provider via the normal getter.
+ * XFF handling. This is required to avoid providing stream info with a non-const connection info
+ * provider. Private inheritance from ConnectionInfoProvider is used to make sure users get the
+ * address provider via the normal getter.
  */
-class OverridableRemoteSocketAddressSetterStreamInfo : public StreamInfo::StreamInfoImpl,
-                                                       private Network::SocketAddressProvider {
+class OverridableRemoteConnectionInfoSetterStreamInfo : public StreamInfo::StreamInfoImpl,
+                                                        private Network::ConnectionInfoProvider {
 public:
   using StreamInfoImpl::StreamInfoImpl;
 
@@ -603,11 +614,16 @@ public:
   }
 
   // StreamInfo::StreamInfo
-  const Network::SocketAddressProvider& downstreamAddressProvider() const override { return *this; }
+  const Network::ConnectionInfoProvider& downstreamAddressProvider() const override {
+    return *this;
+  }
 
-  // Network::SocketAddressProvider
+  // Network::ConnectionInfoProvider
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddress();
+  }
+  const Network::Address::InstanceConstSharedPtr& directLocalAddress() const override {
+    return StreamInfoImpl::downstreamAddressProvider().directLocalAddress();
   }
   bool localAddressRestored() const override {
     return StreamInfoImpl::downstreamAddressProvider().localAddressRestored();
@@ -626,20 +642,32 @@ public:
   absl::optional<uint64_t> connectionID() const override {
     return StreamInfoImpl::downstreamAddressProvider().connectionID();
   }
+  absl::optional<absl::string_view> interfaceName() const override {
+    return StreamInfoImpl::downstreamAddressProvider().interfaceName();
+  }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override {
     return StreamInfoImpl::downstreamAddressProvider().sslConnection();
-  }
-  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
-    return StreamInfoImpl::upstreamSslConnection();
   }
   void dumpState(std::ostream& os, int indent_level) const override {
     StreamInfoImpl::dumpState(os, indent_level);
 
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "OverridableRemoteSocketAddressSetterStreamInfo " << this
+    os << spaces << "OverridableRemoteConnectionInfoSetterStreamInfo " << this
        << DUMP_MEMBER_AS(remoteAddress(), remoteAddress()->asStringView())
        << DUMP_MEMBER_AS(directRemoteAddress(), directRemoteAddress()->asStringView())
        << DUMP_MEMBER_AS(localAddress(), localAddress()->asStringView()) << "\n";
+  }
+  absl::string_view ja3Hash() const override {
+    return StreamInfoImpl::downstreamAddressProvider().ja3Hash();
+  }
+  const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
+    return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
+  }
+  OptRef<const Network::FilterChainInfo> filterChainInfo() const override {
+    return StreamInfoImpl::downstreamAddressProvider().filterChainInfo();
+  }
+  OptRef<const Network::ListenerInfo> listenerInfo() const override {
+    return StreamInfoImpl::downstreamAddressProvider().listenerInfo();
   }
 
 private:
@@ -651,143 +679,61 @@ private:
  * of the resulting response.
  */
 class FilterManager : public ScopeTrackedObject,
-                      FilterChainFactoryCallbacks,
+                      public FilterChainManager,
                       Logger::Loggable<Logger::Id::http> {
 public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
-                const Network::Connection& connection, uint64_t stream_id,
+                OptRef<const Network::Connection> connection, uint64_t stream_id,
                 Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
-                uint32_t buffer_limit, FilterChainFactory& filter_chain_factory,
-                const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
-                TimeSource& time_source, StreamInfo::FilterStateSharedPtr parent_filter_state,
-                StreamInfo::FilterState::LifeSpan filter_state_life_span)
+                uint32_t buffer_limit)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
-        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit),
-        filter_chain_factory_(filter_chain_factory), local_reply_(local_reply),
-        stream_info_(protocol, time_source, connection.addressProviderSharedPtr(),
-                     parent_filter_state, filter_state_life_span) {}
+        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit) {}
+
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
     ASSERT(state_.filter_call_state_ == 0);
   }
 
   // ScopeTrackedObject
+  OptRef<const StreamInfo::StreamInfo> trackedStream() const override { return streamInfo(); }
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_) << "\n";
+    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_)
+       << DUMP_MEMBER(state_.decoder_filter_chain_complete_)
+       << DUMP_MEMBER(state_.encoder_filter_chain_complete_)
+       << DUMP_MEMBER(state_.observed_decode_end_stream_)
+       << DUMP_MEMBER(state_.observed_encode_end_stream_) << "\n";
 
     DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
     DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
     DUMP_DETAILS(filter_manager_callbacks_.responseHeaders());
     DUMP_DETAILS(filter_manager_callbacks_.responseTrailers());
-    DUMP_DETAILS(&stream_info_);
+    DUMP_DETAILS(&streamInfo());
   }
 
-  // Http::FilterChainFactoryCallbacks
-  void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, nullptr, false);
-    filters_.push_back(filter.get());
-  }
-  void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter,
-                              Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
-    if (match_tree) {
-      addStreamDecoderFilterWorker(
-          filter,
-          std::make_shared<FilterMatchState>(std::move(match_tree),
-                                             std::make_shared<Matching::HttpMatchingDataImpl>()),
-          false);
-      return;
-    }
+  // FilterChainManager
+  void applyFilterFactoryCb(FilterContext context, FilterFactoryCb& factory) override;
 
-    addStreamDecoderFilterWorker(filter, nullptr, false);
-  }
-  void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter) override {
-    addStreamEncoderFilterWorker(filter, nullptr, false);
-    filters_.push_back(filter.get());
-  }
-  void addStreamEncoderFilter(StreamEncoderFilterSharedPtr filter,
-                              Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
-    if (match_tree) {
-      addStreamEncoderFilterWorker(
-          filter,
-          std::make_shared<FilterMatchState>(std::move(match_tree),
-                                             std::make_shared<Matching::HttpMatchingDataImpl>()),
-          false);
-      return;
-    }
-
-    addStreamEncoderFilterWorker(filter, nullptr, false);
-  }
-  void addStreamFilter(StreamFilterSharedPtr filter) override {
-    addStreamDecoderFilterWorker(filter, nullptr, true);
-    addStreamEncoderFilterWorker(filter, nullptr, true);
-    StreamDecoderFilter* decoder_filter = filter.get();
-    filters_.push_back(decoder_filter);
-  }
-  void addStreamFilter(StreamFilterSharedPtr filter,
-                       Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree) override {
-    // Note that we share the match data and tree between the two filters to allow things like
-    // matching on both request and response data.
-    // TODO(snowp): The match tree might be fully evaluated twice, ideally we should expose
-    // the result to both filters after the first match evaluation.
-    if (match_tree) {
-      auto matching_state = std::make_shared<FilterMatchState>(
-          std::move(match_tree), std::make_shared<Matching::HttpMatchingDataImpl>());
-      addStreamDecoderFilterWorker(filter, matching_state, true);
-      addStreamEncoderFilterWorker(filter, std::move(matching_state), true);
-      return;
-    }
-
-    addStreamDecoderFilterWorker(filter, nullptr, true);
-    addStreamEncoderFilterWorker(filter, nullptr, true);
-  }
-  void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override;
-
-  void log() {
-    RequestHeaderMap* request_headers = nullptr;
-    if (filter_manager_callbacks_.requestHeaders()) {
-      request_headers = filter_manager_callbacks_.requestHeaders().ptr();
-    }
-    ResponseHeaderMap* response_headers = nullptr;
-    if (filter_manager_callbacks_.responseHeaders()) {
-      response_headers = filter_manager_callbacks_.responseHeaders().ptr();
-    }
-    ResponseTrailerMap* response_trailers = nullptr;
-    if (filter_manager_callbacks_.responseTrailers()) {
-      response_trailers = filter_manager_callbacks_.responseTrailers().ptr();
-    }
-
+  void log(const Formatter::HttpFormatterContext log_context) {
     for (const auto& log_handler : access_log_handlers_) {
-      log_handler->log(request_headers, response_headers, response_trailers, stream_info_);
+      log_handler->log(log_context, streamInfo());
     }
   }
+
+  const AccessLog::InstanceSharedPtrVector& accessLogHandlers() { return access_log_handlers_; }
 
   void onStreamComplete() {
-    for (auto& filter : decoder_filters_) {
-      filter->handle_->onStreamComplete();
-    }
-
-    for (auto& filter : encoder_filters_) {
-      // Do not call onStreamComplete twice for dual registered filters.
-      if (!filter->dual_filter_) {
-        filter->handle_->onStreamComplete();
-      }
+    for (auto filter : filters_) {
+      filter->onStreamComplete();
     }
   }
 
   void destroyFilters() {
     state_.destroyed_ = true;
 
-    for (auto& filter : decoder_filters_) {
-      filter->handle_->onDestroy();
-    }
-
-    for (auto& filter : encoder_filters_) {
-      // Do not call on destroy twice for dual registered filters.
-      if (!filter->dual_filter_) {
-        filter->handle_->onDestroy();
-      }
+    for (auto filter : filters_) {
+      filter->onDestroy();
     }
   }
 
@@ -797,6 +743,7 @@ public:
    * @param end_stream whether the request is header only.
    */
   void decodeHeaders(RequestHeaderMap& headers, bool end_stream) {
+    state_.observed_decode_end_stream_ = end_stream;
     decodeHeaders(nullptr, headers, end_stream);
   }
 
@@ -806,6 +753,7 @@ public:
    * @param end_stream whether this data is the end of the request.
    */
   void decodeData(Buffer::Instance& data, bool end_stream) {
+    state_.observed_decode_end_stream_ = end_stream;
     decodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
   }
 
@@ -813,7 +761,10 @@ public:
    * Decodes the provided trailers starting at the first filter in the chain.
    * @param trailers the trailers to decode.
    */
-  void decodeTrailers(RequestTrailerMap& trailers) { decodeTrailers(nullptr, trailers); }
+  void decodeTrailers(RequestTrailerMap& trailers) {
+    state_.observed_decode_end_stream_ = true;
+    decodeTrailers(nullptr, trailers);
+  }
 
   /**
    * Decodes the provided metadata starting at the first filter in the chain.
@@ -821,19 +772,7 @@ public:
    */
   void decodeMetadata(MetadataMap& metadata_map) { decodeMetadata(nullptr, metadata_map); }
 
-  // TODO(snowp): Make private as filter chain construction is moved into FM.
-  void addStreamDecoderFilterWorker(StreamDecoderFilterSharedPtr filter,
-                                    FilterMatchStateSharedPtr match_state, bool dual_filter);
-  void addStreamEncoderFilterWorker(StreamEncoderFilterSharedPtr filter,
-                                    FilterMatchStateSharedPtr match_state, bool dual_filter);
-
   void disarmRequestTimeout();
-
-  /**
-   * If end_stream is true, marks decoding as complete. This is a noop if end_stream is false.
-   * @param end_stream whether decoding is complete.
-   */
-  void maybeEndDecode(bool end_stream);
 
   /**
    * If end_stream is true, marks encoding as complete. This is a noop if end_stream is false.
@@ -842,32 +781,26 @@ public:
   void maybeEndEncode(bool end_stream);
 
   /**
-   * Called before local reply is made by the filter manager.
-   * @param data the data associated with the local reply.
+   * If terminal_filter_decoded_end_stream is true, marks decoding as complete. This is a noop if
+   * terminal_filter_decoded_end_stream is false.
+   * @param end_stream whether decoding is complete.
    */
-  void onLocalReply(StreamFilterBase::LocalReplyData& data);
+  void maybeEndDecode(bool terminal_filter_decoded_end_stream);
 
-  void sendLocalReply(Code code, absl::string_view body,
-                      const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                      absl::string_view details);
-  /**
-   * Sends a local reply by constructing a response and passing it through all the encoder
-   * filters. The resulting response will be passed out via the FilterManagerCallbacks.
-   */
-  void sendLocalReplyViaFilterChain(
-      bool is_grpc_request, Code code, absl::string_view body,
-      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
-      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+  void checkAndCloseStreamIfFullyClosed();
+
+  virtual void sendLocalReply(Code code, absl::string_view body,
+                              const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                              const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                              absl::string_view details) PURE;
+
+  void resetStream(StreamResetReason reason, absl::string_view transport_failure_reason);
 
   /**
-   * Sends a local reply by constructing a response and skipping the encoder filters. The
-   * resulting response will be passed out via the FilterManagerCallbacks.
+   * Executes a prepared, but not yet propagated, local reply.
+   * Prepared local replies can occur in the decoder filter chain iteration.
    */
-  void sendDirectLocalReply(Code code, absl::string_view body,
-                            const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
-                            bool is_head_request,
-                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+  virtual void executeLocalReplyIfPrepared() PURE;
 
   // Possibly increases buffer_limit_ to the value of limit.
   void setBufferLimit(uint32_t limit);
@@ -893,8 +826,12 @@ public:
 
   /**
    * Marks local processing as complete.
+   * TODO(yanvlasov): deprecate and decommission this function.
    */
-  void setLocalComplete() { state_.local_complete_ = true; }
+  void setLocalComplete() {
+    state_.observed_encode_end_stream_ = true;
+    state_.decoder_filter_chain_aborted_ = true;
+  }
 
   /**
    * Whether the filters have been destroyed.
@@ -904,51 +841,208 @@ public:
   /**
    * Whether remote processing has been marked as complete.
    */
-  bool remoteComplete() const { return state_.remote_complete_; }
+  virtual bool decoderObservedEndStream() const { return state_.observed_decode_end_stream_; }
 
   /**
    * Instructs the FilterManager to not create a filter chain. This makes it possible to issue
    * a local reply without the overhead of creating and traversing the filters.
    */
   void skipFilterChainCreation() {
-    ASSERT(!state_.created_filter_chain_);
-    state_.created_filter_chain_ = true;
+    ASSERT(!state_.create_chain_result_.created());
+    state_.create_chain_result_ = CreateChainResult(true);
   }
 
-  // TODO(snowp): This should probably return a StreamInfo instead of the impl.
-  StreamInfo::StreamInfoImpl& streamInfo() { return stream_info_; }
-  const StreamInfo::StreamInfoImpl& streamInfo() const { return stream_info_; }
-  void setDownstreamRemoteAddress(
-      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
-    stream_info_.setDownstreamRemoteAddress(downstream_remote_address);
-  }
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 
-  // Set up the Encoder/Decoder filter chain.
-  bool createFilterChain();
+  enum class UpgradeResult : uint8_t { UpgradeUnneeded, UpgradeAccepted, UpgradeRejected };
 
-  const Network::Connection* connection() const { return &connection_; }
+  /**
+   * Filter chain creation result.
+   */
+  class CreateChainResult {
+  public:
+    CreateChainResult() = default;
+
+    /**
+     * @param created whether the filter chain was created.
+     * @param upgrade the upgrade result.
+     */
+    CreateChainResult(bool created, UpgradeResult upgrade = UpgradeResult::UpgradeUnneeded)
+        : created_(created), upgrade_(upgrade) {}
+
+    /**
+     * @return whether the filter chain was created.
+     */
+    bool created() const { return created_; }
+    /**
+     * @return whether the upgrade was accepted.
+     */
+    bool upgradeAccepted() const { return upgrade_ == UpgradeResult::UpgradeAccepted; }
+    /**
+     * @return whether the upgrade was rejected.
+     */
+    bool upgradeRejected() const { return upgrade_ == UpgradeResult::UpgradeRejected; }
+
+  private:
+    bool created_ = false;
+    UpgradeResult upgrade_ = UpgradeResult::UpgradeUnneeded;
+  };
+
+  /**
+   * Set up the Encoder/Decoder filter chain.
+   * @param filter_chain_factory the factory to create the filter chain.
+   */
+  CreateChainResult createFilterChain(const FilterChainFactory& filter_chain_factory);
+
+  OptRef<const Network::Connection> connection() const { return connection_; }
 
   uint64_t streamId() const { return stream_id_; }
   Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
 
   Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
 
-  bool enableInternalRedirectsWithBody() const {
-    return filter_manager_callbacks_.enableInternalRedirectsWithBody();
-  }
-
   void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
+  void onDownstreamReset() { state_.saw_downstream_reset_ = true; }
+  bool sawDownstreamReset() { return state_.saw_downstream_reset_; }
+
+  virtual bool shouldLoadShed() { return false; };
+
+  void sendGoAwayAndClose() {
+    // Stop filter chain iteration by checking encoder or decoder chain.
+    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+      state_.decoder_filter_chain_aborted_ = true;
+    } else if (state_.filter_call_state_ & FilterCallState::IsEncodingMask) {
+      state_.encoder_filter_chain_aborted_ = true;
+    }
+    filter_manager_callbacks_.sendGoAwayAndClose();
+  }
+
+protected:
+  struct State {
+    State() = default;
+    uint32_t filter_call_state_{0};
+
+    // Set after decoder filter chain has completed iteration. Prevents further calls to decoder
+    // filters. This flag is used to determine stream completion when the independent half-close is
+    // enabled.
+    bool decoder_filter_chain_complete_{};
+
+    // Set after encoder filter chain has completed iteration. Prevents further calls to encoder
+    // filters. This flag is used to determine stream completion when the independent half-close is
+    // enabled.
+    bool encoder_filter_chain_complete_{};
+
+    // Set `true` when the filter manager observes end stream on the decoder path (from downstream
+    // client) before iteration of the decoder filter chain begins. This flag is used for setting
+    // end_stream value when resuming decoder filter chain iteration.
+    bool observed_decode_end_stream_{};
+    // Set `true` when the filter manager observes end stream on the encoder path (from upstream
+    // server or Envoy's local reply) before iteration of the encoder filter chain begins. This flag
+    // is used for setting end_stream value when resuming encoder filter chain iteration.
+    bool observed_encode_end_stream_{};
+
+    // By default, we will assume there are no 1xx. If encode1xxHeaders
+    // is ever called, this is set to true so commonContinue resumes processing the 1xx.
+    bool has_1xx_headers_{};
+    // These two are latched on initial header read, to determine if the original headers
+    // constituted a HEAD or gRPC request, respectively.
+    bool is_head_request_{};
+    bool is_grpc_request_{};
+    // Tracks if headers other than 100-Continue have been encoded to the codec.
+    bool non_100_response_headers_encoded_{};
+    // True under the stack of onLocalReply, false otherwise.
+    bool under_on_local_reply_{};
+    // True when the filter chain iteration was aborted with local reply.
+    bool decoder_filter_chain_aborted_{};
+    bool encoder_filter_chain_aborted_{};
+    bool saw_downstream_reset_{};
+    // True when the stream was recreated.
+    bool recreated_stream_{};
+
+    // The following 3 members are booleans rather than part of the space-saving bitfield as they
+    // are passed as arguments to functions expecting bools. Extend State using the bitfield
+    // where possible.
+    bool encoder_filters_streaming_{true};
+    bool decoder_filters_streaming_{true};
+    bool destroyed_{false};
+
+    // Result of filter chain creation.
+    CreateChainResult create_chain_result_{};
+
+    // Used to track which filter is the latest filter that has received data.
+    ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
+    ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
+  };
+
+  State& state() { return state_; }
+
 private:
+  friend class DownstreamFilterManager;
+  class FilterChainFactoryCallbacksImpl : public Http::FilterChainFactoryCallbacks {
+  public:
+    FilterChainFactoryCallbacksImpl(FilterManager& manager, const Http::FilterContext& context)
+        : manager_(manager), context_(context) {}
+
+    void addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr filter) override {
+      manager_.filters_.push_back(filter.get());
+
+      manager_.decoder_filters_.entries_.emplace_back(
+          std::make_unique<ActiveStreamDecoderFilter>(manager_, std::move(filter), context_));
+    }
+
+    void addStreamEncoderFilter(Http::StreamEncoderFilterSharedPtr filter) override {
+      manager_.filters_.push_back(filter.get());
+
+      manager_.encoder_filters_.entries_.emplace_back(
+          std::make_unique<ActiveStreamEncoderFilter>(manager_, std::move(filter), context_));
+    }
+
+    void addStreamFilter(Http::StreamFilterSharedPtr filter) override {
+      manager_.filters_.push_back(filter.get());
+
+      manager_.decoder_filters_.entries_.emplace_back(
+          std::make_unique<ActiveStreamDecoderFilter>(manager_, filter, context_));
+      manager_.encoder_filters_.entries_.emplace_back(
+          std::make_unique<ActiveStreamEncoderFilter>(manager_, std::move(filter), context_));
+    }
+
+    void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) override {
+      manager_.access_log_handlers_.push_back(std::move(handler));
+    }
+
+    Event::Dispatcher& dispatcher() override { return manager_.dispatcher_; }
+
+  private:
+    FilterManager& manager_;
+    const Http::FilterContext& context_;
+  };
+
+  class FilterChainOptionsImpl : public FilterChainOptions {
+  public:
+    FilterChainOptionsImpl(Router::RouteConstSharedPtr route) : route_(std::move(route)) {}
+
+    absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
+      return route_ != nullptr ? route_->filterDisabled(config_name) : absl::nullopt;
+    }
+
+  private:
+    const Router::RouteConstSharedPtr route_;
+  };
+
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 
+  UpgradeResult createUpgradeFilterChain(const FilterChainFactory& filter_chain_factory,
+                                         const FilterChainOptionsImpl& options);
+
   // Returns the encoder filter to start iteration with.
-  std::list<ActiveStreamEncoderFilterPtr>::iterator
+  StreamEncoderFilters::Iterator
   commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream,
                      FilterIterationStartState filter_iteration_start_state);
   // Returns the decoder filter to start iteration with.
-  std::list<ActiveStreamDecoderFilterPtr>::iterator
+  StreamDecoderFilters::Iterator
   commonDecodePrefix(ActiveStreamDecoderFilter* filter,
                      FilterIterationStartState filter_iteration_start_state);
   void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
@@ -956,8 +1050,7 @@ private:
   MetadataMapVector& addDecodedMetadata();
   // Helper function for the case where we have a header only request, but a filter adds a body
   // to it.
-  void maybeContinueDecoding(
-      const std::list<ActiveStreamDecoderFilterPtr>::iterator& maybe_continue_data_entry);
+  void maybeContinueDecoding(StreamDecoderFilters::Iterator maybe_continue_data_entry);
   void decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHeaderMap& headers, bool end_stream);
   // Sends data through decoding filter chains. filter_iteration_start_state indicates which
   // filter to start the iteration with.
@@ -967,12 +1060,11 @@ private:
   void decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map);
   void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
   ResponseTrailerMap& addEncodedTrailers();
-  void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
+  void encode1xxHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
   // As with most of the encode functions, this runs encodeHeaders on various
   // filters before calling encodeHeadersInternal which does final header munging and passes the
   // headers to the encoder.
-  void maybeContinueEncoding(
-      const std::list<ActiveStreamEncoderFilterPtr>::iterator& maybe_continue_data_entry);
+  void maybeContinueEncoding(StreamEncoderFilters::Iterator maybe_continue_data_entry);
   void encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers,
                      bool end_stream);
   // Sends data through encoding filter chains. filter_iteration_start_state indicates which
@@ -999,17 +1091,25 @@ private:
     return request_metadata_map_vector_.get();
   }
 
+  bool stopDecoderFilterChain() { return state_.decoder_filter_chain_aborted_; }
+
+  bool stopEncoderFilterChain() { return state_.encoder_filter_chain_aborted_; }
+
+  bool isTerminalDecoderFilter(const ActiveStreamDecoderFilter& filter) const;
+
   FilterManagerCallbacks& filter_manager_callbacks_;
   Event::Dispatcher& dispatcher_;
-  const Network::Connection& connection_;
+  // This is unset if there is no downstream connection, e.g. for health check or
+  // async requests.
+  OptRef<const Network::Connection> connection_;
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
 
-  std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
-  std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
-  std::list<StreamFilterBase*> filters_;
-  std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
+  StreamDecoderFilters decoder_filters_;
+  StreamEncoderFilters encoder_filters_;
+  std::vector<StreamFilterBase*> filters_;
+  AccessLog::InstanceSharedPtrVector access_log_handlers_;
 
   // Stores metadata added in the decoding filter that is being processed. Will be cleared before
   // processing the next filter. The storage is created on demand. We need to store metadata
@@ -1022,10 +1122,8 @@ private:
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
       std::make_shared<Network::Socket::Options>();
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
 
-  FilterChainFactory& filter_chain_factory_;
-  const LocalReply::LocalReply& local_reply_;
-  OverridableRemoteSocketAddressSetterStreamInfo stream_info_;
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.
   friend ActiveStreamFilterBase;
@@ -1039,59 +1137,159 @@ private:
     struct FilterCallState {
       static constexpr uint32_t DecodeHeaders   = 0x01;
       static constexpr uint32_t DecodeData      = 0x02;
-      static constexpr uint32_t DecodeTrailers  = 0x04;
-      static constexpr uint32_t EncodeHeaders   = 0x08;
-      static constexpr uint32_t EncodeData      = 0x10;
-      static constexpr uint32_t EncodeTrailers  = 0x20;
-      // Encode100ContinueHeaders is a bit of a special state as 100 continue
+      static constexpr uint32_t DecodeMetadata  = 0x04;
+      static constexpr uint32_t DecodeTrailers  = 0x08;
+      static constexpr uint32_t EncodeHeaders   = 0x10;
+      static constexpr uint32_t EncodeData      = 0x20;
+      static constexpr uint32_t EncodeMetadata  = 0x40;
+      static constexpr uint32_t EncodeTrailers  = 0x80;
+      // Encode1xxHeaders is a bit of a special state as 1xx
       // headers may be sent during request processing. This state is only used
-      // to verify we do not encode100Continue headers more than once per
+      // to verify we do not encode1xx headers more than once per
       // filter.
-      static constexpr uint32_t Encode100ContinueHeaders  = 0x40;
-      // Used to indicate that we're processing the final [En|De]codeData frame,
-      // i.e. end_stream = true
-      static constexpr uint32_t LastDataFrame = 0x80;
+      static constexpr uint32_t Encode1xxHeaders  = 0x100;
+      // Used to indicate that one of the following conditions is true:
+      // 1. The filter manager is processing the final [En|De]codeData frame.
+      // 2. The filter manager is in [En|De]codeHeaders and is processing a
+      //    header-only request or response.
+      static constexpr uint32_t EndOfStream = 0x200;
+
+      // Masks for filter call state.
+      static constexpr uint32_t IsDecodingMask = DecodeHeaders | DecodeData | DecodeMetadata | DecodeTrailers;
+      static constexpr uint32_t IsEncodingMask = EncodeHeaders | Encode1xxHeaders | EncodeData | EncodeMetadata | EncodeTrailers;
     };
   // clang-format on
 
-  struct State {
-    State()
-        : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
-          created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
-          non_100_response_headers_encoded_(false), under_on_local_reply_(false) {}
-
-    uint32_t filter_call_state_{0};
-
-    bool remote_complete_ : 1;
-    bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
-                              // A filter can still stop the stream from being complete as seen
-                              // by the codec.
-    // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
-    // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
-    bool has_continue_headers_ : 1;
-    bool created_filter_chain_ : 1;
-    // These two are latched on initial header read, to determine if the original headers
-    // constituted a HEAD or gRPC request, respectively.
-    bool is_head_request_ : 1;
-    bool is_grpc_request_ : 1;
-    // Tracks if headers other than 100-Continue have been encoded to the codec.
-    bool non_100_response_headers_encoded_ : 1;
-    // True under the stack of onLocalReply, false otherwise.
-    bool under_on_local_reply_ : 1;
-
-    // The following 3 members are booleans rather than part of the space-saving bitfield as they
-    // are passed as arguments to functions expecting bools. Extend State using the bitfield
-    // where possible.
-    bool encoder_filters_streaming_{true};
-    bool decoder_filters_streaming_{true};
-    bool destroyed_{false};
-
-    // Used to track which filter is the latest filter that has received data.
-    ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
-    ActiveStreamDecoderFilter* latest_data_decoding_filter_{};
-  };
-
   State state_;
+};
+
+// The DownstreamFilterManager has explicit handling to send local replies.
+// The UpstreamFilterManager will not, and will instead defer local reply
+// management to the DownstreamFilterManager.
+class DownstreamFilterManager : public FilterManager {
+public:
+  DownstreamFilterManager(FilterManagerCallbacks& filter_manager_callbacks,
+                          Event::Dispatcher& dispatcher, const Network::Connection& connection,
+                          uint64_t stream_id, Buffer::BufferMemoryAccountSharedPtr account,
+                          bool proxy_100_continue, uint32_t buffer_limit,
+                          FilterChainFactory& filter_chain_factory,
+                          const LocalReply::LocalReply& local_reply, Http::Protocol protocol,
+                          TimeSource& time_source,
+                          StreamInfo::FilterStateSharedPtr parent_filter_state,
+                          Server::OverloadManager& overload_manager)
+      : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
+                      proxy_100_continue, buffer_limit),
+        stream_info_(protocol, time_source, connection.connectionInfoProviderSharedPtr(),
+                     StreamInfo::FilterState::LifeSpan::FilterChain,
+                     std::move(parent_filter_state)),
+        local_reply_(local_reply), filter_chain_factory_(filter_chain_factory),
+        downstream_filter_load_shed_point_(overload_manager.getLoadShedPoint(
+            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)),
+        use_filter_manager_state_for_downstream_end_stream_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream")) {
+    ENVOY_LOG_ONCE_IF(
+        trace, downstream_filter_load_shed_point_ == nullptr,
+        "LoadShedPoint envoy.load_shed_points.http_downstream_filter_check is not found. "
+        "Is it configured?");
+  }
+  ~DownstreamFilterManager() override {
+    ASSERT(prepared_local_reply_ == nullptr,
+           "Filter Manager destroyed without executing prepared local reply");
+  }
+
+  // TODO(snowp): This should probably return a StreamInfo instead of the impl.
+  StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
+  const StreamInfo::StreamInfoImpl& streamInfo() const override { return stream_info_; }
+
+  void setDownstreamRemoteAddress(
+      const Network::Address::InstanceConstSharedPtr& downstream_remote_address) {
+    stream_info_.setDownstreamRemoteAddress(downstream_remote_address);
+  }
+
+  CreateChainResult createDownstreamFilterChain();
+
+  /**
+   * Called before local reply is made by the filter manager.
+   * @param data the data associated with the local reply.
+   */
+  void onLocalReply(StreamFilterBase::LocalReplyData& data);
+
+  void sendLocalReply(Code code, absl::string_view body,
+                      const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) override;
+
+  /**
+   * Whether downstream has observed end_stream.
+   */
+  bool decoderObservedEndStream() const override {
+    // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream
+    // runtime flag.
+    if (use_filter_manager_state_for_downstream_end_stream_) {
+      return state_.observed_decode_end_stream_;
+    }
+
+    return hasLastDownstreamByteReceived();
+  }
+
+  /**
+   * Return true if the timestamp of the downstream end_stream was recorded.
+   * For the HCM to handle the case of internal redirects, timeout error replies
+   * and stream resets on premature upstream response.
+   */
+  bool hasLastDownstreamByteReceived() const {
+    return streamInfo().downstreamTiming() &&
+           streamInfo().downstreamTiming()->lastDownstreamRxByteReceived().has_value();
+  }
+
+  bool shouldLoadShed() override {
+    return downstream_filter_load_shed_point_ != nullptr &&
+           downstream_filter_load_shed_point_->shouldShedLoad();
+  }
+
+private:
+  /**
+   * Sends a local reply by constructing a response and passing it through all the encoder
+   * filters. The resulting response will be passed out via the FilterManagerCallbacks.
+   * This will be deprecated in favor of prepareLocalReplyViaFilterChain.
+   */
+  void sendLocalReplyViaFilterChain(
+      bool is_grpc_request, Code code, absl::string_view body,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+  /**
+   * Prepares a local reply that will be sent along the encoder filters in
+   * executeLocalReplyViaFilterChain.
+   */
+  void prepareLocalReplyViaFilterChain(
+      bool is_grpc_request, Code code, absl::string_view body,
+      const std::function<void(ResponseHeaderMap& headers)>& modify_headers, bool is_head_request,
+      const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details);
+
+  /**
+   * Executes a prepared local reply along the encoder filters.
+   */
+  void executeLocalReplyIfPrepared() override;
+
+  /**
+   * Sends a local reply by constructing a response and skipping the encoder filters. The
+   * resulting response will be passed out via the FilterManagerCallbacks.
+   */
+  void sendDirectLocalReply(Code code, absl::string_view body,
+                            const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
+                            bool is_head_request,
+                            const absl::optional<Grpc::Status::GrpcStatus> grpc_status);
+
+private:
+  OverridableRemoteConnectionInfoSetterStreamInfo stream_info_;
+  const LocalReply::LocalReply& local_reply_;
+  const FilterChainFactory& filter_chain_factory_;
+  Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
+  Server::LoadShedPoint* downstream_filter_load_shed_point_{nullptr};
+  // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream runtime
+  // flag.
+  const bool use_filter_manager_state_for_downstream_end_stream_{};
 };
 
 } // namespace Http

@@ -3,6 +3,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 
+#include "src/core/lib/iomgr/exec_ctx.h"
 #include "src/core/tsi/transport_security_grpc.h"
 #include "src/core/tsi/transport_security_interface.h"
 
@@ -81,7 +82,7 @@ tsi_result TsiFrameProtector::unprotect(Buffer::Instance& input, Buffer::Instanc
   grpc_slice_buffer_init(&unprotected_buffer);
 
   tsi_result result = tsi_zero_copy_grpc_protector_unprotect(
-      frame_protector_.get(), &protected_buffer, &unprotected_buffer);
+      frame_protector_.get(), &protected_buffer, &unprotected_buffer, nullptr);
 
   if (result != TSI_OK) {
     ASSERT(result != TSI_INVALID_ARGUMENT && result != TSI_UNIMPLEMENTED);

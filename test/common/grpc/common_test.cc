@@ -327,59 +327,14 @@ TEST(GrpcContextTest, IsGrpcResponseHeader) {
   EXPECT_FALSE(Common::isGrpcResponseHeaders(json_response_header, false));
 }
 
-TEST(GrpcContextTest, ValidateResponse) {
-  {
-    Http::ResponseMessageImpl response(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
-    response.trailers(
-        Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "0"}}});
-    EXPECT_NO_THROW(Common::validateResponse(response));
-  }
-  {
-    Http::ResponseMessageImpl response(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}});
-    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
-                              "non-200 response code");
-  }
-  {
-    Http::ResponseMessageImpl response(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
-    response.trailers(
-        Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "100"}}});
-    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
-                              "bad grpc-status trailer");
-  }
-  {
-    Http::ResponseMessageImpl response(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
-    response.trailers(
-        Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{{"grpc-status", "4"}}});
-    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "");
-  }
-  {
-    Http::ResponseMessageImpl response(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}});
-    response.trailers(Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl{
-        {"grpc-status", "4"}, {"grpc-message", "custom error"}}});
-    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "custom error");
-  }
-  {
-    Http::ResponseMessageImpl response(Http::ResponseHeaderMapPtr{
-        new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "100"}}});
-    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception,
-                              "bad grpc-status header");
-  }
-  {
-    Http::ResponseMessageImpl response(Http::ResponseHeaderMapPtr{
-        new Http::TestResponseHeaderMapImpl{{":status", "200"}, {"grpc-status", "4"}}});
-    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "");
-  }
-  {
-    Http::ResponseMessageImpl response(
-        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{
-            {":status", "200"}, {"grpc-status", "4"}, {"grpc-message", "custom error"}}});
-    EXPECT_THROW_WITH_MESSAGE(Common::validateResponse(response), Exception, "custom error");
-  }
+TEST(GrpcContextTest, IsProtobufRequestHeader) {
+  Http::TestRequestHeaderMapImpl is{
+      {":method", "GET"}, {":path", "/"}, {"content-type", "application/x-protobuf"}};
+  EXPECT_TRUE(Common::isProtobufRequestHeaders(is));
+
+  Http::TestRequestHeaderMapImpl is_not{{":method", "CONNECT"},
+                                        {"content-type", "application/x-protobuf"}};
+  EXPECT_FALSE(Common::isProtobufRequestHeaders(is_not));
 }
 
 // Ensure that the correct gPRC header is constructed for a Buffer::Instance.

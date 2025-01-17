@@ -7,6 +7,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/config/resource_name.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -17,11 +18,14 @@ std::vector<std::string>
 CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                              const std::string& system_version_info) {
-  Config::ScopedResume maybe_resume_eds;
+  Config::ScopedResume maybe_resume_eds_leds_sds;
   if (cm_.adsMux()) {
-    const auto type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-    maybe_resume_eds = cm_.adsMux()->pause(type_urls);
+    // A cluster update pauses sending EDS and LEDS requests.
+    const std::vector<std::string> paused_xds_types{
+        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+        Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
+        Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
+    maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
   }
 
   ENVOY_LOG(info, "{}: add {} cluster(s), remove {} cluster(s)", name_, added_resources.size(),
@@ -33,27 +37,39 @@ CdsApiHelper::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& adde
   uint32_t added_or_updated = 0;
   uint32_t skipped = 0;
   for (const auto& resource : added_resources) {
-    envoy::config::cluster::v3::Cluster cluster;
+    // Holds a reference to the name of the currently parsed cluster resource.
+    // This is needed for the CATCH clause below.
+    absl::string_view cluster_name = EMPTY_STRING;
     TRY_ASSERT_MAIN_THREAD {
-      cluster = dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
+      const envoy::config::cluster::v3::Cluster& cluster =
+          dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
+      cluster_name = cluster.name();
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
-        throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));
+        exception_msgs.push_back(
+            fmt::format("{}: duplicate cluster {} found", cluster_name, cluster_name));
+        continue;
       }
-      if (cm_.addOrUpdateCluster(cluster, resource.get().version())) {
+      auto update_or_error = cm_.addOrUpdateCluster(cluster, resource.get().version());
+      if (!update_or_error.status().ok()) {
+        exception_msgs.push_back(
+            fmt::format("{}: {}", cluster_name, update_or_error.status().message()));
+        continue;
+      }
+      if (*update_or_error) {
         any_applied = true;
-        ENVOY_LOG(debug, "{}: add/update cluster '{}'", name_, cluster.name());
+        ENVOY_LOG(debug, "{}: add/update cluster '{}'", name_, cluster_name);
         ++added_or_updated;
       } else {
-        ENVOY_LOG(debug, "{}: add/update cluster '{}' skipped", name_, cluster.name());
+        ENVOY_LOG(debug, "{}: add/update cluster '{}' skipped", name_, cluster_name);
         ++skipped;
       }
     }
     END_TRY
-    catch (const EnvoyException& e) {
-      exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
-    }
+    CATCH(const EnvoyException& e,
+          { exception_msgs.push_back(fmt::format("{}: {}", cluster_name, e.what())); });
   }
+
   for (const auto& resource_name : removed_resources) {
     if (cm_.removeCluster(resource_name)) {
       any_applied = true;

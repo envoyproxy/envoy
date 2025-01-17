@@ -5,6 +5,7 @@ package envoy.config.listener.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
 import "envoy/config/listener/v3/listener_components.proto";
@@ -13,7 +14,9 @@ import "envoy/config/listener/v3/udp_listener_config.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
 import "xds/core/v3/collection_entry.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
@@ -24,18 +27,33 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "ListenerProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3;listenerv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Listener configuration]
 // Listener :ref:`configuration overview <config_listeners>`
 
-// Listener list collections. Entries are *Listener* resources or references.
+// The additional address the listener is listening on.
+message AdditionalAddress {
+  core.v3.Address address = 1;
+
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries. If specified, this will override the
+  // :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>`
+  // in the listener. If specified with no
+  // :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`
+  // or an empty list of :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`,
+  // it means no socket option will apply.
+  core.v3.SocketOptionsOverride socket_options = 2;
+}
+
+// Listener list collections. Entries are ``Listener`` resources or references.
 // [#not-implemented-hide:]
 message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 30]
+// [#next-free-field: 36]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -85,11 +103,15 @@ message Listener {
 
       // If specified, the listener will use the exact connection balancer.
       ExactBalance exact_balance = 1;
+
+      // The listener will use the connection balancer according to ``type_url``. If ``type_url`` is invalid,
+      // Envoy will not attempt to balance active connections between worker threads.
+      // [#extension-category: envoy.network.connection_balance]
+      core.v3.TypedExtensionConfig extend_balance = 2;
     }
   }
 
   // Configuration for envoy internal listener. All the future internal listener features should be added here.
-  // [#not-implemented-hide:]
   message InternalListenerConfig {
   }
 
@@ -103,11 +125,17 @@ message Listener {
   // The address that the listener should listen on. In general, the address must be unique, though
   // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
   // Linux as the actual port will be allocated by the OS.
-  core.v3.Address address = 2 [(validate.rules).message = {required: true}];
+  // Required unless ``api_listener`` or ``listener_specifier`` is populated.
+  core.v3.Address address = 2;
+
+  // The additional addresses the listener should listen on. The addresses must be unique across all
+  // listeners. Multiple addresses with port 0 can be supplied. When using multiple addresses in a single listener,
+  // all addresses use the same protocol, and multiple internal addresses are not supported.
+  repeated AdditionalAddress additional_addresses = 33;
 
   // Optional prefix to use on listener stats. If empty, the stats will be rooted at
-  // `listener.<address as string>.`. If non-empty, stats will be rooted at
-  // `listener.<stat_prefix>.`.
+  // ``listener.<address as string>.``. If non-empty, stats will be rooted at
+  // ``listener.<stat_prefix>.``.
   string stat_prefix = 28;
 
   // A list of filter chains to consider for this listener. The
@@ -119,7 +147,26 @@ message Listener {
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
 
-  // If a connection is redirected using *iptables*, the port on which the proxy
+  // :ref:`Matcher API <arch_overview_matching_listener>` resolving the filter chain name from the
+  // network properties. This matcher is used as a replacement for the filter chain match condition
+  // :ref:`filter_chain_match
+  // <envoy_v3_api_field_config.listener.v3.FilterChain.filter_chain_match>`. If specified, all
+  // :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` must have a
+  // non-empty and unique :ref:`name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` field
+  // and not specify :ref:`filter_chain_match
+  // <envoy_v3_api_field_config.listener.v3.FilterChain.filter_chain_match>` field.
+  //
+  // .. note::
+  //
+  //  Once matched, each connection is permanently bound to its filter chain.
+  //  If the matcher changes but the filter chain remains the same, the
+  //  connections bound to the filter chain are not drained. If, however, the
+  //  filter chain is removed or structurally modified, then the drain for its
+  //  connections is initiated.
+  xds.type.matcher.v3.Matcher filter_chain_matcher = 32
+      [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // If a connection is redirected using ``iptables``, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to
   // true, the listener hands off redirected connections to the listener associated with the
   // original destination address. If there is no listener associated with the original destination
@@ -152,13 +199,17 @@ message Listener {
   // before a connection is created.
   // UDP Listener filters can be specified when the protocol in the listener socket address in
   // :ref:`protocol <envoy_v3_api_field_config.core.v3.SocketAddress.protocol>` is :ref:`UDP
-  // <envoy_v3_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>`.
-  // UDP listeners currently support a single filter.
+  // <envoy_v3_api_enum_value_config.core.v3.SocketAddress.Protocol.UDP>` and no
+  // :ref:`quic_options <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` is specified in :ref:`udp_listener_config <envoy_v3_api_field_config.listener.v3.Listener.udp_listener_config>`.
+  // QUIC listener filters can be specified when :ref:`quic_options
+  // <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.quic_options>` is
+  // specified in :ref:`udp_listener_config <envoy_v3_api_field_config.listener.v3.Listener.udp_listener_config>`.
+  // They are processed sequentially right before connection creation. And like TCP Listener filters, they can be used to manipulate the connection metadata and socket. But the difference is that they can't be used to pause connection creation.
   repeated ListenerFilter listener_filters = 9;
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
   // the accepted socket is closed without a connection being created unless
-  // `continue_on_listener_filters_timeout` is set to true. Specify 0 to disable the
+  // ``continue_on_listener_filters_timeout`` is set to true. Specify 0 to disable the
   // timeout. If not specified, a default timeout of 15s is used.
   google.protobuf.Duration listener_filters_timeout = 15;
 
@@ -173,30 +224,33 @@ message Listener {
 
   // Whether the listener should be set as a transparent socket.
   // When this flag is set to true, connections can be redirected to the listener using an
-  // *iptables* *TPROXY* target, in which case the original source and destination addresses and
+  // ``iptables`` ``TPROXY`` target, in which case the original source and destination addresses and
   // ports are preserved on accepted connections. This flag should be used in combination with
   // :ref:`an original_dst <config_listener_filters_original_dst>` :ref:`listener filter
   // <envoy_v3_api_field_config.listener.v3.Listener.listener_filters>` to mark the connections' local addresses as
   // "restored." This can be used to hand off each redirected connection to another listener
   // associated with the connection's destination address. Direct connections to the socket without
-  // using *TPROXY* cannot be distinguished from connections redirected using *TPROXY* and are
+  // using ``TPROXY`` cannot be distinguished from connections redirected using ``TPROXY`` and are
   // therefore treated as if they were redirected.
   // When this flag is set to false, the listener's socket is explicitly reset as non-transparent.
-  // Setting this flag requires Envoy to run with the *CAP_NET_ADMIN* capability.
+  // Setting this flag requires Envoy to run with the ``CAP_NET_ADMIN`` capability.
   // When this flag is not set (default), the socket is not modified, i.e. the transparent option
   // is neither set nor reset.
   google.protobuf.BoolValue transparent = 10;
 
-  // Whether the listener should set the *IP_FREEBIND* socket option. When this
+  // Whether the listener should set the ``IP_FREEBIND`` socket option. When this
   // flag is set to true, listeners can be bound to an IP address that is not
   // configured on the system running Envoy. When this flag is set to false, the
-  // option *IP_FREEBIND* is disabled on the socket. When this flag is not set
+  // option ``IP_FREEBIND`` is disabled on the socket. When this flag is not set
   // (default), the socket is not modified, i.e. the option is neither enabled
   // nor disabled.
   google.protobuf.BoolValue freebind = 11;
 
   // Additional socket options that may not be present in Envoy source code or
-  // precompiled binaries.
+  // precompiled binaries. The socket options can be updated for a listener when
+  // :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`
+  // is ``true``. Otherwise, if socket options change during a listener update the update will be rejected
+  // to make it clear that the options were not updated.
   repeated core.v3.SocketOption socket_options = 13;
 
   // Whether the listener should accept TCP Fast Open (TFO) connections.
@@ -255,14 +309,16 @@ message Listener {
   // enable the balance config in Y1 and Y2 to balance the connections among the workers.
   ConnectionBalanceConfig connection_balance_config = 20;
 
-  // Deprecated. Use `enable_reuse_port` instead.
+  // Deprecated. Use ``enable_reuse_port`` instead.
   bool reuse_port = 21 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and
+  // When this flag is set to true, listeners set the ``SO_REUSEPORT`` socket option and
   // create one socket for each worker thread. This makes inbound connections
   // distribute among worker threads roughly evenly in cases where there are a high number
   // of connections. When this flag is set to false, all worker threads share one socket. This field
-  // defaults to true.
+  // defaults to true. The change of field will be rejected during an listener update when the
+  // runtime flag ``envoy.reloadable_features.enable_update_listener_socket_options`` is enabled.
+  // Otherwise, the update of this field will be ignored quietly.
   //
   // .. attention::
   //
@@ -288,6 +344,17 @@ message Listener {
   // provided net.core.somaxconn will be used on Linux and 128 otherwise.
   google.protobuf.UInt32Value tcp_backlog_size = 24;
 
+  // The maximum number of connections to accept from the kernel per socket
+  // event. Envoy may decide to close these connections after accepting them
+  // from the kernel e.g. due to load shedding, or other policies.
+  // If there are more than max_connections_to_accept_per_socket_event
+  // connections pending accept, connections over this threshold will be
+  // accepted in later event loop iterations.
+  // If no value is provided Envoy will accept all connections pending accept
+  // from the kernel.
+  google.protobuf.UInt32Value max_connections_to_accept_per_socket_event = 34
+      [(validate.rules).uint32 = {gt: 0}];
+
   // Whether the listener should bind to the port. A listener that doesn't
   // bind can only receive connections redirected from other listeners that set
   // :ref:`use_original_dst <envoy_v3_api_field_config.listener.v3.Listener.use_original_dst>`
@@ -295,24 +362,50 @@ message Listener {
   google.protobuf.BoolValue bind_to_port = 26;
 
   // The exclusive listener type and the corresponding config.
-  // TODO(lambdai): https://github.com/envoyproxy/envoy/issues/15372
-  // Will create and add TcpListenerConfig. Will add UdpListenerConfig and ApiListener.
-  // [#not-implemented-hide:]
   oneof listener_specifier {
     // Used to represent an internal listener which does not listen on OSI L4 address but can be used by the
     // :ref:`envoy cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` to create a user space connection to.
-    // The internal listener acts as a tcp listener. It supports listener filters and network filter chains.
-    // The internal listener require :ref:`address <envoy_v3_api_field_config.listener.v3.Listener.address>` has
-    // field `envoy_internal_address`.
+    // The internal listener acts as a TCP listener. It supports listener filters and network filter chains.
+    // Upstream clusters refer to the internal listeners by their :ref:`name
+    // <envoy_v3_api_field_config.listener.v3.Listener.name>`. :ref:`Address
+    // <envoy_v3_api_field_config.listener.v3.Listener.address>` must not be set on the internal listeners.
     //
-    // There are some limitations are derived from the implementation. The known limitations include
+    // There are some limitations that are derived from the implementation. The known limitations include:
     //
     // * :ref:`ConnectionBalanceConfig <envoy_v3_api_msg_config.listener.v3.Listener.ConnectionBalanceConfig>` is not
-    //   allowed because both cluster connection and listener connection must be owned by the same dispatcher.
+    //   allowed because both the cluster connection and the listener connection must be owned by the same dispatcher.
     // * :ref:`tcp_backlog_size <envoy_v3_api_field_config.listener.v3.Listener.tcp_backlog_size>`
     // * :ref:`freebind <envoy_v3_api_field_config.listener.v3.Listener.freebind>`
     // * :ref:`transparent <envoy_v3_api_field_config.listener.v3.Listener.transparent>`
-    // [#not-implemented-hide:]
     InternalListenerConfig internal_listener = 27;
   }
+
+  // Enable MPTCP (multi-path TCP) on this listener. Clients will be allowed to establish
+  // MPTCP connections. Non-MPTCP clients will fall back to regular TCP.
+  bool enable_mptcp = 30;
+
+  // Whether the listener should limit connections based upon the value of
+  // :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`.
+  bool ignore_global_conn_limit = 31;
+
+  // Whether the listener bypasses configured overload manager actions.
+  bool bypass_overload_manager = 35;
+}
+
+// A placeholder proto so that users can explicitly configure the standard
+// Listener Manager via the bootstrap's :ref:`listener_manager <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.listener_manager>`.
+// [#not-implemented-hide:]
+message ListenerManager {
+}
+
+// A placeholder proto so that users can explicitly configure the standard
+// Validation Listener Manager via the bootstrap's :ref:`listener_manager <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.listener_manager>`.
+// [#not-implemented-hide:]
+message ValidationListenerManager {
+}
+
+// A placeholder proto so that users can explicitly configure the API
+// Listener Manager via the bootstrap's :ref:`listener_manager <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.listener_manager>`.
+// [#not-implemented-hide:]
+message ApiListenerManager {
 }

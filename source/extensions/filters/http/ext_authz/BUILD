@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # External authorization L7 HTTP filter
-# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/http_filters
+# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/http/http_filters
 
 envoy_extension_package()
 
@@ -28,8 +28,10 @@ envoy_cc_library(
         "//source/common/http:codes_lib",
         "//source/common/http:utility_lib",
         "//source/common/router:config_lib",
+        "//source/common/runtime:runtime_protos_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
+        "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",

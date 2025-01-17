@@ -20,7 +20,8 @@ namespace Stats {
 class HistogramSettingsImpl : public HistogramSettings {
 public:
   HistogramSettingsImpl() = default;
-  HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config);
+  HistogramSettingsImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                        Server::Configuration::CommonFactoryContext& context);
 
   // HistogramSettings
   const ConstSupportedBuckets& buckets(absl::string_view stat_name) const override;
@@ -36,7 +37,7 @@ private:
 /**
  * Implementation of HistogramStatistics for circllhist.
  */
-class HistogramStatisticsImpl : public HistogramStatistics, NonCopyable {
+class HistogramStatisticsImpl final : public HistogramStatistics, NonCopyable {
 public:
   HistogramStatisticsImpl();
 
@@ -46,10 +47,8 @@ public:
    * will not be retained.
    */
   HistogramStatisticsImpl(
-      const histogram_t* histogram_ptr,
+      const histogram_t* histogram_ptr, Histogram::Unit unit = Histogram::Unit::Unspecified,
       ConstSupportedBuckets& supported_buckets = HistogramSettingsImpl::defaultBuckets());
-
-  static ConstSupportedBuckets& defaultSupportedBuckets();
 
   void refresh(const histogram_t* new_histogram_ptr);
 
@@ -60,15 +59,19 @@ public:
   const std::vector<double>& computedQuantiles() const override { return computed_quantiles_; }
   ConstSupportedBuckets& supportedBuckets() const override { return supported_buckets_; }
   const std::vector<uint64_t>& computedBuckets() const override { return computed_buckets_; }
+  std::vector<uint64_t> computeDisjointBuckets() const override;
   uint64_t sampleCount() const override { return sample_count_; }
+  uint64_t outOfBoundCount() const override { return out_of_bound_count_; }
   double sampleSum() const override { return sample_sum_; }
 
 private:
   ConstSupportedBuckets& supported_buckets_;
   std::vector<double> computed_quantiles_;
   std::vector<uint64_t> computed_buckets_;
-  uint64_t sample_count_;
-  double sample_sum_;
+  uint64_t sample_count_{0};
+  uint64_t out_of_bound_count_{0};
+  double sample_sum_{0};
+  const Histogram::Unit unit_{Histogram::Unit::Unspecified};
 };
 
 class HistogramImplHelper : public MetricImpl<Histogram> {
@@ -109,6 +112,7 @@ public:
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
   bool used() const override { return true; }
+  bool hidden() const override { return false; }
   SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
 private:
@@ -129,6 +133,7 @@ public:
   ~NullHistogramImpl() override { MetricImpl::clear(symbol_table_); }
 
   bool used() const override { return false; }
+  bool hidden() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 
   Unit unit() const override { return Unit::Null; };

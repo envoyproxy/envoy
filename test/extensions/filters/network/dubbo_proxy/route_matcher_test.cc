@@ -64,7 +64,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -99,7 +99,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -137,7 +137,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -172,7 +172,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -181,7 +180,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -221,7 +220,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -230,7 +228,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -261,7 +259,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -270,7 +267,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -302,7 +299,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "(.*?)"
     route:
         cluster: user_service_dubbo_server
@@ -311,7 +307,7 @@ routes:
     envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
-    NiceMock<Server::Configuration::MockFactoryContext> context;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
     SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
@@ -354,7 +350,7 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -385,7 +381,7 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -416,7 +412,7 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -439,7 +435,6 @@ routes:
       method:
         name:
           safe_regex:
-            google_re2: {}
             regex: "\\d{3}test"
     route:
         cluster: user_service_dubbo_server
@@ -452,7 +447,7 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -494,7 +489,7 @@ routes:
 
   setDefaultInvocationCallback(*invo);
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
@@ -528,7 +523,7 @@ routes:
   setDefaultInvocationCallback(*invo);
   invo->mutableParameters()->push_back(std::make_unique<Hessian2::StringObject>("150"));
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
@@ -562,7 +557,7 @@ routes:
   setDefaultInvocationCallback(*invo);
   invo->mutableParameters()->push_back(std::make_unique<Hessian2::NullObject>());
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
@@ -596,7 +591,7 @@ routes:
   setDefaultInvocationCallback(*invo);
   invo->mutableParameters()->push_back(std::make_unique<Hessian2::StringObject>("150"));
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
@@ -630,7 +625,7 @@ routes:
   setDefaultInvocationCallback(*invo);
   invo->mutableParameters()->push_back(std::make_unique<Hessian2::StringObject>("300"));
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 }
@@ -663,7 +658,7 @@ routes:
   invo->mutableParameters()->resize(2);
   invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("user_id:94562");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
@@ -702,7 +697,7 @@ routes:
   invo->mutableAttachment()->insert("custom", "123");
   invo->mutableAttachment()->insert("custom1", "123");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -719,28 +714,30 @@ TEST(MultiDubboRouteMatcherTest, Route) {
 stat_prefix: dubbo_incomming_stats
 protocol_type: Dubbo
 serialization_type: Hessian2
-route_config:
-  - name: test1
-    interface: org.apache.dubbo.demo.DemoService
-    routes:
-      - match:
-          method:
-            name:
-              exact: "add"
-            params_match:
-              1:
-                exact_match: "user_id"
-        route:
-            cluster: user_service_dubbo_server
-  - name: test2
-    interface: org.apache.dubbo.demo.FormatService
-    routes:
-      - match:
-          method:
-            name:
-              exact: "format"
-        route:
-            cluster: format_service
+multiple_route_config:
+  name: test_routes
+  route_config:
+    - name: test1
+      interface: org.apache.dubbo.demo.DemoService
+      routes:
+        - match:
+            method:
+              name:
+                exact: "add"
+              params_match:
+                1:
+                  exact_match: "user_id"
+          route:
+              cluster: user_service_dubbo_server
+    - name: test2
+      interface: org.apache.dubbo.demo.FormatService
+      routes:
+        - match:
+            method:
+              name:
+                exact: "format"
+          route:
+              cluster: format_service
 )EOF";
 
   envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config =
@@ -755,13 +752,13 @@ route_config:
   invo->mutableParameters()->resize(2);
   invo->mutableParameters()->back() = std::make_unique<Hessian2::StringObject>("user_id");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  MultiRouteMatcher matcher(config.route_config(), context);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  RouteConfigImpl matcher(config.multiple_route_config(), context);
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 
   {
     envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy invalid_config;
-    MultiRouteMatcher matcher(invalid_config.route_config(), context);
+    RouteConfigImpl matcher(invalid_config.multiple_route_config(), context);
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   }
 }
@@ -793,7 +790,7 @@ routes:
   setDefaultInvocationCallback(*invo);
 
   // There is no parameter information in metadata.
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
@@ -860,7 +857,7 @@ routes:
   metadata.setInvocationInfo(invo);
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SingleRouteMatcherImpl matcher(config, context);
 
   {
@@ -908,8 +905,301 @@ routes:
 
   envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_THROW(SingleRouteMatcherImpl m(config, context), EnvoyException);
+}
+
+TEST(DubboRouteMatcherTest, RouteActionMetadataMatch) {
+  const std::string yaml = R"EOF(
+name: config
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          exact: "method1"
+    route:
+      cluster: cluster1
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+            k2: v2
+  - match:
+      method:
+        name:
+          exact: "method2"
+    route:
+      cluster: cluster2
+)EOF";
+
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  auto invo = std::make_shared<RpcInvocationImpl>();
+
+  // Match with metadata.
+  {
+    MessageMetadata metadata;
+    metadata.setInvocationInfo(invo);
+    invo->setServiceName("org.apache.dubbo.demo.DemoService");
+    invo->setMethodName("method1");
+
+    setDefaultInvocationCallback(*invo);
+
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    SingleRouteMatcherImpl matcher(config, context);
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, mmc.size());
+
+    ProtobufWkt::Value v1, v2;
+    v1.set_string_value("v1");
+    v2.set_string_value("v2");
+    HashedValue hv1(v1), hv2(v2);
+
+    EXPECT_EQ("k1", mmc[0]->name());
+    EXPECT_EQ(hv1, mmc[0]->value());
+
+    EXPECT_EQ("k2", mmc[1]->name());
+    EXPECT_EQ(hv2, mmc[1]->value());
+  }
+
+  // Match with no metadata.
+  {
+    MessageMetadata metadata;
+    metadata.setInvocationInfo(invo);
+    invo->setServiceName("org.apache.dubbo.demo.DemoService");
+    invo->setMethodName("method2");
+
+    setDefaultInvocationCallback(*invo);
+
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    SingleRouteMatcherImpl matcher(config, context);
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+    EXPECT_EQ(nullptr, route->routeEntry()->metadataMatchCriteria());
+  }
+}
+
+TEST(DubboRouteMatcherTest, WeightedClusterMetadataMatch) {
+  const std::string yaml = R"EOF(
+name: config
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          exact: "method1"
+    route:
+      weighted_clusters:
+        clusters:
+          - name: cluster1
+            weight: 2000
+            metadata_match:
+              filter_metadata:
+                envoy.lb:
+                  k1: v1
+                  k2: v2
+          - name: cluster2
+            weight: 3000
+            metadata_match:
+              filter_metadata:
+                not.envoy.lb:
+                  k1: v1
+                  k2: v2
+          - name: cluster3
+            weight: 5000
+            metadata_match:
+              filter_metadata:
+                envoy.lb:
+                  k3: v3
+)EOF";
+
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  auto invo = std::make_shared<RpcInvocationImpl>();
+  MessageMetadata metadata;
+  metadata.setInvocationInfo(invo);
+  invo->setServiceName("org.apache.dubbo.demo.DemoService");
+  invo->setMethodName("method1");
+
+  setDefaultInvocationCallback(*invo);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  SingleRouteMatcherImpl matcher(config, context);
+
+  ProtobufWkt::Value v1, v2, v3;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  v3.set_string_value("v3");
+  HashedValue hv1(v1), hv2(v2), hv3(v3);
+
+  // Metadata match with multiple metadata entries.
+  {
+
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, mmc.size());
+
+    EXPECT_EQ("k1", mmc[0]->name());
+    EXPECT_EQ(hv1, mmc[0]->value());
+
+    EXPECT_EQ("k2", mmc[1]->name());
+    EXPECT_EQ(hv2, mmc[1]->value());
+  }
+
+  // The case where none 'envoy.lb' metadata key is used in the 'metadata_match'.
+  {
+    RouteConstSharedPtr route = matcher.route(metadata, 2001);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+    EXPECT_EQ(nullptr, route->routeEntry()->metadataMatchCriteria());
+  }
+
+  // Metadata match with single metadata entry.
+  {
+    RouteConstSharedPtr route = matcher.route(metadata, 5001);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(1, mmc.size());
+
+    EXPECT_EQ("k3", mmc[0]->name());
+    EXPECT_EQ(hv3, mmc[0]->value());
+  }
+}
+
+TEST(DubboRouteMatcherTest, WeightedClusterRouteActionMetadataMatchMerged) {
+  const std::string yaml = R"EOF(
+name: config
+interface: org.apache.dubbo.demo.DemoService
+routes:
+  - match:
+      method:
+        name:
+          exact: "method1"
+    route:
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+            k2: v2
+      weighted_clusters:
+        clusters:
+          - name: cluster1
+            weight: 2000
+            metadata_match:
+              filter_metadata:
+                envoy.lb:
+                  k3: v3
+          - name: cluster2
+            weight: 3000
+          - name: cluster3
+            weight: 5000
+            metadata_match:
+              filter_metadata:
+                envoy.lb:
+                  k2: v3
+)EOF";
+
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  auto invo = std::make_shared<RpcInvocationImpl>();
+  MessageMetadata metadata;
+  metadata.setInvocationInfo(invo);
+  invo->setServiceName("org.apache.dubbo.demo.DemoService");
+  invo->setMethodName("method1");
+
+  setDefaultInvocationCallback(*invo);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  SingleRouteMatcherImpl matcher(config, context);
+
+  ProtobufWkt::Value v1, v2, v3;
+  v1.set_string_value("v1");
+  v2.set_string_value("v2");
+  v3.set_string_value("v3");
+  HashedValue hv1(v1), hv2(v2), hv3(v3);
+
+  // 'metadata_match' of both weighted cluster and route action are configured.
+  {
+
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(3, mmc.size());
+
+    EXPECT_EQ("k1", mmc[0]->name());
+    EXPECT_EQ(hv1, mmc[0]->value());
+
+    EXPECT_EQ("k2", mmc[1]->name());
+    EXPECT_EQ(hv2, mmc[1]->value());
+
+    EXPECT_EQ("k3", mmc[2]->name());
+    EXPECT_EQ(hv3, mmc[2]->value());
+  }
+
+  // Only 'metadata_match' of route action is configured.
+  {
+    RouteConstSharedPtr route = matcher.route(metadata, 2001);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, mmc.size());
+
+    EXPECT_EQ("k1", mmc[0]->name());
+    EXPECT_EQ(hv1, mmc[0]->value());
+
+    EXPECT_EQ("k2", mmc[1]->name());
+    EXPECT_EQ(hv2, mmc[1]->value());
+  }
+
+  // 'metadata_match' of both weighted cluster and route action are configured and with same
+  // metadata entry key.
+  {
+    RouteConstSharedPtr route = matcher.route(metadata, 5001);
+    EXPECT_NE(nullptr, route);
+    EXPECT_NE(nullptr, route->routeEntry());
+    const Envoy::Router::MetadataMatchCriteria* criteria =
+        route->routeEntry()->metadataMatchCriteria();
+    EXPECT_NE(nullptr, criteria);
+    const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
+        criteria->metadataMatchCriteria();
+    EXPECT_EQ(2, mmc.size());
+
+    EXPECT_EQ("k1", mmc[0]->name());
+    EXPECT_EQ(hv1, mmc[0]->value());
+
+    EXPECT_EQ("k2", mmc[1]->name());
+    EXPECT_EQ(hv3, mmc[1]->value());
+  }
 }
 
 } // namespace Router

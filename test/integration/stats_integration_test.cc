@@ -2,13 +2,16 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/config/well_known_names.h"
 #include "source/common/memory/stats.h"
 
-#include "test/common/stats/stat_test_utility.h"
+#include "test/common/memory/memory_test_utility.h"
+#include "test/config/integration/certs/clientcert_hash.h"
+#include "test/config/integration/certs/servercert_info.h"
 #include "test/config/utility.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
@@ -45,6 +48,7 @@ TEST_P(StatsIntegrationTest, WithDefaultConfig) {
 }
 
 TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
+  skip_tag_extraction_rule_check_ = true;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
   });
@@ -52,6 +56,26 @@ TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
 
   auto counter = test_server_->counter("http.config_test.rq_total");
   EXPECT_EQ(counter->tags().size(), 0);
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/pull/21069 making
+// sure that the default error_level limits are not applied before runtime is
+// created. As described by the linked issue, this simply bypasses regex size checks.
+TEST_P(StatsIntegrationTest, DEPRECATED_FEATURE_TEST(WithLargeGoogleRE2Regex)) {
+  // This limit of 1000 will be ignored.
+  config_helper_.addRuntimeOverride("re2.max_program_size.error_level", "1000");
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto pattern = bootstrap.mutable_stats_config()
+                       ->mutable_stats_matcher()
+                       ->mutable_inclusion_list()
+                       ->add_patterns();
+    pattern->mutable_safe_regex()->mutable_google_re2();
+    pattern->mutable_safe_regex()->set_regex(
+        "cluster.(metadata-cluster|iam-cluster|service-control-cluster|backend-cluster-sample-"
+        "backend-s3fctubhaq-uc.a.run.app_443).upstream_rq_(reset|timeout|[1-5]xx)|listener.*");
+  });
+  use_lds_ = false;
+  initialize();
 }
 
 TEST_P(StatsIntegrationTest, WithDefaultTagExtractors) {
@@ -131,6 +155,88 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
   EXPECT_EQ(live->tags()[0].value_, "xxx");
 }
 
+TEST_P(StatsIntegrationTest, WithoutCert) {
+  initialize();
+
+  EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(),
+            std::numeric_limits<uint32_t>::max());
+}
+
+TEST_P(StatsIntegrationTest, WithExpiringCert) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* transport_socket = bootstrap.mutable_static_resources()
+                                 ->mutable_listeners(0)
+                                 ->mutable_filter_chains(0)
+                                 ->mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+
+    common_tls_context->mutable_validation_context_sds_secret_config()->set_name(
+        "validation_context");
+    common_tls_context->add_tls_certificate_sds_secret_configs()->set_name("server_cert");
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    transport_socket->mutable_typed_config()->PackFrom(tls_context);
+
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("validation_context");
+    auto* validation_context = secret->mutable_validation_context();
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+
+    secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("server_cert");
+    auto* tls_certificate = secret->mutable_tls_certificate();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+  });
+
+  initialize();
+  auto cert_expiry = TestUtility::parseTime(TEST_SERVER_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
+  EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(),
+            days_until_expiry);
+}
+
+TEST_P(StatsIntegrationTest, WithExpiredCert) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* transport_socket = bootstrap.mutable_static_resources()
+                                 ->mutable_listeners(0)
+                                 ->mutable_filter_chains(0)
+                                 ->mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    common_tls_context->add_alpn_protocols(Http::Utility::AlpnNames::get().Http11);
+
+    common_tls_context->mutable_validation_context_sds_secret_config()->set_name(
+        "validation_context");
+    common_tls_context->add_tls_certificate_sds_secret_configs()->set_name("server_cert");
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    transport_socket->mutable_typed_config()->PackFrom(tls_context);
+
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("validation_context");
+    auto* validation_context = secret->mutable_validation_context();
+    validation_context->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
+    validation_context->add_verify_certificate_hash(TEST_CLIENT_CERT_HASH);
+
+    secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("server_cert");
+    auto* tls_certificate = secret->mutable_tls_certificate();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/expired_cert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/expired_key.pem"));
+  });
+
+  initialize();
+  EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(), 0);
+}
+
 // TODO(cmluciano) Refactor once https://github.com/envoyproxy/envoy/issues/5624 is solved
 // TODO(cmluciano) Add options to measure multiple workers & without stats
 // This class itself does not add additional tests. It is a helper for use in other tests measuring
@@ -170,7 +276,7 @@ private:
    * @return size_t the total memory allocated
    */
   size_t clusterMemoryHelper(int num_clusters, int num_hosts, bool allow_stats) {
-    Stats::TestUtil::MemoryTest memory_test;
+    Memory::TestUtil::MemoryTest memory_test;
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       if (!allow_stats) {
         bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
@@ -268,6 +374,11 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // 2020/08/11  12202    37061       38500   router: add new retry back-off strategy
   // 2020/09/11  12973                38993   upstream: predictive preconnect
   // 2020/10/02  13251                39326   switch to google tcmalloc
+  // 2021/08/15  17290                40349   add all host map to priority set for fast host
+  //                                          searching
+  // 2021/08/18  13176    40577       40700   Support slow start mode
+  // 2022/03/14                       42000   Fix test flakes
+  // 2022/10/27                       44000   Update tcmalloc
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -288,7 +399,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 40000); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 44000); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
@@ -318,6 +429,10 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 2020/02/13  10042    1363         1655   Metadata object are shared across different clusters
   //                                          and hosts.
   // 2020/04/02  10624    1380         1655   Use 100 clusters rather than 1000 to avoid timeouts
+  // 2020/09/10                        2000   Reduce flakes
+  // 2020/03/23                        3000   Reduce flakes
+  // 2023/07/21                        3005   Additional 4 bytes for new health status
+  // 2023/07/21                        3500   Workaround CI flake pending resolution of #28793
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -334,7 +449,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_host, 1380);
   }
-  EXPECT_MEMORY_LE(m_per_host, 2000); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_host, 3500); // Round up to allow platform variations.
 }
 
 } // namespace

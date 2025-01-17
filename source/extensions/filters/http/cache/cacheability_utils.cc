@@ -26,22 +26,23 @@ const absl::flat_hash_set<absl::string_view>& cacheableStatusCodes() {
 const std::vector<const Http::LowerCaseString*>& conditionalHeaders() {
   // As defined by: https://httpwg.org/specs/rfc7232.html#preconditions.
   CONSTRUCT_ON_FIRST_USE(
-      std::vector<const Http::LowerCaseString*>, &Http::CustomHeaders::get().IfMatch,
-      &Http::CustomHeaders::get().IfNoneMatch, &Http::CustomHeaders::get().IfModifiedSince,
-      &Http::CustomHeaders::get().IfUnmodifiedSince, &Http::CustomHeaders::get().IfRange);
+      std::vector<const Http::LowerCaseString*>, &Http::CustomHeaders::get().IfNoneMatch,
+      &Http::CustomHeaders::get().IfModifiedSince, &Http::CustomHeaders::get().IfRange);
 }
 } // namespace
 
 bool CacheabilityUtils::canServeRequestFromCache(const Http::RequestHeaderMap& headers) {
   const absl::string_view method = headers.getMethodValue();
-  const absl::string_view scheme = Http::Utility::getScheme(headers);
   const Http::HeaderValues& header_values = Http::Headers::get();
 
-  // Check if the request contains any conditional headers.
+  // Check if the request contains any conditional headers other than if-unmodified-since
+  // or if-match.
   // For now, requests with conditional headers bypass the CacheFilter.
   // This behavior does not cause any incorrect results, but may reduce the cache effectiveness.
   // If needed to be handled properly refer to:
   // https://httpwg.org/specs/rfc7234.html#validation.received
+  // if-unmodified-since and if-match are ignored, as the spec explicitly says these
+  // header fields can be ignored by caches and intermediaries.
   for (auto conditional_header : conditionalHeaders()) {
     if (!headers.get(*conditional_header).empty()) {
       return false;
@@ -53,11 +54,11 @@ bool CacheabilityUtils::canServeRequestFromCache(const Http::RequestHeaderMap& h
   return headers.Path() && headers.Host() &&
          !headers.getInline(CacheCustomHeaders::authorization()) &&
          (method == header_values.MethodValues.Get || method == header_values.MethodValues.Head) &&
-         (scheme == header_values.SchemeValues.Http || scheme == header_values.SchemeValues.Https);
+         Http::Utility::schemeIsValid(headers.getSchemeValue());
 }
 
 bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& headers,
-                                            const VaryHeader& vary_allow_list) {
+                                            const VaryAllowList& vary_allow_list) {
   absl::string_view cache_control =
       headers.getInlineValue(CacheCustomHeaders::responseCacheControl());
   ResponseCacheControl response_cache_control(cache_control);
@@ -74,7 +75,7 @@ bool CacheabilityUtils::isCacheableResponse(const Http::ResponseHeaderMap& heade
 
   return !response_cache_control.no_store_ &&
          cacheableStatusCodes().contains((headers.getStatusValue())) && has_validation_data &&
-         vary_allow_list.isAllowed(headers);
+         vary_allow_list.allowsHeaders(headers);
 }
 
 } // namespace Cache

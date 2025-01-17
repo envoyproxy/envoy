@@ -17,21 +17,25 @@ namespace Tap {
 
 class SocketTapConfigFactoryImpl : public Extensions::Common::Tap::TapConfigFactory {
 public:
-  SocketTapConfigFactoryImpl(TimeSource& time_source) : time_source_(time_source) {}
+  SocketTapConfigFactoryImpl(TimeSource& time_source,
+                             Server::Configuration::TransportSocketFactoryContext& context)
+      : time_source_(time_source), factory_context_(context) {}
 
   // TapConfigFactory
   Extensions::Common::Tap::TapConfigSharedPtr
   createConfigFromProto(const envoy::config::tap::v3::TapConfig& proto_config,
                         Extensions::Common::Tap::Sink* admin_streamer) override {
     return std::make_shared<SocketTapConfigImpl>(std::move(proto_config), admin_streamer,
-                                                 time_source_);
+                                                 time_source_, factory_context_);
   }
 
 private:
   TimeSource& time_source_;
+  Server::Configuration::TransportSocketFactoryContext& factory_context_;
 };
 
-Network::TransportSocketFactoryPtr UpstreamTapSocketConfigFactory::createTransportSocketFactory(
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
+UpstreamTapSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
   const auto& outer_config =
@@ -41,15 +45,21 @@ Network::TransportSocketFactoryPtr UpstreamTapSocketConfigFactory::createTranspo
       Server::Configuration::UpstreamTransportSocketConfigFactory>(outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
-  auto inner_transport_factory =
+  auto factory_or_error =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
+
+  auto& server_context = context.serverFactoryContext();
   return std::make_unique<TapSocketFactory>(
-      outer_config, std::make_unique<SocketTapConfigFactoryImpl>(context.dispatcher().timeSource()),
-      context.admin(), context.singletonManager(), context.threadLocal(), context.dispatcher(),
-      std::move(inner_transport_factory));
+      outer_config,
+      std::make_unique<SocketTapConfigFactoryImpl>(
+          server_context.mainThreadDispatcher().timeSource(), context),
+      server_context.admin(), server_context.singletonManager(), server_context.threadLocal(),
+      server_context.mainThreadDispatcher(), std::move(factory_or_error.value()));
 }
 
-Network::TransportSocketFactoryPtr DownstreamTapSocketConfigFactory::createTransportSocketFactory(
+absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
+DownstreamTapSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
   const auto& outer_config =
@@ -60,12 +70,16 @@ Network::TransportSocketFactoryPtr DownstreamTapSocketConfigFactory::createTrans
       outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
-  auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
-      *inner_factory_config, context, server_names);
-  return std::make_unique<TapSocketFactory>(
-      outer_config, std::make_unique<SocketTapConfigFactoryImpl>(context.dispatcher().timeSource()),
-      context.admin(), context.singletonManager(), context.threadLocal(), context.dispatcher(),
-      std::move(inner_transport_factory));
+  auto factory_or_error = inner_config_factory.createTransportSocketFactory(*inner_factory_config,
+                                                                            context, server_names);
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
+  auto& server_context = context.serverFactoryContext();
+  return std::make_unique<DownstreamTapSocketFactory>(
+      outer_config,
+      std::make_unique<SocketTapConfigFactoryImpl>(
+          server_context.mainThreadDispatcher().timeSource(), context),
+      server_context.admin(), server_context.singletonManager(), server_context.threadLocal(),
+      server_context.mainThreadDispatcher(), std::move(factory_or_error.value()));
 }
 
 ProtobufTypes::MessagePtr TapSocketConfigFactory::createEmptyConfigProto() {

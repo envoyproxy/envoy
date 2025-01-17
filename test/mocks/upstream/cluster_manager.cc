@@ -15,7 +15,9 @@ using ::testing::ReturnRef;
 MockClusterManager::MockClusterManager(TimeSource&) : MockClusterManager() {}
 
 MockClusterManager::MockClusterManager()
-    : cluster_stat_names_(*symbol_table_), cluster_load_report_stat_names_(*symbol_table_),
+    : cluster_stat_names_(*symbol_table_), cluster_config_update_stat_names_(*symbol_table_),
+      cluster_lb_stat_names_(*symbol_table_), cluster_endpoint_stat_names_(*symbol_table_),
+      cluster_load_report_stat_names_(*symbol_table_),
       cluster_circuit_breakers_stat_names_(*symbol_table_),
       cluster_request_response_size_stat_names_(*symbol_table_),
       cluster_timeout_budget_stat_names_(*symbol_table_) {
@@ -24,6 +26,13 @@ MockClusterManager::MockClusterManager()
   ON_CALL(*this, grpcAsyncClientManager()).WillByDefault(ReturnRef(async_client_manager_));
   ON_CALL(*this, localClusterName()).WillByDefault((ReturnRef(local_cluster_name_)));
   ON_CALL(*this, subscriptionFactory()).WillByDefault(ReturnRef(subscription_factory_));
+  ON_CALL(*this, allocateOdCdsApi(_, _, _, _))
+      .WillByDefault(Invoke([](OdCdsCreationFunction, const envoy::config::core::v3::ConfigSource&,
+                               OptRef<xds::core::v3::ResourceLocator>,
+                               ProtobufMessage::ValidationVisitor&) -> OdCdsApiHandlePtr {
+        return MockOdCdsApiHandle::create();
+      }));
+  ON_CALL(*this, addOrUpdateCluster(_, _, _)).WillByDefault(Return(false));
 }
 
 MockClusterManager::~MockClusterManager() = default;
@@ -52,6 +61,13 @@ void MockClusterManager::initializeThreadLocalClusters(
     ON_CALL(*this, getThreadLocalCluster(absl::string_view(cluster_name)))
         .WillByDefault(Return(&thread_local_cluster_));
   }
+}
+
+envoy::config::core::v3::BindConfig& MockClusterManager::mutableBindConfig() {
+  if (!bind_config_.has_value()) {
+    bind_config_ = envoy::config::core::v3::BindConfig{};
+  }
+  return *bind_config_;
 }
 
 } // namespace Upstream

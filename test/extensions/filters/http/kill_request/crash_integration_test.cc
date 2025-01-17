@@ -24,7 +24,7 @@ class CrashIntegrationTest : public Event::TestUsingSimulatedTime,
                              public HttpProtocolIntegrationTest {
 protected:
   void initializeFilter(const std::string& filter_config) {
-    config_helper_.addFilter(filter_config);
+    config_helper_.prependFilter(filter_config);
     initialize();
   }
 };
@@ -40,9 +40,12 @@ protected:
 
 // Tests should run with all protocols.
 class CrashIntegrationTestAllProtocols : public CrashIntegrationTest {};
-INSTANTIATE_TEST_SUITE_P(Protocols, CrashIntegrationTestAllProtocols,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, CrashIntegrationTestAllProtocols,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(CrashIntegrationTestAllProtocols, UnwindsTrackedObjectStack) {
   const std::string request_kill_config =
@@ -102,7 +105,7 @@ TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueDoesNotAddTrackedObjectIf
         probability:
           numerator: 100
       )EOF";
-  config_helper_.addFilter(request_kill_config);
+  config_helper_.prependFilter(request_kill_config);
 
   // This will stop iteration, and continue via a callback.
   const std::string stop_and_continue_config = R"EOF(
@@ -111,7 +114,7 @@ TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueDoesNotAddTrackedObjectIf
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
     installScopeTrackedObject: true
   )EOF";
-  config_helper_.addFilter(stop_and_continue_config);
+  config_helper_.prependFilter(stop_and_continue_config);
 
   initialize();
 
@@ -137,7 +140,7 @@ TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueAddsCrashContextIfNoneExi
         probability:
           numerator: 100
       )EOF";
-  config_helper_.addFilter(request_kill_config);
+  config_helper_.prependFilter(request_kill_config);
 
   // This will stop iteration, and continue via a callback.
   const std::string stop_and_continue_config = R"EOF(
@@ -146,7 +149,7 @@ TEST_P(CrashIntegrationTestAllProtocols, DecodeContinueAddsCrashContextIfNoneExi
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
     installScopeTrackedObject: false
   )EOF";
-  config_helper_.addFilter(stop_and_continue_config);
+  config_helper_.prependFilter(stop_and_continue_config);
 
   initialize();
 
@@ -172,7 +175,7 @@ TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueDoesNotAddTrackedObjectIf
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
     installScopeTrackedObject: true
   )EOF";
-  config_helper_.addFilter(stop_and_continue_config);
+  config_helper_.prependFilter(stop_and_continue_config);
 
   const std::string request_kill_config =
       R"EOF(
@@ -183,7 +186,7 @@ TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueDoesNotAddTrackedObjectIf
           numerator: 100
         direction: RESPONSE
       )EOF";
-  config_helper_.addFilter(request_kill_config);
+  config_helper_.prependFilter(request_kill_config);
 
   initialize();
 
@@ -205,7 +208,7 @@ TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueAddsCrashContextIfNoneExi
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
     installScopeTrackedObject: false
   )EOF";
-  config_helper_.addFilter(stop_and_continue_config);
+  config_helper_.prependFilter(stop_and_continue_config);
 
   const std::string request_kill_config =
       R"EOF(
@@ -216,7 +219,7 @@ TEST_P(CrashIntegrationTestAllProtocols, EncodeContinueAddsCrashContextIfNoneExi
           numerator: 100
         direction: RESPONSE
       )EOF";
-  config_helper_.addFilter(request_kill_config);
+  config_helper_.prependFilter(request_kill_config);
 
   initialize();
 

@@ -2,7 +2,7 @@ Examples
 --------
 
 Below we will use YAML representation of the config protos and a running example
-of a service proxying HTTP from 127.0.0.1:10000 to 127.0.0.2:1234.
+of a service proxying HTTP from 127.0.0.1:10000 to 127.0.0.1:1234.
 
 Static
 ^^^^^^
@@ -38,6 +38,8 @@ A minimal fully static bootstrap config is provided below:
                   route: { cluster: some_service }
             http_filters:
             - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     clusters:
     - name: some_service
       connect_timeout: 0.25s
@@ -90,6 +92,8 @@ on 127.0.0.1:5678 is provided below:
                   route: { cluster: some_service }
             http_filters:
             - name: envoy.filters.http.router
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     clusters:
     - name: some_service
       connect_timeout: 0.25s
@@ -97,10 +101,8 @@ on 127.0.0.1:5678 is provided below:
       type: EDS
       eds_cluster_config:
         eds_config:
-          resource_api_version: V3
           api_config_source:
             api_type: GRPC
-            transport_api_version: V3
             grpc_services:
               - envoy_grpc:
                   cluster_name: xds_cluster
@@ -152,7 +154,7 @@ In the above example, the EDS management server could then return a proto encodi
       - endpoint:
           address:
             socket_address:
-              address: 127.0.0.2
+              address: 127.0.0.1
               port_value: 1234
 
 
@@ -177,18 +179,14 @@ below:
 
   dynamic_resources:
     lds_config:
-      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: V3
         grpc_services:
           - envoy_grpc:
               cluster_name: xds_cluster
     cds_config:
-      resource_api_version: V3
       api_config_source:
         api_type: GRPC
-        transport_api_version: V3
         grpc_services:
           - envoy_grpc:
               cluster_name: xds_cluster
@@ -241,15 +239,15 @@ The management server could respond to LDS requests with:
           rds:
             route_config_name: local_route
             config_source:
-              resource_api_version: V3
               api_config_source:
                 api_type: GRPC
-                transport_api_version: V3
                 grpc_services:
                   - envoy_grpc:
                       cluster_name: xds_cluster
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
 The management server could respond to RDS requests with:
 
@@ -279,10 +277,8 @@ The management server could respond to CDS requests with:
     type: EDS
     eds_cluster_config:
       eds_config:
-        resource_api_version: V3
         api_config_source:
           api_type: GRPC
-          transport_api_version: V3
           grpc_services:
             - envoy_grpc:
                 cluster_name: xds_cluster
@@ -300,7 +296,7 @@ The management server could respond to EDS requests with:
       - endpoint:
           address:
             socket_address:
-              address: 127.0.0.2
+              address: 127.0.0.1
               port_value: 1234
 
 Special YAML usage

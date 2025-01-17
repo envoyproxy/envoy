@@ -16,7 +16,9 @@ The following Envoy filters emit dynamic metadata that other filters can leverag
 * :ref:`External Authorization Filter <config_http_filters_ext_authz_dynamic_metadata>`
 * :ref:`External Authorization Network Filter <config_network_filters_ext_authz_dynamic_metadata>`
 * :ref:`Header-To-Metadata Filter <config_http_filters_header_to_metadata>`
-* :ref:`JWT Authentication Filter <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+* :ref:`JWT Authentication Filter <config_http_filters_jwt_authn>` for the extracted
+  :ref:`header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  and :ref:`payload <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
 * :ref:`Mongo Proxy Filter <config_network_filters_mongo_proxy_dynamic_metadata>`
 * :ref:`MySQL Proxy Filter <config_network_filters_mysql_proxy_dynamic_metadata>`
 * :ref:`Postgres Proxy Filter <config_network_filters_postgres_proxy_dynamic_metadata>`
@@ -29,6 +31,7 @@ The following Envoy filters can be configured to consume dynamic metadata emitte
 * :ref:`External Authorization Filter via the metadata context namespaces
   <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.metadata_context_namespaces>`
 * :ref:`RateLimit Filter limit override <config_http_filters_rate_limit_override_dynamic_metadata>`
+* :ref:`Original destination listener filter <config_listener_filters_original_dst>`
 
 .. _shared_dynamic_metadata:
 

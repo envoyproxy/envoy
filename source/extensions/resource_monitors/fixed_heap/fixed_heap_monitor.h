@@ -20,6 +20,8 @@ public:
   virtual uint64_t reservedHeapBytes();
   // Memory in free, unmapped pages in the page heap.
   virtual uint64_t unmappedHeapBytes();
+  // Memory in free, mapped pages in the page heap.
+  virtual uint64_t freeMappedHeapBytes();
 };
 
 /**
@@ -31,7 +33,7 @@ public:
       const envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig& config,
       std::unique_ptr<MemoryStatsReader> stats = std::make_unique<MemoryStatsReader>());
 
-  void updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) override;
+  void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
 private:
   const uint64_t max_heap_;

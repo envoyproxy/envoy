@@ -14,10 +14,10 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/resource_name.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/watcher_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_config_impl.h"
 
@@ -42,13 +42,6 @@ ConfigProviderPtr create(
   ASSERT(config.route_specifier_case() ==
          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
              RouteSpecifierCase::kScopedRoutes);
-  OptionalHttpFilters optional_http_filters;
-  auto& filters = config.http_filters();
-  for (const auto& filter : filters) {
-    if (filter.is_optional()) {
-      optional_http_filters.insert(filter.name());
-    }
-  }
   switch (config.scoped_routes().config_specifier_case()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::kScopedRouteConfigurationsList: {
@@ -60,47 +53,82 @@ ConfigProviderPtr create(
             envoy::config::route::v3::ScopedRouteConfiguration,
             ProtobufTypes::ConstMessagePtrVector>(scoped_route_list.scoped_route_configurations()),
         factory_context,
-        ScopedRoutesConfigProviderManagerOptArg(
-            config.scoped_routes().name(), config.scoped_routes().rds_config_source(),
-            config.scoped_routes().scope_key_builder(), optional_http_filters));
+        ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
+                                                config.scoped_routes().rds_config_source()));
   }
   case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
       ConfigSpecifierCase::kScopedRds:
     return scoped_routes_config_provider_manager.createXdsConfigProvider(
         config.scoped_routes().scoped_rds(), factory_context, init_manager, stat_prefix,
-        ScopedRoutesConfigProviderManagerOptArg(
-            config.scoped_routes().name(), config.scoped_routes().rds_config_source(),
-            config.scoped_routes().scope_key_builder(), optional_http_filters));
-  default:
-    // Proto validation enforces that is not reached.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+        ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
+                                                config.scoped_routes().rds_config_source()));
+  case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
+      ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET:
+    PANIC("not implemented");
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+ScopeKeyBuilderPtr createScopeKeyBuilder(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config) {
+  ASSERT(config.route_specifier_case() ==
+         envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+             RouteSpecifierCase::kScopedRoutes);
+  auto scope_key_builder = config.scoped_routes().scope_key_builder();
+  return std::make_unique<ScopeKeyBuilderImpl>(std::move(scope_key_builder));
 }
 
 } // namespace ScopedRoutesConfigProviderUtil
+
+namespace {
+
+std::vector<ScopedRouteInfoConstSharedPtr>
+makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
+                     Server::Configuration::ServerFactoryContext& factory_context,
+                     ScopedRoutesConfigProviderManager& config_provider_manager) {
+  std::vector<ScopedRouteInfoConstSharedPtr> scopes;
+  for (std::unique_ptr<const Protobuf::Message>& config_proto : config_protos) {
+    auto scoped_route_config =
+        MessageUtil::downcastAndValidate<const envoy::config::route::v3::ScopedRouteConfiguration&>(
+            *config_proto, factory_context.messageValidationContext().staticValidationVisitor());
+    if (!scoped_route_config.route_configuration_name().empty()) {
+      throw EnvoyException("Fetching routes via RDS (route_configuration_name) is not supported "
+                           "with inline scoped routes.");
+    }
+    if (!scoped_route_config.has_route_configuration()) {
+      throw EnvoyException("You must specify a route_configuration with inline scoped routes.");
+    }
+    RouteConfigProviderPtr route_config_provider =
+        config_provider_manager.routeConfigProviderManager().createStaticRouteConfigProvider(
+            scoped_route_config.route_configuration(), factory_context,
+            factory_context.messageValidationContext().staticValidationVisitor());
+    scopes.push_back(std::make_shared<const ScopedRouteInfo>(std::move(scoped_route_config),
+                                                             route_config_provider->configCast()));
+  }
+
+  return scopes;
+}
+
+} // namespace
 
 InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
     ProtobufTypes::ConstMessagePtrVector&& config_protos, std::string name,
     Server::Configuration::ServerFactoryContext& factory_context,
     ScopedRoutesConfigProviderManager& config_provider_manager,
-    envoy::config::core::v3::ConfigSource rds_config_source,
-    envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::ScopeKeyBuilder
-        scope_key_builder)
+    envoy::config::core::v3::ConfigSource rds_config_source)
     : Envoy::Config::ImmutableConfigProviderBase(factory_context, config_provider_manager,
                                                  ConfigProviderInstanceType::Inline,
                                                  ConfigProvider::ApiType::Delta),
       name_(std::move(name)),
-      config_(std::make_shared<ScopedConfigImpl>(std::move(scope_key_builder))),
-      config_protos_(std::make_move_iterator(config_protos.begin()),
-                     std::make_move_iterator(config_protos.end())),
+      scopes_(
+          makeScopedRouteInfos(std::move(config_protos), factory_context, config_provider_manager)),
+      config_(std::make_shared<ScopedConfigImpl>(scopes_)),
       rds_config_source_(std::move(rds_config_source)) {}
 
 ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
-    const OptionalHttpFilters& optional_http_filters, const uint64_t manager_identifier,
-    const std::string& name,
-    const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-        ScopeKeyBuilder& scope_key_builder,
+    const uint64_t manager_identifier, const std::string& name,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     envoy::config::core::v3::ConfigSource rds_config_source,
     RouteConfigProviderManager& route_config_provider_manager,
@@ -108,33 +136,33 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     : DeltaConfigSubscriptionInstance("SRDS", manager_identifier, config_provider_manager,
                                       factory_context),
       Envoy::Config::SubscriptionBase<envoy::config::route::v3::ScopedRouteConfiguration>(
-          scoped_rds.scoped_rds_config_source().resource_api_version(),
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       factory_context_(factory_context), name_(name),
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
-      scope_key_builder_(scope_key_builder), rds_config_source_(std::move(rds_config_source)),
-      stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager),
-      optional_http_filters_(optional_http_filters) {
+      rds_config_source_(std::move(rds_config_source)), stat_prefix_(stat_prefix),
+      route_config_provider_manager_(route_config_provider_manager) {
   const auto resource_name = getResourceName();
   if (scoped_rds.srds_resources_locator().empty()) {
-    subscription_ =
+    subscription_ = THROW_OR_RETURN_VALUE(
         factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
             scoped_rds.scoped_rds_config_source(), Grpc::Common::typeUrl(resource_name), *scope_,
-            *this, resource_decoder_, {});
+            *this, resource_decoder_, {}),
+        Envoy::Config::SubscriptionPtr);
   } else {
-    const auto srds_resources_locator =
-        Envoy::Config::XdsResourceIdentifier::decodeUrl(scoped_rds.srds_resources_locator());
-    subscription_ =
+    const auto srds_resources_locator = THROW_OR_RETURN_VALUE(
+        Envoy::Config::XdsResourceIdentifier::decodeUrl(scoped_rds.srds_resources_locator()),
+        xds::core::v3::ResourceLocator);
+    subscription_ = THROW_OR_RETURN_VALUE(
         factory_context.clusterManager().subscriptionFactory().collectionSubscriptionFromUrl(
             srds_resources_locator, scoped_rds.scoped_rds_config_source(), resource_name, *scope_,
-            *this, resource_decoder_);
+            *this, resource_decoder_),
+        Envoy::Config::SubscriptionPtr);
   }
 
-  initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
-    return std::make_shared<ScopedConfigImpl>(
-        envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-            ScopeKeyBuilder(scope_key_builder));
+  // TODO(tony612): consider not using the callback here.
+  initialize([]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
+    return std::make_shared<ScopedConfigImpl>();
   });
 }
 
@@ -193,12 +221,12 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
     Init::Manager& init_manager) {
   route_provider_ = std::dynamic_pointer_cast<RdsRouteConfigProviderImpl>(
       parent_.route_config_provider_manager_.createRdsRouteConfigProvider(
-          rds, parent_.optional_http_filters_, parent_.factory_context_, parent_.stat_prefix_,
-          init_manager));
+          rds, parent_.factory_context_, parent_.stat_prefix_, init_manager));
 
   rds_update_callback_handle_ = route_provider_->subscription().addUpdateCallback([this]() {
     // Subscribe to RDS update.
-    parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
+    parent_.onRdsConfigUpdate(scope_name_, route_provider_->configCast());
+    return absl::OkStatus();
   });
   parent_.stats_.active_scopes_.inc();
 }
@@ -211,21 +239,19 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
 
   // Create a init_manager to create a rds provider.
   // No transitive warming dependency here because only on demand update reach this point.
-  std::unique_ptr<Init::ManagerImpl> srds_init_mgr =
-      std::make_unique<Init::ManagerImpl>(fmt::format("SRDS on demand init manager."));
-  std::unique_ptr<Cleanup> srds_initialization_continuation =
-      std::make_unique<Cleanup>([this, &srds_init_mgr] {
-        Init::WatcherImpl noop_watcher(
-            fmt::format("SRDS on demand ConfigUpdate watcher: {}", scope_name_),
-            []() { /*Do nothing.*/ });
-        srds_init_mgr->initialize(noop_watcher);
-      });
+  Init::ManagerImpl srds_init_mgr("SRDS on demand init manager.");
+  Cleanup srds_initialization_continuation([this, &srds_init_mgr] {
+    Init::WatcherImpl noop_watcher(
+        fmt::format("SRDS on demand ConfigUpdate watcher: {}", scope_name_),
+        []() { /*Do nothing.*/ });
+    srds_init_mgr.initialize(noop_watcher);
+  });
   // Create route provider.
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(parent_.rds_config_source_);
   rds.set_route_config_name(
       parent_.scoped_route_map_[scope_name_]->configProto().route_configuration_name());
-  initRdsConfigProvider(rds, *srds_init_mgr);
+  initRdsConfigProvider(rds, srds_init_mgr);
   ENVOY_LOG(debug, fmt::format("Scope on demand update: {}", scope_name_));
   // If RouteConfiguration hasn't been initialized, routeConfig() return a shared_ptr to
   // NullConfigImpl. The name of NullConfigImpl is an empty string.
@@ -233,40 +259,78 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
     return;
   }
   // If RouteConfiguration has been initialized, apply update to all the threads.
-  parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
+  parent_.onRdsConfigUpdate(scope_name_, route_provider_->configCast());
 }
 
-bool ScopedRdsConfigSubscription::addOrUpdateScopes(
+absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources, Init::Manager& init_manager,
     const std::string& version_info) {
   bool any_applied = false;
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
   std::vector<ScopedRouteInfoConstSharedPtr> updated_scopes;
+  std::list<RdsRouteConfigProviderHelperPtr> to_be_removed_rds_providers;
   for (const auto& resource : resources) {
     // Explicit copy so that we can std::move later.
     envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
         dynamic_cast<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             resource.get().resource());
     const std::string scope_name = scoped_route_config.name();
+    if (const auto& scope_info_iter = scoped_route_map_.find(scope_name);
+        scope_info_iter != scoped_route_map_.end()) {
+      if (scope_info_iter->second->configHash() == MessageUtil::hash(scoped_route_config)) {
+        continue;
+      }
+      // Remove the old key from scope_names_by_hash_ in case the scope key has changed. (If it
+      // hasn't, we'll just add it back anyway.)
+      if (scope_name_by_hash_.find(scope_info_iter->second->scopeKey().hash()) !=
+          scope_name_by_hash_.end()) {
+        scope_name_by_hash_.erase(scope_info_iter->second->scopeKey().hash());
+      }
+    }
     rds.set_route_config_name(scoped_route_config.route_configuration_name());
     std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
     std::shared_ptr<ScopedRouteInfo> scoped_route_info = nullptr;
-    if (scoped_route_config.on_demand() == false) {
-      // For default scopes, create a rds helper with rds provider initialized.
-      rds_config_provider_helper =
-          std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
-      scoped_route_info = std::make_shared<ScopedRouteInfo>(
-          std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
+    if (scoped_route_config.has_route_configuration()) {
+      RouteConfigProviderPtr route_config_provider =
+          route_config_provider_manager_.createStaticRouteConfigProvider(
+              scoped_route_config.route_configuration(), factory_context_,
+              factory_context_.messageValidationContext().staticValidationVisitor());
+      scoped_route_info = std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config),
+                                                            route_config_provider->configCast());
+      // If this is an update from a scoped route configuration specifying route_configuration_name
+      // to one specifying route_configuration, then the RDS subscription is no longer needed. We
+      // can remove the RDS config provider, but hold on to them until exiting the loop in case the
+      // subscription is reused by another scope still to be added.
+      auto rds_config_provider_helper_iter = route_provider_by_scope_.find(scope_name);
+      if (rds_config_provider_helper_iter != route_provider_by_scope_.end()) {
+        to_be_removed_rds_providers.emplace_back(
+            std::move(rds_config_provider_helper_iter->second));
+        route_provider_by_scope_.erase(rds_config_provider_helper_iter);
+      }
     } else {
-      // For on demand scopes, create a rds helper with rds provider uninitialized.
-      rds_config_provider_helper =
-          std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name);
-      // scope_route_info->routeConfig() will be nullptr, because RouteConfiguration is not loaded.
-      scoped_route_info =
-          std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
+      if (scoped_route_config.route_configuration_name().empty()) {
+        return absl::InvalidArgumentError("route_configuration_name is empty.");
+      }
+      rds.set_route_config_name(scoped_route_config.route_configuration_name());
+      std::unique_ptr<RdsRouteConfigProviderHelper> rds_config_provider_helper;
+      if (scoped_route_config.on_demand() == false) {
+        // For default scopes, create a rds helper with rds provider initialized.
+        rds_config_provider_helper =
+            std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name, rds, init_manager);
+        scoped_route_info = std::make_shared<ScopedRouteInfo>(
+            std::move(scoped_route_config), rds_config_provider_helper->routeConfig());
+      } else {
+        // For on demand scopes, create a rds helper with rds provider uninitialized.
+        rds_config_provider_helper =
+            std::make_unique<RdsRouteConfigProviderHelper>(*this, scope_name);
+        // scope_route_info->routeConfig() will be nullptr, because RouteConfiguration is not
+        // loaded.
+        scoped_route_info =
+            std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
+      }
+      route_provider_by_scope_[scope_name] = std::move(rds_config_provider_helper);
     }
-    route_provider_by_scope_[scope_name] = std::move(rds_config_provider_helper);
     scope_name_by_hash_[scoped_route_info->scopeKey().hash()] = scoped_route_info->scopeName();
     scoped_route_map_[scoped_route_info->scopeName()] = scoped_route_info;
     updated_scopes.push_back(scoped_route_info);
@@ -326,7 +390,7 @@ ScopedRdsConfigSubscription::removeScopes(
   return to_be_removed_rds_providers;
 }
 
-void ScopedRdsConfigSubscription::onConfigUpdate(
+absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
@@ -345,13 +409,12 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   // server.
   std::unique_ptr<Cleanup> srds_initialization_continuation;
   ASSERT(localInitManager().state() > Init::Manager::State::Uninitialized);
-  const auto type_urls =
-      Envoy::Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
+  const auto type_url = Envoy::Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
   // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
   // In the case that localInitManager is uninitialized, RDS is already paused
   // either by Server init or LDS init.
   if (factory_context_.clusterManager().adsMux()) {
-    resume_rds = factory_context_.clusterManager().adsMux()->pause(type_urls);
+    resume_rds = factory_context_.clusterManager().adsMux()->pause(type_url);
   }
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
@@ -373,7 +436,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources =
       detectUpdateConflictAndCleanupRemoved(added_resources, removed_resources, exception_msg);
   if (!exception_msg.empty()) {
-    throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}", exception_msg));
+    return absl::InvalidArgumentError(
+        fmt::format("Error adding/updating scoped route(s): {}", exception_msg));
   }
 
   // Do not delete RDS config providers just yet, in case the to be deleted RDS subscriptions could
@@ -381,31 +445,35 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
       to_be_removed_rds_providers = removeScopes(clean_removed_resources, version_info);
 
-  bool any_applied =
-      addOrUpdateScopes(added_resources,
-                        (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
-                        version_info) ||
-      !to_be_removed_rds_providers.empty();
-  ConfigSubscriptionCommonBase::onConfigUpdate();
-  if (any_applied) {
+  auto status_or_applied = addOrUpdateScopes(
+      added_resources, (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
+      version_info);
+  if (!status_or_applied.status().ok()) {
+    return status_or_applied.status();
+  }
+  const bool any_applied = status_or_applied.value();
+  const auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
+  if (!status.ok()) {
+    return status;
+  }
+  if (any_applied || !to_be_removed_rds_providers.empty()) {
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
   }
   stats_.all_scopes_.set(scoped_route_map_.size());
   stats_.config_reload_.inc();
   stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
+  return absl::OkStatus();
 }
 
 void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_name,
-                                                    RdsRouteConfigSubscription& rds_subscription) {
+                                                    ConfigConstSharedPtr new_rds_config) {
   auto iter = scoped_route_map_.find(scope_name);
   ASSERT(iter != scoped_route_map_.end(),
          fmt::format("trying to update route config for non-existing scope {}", scope_name));
   auto new_scoped_route_info = std::make_shared<ScopedRouteInfo>(
       envoy::config::route::v3::ScopedRouteConfiguration(iter->second->configProto()),
-      std::make_shared<ConfigImpl>(
-          rds_subscription.routeConfigUpdate()->protobufConfiguration(), optional_http_filters_,
-          factory_context_, factory_context_.messageValidationContext().dynamicValidationVisitor(),
-          false));
+      std::move(new_rds_config));
+  scoped_route_map_[new_scoped_route_info->scopeName()] = new_scoped_route_info;
   applyConfigUpdate([new_scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
                         -> ConfigProvider::ConfigConstSharedPtr {
     auto* thread_local_scoped_config =
@@ -419,14 +487,14 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
 
 // TODO(stevenzzzz): see issue #7508, consider generalizing this function as it overlaps with
 // CdsApiImpl::onConfigUpdate.
-void ScopedRdsConfigSubscription::onConfigUpdate(
+absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const std::string& version_info) {
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (const auto& scoped_route : scoped_route_map_) {
     *to_remove_repeated.Add() = scoped_route.first;
   }
-  onConfigUpdate(resources, to_remove_repeated, version_info);
+  return onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
 Protobuf::RepeatedPtrField<std::string>
@@ -490,8 +558,8 @@ void ScopedRdsConfigSubscription::onDemandRdsUpdate(
     std::shared_ptr<Router::ScopeKey> scope_key, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallback&& route_config_updated_cb,
     std::weak_ptr<Envoy::Config::ConfigSubscriptionCommonBase> weak_subscription) {
-  factory_context_.dispatcher().post([this, &thread_local_dispatcher, scope_key,
-                                      route_config_updated_cb, weak_subscription]() {
+  factory_context_.mainThreadDispatcher().post([this, &thread_local_dispatcher, scope_key,
+                                                route_config_updated_cb, weak_subscription]() {
     // If the subscription has been destroyed, return immediately.
     if (!weak_subscription.lock()) {
       thread_local_dispatcher.post([route_config_updated_cb] { route_config_updated_cb(false); });
@@ -538,8 +606,7 @@ ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& na
         if (!name_matcher.match(it.second->configProto().name())) {
           continue;
         }
-        dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
-            API_RECOVER_ORIGINAL(it.second->configProto()));
+        dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(it.second->configProto());
       }
       TimestampUtil::systemClockToTimestamp(subscription->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
@@ -556,8 +623,7 @@ ScopedRoutesConfigProviderManager::dumpConfigs(const Matchers::StringMatcher& na
       if (!name_matcher.match(config_proto->name())) {
         continue;
       }
-      inline_config->mutable_scoped_route_configs()->Add()->PackFrom(
-          API_RECOVER_ORIGINAL(*config_proto));
+      inline_config->mutable_scoped_route_configs()->Add()->PackFrom(*config_proto);
     }
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *inline_config->mutable_last_updated());
@@ -582,11 +648,10 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
                 const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds&>(
                 config_source_proto);
             return std::make_shared<ScopedRdsConfigSubscription>(
-                scoped_rds_config_source, typed_optarg.optional_http_filters_, manager_identifier,
-                typed_optarg.scoped_routes_name_, typed_optarg.scope_key_builder_, factory_context,
-                stat_prefix, typed_optarg.rds_config_source_,
+                scoped_rds_config_source, manager_identifier, typed_optarg.scoped_routes_name_,
+                factory_context, stat_prefix, typed_optarg.rds_config_source_,
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager)
-                    .routeConfigProviderPanager(),
+                    .routeConfigProviderManager(),
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager));
           });
 
@@ -600,8 +665,10 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createStaticConfigProvider(
   const auto& typed_optarg = static_cast<const ScopedRoutesConfigProviderManagerOptArg&>(optarg);
   return std::make_unique<InlineScopedRoutesConfigProvider>(
       std::move(config_protos), typed_optarg.scoped_routes_name_, factory_context, *this,
-      typed_optarg.rds_config_source_, typed_optarg.scope_key_builder_);
+      typed_optarg.rds_config_source_);
 }
+
+REGISTER_FACTORY(SrdsFactoryDefault, SrdsFactory);
 
 } // namespace Router
 } // namespace Envoy

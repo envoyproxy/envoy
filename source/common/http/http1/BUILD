@@ -21,6 +21,7 @@ envoy_cc_library(
     name = "codec_stats_lib",
     hdrs = ["codec_stats.h"],
     deps = [
+        "//envoy/http:header_validator_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//source/common/common:thread_lib",
@@ -32,6 +33,7 @@ envoy_cc_library(
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
     deps = [
+        ":balsa_parser_lib",
         ":codec_stats_lib",
         ":header_formatter_lib",
         ":legacy_parser_lib",
@@ -41,6 +43,7 @@ envoy_cc_library(
         "//envoy/http:codec_interface",
         "//envoy/http:header_map_interface",
         "//envoy/network:connection_interface",
+        "//envoy/server/overload:overload_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
@@ -66,7 +69,6 @@ envoy_cc_library(
     name = "conn_pool_lib",
     srcs = ["conn_pool.cc"],
     hdrs = ["conn_pool.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
@@ -81,6 +83,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/upstream:upstream_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -88,11 +91,12 @@ envoy_cc_library(
     name = "settings_lib",
     srcs = ["settings.cc"],
     hdrs = ["settings.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/http:codec_interface",
         "//envoy/protobuf:message_validator_interface",
         "//source/common/config:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -110,9 +114,25 @@ envoy_cc_library(
     name = "legacy_parser_lib",
     srcs = ["legacy_parser_impl.cc"],
     hdrs = ["legacy_parser_impl.h"],
-    external_deps = ["http_parser"],
+    deps = [
+        ":parser_interface",
+        "//bazel/external/http_parser",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "balsa_parser_lib",
+    srcs = ["balsa_parser.cc"],
+    hdrs = ["balsa_parser.h"],
     deps = [
         ":parser_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:regex_lib",
+        "//source/common/http:headers_lib",
+        "@com_github_google_quiche//:quiche_balsa_balsa_enums_lib",
+        "@com_github_google_quiche//:quiche_balsa_balsa_frame_lib",
+        "@com_github_google_quiche//:quiche_balsa_balsa_headers_lib",
+        "@com_github_google_quiche//:quiche_balsa_balsa_visitor_interface_lib",
     ],
 )

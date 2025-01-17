@@ -45,6 +45,8 @@ static_resources:
                           typed_config:
                             "@type": type.googleapis.com/envoy.extensions.filters.common.matcher.action.v3.SkipFilter
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           route_config:
             virtual_hosts:
             - name: default
@@ -64,11 +66,3 @@ static_resources:
               socket_address:
                 address: 127.0.0.1
                 port_value: 8080
-
-layered_runtime:
-  layers:
-  - name: static-layer
-    static_layer:
-      envoy:
-        reloadable_features:
-          experimental_matching_api: true

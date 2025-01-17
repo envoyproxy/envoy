@@ -94,14 +94,148 @@ public:
           return protocol_;
         }),
         serializer_register_(serializer_factory_), protocol_register_(protocol_factory_) {
-    context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
+    context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
+  }
+
+  void verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match) {
+    ProtobufWkt::Struct request_struct;
+    ProtobufWkt::Value val;
+
+    // Populate metadata like StreamInfo.setDynamicMetadata() would.
+    auto& fields_map = *request_struct.mutable_fields();
+    val.set_string_value("v3.1");
+    fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
+    val.set_string_value("1");
+    fields_map["xkey_in_request"] = val;
+    (*callbacks_.stream_info_.metadata_
+          .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+        request_struct;
+
+    // Populate route entry's metadata which will be overridden.
+    val.set_string_value("v3.0");
+    fields_map = *request_struct.mutable_fields();
+    fields_map["version"] = val;
+    fields_map.erase("xkey_in_request");
+    Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(request_struct);
+
+    if (route_entry_has_match) {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(&route_entry_matches));
+    } else {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+    }
+
+    auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+
+    EXPECT_EQ(match.size(), 3);
+    auto it = match.begin();
+
+    // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+    // below matters.
+
+    // `stage` was only set by the request, not by the route entry.
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    // `version` should be what came from the request, overriding the route entry.
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+    it++;
+
+    // `key_in_request` was only set by the request
+    EXPECT_EQ((*it)->name(), "xkey_in_request");
+    EXPECT_EQ((*it)->value().value().string_value(), "1");
+  }
+
+  void verifyMetadataMatchCriteriaFromRoute(bool route_entry_has_match) {
+    ProtobufWkt::Struct route_struct;
+    ProtobufWkt::Value val;
+
+    // Populate metadata like StreamInfo.setDynamicMetadata() would.
+    auto& fields_map = *route_struct.mutable_fields();
+    val.set_string_value("v3.1");
+    fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
+    val.set_string_value("1");
+    fields_map["xkey_in_request"] = val;
+
+    Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(route_struct);
+
+    if (route_entry_has_match) {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(&route_entry_matches));
+
+      EXPECT_NE(nullptr, router_->metadataMatchCriteria());
+      auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+      EXPECT_EQ(match.size(), 3);
+      auto it = match.begin();
+
+      // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+      // below matters.
+
+      EXPECT_EQ((*it)->name(), "stage");
+      EXPECT_EQ((*it)->value().value().string_value(), "devel");
+      it++;
+
+      EXPECT_EQ((*it)->name(), "version");
+      EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+      it++;
+
+      EXPECT_EQ((*it)->name(), "xkey_in_request");
+      EXPECT_EQ((*it)->value().value().string_value(), "1");
+    } else {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+
+      EXPECT_EQ(nullptr, router_->metadataMatchCriteria());
+    }
+  }
+
+  void verifyMetadataMatchCriteriaFromPreviousCompute() {
+    ProtobufWkt::Struct request_struct;
+    ProtobufWkt::Value val;
+
+    // Populate metadata like StreamInfo.setDynamicMetadata() would.
+    auto& fields_map = *request_struct.mutable_fields();
+    val.set_string_value("v3.1");
+    fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
+    (*callbacks_.stream_info_.metadata_
+          .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+        request_struct;
+
+    ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+
+    auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+    EXPECT_EQ(match.size(), 2);
+
+    val.set_string_value("1");
+    fields_map["xkey_in_request"] = val;
+
+    (*callbacks_.stream_info_.metadata_
+          .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+        request_struct;
+
+    match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+    EXPECT_EQ(match.size(), 2);
+
+    auto it = match.begin();
+
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
   }
 
   void initializeRouter() {
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_ = std::make_unique<Router>(context_.clusterManager());
+    router_ = std::make_unique<Router>(context_.server_factory_context_.clusterManager());
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
@@ -149,20 +283,23 @@ public:
   }
 
   void connectUpstream() {
-    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+    EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.connection_data_,
                 addUpstreamCallbacks(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
         }));
 
     conn_state_.reset();
-    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+    EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.connection_data_,
                 connectionState())
         .WillRepeatedly(
             Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
 
     EXPECT_CALL(callbacks_, continueDecoding());
-    context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(upstream_connection_);
+    context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+        .poolReady(upstream_connection_);
 
     EXPECT_NE(nullptr, upstream_callbacks_);
   }
@@ -174,7 +311,8 @@ public:
 
     initializeMetadata(msg_type);
 
-    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+    EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.connection_data_,
                 addUpstreamCallbacks(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
@@ -192,12 +330,15 @@ public:
     EXPECT_CALL(callbacks_, protocolType()).WillOnce(Return(ProtocolType::Dubbo));
 
     EXPECT_CALL(callbacks_, continueDecoding()).Times(0);
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+    EXPECT_CALL(
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+        newConnection(_))
         .WillOnce(
             Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-              context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
-              context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
-                  upstream_connection_);
+              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .newConnectionImpl(cb);
+              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .poolReady(upstream_connection_);
               return nullptr;
             }));
   }
@@ -217,8 +358,9 @@ public:
 
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(DubboFilters::UpstreamResponseStatus::Complete));
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
-                released(Ref(upstream_connection_)));
+    EXPECT_CALL(
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+        released(Ref(upstream_connection_)));
     upstream_callbacks_->onUpstreamData(buffer, false);
   }
 
@@ -273,8 +415,32 @@ TEST_F(DubboRouterTest, PoolRemoteConnectionFailure) {
       }));
   startRequest(MessageType::Request);
 
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+}
+
+TEST_F(DubboRouterTest, PoolLocalConnectionFailure) {
+  initializeRouter();
+
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_FALSE(end_stream);
+      }));
+  startRequest(MessageType::Request);
+
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 }
 
 TEST_F(DubboRouterTest, PoolTimeout) {
@@ -289,8 +455,8 @@ TEST_F(DubboRouterTest, PoolTimeout) {
       }));
   startRequest(MessageType::Request);
 
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::Timeout);
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::Timeout);
 }
 
 TEST_F(DubboRouterTest, PoolOverflowFailure) {
@@ -305,8 +471,8 @@ TEST_F(DubboRouterTest, PoolOverflowFailure) {
       }));
   startRequest(MessageType::Request);
 
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::Overflow);
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::Overflow);
 }
 
 TEST_F(DubboRouterTest, ClusterMaintenanceMode) {
@@ -316,7 +482,9 @@ TEST_F(DubboRouterTest, ClusterMaintenanceMode) {
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, maintenanceMode())
+  EXPECT_CALL(
+      *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+      maintenanceMode())
       .WillOnce(Return(true));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
@@ -326,7 +494,7 @@ TEST_F(DubboRouterTest, ClusterMaintenanceMode) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
         EXPECT_FALSE(end_stream);
       }));
-  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
+  EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
 TEST_F(DubboRouterTest, NoHealthyHosts) {
@@ -336,7 +504,8 @@ TEST_F(DubboRouterTest, NoHealthyHosts) {
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(Return(absl::nullopt));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
@@ -347,11 +516,11 @@ TEST_F(DubboRouterTest, NoHealthyHosts) {
         EXPECT_FALSE(end_stream);
       }));
 
-  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
+  EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
 TEST_F(DubboRouterTest, PoolConnectionFailureWithOnewayMessage) {
-  context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+  context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
   initializeRouter();
   initializeMetadata(MessageType::Oneway);
 
@@ -361,8 +530,8 @@ TEST_F(DubboRouterTest, PoolConnectionFailureWithOnewayMessage) {
   EXPECT_CALL(callbacks_, resetStream());
   EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
 
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   destroyRouter();
 }
@@ -379,7 +548,7 @@ TEST_F(DubboRouterTest, NoRoute) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
         EXPECT_FALSE(end_stream);
       }));
-  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
+  EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
 TEST_F(DubboRouterTest, NoCluster) {
@@ -389,7 +558,8 @@ TEST_F(DubboRouterTest, NoCluster) {
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq(cluster_name_)))
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(Eq(cluster_name_)))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
@@ -398,7 +568,42 @@ TEST_F(DubboRouterTest, NoCluster) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
         EXPECT_FALSE(end_stream);
       }));
-  EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
+  EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRequest) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromRequest(true);
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromRequest(false);
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRoute) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromRoute(true);
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRouteNoRouteEntryMatch) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromRoute(false);
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromPreviousCompute) {
+  initializeRouter();
+  startRequest(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromPreviousCompute();
 }
 
 TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
@@ -476,8 +681,9 @@ TEST_F(DubboRouterTest, OneWay) {
   initializeRouter();
   initializeMetadata(MessageType::Oneway);
 
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
-              released(Ref(upstream_connection_)));
+  EXPECT_CALL(
+      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+      released(Ref(upstream_connection_)));
 
   startRequest(MessageType::Oneway);
   connectUpstream();
@@ -529,13 +735,14 @@ TEST_F(DubboRouterTest, AttachmentUpdated) {
   // Verify that the attachment is properly serialized.
   Hessian2::Decoder decoder(
       std::make_unique<BufferReader>(upstream_request_buffer, origin_message_size));
-  EXPECT_EQ("fake_attach_value",
-            *(decoder.decode<Hessian2::Object>()
-                  ->toUntypedMap()
-                  .value()
-                  ->at(std::make_unique<Hessian2::StringObject>("fake_attach_key"))
-                  ->toString()
-                  .value()));
+  EXPECT_EQ("fake_attach_value", decoder.decode<Hessian2::Object>()
+                                     ->toUntypedMap()
+                                     .value()
+                                     .get()
+                                     .at("fake_attach_key")
+                                     ->toString()
+                                     .value()
+                                     .get());
 
   // Check new body size value.
   EXPECT_EQ(upstream_request_buffer.peekBEInt<int32_t>(12), upstream_request_buffer.length() - 16);
@@ -596,7 +803,9 @@ TEST_F(DubboRouterTest, DestroyWhileConnecting) {
   initializeMetadata(MessageType::Request);
 
   NiceMock<Envoy::ConnectionPool::MockCancellable> conn_pool_handle;
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+  EXPECT_CALL(
+      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+      newConnection(_))
       .WillOnce(Invoke([&](Tcp::ConnectionPool::Callbacks&) -> Tcp::ConnectionPool::Cancellable* {
         return &conn_pool_handle;
       }));
@@ -639,9 +848,9 @@ TEST_F(DubboRouterTest, ResponseOk) {
   response_meta->setMessageType(MessageType::Response);
   response_meta->setResponseStatus(ResponseStatus::Ok);
 
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
   EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
 
   destroyRouter();
@@ -656,9 +865,9 @@ TEST_F(DubboRouterTest, ResponseException) {
   response_meta->setMessageType(MessageType::Exception);
   response_meta->setResponseStatus(ResponseStatus::Ok);
 
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
   EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
 
   destroyRouter();
@@ -673,9 +882,9 @@ TEST_F(DubboRouterTest, ResponseServerTimeout) {
   response_meta->setMessageType(MessageType::Response);
   response_meta->setResponseStatus(ResponseStatus::ServerTimeout);
 
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
 
   destroyRouter();
@@ -690,9 +899,9 @@ TEST_F(DubboRouterTest, ResponseServerError) {
   response_meta->setMessageType(MessageType::Response);
   response_meta->setResponseStatus(ResponseStatus::ServiceError);
 
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
   EXPECT_EQ(FilterStatus::Continue, router_->onMessageEncoded(response_meta, message_context_));
 
   destroyRouter();

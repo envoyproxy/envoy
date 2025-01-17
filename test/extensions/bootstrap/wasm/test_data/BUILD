@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary", "wasm_rust_binary")
@@ -15,11 +15,11 @@ wasm_rust_binary(
     wasi = True,
     deps = [
         "@proxy_wasm_rust_sdk//:proxy_wasm",
-        "@proxy_wasm_rust_sdk//bazel/cargo:log",
+        "@proxy_wasm_rust_sdk//bazel/cargo/remote:log",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "speed_cpp_plugin",
     srcs = [
         "speed_cpp.cc",
@@ -27,15 +27,15 @@ envoy_cc_library(
     ],
     copts = ["-DNULL_PLUGIN=1"],
     deps = [
-        "//external:abseil_node_hash_map",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_lib",
+        "@com_google_absl//absl/container:node_hash_map",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "start_cpp_plugin",
     srcs = [
         "start_cpp.cc",
@@ -43,15 +43,15 @@ envoy_cc_library(
     ],
     copts = ["-DNULL_PLUGIN=1"],
     deps = [
-        "//external:abseil_node_hash_map",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:wasm_lib",
+        "@com_google_absl//absl/container:node_hash_map",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "stats_cpp_plugin",
     srcs = [
         "stats_cpp.cc",
@@ -59,11 +59,11 @@ envoy_cc_library(
     ],
     copts = ["-DNULL_PLUGIN=1"],
     deps = [
-        "//external:abseil_node_hash_map",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
         "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:wasm_lib",
+        "@com_google_absl//absl/container:node_hash_map",
     ],
 )
 
@@ -108,9 +108,7 @@ envoy_wasm_cc_binary(
 envoy_wasm_cc_binary(
     name = "speed_cpp.wasm",
     srcs = ["speed_cpp.cc"],
-    deps = [
-        "@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics_full",
-    ],
+    protobuf = "full",
 )
 
 envoy_wasm_cc_binary(

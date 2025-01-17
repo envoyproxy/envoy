@@ -1,0 +1,50 @@
+# This configuration listens on port 9999 and creates TCP connections to port 10000 using an
+# intermediate internal listener.
+bootstrap_extensions:
+- name: envoy.bootstrap.internal_listener
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
+static_resources:
+  listeners:
+  - name: ingress
+    address:
+      socket_address:
+        protocol: TCP
+        address: 127.0.0.1
+        port_value: 9999
+    filter_chains:
+    - filters:
+      - name: tcp
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: ingress
+          cluster: encap_cluster
+  - name: encap
+    internal_listener: {}
+    filter_chains:
+    - filters:
+      - name: tcp
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: encap
+          cluster: cluster_0
+  clusters:
+  - name: encap_cluster
+    load_assignment:
+      cluster_name: encap_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              envoy_internal_address:
+                server_listener_name: encap
+  - name: cluster_0
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 10000

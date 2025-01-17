@@ -1,6 +1,10 @@
 # This configuration terminates a CONNECT request and sends the CONNECT payload upstream.
-# It can be used to test TCP tunneling as described in docs/root/intro/arch_overview/http/upgrades.rst
-# or used to test CONNECT directly, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com`
+# It can be used to test TCP tunneling as described in
+# https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
+# or used to test CONNECT to domain such as www.google.com, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com.
+#
+# To test the CONNECT to tcp address 127.0.0.1:10003, run
+# `curl -k -v -x 127.0.0.1:10001 --proxy-header "foo: bar" https://127.0.0.1:10003`.
 admin:
   address:
     socket_address:
@@ -31,6 +35,19 @@ static_resources:
               - match:
                   connect_matcher:
                     {}
+                  headers:
+                  - name: foo
+                    string_match:
+                      exact: bar
+                route:
+                  cluster: local_original_dst
+                  upgrade_configs:
+                  - upgrade_type: CONNECT
+                    connect_config:
+                      {}
+              - match:
+                  connect_matcher:
+                    {}
                 route:
                   cluster: service_google
                   upgrade_configs:
@@ -39,6 +56,8 @@ static_resources:
                       {}
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           http_protocol_options: {}
           upgrade_configs:
           - upgrade_type: CONNECT
@@ -58,3 +77,10 @@ static_resources:
               socket_address:
                 address: www.google.com
                 port_value: 443
+  - name: local_original_dst
+    connect_timeout: 0.25s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    original_dst_lb_config:
+      use_http_header: true
+      http_header_name: ":authority"

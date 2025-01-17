@@ -1,0 +1,78 @@
+{#
+  Template for response serialization/deserialization tests.
+  For every response, we want to check if it can be serialized and deserialized properly.
+#}
+
+#include "contrib/kafka/filters/network/source/external/responses.h"
+#include "contrib/kafka/filters/network/source/response_codec.h"
+
+#include "contrib/kafka/filters/network/test/buffer_based_test.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+namespace ResponseTest {
+
+class ResponseTest : public testing::Test, public MessageBasedTest<ResponseEncoder> {
+protected:
+  template <typename T> std::shared_ptr<T> serializeAndDeserialize(T message);
+};
+
+class MockMessageListener : public ResponseCallback {
+public:
+  MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr));
+  MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr));
+};
+
+/**
+ * Helper method.
+ * Takes an instance of a response, serializes it, then deserializes it.
+ * This method gets executed for every response * version pair.
+ */
+template <typename T> std::shared_ptr<T> ResponseTest::serializeAndDeserialize(T message) {
+  putMessageIntoBuffer(message);
+
+  std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
+  ResponseDecoder testee{ {mock_listener} };
+  const ResponseMetadata& metadata = message.metadata_;
+  testee.expectResponse(metadata.correlation_id_, metadata.api_key_, metadata.api_version_);
+
+  AbstractResponseSharedPtr received_message;
+  EXPECT_CALL(*mock_listener, onMessage(testing::_))
+    .WillOnce(testing::SaveArg<0>(&received_message));
+
+  testee.onData(buffer_);
+
+  return std::dynamic_pointer_cast<T>(received_message);
+};
+
+{#
+  Concrete tests for each message_type and version (field_list).
+  Each response is naively constructed using some default values
+  (put "string" as std::string, 32 as uint32_t, etc.).
+#}
+{% for message_type in message_types %}{% for field_list in message_type.compute_field_lists() %}
+TEST_F(ResponseTest, ShouldParse{{ message_type.name }}V{{ field_list.version }}) {
+  // given
+  {{ message_type.name }} data = { {{ field_list.example_value() }} };
+  Response<{{ message_type.name }}> message = { {
+    {{ message_type.get_extra('api_key') }}, {{ field_list.version }}, 0 }, data };
+
+  // when
+  auto received = serializeAndDeserialize(message);
+
+  // then
+  ASSERT_NE(received, nullptr);
+  ASSERT_EQ(*received, message);
+}
+{% endfor %}{% endfor %}
+
+} // namespace ResponseTest
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

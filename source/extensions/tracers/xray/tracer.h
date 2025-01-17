@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "envoy/common/time.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/hex.h"
@@ -13,6 +13,7 @@
 #include "source/common/http/codes.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/tracing/common_values.h"
+#include "source/common/tracing/trace_context_impl.h"
 #include "source/extensions/tracers/xray/daemon_broker.h"
 #include "source/extensions/tracers/xray/sampling_strategy.h"
 #include "source/extensions/tracers/xray/xray_configuration.h"
@@ -25,7 +26,12 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-constexpr auto XRayTraceHeader = "x-amzn-trace-id";
+constexpr absl::string_view SpanClientIp = "client_ip";
+constexpr absl::string_view SpanXForwardedFor = "x_forwarded_for";
+constexpr absl::string_view Subsegment = "subsegment";
+
+const Tracing::TraceContextHandler& xRayTraceHeader();
+const Tracing::TraceContextHandler& xForwardedForHeader();
 
 class Span : public Tracing::Span, Logger::Loggable<Logger::Id::config> {
 public:
@@ -38,8 +44,7 @@ public:
    */
   Span(TimeSource& time_source, Random::RandomGenerator& random, DaemonBroker& broker)
       : time_source_(time_source), random_(random), broker_(broker),
-        id_(Hex::uint64ToHex(random_.random())), server_error_(false), response_status_code_(0),
-        sampled_(true) {}
+        id_(Hex::uint64ToHex(random_.random())) {}
 
   /**
    * Sets the Span's trace ID.
@@ -63,6 +68,12 @@ public:
   void setOperation(absl::string_view operation) override {
     operation_name_ = std::string(operation);
   }
+
+  /**
+   * Sets the current direction on the Span.
+   * This information will be included in the X-Ray span's annotation.
+   */
+  void setDirection(absl::string_view direction) { direction_ = std::string(direction); }
 
   /**
    * Sets the name of the Span.
@@ -96,10 +107,37 @@ public:
   }
 
   /**
+   * Sets the type of the Span. In X-Ray, an independent subsegment has a type of "subsegment".
+   * https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html#api-segmentdocuments-subsegments
+   */
+  void setType(absl::string_view type) { type_ = std::string(type); }
+
+  /**
    * Sets the aws metadata field of the Span.
    */
   void setAwsMetadata(const absl::flat_hash_map<std::string, ProtobufWkt::Value>& aws_metadata) {
     aws_metadata_ = aws_metadata;
+  }
+
+  /*
+   * Adds to the http request annotation field of the Span.
+   */
+  void addToHttpRequestAnnotations(absl::string_view key, const ProtobufWkt::Value& value) {
+    http_request_annotations_.emplace(std::string(key), value);
+  }
+
+  /*
+   * Check if key is set in http request annotation field of a Span.
+   */
+  bool hasKeyInHttpRequestAnnotations(absl::string_view key) {
+    return http_request_annotations_.find(key) != http_request_annotations_.end();
+  }
+
+  /*
+   * Adds to the http response annotation field of the Span.
+   */
+  void addToHttpResponseAnnotations(absl::string_view key, const ProtobufWkt::Value& value) {
+    http_response_annotations_.emplace(std::string(key), value);
   }
 
   /**
@@ -128,7 +166,8 @@ public:
   /**
    * Adds X-Ray trace header to the set of outgoing headers.
    */
-  void injectContext(Tracing::TraceContext& trace_context) override;
+  void injectContext(Tracing::TraceContext& trace_context,
+                     const Tracing::UpstreamContext&) override;
 
   /**
    * Gets the start time of this Span.
@@ -140,7 +179,20 @@ public:
    */
   const std::string& id() const { return id_; }
 
+  /**
+   * Gets this Span's parent ID.
+   */
   const std::string& parentId() const { return parent_segment_id_; }
+
+  /**
+   * Gets this Span's direction.
+   */
+  const std::string& direction() const { return direction_; }
+
+  /**
+   * Gets this Span's type.
+   */
+  const std::string& type() const { return type_; }
 
   /**
    * Gets this Span's name.
@@ -178,8 +230,10 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
 
-  // TODO: This method is unimplemented for X-Ray.
-  std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+  std::string getTraceId() const override { return trace_id_; };
+
+  // TODO(#34412): This method is unimplemented for X-Ray.
+  std::string getSpanId() const override { return EMPTY_STRING; };
 
   /**
    * Creates a child span.
@@ -196,18 +250,20 @@ private:
   DaemonBroker& broker_;
   Envoy::SystemTime start_time_;
   std::string operation_name_;
+  std::string direction_;
   std::string id_;
   std::string trace_id_;
   std::string parent_segment_id_;
   std::string name_;
   std::string origin_;
+  std::string type_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_request_annotations_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
   absl::flat_hash_map<std::string, std::string> custom_annotations_;
-  bool server_error_;
-  uint64_t response_status_code_;
-  bool sampled_;
+  bool server_error_{false};
+  uint64_t response_status_code_{0};
+  bool sampled_{true};
 };
 
 using SpanPtr = std::unique_ptr<Span>;
@@ -222,15 +278,17 @@ public:
   /**
    * Starts a tracing span for X-Ray
    */
-  Tracing::SpanPtr startSpan(const std::string& operation_name, Envoy::SystemTime start_time,
-                             const absl::optional<XRayHeader>& xray_header);
+  Tracing::SpanPtr startSpan(const Tracing::Config&, const std::string& operation_name,
+                             Envoy::SystemTime start_time,
+                             const absl::optional<XRayHeader>& xray_header,
+                             const absl::optional<absl::string_view> client_ip);
   /**
    * Creates a Span that is marked as not-sampled.
    * This is useful when the sampling decision is done in Envoy's X-Ray and we want to avoid
    * overruling that decision in the upstream service in case that service itself uses X-Ray for
-   * tracing.
+   * tracing. Also at the same time if X-Ray header is set then preserve its value.
    */
-  XRay::SpanPtr createNonSampledSpan() const;
+  XRay::SpanPtr createNonSampledSpan(const absl::optional<XRayHeader>& xray_header) const;
 
 private:
   const std::string segment_name_;

@@ -1,4 +1,4 @@
-#include "envoy/extensions/watchdog/profile_action/v3alpha/profile_action.pb.h"
+#include "envoy/extensions/watchdog/profile_action/v3/profile_action.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/guarddog_config.h"
 
@@ -30,8 +30,8 @@ TEST(ProfileActionFactoryTest, CanCreateAction) {
           "config": {
             "name": "envoy.watchdog.profile_action",
             "typed_config": {
-              "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-              "type_url": "type.googleapis.com/envoy.extensions.watchdog.profile_action.v3alpha.ProfileActionConfig",
+              "@type": "type.googleapis.com/xds.type.v3.TypedStruct",
+              "type_url": "type.googleapis.com/envoy.extensions.watchdog.profile_action.v3.ProfileActionConfig",
               "value": {
                 "profile_duration": "2s",
                 "profile_path": "/tmp/envoy/",
@@ -46,7 +46,8 @@ TEST(ProfileActionFactoryTest, CanCreateAction) {
   Stats::TestUtil::TestStore stats;
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest(stats);
-  Server::Configuration::GuardDogActionFactoryContext context{*api, dispatcher, stats, "test"};
+  Server::Configuration::GuardDogActionFactoryContext context{*api, dispatcher, *stats.rootScope(),
+                                                              "test"};
 
   EXPECT_CALL(dispatcher, createTimer_(_));
   EXPECT_NE(factory->createGuardDogActionFromProto(config, context), nullptr);

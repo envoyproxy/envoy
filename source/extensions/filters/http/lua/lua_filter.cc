@@ -1,6 +1,10 @@
 #include "source/extensions/filters/http/lua/lua_filter.h"
 
+#include <lua.h>
+
 #include <atomic>
+#include <cstdint>
+#include <functional>
 #include <memory>
 
 #include "envoy/http/codes.h"
@@ -9,6 +13,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/config/datasource.h"
+#include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
 
@@ -21,32 +26,83 @@ namespace Lua {
 
 namespace {
 
+using OptionHandler =
+    std::function<void(lua_State* state, StreamHandleWrapper::HttpCallOptions& options)>;
+using OptionHandlers = std::map<absl::string_view, OptionHandler>;
+
+const OptionHandlers& optionHandlers() {
+  CONSTRUCT_ON_FIRST_USE(OptionHandlers,
+                         {
+                             {"asynchronous",
+                              [](lua_State* state, StreamHandleWrapper::HttpCallOptions& options) {
+                                // Handle the case when the table has: {["asynchronous"] =
+                                // <boolean>} entry.
+                                options.is_async_request_ = lua_toboolean(state, -1);
+                              }},
+                             {"timeout_ms",
+                              [](lua_State* state, StreamHandleWrapper::HttpCallOptions& options) {
+                                // Handle the case when the table has: {["timeout_ms"] = <int>}
+                                // entry.
+                                const int timeout_ms = luaL_checkint(state, -1);
+                                if (timeout_ms < 0) {
+                                  luaL_error(state, "http call timeout must be >= 0");
+                                } else {
+                                  options.request_options_.setTimeout(
+                                      std::chrono::milliseconds(timeout_ms));
+                                }
+                              }},
+                             {"trace_sampled",
+                              [](lua_State* state, StreamHandleWrapper::HttpCallOptions& options) {
+                                const bool sampled = lua_toboolean(state, -1);
+                                options.request_options_.setSampled(sampled);
+                              }},
+                             {"return_duplicate_headers",
+                              [](lua_State* state, StreamHandleWrapper::HttpCallOptions& options) {
+                                // Handle the case when the table has: {["return_duplicate_headers"]
+                                // = <boolean>} entry.
+                                options.return_duplicate_headers_ = lua_toboolean(state, -1);
+                              }},
+                             {"send_xff",
+                              [](lua_State* state, StreamHandleWrapper::HttpCallOptions& options) {
+                                // Handle the case when the table has: {["send_xff"] =
+                                // <boolean>} entry.
+                                options.request_options_.setSendXff(lua_toboolean(state, -1));
+                              }},
+                         });
+}
+
+constexpr int AsyncFlagIndex = 6;
+constexpr int HttpCallOptionsIndex = 5;
+
 struct HttpResponseCodeDetailValues {
   const absl::string_view LuaResponse = "lua_response";
 };
 using HttpResponseCodeDetails = ConstSingleton<HttpResponseCodeDetailValues>;
 
-const std::string DEPRECATED_LUA_NAME = "envoy.lua";
+// Parse http call options by inspecting the provided table.
+void parseOptionsFromTable(lua_State* state, int index,
+                           StreamHandleWrapper::HttpCallOptions& options) {
+  const auto& handlers = optionHandlers();
 
-std::atomic<bool>& deprecatedNameLogged() {
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(std::atomic<bool>, false);
-}
+  lua_pushnil(state);
+  while (lua_next(state, index) != 0) {
+    // Uses 'key' (at index -2) and 'value' (at index -1). We only care for string keys.
+    size_t key_length = 0;
+    const char* key = luaL_checklstring(state, -2, &key_length);
+    if (key == nullptr) {
+      continue;
+    }
 
-// Checks if deprecated metadata names are allowed. On the first check only it will log either
-// a warning (indicating the name should be updated) or an error (the feature is off and the
-// name is not allowed). When warning, the deprecated feature stat is incremented. Subsequent
-// checks do not log since this check is done in potentially high-volume request paths.
-bool allowDeprecatedMetadataName() {
-  if (!deprecatedNameLogged().exchange(true)) {
-    // Have not logged yet, so use the logging test.
-    return Extensions::Common::Utility::ExtensionNameUtil::allowDeprecatedExtensionName(
-        "http filter", DEPRECATED_LUA_NAME, "envoy.filters.http.lua");
+    auto iter = handlers.find(absl::string_view(key, key_length));
+    if (iter != handlers.end()) {
+      iter->second(state, options);
+    } else {
+      luaL_error(state, "\"%s\" is not valid key for httpCall() options", key);
+    }
+
+    // Pop value of key/value pair.
+    lua_pop(state, 1);
   }
-
-  // We have logged (or another thread will do so momentarily), so just check whether the
-  // deprecated name is allowed.
-  auto status = Extensions::Common::Utility::ExtensionNameUtil::deprecatedExtensionNameStatus();
-  return status == Extensions::Common::Utility::ExtensionNameUtil::Status::Warn;
 }
 
 const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
@@ -59,17 +115,6 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
     const auto& filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
     if (filter_it != metadata.filter_metadata().end()) {
       return filter_it->second;
-    }
-  }
-
-  // TODO(zuercher): Remove this block when deprecated filter names are removed.
-  {
-    const auto& filter_it = metadata.filter_metadata().find(DEPRECATED_LUA_NAME);
-    if (filter_it != metadata.filter_metadata().end()) {
-      // Use the non-throwing check here because this happens at request time.
-      if (allowDeprecatedMetadataName()) {
-        return filter_it->second;
-      }
     }
   }
 
@@ -109,16 +154,10 @@ void buildHeadersFromTable(Http::HeaderMap& headers, lua_State* state, int table
 }
 
 Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
-                                         Tracing::Span& parent_span,
+                                         const Http::AsyncClient::RequestOptions& options,
                                          Http::AsyncClient::Callbacks& callbacks) {
   const std::string cluster = luaL_checkstring(state, 2);
   luaL_checktype(state, 3, LUA_TTABLE);
-  size_t body_size;
-  const char* body = luaL_optlstring(state, 4, nullptr, &body_size);
-  int timeout_ms = luaL_checkint(state, 5);
-  if (timeout_ms < 0) {
-    luaL_error(state, "http call timeout must be >= 0");
-  }
 
   const auto thread_local_cluster = filter.clusterManager().getThreadLocalCluster(cluster);
   if (thread_local_cluster == nullptr) {
@@ -134,19 +173,16 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   if (message->headers().Path() == nullptr || message->headers().Method() == nullptr ||
       message->headers().Host() == nullptr) {
     luaL_error(state, "http call headers must include ':path', ':method', and ':authority'");
+    return nullptr;
   }
 
+  size_t body_size;
+  const char* body = luaL_optlstring(state, 4, nullptr, &body_size);
   if (body != nullptr) {
     message->body().add(body, body_size);
     message->headers().setContentLength(body_size);
   }
 
-  absl::optional<std::chrono::milliseconds> timeout;
-  if (timeout_ms > 0) {
-    timeout = std::chrono::milliseconds(timeout_ms);
-  }
-
-  auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout).setParentSpan(parent_span);
   return thread_local_cluster->httpAsyncClient().send(std::move(message), callbacks, options);
 }
 
@@ -159,6 +195,7 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();
   lua_state_.registerType<Filters::Common::Lua::ConnectionWrapper>();
   lua_state_.registerType<Filters::Common::Lua::SslConnectionWrapper>();
+  lua_state_.registerType<Filters::Common::Lua::ParsedX509NameWrapper>();
   lua_state_.registerType<HeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamInfoWrapper>();
@@ -166,6 +203,9 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<DynamicMetadataMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
+  lua_state_.registerType<ConnectionStreamInfoWrapper>();
+  lua_state_.registerType<ConnectionDynamicMetadataMapWrapper>();
+  lua_state_.registerType<ConnectionDynamicMetadataMapIterator>();
 
   const Filters::Common::Lua::InitializerList initializers(
       // EnvoyTimestampResolution "enum".
@@ -173,6 +213,7 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
           [](lua_State* state) {
             lua_newtable(state);
             { LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond); }
+            { LUA_ENUM(state, MICROSECOND, Timestamp::Resolution::Microsecond); }
             lua_setglobal(state, "EnvoyTimestampResolution");
           },
           // Add more initializers here.
@@ -190,8 +231,9 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
 }
 
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
-                                         Http::HeaderMap& headers, bool end_stream, Filter& filter,
-                                         FilterCallbacks& callbacks, TimeSource& time_source)
+                                         Http::RequestOrResponseHeaderMap& headers, bool end_stream,
+                                         Filter& filter, FilterCallbacks& callbacks,
+                                         TimeSource& time_source)
     : coroutine_(coroutine), headers_(headers), end_stream_(end_stream), filter_(filter),
       callbacks_(callbacks), yield_callback_([this]() {
         if (state_ == State::Running) {
@@ -223,21 +265,26 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
   if (state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(trace, "resuming for next body chunk");
     Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> wrapper(
-        Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), data), true);
+        Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), headers_, data), true);
     state_ = State::Running;
-    coroutine_.resume(1, yield_callback_);
+    resumeCoroutine(1, yield_callback_);
   } else if (state_ == State::WaitForBody && end_stream_) {
     ENVOY_LOG(debug, "resuming body due to end stream");
     callbacks_.addData(data);
     state_ = State::Running;
-    coroutine_.resume(luaBody(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   } else if (state_ == State::WaitForTrailers && end_stream_) {
     ENVOY_LOG(debug, "resuming nil trailers due to end stream");
     state_ = State::Running;
-    coroutine_.resume(0, yield_callback_);
+    resumeCoroutine(0, yield_callback_);
   }
 
-  if (state_ == State::HttpCall || state_ == State::WaitForBody) {
+  if (state_ == State::HttpCall) {
+    return (Runtime::runtimeFeatureEnabled(
+               "envoy.reloadable_features.lua_flow_control_while_http_call"))
+               ? Http::FilterDataStatus::StopIterationAndWatermark
+               : Http::FilterDataStatus::StopIterationAndBuffer;
+  } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(trace, "buffering body");
     return Http::FilterDataStatus::StopIterationAndBuffer;
   } else if (state_ == State::Responded) {
@@ -256,17 +303,17 @@ Http::FilterTrailersStatus StreamHandleWrapper::onTrailers(Http::HeaderMap& trai
   if (state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(debug, "resuming nil body chunk due to trailers");
     state_ = State::Running;
-    coroutine_.resume(0, yield_callback_);
+    resumeCoroutine(0, yield_callback_);
   } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(debug, "resuming body due to trailers");
     state_ = State::Running;
-    coroutine_.resume(luaBody(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaBody(coroutine_.luaState()), yield_callback_);
   }
 
   if (state_ == State::WaitForTrailers) {
     // Mimic a call to trailers which will push the trailers onto the stack and then resume.
     state_ = State::Running;
-    coroutine_.resume(luaTrailers(coroutine_.luaState()), yield_callback_);
+    resumeCoroutine(luaTrailers(coroutine_.luaState()), yield_callback_);
   }
 
   Http::FilterTrailersStatus status = (state_ == State::HttpCall || state_ == State::Responded)
@@ -314,33 +361,51 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 int StreamHandleWrapper::luaHttpCall(lua_State* state) {
   ASSERT(state_ == State::Running);
 
-  const int async_flag_index = 6;
-  if (!lua_isnone(state, async_flag_index) && !lua_isboolean(state, async_flag_index)) {
-    luaL_error(state, "http call asynchronous flag must be 'true', 'false', or empty");
+  StreamHandleWrapper::HttpCallOptions options;
+  options.request_options_
+      .setParentSpan(callbacks_.activeSpan())
+      // By default, do not enforce a sampling decision on this `httpCall`'s span.
+      // Instead, reuse the parent span's sampling decision. Callers can override
+      // this default with the `trace_sampled` flag in the table argument below.
+      .setSampled(absl::nullopt);
+
+  // Check if the last argument is table of options. For example:
+  // handle:httpCall(cluster, headers, body, {["timeout"] = 200, ...}).
+  if (const bool has_options = lua_istable(state, HttpCallOptionsIndex); has_options) {
+    parseOptionsFromTable(state, HttpCallOptionsIndex, options);
+  } else {
+    if (!lua_isnone(state, AsyncFlagIndex) && !lua_isboolean(state, AsyncFlagIndex)) {
+      luaL_error(state, "http call asynchronous flag must be 'true', 'false', or empty");
+    }
+
+    // When the last argument is not option table, the timeout is provided at the 5th index.
+    int timeout_ms = luaL_checkint(state, 5);
+    if (timeout_ms < 0) {
+      luaL_error(state, "http call timeout must be >= 0");
+    }
+    options.request_options_.setTimeout(std::chrono::milliseconds(timeout_ms));
+    options.is_async_request_ = lua_toboolean(state, AsyncFlagIndex);
   }
 
-  if (lua_toboolean(state, async_flag_index)) {
-    return doAsynchronousHttpCall(state, callbacks_.activeSpan());
-  } else {
-    return doSynchronousHttpCall(state, callbacks_.activeSpan());
-  }
+  return doHttpCall(state, options);
 }
 
-int StreamHandleWrapper::doSynchronousHttpCall(lua_State* state, Tracing::Span& span) {
-  http_request_ = makeHttpCall(state, filter_, span, *this);
+int StreamHandleWrapper::doHttpCall(lua_State* state, const HttpCallOptions& options) {
+  if (options.is_async_request_) {
+    makeHttpCall(state, filter_, options.request_options_, noopCallbacks());
+    return 0;
+  }
+
+  http_request_ = makeHttpCall(state, filter_, options.request_options_, *this);
   if (http_request_ != nullptr) {
     state_ = State::HttpCall;
+    return_duplicate_headers_ = options.return_duplicate_headers_;
     return lua_yield(state, 0);
   } else {
     // Immediate failure case. The return arguments are already on the stack.
     ASSERT(lua_gettop(state) >= 2);
     return 2;
   }
-}
-
-int StreamHandleWrapper::doAsynchronousHttpCall(lua_State* state, Tracing::Span& span) {
-  makeHttpCall(state, filter_, span, noopCallbacks());
-  return 0;
 }
 
 void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
@@ -351,15 +416,45 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
 
   // We need to build a table with the headers as return param 1. The body will be return param 2.
   lua_newtable(coroutine_.luaState());
-  response->headers().iterate([lua_State = coroutine_.luaState()](
-                                  const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    lua_pushlstring(lua_State, header.key().getStringView().data(),
-                    header.key().getStringView().length());
-    lua_pushlstring(lua_State, header.value().getStringView().data(),
-                    header.value().getStringView().length());
-    lua_settable(lua_State, -3);
-    return Http::HeaderMap::Iterate::Continue;
-  });
+
+  if (return_duplicate_headers_) {
+    absl::flat_hash_map<absl::string_view, absl::InlinedVector<absl::string_view, 1>> headers;
+    headers.reserve(response->headers().size());
+
+    response->headers().iterate([&headers](const Http::HeaderEntry& header) {
+      headers[header.key().getStringView()].push_back(header.value().getStringView());
+      return Http::HeaderMap::Iterate::Continue;
+    });
+
+    auto lua_state = coroutine_.luaState();
+    for (const auto& header : headers) {
+      lua_pushlstring(lua_state, header.first.data(), header.first.size());
+      ASSERT(!header.second.empty());
+      // If there are multiple values for same header name then create table for these values.
+      if (header.second.size() > 1) {
+        lua_newtable(lua_state);
+        for (size_t i = 0; i < header.second.size(); i++) {
+          lua_pushinteger(lua_state, i + 1);
+          lua_pushlstring(lua_state, header.second[i].data(), header.second[i].size());
+          lua_settable(lua_state, -3);
+        }
+      } else {
+        lua_pushlstring(lua_state, header.second[0].data(), header.second[0].size());
+      }
+
+      lua_settable(lua_state, -3);
+    }
+  } else {
+    response->headers().iterate([lua_State = coroutine_.luaState()](
+                                    const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+      lua_pushlstring(lua_State, header.key().getStringView().data(),
+                      header.key().getStringView().size());
+      lua_pushlstring(lua_State, header.value().getStringView().data(),
+                      header.value().getStringView().size());
+      lua_settable(lua_State, -3);
+      return Http::HeaderMap::Iterate::Continue;
+    });
+  }
 
   // TODO(mattklein123): Avoid double copy here.
   if (response->body().length() > 0) {
@@ -375,12 +470,11 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
     state_ = State::Running;
     markLive();
 
-    try {
-      coroutine_.resume(2, yield_callback_);
+    TRY_NEEDS_AUDIT {
+      resumeCoroutine(2, yield_callback_);
       markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      filter_.scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { filter_.scriptError(e); }
 
     if (state_ == State::Running) {
       headers_continued_ = true;
@@ -457,9 +551,10 @@ int StreamHandleWrapper::luaBody(lua_State* state) {
           callbacks_.addData(body);
         }
 
-        body_wrapper_.reset(Filters::Common::Lua::BufferWrapper::create(
-                                state, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
-                            true);
+        body_wrapper_.reset(
+            Filters::Common::Lua::BufferWrapper::create(
+                state, headers_, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
+            true);
       }
       return 1;
     }
@@ -540,6 +635,17 @@ int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaConnectionStreamInfo(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (connection_stream_info_wrapper_.get() != nullptr) {
+    connection_stream_info_wrapper_.pushStack();
+  } else {
+    connection_stream_info_wrapper_.reset(
+        ConnectionStreamInfoWrapper::create(state, callbacks_.connection()->streamInfo()), true);
+  }
+  return 1;
+}
+
 int StreamHandleWrapper::luaConnection(lua_State* state) {
   ASSERT(state_ == State::Running);
   if (connection_wrapper_.get() != nullptr) {
@@ -549,42 +655,6 @@ int StreamHandleWrapper::luaConnection(lua_State* state) {
         Filters::Common::Lua::ConnectionWrapper::create(state, callbacks_.connection()), true);
   }
   return 1;
-}
-
-int StreamHandleWrapper::luaLogTrace(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
-  filter_.scriptLog(spdlog::level::trace, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogDebug(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
-  filter_.scriptLog(spdlog::level::debug, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogInfo(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
-  filter_.scriptLog(spdlog::level::info, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogWarn(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
-  filter_.scriptLog(spdlog::level::warn, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogErr(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
-  filter_.scriptLog(spdlog::level::err, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogCritical(lua_State* state) {
-  const char* message = luaL_checkstring(state, 2);
-  filter_.scriptLog(spdlog::level::critical, message);
-  return 0;
 }
 
 int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
@@ -616,7 +686,7 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   if (output.result_) {
     lua_pushnil(state);
   } else {
-    lua_pushlstring(state, output.error_message_.data(), output.error_message_.length());
+    lua_pushlstring(state, output.error_message_.data(), output.error_message_.size());
   }
   return 2;
 }
@@ -649,10 +719,9 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
 }
 
 int StreamHandleWrapper::luaBase64Escape(lua_State* state) {
-  size_t input_size;
-  const char* input = luaL_checklstring(state, 2, &input_size);
-  auto output = absl::Base64Escape(absl::string_view(input, input_size));
-  lua_pushlstring(state, output.data(), output.length());
+  absl::string_view input = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
+  auto output = absl::Base64Escape(input);
+  lua_pushlstring(state, output.data(), output.size());
 
   return 1;
 }
@@ -678,17 +747,66 @@ int StreamHandleWrapper::luaTimestamp(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaTimestampString(lua_State* state) {
+  auto now = time_source_.systemTime().time_since_epoch();
+
+  absl::string_view unit_parameter = luaL_optstring(state, 2, "");
+  auto resolution = getTimestampResolution(unit_parameter);
+  if (resolution == Timestamp::Resolution::Millisecond) {
+    auto milliseconds_since_epoch =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    std::string timestamp = std::to_string(milliseconds_since_epoch);
+    lua_pushlstring(state, timestamp.data(), timestamp.size());
+  } else if (resolution == Timestamp::Resolution::Microsecond) {
+    auto microseconds_since_epoch =
+        std::chrono::duration_cast<std::chrono::microseconds>(now).count();
+    std::string timestamp = std::to_string(microseconds_since_epoch);
+    lua_pushlstring(state, timestamp.data(), timestamp.size());
+  } else {
+    luaL_error(state, "timestamp format must be MILLISECOND or MICROSECOND.");
+  }
+  return 1;
+}
+
+enum Timestamp::Resolution
+StreamHandleWrapper::getTimestampResolution(absl::string_view unit_parameter) {
+  auto resolution = Timestamp::Resolution::Undefined;
+
+  absl::uint128 resolution_as_int_from_state = 0;
+  if (unit_parameter.empty()) {
+    resolution = Timestamp::Resolution::Millisecond;
+  } else if (absl::SimpleAtoi(unit_parameter, &resolution_as_int_from_state) &&
+             resolution_as_int_from_state == enumToInt(Timestamp::Resolution::Millisecond)) {
+    resolution = Timestamp::Resolution::Millisecond;
+  } else if (absl::SimpleAtoi(unit_parameter, &resolution_as_int_from_state) &&
+             resolution_as_int_from_state == enumToInt(Timestamp::Resolution::Microsecond)) {
+    resolution = Timestamp::Resolution::Microsecond;
+  }
+  return resolution;
+}
+
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config,
                            ThreadLocal::SlotAllocator& tls,
-                           Upstream::ClusterManager& cluster_manager, Api::Api& api)
-    : cluster_manager_(cluster_manager) {
-  auto global_setup_ptr = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
-  if (global_setup_ptr) {
-    per_lua_code_setups_map_[GLOBAL_SCRIPT_NAME] = std::move(global_setup_ptr);
+                           Upstream::ClusterManager& cluster_manager, Api::Api& api,
+                           Stats::Scope& scope, const std::string& stats_prefix)
+    : cluster_manager_(cluster_manager),
+      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)) {
+  if (proto_config.has_default_source_code()) {
+    if (!proto_config.inline_code().empty()) {
+      throw EnvoyException("Error: Only one of `inline_code` or `default_source_code` can be set "
+                           "for the Lua filter.");
+    }
+
+    const std::string code = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(proto_config.default_source_code(), true, api), std::string);
+    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(code, tls);
+  } else if (!proto_config.inline_code().empty()) {
+    default_lua_code_setup_ = std::make_unique<PerLuaCodeSetup>(proto_config.inline_code(), tls);
   }
 
   for (const auto& source : proto_config.source_codes()) {
-    const std::string code = Config::DataSource::read(source.second, true, api);
+    const std::string code =
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(source.second, true, api), std::string);
     auto per_lua_code_setup_ptr = std::make_unique<PerLuaCodeSetup>(code, tls);
     if (!per_lua_code_setup_ptr) {
       continue;
@@ -700,13 +818,14 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
     Server::Configuration::ServerFactoryContext& context)
-    : main_thread_dispatcher_(context.dispatcher()), disabled_(config.disabled()),
+    : main_thread_dispatcher_(context.mainThreadDispatcher()), disabled_(config.disabled()),
       name_(config.name()) {
   if (disabled_ || !name_.empty()) {
     return;
   }
   // Read and parse the inline Lua code defined in the route configuration.
-  const std::string code_str = Config::DataSource::read(config.source_code(), true, context.api());
+  const std::string code_str = THROW_OR_RETURN_VALUE(
+      Config::DataSource::read(config.source_code(), true, context.api()), std::string);
   per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
 }
 
@@ -720,11 +839,10 @@ void Filter::onDestroy() {
   }
 }
 
-Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
-                                            Filters::Common::Lua::CoroutinePtr& coroutine,
-                                            FilterCallbacks& callbacks, int function_ref,
-                                            PerLuaCodeSetup* setup, Http::HeaderMap& headers,
-                                            bool end_stream) {
+Http::FilterHeadersStatus
+Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& coroutine,
+                  FilterCallbacks& callbacks, int function_ref, PerLuaCodeSetup* setup,
+                  Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
   if (function_ref == LUA_REFNIL) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -736,12 +854,11 @@ Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
                true);
 
   Http::FilterHeadersStatus status = Http::FilterHeadersStatus::Continue;
-  try {
+  TRY_NEEDS_AUDIT {
     status = handle.get()->start(function_ref);
     handle.markDead();
-  } catch (const Filters::Common::Lua::LuaException& e) {
-    scriptError(e);
   }
+  END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
 
   return status;
 }
@@ -750,13 +867,12 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
                                       bool end_stream) {
   Http::FilterDataStatus status = Http::FilterDataStatus::Continue;
   if (handle.get() != nullptr) {
-    try {
+    TRY_NEEDS_AUDIT {
       handle.markLive();
       status = handle.get()->onData(data, end_stream);
       handle.markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;
@@ -765,59 +881,64 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
 Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers) {
   Http::FilterTrailersStatus status = Http::FilterTrailersStatus::Continue;
   if (handle.get() != nullptr) {
-    try {
+    TRY_NEEDS_AUDIT {
       handle.markLive();
       status = handle.get()->onTrailers(trailers);
       handle.markDead();
-    } catch (const Filters::Common::Lua::LuaException& e) {
-      scriptError(e);
     }
+    END_TRY catch (const Filters::Common::Lua::LuaException& e) { scriptError(e); }
   }
 
   return status;
 }
 
 void Filter::scriptError(const Filters::Common::Lua::LuaException& e) {
+  stats_.errors_.inc();
   scriptLog(spdlog::level::err, e.what());
   request_stream_wrapper_.reset();
   response_stream_wrapper_.reset();
 }
 
-void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
-  switch (level) {
-  case spdlog::level::trace:
-    ENVOY_LOG(trace, "script log: {}", message);
-    return;
-  case spdlog::level::debug:
-    ENVOY_LOG(debug, "script log: {}", message);
-    return;
-  case spdlog::level::info:
-    ENVOY_LOG(info, "script log: {}", message);
-    return;
-  case spdlog::level::warn:
-    ENVOY_LOG(warn, "script log: {}", message);
-    return;
-  case spdlog::level::err:
-    ENVOY_LOG(error, "script log: {}", message);
-    return;
-  case spdlog::level::critical:
-    ENVOY_LOG(critical, "script log: {}", message);
-    return;
-  case spdlog::level::off:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    return;
-  case spdlog::level::n_levels:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+int StreamHandleWrapper::luaSetUpstreamOverrideHost(lua_State* state) {
+  // Get the host address argument
+  size_t len;
+  const char* host = luaL_checklstring(state, 2, &len);
+
+  // Validate that host is not null and is an IP address
+  if (host == nullptr) {
+    luaL_error(state, "host argument is required");
   }
+  if (!Http::Utility::parseAuthority(host).is_ip_address_) {
+    luaL_error(state, "host is not a valid IP address");
+  }
+
+  // Get the optional strict flag (defaults to false)
+  bool strict = false;
+  if (lua_gettop(state) >= 3) {
+    luaL_checktype(state, 3, LUA_TBOOLEAN);
+    strict = lua_toboolean(state, 3);
+  }
+
+  // Set the upstream override host
+  callbacks_.setUpstreamOverrideHost(std::make_pair(std::string(host, len), strict));
+
+  return 0;
 }
 
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
-  callbacks_->encodeHeaders(std::move(headers), body == nullptr,
-                            HttpResponseCodeDetails::get().LuaResponse);
-  if (body && !parent_.destroyed_) {
-    callbacks_->encodeData(*body, true);
-  }
+  uint64_t status = Http::Utility::getResponseStatus(*headers);
+  auto modify_headers = [&headers](Http::ResponseHeaderMap& response_headers) {
+    headers->iterate(
+        [&response_headers](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+          response_headers.addCopy(Http::LowerCaseString(header.key().getStringView()),
+                                   header.value().getStringView());
+          return Http::HeaderMap::Iterate::Continue;
+        });
+  };
+  callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(status), body ? body->toString() : "",
+                             modify_headers, absl::nullopt,
+                             HttpResponseCodeDetails::get().LuaResponse);
 }
 
 const ProtobufWkt::Struct& Filter::DecoderCallbacks::metadata() const {

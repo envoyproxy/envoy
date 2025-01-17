@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+#include <vector>
+
 #include "envoy/api/io_error.h"
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/platform.h"
@@ -8,28 +11,36 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/io_socket_handle_base_impl.h"
+#include "source/common/runtime/runtime_features.h"
+
+#include "quiche/quic/platform/api/quic_socket_address.h"
 
 namespace Envoy {
 namespace Network {
 
+using QuicEnvoyAddressPair = std::pair<quic::QuicSocketAddress, Address::InstanceConstSharedPtr>;
+
 /**
  * IoHandle derivative for sockets.
  */
-class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::Id::io> {
+class IoSocketHandleImpl : public IoSocketHandleBaseImpl {
 public:
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
-                              absl::optional<int> domain = absl::nullopt)
-      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
+                              absl::optional<int> domain = absl::nullopt,
+                              size_t address_cache_max_capacity = 0)
+      : IoSocketHandleBaseImpl(fd, socket_v6only, domain),
+        receive_ecn_(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")),
+        address_cache_max_capacity_(address_cache_max_capacity) {
+    if (address_cache_max_capacity > 0) {
+      recent_received_addresses_ = std::vector<QuicEnvoyAddressPair>();
+    }
+  }
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
 
-  // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
-  os_fd_t fdDoNotUse() const override { return fd_; }
-
   Api::IoCallUint64Result close() override;
-
-  bool isOpen() const override;
 
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
@@ -45,29 +56,18 @@ public:
                                   const Address::Instance& peer_address) override;
 
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                  uint32_t self_port, RecvMsgOutput& output) override;
+                                  uint32_t self_port, const UdpSaveCmsgConfig& save_cmsg_config,
+                                  RecvMsgOutput& output) override;
 
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   const UdpSaveCmsgConfig& save_cmsg_config,
                                    RecvMsgOutput& output) override;
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
-
-  bool supportsMmsg() const override;
-  bool supportsUdpGro() const override;
 
   Api::SysCallIntResult bind(Address::InstanceConstSharedPtr address) override;
   Api::SysCallIntResult listen(int backlog) override;
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::SysCallIntResult connect(Address::InstanceConstSharedPtr address) override;
-  Api::SysCallIntResult setOption(int level, int optname, const void* optval,
-                                  socklen_t optlen) override;
-  Api::SysCallIntResult getOption(int level, int optname, void* optval, socklen_t* optlen) override;
-  Api::SysCallIntResult ioctl(unsigned long control_code, void* in_buffer,
-                              unsigned long in_buffer_len, void* out_buffer,
-                              unsigned long out_buffer_len, unsigned long* bytes_returned) override;
-  Api::SysCallIntResult setBlocking(bool blocking) override;
-  absl::optional<int> domain() override;
-  Address::InstanceConstSharedPtr localAddress() override;
-  Address::InstanceConstSharedPtr peerAddress() override;
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
 
@@ -79,7 +79,6 @@ public:
   void resetFileEvents() override { file_event_.reset(); }
 
   Api::SysCallIntResult shutdown(int how) override;
-  absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
 
 protected:
   // Converts a SysCallSizeResult to IoCallUint64Result.
@@ -87,22 +86,18 @@ protected:
   Api::IoCallUint64Result sysCallResultToIoCallResult(const Api::SysCallResult<T>& result) {
     if (result.return_value_ >= 0) {
       // Return nullptr as IoError upon success.
-      return Api::IoCallUint64Result(result.return_value_,
-                                     Api::IoErrorPtr(nullptr, IoSocketError::deleteIoError));
+      return Api::IoCallUint64Result(result.return_value_, Api::IoError::none());
     }
-    RELEASE_ASSERT(result.errno_ != SOCKET_ERROR_INVAL, "Invalid argument passed in.");
+    if (result.errno_ == SOCKET_ERROR_INVAL) {
+      ENVOY_LOG(error, "Invalid argument passed in.");
+    }
     return Api::IoCallUint64Result(
-        /*rc=*/0,
-        (result.errno_ == SOCKET_ERROR_AGAIN
-             // EAGAIN is frequent enough that its memory allocation should be avoided.
-             ? Api::IoErrorPtr(IoSocketError::getIoSocketEagainInstance(),
-                               IoSocketError::deleteIoError)
-             : Api::IoErrorPtr(new IoSocketError(result.errno_), IoSocketError::deleteIoError)));
+        /*rc=*/0, (result.errno_ == SOCKET_ERROR_AGAIN
+                       // EAGAIN is frequent enough that its memory allocation should be avoided.
+                       ? IoSocketError::getIoSocketEagainError()
+                       : IoSocketError::create(result.errno_)));
   }
 
-  os_fd_t fd_;
-  int socket_v6only_{false};
-  const absl::optional<int> domain_;
   Event::FileEventPtr file_event_{nullptr};
 
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
@@ -110,6 +105,33 @@ protected:
   // and IPV6 addresses.
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
                            CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t))};
+
+  // Latches a copy of the runtime feature "envoy.reloadable_features.quic_receive_ecn".
+  const bool receive_ecn_;
+
+  size_t addressCacheMaxSize() const { return address_cache_max_capacity_; }
+
+private:
+  // Returns the destination address if the control message carries it.
+  // Otherwise returns nullptr.
+  Address::InstanceConstSharedPtr maybeGetDstAddressFromHeader(const cmsghdr& cmsg,
+                                                               uint32_t self_port);
+
+  Address::InstanceConstSharedPtr getOrCreateEnvoyAddressInstance(sockaddr_storage ss,
+                                                                  socklen_t ss_len);
+
+  // Caches the address instances of the most recently received packets on this socket.
+  // Should only be used by QUIC client sockets to avoid creating multiple address instances for
+  // the same address in each read operation. Since the QUIC client sockets are typically connected
+  // via a connect() call (when envoy.reloadable_features.quic_connect_client_udp_sockets is set),
+  // the total number of expected addresses are 2 (source and destination address), and the cache
+  // size defaults to 4.
+  size_t address_cache_max_capacity_;
+  // Only non-null if address_cache_max_capacity_ is greater than 0.
+  absl::optional<std::vector<QuicEnvoyAddressPair>> recent_received_addresses_ = absl::nullopt;
+
+  // For testing and benchmarking non-public methods.
+  friend class IoSocketHandleImplTestWrapper;
 };
 } // namespace Network
 } // namespace Envoy

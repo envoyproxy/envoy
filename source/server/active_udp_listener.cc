@@ -4,6 +4,7 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/utility.h"
 
 #include "spdlog/spdlog.h"
@@ -18,33 +19,29 @@ ActiveUdpListenerBase::ActiveUdpListenerBase(uint32_t worker_index, uint32_t con
     : ActiveListenerImplBase(parent, config), worker_index_(worker_index),
       concurrency_(concurrency), parent_(parent), listen_socket_(listen_socket),
       udp_listener_(std::move(listener)),
-      udp_stats_({ALL_UDP_LISTENER_STATS(POOL_COUNTER_PREFIX(config->listenerScope(), "udp"))}) {
+      udp_stats_({ALL_UDP_LISTENER_STATS(POOL_COUNTER_PREFIX(config->listenerScope(), "udp"))}),
+      udp_listener_worker_router_(config_->udpListenerConfig()->listenerWorkerRouter(
+          *listen_socket.connectionInfoProvider().localAddress())) {
   ASSERT(worker_index_ < concurrency_);
-  config_->udpListenerConfig()->listenerWorkerRouter().registerWorkerForListener(*this);
+  udp_listener_worker_router_.registerWorkerForListener(*this);
 }
 
 ActiveUdpListenerBase::~ActiveUdpListenerBase() {
-  config_->udpListenerConfig()->listenerWorkerRouter().unregisterWorkerForListener(*this);
+  udp_listener_worker_router_.unregisterWorkerForListener(*this);
 }
 
 void ActiveUdpListenerBase::post(Network::UdpRecvData&& data) {
   ASSERT(!udp_listener_->dispatcher().isThreadSafe(),
          "Shouldn't be posting if thread safe; use onWorkerData() instead.");
 
-  // It is not possible to capture a unique_ptr because the post() API copies the lambda, so we must
-  // bundle the socket inside a shared_ptr that can be captured.
-  // TODO(mattklein123): It may be possible to change the post() API such that the lambda is only
-  // moved, but this is non-trivial and needs investigation.
-  auto data_to_post = std::make_shared<Network::UdpRecvData>();
-  *data_to_post = std::move(data);
-
-  udp_listener_->dispatcher().post(
-      [data_to_post, tag = config_->listenerTag(), &parent = parent_]() {
-        Network::UdpListenerCallbacksOptRef listener = parent.getUdpListenerCallbacks(tag);
-        if (listener.has_value()) {
-          listener->get().onDataWorker(std::move(*data_to_post));
-        }
-      });
+  auto address = listen_socket_.connectionInfoProvider().localAddress();
+  udp_listener_->dispatcher().post([data = std::move(data), tag = config_->listenerTag(),
+                                    &parent = parent_, address]() mutable {
+    Network::UdpListenerCallbacksOptRef listener = parent.getUdpListenerCallbacks(tag, *address);
+    if (listener.has_value()) {
+      listener->get().onDataWorker(std::move(data));
+    }
+  });
 }
 
 void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
@@ -59,17 +56,9 @@ void ActiveUdpListenerBase::onData(Network::UdpRecvData&& data) {
   if (dest == worker_index_) {
     onDataWorker(std::move(data));
   } else {
-    config_->udpListenerConfig()->listenerWorkerRouter().deliver(dest, std::move(data));
+    udp_listener_worker_router_.deliver(dest, std::move(data));
   }
 }
-
-ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
-                                           Network::UdpConnectionHandler& parent,
-                                           Event::Dispatcher& dispatcher,
-                                           Network::ListenerConfig& config)
-    : ActiveRawUdpListener(worker_index, concurrency, parent,
-                           config.listenSocketFactory().getListenSocket(worker_index), dispatcher,
-                           config) {}
 
 ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                                            Network::UdpConnectionHandler& parent,
@@ -86,8 +75,8 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
                                            Event::Dispatcher& dispatcher,
                                            Network::ListenerConfig& config)
     : ActiveRawUdpListener(worker_index, concurrency, parent, listen_socket,
-                           dispatcher.createUdpListener(
-                               listen_socket_ptr, *this,
+                           std::make_unique<Network::UdpListenerImpl>(
+                               dispatcher, listen_socket_ptr, *this, dispatcher.timeSource(),
                                config.udpListenerConfig()->config().downstream_socket_config()),
                            config) {}
 
@@ -103,7 +92,7 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
 
   // If filter is nullptr warn that we will be dropping packets. This is an edge case and should
   // only happen due to a bad factory. It's not worth adding per-worker error handling for this.
-  if (read_filter_ == nullptr) {
+  if (read_filters_.empty()) {
     ENVOY_LOG(warn, "UDP listener has no filters. Packets will be dropped.");
   }
 
@@ -113,8 +102,11 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
 }
 
 void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
-  if (read_filter_ != nullptr) {
-    read_filter_->onData(data);
+  for (auto& read_filter : read_filters_) {
+    Network::FilterStatus status = read_filter->onData(data);
+    if (status == Network::FilterStatus::StopIteration) {
+      return;
+    }
   }
 }
 
@@ -130,14 +122,16 @@ void ActiveRawUdpListener::onWriteReady(const Network::Socket&) {
 }
 
 void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
-  if (read_filter_ != nullptr) {
-    read_filter_->onReceiveError(error_code);
+  for (auto& read_filter : read_filters_) {
+    Network::FilterStatus status = read_filter->onReceiveError(error_code);
+    if (status == Network::FilterStatus::StopIteration) {
+      return;
+    }
   }
 }
 
 void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {
-  ASSERT(read_filter_ == nullptr, "Cannot add a 2nd UDP read filter");
-  read_filter_ = std::move(filter);
+  read_filters_.emplace_back(std::move(filter));
 }
 
 Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }

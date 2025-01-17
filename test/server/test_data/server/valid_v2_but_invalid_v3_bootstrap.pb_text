@@ -1,4 +1,0 @@
-node {
-  id: "bootstrap_id"
-  build_version: "foo"
-}

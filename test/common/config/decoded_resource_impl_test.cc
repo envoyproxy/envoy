@@ -24,7 +24,7 @@ TEST(DecodedResourceImplTest, All) {
     EXPECT_CALL(resource_decoder, resourceName(ProtoEq(ProtobufWkt::Empty())))
         .WillOnce(Return("some_name"));
     auto decoded_resource =
-        DecodedResourceImpl::fromResource(resource_decoder, some_opaque_resource, "foo");
+        *DecodedResourceImpl::fromResource(resource_decoder, some_opaque_resource, "foo");
     EXPECT_EQ("some_name", decoded_resource->name());
     EXPECT_TRUE(decoded_resource->aliases().empty());
     EXPECT_EQ("foo", decoded_resource->version());
@@ -49,6 +49,51 @@ TEST(DecodedResourceImplTest, All) {
     EXPECT_EQ("foo", decoded_resource.version());
     EXPECT_THAT(decoded_resource.resource(), ProtoEq(ProtobufWkt::Empty()));
     EXPECT_TRUE(decoded_resource.hasResource());
+    EXPECT_FALSE(decoded_resource.metadata().has_value());
+  }
+
+  // To verify the metadata is decoded as expected.
+  {
+    envoy::service::discovery::v3::Resource resource_wrapper;
+    resource_wrapper.set_name("real_name");
+    resource_wrapper.mutable_resource()->MergeFrom(some_opaque_resource);
+    auto metadata = resource_wrapper.mutable_metadata();
+    metadata->mutable_filter_metadata()->insert(
+        {"fake_test_domain", MessageUtil::keyValueStruct("fake_test_key", "fake_test_value")});
+    EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource)))
+        .WillOnce(InvokeWithoutArgs(
+            []() -> ProtobufTypes::MessagePtr { return std::make_unique<ProtobufWkt::Empty>(); }));
+    EXPECT_CALL(resource_decoder, resourceName(ProtoEq(ProtobufWkt::Empty()))).Times(0);
+    DecodedResourceImpl decoded_resource(resource_decoder, resource_wrapper);
+    EXPECT_EQ("real_name", decoded_resource.name());
+    EXPECT_THAT(decoded_resource.resource(), ProtoEq(ProtobufWkt::Empty()));
+    EXPECT_TRUE(decoded_resource.hasResource());
+    EXPECT_TRUE(decoded_resource.metadata().has_value());
+    EXPECT_EQ(metadata->DebugString(), decoded_resource.metadata()->DebugString());
+  }
+
+  // To verify the metadata is decoded as expected for the fromResource variant
+  // with ProtobufWkt::Any& input.
+  {
+    envoy::service::discovery::v3::Resource resource_wrapper;
+    resource_wrapper.set_name("real_name");
+    resource_wrapper.mutable_resource()->MergeFrom(some_opaque_resource);
+    auto metadata = resource_wrapper.mutable_metadata();
+    metadata->mutable_filter_metadata()->insert(
+        {"fake_test_domain", MessageUtil::keyValueStruct("fake_test_key", "fake_test_value")});
+    ProtobufWkt::Any resource_any;
+    resource_any.PackFrom(resource_wrapper);
+    EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource)))
+        .WillOnce(InvokeWithoutArgs(
+            []() -> ProtobufTypes::MessagePtr { return std::make_unique<ProtobufWkt::Empty>(); }));
+    EXPECT_CALL(resource_decoder, resourceName(ProtoEq(ProtobufWkt::Empty()))).Times(0);
+    DecodedResourceImplPtr decoded_resource =
+        *DecodedResourceImpl::fromResource(resource_decoder, resource_any, "1");
+    EXPECT_EQ("real_name", decoded_resource->name());
+    EXPECT_THAT(decoded_resource->resource(), ProtoEq(ProtobufWkt::Empty()));
+    EXPECT_TRUE(decoded_resource->hasResource());
+    EXPECT_TRUE(decoded_resource->metadata().has_value());
+    EXPECT_EQ(metadata->DebugString(), decoded_resource->metadata()->DebugString());
   }
 
   {
@@ -67,6 +112,31 @@ TEST(DecodedResourceImplTest, All) {
     EXPECT_EQ("foo", decoded_resource.version());
     EXPECT_THAT(decoded_resource.resource(), ProtoEq(ProtobufWkt::Empty()));
     EXPECT_FALSE(decoded_resource.hasResource());
+  }
+
+  {
+    envoy::service::discovery::v3::Resource resource_wrapper;
+    resource_wrapper.set_name("real_name");
+    resource_wrapper.add_aliases("bar");
+    resource_wrapper.add_aliases("baz");
+    resource_wrapper.mutable_resource()->MergeFrom(some_opaque_resource);
+    resource_wrapper.set_version("foo");
+    auto metadata = resource_wrapper.mutable_metadata();
+    metadata->mutable_filter_metadata()->insert(
+        {"fake_test_domain", MessageUtil::keyValueStruct("fake_test_key", "fake_test_value")});
+    EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource)))
+        .WillOnce(InvokeWithoutArgs(
+            []() -> ProtobufTypes::MessagePtr { return std::make_unique<ProtobufWkt::Empty>(); }));
+    EXPECT_CALL(resource_decoder, resourceName(ProtoEq(ProtobufWkt::Empty()))).Times(0);
+    DecodedResourceImplPtr decoded_resource =
+        DecodedResourceImpl::fromResource(resource_decoder, resource_wrapper);
+    EXPECT_EQ("real_name", decoded_resource->name());
+    EXPECT_EQ((std::vector<std::string>{"bar", "baz"}), decoded_resource->aliases());
+    EXPECT_EQ("foo", decoded_resource->version());
+    EXPECT_THAT(decoded_resource->resource(), ProtoEq(ProtobufWkt::Empty()));
+    EXPECT_TRUE(decoded_resource->hasResource());
+    EXPECT_TRUE(decoded_resource->metadata().has_value());
+    EXPECT_EQ(metadata->DebugString(), decoded_resource->metadata()->DebugString());
   }
 
   {

@@ -11,6 +11,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/filter/config_provider_manager.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
@@ -36,30 +37,36 @@ public:
   /**
    * Create a particular Stats::Sink implementation. If the implementation is unable to produce a
    * Stats::Sink with the provided parameters, it should throw an EnvoyException. The returned
-   * pointer should always be valid.
+   * pointer should always be valid when status is OK.
    * @param config supplies the custom proto configuration for the Stats::Sink
    * @param server supplies the server instance
    */
-  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
-                                         Server::Configuration::ServerFactoryContext& server) PURE;
+  virtual absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message& config,
+                  Server::Configuration::ServerFactoryContext& server) PURE;
 
   std::string category() const override { return "envoy.stats_sinks"; }
 };
 
 class StatsConfigImpl : public StatsConfig {
 public:
-  StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                  absl::Status& creation_status);
 
   const std::list<Stats::SinkPtr>& sinks() const override { return sinks_; }
   std::chrono::milliseconds flushInterval() const override { return flush_interval_; }
   bool flushOnAdmin() const override { return flush_on_admin_; }
 
   void addSink(Stats::SinkPtr sink) { sinks_.emplace_back(std::move(sink)); }
+  bool enableDeferredCreationStats() const override {
+    return deferred_stat_options_.enable_deferred_creation_stats();
+  }
 
 private:
   std::list<Stats::SinkPtr> sinks_;
   std::chrono::milliseconds flush_interval_;
   bool flush_on_admin_{false};
+  const envoy::config::bootstrap::v3::Bootstrap::DeferredStatOptions deferred_stat_options_;
 };
 
 /**
@@ -72,7 +79,7 @@ public:
    * exit early if any filters immediately close the connection.
    */
   static bool buildFilterChain(Network::FilterManager& filter_manager,
-                               const std::vector<Network::FilterFactoryCb>& factories);
+                               const Filter::NetworkFilterFactoriesList& factories);
 
   /**
    * Given a ListenerFilterManager and a list of factories, create a new filter chain. Chain
@@ -81,7 +88,7 @@ public:
    * TODO(sumukhs): Coalesce with the above as they are very similar
    */
   static bool buildFilterChain(Network::ListenerFilterManager& filter_manager,
-                               const std::vector<Network::ListenerFilterFactoryCb>& factories);
+                               const Filter::ListenerFilterFactoriesList& factories);
 
   /**
    * Given a UdpListenerFilterManager and a list of factories, create a new filter chain. Chain
@@ -91,6 +98,15 @@ public:
   buildUdpFilterChain(Network::UdpListenerFilterManager& filter_manager,
                       Network::UdpReadFilterCallbacks& callbacks,
                       const std::vector<Network::UdpListenerFilterFactoryCb>& factories);
+
+  /**
+   * Given a QuicListenerFilterManager and a list of factories, create a new filter chain. Chain
+   * creation will exit early if any filters don't have a valid config.
+   *
+   * TODO(sumukhs): Coalesce with the above as they are very similar
+   */
+  static bool buildQuicFilterChain(Network::QuicListenerFilterManager& filter_manager,
+                                   const Filter::QuicListenerFilterFactoriesList& factories);
 };
 
 /**
@@ -108,12 +124,15 @@ public:
    * @param bootstrap v2 bootstrap proto.
    * @param server supplies the owning server.
    * @param cluster_manager_factory supplies the cluster manager creation factory.
+   * @return a status indicating initialization success or failure.
    */
-  void initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, Instance& server,
-                  Upstream::ClusterManagerFactory& cluster_manager_factory);
+  absl::Status initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                          Instance& server,
+                          Upstream::ClusterManagerFactory& cluster_manager_factory);
 
   // Server::Configuration::Main
   Upstream::ClusterManager* clusterManager() override { return cluster_manager_.get(); }
+  const Upstream::ClusterManager* clusterManager() const override { return cluster_manager_.get(); }
   StatsConfig& statsConfig() override { return *stats_config_; }
   const Watchdog& mainThreadWatchdogConfig() const override { return *main_thread_watchdog_; }
   const Watchdog& workerWatchdogConfig() const override { return *worker_watchdog_; }
@@ -127,14 +146,14 @@ private:
   /**
    * Initialize stats configuration.
    */
-  void initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                             Instance& server);
+  absl::Status initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                     Instance& server);
 
   /**
    * Initialize watchdog(s). Call before accessing any watchdog configuration.
    */
-  void initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                           Instance& server);
+  absl::Status initializeWatchdogs(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                   Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
   std::unique_ptr<StatsConfigImpl> stats_config_;
@@ -170,7 +189,8 @@ private:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap, const Options& options);
+  InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+              absl::Status& creation_status);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
@@ -183,7 +203,7 @@ public:
    * Initialize admin access log.
    */
   void initAdminAccessLog(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                          Instance& server);
+                          FactoryContext& factory_context);
 
 private:
   struct AdminImpl : public Admin {
@@ -191,15 +211,16 @@ private:
     const std::string& profilePath() const override { return profile_path_; }
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
-    std::list<AccessLog::InstanceSharedPtr> accessLogs() const override { return access_logs_; }
+    AccessLog::InstanceSharedPtrVector accessLogs() const override { return access_logs_; }
+    bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
 
     std::string profile_path_;
-    std::list<AccessLog::InstanceSharedPtr> access_logs_;
+    AccessLog::InstanceSharedPtrVector access_logs_;
     Network::Address::InstanceConstSharedPtr address_;
     Network::Socket::OptionsSharedPtr socket_options_;
+    bool ignore_global_conn_limit_;
   };
 
-  const bool enable_deprecated_v2_api_;
   AdminImpl admin_;
   absl::optional<std::string> flags_path_;
   envoy::config::bootstrap::v3::LayeredRuntime layered_runtime_;

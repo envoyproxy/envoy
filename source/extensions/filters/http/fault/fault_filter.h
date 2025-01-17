@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -16,7 +17,8 @@
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/token_bucket_impl.h"
 #include "source/common/http/header_utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/filters/common/fault/fault_config.h"
 #include "source/extensions/filters/http/common/stream_rate_limiter.h"
 
@@ -47,7 +49,8 @@ struct FaultFilterStats {
  */
 class FaultSettings : public Router::RouteSpecificFilterConfig {
 public:
-  FaultSettings(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault);
+  FaultSettings(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault,
+                Server::Configuration::CommonFactoryContext& context);
 
   const std::vector<Http::HeaderUtility::HeaderDataPtr>& filterHeaders() const {
     return fault_filter_headers_;
@@ -74,6 +77,7 @@ public:
     return response_rate_limit_percent_runtime_;
   }
   bool disableDownstreamClusterStats() const { return disable_downstream_cluster_stats_; }
+  const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
 
 private:
   class RuntimeKeyValues {
@@ -106,6 +110,8 @@ private:
   const std::string max_active_faults_runtime_;
   const std::string response_rate_limit_percent_runtime_;
   const bool disable_downstream_cluster_stats_;
+
+  const Envoy::ProtobufWkt::Struct filter_metadata_;
 };
 
 /**
@@ -114,8 +120,8 @@ private:
 class FaultFilterConfig {
 public:
   FaultFilterConfig(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault,
-                    Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
-                    TimeSource& time_source);
+                    const std::string& stats_prefix, Stats::Scope& scope,
+                    Server::Configuration::CommonFactoryContext& context);
 
   Runtime::Loader& runtime() { return runtime_; }
   FaultFilterStats& stats() { return stats_; }
@@ -171,8 +177,8 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
-    return Http::FilterHeadersStatus::Continue;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
     return Http::FilterHeadersStatus::Continue;

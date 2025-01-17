@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package envoy.extensions.geoip_providers.common.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.geoip_providers.common.v3";
+option java_outer_classname = "CommonProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/geoip_providers/common/v3;commonv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Common Geolocation Provider Configuration]
+// Common geolocation provider :ref:`configuration overview <config_geoip_providers_common>`.
+// Common configuration shared across geolocation providers.
+
+message CommonGeoipProviderConfig {
+  // The set of geolocation headers to add to request. If any of the configured headers is present
+  // in the incoming request, it will be overridden by the :ref:`Geoip filter <config_http_filters_geoip>`.
+  // [#next-free-field: 10]
+  message GeolocationHeadersToAdd {
+    // If set, the header will be used to populate the country ISO code associated with the IP address.
+    string country = 1
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // If set, the header will be used to populate the city associated with the IP address.
+    string city = 2
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // If set, the header will be used to populate the region ISO code associated with the IP address.
+    // The least specific subdivision will be selected as region value.
+    string region = 3
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // If set, the header will be used to populate the ASN associated with the IP address.
+    string asn = 4
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // If set, the IP address will be checked if it belongs to any type of anonymization network (e.g. VPN, public proxy etc)
+    // and header will be populated with the check result. Header value will be set to either "true" or "false" depending on the check result.
+    string is_anon = 5
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // If set, the IP address will be checked if it belongs to a VPN and header will be populated with the check result.
+    // Header value will be set to either "true" or "false" depending on the check result.
+    string anon_vpn = 6
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // If set, the IP address will be checked if it belongs to a hosting provider and header will be populated with the check result.
+    // Header value will be set to either "true" or "false" depending on the check result.
+    string anon_hosting = 7
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // If set, the IP address will be checked if it belongs to a TOR exit node and header will be populated with the check result.
+    // Header value will be set to either "true" or "false" depending on the check result.
+    string anon_tor = 8
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+    // If set, the IP address will be checked if it belongs to a public proxy and header will be populated with the check result.
+    // Header value will be set to either "true" or "false" depending on the check result.
+    string anon_proxy = 9
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+  }
+
+  // Configuration for geolocation headers to add to request.
+  GeolocationHeadersToAdd geo_headers_to_add = 1 [(validate.rules).message = {required: true}];
+}

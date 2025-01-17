@@ -132,6 +132,11 @@ outlier_detection.max_ejection_time_ms
   <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time>`
   setting in outlier detection
 
+outlier_detection.max_ejection_time_jitter_ms
+  :ref:`base_ejection_time
+  <envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_time_jitter>`
+  setting in outlier detection
+
 Core
 ----
 
@@ -140,11 +145,11 @@ upstream.healthy_panic_threshold
   Defaults to 50%.
 
 upstream.use_http2
-  Whether the cluster uses ``HTTP/2`` if configured in `HttpProtocolOptions <envoy_v3_msg_config.upstreams.http.v3.HttpProtocolOptions>`.
+  Whether the cluster uses ``HTTP/2`` if configured in :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
   Set to 0 to disable HTTP/2 even if the feature is configured. Defaults to enabled.
 
 upstream.use_http3
-  Whether the cluster uses ``HTTP/3`` if configured in `HttpProtocolOptions <envoy_v3_msg_config.upstreams.http.v3.HttpProtocolOptions>`.
+  Whether the cluster uses ``HTTP/3`` if configured in :ref:`HttpProtocolOptions <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
   Set to 0 to disable HTTP/3 even if the feature is configured. Defaults to enabled.
 
 

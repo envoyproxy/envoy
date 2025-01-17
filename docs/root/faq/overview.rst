@@ -37,6 +37,7 @@ Debugging
   debugging/why_is_envoy_sending_413s
   debugging/why_is_my_route_not_found
   debugging/xfp_vs_scheme
+  debugging/how_to_dump_heap_profile_of_envoy
 
 Performance
 -----------
@@ -86,6 +87,8 @@ Extensions
 Windows
 -------
 
+.. include:: ../_include/windows_support_ended.rst
+
 .. toctree::
   :maxdepth: 2
 
@@ -95,4 +98,3 @@ Windows
   windows/win_performance
   windows/win_security
   windows/win_run_as_service
-

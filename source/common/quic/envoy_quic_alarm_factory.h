@@ -3,18 +3,9 @@
 #include "source/common/common/non_copyable.h"
 #include "source/common/quic/envoy_quic_alarm.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
-
 #include "quiche/quic/core/quic_alarm_factory.h"
 #include "quiche/quic/core/quic_arena_scoped_ptr.h"
 #include "quiche/quic/core/quic_one_block_arena.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
 namespace Envoy {
 namespace Quic {

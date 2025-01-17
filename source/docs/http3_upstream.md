@@ -24,16 +24,16 @@ broken for twice the previous period, up to a maximum of 1 day. If it is instead
 marked as confirmed, then the period is reset to the default and the next time
 HTTP/3 is marked as broken it will be for the initial 5 minutes.
 
-#### Alternate Protocols Cache
-The `AlternateProtocolsCache` is responsible for tracking servers which advertise HTTP/3.
+#### Http Server Protocols Cache
+The `HttpServerPropertiesCache` is responsible for tracking servers which advertise HTTP/3.
 These advertisements may arrive via HTTP Alternative Service (alt-svc) or soon via the HTTPS
 DNS RR. Currently only advertisements which specify the same hostname and port are stored.
 
 #### Connectivity Grid
 The `ConnectivityGrid` is a `ConnectionPool` which wraps a `Http3ConnPoolImpl` connection pool
 (QUIC) and a `HttpConnPoolImplMixed` connection pool (TCP). If HTTP/3 is currently broken, stream
-requets will be sent directly to the mixed connection pool. If HTTP/3 is not advertised in the
-alternate protocols cache, stream requets will be sent directly to the mixed connection pool.
+requests will be sent directly to the mixed connection pool. If HTTP/3 is not advertised in the
+alternate protocols cache, stream requests will be sent directly to the mixed connection pool.
 If, however, HTTP/3 is advertised and working then the request will be sent to the HTTP/3
 connection pool. After 300ms, if this request has not succeeded, then the request will also be
 sent to the mixed pool, and whichever succeeds first will be passed back up to the caller.

@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that probabilistically rejects requests based on upstream success-rate.
-# Public docs: docs/root/configuration/http_filters/admission_control.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/admission_control_filter
 
 envoy_extension_package()
 
@@ -31,7 +31,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http/admission_control/evaluators:response_evaluator_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/admission_control/v3:pkg_cc_proto",
     ],
 )
 
@@ -45,6 +45,6 @@ envoy_cc_extension(
         "//source/extensions/filters/http/admission_control:admission_control_filter_lib",
         "//source/extensions/filters/http/admission_control/evaluators:response_evaluator_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/admission_control/v3:pkg_cc_proto",
     ],
 )

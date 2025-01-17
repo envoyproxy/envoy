@@ -3,18 +3,63 @@
 #include <chrono>
 #include <memory>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/filter.h"
+#include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 
 namespace Envoy {
+namespace Router {
+class FilterConfig;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+} // namespace Router
 namespace Http {
+
+/**
+ * Callbacks for sidestream connection (from http async client) watermark limits.
+ */
+class SidestreamWatermarkCallbacks {
+public:
+  virtual ~SidestreamWatermarkCallbacks() = default;
+
+  /**
+   * Called when the sidestream connection or stream goes over its high watermark. Note that this
+   * may be called separately for both the stream going over and the connection going over. It
+   * is the responsibility of the sidestreamWatermarkCallbacks implementation to handle unwinding
+   * multiple high and low watermark calls.
+   */
+  virtual void onSidestreamAboveHighWatermark() PURE;
+
+  /**
+   * Called when the sidestream connection or stream goes from over its high watermark to under its
+   * low watermark. As with onSidestreamAboveHighWatermark above, this may be called independently
+   * when both the stream and the connection go under the low watermark limit, and the callee must
+   * ensure that the flow of data does not resume until all callers which were above their high
+   * watermarks have gone below.
+   */
+  virtual void onSidestreamBelowLowWatermark() PURE;
+
+  /**
+    Sidestream subscribes to downstream watermark events on the downstream stream and downstream
+    connection.
+  */
+  virtual void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) PURE;
+  /**
+    Sidestream stop subscribing to watermark events on the downstream stream and downstream
+    connection.
+   */
+  virtual void
+  removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) PURE;
+};
 
 /**
  * Supports sending an HTTP request message and receiving a response asynchronously.
@@ -39,7 +84,9 @@ public:
    */
   enum class FailureReason {
     // The stream has been reset.
-    Reset
+    Reset,
+    // The stream exceeds the response buffer limit.
+    ExceedResponseBufferLimit
   };
 
   /**
@@ -126,6 +173,8 @@ public:
     virtual void onReset() PURE;
   };
 
+  using StreamDestructorCallbacks = std::function<void()>;
+
   /**
    * An in-flight HTTP stream.
    */
@@ -161,10 +210,57 @@ public:
     virtual void reset() PURE;
 
     /***
+     * Register callback to be called on stream destruction. This callback must persist beyond the
+     * lifetime of the stream or be unregistered via removeDestructorCallback. If there's already a
+     * destructor callback registered, this method will ASSERT-fail.
+     */
+    virtual void setDestructorCallback(StreamDestructorCallbacks callback) PURE;
+
+    /***
+     * Remove previously set destructor callback. Calling this without having previously set a
+     * Destructor callback will ASSERT-fail.
+     */
+    virtual void removeDestructorCallback() PURE;
+
+    /***
+     * Register a callback to be called when high/low write buffer watermark events occur on the
+     * stream. This callback must persist beyond the lifetime of the stream or be unregistered via
+     * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
+     * will trigger ENVOY_BUG.
+     */
+    virtual void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) PURE;
+
+    /***
+     * Remove previously set watermark callbacks. If there's no watermark callback registered, this
+     * method will trigger ENVOY_BUG.
+     */
+    virtual void removeWatermarkCallbacks() PURE;
+
+    /***
      * @returns if the stream has enough buffered outbound data to be over the configured buffer
      * limits
      */
     virtual bool isAboveWriteBufferHighWatermark() const PURE;
+
+    /***
+     * @returns the stream info object associated with the stream.
+     */
+    virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+    virtual StreamInfo::StreamInfo& streamInfo() PURE;
+  };
+
+  /***
+   * An in-flight HTTP request to which additional data and trailers can be sent, as well as resets
+   * and other stream-cancelling events. Must be terminated by sending trailers or data with
+   * end_stream.
+   */
+  class OngoingRequest : public virtual Request, public virtual Stream {
+  public:
+    /***
+     * Takes ownership of trailers, and sends it to the underlying stream.
+     * @param trailers owned trailers to pass to upstream.
+     */
+    virtual void captureAndSendTrailers(RequestTrailerMapPtr&& trailers) PURE;
   };
 
   virtual ~AsyncClient() = default;
@@ -173,7 +269,7 @@ public:
    * A context from the caller of an async client.
    */
   struct ParentContext {
-    const StreamInfo::StreamInfo* stream_info;
+    const StreamInfo::StreamInfo* stream_info{nullptr};
   };
 
   /**
@@ -196,6 +292,10 @@ public:
       send_xff = v;
       return *this;
     }
+    StreamOptions& setSendInternal(bool v) {
+      send_internal = v;
+      return *this;
+    }
     StreamOptions& setHashPolicy(
         const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
       hash_policy = v;
@@ -213,16 +313,84 @@ public:
       return *this;
     }
 
+    // Set FilterState on async stream allowing upstream filters to access it.
+    StreamOptions& setFilterState(Envoy::StreamInfo::FilterStateSharedPtr fs) {
+      filter_state = fs;
+      return *this;
+    }
+
+    // Set buffer restriction and accounting for the stream.
+    StreamOptions& setBufferAccount(const Buffer::BufferMemoryAccountSharedPtr& account) {
+      account_ = account;
+      return *this;
+    }
+    StreamOptions& setBufferLimit(uint32_t limit) {
+      buffer_limit_ = limit;
+      return *this;
+    }
+
     // this should be done with setBufferedBodyForRetry=true ?
+    // The retry policy can be set as either a proto or Router::RetryPolicy but
+    // not both. If both formats of the options are set, the more recent call
+    // will overwrite the older one.
     StreamOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
       retry_policy = p;
+      parsed_retry_policy = nullptr;
+      return *this;
+    }
+
+    // The retry policy can be set as either a proto or Router::RetryPolicy but
+    // not both. If both formats of the options are set, the more recent call
+    // will overwrite the older one.
+    StreamOptions& setRetryPolicy(const Router::RetryPolicy& p) {
+      parsed_retry_policy = &p;
+      retry_policy = absl::nullopt;
+      return *this;
+    }
+    StreamOptions& setFilterConfig(const Router::FilterConfigSharedPtr& config) {
+      filter_config_ = config;
+      return *this;
+    }
+
+    StreamOptions& setIsShadow(bool s) {
+      is_shadow = s;
+      return *this;
+    }
+
+    StreamOptions& setDiscardResponseBody(bool discard) {
+      discard_response_body = discard;
+      return *this;
+    }
+
+    StreamOptions& setIsShadowSuffixDisabled(bool d) {
+      is_shadow_suffixed_disabled = d;
+      return *this;
+    }
+
+    StreamOptions& setParentSpan(Tracing::Span& parent_span) {
+      parent_span_ = &parent_span;
+      return *this;
+    }
+    StreamOptions& setChildSpanName(const std::string& child_span_name) {
+      child_span_name_ = child_span_name;
+      return *this;
+    }
+    StreamOptions& setSampled(absl::optional<bool> sampled) {
+      sampled_ = sampled;
+      return *this;
+    }
+
+    StreamOptions& setSidestreamWatermarkCallbacks(SidestreamWatermarkCallbacks* callbacks) {
+      sidestream_watermark_callbacks = callbacks;
       return *this;
     }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
       return timeout == src.timeout && buffer_body_for_retry == src.buffer_body_for_retry &&
-             send_xff == src.send_xff;
+             send_xff == src.send_xff && send_internal == src.send_internal &&
+             parent_span_ == src.parent_span_ && child_span_name_ == src.child_span_name_ &&
+             sampled_ == src.sampled_;
     }
 
     // The timeout supplies the stream timeout, measured since when the frame with
@@ -238,6 +406,9 @@ public:
     // If true, x-forwarded-for header will be added.
     bool send_xff{true};
 
+    // If true, x-envoy-internal header will be added.
+    bool send_internal{true};
+
     // Provides the hash policy for hashing load balancing strategies.
     Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy> hash_policy;
 
@@ -245,65 +416,22 @@ public:
     ParentContext parent_context;
 
     envoy::config::core::v3::Metadata metadata;
+    Envoy::StreamInfo::FilterStateSharedPtr filter_state;
+
+    // Buffer memory account for tracking bytes.
+    Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
+
+    absl::optional<uint32_t> buffer_limit_;
 
     absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy;
-  };
+    const Router::RetryPolicy* parsed_retry_policy{nullptr};
 
-  /**
-   * A structure to hold the options for AsyncRequest object.
-   */
-  struct RequestOptions : public StreamOptions {
-    RequestOptions& setTimeout(const absl::optional<std::chrono::milliseconds>& v) {
-      StreamOptions::setTimeout(v);
-      return *this;
-    }
-    RequestOptions& setTimeout(const std::chrono::milliseconds& v) {
-      StreamOptions::setTimeout(v);
-      return *this;
-    }
-    RequestOptions& setBufferBodyForRetry(bool v) {
-      StreamOptions::setBufferBodyForRetry(v);
-      return *this;
-    }
-    RequestOptions& setSendXff(bool v) {
-      StreamOptions::setSendXff(v);
-      return *this;
-    }
-    RequestOptions& setHashPolicy(
-        const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>& v) {
-      StreamOptions::setHashPolicy(v);
-      return *this;
-    }
-    RequestOptions& setParentContext(const ParentContext& v) {
-      StreamOptions::setParentContext(v);
-      return *this;
-    }
-    RequestOptions& setMetadata(const envoy::config::core::v3::Metadata& m) {
-      StreamOptions::setMetadata(m);
-      return *this;
-    }
-    RequestOptions& setRetryPolicy(const envoy::config::route::v3::RetryPolicy& p) {
-      StreamOptions::setRetryPolicy(p);
-      return *this;
-    }
-    RequestOptions& setParentSpan(Tracing::Span& parent_span) {
-      parent_span_ = &parent_span;
-      return *this;
-    }
-    RequestOptions& setChildSpanName(const std::string& child_span_name) {
-      child_span_name_ = child_span_name;
-      return *this;
-    }
-    RequestOptions& setSampled(bool sampled) {
-      sampled_ = sampled;
-      return *this;
-    }
+    Router::FilterConfigSharedPtr filter_config_;
 
-    // For gmock test
-    bool operator==(const RequestOptions& src) const {
-      return StreamOptions::operator==(src) && parent_span_ == src.parent_span_ &&
-             child_span_name_ == src.child_span_name_ && sampled_ == src.sampled_;
-    }
+    bool is_shadow{false};
+
+    bool is_shadow_suffixed_disabled{false};
+    bool discard_response_body{false};
 
     // The parent span that child spans are created under to trace egress requests/responses.
     // If not set, requests will not be traced.
@@ -313,8 +441,15 @@ public:
     // Only used if parent_span_ is set.
     std::string child_span_name_{""};
     // Sampling decision for the tracing span. The span is sampled by default.
-    bool sampled_{true};
+    absl::optional<bool> sampled_{true};
+    // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
+    Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
   };
+
+  /**
+   * A structure to hold the options for AsyncRequest object.
+   */
+  using RequestOptions = StreamOptions;
 
   /**
    * Send an HTTP request asynchronously
@@ -330,7 +465,20 @@ public:
                         const RequestOptions& options) PURE;
 
   /**
-   * Start an HTTP stream asynchronously.
+   * Starts a new OngoingRequest asynchronously with the given headers.
+   *
+   * @param request_headers headers to send.
+   * @param callbacks the callbacks to be notified of request status.
+   * @param options the data struct to control the request sending.
+   * @return a request handle or nullptr if no request could be created. See note attached to
+   * `send`. Calling startRequest will not trigger end stream. For header-only requests, `send`
+   * should be called instead.
+   */
+  virtual OngoingRequest* startRequest(RequestHeaderMapPtr&& request_headers, Callbacks& callbacks,
+                                       const RequestOptions& options) PURE;
+
+  /**
+   * Start an HTTP stream asynchronously, without an associated HTTP request.
    * @param callbacks the callbacks to be notified of stream status.
    * @param options the data struct to control the stream.
    * @return a stream handle or nullptr if no stream could be started. NOTE: In this case

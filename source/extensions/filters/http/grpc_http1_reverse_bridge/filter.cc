@@ -83,8 +83,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Disable filter per route config if applies
   if (decoder_callbacks_->route() != nullptr) {
     const auto* per_route_config =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-            "envoy.filters.http.grpc_http1_reverse_bridge", decoder_callbacks_->route());
+        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_);
     if (per_route_config != nullptr && per_route_config->disabled()) {
       enabled_ = false;
       return Http::FilterHeadersStatus::Continue;
@@ -110,7 +109,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
     // Clear the route cache to recompute the cache. This provides additional
     // flexibility around request modification through the route table.
-    decoder_callbacks_->clearRouteCache();
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -134,7 +133,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& buffer, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
   if (enabled_) {
     absl::string_view content_type = headers.getContentTypeValue();
 
@@ -180,6 +179,25 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     // We can only insert trailers at the end of data, so keep track of this value
     // until then.
     grpc_status_ = grpcStatusFromHeaders(headers);
+
+    // gRPC clients expect that the HTTP status will always be 200.
+    headers.setStatus(enumToInt(Http::Code::OK));
+
+    // This is a header-only response, and we should prepend the gRPC frame
+    // header directly.
+    if (end_stream && withhold_grpc_frames_) {
+      Envoy::Buffer::OwnedImpl data;
+      buildGrpcFrameHeader(data, 0);
+      encoder_callbacks_->addEncodedData(data, false);
+
+      // This call exists to ensure that the content-length is set correctly,
+      // regardless of whether we are withholding grpc frames above.
+      headers.setContentLength(Grpc::GRPC_FRAME_HEADER_SIZE);
+
+      // Insert grpc-status trailers to communicate the error code.
+      auto& trailers = encoder_callbacks_->addEncodedTrailers();
+      trailers.setGrpcStatus(grpc_status_);
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;

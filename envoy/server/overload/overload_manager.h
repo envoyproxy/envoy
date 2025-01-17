@@ -5,6 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
+#include "envoy/server/overload/load_shed_point.h"
 #include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "source/common/singleton/const_singleton.h"
@@ -34,19 +35,42 @@ public:
 
   // Overload action to reduce some subset of configured timeouts.
   const std::string ReduceTimeouts = "envoy.overload_actions.reduce_timeouts";
+
+  // Overload action to reset streams using excessive memory.
+  const std::string ResetStreams = "envoy.overload_actions.reset_high_memory_stream";
+
+  // This should be kept current with the Overload actions available.
+  // This is the last member of this class to duplicating the strings with
+  // proper lifetime guarantees.
+  const std::array<absl::string_view, 7> WellKnownActions = {StopAcceptingRequests,
+                                                             DisableHttpKeepAlive,
+                                                             StopAcceptingConnections,
+                                                             RejectIncomingConnections,
+                                                             ShrinkHeap,
+                                                             ReduceTimeouts,
+                                                             ResetStreams};
 };
 
 using OverloadActionNames = ConstSingleton<OverloadActionNameValues>;
+
+/**
+ * Well-known overload action stats.
+ */
+class OverloadActionStatsNameValues {
+public:
+  // Count of the number of streams the reset streams action has reset
+  const std::string ResetStreamsCount = "envoy.overload_actions.reset_high_memory_stream.count";
+};
+
+using OverloadActionStatsNames = ConstSingleton<OverloadActionStatsNameValues>;
 
 /**
  * The OverloadManager protects the Envoy instance from being overwhelmed by client
  * requests. It monitors a set of resources and notifies registered listeners if
  * configured thresholds for those resources have been exceeded.
  */
-class OverloadManager {
+class OverloadManager : public LoadShedPointProvider {
 public:
-  virtual ~OverloadManager() = default;
-
   /**
    * Start a recurring timer to monitor resources and notify listeners when overload actions
    * change state.
@@ -75,6 +99,13 @@ public:
    * Get a factory for constructing scaled timer managers that respond to overload state.
    */
   virtual Event::ScaledRangeTimerManagerFactory scaledTimerFactory() PURE;
+
+  /**
+   * Stop the overload manager timer and wait for any pending resource updates to complete.
+   * After this returns, overload manager clients should not receive any more callbacks
+   * about overload state changes.
+   */
+  virtual void stop() PURE;
 };
 
 } // namespace Server

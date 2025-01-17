@@ -57,7 +57,7 @@ MULTI_COMMENT_END = re.compile(r'^(.*?)\*/')
 TODO = re.compile(r'(TODO|NOTE)\s*\(@?[A-Za-z0-9-]+\):?')
 
 # Ignore parameter names in doxygen comments.
-METHOD_DOC = re.compile('@(param\s+\w+|return(\s+const)?\s+\w+)')
+METHOD_DOC = re.compile(r'@(param\s+\w+|return(\s+const)?\s+\w+)')
 
 # Camel Case splitter
 CAMEL_CASE = re.compile(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z]|$)')
@@ -106,9 +106,12 @@ RST_LITERAL = re.compile(r'``.*``')
 # RST code block marker.
 RST_CODE_BLOCK = '.. code-block::'
 
+# RST literal include.
+RST_LITERAL_INCLUDE = '.. literalinclude::'
+
 # Path names.
 ABSPATH = re.compile(r'(?:\s|^)((/[A-Za-z0-9_.*-]+)+)(?:\s|$)')
-FILEREF = re.compile(r'(?:\s|^)([A-Za-z0-9_./-]+\.(cc|h|py|sh))(?:\s|$)')
+FILEREF = re.compile(r'(?:\s|^)([A-Za-z0-9_./-]+\.(cc|js|h|py|sh))(?:\s|$)')
 
 # Ordinals (1st, 2nd, 3rd, 4th, ...)
 ORDINALS = re.compile(r'([0-9]*1st|[0-9]*2nd|[0-9]*3rd|[0-9]+th)')
@@ -164,8 +167,8 @@ class SpellChecker:
         self.prefixes = prefixes
         self.suffixes = suffixes
 
-        self.prefix_re = re.compile("(?:\s|^)((%s)-)" % ("|".join(prefixes)), re.IGNORECASE)
-        self.suffix_re = re.compile("(-(%s))(?:\s|$)" % ("|".join(suffixes)), re.IGNORECASE)
+        self.prefix_re = re.compile(r"(?:\s|^)((%s)-)" % ("|".join(prefixes)), re.IGNORECASE)
+        self.suffix_re = re.compile(r"(-(%s))(?:\s|$)" % ("|".join(suffixes)), re.IGNORECASE)
 
         # Generate aspell personal dictionary.
         pws = os.path.join(CURR_DIR, '.aspell.en.pws')
@@ -649,7 +652,7 @@ def extract_comments(lines):
             comments.append(Comment(line=line_idx, col=col, text=text, last_on_line=last_on_line))
 
     # Handle control statements and filter out comments that are part of
-    # RST code block directives.
+    # RST code block and literal include directives.
     result = []
     n = 0
     nc = len(comments)
@@ -687,7 +690,8 @@ def extract_comments(lines):
                     break
 
                 n += 1
-        elif text.strip().startswith(RST_CODE_BLOCK):
+        elif text.strip().startswith(RST_CODE_BLOCK) or text.strip().startswith(
+                RST_LITERAL_INCLUDE):
             # Start of a code block.
             indent = len(INDENT.search(text).group(1))
             last_line = comments[n].line
@@ -812,12 +816,9 @@ if __name__ == "__main__":
 
     # Exclude ./third_party/ directory from spell checking, even when requested through arguments.
     # Otherwise git pre-push hook checks it for merged commits.
-    paths = [
-        path for path in paths
-        if not path.startswith('./third_party/') and not path.startswith('./third_party/')
-    ]
+    paths = [path for path in paths if not path.startswith('./third_party/')]
 
-    exts = ['.cc', '.h', '.proto']
+    exts = ['.cc', '.js', '.h', '.proto']
     if args.test_ignore_exts:
         exts = None
     target_paths = []

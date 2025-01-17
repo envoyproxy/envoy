@@ -1,112 +1,81 @@
 version: 2
 updates:
 
-- package-ecosystem: "pip"
-  directory: "/.github/actions/pr_notifier"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/test/extensions/filters/network/thrift_proxy"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/source/extensions/filters/network/kafka"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/examples/grpc-bridge/client"
-  schedule:
-    interval: "daily"
+# We currently have CI to make sure that all python `requirements.txt` files
+# are listed here, and only existing `requirements.txt` files are listed here.
+#
+# Until https://github.com/envoyproxy/envoy/issues/26163 is resolved `Dockerfiles`,
+# and `go.mod` files need to be kept in sync manually.
+#
+# Please ensure any new ones are added here, and any that are removed are removed here also.
 
 - package-ecosystem: "pip"
   directory: "/tools/base"
+  open-pull-requests-limit: 20
   schedule:
     interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/docs"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/git"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/github"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/config_validation"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/docker"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/dependency"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/deprecate_version"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/gpg"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/protodoc"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/deprecate_features"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/code_format"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/ci/flaky_test"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/configs"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/testing"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "docker"
-  directory: "/ci"
-  schedule:
-    interval: daily
+    time: "06:00"
 
 - package-ecosystem: "docker"
   directory: "/.devcontainer"
   schedule:
     interval: daily
+    time: "06:00"
+
+- package-ecosystem: "docker"
+  directory: "/ci"
+  schedule:
+    interval: daily
+    time: "06:00"
 
 - package-ecosystem: "github-actions"
   directory: "/"
   schedule:
     interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/http/test/test_data/dummy"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/filters/network/test/test_data"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"
+
+- package-ecosystem: "gomod"
+  directory: "/contrib/golang/router/cluster_specifier/test/test_data/simple"
+  groups:
+    contrib-golang:
+      patterns:
+      - "*"
+  schedule:
+    interval: daily
+    time: "06:00"

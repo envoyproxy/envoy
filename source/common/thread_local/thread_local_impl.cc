@@ -9,25 +9,30 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/stl_helpers.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace ThreadLocal {
 
 thread_local InstanceImpl::ThreadLocalData InstanceImpl::thread_local_data_;
 
+InstanceImpl::InstanceImpl() {
+  allow_slot_destroy_on_worker_threads_ =
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.allow_slot_destroy_on_worker_threads");
+}
+
 InstanceImpl::~InstanceImpl() {
-  ASSERT(Thread::MainThread::isMainThread());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(shutdown_);
   thread_local_data_.data_.clear();
-  Thread::MainThread::clear();
 }
 
 SlotPtr InstanceImpl::allocateSlot() {
-  ASSERT(Thread::MainThread::isMainThread());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(!shutdown_);
 
   if (free_slot_indexes_.empty()) {
-    SlotPtr slot = std::make_unique<SlotImpl>(*this, slots_.size());
+    SlotPtr slot = std::make_unique<SlotImpl>(*this, uint32_t(slots_.size()));
     slots_.push_back(slot.get());
     return slot;
   }
@@ -42,7 +47,42 @@ SlotPtr InstanceImpl::allocateSlot() {
 InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
-Event::PostCb InstanceImpl::SlotImpl::wrapCallback(const Event::PostCb& cb) {
+InstanceImpl::SlotImpl::~SlotImpl() {
+  // If the runtime feature is disabled then keep the original behavior. This should
+  // be cleaned up when the runtime feature
+  // "envoy.restart_features.allow_slot_destroy_on_worker_threads" is deprecated.
+  if (!parent_.allow_slot_destroy_on_worker_threads_) {
+    parent_.removeSlot(index_);
+    return;
+  }
+
+  // Do nothing if the parent is already shutdown. Return early here to avoid accessing the main
+  // thread dispatcher because it may have been destroyed.
+  if (isShutdown()) {
+    return;
+  }
+
+  auto* main_thread_dispatcher = parent_.main_thread_dispatcher_;
+  // Main thread dispatcher may be nullptr if the slot is being created and destroyed during
+  // server initialization.
+  if (!parent_.allow_slot_destroy_on_worker_threads_ || main_thread_dispatcher == nullptr ||
+      main_thread_dispatcher->isThreadSafe()) {
+    // If the slot is being destroyed on the main thread, we can remove it immediately.
+    parent_.removeSlot(index_);
+  } else {
+    // If the slot is being destroyed on a worker thread, we need to post the removal to the
+    // main thread. There are two possible cases here:
+    // 1. The removal is executed on the main thread as expected if the main dispatcher is still
+    //    active. This is the common case and the clean up will be done as expected because the
+    //    the worker dispatchers must be active before the main dispatcher is exited.
+    // 2. The removal is not executed if the main dispatcher has already exited. This is fine
+    //    because the removal has no side effect and will be ignored. The shutdown process will
+    //    clean up all the slots anyway.
+    main_thread_dispatcher->post([i = index_, &tls = parent_] { tls.removeSlot(i); });
+  }
+}
+
+std::function<void()> InstanceImpl::SlotImpl::wrapCallback(const std::function<void()>& cb) {
   // See the header file comments for still_alive_guard_ for the purpose of this capture and the
   // expired check below.
   //
@@ -70,9 +110,10 @@ ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::getWorker(uint32_t index) {
 
 ThreadLocalObjectSharedPtr InstanceImpl::SlotImpl::get() { return getWorker(index_); }
 
-Event::PostCb InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
+std::function<void()> InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
   // See the header file comments for still_alive_guard_ for why we capture index_.
-  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb, index = index_] {
+  return [still_alive_guard = std::weak_ptr<bool>(still_alive_guard_), cb = std::move(cb),
+          index = index_]() mutable {
     // This duplicates logic in wrapCallback() (above). Using wrapCallback also
     // works, but incurs another indirection of lambda at runtime. As the
     // duplicated logic is only an if-statement and a bool function, it doesn't
@@ -83,7 +124,8 @@ Event::PostCb InstanceImpl::SlotImpl::dataCallback(const UpdateCb& cb) {
   };
 }
 
-void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb, const Event::PostCb& complete_cb) {
+void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb,
+                                             const std::function<void()>& complete_cb) {
   parent_.runOnAllThreads(dataCallback(cb), complete_cb);
 }
 
@@ -92,7 +134,7 @@ void InstanceImpl::SlotImpl::runOnAllThreads(const UpdateCb& cb) {
 }
 
 void InstanceImpl::SlotImpl::set(InitializeCb cb) {
-  ASSERT(Thread::MainThread::isMainThread());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(!parent_.shutdown_);
 
   for (Event::Dispatcher& dispatcher : parent_.registered_threads_) {
@@ -106,7 +148,7 @@ void InstanceImpl::SlotImpl::set(InitializeCb cb) {
 }
 
 void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_thread) {
-  ASSERT(Thread::MainThread::isMainThread());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(!shutdown_);
 
   if (main_thread) {
@@ -120,7 +162,7 @@ void InstanceImpl::registerThread(Event::Dispatcher& dispatcher, bool main_threa
 }
 
 void InstanceImpl::removeSlot(uint32_t slot) {
-  ASSERT(Thread::MainThread::isMainThread());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
 
   // When shutting down, we do not post slot removals to other threads. This is because the other
   // threads have already shut down and the dispatcher is no longer alive. There is also no reason
@@ -146,8 +188,8 @@ void InstanceImpl::removeSlot(uint32_t slot) {
   });
 }
 
-void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
-  ASSERT(Thread::MainThread::isMainThread());
+void InstanceImpl::runOnAllThreads(std::function<void()> cb) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(!shutdown_);
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
@@ -158,19 +200,20 @@ void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
   cb();
 }
 
-void InstanceImpl::runOnAllThreads(Event::PostCb cb, Event::PostCb all_threads_complete_cb) {
-  ASSERT(Thread::MainThread::isMainThread());
+void InstanceImpl::runOnAllThreads(std::function<void()> cb,
+                                   std::function<void()> all_threads_complete_cb) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(!shutdown_);
   // Handle main thread first so that when the last worker thread wins, we could just call the
   // all_threads_complete_cb method. Parallelism of main thread execution is being traded off
   // for programming simplicity here.
   cb();
 
-  Event::PostCbSharedPtr cb_guard(new Event::PostCb(cb),
-                                  [this, all_threads_complete_cb](Event::PostCb* cb) {
-                                    main_thread_dispatcher_->post(all_threads_complete_cb);
-                                    delete cb;
-                                  });
+  std::shared_ptr<std::function<void()>> cb_guard(
+      new std::function<void()>(cb), [this, all_threads_complete_cb](std::function<void()>* cb) {
+        main_thread_dispatcher_->post(all_threads_complete_cb);
+        delete cb;
+      });
 
   for (Event::Dispatcher& dispatcher : registered_threads_) {
     dispatcher.post([cb_guard]() -> void { (*cb_guard)(); });
@@ -186,7 +229,7 @@ void InstanceImpl::setThreadLocal(uint32_t index, ThreadLocalObjectSharedPtr obj
 }
 
 void InstanceImpl::shutdownGlobalThreading() {
-  ASSERT(Thread::MainThread::isMainThread());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   ASSERT(!shutdown_);
   shutdown_ = true;
 }

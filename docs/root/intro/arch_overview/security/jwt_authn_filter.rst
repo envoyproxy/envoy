@@ -23,6 +23,6 @@ could combine multiple JWT requirements for the same request. The
 verification could be either specified inline in the filter config or fetched from remote server
 via HTTP/HTTPS.
 
-The JWT Authentication filter also supports to write the payloads of the successfully verified JWT
-to :ref:`Dynamic State <arch_overview_data_sharing_between_filters>` so that later filters could use
-it to make their own decisions based on the JWT payloads.
+The JWT Authentication filter also supports to write the header and payload of the successfully
+verified JWT to :ref:`Dynamic State <arch_overview_data_sharing_between_filters>` so that later
+filters could use it to make their own decisions based on the JWT payloads.

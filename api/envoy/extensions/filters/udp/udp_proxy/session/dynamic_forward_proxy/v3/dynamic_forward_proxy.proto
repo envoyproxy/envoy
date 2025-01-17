@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3;
+
+import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.udp.udp_proxy.session.dynamic_forward_proxy.v3";
+option java_outer_classname = "DynamicForwardProxyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/udp/udp_proxy/session/dynamic_forward_proxy/v3;dynamic_forward_proxyv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Filter state dynamic forward proxy]
+
+// Configuration for the filter state based dynamic forward proxy filter. See the
+// :ref:`architecture overview <arch_overview_http_dynamic_forward_proxy>` for
+// more information. Note this filter must be used in conjunction to another filter that
+// sets the 'envoy.upstream.dynamic_host' and the 'envoy.upstream.dynamic_port' filter
+// state keys for the required upstream UDP session.
+// [#extension: envoy.filters.udp.session.dynamic_forward_proxy]
+message FilterConfig {
+  // Configuration for UDP datagrams buffering.
+  message BufferOptions {
+    // If set, the filter will only buffer datagrams up to the requested limit, and will drop
+    // new UDP datagrams if the buffer contains the max_buffered_datagrams value at the time
+    // of a new datagram arrival. If not set, the default value is 1024 datagrams.
+    google.protobuf.UInt32Value max_buffered_datagrams = 1;
+
+    // If set, the filter will only buffer datagrams up to the requested total buffered bytes limit,
+    // and will drop new UDP datagrams if the buffer contains the max_buffered_datagrams value
+    // at the time of a new datagram arrival. If not set, the default value is 16,384 (16KB).
+    google.protobuf.UInt64Value max_buffered_bytes = 2;
+  }
+
+  // The prefix to use when emitting :ref:`statistics <config_udp_session_filters_dynamic_forward_proxy_stats>`.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  oneof implementation_specifier {
+    // The DNS cache configuration that the filter will attach to. Note this
+    // configuration must match that of associated :ref:`dynamic forward proxy cluster configuration
+    // <envoy_v3_api_field_extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig.dns_cache_config>`.
+    common.dynamic_forward_proxy.v3.DnsCacheConfig dns_cache_config = 2
+        [(validate.rules).message = {required: true}];
+  }
+
+  // If configured, the filter will buffer datagrams in case that it is waiting for a DNS response.
+  // If this field is not configured, there will be no buffering and downstream datagrams that arrive
+  // while the DNS resolution is in progress will be dropped. In case this field is set but the options
+  // are not configured, the default values will be applied as described in the ``BufferOptions``.
+  BufferOptions buffer_options = 3;
+}

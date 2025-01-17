@@ -27,8 +27,8 @@ public:
     } else if (default_value == 100) {
       return true;
     } else {
-      throw std::invalid_argument("Not implemented yet. You may want to set expectation of mocked "
-                                  "featureEnabled() instead.");
+      PANIC("Not implemented yet. You may want to set expectation of mocked"
+            "featureEnabled() instead.");
     }
   }
 
@@ -61,14 +61,16 @@ public:
   MockLoader();
   ~MockLoader() override;
 
-  MOCK_METHOD(void, initialize, (Upstream::ClusterManager & cm));
+  MOCK_METHOD(absl::Status, initialize, (Upstream::ClusterManager & cm));
   MOCK_METHOD(const Snapshot&, snapshot, ());
   MOCK_METHOD(SnapshotConstSharedPtr, threadsafeSnapshot, ());
-  MOCK_METHOD(void, mergeValues, ((const absl::node_hash_map<std::string, std::string>&)));
+  MOCK_METHOD(absl::Status, mergeValues, ((const absl::node_hash_map<std::string, std::string>&)));
   MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback));
   MOCK_METHOD(Stats::Scope&, getRootScope, ());
   MOCK_METHOD(void, countDeprecatedFeatureUse, (), (const));
 
+  SnapshotConstSharedPtr threadsafe_snapshot_{
+      std::make_shared<const testing::NiceMock<MockSnapshot>>()};
   testing::NiceMock<MockSnapshot> snapshot_;
   testing::NiceMock<Stats::MockStore> store_;
 };

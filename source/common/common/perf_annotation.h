@@ -25,6 +25,10 @@
 // See also, for a much more comprehensive study in performance annotation:
 // https://labs.vmware.com/vmtj/methodology-for-performance-analysis-of-vmware-vsphere-under-tier-1-applications
 // https://dl.acm.org/citation.cfm?id=1899945&dl=ACM&coll=DL
+//
+// See also, source/common/common/perf_tracing.h adding support for "Perfetto" -
+// an open-source stack for performance instrumentation and trace analysis.
+// It can give a better insight into execution flows and ordering of events.
 
 /**
  * Initiates a performance operation, storing its state in perf_var. A perf_var

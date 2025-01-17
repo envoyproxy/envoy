@@ -6,22 +6,58 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
+#include <string>
+
+#include "source/common/common/assert.h"
+
+#include "absl/flags/reflection.h"
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/common/platform/api/quiche_flags.h"
+#include "quiche/common/platform/api/quiche_logging.h"
+
+using QuicheFlagSaverImpl = absl::FlagSaver;
+
+// No special setup needed for tests to use threads.
+class ScopedEnvironmentForThreadsImpl {};
+
+inline std::string QuicheGetTestMemoryCachePathImpl() { // NOLINT(readability-identifier-naming)
+  PANIC("not implemented");                             // TODO(mpwarres): implement
+}
 
 namespace quiche {
 namespace test {
 
-using QuicheTest = ::testing::Test;
+using QuicheTestImpl = ::testing::Test;
+using QuicTestImpl = QuicheTestImpl;
 
 template <class T> using QuicheTestWithParamImpl = ::testing::TestWithParam<T>;
+template <class T> using QuicTestWithParamImpl = QuicheTestWithParamImpl<T>;
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 inline std::string QuicheGetCommonSourcePathImpl() {
   std::string test_srcdir(getenv("TEST_SRCDIR"));
-  return absl::StrCat(test_srcdir, "/external/com_googlesource_quiche/quiche/common");
+  return absl::StrCat(test_srcdir, "/external/com_github_google_quiche/quiche/common");
 }
+
+class QuicheScopedDisableExitOnDFatalImpl {
+public:
+  explicit QuicheScopedDisableExitOnDFatalImpl() {
+    original_value_ = isDFatalExitDisabled();
+    setDFatalExitDisabled(true);
+  }
+
+  // This type is neither copyable nor movable.
+  QuicheScopedDisableExitOnDFatalImpl(const QuicheScopedDisableExitOnDFatalImpl&) = delete;
+  QuicheScopedDisableExitOnDFatalImpl&
+  operator=(const QuicheScopedDisableExitOnDFatalImpl&) = delete;
+
+  ~QuicheScopedDisableExitOnDFatalImpl() { setDFatalExitDisabled(original_value_); }
+
+private:
+  bool original_value_;
+};
 
 } // namespace test
 } // namespace quiche

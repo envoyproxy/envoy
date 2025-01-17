@@ -1,5 +1,7 @@
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 
+#include <cstdint>
+
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
 
@@ -21,19 +23,25 @@ ConnPool::DoNothingPoolCallbacks null_pool_callbacks;
  * @param key supplies the key of the request.
  * @param incoming_request supplies the request.
  * @param callbacks supplies the request completion callbacks.
+ * @param transaction supplies the transaction info of the current connection.
  * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
  *         for some reason.
  */
 Common::Redis::Client::PoolRequest* makeSingleServerRequest(
     const RouteSharedPtr& route, const std::string& command, const std::string& key,
-    Common::Redis::RespValueConstSharedPtr incoming_request, ConnPool::PoolCallbacks& callbacks) {
-  auto handler =
-      route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request), callbacks);
+    Common::Redis::RespValueConstSharedPtr incoming_request, ConnPool::PoolCallbacks& callbacks,
+    Common::Redis::Client::Transaction& transaction) {
+  // If a transaction is active, clients_[0] is the primary connection to the cluster.
+  // The subsequent clients in the array are used for mirroring.
+  transaction.current_client_idx_ = 0;
+  auto handler = route->upstream(command)->makeRequest(key, ConnPool::RespVariant(incoming_request),
+                                                       callbacks, transaction);
   if (handler) {
     for (auto& mirror_policy : route->mirrorPolicies()) {
+      transaction.current_client_idx_++;
       if (mirror_policy->shouldMirror(command)) {
         mirror_policy->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
-                                               null_pool_callbacks);
+                                               null_pool_callbacks, transaction);
       }
     }
   }
@@ -47,24 +55,63 @@ Common::Redis::Client::PoolRequest* makeSingleServerRequest(
  * @param key supplies the key of the request.
  * @param incoming_request supplies the request.
  * @param callbacks supplies the request completion callbacks.
+ * @param transaction supplies the transaction info of the current connection.
  * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
  *         for some reason.
  */
 Common::Redis::Client::PoolRequest*
 makeFragmentedRequest(const RouteSharedPtr& route, const std::string& command,
                       const std::string& key, const Common::Redis::RespValue& incoming_request,
-                      ConnPool::PoolCallbacks& callbacks) {
-  auto handler =
-      route->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request), callbacks);
+                      ConnPool::PoolCallbacks& callbacks,
+                      Common::Redis::Client::Transaction& transaction) {
+  auto handler = route->upstream(command)->makeRequest(key, ConnPool::RespVariant(incoming_request),
+                                                       callbacks, transaction);
   if (handler) {
     for (auto& mirror_policy : route->mirrorPolicies()) {
       if (mirror_policy->shouldMirror(command)) {
         mirror_policy->upstream()->makeRequest(key, ConnPool::RespVariant(incoming_request),
-                                               null_pool_callbacks);
+                                               null_pool_callbacks, transaction);
       }
     }
   }
   return handler;
+}
+
+/**
+ * Make request and maybe mirror the request based on the mirror policies of the route.
+ * @param route supplies the route matched with the request.
+ * @param command supplies the command of the request.
+ * @param key supplies the key of the request.
+ * @param incoming_request supplies the request.
+ * @param callbacks supplies the request completion callbacks.
+ * @param transaction supplies the transaction info of the current connection.
+ * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
+ *         for some reason.
+ */
+Common::Redis::Client::PoolRequest*
+makeFragmentedRequestToShard(const RouteSharedPtr& route, const std::string& command,
+                             uint16_t shard_index, const Common::Redis::RespValue& incoming_request,
+                             ConnPool::PoolCallbacks& callbacks,
+                             Common::Redis::Client::Transaction& transaction) {
+  auto handler = route->upstream(command)->makeRequestToShard(
+      shard_index, ConnPool::RespVariant(incoming_request), callbacks, transaction);
+  if (handler) {
+    for (auto& mirror_policy : route->mirrorPolicies()) {
+      if (mirror_policy->shouldMirror(command)) {
+        mirror_policy->upstream()->makeRequestToShard(
+            shard_index, ConnPool::RespVariant(incoming_request), null_pool_callbacks, transaction);
+      }
+    }
+  }
+  return handler;
+}
+
+// Send a string response downstream.
+void localResponse(SplitCallbacks& callbacks, std::string response) {
+  Common::Redis::RespValuePtr res(new Common::Redis::RespValue());
+  res->type(Common::Redis::RespType::SimpleString);
+  res->asString() = response;
+  callbacks.onResponse(std::move(res));
 }
 } // namespace
 
@@ -107,7 +154,8 @@ void SingleServerRequest::cancel() {
 }
 
 SplitRequestPtr ErrorFaultRequest::create(SplitCallbacks& callbacks, CommandStats& command_stats,
-                                          TimeSource& time_source, bool delay_command_latency) {
+                                          TimeSource& time_source, bool delay_command_latency,
+                                          const StreamInfo::StreamInfo&) {
   std::unique_ptr<ErrorFaultRequest> request_ptr{
       new ErrorFaultRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
@@ -116,11 +164,10 @@ SplitRequestPtr ErrorFaultRequest::create(SplitCallbacks& callbacks, CommandStat
   return nullptr;
 }
 
-std::unique_ptr<DelayFaultRequest> DelayFaultRequest::create(SplitCallbacks& callbacks,
-                                                             CommandStats& command_stats,
-                                                             TimeSource& time_source,
-                                                             Event::Dispatcher& dispatcher,
-                                                             std::chrono::milliseconds delay) {
+std::unique_ptr<DelayFaultRequest>
+DelayFaultRequest::create(SplitCallbacks& callbacks, CommandStats& command_stats,
+                          TimeSource& time_source, Event::Dispatcher& dispatcher,
+                          std::chrono::milliseconds delay, const StreamInfo::StreamInfo&) {
   return std::make_unique<DelayFaultRequest>(callbacks, command_stats, time_source, dispatcher,
                                              delay);
 }
@@ -141,15 +188,16 @@ void DelayFaultRequest::cancel() { delay_timer_->disableTimer(); }
 SplitRequestPtr SimpleRequest::create(Router& router,
                                       Common::Redis::RespValuePtr&& incoming_request,
                                       SplitCallbacks& callbacks, CommandStats& command_stats,
-                                      TimeSource& time_source, bool delay_command_latency) {
+                                      TimeSource& time_source, bool delay_command_latency,
+                                      const StreamInfo::StreamInfo& stream_info) {
   std::unique_ptr<SimpleRequest> request_ptr{
       new SimpleRequest(callbacks, command_stats, time_source, delay_command_latency)};
-  const auto route = router.upstreamPool(incoming_request->asArray()[1].asString());
+  const auto route = router.upstreamPool(incoming_request->asArray()[1].asString(), stream_info);
   if (route) {
     Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
-    request_ptr->handle_ =
-        makeSingleServerRequest(route, base_request->asArray()[0].asString(),
-                                base_request->asArray()[1].asString(), base_request, *request_ptr);
+    request_ptr->handle_ = makeSingleServerRequest(
+        route, base_request->asArray()[0].asString(), base_request->asArray()[1].asString(),
+        base_request, *request_ptr, callbacks.transaction());
   } else {
     ENVOY_LOG(debug, "route not found: '{}'", incoming_request->toString());
   }
@@ -165,7 +213,8 @@ SplitRequestPtr SimpleRequest::create(Router& router,
 
 SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source, bool delay_command_latency) {
+                                    TimeSource& time_source, bool delay_command_latency,
+                                    const StreamInfo::StreamInfo& stream_info) {
   // EVAL looks like: EVAL script numkeys key [key ...] arg [arg ...]
   // Ensure there are at least three args to the command or it cannot be hashed.
   if (incoming_request->asArray().size() < 4) {
@@ -177,12 +226,12 @@ SplitRequestPtr EvalRequest::create(Router& router, Common::Redis::RespValuePtr&
   std::unique_ptr<EvalRequest> request_ptr{
       new EvalRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
-  const auto route = router.upstreamPool(incoming_request->asArray()[3].asString());
+  const auto route = router.upstreamPool(incoming_request->asArray()[3].asString(), stream_info);
   if (route) {
     Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
-    request_ptr->handle_ =
-        makeSingleServerRequest(route, base_request->asArray()[0].asString(),
-                                base_request->asArray()[3].asString(), base_request, *request_ptr);
+    request_ptr->handle_ = makeSingleServerRequest(
+        route, base_request->asArray()[0].asString(), base_request->asArray()[3].asString(),
+        base_request, *request_ptr, callbacks.transaction());
   }
 
   if (!request_ptr->handle_) {
@@ -217,7 +266,8 @@ void FragmentedRequest::onChildFailure(uint32_t index) {
 
 SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source, bool delay_command_latency) {
+                                    TimeSource& time_source, bool delay_command_latency,
+                                    const StreamInfo::StreamInfo& stream_info) {
   std::unique_ptr<MGETRequest> request_ptr{
       new MGETRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
@@ -234,13 +284,14 @@ SplitRequestPtr MGETRequest::create(Router& router, Common::Redis::RespValuePtr&
     request_ptr->pending_requests_.emplace_back(*request_ptr, i - 1);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    const auto route = router.upstreamPool(base_request->asArray()[i].asString());
+    const auto route = router.upstreamPool(base_request->asArray()[i].asString(), stream_info);
     if (route) {
       // Create composite array for a single get.
       const Common::Redis::RespValue single_mget(
           base_request, Common::Redis::Utility::GetRequest::instance(), i, i);
-      pending_request.handle_ = makeFragmentedRequest(
-          route, "get", base_request->asArray()[i].asString(), single_mget, pending_request);
+      pending_request.handle_ =
+          makeFragmentedRequest(route, "get", base_request->asArray()[i].asString(), single_mget,
+                                pending_request, callbacks.transaction());
     }
 
     if (!pending_request.handle_) {
@@ -291,7 +342,8 @@ void MGETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
 
 SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                     SplitCallbacks& callbacks, CommandStats& command_stats,
-                                    TimeSource& time_source, bool delay_command_latency) {
+                                    TimeSource& time_source, bool delay_command_latency,
+                                    const StreamInfo::StreamInfo& stream_info) {
   if ((incoming_request->asArray().size() - 1) % 2 != 0) {
     onWrongNumberOfArguments(callbacks, *incoming_request);
     command_stats.error_.inc();
@@ -312,14 +364,15 @@ SplitRequestPtr MSETRequest::create(Router& router, Common::Redis::RespValuePtr&
     request_ptr->pending_requests_.emplace_back(*request_ptr, fragment_index++);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    const auto route = router.upstreamPool(base_request->asArray()[i].asString());
+    const auto route = router.upstreamPool(base_request->asArray()[i].asString(), stream_info);
     if (route) {
       // Create composite array for a single set command.
       const Common::Redis::RespValue single_set(
           base_request, Common::Redis::Utility::SetRequest::instance(), i, i + 1);
       ENVOY_LOG(debug, "parallel set: '{}'", single_set.toString());
-      pending_request.handle_ = makeFragmentedRequest(
-          route, "set", base_request->asArray()[i].asString(), single_set, pending_request);
+      pending_request.handle_ =
+          makeFragmentedRequest(route, "set", base_request->asArray()[i].asString(), single_set,
+                                pending_request, callbacks.transaction());
     }
 
     if (!pending_request.handle_) {
@@ -363,10 +416,85 @@ void MSETRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
   }
 }
 
+SplitRequestPtr KeysRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                    SplitCallbacks& callbacks, CommandStats& command_stats,
+                                    TimeSource& time_source, bool delay_command_latency,
+                                    const StreamInfo::StreamInfo& stream_info) {
+  if (incoming_request->asArray().size() != 2) {
+    onWrongNumberOfArguments(callbacks, *incoming_request);
+    command_stats.error_.inc();
+    return nullptr;
+  }
+  const auto route = router.upstreamPool(incoming_request->asArray()[1].asString(), stream_info);
+  uint32_t shard_size =
+      route ? route->upstream(incoming_request->asArray()[0].asString())->shardSize() : 0;
+  if (shard_size == 0) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    return nullptr;
+  }
+
+  std::unique_ptr<KeysRequest> request_ptr{
+      new KeysRequest(callbacks, command_stats, time_source, delay_command_latency)};
+  request_ptr->num_pending_responses_ = shard_size;
+  request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
+
+  request_ptr->pending_response_ = std::make_unique<Common::Redis::RespValue>();
+  request_ptr->pending_response_->type(Common::Redis::RespType::Array);
+
+  Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+  for (uint32_t shard_index = 0; shard_index < shard_size; shard_index++) {
+    request_ptr->pending_requests_.emplace_back(*request_ptr, shard_index);
+    PendingRequest& pending_request = request_ptr->pending_requests_.back();
+
+    ENVOY_LOG(debug, "keys request shard index {}: {}", shard_index, base_request->toString());
+    pending_request.handle_ =
+        makeFragmentedRequestToShard(route, base_request->asArray()[0].asString(), shard_index,
+                                     *base_request, pending_request, callbacks.transaction());
+
+    if (!pending_request.handle_) {
+      pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    }
+  }
+
+  if (request_ptr->num_pending_responses_ > 0) {
+    return request_ptr;
+  }
+
+  return nullptr;
+}
+
+void KeysRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
+  pending_requests_[index].handle_ = nullptr;
+  switch (value->type()) {
+  case Common::Redis::RespType::Array: {
+    pending_response_->asArray().insert(pending_response_->asArray().end(),
+                                        value->asArray().begin(), value->asArray().end());
+    break;
+  }
+  default: {
+    error_count_++;
+    break;
+  }
+  }
+
+  ASSERT(num_pending_responses_ > 0);
+  if (--num_pending_responses_ == 0) {
+    updateStats(error_count_ == 0);
+    if (error_count_ == 0) {
+      callbacks_.onResponse(std::move(pending_response_));
+    } else {
+      callbacks_.onResponse(Common::Redis::Utility::makeError(
+          fmt::format("finished with {} error(s)", error_count_)));
+    }
+  }
+}
+
 SplitRequestPtr
 SplitKeysSumResultRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                   SplitCallbacks& callbacks, CommandStats& command_stats,
-                                  TimeSource& time_source, bool delay_command_latency) {
+                                  TimeSource& time_source, bool delay_command_latency,
+                                  const StreamInfo::StreamInfo& stream_info) {
   std::unique_ptr<SplitKeysSumResultRequest> request_ptr{
       new SplitKeysSumResultRequest(callbacks, command_stats, time_source, delay_command_latency)};
 
@@ -385,11 +513,11 @@ SplitKeysSumResultRequest::create(Router& router, Common::Redis::RespValuePtr&& 
     const Common::Redis::RespValue single_fragment(base_request, base_request->asArray()[0], i, i);
     ENVOY_LOG(debug, "parallel {}: '{}'", base_request->asArray()[0].asString(),
               single_fragment.toString());
-    const auto route = router.upstreamPool(base_request->asArray()[i].asString());
+    const auto route = router.upstreamPool(base_request->asArray()[i].asString(), stream_info);
     if (route) {
-      pending_request.handle_ = makeFragmentedRequest(route, base_request->asArray()[0].asString(),
-                                                      base_request->asArray()[i].asString(),
-                                                      single_fragment, pending_request);
+      pending_request.handle_ = makeFragmentedRequest(
+          route, base_request->asArray()[0].asString(), base_request->asArray()[i].asString(),
+          single_fragment, pending_request, callbacks.transaction());
     }
 
     if (!pending_request.handle_) {
@@ -432,13 +560,147 @@ void SplitKeysSumResultRequest::onChildResponse(Common::Redis::RespValuePtr&& va
   }
 }
 
+SplitRequestPtr TransactionRequest::create(Router& router,
+                                           Common::Redis::RespValuePtr&& incoming_request,
+                                           SplitCallbacks& callbacks, CommandStats& command_stats,
+                                           TimeSource& time_source, bool delay_command_latency,
+                                           const StreamInfo::StreamInfo& stream_info) {
+  Common::Redis::Client::Transaction& transaction = callbacks.transaction();
+  std::string command_name = absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
+
+  // Within transactions we only support simple commands.
+  // So if this is not a transaction command or a simple command, it is an error.
+  if (Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0 &&
+      Common::Redis::SupportedCommands::simpleCommands().count(command_name) == 0) {
+    callbacks.onResponse(Common::Redis::Utility::makeError(
+        fmt::format("'{}' command is not supported within transaction",
+                    incoming_request->asArray()[0].asString())));
+    return nullptr;
+  }
+
+  // Start transaction on MULTI, and stop on EXEC/DISCARD.
+  if (command_name == "multi") {
+    // Check for nested MULTI commands.
+    if (transaction.active_) {
+      callbacks.onResponse(
+          Common::Redis::Utility::makeError(fmt::format("MULTI calls can not be nested")));
+      return nullptr;
+    }
+    transaction.start();
+
+    // If we already have a key set (from a previous WATCH command), we will send the actual MULTI
+    // upstream. Otherwise, we will respond locally with "OK".
+    if (transaction.key_.empty()) {
+      localResponse(callbacks, "OK");
+      return nullptr;
+    } else {
+      RouteSharedPtr route = router.upstreamPool(transaction.key_, stream_info);
+      if (route) {
+        // We reserve a client for the main connection and for each mirror connection.
+        transaction.clients_.resize(1 + route->mirrorPolicies().size());
+      }
+    }
+  } else if (command_name == "exec" || command_name == "discard") {
+    // Handle the case where we don't have an open transaction.
+    if (transaction.active_ == false) {
+      callbacks.onResponse(Common::Redis::Utility::makeError(
+          fmt::format("{} without MULTI", absl::AsciiStrToUpper(command_name))));
+      return nullptr;
+    }
+
+    // Handle the case where the transaction is empty.
+    if (transaction.key_.empty()) {
+      if (command_name == "exec") {
+        Common::Redis::RespValuePtr empty_array{new Common::Redis::Client::EmptyArray{}};
+        callbacks.onResponse(std::move(empty_array));
+      } else {
+        localResponse(callbacks, "OK");
+      }
+      transaction.close();
+      return nullptr;
+    }
+
+    // In all other cases we will close the transaction connection after sending the last command.
+    transaction.should_close_ = true;
+  }
+
+  // If we do a WATCH command without having started a transaction, we send it upstream and save the
+  // key, so we can support UNWATCH. We have to also set the connection details.
+  if (command_name == "watch" && !transaction.active_) {
+    transaction.key_ = incoming_request->asArray()[1].asString();
+  }
+
+  // When we receive the first command with a key we will set this key as our transaction
+  // key, and then send a MULTI command to the node that handles that key.
+  // The response for the MULTI command will be discarded since we pass the null_pool_callbacks
+  // to the handler.
+  RouteSharedPtr route;
+  if (transaction.key_.empty()) {
+    // If we do an UNWATCH and we don't have a key until now, this is a no-op.
+    if (command_name == "unwatch") {
+      if (transaction.active_) {
+        // No-op during transaction -> QUEUED
+        localResponse(callbacks, "QUEUED");
+      } else {
+        // No-op outside transaction -> OK
+        localResponse(callbacks, "OK");
+      }
+
+      return nullptr;
+    }
+
+    transaction.key_ = incoming_request->asArray()[1].asString();
+    route = router.upstreamPool(transaction.key_, stream_info);
+    Common::Redis::RespValueSharedPtr multi_request =
+        std::make_shared<Common::Redis::Client::MultiRequest>();
+    if (route) {
+      // We reserve a client for the main connection and for each mirror connection.
+      transaction.clients_.resize(1 + route->mirrorPolicies().size());
+      makeSingleServerRequest(route, "MULTI", transaction.key_, multi_request, null_pool_callbacks,
+                              callbacks.transaction());
+      transaction.connection_established_ = true;
+    }
+  } else {
+    route = router.upstreamPool(transaction.key_, stream_info);
+  }
+
+  std::unique_ptr<TransactionRequest> request_ptr{
+      new TransactionRequest(callbacks, command_stats, time_source, delay_command_latency)};
+
+  if (route) {
+    Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+    request_ptr->handle_ =
+        makeSingleServerRequest(route, base_request->asArray()[0].asString(), transaction.key_,
+                                base_request, *request_ptr, callbacks.transaction());
+  }
+
+  // If we send an UNWATCH outside of a transaction, we clear the transaction key.
+  if (command_name == "unwatch" && !transaction.active_) {
+    transaction.key_.clear();
+  }
+
+  if (!request_ptr->handle_) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    return nullptr;
+  }
+
+  // If we sent a MULTI command upstream, connection was established.
+  if (command_name == "multi") {
+    transaction.connection_established_ = true;
+  }
+
+  return request_ptr;
+}
+
 InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                            TimeSource& time_source, bool latency_in_micros,
                            Common::Redis::FaultManagerPtr&& fault_manager)
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
-      split_keys_sum_result_handler_(*router_),
-      stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
+      keys_handler_(*router_), split_keys_sum_result_handler_(*router_),
+      transaction_handler_(*router_), stats_{ALL_COMMAND_SPLITTER_STATS(
+                                          POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source), fault_manager_(std::move(fault_manager)) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
@@ -458,11 +720,18 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 
   addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::mset(), latency_in_micros,
              mset_handler_);
+
+  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::keys(), latency_in_micros,
+             keys_handler_);
+
+  for (const std::string& command : Common::Redis::SupportedCommands::transactionCommands()) {
+    addHandler(scope, stat_prefix, command, latency_in_micros, transaction_handler_);
+  }
 }
 
 SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
-                                          SplitCallbacks& callbacks,
-                                          Event::Dispatcher& dispatcher) {
+                                          SplitCallbacks& callbacks, Event::Dispatcher& dispatcher,
+                                          const StreamInfo::StreamInfo& stream_info) {
   if ((request->type() != Common::Redis::RespType::Array) || request->asArray().empty()) {
     onInvalidRequest(callbacks);
     return nullptr;
@@ -475,9 +744,18 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     }
   }
 
-  std::string to_lower_string = absl::AsciiStrToLower(request->asArray()[0].asString());
+  std::string command_name = absl::AsciiStrToLower(request->asArray()[0].asString());
+  // Compatible with redis behavior, if there is an unsupported command, return immediately,
+  // this action must be performed before verifying auth, some redis clients rely on this behavior.
+  if (!Common::Redis::SupportedCommands::isSupportedCommand(command_name)) {
+    stats_.unsupported_command_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(fmt::format(
+        "ERR unknown command '{}', with args beginning with: {}", request->asArray()[0].asString(),
+        request->asArray().size() > 1 ? request->asArray()[1].asString() : "")));
+    return nullptr;
+  }
 
-  if (to_lower_string == Common::Redis::SupportedCommands::auth()) {
+  if (command_name == Common::Redis::SupportedCommands::auth()) {
     if (request->asArray().size() < 2) {
       onInvalidRequest(callbacks);
       return nullptr;
@@ -496,7 +774,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
-  if (to_lower_string == Common::Redis::SupportedCommands::ping()) {
+  if (command_name == Common::Redis::SupportedCommands::ping()) {
     // Respond to PING locally.
     Common::Redis::RespValuePtr pong(new Common::Redis::RespValue());
     pong->type(Common::Redis::RespType::SimpleString);
@@ -505,23 +783,78 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
-  if (request->asArray().size() < 2) {
-    // Commands other than PING all have at least two arguments.
+  if (command_name == Common::Redis::SupportedCommands::echo()) {
+    // Respond to ECHO locally.
+    if (request->asArray().size() != 2) {
+      onInvalidRequest(callbacks);
+      return nullptr;
+    }
+    Common::Redis::RespValuePtr echo_resp(new Common::Redis::RespValue());
+    echo_resp->type(Common::Redis::RespType::BulkString);
+    echo_resp->asString() = request->asArray()[1].asString();
+    callbacks.onResponse(std::move(echo_resp));
+    return nullptr;
+  }
+
+  if (command_name == Common::Redis::SupportedCommands::time()) {
+    // Respond to TIME locally.
+    Common::Redis::RespValuePtr time_resp(new Common::Redis::RespValue());
+    time_resp->type(Common::Redis::RespType::Array);
+    std::vector<Common::Redis::RespValue> resp_array;
+
+    auto now = dispatcher.timeSource().systemTime().time_since_epoch();
+
+    Common::Redis::RespValue time_in_secs;
+    time_in_secs.type(Common::Redis::RespType::BulkString);
+    time_in_secs.asString() =
+        std::to_string(std::chrono::duration_cast<std::chrono::seconds>(now).count());
+    resp_array.push_back(time_in_secs);
+
+    Common::Redis::RespValue time_in_micro_secs;
+    time_in_micro_secs.type(Common::Redis::RespType::BulkString);
+    time_in_micro_secs.asString() =
+        std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(now).count());
+    resp_array.push_back(time_in_micro_secs);
+
+    time_resp->asArray().swap(resp_array);
+    callbacks.onResponse(std::move(time_resp));
+    return nullptr;
+  }
+
+  if (command_name == Common::Redis::SupportedCommands::select()) {
+    // Respond to OK locally.
+    if (request->asArray().size() != 2) {
+      onInvalidRequest(callbacks);
+      return nullptr;
+    }
+    localResponse(callbacks, "OK");
+    return nullptr;
+  }
+
+  if (command_name == Common::Redis::SupportedCommands::quit()) {
+    callbacks.onQuit();
+    return nullptr;
+  }
+
+  if (request->asArray().size() < 2 &&
+      Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0) {
+    // Commands other than PING, TIME and transaction commands all have at least two arguments.
     onInvalidRequest(callbacks);
     return nullptr;
   }
 
   // Get the handler for the downstream request
-  auto handler = handler_lookup_table_.find(to_lower_string.c_str());
-  if (handler == nullptr) {
-    stats_.unsupported_command_.inc();
-    callbacks.onResponse(Common::Redis::Utility::makeError(
-        fmt::format("unsupported command '{}'", request->asArray()[0].asString())));
-    return nullptr;
+  auto handler = handler_lookup_table_.find(command_name.c_str());
+  ASSERT(handler != nullptr);
+
+  // If we are within a transaction, forward all requests to the transaction handler (i.e. handler
+  // of "multi" command).
+  if (callbacks.transaction().active_) {
+    handler = handler_lookup_table_.find("multi");
   }
 
   // Fault Injection Check
-  const Common::Redis::Fault* fault_ptr = fault_manager_->getFaultForCommand(to_lower_string);
+  const Common::Redis::Fault* fault_ptr = fault_manager_->getFaultForCommand(command_name);
 
   // Check if delay, which determines which callbacks to use. If a delay fault is enabled,
   // the delay fault itself wraps the request (or other fault) and the delay fault itself
@@ -532,7 +865,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   std::unique_ptr<DelayFaultRequest> delay_fault_ptr;
   if (has_delay_fault) {
     delay_fault_ptr = DelayFaultRequest::create(callbacks, handler->command_stats_, time_source_,
-                                                dispatcher, fault_ptr->delayMs());
+                                                dispatcher, fault_ptr->delayMs(), stream_info);
   }
 
   // Note that the command_stats_ object of the original request is used for faults, so that our
@@ -545,11 +878,12 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   SplitRequestPtr request_ptr;
   if (fault_ptr != nullptr && fault_ptr->faultType() == Common::Redis::FaultType::Error) {
     request_ptr = ErrorFaultRequest::create(has_delay_fault ? *delay_fault_ptr : callbacks,
-                                            handler->command_stats_, time_source_, has_delay_fault);
+                                            handler->command_stats_, time_source_, has_delay_fault,
+                                            stream_info);
   } else {
     request_ptr = handler->handler_.get().startRequest(
         std::move(request), has_delay_fault ? *delay_fault_ptr : callbacks, handler->command_stats_,
-        time_source_, has_delay_fault);
+        time_source_, has_delay_fault, stream_info);
   }
 
   // Complete delay, if any. The delay fault takes ownership of the wrapped request.

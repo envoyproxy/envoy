@@ -11,6 +11,8 @@
 #include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
+#include "source/common/network/cidr_range.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -39,6 +41,12 @@ public:
    * The ':' delimited list of supported ECDH curves.
    */
   virtual const std::string& ecdhCurves() const PURE;
+
+  /**
+   * The ':' delimited list of supported signature algorithms.
+   * See https://www.rfc-editor.org/rfc/rfc8446#page-41 for the names.
+   */
+  virtual const std::string& signatureAlgorithms() const PURE;
 
   /**
    * @return std::vector<std::reference_wrapper<const TlsCertificateConfig>> TLS
@@ -73,7 +81,7 @@ public:
    * are downloaded from SDS server, this callback is invoked to update SSL context.
    * @param callback callback that is executed by context config.
    */
-  virtual void setSecretUpdateCallback(std::function<void()> callback) PURE;
+  virtual void setSecretUpdateCallback(std::function<absl::Status()> callback) PURE;
 
   /**
    * @return a callback which can be used to create Handshaker instances.
@@ -89,6 +97,26 @@ public:
    * @return a callback for configuring an SSL_CTX before use.
    */
   virtual SslCtxCb sslctxCb() const PURE;
+
+  /**
+   * @return the TLS key log local filter.
+   */
+  virtual const Network::Address::IpList& tlsKeyLogLocal() const PURE;
+
+  /**
+   * @return the TLS key log remote filter.
+   */
+  virtual const Network::Address::IpList& tlsKeyLogRemote() const PURE;
+
+  /**
+   * @return the TLS key log path
+   */
+  virtual const std::string& tlsKeyLogPath() const PURE;
+
+  /**
+   * @return the access log manager object reference
+   */
+  virtual AccessLog::AccessLogManager& accessLogManager() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
@@ -98,6 +126,19 @@ public:
    * Otherwise, ""
    */
   virtual const std::string& serverNameIndication() const PURE;
+
+  /**
+   * If true, replaces the SNI for the connection with the hostname of the upstream host, if
+   * the hostname is known.
+   */
+  virtual bool autoHostServerNameIndication() const PURE;
+
+  /**
+   * If true, replace any Subject Alternative Name validations with a validation for a DNS SAN
+   * matching the SNI value sent. Note that the validation will be against the actual requested SNI,
+   * regardless of how it is configured.
+   */
+  virtual bool autoSniSanMatch() const PURE;
 
   /**
    * @return true if server-initiated TLS renegotiation will be allowed.
@@ -110,12 +151,10 @@ public:
   virtual size_t maxSessionKeys() const PURE;
 
   /**
-   * @return const std::string& with the signature algorithms for the context.
-   *         This is a :-delimited list of algorithms, see
-   *         https://tools.ietf.org/id/draft-ietf-tls-tls13-21.html#rfc.section.4.2.3
-   *         for names.
+   * @return true if the enforcement that handshake will fail if the keyUsage extension is present
+   * and incompatible with the TLS usage is enabled.
    */
-  virtual const std::string& signingAlgorithmsForTest() const PURE;
+  virtual bool enforceRsaKeyUsage() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;
@@ -162,6 +201,27 @@ public:
    * @return True if stateless TLS session resumption is disabled, false otherwise.
    */
   virtual bool disableStatelessSessionResumption() const PURE;
+
+  /**
+   * @return True if stateful TLS session resumption is disabled, false otherwise.
+   */
+  virtual bool disableStatefulSessionResumption() const PURE;
+
+  /**
+   * @return True if we allow full scan certificates when there is no cert matching SNI during
+   * downstream TLS handshake, false otherwise.
+   */
+  virtual bool fullScanCertsOnSNIMismatch() const PURE;
+
+  /**
+   * @return true if the client cipher preference is enabled, false otherwise.
+   */
+  virtual bool preferClientCiphers() const PURE;
+
+  /**
+   * @return a factory which can be used to create TLS context provider instances.
+   */
+  virtual TlsCertificateSelectorFactory tlsCertificateSelectorFactory() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;

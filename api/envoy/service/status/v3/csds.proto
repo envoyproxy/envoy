@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.status.v3;
 
-import "envoy/admin/v3/config_dump.proto";
+import "envoy/admin/v3/config_dump_shared.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/matcher/v3/node.proto";
 
@@ -17,10 +17,10 @@ import "udpa/annotations/versioning.proto";
 option java_package = "io.envoyproxy.envoy.service.status.v3";
 option java_outer_classname = "CsdsProto";
 option java_multiple_files = true;
-option java_generic_services = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/status/v3;statusv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Client Status Discovery Service (CSDS)]
+// [#protodoc-title: Client status discovery service (CSDS)]
 
 // CSDS is Client Status Discovery Service. It can be used to get the status of
 // an xDS-compliant client from the management server's point of view. It can
@@ -72,6 +72,11 @@ enum ClientConfigStatus {
   // config dump is not the NACKed version, but the most recent accepted one. If
   // no config is accepted yet, the attached config dump will be empty.
   CLIENT_NACKED = 3;
+
+  // Client received an error from the control plane. The attached config
+  // dump is the most recent accepted one. If no config is accepted yet,
+  // the attached config dump will be empty.
+  CLIENT_RECEIVED_ERROR = 4;
 }
 
 // Request for client status of clients identified by a list of NodeMatchers.
@@ -85,6 +90,11 @@ message ClientStatusRequest {
 
   // The node making the csds request.
   config.core.v3.Node node = 2;
+
+  // If true, the server will not include the resource contents in the response
+  // (i.e., the generic_xds_configs.xds_config field will not be populated).
+  // [#not-implemented-hide:]
+  bool exclude_resource_contents = 3;
 }
 
 // Detailed config (per xDS) with status.
@@ -180,6 +190,11 @@ message ClientConfig {
   // Represents generic xDS config and the exact config structure depends on
   // the type URL (like Cluster if it is CDS)
   repeated GenericXdsConfig generic_xds_configs = 3;
+
+  // For xDS clients, the scope in which the data is used.
+  // For example, gRPC indicates the data plane target or that the data is
+  // associated with gRPC server(s).
+  string client_scope = 4;
 }
 
 message ClientStatusResponse {

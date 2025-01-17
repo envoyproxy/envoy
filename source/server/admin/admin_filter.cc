@@ -5,8 +5,7 @@
 namespace Envoy {
 namespace Server {
 
-AdminFilter::AdminFilter(AdminServerCallbackFunction admin_server_callback_func)
-    : admin_server_callback_func_(admin_server_callback_func) {}
+AdminFilter::AdminFilter(const Admin& admin) : admin_(admin) {}
 
 Http::FilterHeadersStatus AdminFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                      bool end_stream) {
@@ -61,22 +60,50 @@ const Http::RequestHeaderMap& AdminFilter::getRequestHeaders() const {
   return *request_headers_;
 }
 
+Http::Utility::QueryParamsMulti AdminFilter::queryParams() const {
+  absl::string_view path = request_headers_->getPathValue();
+  Http::Utility::QueryParamsMulti query =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+  if (!query.data().empty()) {
+    return query;
+  }
+
+  // Check if the params are in the request's body.
+  if (request_headers_->getContentTypeValue() ==
+      Http::Headers::get().ContentTypeValues.FormUrlEncoded) {
+    const Buffer::Instance* body = getRequestBody();
+    if (body != nullptr) {
+      query = Http::Utility::QueryParamsMulti::parseParameters(body->toString(), 0, true);
+    }
+  }
+
+  return query;
+}
+
 void AdminFilter::onComplete() {
-  const absl::string_view path = request_headers_->getPathValue();
+  absl::string_view path = request_headers_->getPathValue();
   ENVOY_STREAM_LOG(debug, "request complete: path: {}", *decoder_callbacks_, path);
 
-  Buffer::OwnedImpl response;
   auto header_map = Http::ResponseHeaderMapImpl::create();
   RELEASE_ASSERT(request_headers_, "");
-  Http::Code code = admin_server_callback_func_(path, *header_map, response, *this);
+  Admin::RequestPtr handler = admin_.makeRequest(*this);
+  Http::Code code = handler->start(*header_map);
   Utility::populateFallbackResponseHeaders(code, *header_map);
-  decoder_callbacks_->encodeHeaders(std::move(header_map),
-                                    end_stream_on_complete_ && response.length() == 0,
+  decoder_callbacks_->encodeHeaders(std::move(header_map), false,
                                     StreamInfo::ResponseCodeDetails::get().AdminFilterResponse);
 
-  if (response.length() > 0) {
-    decoder_callbacks_->encodeData(response, end_stream_on_complete_);
-  }
+  // TODO(#31087): use high/lower watermarks to apply flow-control to the admin http port.
+  bool more_data;
+  do {
+    Buffer::OwnedImpl response;
+    more_data = handler->nextChunk(response);
+    bool end_stream = end_stream_on_complete_ && !more_data;
+    ENVOY_LOG_MISC(debug, "nextChunk: response.length={} more_data={} end_stream={}",
+                   response.length(), more_data, end_stream);
+    if (response.length() > 0 || end_stream) {
+      decoder_callbacks_->encodeData(response, end_stream);
+    }
+  } while (more_data);
 }
 
 } // namespace Server

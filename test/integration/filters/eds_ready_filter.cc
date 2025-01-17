@@ -6,9 +6,10 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
 namespace Envoy {
@@ -20,7 +21,18 @@ public:
   EdsReadyFilter(const Stats::Scope& root_scope, Stats::SymbolTable& symbol_table)
       : root_scope_(root_scope), stat_name_("cluster.cluster_0.membership_healthy", symbol_table) {}
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-    Stats::GaugeOptConstRef gauge = root_scope_.findGauge(stat_name_.statName());
+
+    // We must do the 'find' on the Store, which searches all scopes. Doing the
+    // find only on the root scope will not find the gauge which is defined on a
+    // lower-level scope.
+    Stats::StatName stat_name = stat_name_.statName();
+    Stats::GaugeOptConstRef gauge;
+    root_scope_.constStore().forEachScope(nullptr, [&gauge, stat_name](const Stats::Scope& scope) {
+      if (!gauge.has_value()) {
+        gauge = scope.findGauge(stat_name);
+      }
+    });
+
     if (!gauge.has_value()) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError,
                                          "Couldn't find stat", nullptr, absl::nullopt, "");
@@ -45,11 +57,11 @@ class EdsReadyFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFi
 public:
   EdsReadyFilterConfig() : EmptyHttpFilterConfig("eds-ready-filter") {}
 
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,
                Server::Configuration::FactoryContext& factory_context) override {
     return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {
-      const Stats::Scope& scope = factory_context.api().rootScope();
+      const Stats::Scope& scope = factory_context.serverFactoryContext().api().rootScope();
       Stats::SymbolTable& symbol_table = factory_context.scope().symbolTable();
       callbacks.addStreamFilter(std::make_shared<EdsReadyFilter>(scope, symbol_table));
     };

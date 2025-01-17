@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/http/async_client.h"
+#include "envoy/tcp/async_tcp_client.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -22,9 +23,10 @@ public:
    */
   Envoy::Http::ConnectionPool::Cancellable*
   newStream(Http::ResponseDecoder& response_decoder,
-            Envoy::Http::ConnectionPool::Callbacks& callbacks) {
+            Envoy::Http::ConnectionPool::Callbacks& callbacks,
+            const Http::ConnectionPool::Instance::StreamOptions& stream_options) {
     on_new_stream_();
-    return pool_->newStream(response_decoder, callbacks);
+    return pool_->newStream(response_decoder, callbacks, stream_options);
   }
   bool hasActiveConnections() const { return pool_->hasActiveConnections(); };
 
@@ -32,6 +34,9 @@ public:
    * See documentation of Envoy::ConnectionPool::Instance.
    */
   void addIdleCallback(ConnectionPool::Instance::IdleCb cb) { pool_->addIdleCallback(cb); };
+  void drainConnections(ConnectionPool::DrainBehavior drain_behavior) {
+    pool_->drainConnections(drain_behavior);
+  };
 
   Upstream::HostDescriptionConstSharedPtr host() const { return pool_->host(); }
 
@@ -91,6 +96,16 @@ public:
    */
   virtual LoadBalancer& loadBalancer() PURE;
 
+  /* Choose a host for the next request. If this returns a host, this should immediately be
+   * followed by a call to httpConnPool or tcpConnPool or load balancing may not work as
+   * expected.
+   *
+   * @param context the optional load balancer context.
+   * @return host the next host selected by the load balancer or null if no host
+   * is available.
+   */
+  virtual HostSelectionResponse chooseHost(LoadBalancerContext* context) PURE;
+
   /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that
    * callers do not need to worry about per thread synchronization. The load balancing policy that
@@ -104,7 +119,8 @@ public:
    * @return the connection pool data or nullopt if there is no host available in the cluster.
    */
   virtual absl::optional<HttpPoolData>
-  httpConnPool(ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
+  httpConnPool(HostConstSharedPtr host, ResourcePriority priority,
+               absl::optional<Http::Protocol> downstream_protocol,
                LoadBalancerContext* context) PURE;
 
   /**
@@ -117,6 +133,11 @@ public:
    *        valid until newConnection is called on the pool (if it is to be called).
    * @return the connection pool data or nullopt if there is no host available in the cluster.
    */
+  virtual absl::optional<TcpPoolData> tcpConnPool(HostConstSharedPtr host,
+                                                  ResourcePriority priority,
+                                                  LoadBalancerContext* context) PURE;
+
+  /* a legacy API which synchronously chooses a host and creates a conn pool*/
   virtual absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
                                                   LoadBalancerContext* context) PURE;
 
@@ -137,6 +158,35 @@ public:
    * owns the client.
    */
   virtual Http::AsyncClient& httpAsyncClient() PURE;
+
+  /**
+   * @param context the optional load balancer context.
+   * @param options the tcp client creation config options.
+   * @return a client that can be used to make async Tcp calls against the given cluster.
+   */
+  virtual Tcp::AsyncTcpClientPtr
+  tcpAsyncClient(LoadBalancerContext* context,
+                 Tcp::AsyncTcpClientOptionsConstSharedPtr options) PURE;
+
+  /**
+   * @return the thread local cluster drop_overload configuration.
+   */
+  virtual UnitFloat dropOverload() const PURE;
+
+  /**
+   * @return the thread local cluster drop_category configuration.
+   */
+  virtual const std::string& dropCategory() const PURE;
+
+  /**
+   * Set up the drop_overload value for the thread local cluster.
+   */
+  virtual void setDropOverload(UnitFloat drop_overload) PURE;
+
+  /**
+   * Set up the drop_category value for the thread local cluster.
+   */
+  virtual void setDropCategory(absl::string_view drop_category) PURE;
 };
 
 using ThreadLocalClusterOptRef = absl::optional<std::reference_wrapper<ThreadLocalCluster>>;

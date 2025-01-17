@@ -18,11 +18,16 @@ from datetime import datetime
 
 import yaml
 
+from docutils import nodes, utils
+
 from sphinx.directives.code import CodeBlock
-import sphinx_rtd_theme
+from sphinx.util.nodes import split_explicit_title
+
+# TODO(phlax): move the pygments style to envoy.docs.sphinx_runner and remove this
+sys.path.append(os.path.abspath("./_pygments"))
 
 
-class SphinxConfigException(Exception):
+class SphinxConfigError(Exception):
     pass
 
 
@@ -49,10 +54,55 @@ class SubstitutionCodeBlock(CodeBlock):
         return list(CodeBlock.run(self))
 
 
+def dockerhub_envoy_role(
+        typ: str,
+        rawtext: str,
+        text: str,
+        lineno: int,
+        inliner,  # : Inliner,
+        options: dict = {},
+        content: list[str] = []) -> tuple[list, list]:
+    text = utils.unescape(text)
+    has_explicit_title, title, part = split_explicit_title(text)
+
+    if part.startswith("envoy"):
+        part = part[len("envoy"):]
+
+    # envoy-build-ubuntu images
+    if part.startswith("build"):
+        parts = part.split("-")
+        if len(parts) > 2:
+            title = f"envoyproxy/envoy-build-ubuntu:{''.join(parts[2:])}-<build_sha>"
+            full_url = f"https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?name={''.join(parts[2:])}"
+        else:
+            title = f"envoyproxy/envoy-build-ubuntu:<build_sha>"
+            full_url = f"https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags"
+
+    # dev images
+    elif part.endswith("-dev"):
+        if part == "-dev":
+            part = "dev"
+        title = f"envoyproxy/envoy:{part}"
+        full_url = f"https://hub.docker.com/r/envoyproxy/envoy/tags?name={part}"
+
+    # envoy images
+    else:
+        variant = (
+            f"-{_config('docker_image_tag_name')}" if part else _config("docker_image_tag_name"))
+        title = f"envoyproxy/envoy:{part}{variant}"
+        full_url = f"https://hub.docker.com/r/envoyproxy/envoy/tags?name={part}{variant}"
+
+    if not has_explicit_title:
+        title = title
+    pnode = nodes.reference(title, title, internal=False, refuri=full_url)
+    return [pnode], []
+
+
 def setup(app):
     app.add_config_value('release_level', '', 'env')
     app.add_config_value('substitutions', [], 'html')
     app.add_directive('substitution-code-block', SubstitutionCodeBlock)
+    app.add_role('dockerhub_envoy', dockerhub_envoy_role)
 
 
 missing_config = (
@@ -60,7 +110,7 @@ missing_config = (
     or not os.path.exists(os.environ["ENVOY_DOCS_BUILD_CONFIG"]))
 
 if missing_config:
-    raise SphinxConfigException(
+    raise SphinxConfigError(
         "`ENVOY_DOCS_BUILD_CONFIG` env var must be defined, "
         "and point to a valid yaml file")
 
@@ -70,7 +120,7 @@ with open(os.environ["ENVOY_DOCS_BUILD_CONFIG"]) as f:
 
 def _config(key):
     if not configs.get(key):
-        raise SphinxConfigException(f"`{key}` config var must be defined")
+        raise SphinxConfigError(f"`{key}` config var must be defined")
     return configs[key]
 
 
@@ -91,30 +141,39 @@ def _config(key):
 sys.path.append(os.path.abspath("./_ext"))
 
 extensions = [
-    'sphinxcontrib.httpdomain', 'sphinx.ext.extlinks', 'sphinx.ext.ifconfig', 'intersphinx_custom',
-    'sphinx_tabs.tabs', 'sphinx_copybutton', 'validating_code_block', 'sphinxext.rediraffe',
-    'powershell_lexer'
+    'envoy.docs.sphinx_runner.ext.httpdomain',
+    'sphinx.ext.extlinks',
+    'sphinx.ext.ifconfig',
+    'sphinx.ext.intersphinx',
+    'envoy.docs.sphinx_runner.sphinx_tabs.tabs',
+    'sphinx_copybutton',
+    'envoy.docs.sphinx_runner.ext.validating_code_block',
+    'sphinxext.rediraffe',
+    'envoy.docs.sphinx_runner.ext.powershell_lexer',
+    'sphinxcontrib.jquery',
 ]
 
 release_level = _config('release_level')
 blob_sha = _config('blob_sha')
 
 extlinks = {
-    'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), ''),
-    'api': ('https://github.com/envoyproxy/envoy/blob/{}/api/%s'.format(blob_sha), ''),
+    'repo': ('https://github.com/envoyproxy/envoy/blob/{}/%s'.format(blob_sha), '%s'),
+    'api': ('https://github.com/envoyproxy/envoy/blob/{}/api/%s'.format(blob_sha), '%s'),
 }
+
+# Only lookup intersphinx for explicitly prefixed in cross-references
+# This makes docs versioning work
+intersphinx_disabled_reftypes = ['*']
 
 # Setup global substitutions
 if 'pre-release' in release_level:
     substitutions = [
-        ('|envoy_docker_image|', 'envoy-dev:{}'.format(blob_sha)),
-        ('|envoy_windows_docker_image|', 'envoy-windows-dev:{}'.format(blob_sha)),
-        ('|envoy_distroless_docker_image|', 'envoy-distroless-dev:{}'.format(blob_sha))
+        ('|envoy_docker_image|', 'envoy:dev-{}'.format(blob_sha)),
+        ('|envoy_distroless_docker_image|', 'envoy:distroless-dev-{}'.format(blob_sha))
     ]
 else:
     substitutions = [('|envoy_docker_image|', 'envoy:{}'.format(blob_sha)),
-                     ('|envoy_windows_docker_image|', 'envoy-windows:{}'.format(blob_sha)),
-                     ('|envoy_distroless_docker_image|', 'envoy-distroless:{}'.format(blob_sha))]
+                     ('|envoy_distroless_docker_image|', 'envoy:distroless-{}'.format(blob_sha))]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -147,16 +206,22 @@ version = _config('version_string')
 # The full version, including alpha/beta/rc tags.
 release = _config('version_string')
 
+short_tag_name = _config('docker_image_tag_name')
+if short_tag_name.endswith("-latest"):
+    short_tag_name = short_tag_name[:-len("-latest")]
+
 rst_epilog = """
 .. |DOCKER_IMAGE_TAG_NAME| replace:: {}
-""".format(_config('docker_image_tag_name'))
+
+.. |DOCKER_IMAGE_TAG_NAME_SHORT| replace:: {}
+""".format(_config('docker_image_tag_name'), short_tag_name)
 
 # The language for content autogenerated by Sphinx. Refer to documentation
 # for a list of supported languages.
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
@@ -216,7 +281,7 @@ html_theme_options = {
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
-html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+# html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 # The name for this set of Sphinx documents.
 # "<project> v<release> documentation" by default.
@@ -309,39 +374,8 @@ htmlhelp_basename = 'envoydoc'
 # TODO(phlax): add redirect diff (`rediraffe_branch` setting)
 #  - not sure how diffing will work with main merging in PRs - might need
 #    to be injected dynamically, somehow
-rediraffe_redirects = "envoy-redirects.txt"
+rediraffe_redirects = "redirects.txt"
 
-intersphinx_mapping = {
-    'v1.5.0': ('https://www.envoyproxy.io/docs/envoy/v1.5.0', None),
-    'v1.6.0': ('https://www.envoyproxy.io/docs/envoy/v1.6.0', None),
-    'v1.7.0': ('https://www.envoyproxy.io/docs/envoy/v1.7.1', None),
-    'v1.8.0': ('https://www.envoyproxy.io/docs/envoy/v1.8.0', None),
-    'v1.9.0': ('https://www.envoyproxy.io/docs/envoy/v1.9.0', None),
-    'v1.9.1': ('https://www.envoyproxy.io/docs/envoy/v1.9.1', None),
-    'v1.10.0': ('https://www.envoyproxy.io/docs/envoy/v1.10.0', None),
-    'v1.11.0': ('https://www.envoyproxy.io/docs/envoy/v1.11.0', None),
-    'v1.11.1': ('https://www.envoyproxy.io/docs/envoy/v1.11.1', None),
-    'v1.11.2': ('https://www.envoyproxy.io/docs/envoy/v1.11.2', None),
-    'v1.12.0': ('https://www.envoyproxy.io/docs/envoy/v1.12.0', None),
-    'v1.12.2': ('https://www.envoyproxy.io/docs/envoy/v1.12.2', None),
-    'v1.12.3': ('https://www.envoyproxy.io/docs/envoy/v1.12.3', None),
-    'v1.12.4': ('https://www.envoyproxy.io/docs/envoy/v1.12.4', None),
-    'v1.12.5': ('https://www.envoyproxy.io/docs/envoy/v1.12.5', None),
-    'v1.12.6': ('https://www.envoyproxy.io/docs/envoy/v1.12.6', None),
-    'v1.13.0': ('https://www.envoyproxy.io/docs/envoy/v1.13.0', None),
-    'v1.13.1': ('https://www.envoyproxy.io/docs/envoy/v1.13.1', None),
-    'v1.13.2': ('https://www.envoyproxy.io/docs/envoy/v1.13.2', None),
-    'v1.13.3': ('https://www.envoyproxy.io/docs/envoy/v1.13.3', None),
-    'v1.14.0': ('https://www.envoyproxy.io/docs/envoy/v1.14.0', None),
-    'v1.14.2': ('https://www.envoyproxy.io/docs/envoy/v1.14.2', None),
-    'v1.14.3': ('https://www.envoyproxy.io/docs/envoy/v1.14.3', None),
-    'v1.14.7': ('https://www.envoyproxy.io/docs/envoy/v1.14.7', None),
-    'v1.15.0': ('https://www.envoyproxy.io/docs/envoy/v1.15.0', None),
-    'v1.15.4': ('https://www.envoyproxy.io/docs/envoy/v1.15.4', None),
-    'v1.16.0': ('https://www.envoyproxy.io/docs/envoy/v1.16.0', None),
-    'v1.16.3': ('https://www.envoyproxy.io/docs/envoy/v1.16.3', None),
-    'v1.17.0': ('https://www.envoyproxy.io/docs/envoy/v1.17.0', None),
-    'v1.17.1': ('https://www.envoyproxy.io/docs/envoy/v1.17.1', None),
-    'v1.17.2': ('https://www.envoyproxy.io/docs/envoy/v1.17.2', None),
-    'v1.18.0': ('https://www.envoyproxy.io/docs/envoy/v1.18.2', None)
-}
+intersphinx_mapping = _config("intersphinx_mapping")
+
+pygments_style = "style.EnvoyCodeStyle"

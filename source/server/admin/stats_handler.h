@@ -9,8 +9,9 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "source/common/stats/histogram_impl.h"
 #include "source/server/admin/handler_ctx.h"
+#include "source/server/admin/stats_request.h"
+#include "source/server/admin/utils.h"
 
 #include "absl/strings/string_view.h"
 
@@ -22,52 +23,79 @@ class StatsHandler : public HandlerContextBase {
 public:
   StatsHandler(Server::Instance& server);
 
-  Http::Code handlerResetCounters(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerResetCounters(Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookups(absl::string_view path_and_query,
-                                       Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerStatsRecentLookups(Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsClear(absl::string_view path_and_query,
-                                            Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerStatsRecentLookupsClear(Http::ResponseHeaderMap& response_headers,
                                             Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsDisable(absl::string_view path_and_query,
-                                              Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerStatsRecentLookupsDisable(Http::ResponseHeaderMap& response_headers,
                                               Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStatsRecentLookupsEnable(absl::string_view path_and_query,
-                                             Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerStatsRecentLookupsEnable(Http::ResponseHeaderMap& response_headers,
                                              Buffer::Instance& response, AdminStream&);
-  Http::Code handlerStats(absl::string_view path_and_query,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                          AdminStream&);
-  Http::Code handlerPrometheusStats(absl::string_view path_and_query,
-                                    Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerPrometheusStats(Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
-  Http::Code handlerContention(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers,
+
+  /**
+   * Parses and executes a prometheus stats request.
+   *
+   * @param path_and_query the URL path and query
+   * @param response buffer into which to write response
+   * @return http response code
+   */
+  Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response);
+
+  /**
+   * Checks the server_ to see if a flush is needed, and then renders the
+   * prometheus stats request.
+   *
+   * @params params the already-parsed parameters.
+   * @param response buffer into which to write response
+   */
+  Http::Code prometheusFlushAndRender(const StatsParams& params, Buffer::Instance& response);
+
+  /**
+   * Renders the stats as prometheus. This is broken out as a separately
+   * callable API to facilitate the benchmark
+   * (test/server/admin/stats_handler_speed_test.cc) which does not have a
+   * server object.
+   *
+   * @params stats the stats store to read
+   * @param custom_namespaces namespace mappings used for prometheus
+   * @params params the already-parsed parameters.
+   * @param response buffer into which to write response
+   */
+  static void prometheusRender(Stats::Store& stats,
+                               const Stats::CustomStatNamespaces& custom_namespaces,
+                               const Upstream::ClusterManager& cluster_manager,
+                               const StatsParams& params, Buffer::Instance& response);
+
+  Http::Code handlerContention(Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
+  /**
+   * When stats are rendered in HTML mode, we want users to be able to tweak
+   * parameters after the stats page is rendered, such as tweaking the filter or
+   * `usedonly`. We use the same stats UrlHandler both for the admin home page
+   * and for rendering in /stats?format=html. We share the same UrlHandler in
+   * both contexts by defining an API for it here.
+   *
+   * @param active_mode skips rendering a form-field for 'usedonly', which we
+   *        force-enable for active mode. It makes no sense to include stats
+   *        that have never been written in a top-most-frequently-updated list.
+   * @return a URL handler for stats.
+   */
+  Admin::UrlHandler statsHandler(bool active_mode);
+
+  static Admin::RequestPtr makeRequest(Stats::Store& stats, const StatsParams& params,
+                                       const Upstream::ClusterManager& cm,
+                                       StatsRequest::UrlHandlerFn url_handler_fn = nullptr);
+  Admin::RequestPtr makeRequest(AdminStream&);
+
 private:
-  template <class StatType>
-  static bool shouldShowMetric(const StatType& metric, const bool used_only,
-                               const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric.used()) &&
-            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
-  }
-
-  friend class AdminStatsTest;
-
-  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                                 const std::map<std::string, std::string>& text_readouts,
-                                 const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool used_only, const absl::optional<std::regex>& regex,
-                                 bool pretty_print = false);
-
-  void statsAsText(const std::map<std::string, uint64_t>& all_stats,
-                   const std::map<std::string, std::string>& text_readouts,
-                   const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                   bool used_only, const absl::optional<std::regex>& regex,
-                   Buffer::Instance& response);
+  static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
+                                    Stats::Store& stats,
+                                    Stats::CustomStatNamespaces& custom_namespaces);
 };
 
 } // namespace Server

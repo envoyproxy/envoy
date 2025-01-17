@@ -1,0 +1,197 @@
+frames {
+  h2frame {
+    headers {
+      key: ":scheme"
+      value: "http"
+    }
+    headers {
+      key: ":path"
+      value: "/"
+    }
+    headers {
+      key: ":method"
+      value: "head"
+    }
+    headers {
+      key: "content-type"
+      value: "text/plain; charset=UTF-8"
+    }
+    headers {
+      key: "access-control-request-private-network"
+      value: "empty"
+    }
+    headers {
+      key: "grpc-status"
+      value: "empty"
+    }
+    headers {
+      key: "x-forwarded-host"
+      value: "empty"
+    }
+    headers {
+      key: "-original-path"
+      value: "empty"
+    }
+    headers {
+      key: "proxy-authenticate"
+      value: "empty"
+    }
+    headers {
+      key: "expect"
+      value: "100-continue"
+    }
+    headers {
+      key: "-retriable-header-names"
+      value: "empty"
+    }
+    headers {
+      key: "-internal"
+      value: "true"
+    }
+    headers {
+      key: "accept-encoding"
+      value: "identity"
+    }
+    headers {
+      key: "date"
+      value: "empty"
+    }
+    headers {
+      key: "transfer-encoding"
+      value: "zstd"
+    }
+    headers {
+      key: "vary"
+      value: "Accept-Encoding"
+    }
+    headers {
+      key: "-retry-on"
+      value: "retriable-headers"
+    }
+    headers {
+      key: "connection"
+      value: "http2-settings"
+    }
+    headers {
+      key: "-overloaded"
+      value: "true"
+    }
+    headers {
+      key: ":protocol"
+      value: "bytestream"
+    }
+    headers {
+      key: "-degraded"
+      value: "empty"
+    }
+    headers {
+      key: "-ratelimited"
+      value: "true"
+    }
+    headers {
+      key: "grpc-timeout"
+      value: "empty"
+    }
+    headers {
+      key: "x-content-type-options"
+      value: "empty"
+    }
+    headers {
+      key: "x-ot-span-context"
+      value: "empty"
+    }
+    headers {
+      key: "x-client-trace-id"
+      value: "empty"
+    }
+    headers {
+      key: "if-match"
+      value: "empty"
+    }
+    headers {
+      key: "-upstream-stream-duration-ms"
+      value: "empty"
+    }
+    headers {
+      key: "-upstream-service-time"
+      value: "empty"
+    }
+    headers {
+      key: "-immediate-health-check-fail"
+      value: "true"
+    }
+    headers {
+      key: "content-range"
+      value: "empty"
+    }
+    headers {
+      key: "-upstream-canary"
+      value: "empty"
+    }
+    headers {
+      key: "x-squash-debug"
+      value: "empty"
+    }
+    headers {
+      key: "grpc-accept-encoding"
+      value: "identity"
+    }
+    headers {
+      key: "access-control-allow-methods"
+      value: "empty"
+    }
+    headers {
+      key: "cdn-loop"
+      value: "empty"
+    }
+    headers {
+      key: "user-agent"
+      value: "Envoy/HC"
+    }
+    headers {
+      key: "-upstream-hostname"
+      value: "empty"
+    }
+    headers {
+      key: "access-control-allow-origin"
+      value: "empty"
+    }
+    headers {
+      key: "access-control-request-headers"
+      value: "empty"
+    }
+    headers {
+      key: "set-cookie"
+      value: "empty"
+    }
+    headers {
+      key: "-upstream-rq-per-try-timeout-ms"
+      value: "empty"
+    }
+    headers {
+      key: "-decorator-operation"
+      value: "empty"
+    }
+    headers {
+      key: "grpc-status-details-bin"
+      value: "empty"
+    }
+    headers {
+      key: "grpc-message-type"
+      value: "empty"
+    }
+    headers {
+      key: "proxy-status"
+      value: "empty"
+    }
+    headers {
+      key: "upgrade"
+      value: "h2c"
+    }
+    headers {
+      key: "location"
+      value: "empty"
+    }
+    }
+  }
+}

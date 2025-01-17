@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.data.core.v3;
 
 import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/timestamp.proto";
 
@@ -13,6 +14,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.data.core.v3";
 option java_outer_classname = "HealthCheckEventProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/data/core/v3;corev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Health check logging events]
@@ -30,9 +32,10 @@ enum HealthCheckerType {
   TCP = 1;
   GRPC = 2;
   REDIS = 3;
+  THRIFT = 4;
 }
 
-// [#next-free-field: 10]
+// [#next-free-field: 13]
 message HealthCheckEvent {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.core.v2alpha.HealthCheckEvent";
@@ -52,6 +55,12 @@ message HealthCheckEvent {
     // Host addition.
     HealthCheckAddHealthy add_healthy_event = 5;
 
+    // A health check was successful. Note: a host will be considered healthy either if it is
+    // the first ever health check, or if the healthy threshold is reached. This kind of event
+    // indicate that a health check was successful, but does not indicates that the host is
+    // considered healthy. A host is considered healthy if HealthCheckAddHealthy kind of event is sent.
+    HealthCheckSuccessful successful_health_check_event = 12;
+
     // Host failure.
     HealthCheckFailure health_check_failure_event = 7;
 
@@ -64,6 +73,12 @@ message HealthCheckEvent {
 
   // Timestamp for event.
   google.protobuf.Timestamp timestamp = 6;
+
+  // Host metadata
+  config.core.v3.Metadata metadata = 10;
+
+  // Host locality
+  config.core.v3.Locality locality = 11;
 }
 
 message HealthCheckEjectUnhealthy {
@@ -82,6 +97,9 @@ message HealthCheckAddHealthy {
   // the configured :ref:`healthy threshold <envoy_v3_api_field_config.core.v3.HealthCheck.healthy_threshold>`
   // is bypassed and the host is immediately added.
   bool first_check = 1;
+}
+
+message HealthCheckSuccessful {
 }
 
 message HealthCheckFailure {

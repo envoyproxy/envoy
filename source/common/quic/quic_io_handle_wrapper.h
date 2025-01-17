@@ -1,10 +1,11 @@
 #pragma once
 
 #include <chrono>
-#include <iostream>
+#include <iosfwd>
 
 #include "envoy/network/io_handle.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/network/io_socket_error_impl.h"
 
 namespace Envoy {
@@ -23,33 +24,30 @@ public:
     return Api::ioCallUint64ResultNoError();
   }
   bool isOpen() const override { return !closed_; }
+  bool wasConnected() const override { return io_handle_.wasConnected(); }
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override {
     if (closed_) {
-      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError));
+      return {0, Network::IoSocketError::getIoSocketEbadfError()};
     }
     return io_handle_.readv(max_length, slices, num_slice);
   }
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
                                absl::optional<uint64_t> max_length) override {
     if (closed_) {
-      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError));
+      return {0, Network::IoSocketError::getIoSocketEbadfError()};
     }
     return io_handle_.read(buffer, max_length);
   }
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override {
     if (closed_) {
-      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError));
+      return {0, Network::IoSocketError::getIoSocketEbadfError()};
     }
     return io_handle_.writev(slices, num_slice);
   }
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override {
     if (closed_) {
-      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError));
+      return {0, Network::IoSocketError::getIoSocketEbadfError()};
     }
     return io_handle_.write(buffer);
   }
@@ -57,34 +55,32 @@ public:
                                   const Envoy::Network::Address::Ip* self_ip,
                                   const Network::Address::Instance& peer_address) override {
     if (closed_) {
-      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError));
+      return {0, Network::IoSocketError::getIoSocketEbadfError()};
     }
     return io_handle_.sendmsg(slices, num_slice, flags, self_ip, peer_address);
   }
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
-                                  uint32_t self_port, RecvMsgOutput& output) override {
+                                  uint32_t self_port, const UdpSaveCmsgConfig& udp_save_cmsg_config,
+                                  RecvMsgOutput& output) override {
     if (closed_) {
       ASSERT(false, "recvmmsg is called after close.");
-      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError));
+      return {0, Network::IoSocketError::getIoSocketEbadfError()};
     }
-    return io_handle_.recvmsg(slices, num_slice, self_port, output);
+    return io_handle_.recvmsg(slices, num_slice, self_port, udp_save_cmsg_config, output);
   }
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                   const UdpSaveCmsgConfig& udp_save_cmsg_config,
                                    RecvMsgOutput& output) override {
     if (closed_) {
       ASSERT(false, "recvmmsg is called after close.");
-      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError));
+      return {0, Network::IoSocketError::getIoSocketEbadfError()};
     }
-    return io_handle_.recvmmsg(slices, self_port, output);
+    return io_handle_.recvmmsg(slices, self_port, udp_save_cmsg_config, output);
   }
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override {
     if (closed_) {
       ASSERT(false, "recv called after close.");
-      return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
-                                                        Network::IoSocketError::deleteIoError));
+      return {0, Network::IoSocketError::getIoSocketEbadfError()};
     }
     return io_handle_.recv(buffer, length, flags);
   }
@@ -121,10 +117,10 @@ public:
     return io_handle_.setBlocking(blocking);
   }
   absl::optional<int> domain() override { return io_handle_.domain(); }
-  Network::Address::InstanceConstSharedPtr localAddress() override {
+  absl::StatusOr<Network::Address::InstanceConstSharedPtr> localAddress() override {
     return io_handle_.localAddress();
   }
-  Network::Address::InstanceConstSharedPtr peerAddress() override {
+  absl::StatusOr<Network::Address::InstanceConstSharedPtr> peerAddress() override {
     return io_handle_.peerAddress();
   }
 
@@ -138,9 +134,16 @@ public:
   void activateFileEvents(uint32_t events) override { io_handle_.activateFileEvents(events); }
   void enableFileEvents(uint32_t events) override { io_handle_.enableFileEvents(events); }
   void resetFileEvents() override { return io_handle_.resetFileEvents(); };
+  absl::optional<std::string> interfaceName() override { return io_handle_.interfaceName(); }
 
   Api::SysCallIntResult shutdown(int how) override { return io_handle_.shutdown(how); }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override { return {}; }
+  absl::optional<uint64_t> congestionWindowInBytes() const override {
+    // QUIC should get congestion window from QuicFilterManagerConnectionImpl, which implements the
+    // Envoy::Network::Connection::congestionWindowInBytes interface.
+    IS_ENVOY_BUG("QuicIoHandleWrapper does not implement congestionWindowInBytes.");
+    return {};
+  }
 
 private:
   Network::IoHandle& io_handle_;

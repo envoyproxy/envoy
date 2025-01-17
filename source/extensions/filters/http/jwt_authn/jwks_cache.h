@@ -6,13 +6,13 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
-#include "envoy/thread_local/thread_local.h"
 
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
 #include "source/extensions/filters/http/jwt_authn/jwks_async_fetcher.h"
 #include "source/extensions/filters/http/jwt_authn/jwt_cache.h"
 #include "source/extensions/filters/http/jwt_authn/stats.h"
 
+#include "absl/strings/string_view.h"
 #include "jwt_verify_lib/jwks.h"
 
 namespace Envoy {
@@ -56,6 +56,12 @@ public:
     // Check if a list of audiences are allowed.
     virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;
 
+    // Check if a subject is allowed.
+    virtual bool isSubjectAllowed(absl::string_view sub) const PURE;
+
+    // Check if the current credential lifetime is allowed.
+    virtual bool isLifetimeAllowed(const absl::Time& now, const absl::Time* exp) const PURE;
+
     // Get the cached config: JWT rule.
     virtual const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&
     getJwtProvider() const PURE;
@@ -69,9 +75,13 @@ public:
     // Set a remote Jwks.
     virtual const ::google::jwt_verify::Jwks* setRemoteJwks(JwksConstPtr&& jwks) PURE;
 
-    // Get Token Cache
+    // Get Token Cache.
     virtual JwtCache& getJwtCache() PURE;
   };
+
+  // If there is only one provider in the config, return the data for that provider.
+  // It is only used for checking "failed_status_in_metadata" config for now.
+  virtual JwksData* getSingleProvider() PURE;
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.
   virtual JwksData* findByIssuer(const std::string& issuer) PURE;

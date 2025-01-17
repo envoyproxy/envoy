@@ -25,8 +25,12 @@ absl::string_view statusCodeToString(StatusCode code) {
     return "CodecClientError";
   case StatusCode::InboundFramesWithEmptyPayload:
     return "InboundFramesWithEmptyPayloadError";
+  case StatusCode::EnvoyOverloadError:
+    return "EnvoyOverloadError";
+  case StatusCode::GoAwayGracefulClose:
+    return "GoAwayGracefulClose";
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 struct EnvoyStatusPayload {
@@ -41,7 +45,10 @@ struct PrematureResponsePayload : public EnvoyStatusPayload {
 };
 
 template <typename T> void storePayload(absl::Status& status, const T& payload) {
-  absl::Cord cord(absl::string_view(reinterpret_cast<const char*>(&payload), sizeof(payload)));
+  const T* allocated = new T(payload);
+  const absl::string_view sv =
+      absl::string_view(reinterpret_cast<const char*>(allocated), sizeof(T));
+  absl::Cord cord = absl::MakeCordFromExternal(sv, [allocated]() { delete allocated; });
   cord.Flatten(); // Flatten ahead of time for easier access later.
   status.SetPayload(EnvoyPayloadUrl, std::move(cord));
 }
@@ -113,6 +120,18 @@ Status inboundFramesWithEmptyPayloadError() {
   return status;
 }
 
+Status envoyOverloadError(absl::string_view message) {
+  absl::Status status(absl::StatusCode::kInternal, message);
+  storePayload(status, EnvoyStatusPayload(StatusCode::EnvoyOverloadError));
+  return status;
+}
+
+Status goAwayGracefulCloseError() {
+  absl::Status status(absl::StatusCode::kInternal, {});
+  storePayload(status, EnvoyStatusPayload(StatusCode::GoAwayGracefulClose));
+  return status;
+}
+
 // Methods for checking and extracting error information
 StatusCode getStatusCode(const Status& status) {
   return status.ok() ? StatusCode::Ok : getPayload(status).status_code_;
@@ -143,6 +162,14 @@ bool isCodecClientError(const Status& status) {
 
 bool isInboundFramesWithEmptyPayloadError(const Status& status) {
   return getStatusCode(status) == StatusCode::InboundFramesWithEmptyPayload;
+}
+
+bool isEnvoyOverloadError(const Status& status) {
+  return getStatusCode(status) == StatusCode::EnvoyOverloadError;
+}
+
+bool isGoAwayGracefulCloseError(const Status& status) {
+  return getStatusCode(status) == StatusCode::GoAwayGracefulClose;
 }
 
 } // namespace Http

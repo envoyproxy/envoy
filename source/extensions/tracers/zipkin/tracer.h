@@ -3,7 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/extensions/tracers/zipkin/span_context.h"
 #include "source/extensions/tracers/zipkin/tracer_interface.h"
@@ -61,10 +61,12 @@ public:
    */
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address,
          Random::RandomGenerator& random_generator, const bool trace_id_128bit,
-         const bool shared_span_context, TimeSource& time_source)
+         const bool shared_span_context, TimeSource& time_source,
+         bool split_spans_for_request = false)
       : service_name_(service_name), address_(address), reporter_(nullptr),
         random_generator_(random_generator), trace_id_128bit_(trace_id_128bit),
-        shared_span_context_(shared_span_context), time_source_(time_source) {}
+        shared_span_context_(shared_span_context), time_source_(time_source),
+        split_spans_for_request_(split_spans_for_request) {}
 
   /**
    * Creates a "root" Zipkin span.
@@ -110,6 +112,7 @@ private:
   const bool trace_id_128bit_;
   const bool shared_span_context_;
   TimeSource& time_source_;
+  const bool split_spans_for_request_{};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

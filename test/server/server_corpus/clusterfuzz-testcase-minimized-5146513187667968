@@ -39,5 +39,6 @@ static_resources {
   }
 }
 hds_config {
+  api_type: REST
 }
 enable_dispatcher_stats: true

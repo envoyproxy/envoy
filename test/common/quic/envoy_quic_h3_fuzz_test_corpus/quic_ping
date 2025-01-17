@@ -1,0 +1,7 @@
+frames {
+  qframe {
+    ping {
+      control_frame_id: 0,
+    }
+  }
+}

@@ -3,7 +3,6 @@
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/config/version_converter.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -12,24 +11,25 @@ namespace Upstream {
 LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::RawAsyncClientPtr async_client,
-                                     envoy::config::core::v3::ApiVersion transport_api_version,
                                      Event::Dispatcher& dispatcher)
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
-      async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
-      service_method_(
-          Grpc::VersionedMethods("envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats",
-                                 "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")
-              .getMethodDescriptorForVersion(transport_api_version)),
+      async_client_(std::move(async_client)),
+      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats")),
       time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
-  retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
+  retry_timer_ = dispatcher.createTimer([this]() -> void {
+    stats_.retries_.inc();
+    establishNewStream();
+  });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
   establishNewStream();
 }
 
 void LoadStatsReporter::setRetryTimer() {
+  ENVOY_LOG(info, "Load reporter stats stream/connection will retry in {} ms.", RETRY_DELAY_MS);
   retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
 }
 
@@ -73,22 +73,39 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto& cluster = it->second.get();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
-    if (cluster.info()->edsServiceName().has_value()) {
-      cluster_stats->set_cluster_service_name(cluster.info()->edsServiceName().value());
+    if (const auto& name = cluster.info()->edsServiceName(); !name.empty()) {
+      cluster_stats->set_cluster_service_name(name);
     }
-    for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+    for (const HostSetPtr& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
-      for (auto& hosts : host_set->hostsPerLocality().get()) {
+      for (const HostVector& hosts : host_set->hostsPerLocality().get()) {
         ASSERT(!hosts.empty());
         uint64_t rq_success = 0;
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
         uint64_t rq_issued = 0;
-        for (const auto& host : hosts) {
-          rq_success += host->stats().rq_success_.latch();
-          rq_error += host->stats().rq_error_.latch();
-          rq_active += host->stats().rq_active_.value();
-          rq_issued += host->stats().rq_total_.latch();
+        LoadMetricStats::StatMap load_metrics;
+        for (const HostSharedPtr& host : hosts) {
+          uint64_t host_rq_success = host->stats().rq_success_.latch();
+          uint64_t host_rq_error = host->stats().rq_error_.latch();
+          uint64_t host_rq_active = host->stats().rq_active_.value();
+          uint64_t host_rq_issued = host->stats().rq_total_.latch();
+          rq_success += host_rq_success;
+          rq_error += host_rq_error;
+          rq_active += host_rq_active;
+          rq_issued += host_rq_issued;
+          if (host_rq_success + host_rq_error + host_rq_active != 0) {
+            const std::unique_ptr<LoadMetricStats::StatMap> latched_stats =
+                host->loadMetricStats().latch();
+            if (latched_stats != nullptr) {
+              for (const auto& metric : *latched_stats) {
+                const std::string& name = metric.first;
+                LoadMetricStats::Stat& stat = load_metrics[name];
+                stat.num_requests_with_metric += metric.second.num_requests_with_metric;
+                stat.total_metric_value += metric.second.total_metric_value;
+              }
+            }
+          }
         }
         if (rq_success + rq_error + rq_active != 0) {
           auto* locality_stats = cluster_stats->add_upstream_locality_stats();
@@ -98,11 +115,26 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           locality_stats->set_total_error_requests(rq_error);
           locality_stats->set_total_requests_in_progress(rq_active);
           locality_stats->set_total_issued_requests(rq_issued);
+          for (const auto& metric : load_metrics) {
+            auto* load_metric_stats = locality_stats->add_load_metric_stats();
+            load_metric_stats->set_metric_name(metric.first);
+            load_metric_stats->set_num_requests_finished_with_metric(
+                metric.second.num_requests_with_metric);
+            load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
+          }
         }
       }
     }
     cluster_stats->set_total_dropped_requests(
         cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
+    const uint64_t drop_overload_count =
+        cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
+    if (drop_overload_count > 0) {
+      auto* dropped_request = cluster_stats->add_dropped_requests();
+      dropped_request->set_category(cluster.dropCategory());
+      dropped_request->set_dropped_count(drop_overload_count);
+    }
+
     const auto now = time_source_.monotonicTime().time_since_epoch();
     const auto measured_interval = now - cluster_name_and_timestamp.second;
     cluster_stats->mutable_load_report_interval()->MergeFrom(
@@ -111,7 +143,6 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     clusters_[cluster_name] = now;
   }
 
-  Config::VersionConverter::prepareMessageForGrpcWire(request_, transport_api_version_);
   ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
   stream_->sendMessage(request_, false);
   stats_.responses_.inc();
@@ -123,8 +154,6 @@ void LoadStatsReporter::sendLoadStatsRequest() {
 }
 
 void LoadStatsReporter::handleFailure() {
-  ENVOY_LOG(warn, "Load reporter stats stream/connection failure, will retry in {} ms.",
-            RETRY_DELAY_MS);
   stats_.errors_.inc();
   setRetryTimer();
 }
@@ -195,6 +224,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
       }
     }
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();
+    cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
   };
   if (message_->send_all_clusters()) {
     for (const auto& p : all_clusters.active_clusters_) {
@@ -215,10 +245,17 @@ void LoadStatsReporter::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& 
 }
 
 void LoadStatsReporter::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status, message);
   response_timer_->disableTimer();
   stream_ = nullptr;
-  handleFailure();
+  if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+              message);
+    handleFailure();
+  } else {
+    ENVOY_LOG(debug, "{} gRPC config stream closed gracefully, {}", service_method_.name(),
+              message);
+    setRetryTimer();
+  }
 }
 
 } // namespace Upstream

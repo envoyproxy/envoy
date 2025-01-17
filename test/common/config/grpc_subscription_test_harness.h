@@ -5,15 +5,18 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
+#include "envoy/config/xds_config_tracker.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/hash.h"
 #include "source/common/config/api_version.h"
-#include "source/common/config/grpc_mux_impl.h"
-#include "source/common/config/grpc_subscription_impl.h"
-#include "source/common/config/version_converter.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_impl.h"
+#include "source/extensions/config_subscription/grpc/grpc_subscription_impl.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
 
 #include "test/common/config/subscription_test_harness.h"
+#include "test/mocks/config/custom_config_validators.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -35,22 +38,47 @@ namespace Config {
 
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  GrpcSubscriptionTestHarness() : GrpcSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
+  GrpcSubscriptionTestHarness(Envoy::Config::LegacyOrUnified legacy_or_unified)
+      : GrpcSubscriptionTestHarness(legacy_or_unified, std::chrono::milliseconds(0)) {}
 
-  GrpcSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
+  GrpcSubscriptionTestHarness(Envoy::Config::LegacyOrUnified legacy_or_unified,
+                              std::chrono::milliseconds init_fetch_timeout)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints")),
-        async_client_(new NiceMock<Grpc::MockAsyncClient>()) {
+        async_client_(new NiceMock<Grpc::MockAsyncClient>()),
+        resource_decoder_(std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
+                              envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name")),
+        config_validators_(std::make_unique<NiceMock<MockCustomConfigValidators>>()),
+        should_use_unified_(legacy_or_unified == Envoy::Config::LegacyOrUnified::Unified) {
     node_.set_id("fo0");
     EXPECT_CALL(local_info_, node()).WillRepeatedly(testing::ReturnRef(node_));
     ttl_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
 
     timer_ = new Event::MockTimer(&dispatcher_);
 
-    mux_ = std::make_shared<Config::GrpcMuxImpl>(
-        local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
-        *method_descriptor_, envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_,
-        rate_limit_settings_, true);
+    auto backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
+        SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_);
+
+    GrpcMuxContext grpc_mux_context{
+        /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+        /*failover_async_client_=*/nullptr,
+        /*dispatcher_=*/dispatcher_,
+        /*service_method_=*/*method_descriptor_,
+        /*local_info_=*/local_info_,
+        /*rate_limit_settings_=*/rate_limit_settings_,
+        /*scope_=*/*stats_store_.rootScope(),
+        /*config_validators_=*/std::move(config_validators_),
+        /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+        /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+        /*backoff_strategy_=*/std::move(backoff_strategy),
+        /*target_xds_authority_=*/"",
+        /*eds_resources_cache_=*/nullptr};
+
+    if (should_use_unified_) {
+      mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(grpc_mux_context, true);
+    } else {
+      mux_ = std::make_shared<Config::GrpcMuxImpl>(grpc_mux_context, true);
+    }
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         mux_, callbacks_, resource_decoder_, stats_, Config::TypeUrl::get().ClusterLoadAssignment,
         dispatcher_, init_fetch_timeout, false, SubscriptionOptions());
@@ -89,7 +117,9 @@ public:
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
     }
-    EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(expected_request), false));
+    EXPECT_CALL(
+        async_stream_,
+        sendMessageRaw_(Grpc::ProtoBufferEqIgnoreRepeatedFieldOrdering(expected_request), false));
   }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {
@@ -97,6 +127,29 @@ public:
     last_cluster_names_ = cluster_names;
     expectSendMessage(last_cluster_names_, "", true);
     subscription_->start(flattenResources(cluster_names));
+  }
+
+  void onDiscoveryResponse(
+      std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& response) {
+    if (should_use_unified_) {
+      dynamic_cast<Config::XdsMux::GrpcMuxSotw*>(mux_.get())
+          ->onDiscoveryResponse(std::move(response), control_plane_stats_);
+      return;
+    }
+    dynamic_cast<Config::GrpcMuxImpl*>(mux_.get())
+        ->onDiscoveryResponse(std::move(response), control_plane_stats_);
+  }
+
+  void onRemoteClose() {
+    if (should_use_unified_) {
+      dynamic_cast<Config::XdsMux::GrpcMuxSotw*>(mux_.get())
+          ->grpcStreamForTest()
+          .onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
+      return;
+    }
+    dynamic_cast<Config::GrpcMuxImpl*>(mux_.get())
+        ->grpcStreamForTest()
+        .onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   }
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
@@ -133,24 +186,27 @@ public:
       expectSendMessage(last_cluster_names_, version_, false,
                         Grpc::Status::WellKnownGrpcStatus::Internal, "bad config");
     }
-    mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
+
+    onDiscoveryResponse(std::move(response));
     EXPECT_EQ(control_plane_stats_.identifier_.value(), "ground_control_foo123");
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
   void updateResourceInterest(const std::set<std::string>& cluster_names) override {
-    // The "watch" mechanism means that updates that lose interest in a resource
-    // will first generate a request for [still watched resources, i.e. without newly unwatched
-    // ones] before generating the request for all of cluster_names.
-    // TODO(fredlas) this unnecessary second request will stop happening once the watch mechanism is
-    // no longer internally used by GrpcSubscriptionImpl.
-    std::set<std::string> both;
-    for (const auto& n : cluster_names) {
-      if (last_cluster_names_.find(n) != last_cluster_names_.end()) {
-        both.insert(n);
+    if (!should_use_unified_) {
+      // The "watch" mechanism means that updates that lose interest in a resource
+      // will first generate a request for [still watched resources, i.e. without newly unwatched
+      // ones] before generating the request for all of cluster_names.
+      // TODO(fredlas) this unnecessary second request will stop happening once the watch mechanism
+      // is no longer internally used by GrpcSubscriptionImpl.
+      std::set<std::string> both;
+      for (const auto& n : cluster_names) {
+        if (last_cluster_names_.find(n) != last_cluster_names_.end()) {
+          both.insert(n);
+        }
       }
+      expectSendMessage(both, version_);
     }
-    expectSendMessage(both, version_);
     expectSendMessage(cluster_names, version_);
     subscription_->updateResourceInterest(flattenResources(cluster_names));
     last_cluster_names_ = cluster_names;
@@ -181,16 +237,17 @@ public:
   Event::MockTimer* ttl_timer_;
   envoy::config::core::v3::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks> callbacks_;
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder_{"cluster_name"};
+  OpaqueResourceDecoderSharedPtr resource_decoder_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  CustomConfigValidatorsPtr config_validators_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
-  GrpcMuxImplSharedPtr mux_;
+  GrpcMuxSharedPtr mux_;
   GrpcSubscriptionImplPtr subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
+  bool should_use_unified_;
 };
 
 // TODO(danielhochman): test with RDS and ensure version_info is same as what API returned

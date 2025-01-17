@@ -42,21 +42,18 @@ typed_config:
   response_size_header: "{}"
             )EOF",
         response_size_header ? *response_size_header : "");
-    config_helper_.addFilter(filter);
+    config_helper_.prependFilter(filter);
 
     auto vhost = config_helper_.createVirtualHost("disabled");
     envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute
         route_config;
     route_config.set_disabled(true);
-    (*vhost.mutable_routes(0)
-          ->mutable_typed_per_filter_config())["envoy.filters.http.grpc_http1_reverse_bridge"]
+    (*vhost.mutable_routes(0)->mutable_typed_per_filter_config())["grpc_http1_reverse_bridge"]
         .PackFrom(route_config);
     config_helper_.addVirtualHost(vhost);
 
     HttpIntegrationTest::initialize();
   }
-
-  void TearDown() override { fake_upstream_connection_.reset(); }
 
 protected:
   Http::CodecType upstream_protocol_;

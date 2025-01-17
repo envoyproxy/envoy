@@ -17,6 +17,14 @@
 
 namespace Envoy {
 namespace Stats {
+namespace {
+std::regex parseStdRegex(const std::string& regex) {
+  TRY_ASSERT_MAIN_THREAD { return std::regex(regex, std::regex::optimize); }
+  END_TRY
+  CATCH(const std::regex_error& e,
+        { throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what())); });
+}
+} // namespace
 
 const std::vector<absl::string_view>& TagExtractionContext::tokens() {
   if (tokens_.empty()) {
@@ -58,25 +66,26 @@ std::string TagExtractorImplBase::extractRegexPrefix(absl::string_view regex) {
   return prefix;
 }
 
-TagExtractorPtr TagExtractorImplBase::createTagExtractor(absl::string_view name,
-                                                         absl::string_view regex,
-                                                         absl::string_view substr,
-                                                         Regex::Type re_type) {
+absl::StatusOr<TagExtractorPtr>
+TagExtractorImplBase::createTagExtractor(absl::string_view name, absl::string_view regex,
+                                         absl::string_view substr, absl::string_view negative_match,
+                                         Regex::Type re_type) {
   if (name.empty()) {
-    throw EnvoyException("tag_name cannot be empty");
+    return absl::InvalidArgumentError("tag_name cannot be empty");
   }
 
   if (regex.empty()) {
-    throw EnvoyException(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "No regex specified for tag specifier and no default regex for name: '{}'", name));
   }
   switch (re_type) {
   case Regex::Type::Re2:
-    return std::make_unique<TagExtractorRe2Impl>(name, regex, substr);
+    return std::make_unique<TagExtractorRe2Impl>(name, regex, substr, negative_match);
   case Regex::Type::StdRegex:
+    ASSERT(negative_match.empty(), "Not supported");
     return std::make_unique<TagExtractorStdRegexImpl>(name, regex, substr);
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool TagExtractorImplBase::substrMismatch(absl::string_view stat_name) const {
@@ -85,10 +94,9 @@ bool TagExtractorImplBase::substrMismatch(absl::string_view stat_name) const {
 
 TagExtractorStdRegexImpl::TagExtractorStdRegexImpl(absl::string_view name, absl::string_view regex,
                                                    absl::string_view substr)
-    : TagExtractorImplBase(name, regex, substr),
-      regex_(Regex::Utility::parseStdRegex(std::string(regex))) {}
+    : TagExtractorImplBase(name, regex, substr), regex_(parseStdRegex(std::string(regex))) {}
 
-std::string& TagExtractorImplBase::addTag(std::vector<Tag>& tags) const {
+std::string& TagExtractorImplBase::addTagReturningValueRef(std::vector<Tag>& tags) const {
   tags.emplace_back();
   Tag& tag = tags.back();
   tag.name_ = name_;
@@ -119,7 +127,7 @@ bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::ve
     // from the string but also not necessary in the tag value ("." for example). If there is no
     // second submatch, then the value_subexpr is the same as the remove_subexpr.
     const auto& value_subexpr = match.size() > 2 ? match[2] : remove_subexpr;
-    addTag(tags) = value_subexpr.str();
+    addTagReturningValueRef(tags) = value_subexpr.str();
 
     // Determines which characters to remove from stat_name to elide remove_subexpr.
     std::string::size_type start = remove_subexpr.first - stat_name.begin();
@@ -135,8 +143,9 @@ bool TagExtractorStdRegexImpl::extractTag(TagExtractionContext& context, std::ve
 }
 
 TagExtractorRe2Impl::TagExtractorRe2Impl(absl::string_view name, absl::string_view regex,
-                                         absl::string_view substr)
-    : TagExtractorImplBase(name, regex, substr), regex_(std::string(regex)) {}
+                                         absl::string_view substr, absl::string_view negative_match)
+    : TagExtractorImplBase(name, regex, substr), regex_(std::string(regex)),
+      negative_match_(std::string(negative_match)) {}
 
 bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<Tag>& tags,
                                      IntervalSet<size_t>& remove_characters) const {
@@ -150,11 +159,10 @@ bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<
   }
 
   // remove_subexpr is the first submatch. It represents the portion of the string to be removed.
-  re2::StringPiece remove_subexpr, value_subexpr;
+  absl::string_view remove_subexpr, value_subexpr;
 
   // The regex must match and contain one or more subexpressions (all after the first are ignored).
-  if (re2::RE2::PartialMatch(re2::StringPiece(stat_name.data(), stat_name.size()), regex_,
-                             &remove_subexpr, &value_subexpr) &&
+  if (re2::RE2::PartialMatch(stat_name, regex_, &remove_subexpr, &value_subexpr) &&
       !remove_subexpr.empty()) {
 
     // value_subexpr is the optional second submatch. It is usually inside the first submatch
@@ -164,16 +172,19 @@ bool TagExtractorRe2Impl::extractTag(TagExtractionContext& context, std::vector<
     if (value_subexpr.empty()) {
       value_subexpr = remove_subexpr;
     }
-    addTag(tags) = std::string(value_subexpr);
 
-    // Determines which characters to remove from stat_name to elide remove_subexpr.
-    std::string::size_type start = remove_subexpr.data() - stat_name.data();
-    std::string::size_type end = remove_subexpr.data() + remove_subexpr.size() - stat_name.data();
-    remove_characters.insert(start, end);
+    if (negative_match_.empty() || negative_match_ != value_subexpr) {
+      addTagReturningValueRef(tags) = std::string(value_subexpr);
 
-    PERF_RECORD(perf, "re2-match", name_);
-    PERF_TAG_INC(matched_);
-    return true;
+      // Determines which characters to remove from stat_name to elide remove_subexpr.
+      std::string::size_type start = remove_subexpr.data() - stat_name.data();
+      std::string::size_type end = remove_subexpr.data() + remove_subexpr.size() - stat_name.data();
+      remove_characters.insert(start, end);
+
+      PERF_RECORD(perf, "re2-match", name_);
+      PERF_TAG_INC(matched_);
+      return true;
+    }
   }
   PERF_RECORD(perf, "re2-miss", name_);
   PERF_TAG_INC(missed_);
@@ -236,7 +247,7 @@ bool TagExtractorTokensImpl::extractTag(TagExtractionContext& context, std::vect
   } else if (start > 0) {
     --start; // Remove the dot prior to the lat token, e.g. ".ef"
   }
-  addTag(tags) = std::string(tag_value);
+  addTagReturningValueRef(tags) = std::string(tag_value);
   remove_characters.insert(start, end);
 
   PERF_RECORD(perf, "tokens-match", name_);
@@ -286,6 +297,15 @@ bool TagExtractorTokensImpl::searchTags(const std::vector<absl::string_view>& in
     }
   }
   return pattern_index == tokens_.size() && input_index == input_tokens.size();
+}
+
+TagExtractorFixedImpl::TagExtractorFixedImpl(absl::string_view name, absl::string_view value)
+    : TagExtractorImplBase(name, value), value_(std::string(value)) {}
+
+bool TagExtractorFixedImpl::extractTag(TagExtractionContext&, std::vector<Tag>& tags,
+                                       IntervalSet<size_t>&) const {
+  addTagReturningValueRef(tags) = value_;
+  return true;
 }
 
 } // namespace Stats

@@ -14,10 +14,12 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
+#include "test/test_listener.h"
 
 #include "absl/debugging/symbolize.h"
 
@@ -43,7 +45,7 @@ protected:
 
 TEST_P(FuzzerCorpusTest, RunOneCorpusFile) {
   ENVOY_LOG_MISC(info, "Corpus file: {}", GetParam());
-  const std::string buf = api_->fileSystem().fileReadToEnd(GetParam());
+  const std::string buf = api_->fileSystem().fileReadToEnd(GetParam()).value();
   // Everything from here on is the same as under the fuzzer lib.
   LLVMFuzzerTestOneInput(reinterpret_cast<const uint8_t*>(buf.c_str()), buf.size());
 }
@@ -85,9 +87,14 @@ int main(int argc, char** argv) {
     argv[i] = argv[i + input_args];
   }
 
+  // Make sure flags are restored. Fuzz tests do not pass the singleton checks.
+  ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
+  listeners.Append(new Envoy::TestListener(false));
   testing::InitGoogleTest(&argc, argv);
   testing::InitGoogleMock(&argc, argv);
   Envoy::Fuzz::Runner::setupEnvironment(argc, argv, spdlog::level::info);
 
-  return RUN_ALL_TESTS();
+  int status = RUN_ALL_TESTS();
+  Envoy::Fuzz::runCleanupHooks();
+  return status;
 }

@@ -16,7 +16,8 @@ namespace Lua {
  */
 class BufferWrapper : public BaseLuaObject<BufferWrapper> {
 public:
-  BufferWrapper(Buffer::Instance& data) : data_(data) {}
+  BufferWrapper(Http::RequestOrResponseHeaderMap& headers, Buffer::Instance& data)
+      : data_(data), headers_(headers) {}
 
   static ExportedFunctions exportedFunctions() {
     return {{"length", static_luaLength},
@@ -46,6 +47,7 @@ private:
   DECLARE_LUA_FUNCTION(BufferWrapper, luaSetBytes);
 
   Buffer::Instance& data_;
+  Http::RequestOrResponseHeaderMap& headers_;
 };
 
 class MetadataMapWrapper;
@@ -116,6 +118,33 @@ private:
 };
 
 /**
+ * Lua wrapper for parsed fields from a X509Name
+ */
+class ParsedX509NameWrapper : public BaseLuaObject<ParsedX509NameWrapper> {
+public:
+  ParsedX509NameWrapper(const Ssl::ParsedX509Name& parsed_name) : parsed_name_{parsed_name} {}
+
+  static ExportedFunctions exportedFunctions() {
+    return {{"commonName", static_luaCommonName}, {"organizationName", static_luaOrganizationName}};
+  }
+
+private:
+  /**
+   * Returns the commonName(CN) field as a string in the X509 name. Return empty string if there
+   * is no CN field, or can't be converted to utf8 string (in case of malicious certificate).
+   */
+  DECLARE_LUA_FUNCTION(ParsedX509NameWrapper, luaCommonName);
+
+  /**
+   * Returns the organizationName(O) fields as list of strings in the X509 name. Return empty list
+   * if there is no O field, or can't be converted to utf8 string.
+   */
+  DECLARE_LUA_FUNCTION(ParsedX509NameWrapper, luaOrganizationName);
+
+  const Ssl::ParsedX509Name& parsed_name_;
+};
+
+/**
  * Lua wrapper for Ssl::ConnectionInfo.
  */
 class SslConnectionWrapper : public BaseLuaObject<SslConnectionWrapper> {
@@ -129,10 +158,13 @@ public:
             {"serialNumberPeerCertificate", static_luaSerialNumberPeerCertificate},
             {"issuerPeerCertificate", static_luaIssuerPeerCertificate},
             {"subjectPeerCertificate", static_luaSubjectPeerCertificate},
+            {"parsedSubjectPeerCertificate", static_luaParsedSubjectPeerCertificate},
             {"uriSanPeerCertificate", static_luaUriSanPeerCertificate},
             {"subjectLocalCertificate", static_luaSubjectLocalCertificate},
             {"dnsSansPeerCertificate", static_luaDnsSansPeerCertificate},
             {"dnsSansLocalCertificate", static_luaDnsSansLocalCertificate},
+            {"oidsPeerCertificate", static_luaOidsPeerCertificate},
+            {"oidsLocalCertificate", static_luaOidsLocalCertificate},
             {"validFromPeerCertificate", static_luaValidFromPeerCertificate},
             {"expirationPeerCertificate", static_luaExpirationPeerCertificate},
             {"sessionId", static_luaSessionId},
@@ -192,6 +224,12 @@ private:
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaSubjectPeerCertificate);
 
   /**
+   * Returns the parsed subject field of the peer certificate. Returns nil if there is no peer
+   * certificate, or no subject.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaParsedSubjectPeerCertificate);
+
+  /**
    * Returns the URIs in the SAN field of the peer certificate. Returns empty table if there is no
    * peer certificate, or no SAN field, or no URI.
    */
@@ -220,6 +258,18 @@ private:
    * there is no local certificate, or no SAN field, or no DNS entries in SAN.
    */
   DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaDnsSansLocalCertificate);
+
+  /**
+   * Returns the OIDs (ASN.1 Object Identifiers) of the peer certificate. Returns an empty table if
+   * there is no peer certificate or no OIDs.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaOidsPeerCertificate);
+
+  /**
+   * Returns the OIDs (ASN.1 Object Identifiers) of the peer certificate. Returns an empty table if
+   * there is no peer certificate or no OIDs.
+   */
+  DECLARE_LUA_FUNCTION(SslConnectionWrapper, luaOidsLocalCertificate);
 
   /**
    * Returns the timestamp-since-epoch (in seconds) that the peer certificate was issued and should
@@ -258,7 +308,11 @@ private:
 
   // TODO(dio): Add luaX509Extension if required, since currently it is used out of tree.
 
+  // Envoy::Lua::BaseLuaObject
+  void onMarkDead() override { parsed_subject_peer_certificate_.reset(); }
+
   const Ssl::ConnectionInfo& connection_info_;
+  LuaDeathRef<ParsedX509NameWrapper> parsed_subject_peer_certificate_;
 };
 
 /**

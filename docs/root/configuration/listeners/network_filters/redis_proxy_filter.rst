@@ -4,8 +4,8 @@ Redis proxy
 ===========
 
 * Redis :ref:`architecture overview <arch_overview_redis>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.redis_proxy.v3.RedisProxy>`
-* This filter should be configured with the name *envoy.filters.network.redis_proxy*.
 
 .. _config_network_filters_redis_proxy_stats:
 
@@ -120,3 +120,24 @@ Example configuration:
 
 This creates two faults- an error, applying only to GET commands at 10%, and a delay, applying to all
 commands at 10%. This means that 20% of GET commands will have a fault applied, as discussed earlier.
+
+DNS lookups on redirections
+---------------------------
+
+As noted in the :ref:`architecture overview <arch_overview_redis>`, when Envoy sees a MOVED or ASK response containing a hostname it will not perform a DNS lookup and instead bubble up the error to the client. The following configuration example enables DNS lookups on such responses to avoid the client error and have Envoy itself perform the redirection:
+
+.. code-block:: yaml
+
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+    stat_prefix: redis_stats
+    prefix_routes:
+      catch_all_route:
+        cluster: cluster_0
+    settings:
+      op_timeout: 5
+      enable_redirection: true
+      dns_cache_config:
+        name: dns_cache_for_redis
+        dns_lookup_family: V4_ONLY
+        max_hosts: 100

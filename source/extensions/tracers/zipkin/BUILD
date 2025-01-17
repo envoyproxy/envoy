@@ -34,16 +34,13 @@ envoy_cc_library(
         "zipkin_json_field_names.h",
         "zipkin_tracer_impl.h",
     ],
-    external_deps = [
-        "abseil_optional",
-    ],
     deps = [
         "//envoy/common:time_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:address_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/thread_local:thread_local_interface",
-        "//envoy/tracing:http_tracer_interface",
+        "//envoy/tracing:tracer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:hex_lib",
@@ -59,6 +56,7 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:cluster_update_tracker_lib",
         "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
@@ -67,10 +65,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # Legacy test use. TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/server:__subpackages__",
-    ],
     deps = [
         ":zipkin_lib",
         "//source/extensions/tracers/common:factory_base_lib",

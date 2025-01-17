@@ -1,0 +1,23 @@
+config {
+  virtual_hosts {
+    name: "*"
+    domains: "*"
+    matcher {
+      on_no_match {
+        action {
+          name: "*"
+          typed_config {
+            type_url: "m/envoy.config.route.v3.Route"
+            value: "\n\002\022\000\022\'\n\001*\202\002!\n\004\022\002%*\022\031ty/envoy.$nigfig.rououte"
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: "x-forwarded-proto"
+    value: "D"
+  }
+}

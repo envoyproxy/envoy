@@ -70,7 +70,7 @@ private:
 
 class Rule {
 public:
-  Rule(const ProtoRule& rule);
+  Rule(const ProtoRule& rule, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
   const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
   const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
@@ -95,7 +95,7 @@ class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
                public Logger::Loggable<Logger::Id::config> {
 public:
   Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
-         bool per_route = false);
+         Regex::Engine& regex_engine, bool per_route = false);
 
   const HeaderToMetadataRules& requestRules() const { return request_rules_; }
   const HeaderToMetadataRules& responseRules() const { return response_rules_; }
@@ -115,7 +115,7 @@ private:
    *  @return true if any configuration data was added to the vector, false otherwise. Can be used
    *          to validate whether the configuration was empty.
    */
-  static bool configToVector(const ProtobufRepeatedRule&, HeaderToMetadataRules&);
+  static bool configToVector(const ProtobufRepeatedRule&, HeaderToMetadataRules&, Regex::Engine&);
 
   const std::string& decideNamespace(const std::string& nspace) const;
 
@@ -151,8 +151,8 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
-    return Http::FilterHeadersStatus::Continue;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
   Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {

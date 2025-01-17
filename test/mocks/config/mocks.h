@@ -25,9 +25,9 @@ public:
   MockSubscriptionCallbacks();
   ~MockSubscriptionCallbacks() override;
 
-  MOCK_METHOD(void, onConfigUpdate,
+  MOCK_METHOD(absl::Status, onConfigUpdate,
               (const std::vector<DecodedResourceRef>& resources, const std::string& version_info));
-  MOCK_METHOD(void, onConfigUpdate,
+  MOCK_METHOD(absl::Status, onConfigUpdate,
               (const std::vector<DecodedResourceRef>& added_resources,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                const std::string& system_version_info));
@@ -52,11 +52,14 @@ public:
   MOCK_METHOD(void, onConfigUpdate,
               (const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                const std::string& version_info));
-  MOCK_METHOD(
-      void, onConfigUpdate,
-      (const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-       const std::string& system_version_info));
+
+  MOCK_METHOD(void, onConfigUpdate,
+              (const std::vector<DecodedResourcePtr>& resources, const std::string& version_info));
+
+  MOCK_METHOD(void, onConfigUpdate,
+              (absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+               const std::string& system_version_info));
   MOCK_METHOD(void, onConfigUpdateFailed,
               (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
 };
@@ -75,15 +78,16 @@ public:
   MockSubscriptionFactory();
   ~MockSubscriptionFactory() override;
 
-  MOCK_METHOD(SubscriptionPtr, subscriptionFromConfigSource,
+  MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, subscriptionFromConfigSource,
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-               OpaqueResourceDecoder& resource_decoder, const SubscriptionOptions& options));
-  MOCK_METHOD(SubscriptionPtr, collectionSubscriptionFromUrl,
+               OpaqueResourceDecoderSharedPtr resource_decoder,
+               const SubscriptionOptions& options));
+  MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, collectionSubscriptionFromUrl,
               (const xds::core::v3::ResourceLocator& collection_locator,
                const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-               OpaqueResourceDecoder& resource_decoder));
+               OpaqueResourceDecoderSharedPtr resource_decoder));
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   MockSubscription* subscription_{};
@@ -116,12 +120,22 @@ public:
 
   MOCK_METHOD(GrpcMuxWatchPtr, addWatch,
               (const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
-               SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
+               SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
                const SubscriptionOptions& options));
 
   MOCK_METHOD(void, requestOnDemandUpdate,
               (const std::string& type_url,
                const absl::flat_hash_set<std::string>& add_these_names));
+
+  MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
+
+  MOCK_METHOD(EdsResourcesCacheOptRef, edsResourcesCache, ());
+
+  MOCK_METHOD(absl::Status, updateMuxSource,
+              (Grpc::RawAsyncClientPtr && primary_async_client,
+               Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+               BackOffStrategyPtr&& backoff_strategy,
+               const envoy::config::core::v3::ApiConfigSource& ads_config_source));
 };
 
 class MockGrpcStreamCallbacks
@@ -131,7 +145,7 @@ public:
   ~MockGrpcStreamCallbacks() override;
 
   MOCK_METHOD(void, onStreamEstablished, ());
-  MOCK_METHOD(void, onEstablishmentFailure, ());
+  MOCK_METHOD(void, onEstablishmentFailure, (bool));
   MOCK_METHOD(void, onDiscoveryResponse,
               (std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> && message,
                ControlPlaneStats& control_plane_stats));
@@ -147,10 +161,6 @@ public:
               (const Protobuf::Message& config_source_proto,
                Server::Configuration::ServerFactoryContext& factory_context,
                Init::Manager& init_manager, const std::string& stat_prefix,
-               const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
-  MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
-              (const Protobuf::Message& config_proto,
-               Server::Configuration::ServerFactoryContext& factory_context,
                const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
   MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
               (std::vector<std::unique_ptr<const Protobuf::Message>> && config_protos,
@@ -176,15 +186,27 @@ public:
   MOCK_METHOD(const xds::core::v3::ContextParams&, nodeContext, (), (const));
   MOCK_METHOD(const xds::core::v3::ContextParams&, dynamicContext,
               (absl::string_view resource_type_url), (const));
-  MOCK_METHOD(void, setDynamicContextParam,
+  MOCK_METHOD(absl::Status, setDynamicContextParam,
               (absl::string_view resource_type_url, absl::string_view key,
                absl::string_view value));
-  MOCK_METHOD(void, unsetDynamicContextParam,
+  MOCK_METHOD(absl::Status, unsetDynamicContextParam,
               (absl::string_view resource_type_url, absl::string_view key));
   MOCK_METHOD(Common::CallbackHandlePtr, addDynamicContextUpdateCallback,
               (UpdateNotificationCb callback), (const));
 
   Common::CallbackManager<absl::string_view> update_cb_handler_;
+};
+
+template <class FactoryCallback>
+class TestExtensionConfigProvider : public Config::ExtensionConfigProvider<FactoryCallback> {
+public:
+  TestExtensionConfigProvider(FactoryCallback cb) : cb_(cb) {}
+  const std::string& name() override { return name_; }
+  OptRef<FactoryCallback> config() override { return {cb_}; }
+
+private:
+  const std::string name_ = "mock_config_provider";
+  FactoryCallback cb_;
 };
 
 } // namespace Config

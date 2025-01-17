@@ -24,6 +24,8 @@ public:
 
   MOCK_METHOD(void, move, (Buffer::Instance & rhs));
   MOCK_METHOD(void, move, (Buffer::Instance & rhs, uint64_t length));
+  MOCK_METHOD(void, move,
+              (Buffer::Instance & rhs, uint64_t length, bool reset_drain_trackers_and_accounting));
   MOCK_METHOD(void, drain, (uint64_t size));
 
   void baseMove(Buffer::Instance& rhs) { BaseClass::move(rhs); }
@@ -89,6 +91,7 @@ public:
                std::function<void()> above_overflow));
 
   MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, createAccount, (Http::StreamResetHandler&));
+  MOCK_METHOD(uint64_t, resetAccountsGivenPressure, (float));
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {

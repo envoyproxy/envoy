@@ -26,7 +26,7 @@ namespace {
 
 std::shared_ptr<grpc::ChannelCredentials>
 getGoogleGrpcChannelCredentials(const envoy::config::core::v3::GrpcService& grpc_service,
-                                Api::Api& api) {
+                                Server::Configuration::CommonFactoryContext& context) {
   GoogleGrpcCredentialsFactory* credentials_factory = nullptr;
   const std::string& google_grpc_credentials_factory_name =
       grpc_service.google_grpc().credentials_factory_name();
@@ -41,7 +41,7 @@ getGoogleGrpcChannelCredentials(const envoy::config::core::v3::GrpcService& grpc
     throw EnvoyException(absl::StrCat("Unknown google grpc credentials factory: ",
                                       google_grpc_credentials_factory_name));
   }
-  return credentials_factory->getChannelCredentials(grpc_service, api);
+  return credentials_factory->getChannelCredentials(grpc_service, context);
 }
 
 } // namespace
@@ -79,7 +79,7 @@ grpc::ByteBuffer GoogleGrpcUtils::makeByteBuffer(Buffer::InstancePtr&& buffer_in
     slices.emplace_back(raw_slice.mem_, raw_slice.len_,
                         &BufferInstanceContainer::derefBufferInstanceContainer, container);
   }
-  return {&slices[0], slices.size()};
+  return {&slices[0], slices.size()}; // NOLINT(clang-analyzer-cplusplus.NewDeleteLeaks)
 }
 
 class GrpcSliceBufferFragmentImpl : public Buffer::BufferFragment {
@@ -118,24 +118,25 @@ GoogleGrpcUtils::channelArgsFromConfig(const envoy::config::core::v3::GrpcServic
   grpc::ChannelArguments args;
   for (const auto& channel_arg : config.google_grpc().channel_args().args()) {
     switch (channel_arg.second.value_specifier_case()) {
-    case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::kStringValue: {
+    case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::kStringValue:
       args.SetString(channel_arg.first, channel_arg.second.string_value());
       break;
-    }
-    case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::kIntValue: {
+    case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::kIntValue:
       args.SetInt(channel_arg.first, channel_arg.second.int_value());
       break;
-    }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::
+        VALUE_SPECIFIER_NOT_SET:
+      PANIC_DUE_TO_PROTO_UNSET;
     }
   }
   return args;
 }
 
 std::shared_ptr<grpc::Channel>
-GoogleGrpcUtils::createChannel(const envoy::config::core::v3::GrpcService& config, Api::Api& api) {
-  std::shared_ptr<grpc::ChannelCredentials> creds = getGoogleGrpcChannelCredentials(config, api);
+GoogleGrpcUtils::createChannel(const envoy::config::core::v3::GrpcService& config,
+                               Server::Configuration::CommonFactoryContext& context) {
+  std::shared_ptr<grpc::ChannelCredentials> creds =
+      getGoogleGrpcChannelCredentials(config, context);
   const grpc::ChannelArguments args = channelArgsFromConfig(config);
   return CreateCustomChannel(config.google_grpc().target_uri(), creds, args);
 }

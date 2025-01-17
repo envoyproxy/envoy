@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="io.envoyproxy.envoymobile.test">
+
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- This permission is needed in order to allow the application
+     to initiate DNS resolution via c-ares. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <uses-sdk
+            android:minSdkVersion="26"
+            android:targetSdkVersion="27"/>
+</manifest>

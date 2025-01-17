@@ -10,13 +10,14 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 # Access log formatter that strips query string from request path
-# Public docs: docs/root/TODO(tsaarni)
+# Public docs: TODO(tsaarni)
 
 envoy_cc_library(
     name = "req_without_query_lib",
     srcs = ["req_without_query.cc"],
     hdrs = ["req_without_query.h"],
     deps = [
+        "//source/common/formatter:substitution_format_utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/protobuf:utility_lib",
     ],

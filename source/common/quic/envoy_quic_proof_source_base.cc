@@ -1,17 +1,8 @@
 #include "source/common/quic/envoy_quic_proof_source_base.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include "quiche/quic/core/quic_data_writer.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -24,7 +15,7 @@ void EnvoyQuicProofSourceBase::GetProof(const quic::QuicSocketAddress& /*server_
                                         absl::string_view /*chlo_hash*/,
                                         std::unique_ptr<quic::ProofSource::Callback> /*callback*/) {
   // Only reachable in Google QUIC which is not supported by Envoy.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Unexpected call to EnvoyQuicProofSourceBase::GetProof");
 }
 
 absl::InlinedVector<uint16_t, 8> EnvoyQuicProofSourceBase::SupportedTlsSignatureAlgorithms() const {

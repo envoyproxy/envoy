@@ -14,6 +14,8 @@ static_resources:
           stat_prefix: ingress_http
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           route_config:
             name: local_route
             virtual_hosts:
@@ -58,3 +60,11 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: www.envoyproxy.io
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: certs/cacert.pem
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: www.envoyproxy.io

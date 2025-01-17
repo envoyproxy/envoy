@@ -16,7 +16,6 @@
 #include "gtest/gtest.h"
 
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -43,7 +42,8 @@ ip_tags:
   void initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<IpTaggingFilterConfig>(config, "prefix.", stats_, runtime_);
+    config_ =
+        std::make_shared<IpTaggingFilterConfig>(config, "prefix.", *stats_.rootScope(), runtime_);
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
@@ -64,8 +64,9 @@ TEST_F(IpTaggingFilterTest, InternalRequest) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.5");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
@@ -99,8 +100,9 @@ ip_tags:
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.external_request.hit"));
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("external_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
@@ -136,15 +138,17 @@ ip_tags:
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.external_request.hit"));
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.5");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
 
   request_headers = Http::TestRequestHeaderMapImpl{};
-  remote_address = Network::Utility::parseInternetAddress("1.2.3.4");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+  remote_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("external_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
@@ -155,8 +159,9 @@ TEST_F(IpTaggingFilterTest, NoHits) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("10.2.3.5");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+      Network::Utility::parseInternetAddressNoThrow("10.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.no_hit"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
@@ -175,11 +180,163 @@ TEST_F(IpTaggingFilterTest, AppendEntry) {
                                                  {"x-envoy-ip-tags", "test"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.5");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("test,internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+}
+
+TEST_F(IpTaggingFilterTest, ReplaceAlternateHeaderWhenActionIsDefaulted) {
+  const std::string internal_request_yaml = R"EOF(
+request_type: internal
+ip_tag_header:
+  header: x-envoy-optional-header
+ip_tags:
+  - ip_tag_name: internal_request_with_optional_header
+    ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}
+)EOF";
+
+  initializeFilter(internal_request_yaml);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-envoy-internal", "true"},
+      {"x-envoy-optional-header", "foo"}, // foo will be removed
+      {"x-envoy-optional-header", "bar"}, // bar will be removed
+      {"x-envoy-optional-header", "baz"}, // baz will be removed
+  };
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("internal_request_with_optional_header",
+            request_headers.get_("x-envoy-optional-header"));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+}
+
+TEST_F(IpTaggingFilterTest, ReplaceAlternateHeader) {
+  const std::string internal_request_yaml = R"EOF(
+request_type: internal
+ip_tag_header:
+  header: x-envoy-optional-header
+  action: SANITIZE
+ip_tags:
+  - ip_tag_name: internal_request_with_optional_header
+    ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}
+)EOF";
+
+  initializeFilter(internal_request_yaml);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-envoy-internal", "true"}, {"x-envoy-optional-header", "foo"}}; // foo will be removed
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("internal_request_with_optional_header",
+            request_headers.get_("x-envoy-optional-header"));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+}
+
+TEST_F(IpTaggingFilterTest, ClearAlternateHeaderWhenUnmatchedAndSanitized) {
+  const std::string internal_request_yaml = R"EOF(
+request_type: internal
+ip_tag_header:
+  header: x-envoy-optional-header
+  action: SANITIZE
+ip_tags:
+  - ip_tag_name: internal_request_with_optional_header
+    ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}
+)EOF";
+
+  initializeFilter(internal_request_yaml);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-envoy-internal", "true"}, {"x-envoy-optional-header", "foo"}}; // header will be removed
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_FALSE(request_headers.has("x-envoy-optional-header"));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+}
+
+TEST_F(IpTaggingFilterTest, AppendForwardAlternateHeader) {
+  const std::string internal_request_yaml = R"EOF(
+request_type: internal
+ip_tag_header:
+  header: x-envoy-optional-header
+  action: APPEND_IF_EXISTS_OR_ADD
+ip_tags:
+  - ip_tag_name: internal_request_with_optional_header
+    ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}
+)EOF";
+
+  initializeFilter(internal_request_yaml);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"},
+                                                 {"x-envoy-optional-header", "foo"}};
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("foo,internal_request_with_optional_header",
+            request_headers.get_("x-envoy-optional-header"));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+}
+
+TEST_F(IpTaggingFilterTest, RetainAlternateHeaderWhenUnmatchedAndAppendForwarded) {
+  const std::string internal_request_yaml = R"EOF(
+request_type: internal
+ip_tag_header:
+  header: x-envoy-optional-header
+  action: APPEND_IF_EXISTS_OR_ADD
+ip_tags:
+  - ip_tag_name: internal_request_with_optional_header
+    ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}
+)EOF";
+
+  initializeFilter(internal_request_yaml);
+
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"},
+                                                 {"x-envoy-optional-header", "foo"}};
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("foo", request_headers.get_("x-envoy-optional-header"));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   Http::TestRequestTrailerMapImpl request_trailers;
@@ -203,8 +360,9 @@ ip_tags:
                                                  {"x-envoy-ip-tags", "test"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.4");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
@@ -234,8 +392,9 @@ ip_tags:
   Http::TestRequestHeaderMapImpl request_headers;
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("2001:abcd:ef01:2345::1");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+      Network::Utility::parseInternetAddressNoThrow("2001:abcd:ef01:2345::1");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("ipv6_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
@@ -263,28 +422,19 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
   Network::Address::InstanceConstSharedPtr remote_address =
-      Network::Utility::parseInternetAddress("1.2.3.5");
-  filter_callbacks_.stream_info_.downstream_address_provider_->setRemoteAddress(remote_address);
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
 
-  EXPECT_CALL(filter_callbacks_, clearRouteCache());
+  EXPECT_CALL(filter_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
 
   // no tags, no call
-  EXPECT_CALL(filter_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(filter_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   request_headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
-}
-
-// Test that the deprecated extension name still functions.
-TEST(IpTaggingFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.ip_tagging";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
 }
 
 } // namespace

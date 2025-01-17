@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package test.envoy.config.xds;
+
+// Configuration for TestXdsConfigTracker.
+message TestXdsConfigTracker {
+}
+
+// Typed metadata for XDS tracker.
+message TestTrackerMetadata {
+}

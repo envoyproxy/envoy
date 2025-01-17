@@ -25,22 +25,29 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Network {
 
-MockUdpListenerConfig::MockUdpListenerConfig()
-    : udp_listener_worker_router_(std::make_unique<UdpListenerWorkerRouterImpl>(1)) {
-  ON_CALL(*this, listenerWorkerRouter()).WillByDefault(ReturnRef(*udp_listener_worker_router_));
+MockUdpListenerConfig::MockUdpListenerConfig(uint32_t concurrency)
+    : udp_listener_worker_router_(std::make_unique<UdpListenerWorkerRouterImpl>(concurrency)) {
+  ON_CALL(*this, listenerWorkerRouter(_)).WillByDefault(ReturnRef(*udp_listener_worker_router_));
   ON_CALL(*this, config()).WillByDefault(ReturnRef(config_));
 }
 MockUdpListenerConfig::~MockUdpListenerConfig() = default;
 
 MockListenerConfig::MockListenerConfig()
-    : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()) {
+    : socket_(std::make_shared<testing::NiceMock<MockListenSocket>>()),
+      listener_info_(std::make_shared<testing::NiceMock<MockListenerInfo>>()) {
+  socket_factories_.emplace_back(std::make_unique<MockListenSocketFactory>());
   ON_CALL(*this, filterChainFactory()).WillByDefault(ReturnRef(filter_chain_factory_));
-  ON_CALL(*this, listenSocketFactory()).WillByDefault(ReturnRef(socket_factory_));
-  ON_CALL(socket_factory_, localAddress())
-      .WillByDefault(ReturnRef(socket_->addressProvider().localAddress()));
-  ON_CALL(socket_factory_, getListenSocket(_)).WillByDefault(Return(socket_));
-  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(scope_));
+  ON_CALL(*this, listenSocketFactories()).WillByDefault(ReturnRef(socket_factories_));
+  ON_CALL(*static_cast<MockListenSocketFactory*>(socket_factories_[0].get()), localAddress())
+      .WillByDefault(ReturnRef(socket_->connectionInfoProvider().localAddress()));
+  ON_CALL(*static_cast<MockListenSocketFactory*>(socket_factories_[0].get()), getListenSocket(_))
+      .WillByDefault(Return(socket_));
+  ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(*store_.rootScope()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
+  ON_CALL(*this, maxConnectionsToAcceptPerSocketEvent())
+      .WillByDefault(Return(Network::DefaultMaxConnectionsToAcceptPerSocketEvent));
+  ON_CALL(*this, ignoreGlobalConnLimit()).WillByDefault(Return(false));
+  ON_CALL(*this, bindToPort()).WillByDefault(Return(true));
 }
 MockListenerConfig::~MockListenerConfig() = default;
 
@@ -109,10 +116,11 @@ MockUdpListenerCallbacks::~MockUdpListenerCallbacks() = default;
 MockDrainDecision::MockDrainDecision() = default;
 MockDrainDecision::~MockDrainDecision() = default;
 
-MockListenerFilter::MockListenerFilter() = default;
 MockListenerFilter::~MockListenerFilter() { destroy_(); }
 
-MockListenerFilterCallbacks::MockListenerFilterCallbacks() {
+MockListenerFilterCallbacks::MockListenerFilterCallbacks()
+    : filter_state_(StreamInfo::FilterStateImpl(StreamInfo::FilterState::LifeSpan::FilterChain)) {
+  ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(*this, socket()).WillByDefault(ReturnRef(socket_));
 }
 MockListenerFilterCallbacks::~MockListenerFilterCallbacks() = default;
@@ -122,6 +130,12 @@ MockListenerFilterManager::~MockListenerFilterManager() = default;
 
 MockFilterChain::MockFilterChain() = default;
 MockFilterChain::~MockFilterChain() = default;
+
+MockFilterChainInfo::MockFilterChainInfo() {
+  ON_CALL(*this, name()).WillByDefault(Invoke([this]() {
+    return absl::string_view{filter_chain_name_};
+  }));
+}
 
 MockFilterChainManager::MockFilterChainManager() = default;
 MockFilterChainManager::~MockFilterChainManager() = default;
@@ -133,7 +147,7 @@ MockFilterChainFactory::~MockFilterChainFactory() = default;
 
 MockListenSocket::MockListenSocket()
     : io_handle_(std::make_unique<NiceMock<MockIoHandle>>()),
-      address_provider_(std::make_shared<SocketAddressSetterImpl>(
+      connection_info_provider_(std::make_shared<ConnectionInfoSetterImpl>(
           std::make_shared<Address::Ipv4Instance>(80), nullptr)) {
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
@@ -143,7 +157,7 @@ MockListenSocket::MockListenSocket()
     return socket_is_open_;
   }));
   ON_CALL(*this, ipVersion())
-      .WillByDefault(Return(address_provider_->localAddress()->ip()->version()));
+      .WillByDefault(Return(connection_info_provider_->localAddress()->ip()->version()));
   ON_CALL(*this, duplicate()).WillByDefault(Invoke([]() {
     return std::make_unique<NiceMock<MockListenSocket>>();
   }));
@@ -157,13 +171,13 @@ MockSocketOption::~MockSocketOption() = default;
 
 MockConnectionSocket::MockConnectionSocket()
     : io_handle_(std::make_unique<IoSocketHandleImpl>()),
-      address_provider_(
-          std::make_shared<SocketAddressSetterImpl>(std::make_shared<Address::Ipv4Instance>(80),
-                                                    std::make_shared<Address::Ipv4Instance>(80))) {
+      connection_info_provider_(
+          std::make_shared<ConnectionInfoSetterImpl>(std::make_shared<Address::Ipv4Instance>(80),
+                                                     std::make_shared<Address::Ipv4Instance>(80))) {
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(*this, ipVersion())
-      .WillByDefault(Return(address_provider_->localAddress()->ip()->version()));
+      .WillByDefault(Return(connection_info_provider_->localAddress()->ip()->version()));
 }
 
 MockConnectionSocket::~MockConnectionSocket() = default;
@@ -184,6 +198,8 @@ MockConnectionHandler::MockConnectionHandler() {
   }));
 }
 MockConnectionHandler::~MockConnectionHandler() = default;
+
+MockUdpListenerWorkerRouter::~MockUdpListenerWorkerRouter() = default;
 
 MockIp::MockIp() = default;
 MockIp::~MockIp() = default;

@@ -6,15 +6,18 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/type/v3/range.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 #include "source/extensions/filters/network/dubbo_proxy/metadata.h"
-#include "source/extensions/filters/network/dubbo_proxy/router/route.h"
 #include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 
 #include "absl/types/optional.h"
@@ -30,7 +33,8 @@ class RouteEntryImplBase : public RouteEntry,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            public Logger::Loggable<Logger::Id::dubbo> {
 public:
-  RouteEntryImplBase(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route);
+  RouteEntryImplBase(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route,
+                     Server::Configuration::CommonFactoryContext& context);
   ~RouteEntryImplBase() override = default;
 
   // Router::RouteEntry
@@ -89,7 +93,8 @@ using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBas
 
 class ParameterRouteEntryImpl : public RouteEntryImplBase {
 public:
-  ParameterRouteEntryImpl(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route);
+  ParameterRouteEntryImpl(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route,
+                          Server::Configuration::CommonFactoryContext& context);
   ~ParameterRouteEntryImpl() override;
 
   struct ParameterData {
@@ -115,7 +120,8 @@ private:
 
 class MethodRouteEntryImpl : public RouteEntryImplBase {
 public:
-  MethodRouteEntryImpl(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route);
+  MethodRouteEntryImpl(const envoy::extensions::filters::network::dubbo_proxy::v3::Route& route,
+                       Server::Configuration::CommonFactoryContext& context);
   ~MethodRouteEntryImpl() override;
 
   // RoutEntryImplBase
@@ -127,7 +133,7 @@ private:
   std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
 };
 
-class SingleRouteMatcherImpl : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {
+class SingleRouteMatcherImpl : public Logger::Loggable<Logger::Id::dubbo> {
 public:
   class InterfaceMatcher {
   public:
@@ -139,9 +145,10 @@ public:
   };
 
   using RouteConfig = envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration;
-  SingleRouteMatcherImpl(const RouteConfig& config, Server::Configuration::FactoryContext& context);
+  SingleRouteMatcherImpl(const RouteConfig& config,
+                         Server::Configuration::ServerFactoryContext& context);
 
-  RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override;
+  RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 
 private:
   bool matchServiceName(const RpcInvocationImpl& invocation) const;
@@ -153,18 +160,32 @@ private:
   const absl::optional<std::string> group_;
   const absl::optional<std::string> version_;
 };
+using SingleRouteMatcherImplPtr = std::unique_ptr<SingleRouteMatcherImpl>;
 
-class MultiRouteMatcher : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {
+class RouteConfigImpl : public Config, public Logger::Loggable<Logger::Id::dubbo> {
 public:
   using RouteConfigList = Envoy::Protobuf::RepeatedPtrField<
       envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration>;
-  MultiRouteMatcher(const RouteConfigList& route_config_list,
-                    Server::Configuration::FactoryContext& context);
+  using MultipleRouteConfig =
+      envoy::extensions::filters::network::dubbo_proxy::v3::MultipleRouteConfiguration;
+  RouteConfigImpl(const RouteConfigList& route_config_list,
+                  Server::Configuration::ServerFactoryContext& context,
+                  bool validate_clusters_default = false);
+  RouteConfigImpl(const MultipleRouteConfig& multiple_route_config,
+                  Server::Configuration::ServerFactoryContext& context,
+                  bool validate_clusters_default = false)
+      : RouteConfigImpl(multiple_route_config.route_config(), context, validate_clusters_default) {}
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override;
 
 private:
-  std::vector<RouteMatcherPtr> route_matcher_list_;
+  std::vector<SingleRouteMatcherImplPtr> route_matcher_list_;
+};
+using RouteConfigImplPtr = std::unique_ptr<RouteConfigImpl>;
+
+class NullRouteConfigImpl : public Config {
+public:
+  RouteConstSharedPtr route(const MessageMetadata&, uint64_t) const override { return nullptr; }
 };
 
 } // namespace Router

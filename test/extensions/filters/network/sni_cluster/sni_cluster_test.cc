@@ -25,7 +25,7 @@ TEST(SniCluster, ConfigTest) {
   SniClusterNetworkFilterConfigFactory factory;
 
   Network::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), context);
+      factory.createFilterFactoryFromProto(*factory.createEmptyConfigProto(), context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -64,7 +64,7 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
     auto per_connection_cluster =
         stream_info.filterState()->getDataReadOnly<TcpProxy::PerConnectionCluster>(
             TcpProxy::PerConnectionCluster::key());
-    EXPECT_EQ(per_connection_cluster.value(), "filter_state_cluster");
+    EXPECT_EQ(per_connection_cluster->value(), "filter_state_cluster");
   }
 }
 

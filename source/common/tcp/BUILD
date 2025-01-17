@@ -12,13 +12,10 @@ envoy_cc_library(
     name = "conn_pool_lib",
     srcs = [
         "conn_pool.cc",
-        "original_conn_pool.cc",
     ],
     hdrs = [
         "conn_pool.h",
-        "original_conn_pool.h",
     ],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
@@ -35,5 +32,26 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
+        "@com_google_absl//absl/types:optional",
+    ],
+)
+
+envoy_cc_library(
+    name = "async_tcp_client_lib",
+    srcs = [
+        "async_tcp_client_impl.cc",
+    ],
+    hdrs = [
+        "async_tcp_client_impl.h",
+    ],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/stats:timespan_interface",
+        "//envoy/tcp:async_tcp_client_interface",
+        "//envoy/upstream:thread_local_cluster_interface",
+        "//source/common/network:filter_lib",
+        "//source/common/stats:timespan_lib",
     ],
 )

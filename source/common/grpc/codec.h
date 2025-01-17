@@ -12,6 +12,8 @@ namespace Grpc {
 const uint8_t GRPC_FH_DEFAULT = 0b0u;
 // Last bit for a compressed message.
 const uint8_t GRPC_FH_COMPRESSED = 0b1u;
+// Bit specifies end-of-stream response in Connect.
+const uint8_t CONNECT_FH_EOS = 0b10u;
 
 constexpr uint64_t GRPC_FRAME_HEADER_SIZE = sizeof(uint8_t) + sizeof(uint32_t);
 
@@ -49,9 +51,9 @@ public:
 // Wire format (http://www.grpc.io/docs/guides/wire.html) of GRPC data frame
 // header:
 //
-// -----------------------------------------------------------------------
-// |R|R|R|R|R|R|R|R|C|      L     |      L     |      L     |      L     |
-// -----------------------------------------------------------------------
+// ---------------------------------------------------------------------
+// |R|R|R|R|R|R|R|C|      L     |      L     |      L     |      L     |
+// ---------------------------------------------------------------------
 //    Flag (1 byte)                Message Length (4 bytes)
 //
 // A fixed header consists of five bytes.
@@ -103,8 +105,19 @@ protected:
   virtual void frameDataEnd() {}
 
   State state_{State::FhFlag};
-  uint32_t length_{0};
+  union {
+    // Note that this union does not rely on bytes being arranged accurately for a
+    // uint32_t, it merely shares the storage. absl::big_endian is used to deserialize
+    // the bytes correctly once they are populated.
+    uint32_t length_{0};
+    uint8_t length_as_bytes_[4];
+  };
   uint64_t count_{0};
+  // Default value 0 means there is no limitation on maximum frame length.
+  uint32_t max_frame_length_{0};
+  // When `max_frame_length_` is configured, this flag will be true if frame length is larger than
+  // `max_frame_length_`.
+  bool is_frame_oversized_{false};
 };
 
 class Decoder : public FrameInspector {
@@ -115,8 +128,8 @@ public:
   // error happened, the input buffer remains unchanged.
   // @param input supplies the binary octets wrapped in a GRPC data frame.
   // @param output supplies the buffer to store the decoded data.
-  // @return bool whether the decoding succeeded or not.
-  bool decode(Buffer::Instance& input, std::vector<Frame>& output);
+  // @return absl::status whether the decoding succeeded or not.
+  absl::Status decode(Buffer::Instance& input, std::vector<Frame>& output);
 
   // Determine the length of the current frame being decoded. This is useful when supplying a
   // partial frame to decode() and wanting to know how many more bytes need to be read to complete
@@ -125,6 +138,9 @@ public:
 
   // Indicates whether it has buffered any partial data.
   bool hasBufferedData() const { return state_ != State::FhFlag; }
+
+  // Configures the maximum frame length.
+  void setMaxFrameLength(uint32_t max_frame_length) { max_frame_length_ = max_frame_length; }
 
 protected:
   bool frameStart(uint8_t) override;

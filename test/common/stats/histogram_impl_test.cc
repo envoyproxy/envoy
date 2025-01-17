@@ -2,6 +2,7 @@
 
 #include "source/common/stats/histogram_impl.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -17,9 +18,10 @@ public:
     for (auto& item : buckets_configs_) {
       bucket_settings.Add(std::move(item));
     }
-    settings_ = std::make_unique<HistogramSettingsImpl>(config);
+    settings_ = std::make_unique<HistogramSettingsImpl>(config, context_);
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::vector<envoy::config::metrics::v3::HistogramBucketSettings> buckets_configs_;
   std::unique_ptr<HistogramSettingsImpl> settings_;
 };
@@ -93,6 +95,18 @@ TEST_F(HistogramSettingsImplTest, Priority) {
 
   initialize();
   EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({1, 2}));
+}
+
+TEST_F(HistogramSettingsImplTest, ScaledPercent) {
+  envoy::config::metrics::v3::HistogramBucketSettings setting;
+  setting.mutable_match()->set_prefix("a");
+  setting.mutable_buckets()->Add(0.1);
+  setting.mutable_buckets()->Add(2);
+  buckets_configs_.push_back(setting);
+
+  initialize();
+  EXPECT_EQ(settings_->buckets("test"), settings_->defaultBuckets());
+  EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({0.1, 2}));
 }
 
 } // namespace Stats

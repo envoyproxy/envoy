@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -15,6 +16,7 @@ envoy_extension_cc_test(
     name = "adaptive_concurrency_filter_test",
     srcs = ["adaptive_concurrency_filter_test.cc"],
     extension_names = ["envoy.filters.http.adaptive_concurrency"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -27,14 +29,21 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "adaptive_concurrency_filter_integration_test_lib",
+    hdrs = ["adaptive_concurrency_filter_integration_test.h"],
+)
+
 envoy_extension_cc_test(
     name = "adaptive_concurrency_integration_test",
+    size = "large",
     srcs = [
         "adaptive_concurrency_filter_integration_test.cc",
-        "adaptive_concurrency_filter_integration_test.h",
     ],
     extension_names = ["envoy.filters.http.adaptive_concurrency"],
+    rbe_pool = "6gig",
     deps = [
+        ":adaptive_concurrency_filter_integration_test_lib",
         "//source/extensions/filters/http/adaptive_concurrency:config",
         "//source/extensions/filters/http/fault:config",
         "//test/integration:http_integration_lib",

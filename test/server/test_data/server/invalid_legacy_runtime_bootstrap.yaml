@@ -1,4 +1,0 @@
-runtime:
-  base:
-    foo:
-    - bar: baz

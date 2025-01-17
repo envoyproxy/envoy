@@ -10,6 +10,6 @@ api_proto_package(
         "//envoy/api/v2/core:pkg",
         "//envoy/type:pkg",
         "//envoy/type/matcher:pkg",
-        "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_xds//udpa/annotations:pkg",
     ],
 )

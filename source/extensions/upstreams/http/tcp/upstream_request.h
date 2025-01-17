@@ -5,7 +5,6 @@
 
 #include "envoy/http/codec.h"
 #include "envoy/tcp/conn_pool.h"
-#include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/cleanup.h"
@@ -22,30 +21,24 @@ namespace Tcp {
 
 class TcpConnPool : public Router::GenericConnPool, public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
-              const Router::RouteEntry& route_entry, absl::optional<Envoy::Http::Protocol>,
-              Upstream::LoadBalancerContext* ctx) {
-    ASSERT(is_connect);
-    conn_pool_data_ = thread_local_cluster.tcpConnPool(route_entry.priority(), ctx);
+  TcpConnPool(Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
+              Upstream::ResourcePriority priority, Upstream::LoadBalancerContext* ctx) {
+    conn_pool_data_ = thread_local_cluster.tcpConnPool(host, priority, ctx);
   }
+  ~TcpConnPool() override {
+    ENVOY_BUG(upstream_handle_ == nullptr, "upstream_handle not null");
+    resetUpstreamHandleIfSet();
+  }
+  // Router::GenericConnPool
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
     callbacks_ = callbacks;
     upstream_handle_ = conn_pool_data_.value().newConnection(*this);
   }
-
-  bool cancelAnyPendingStream() override {
-    if (upstream_handle_) {
-      upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::Default);
-      upstream_handle_ = nullptr;
-      return true;
-    }
-    return false;
-  }
+  bool cancelAnyPendingStream() override { return resetUpstreamHandleIfSet(); }
   Upstream::HostDescriptionConstSharedPtr host() const override {
     return conn_pool_data_.value().host();
   }
-
-  bool valid() { return conn_pool_data_.has_value(); }
+  bool valid() const override { return conn_pool_data_.has_value(); }
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -59,6 +52,15 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
 private:
+  bool resetUpstreamHandleIfSet() {
+    if (upstream_handle_) {
+      upstream_handle_->cancel(Envoy::Tcp::ConnectionPool::CancelPolicy::Default);
+      upstream_handle_ = nullptr;
+      return true;
+    }
+    return false;
+  }
+
   absl::optional<Envoy::Upstream::TcpPoolData> conn_pool_data_;
   Envoy::Tcp::ConnectionPool::Cancellable* upstream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
@@ -75,6 +77,7 @@ public:
   void encodeMetadata(const Envoy::Http::MetadataMapVector&) override {}
   Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
+  void enableTcpTunneling() override {}
   void readDisable(bool disable) override;
   void resetStream() override;
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
@@ -84,10 +87,14 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override;
   void onBelowWriteBufferLowWatermark() override;
+  const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
 private:
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
+  StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
+  bool downstream_complete_ = false;
+  const bool force_reset_on_upstream_half_close_{};
 };
 
 } // namespace Tcp

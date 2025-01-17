@@ -1,6 +1,6 @@
 #include "envoy/admin/v3/memory.pb.h"
 
-#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/common/tls/context_config_impl.h"
 
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -25,10 +25,11 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   // Setup a context that returns null cert details.
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext config;
-  Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(config, factory_context);
+  auto cfg =
+      *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(config, factory_context);
   Stats::IsolatedStoreImpl store;
   Envoy::Ssl::ClientContextSharedPtr client_ctx(
-      server_.sslContextManager().createSslClientContext(store, cfg, nullptr));
+      *server_.sslContextManager().createSslClientContext(*store.rootScope(), *cfg));
 
   const std::string expected_empty_json = R"EOF({
  "certificates": [
@@ -45,6 +46,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
   EXPECT_TRUE(client_ctx->getCertChainInformation().empty());
   EXPECT_EQ(Http::Code::OK, getCallback("/certs", header_map, response));
   EXPECT_EQ(expected_empty_json, response.toString());
+  server_.sslContextManager().removeContext(client_ctx);
 }
 
 TEST_P(AdminInstanceTest, Memory) {

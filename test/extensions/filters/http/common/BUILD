@@ -21,6 +21,7 @@ envoy_cc_test_library(
     hdrs = [
         "mock.h",
     ],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//test/mocks/upstream:upstream_mocks",
@@ -42,6 +43,7 @@ envoy_extension_cc_test(
         "jwks_fetcher_test.cc",
     ],
     extension_names = ["envoy.filters.http.jwt_authn"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//test/extensions/filters/http/common:mock_lib",
@@ -55,6 +57,7 @@ envoy_extension_cc_test(
 envoy_cc_test(
     name = "stream_rate_limiter_test",
     srcs = ["stream_rate_limiter_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
@@ -69,18 +72,6 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "utility_test",
-    srcs = [
-        "utility_test.cc",
-    ],
-    deps = [
-        "//source/extensions/filters/http/common:utility_lib",
-        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
     ],
 )

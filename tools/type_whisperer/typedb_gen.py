@@ -10,6 +10,8 @@ from google.protobuf import text_format
 from tools.type_whisperer.api_type_db_pb2 import TypeDb
 from tools.type_whisperer.types_pb2 import Types, TypeDescription
 
+# TODO(htuch): cleanup this file, remove type upgrade, simplify.
+
 # Regexes governing v3upgrades. TODO(htuch): The regex approach will have
 # to be rethought as we go beyond v3, this is WiP.
 TYPE_UPGRADE_REGEXES = [
@@ -17,11 +19,11 @@ TYPE_UPGRADE_REGEXES = [
     (r'(envoy[\w\.]*\.)(v1alpha\d?|v1)', r'\1v3'),
     (r'(envoy[\w\.]*\.)(v2alpha\d?|v2)', r'\1v3'),
     # These are special cases, e.g. upgrading versionless packages.
-    ('envoy\.type\.matcher', 'envoy.type.matcher.v3'),
-    ('envoy\.type', 'envoy.type.v3'),
-    ('envoy\.config\.cluster\.redis', 'envoy.extensions.clusters.redis.v3'),
+    (r'envoy\.type\.matcher', 'envoy.type.matcher.v3'),
+    (r'envoy\.type', 'envoy.type.v3'),
+    (r'envoy\.config\.cluster\.redis', 'envoy.extensions.clusters.redis.v3'),
     (
-        'envoy\.config\.retry\.previous_priorities',
+        r'envoy\.config\.retry\.previous_priorities',
         'envoy.extensions.retry.priority.previous_priorities.v3'),
 ]
 
@@ -174,15 +176,6 @@ if __name__ == '__main__':
         type_desc = type_db.types[t]
         type_desc.qualified_package = type_map[t].qualified_package
         type_desc.proto_path = type_map[t].proto_path
-        if type_desc.qualified_package in next_versions_pkgs:
-            type_desc.next_version_type_name = upgraded_type(t, type_map[t])
-            assert (type_desc.next_version_type_name != t)
-            next_proto_info[type_map[t].proto_path] = (
-                type_map[type_desc.next_version_type_name].proto_path,
-                type_map[type_desc.next_version_type_name].qualified_package)
-    for proto_path, (next_proto_path, next_package) in sorted(next_proto_info.items()):
-        type_db.next_version_protos[proto_path].proto_path = next_proto_path
-        type_db.next_version_protos[proto_path].qualified_package = next_package
 
     # Write out proto text.
     with open(out_path, 'w') as f:

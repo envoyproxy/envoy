@@ -9,9 +9,10 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local_object.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 
 #include "source/common/common/linked_object.h"
 #include "source/common/common/thread.h"
@@ -20,6 +21,7 @@
 #include "source/common/grpc/stat_names.h"
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/router/header_parser.h"
+#include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -173,7 +175,8 @@ class GoogleAsyncClientImpl final : public RawAsyncClient, Logger::Loggable<Logg
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::config::core::v3::GrpcService& config, Api::Api& api,
+                        const envoy::config::core::v3::GrpcService& config,
+                        Server::Configuration::CommonFactoryContext& context,
                         const StatNames& stat_names);
   ~GoogleAsyncClientImpl() override;
 
@@ -185,6 +188,7 @@ public:
   RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
                            RawAsyncStreamCallbacks& callbacks,
                            const Http::AsyncClient::StreamOptions& options) override;
+  absl::string_view destination() override { return target_uri_; }
 
   TimeSource& timeSource() { return dispatcher_.timeSource(); }
   uint64_t perStreamBufferLimitBytes() const { return per_stream_buffer_limit_bytes_; }
@@ -198,6 +202,7 @@ private:
   GoogleStubSharedPtr stub_;
   std::list<GoogleAsyncStreamImplPtr> active_streams_;
   const std::string stat_prefix_;
+  const std::string target_uri_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
   uint64_t per_stream_buffer_limit_bytes_;
@@ -230,6 +235,12 @@ public:
   bool isAboveWriteBufferHighWatermark() const override {
     return bytes_in_write_pending_queue_ > parent_.perStreamBufferLimitBytes();
   }
+  const StreamInfo::StreamInfo& streamInfo() const override { return unused_stream_info_; }
+  StreamInfo::StreamInfo& streamInfo() override { return unused_stream_info_; }
+
+  // Google-gRPC code doesn't use Envoy watermark buffers, so the functions below are not used.
+  void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks&) override {}
+  void removeWatermarkCallbacks() override {}
 
 protected:
   bool callFailed() const { return call_failed_; }
@@ -307,6 +318,11 @@ private:
   // Count of the tags in-flight. This must hit zero before the stream can be
   // freed.
   uint32_t inflight_tags_{};
+
+  Tracing::SpanPtr current_span_;
+  // This is unused.
+  StreamInfo::StreamInfoImpl unused_stream_info_;
+
   // Queue of completed (op, ok) passed from completionThread() to
   // handleOpCompletion().
   std::deque<std::pair<GoogleAsyncTag::Operation, bool>>
@@ -330,8 +346,12 @@ public:
 
   // Grpc::AsyncRequest
   void cancel() override;
+  const StreamInfo::StreamInfo& streamInfo() const override {
+    return GoogleAsyncStreamImpl::streamInfo();
+  }
 
 private:
+  using GoogleAsyncStreamImpl::streamInfo;
   // Grpc::RawAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override;

@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/html:utility_lib",
     ],

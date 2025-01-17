@@ -11,10 +11,12 @@ namespace Quic {
 
 class QuicStatNamesTest : public testing::Test {
 public:
-  QuicStatNamesTest() : scope_(*symbol_table_), quic_stat_names_(*symbol_table_) {}
+  QuicStatNamesTest()
+      : store_(*symbol_table_), scope_(*store_.rootScope()), quic_stat_names_(*symbol_table_) {}
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
-  Stats::TestUtil::TestStore scope_;
+  Stats::TestUtil::TestStore store_;
+  Stats::Scope& scope_;
   QuicStatNames quic_stat_names_;
 };
 
@@ -23,7 +25,7 @@ TEST_F(QuicStatNamesTest, QuicConnectionCloseStats) {
                                                   quic::ConnectionCloseSource::FROM_SELF, false);
   EXPECT_EQ(
       1U,
-      scope_.counter("http3.downstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR").value());
+      store_.counter("http3.downstream.tx.quic_connection_close_error_code_QUIC_NO_ERROR").value());
 }
 
 TEST_F(QuicStatNamesTest, OutOfRangeQuicConnectionCloseStats) {
@@ -32,24 +34,27 @@ TEST_F(QuicStatNamesTest, OutOfRangeQuicConnectionCloseStats) {
                                                   static_cast<quic::QuicErrorCode>(bad_error_code),
                                                   quic::ConnectionCloseSource::FROM_SELF, false);
   EXPECT_EQ(1U,
-            scope_.counter("http3.downstream.tx.quic_connection_close_error_code_QUIC_LAST_ERROR")
+            store_.counter("http3.downstream.tx.quic_connection_close_error_code_QUIC_LAST_ERROR")
                 .value());
 }
 
 TEST_F(QuicStatNamesTest, ResetStreamErrorStats) {
-  quic_stat_names_.chargeQuicResetStreamErrorStats(scope_, quic::QUIC_STREAM_CANCELLED, true,
-                                                   false);
+  quic_stat_names_.chargeQuicResetStreamErrorStats(
+      scope_, quic::QuicResetStreamError::FromInternal(quic::QUIC_STREAM_CANCELLED), true, false);
   EXPECT_EQ(1U,
-            scope_.counter("http3.downstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED")
+            store_.counter("http3.downstream.tx.quic_reset_stream_error_code_QUIC_STREAM_CANCELLED")
                 .value());
 }
 
 TEST_F(QuicStatNamesTest, OutOfRangeResetStreamErrorStats) {
   uint64_t bad_error_code = quic::QUIC_STREAM_LAST_ERROR + 1;
   quic_stat_names_.chargeQuicResetStreamErrorStats(
-      scope_, static_cast<quic::QuicRstStreamErrorCode>(bad_error_code), true, false);
+      scope_,
+      quic::QuicResetStreamError::FromInternal(
+          static_cast<quic::QuicRstStreamErrorCode>(bad_error_code)),
+      true, false);
   EXPECT_EQ(
-      1U, scope_.counter("http3.downstream.tx.quic_reset_stream_error_code_QUIC_STREAM_LAST_ERROR")
+      1U, store_.counter("http3.downstream.tx.quic_reset_stream_error_code_QUIC_STREAM_LAST_ERROR")
               .value());
 }
 

@@ -16,10 +16,10 @@ envoy_cc_library(
     srcs = ["redis.cc"],
     hdrs = ["redis.h"],
     deps = [
-        "//source/common/upstream:health_checker_base_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
+        "//source/extensions/health_checkers/common:health_checker_base_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",

@@ -30,6 +30,7 @@ ConfigImpl::ConfigImpl(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_upstream_unknown_connections, 100)),
       enable_command_stats_(config.enable_command_stats()) {
   switch (config.read_policy()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::MASTER:
     read_policy_ = ReadPolicy::Primary;
     break;
@@ -47,19 +48,25 @@ ConfigImpl::ConfigImpl(
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings::ANY:
     read_policy_ = ReadPolicy::Any;
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-    break;
+  }
+
+  if (config.has_connection_rate_limit()) {
+    connection_rate_limit_enabled_ = true;
+    connection_rate_limit_per_sec_ = config.connection_rate_limit().connection_rate_limit_per_sec();
+  } else {
+    connection_rate_limit_enabled_ = false;
+    connection_rate_limit_per_sec_ = 100;
   }
 }
 
 ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                             const Config& config,
+                             const ConfigSharedPtr& config,
                              const RedisCommandStatsSharedPtr& redis_command_stats,
-                             Stats::Scope& scope) {
-  auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory,
-                                             config, redis_command_stats, scope);
+                             Stats::Scope& scope, bool is_transaction_client) {
+  auto client =
+      std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory, config,
+                                   redis_command_stats, scope, is_transaction_client);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -69,17 +76,20 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
 }
 
 ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                       EncoderPtr&& encoder, DecoderFactory& decoder_factory, const Config& config,
-                       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope)
+                       EncoderPtr&& encoder, DecoderFactory& decoder_factory,
+                       const ConfigSharedPtr& config,
+                       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+                       bool is_transaction_client)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
-      scope_(scope) {
-  host->cluster().stats().upstream_cx_total_.inc();
+      scope_(scope), is_transaction_client_(is_transaction_client) {
+  Upstream::ClusterTrafficStats& traffic_stats = *host->cluster().trafficStats();
+  traffic_stats.upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
-  host->cluster().stats().upstream_cx_active_.inc();
+  traffic_stats.upstream_cx_active_.inc();
   host->stats().cx_active_.inc();
   connect_or_op_timer_->enableTimer(host->cluster().connectTimeout());
 }
@@ -87,7 +97,7 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
 ClientImpl::~ClientImpl() {
   ASSERT(pending_requests_.empty());
   ASSERT(connection_->state() == Network::Connection::State::Closed);
-  host_->cluster().stats().upstream_cx_active_.dec();
+  host_->cluster().trafficStats()->upstream_cx_active_.dec();
   host_->stats().cx_active_.dec();
 }
 
@@ -106,7 +116,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   const bool empty_buffer = encoder_buffer_.length() == 0;
 
   Stats::StatName command;
-  if (config_.enableCommandStats()) {
+  if (config_->enableCommandStats()) {
     // Only lowercase command and get StatName if we enable command stats
     command = redis_command_stats_->getCommandFromRequest(request);
     redis_command_stats_->updateStatsTotal(scope_, command);
@@ -119,10 +129,10 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   encoder_->encode(request, encoder_buffer_);
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
-  if (encoder_buffer_.length() >= config_.maxBufferSizeBeforeFlush()) {
+  if (encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
     flushBufferAndResetTimer();
   } else if (empty_buffer) {
-    flush_timer_->enableTimer(std::chrono::milliseconds(config_.bufferFlushTimeoutInMs()));
+    flush_timer_->enableTimer(std::chrono::milliseconds(config_->bufferFlushTimeoutInMs()));
   }
 
   // Only boost the op timeout if:
@@ -132,7 +142,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   // - This is the first request on the pipeline. Otherwise the timeout would effectively start on
   //   the last operation.
   if (connected_ && pending_requests_.size() == 1) {
-    connect_or_op_timer_->enableTimer(config_.opTimeout());
+    connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 
   return &pending_requests_.back();
@@ -141,10 +151,10 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
 void ClientImpl::onConnectOrOpTimeout() {
   putOutlierEvent(Upstream::Outlier::Result::LocalOriginTimeout);
   if (connected_) {
-    host_->cluster().stats().upstream_rq_timeout_.inc();
+    host_->cluster().trafficStats()->upstream_rq_timeout_.inc();
     host_->stats().rq_timeout_.inc();
   } else {
-    host_->cluster().stats().upstream_cx_connect_timeout_.inc();
+    host_->cluster().trafficStats()->upstream_cx_connect_timeout_.inc();
     host_->stats().cx_connect_fail_.inc();
   }
 
@@ -152,18 +162,17 @@ void ClientImpl::onConnectOrOpTimeout() {
 }
 
 void ClientImpl::onData(Buffer::Instance& data) {
-  try {
-    decoder_->decode(data);
-  } catch (ProtocolError&) {
+  TRY_NEEDS_AUDIT { decoder_->decode(data); }
+  END_TRY catch (ProtocolError&) {
     putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestFailed);
-    host_->cluster().stats().upstream_cx_protocol_error_.inc();
+    host_->cluster().trafficStats()->upstream_cx_protocol_error_.inc();
     host_->stats().rq_error_.inc();
     connection_->close(Network::ConnectionCloseType::NoFlush);
   }
 }
 
 void ClientImpl::putOutlierEvent(Upstream::Outlier::Result result) {
-  if (!config_.disableOutlierEvents()) {
+  if (!config_->disableOutlierEvents()) {
     host_->outlierDetector().putResult(result);
   }
 }
@@ -185,7 +194,7 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
       if (!request.canceled_) {
         request.callbacks_.onFailure();
       } else {
-        host_->cluster().stats().upstream_rq_cancelled_.inc();
+        host_->cluster().trafficStats()->upstream_rq_cancelled_.inc();
       }
       pending_requests_.pop_front();
     }
@@ -194,11 +203,11 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
   } else if (event == Network::ConnectionEvent::Connected) {
     connected_ = true;
     ASSERT(!pending_requests_.empty());
-    connect_or_op_timer_->enableTimer(config_.opTimeout());
+    connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 
   if (event == Network::ConnectionEvent::RemoteClose && !connected_) {
-    host_->cluster().stats().upstream_cx_connect_fail_.inc();
+    host_->cluster().trafficStats()->upstream_cx_connect_fail_.inc();
     host_->stats().cx_connect_fail_.inc();
   }
 }
@@ -208,7 +217,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   PendingRequest& request = pending_requests_.front();
   const bool canceled = request.canceled_;
 
-  if (config_.enableCommandStats()) {
+  if (config_->enableCommandStats()) {
     bool success = !canceled && (value->type() != Common::Redis::RespType::Error);
     redis_command_stats_->updateStats(scope_, request.command_, success);
     request.command_request_timer_->complete();
@@ -221,25 +230,17 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   // result in closing the connection.
   pending_requests_.pop_front();
   if (canceled) {
-    host_->cluster().stats().upstream_rq_cancelled_.inc();
-  } else if (config_.enableRedirection() && (value->type() == Common::Redis::RespType::Error)) {
+    host_->cluster().trafficStats()->upstream_rq_cancelled_.inc();
+  } else if (config_->enableRedirection() && !is_transaction_client_ &&
+             (value->type() == Common::Redis::RespType::Error)) {
     std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
-    bool redirected = false;
-    if (err.size() == 3) {
+    if (err.size() == 3 &&
+        (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK)) {
       // MOVED and ASK redirection errors have the following substrings: MOVED or ASK (err[0]), hash
       // key slot (err[1]), and IP address and TCP port separated by a colon (err[2])
-      if (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK) {
-        redirected = true;
-        bool redirect_succeeded = callbacks.onRedirection(std::move(value), std::string(err[2]),
-                                                          err[0] == RedirectionResponse::get().ASK);
-        if (redirect_succeeded) {
-          host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
-        } else {
-          host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
-        }
-      }
-    }
-    if (!redirected) {
+      callbacks.onRedirection(std::move(value), std::string(err[2]),
+                              err[0] == RedirectionResponse::get().ASK);
+    } else {
       if (err[0] == RedirectionResponse::get().CLUSTER_DOWN) {
         callbacks.onFailure();
       } else {
@@ -256,7 +257,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   if (pending_requests_.empty()) {
     connect_or_op_timer_->disableTimer();
   } else {
-    connect_or_op_timer_->enableTimer(config_.opTimeout());
+    connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 
   putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
@@ -267,18 +268,18 @@ ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, ClientCallbacks& 
     : parent_(parent), callbacks_(callbacks), command_{command},
       aggregate_request_timer_(parent_.redis_command_stats_->createAggregateTimer(
           parent_.scope_, parent_.time_source_)) {
-  if (parent_.config_.enableCommandStats()) {
+  if (parent_.config_->enableCommandStats()) {
     command_request_timer_ = parent_.redis_command_stats_->createCommandTimer(
         parent_.scope_, command_, parent_.time_source_);
   }
-  parent.host_->cluster().stats().upstream_rq_total_.inc();
+  parent.host_->cluster().trafficStats()->upstream_rq_total_.inc();
   parent.host_->stats().rq_total_.inc();
-  parent.host_->cluster().stats().upstream_rq_active_.inc();
+  parent.host_->cluster().trafficStats()->upstream_rq_active_.inc();
   parent.host_->stats().rq_active_.inc();
 }
 
 ClientImpl::PendingRequest::~PendingRequest() {
-  parent_.host_->cluster().stats().upstream_rq_active_.dec();
+  parent_.host_->cluster().trafficStats()->upstream_rq_active_.dec();
   parent_.host_->stats().rq_active_.dec();
 }
 
@@ -302,7 +303,7 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
   // Any connection to replica requires the READONLY command in order to perform read.
   // Also the READONLY command is a no-opt for the primary.
   // We only need to send the READONLY command iff it's possible that the host is a replica.
-  if (config_.readPolicy() != Common::Redis::Client::ReadPolicy::Primary) {
+  if (config_->readPolicy() != Common::Redis::Client::ReadPolicy::Primary) {
     makeRequest(Utility::ReadOnlyRequest::instance(), null_pool_callbacks);
   }
 }
@@ -310,12 +311,13 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
-                                    Event::Dispatcher& dispatcher, const Config& config,
+                                    Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
-                                    const std::string& auth_password) {
-  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
-                                        decoder_factory_, config, redis_command_stats, scope);
+                                    const std::string& auth_password, bool is_transaction_client) {
+  ClientPtr client =
+      ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,
+                         redis_command_stats, scope, is_transaction_client);
   client->initialize(auth_username, auth_password);
   return client;
 }

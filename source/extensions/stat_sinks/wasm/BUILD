@@ -20,10 +20,12 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:factory_context_interface",
         "//envoy/server:instance_interface",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//source/server:configuration_lib",
         "@envoy_api//envoy/extensions/stat_sinks/wasm/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -34,4 +36,5 @@ envoy_cc_library(
         "//source/extensions/common/wasm:wasm_lib",
         "@envoy_api//envoy/extensions/filters/network/wasm/v3:pkg_cc_proto",
     ],
+    alwayslink = 1,
 )

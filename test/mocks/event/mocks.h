@@ -37,7 +37,10 @@ public:
 
   // Dispatcher
   const std::string& name() override { return name_; }
-  TimeSource& timeSource() override { return time_system_; }
+  TimeSource& timeSource() override { return *time_system_; }
+  GlobalTimeSystem& globalTimeSystem() {
+    return *(dynamic_cast<GlobalTimeSystem*>(time_system_.get()));
+  }
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
@@ -52,7 +55,8 @@ public:
   createClientConnection(Network::Address::InstanceConstSharedPtr address,
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override {
+                         const Network::ConnectionSocket::OptionsSharedPtr& options,
+                         const Network::TransportSocketOptionsConstSharedPtr&) override {
     return Network::ClientConnectionPtr{
         createClientConnection_(address, source_address, transport_socket, options)};
   }
@@ -64,18 +68,6 @@ public:
 
   Filesystem::WatcherPtr createFilesystemWatcher() override {
     return Filesystem::WatcherPtr{createFilesystemWatcher_()};
-  }
-
-  Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb,
-                                      bool bind_to_port) override {
-    return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port)};
-  }
-
-  Network::UdpListenerPtr
-  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
-                    const envoy::config::core::v3::UdpSocketConfig& config) override {
-    return Network::UdpListenerPtr{createUdpListener_(socket, cb, config)};
   }
 
   Event::TimerPtr createTimer(Event::TimerCb cb) override {
@@ -109,6 +101,9 @@ public:
   }
 
   void deferredDelete(DeferredDeletablePtr&& to_delete) override {
+    if (to_delete) {
+      to_delete->deleteIsPending();
+    }
     deferredDelete_(to_delete.get());
     if (to_delete) {
       to_delete_.push_back(std::move(to_delete));
@@ -130,18 +125,9 @@ public:
                Network::Address::InstanceConstSharedPtr source_address,
                Network::TransportSocketPtr& transport_socket,
                const Network::ConnectionSocket::OptionsSharedPtr& options));
-  MOCK_METHOD(Network::DnsResolverSharedPtr, createDnsResolver,
-              (const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-               const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options));
   MOCK_METHOD(FileEvent*, createFileEvent_,
               (os_fd_t fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
-  MOCK_METHOD(Network::Listener*, createListener_,
-              (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
-               bool bind_to_port));
-  MOCK_METHOD(Network::UdpListener*, createUdpListener_,
-              (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
-               const envoy::config::core::v3::UdpSocketConfig& config));
   MOCK_METHOD(Timer*, createTimer_, (Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTimer_, (ScaledTimerMinimum minimum, Event::TimerCb cb));
   MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));
@@ -149,7 +135,7 @@ public:
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
   MOCK_METHOD(void, exit, ());
   MOCK_METHOD(SignalEvent*, listenForSignal_, (signal_t signal_num, SignalCb cb));
-  MOCK_METHOD(void, post, (std::function<void()> callback));
+  MOCK_METHOD(void, post, (PostCb callback));
   MOCK_METHOD(void, deleteInDispatcherThread, (DispatcherThreadDeletableConstPtr deletable));
   MOCK_METHOD(void, run, (RunType type));
   MOCK_METHOD(void, pushTrackedObject, (const ScopeTrackedObject* object));
@@ -162,7 +148,7 @@ public:
   MOCK_METHOD(void, updateApproximateMonotonicTime, ());
   MOCK_METHOD(void, shutdown, ());
 
-  GlobalTimeSystem time_system_;
+  std::unique_ptr<TimeSource> time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
   bool allow_null_callback_{};
@@ -224,7 +210,10 @@ public:
 
 class MockSchedulableCallback : public SchedulableCallback {
 public:
-  MockSchedulableCallback(MockDispatcher* dispatcher);
+  MockSchedulableCallback(MockDispatcher* dispatcher,
+                          testing::MockFunction<void()>* destroy_cb = nullptr);
+  MockSchedulableCallback(MockDispatcher* dispatcher, std::function<void()> callback,
+                          testing::MockFunction<void()>* destroy_cb = nullptr);
   ~MockSchedulableCallback() override;
 
   void invokeCallback() {
@@ -244,6 +233,7 @@ public:
 
 private:
   std::function<void()> callback_;
+  testing::MockFunction<void()>* destroy_cb_{nullptr};
 };
 
 class MockSignalEvent : public SignalEvent {

@@ -11,6 +11,7 @@
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -21,7 +22,7 @@ namespace {
 
 Http::TestRequestHeaderMapImpl upgradeRequestHeaders(const char* upgrade_type = "websocket",
                                                      uint32_t content_length = 0) {
-  return Http::TestRequestHeaderMapImpl{{":authority", "host:80"},
+  return Http::TestRequestHeaderMapImpl{{":authority", "sni.lyft.com"},
                                         {"content-length", fmt::format("{}", content_length)},
                                         {":path", "/websocket/test"},
                                         {":method", "GET"},
@@ -60,7 +61,8 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
     const Http::RequestHeaderMap& original_request_headers) {
   Http::TestRequestHeaderMapImpl proxied_request_headers(original_proxied_request_headers);
   if (proxied_request_headers.ForwardedProto()) {
-    ASSERT_EQ(proxied_request_headers.getForwardedProtoValue(), "http");
+    ASSERT_EQ(proxied_request_headers.getForwardedProtoValue(),
+              downstreamProtocol() == Http::CodecType::HTTP3 ? "https" : "http");
     proxied_request_headers.removeForwardedProto();
   }
 
@@ -117,7 +119,7 @@ ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
 }
 
 void WebsocketIntegrationTest::initialize() {
-  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           ConfigHelper::HttpProtocolOptions protocol_options;
@@ -127,18 +129,35 @@ void WebsocketIntegrationTest::initialize() {
           ConfigHelper::setProtocolOptions(
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
+  } else if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()
+              ->mutable_http3_protocol_options()
+              ->set_allow_extended_connect(true);
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
   }
-  if (downstreamProtocol() != Http::CodecType::HTTP1) {
+
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
+  } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
+          hcm.mutable_http3_protocol_options()->set_allow_extended_connect(true);
+        });
   }
   HttpProtocolIntegrationTest::initialize();
 }
 
 void WebsocketIntegrationTest::performUpgrade(
     const Http::TestRequestHeaderMapImpl& upgrade_request_headers,
-    const Http::TestResponseHeaderMapImpl& upgrade_response_headers) {
+    const Http::TestResponseHeaderMapImpl& upgrade_response_headers, bool upgrade_should_fail) {
   // Establish the initial connection.
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -160,7 +179,9 @@ void WebsocketIntegrationTest::performUpgrade(
 
   // Verify the upgrade response was received downstream.
   response_->waitForHeaders();
-  validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers);
+  if (!upgrade_should_fail) {
+    validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers);
+  }
 }
 
 void WebsocketIntegrationTest::sendBidirectionalData() {
@@ -195,7 +216,8 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
 }
 
 TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
-  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2 ||
+      upstreamProtocol() == Http::CodecType::HTTP3) {
     return;
   }
 
@@ -207,7 +229,7 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
   initialize();
 
   performUpgrade(upgradeRequestHeaders(), upgradeResponseHeaders());
-  ASSERT_EQ(upstream_request_->headers().getHostValue(), "host:80");
+  ASSERT_EQ(upstream_request_->headers().getHostValue(), "sni.lyft.com");
 
   codec_client_->sendData(*request_encoder_, "bye!", false);
   codec_client_->close();
@@ -217,10 +239,14 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
 }
 
 TEST_P(WebsocketIntegrationTest, EarlyData) {
-  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-      upstreamProtocol() == Http::CodecType::HTTP2) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "false"}});
+
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
@@ -323,7 +349,7 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
         foo_upgrade->set_upgrade_type("foo");
         foo_upgrade->mutable_enabled()->set_value(false);
       });
-  auto host = config_helper_.createVirtualHost("host:80", "/websocket/test");
+  auto host = config_helper_.createVirtualHost("sni.lyft.com", "/websocket/test");
   host.mutable_routes(0)->mutable_route()->add_upgrade_configs()->set_upgrade_type("foo");
   config_helper_.addVirtualHost(host);
   initialize();
@@ -346,11 +372,17 @@ TEST_P(WebsocketIntegrationTest, RouteSpecificUpgrade) {
 }
 
 TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
+  // TODO(#26373) - debug and re-enable.
+  if (downstreamProtocol() != Http::CodecType::HTTP2 ||
+      upstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
+
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
 
   // Add a small buffer filter to the standard HTTP filter chain. Websocket
   // upgrades will use the HTTP filter chain so will also have small buffers.
-  config_helper_.addFilter(ConfigHelper::smallBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::smallBufferFilter());
 
   // Add a second upgrade type which goes directly to the router filter.
   config_helper_.addConfigModifier(
@@ -389,13 +421,15 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     codec_client_->sendData(encoder_decoder.first, large_req_str, false);
     ASSERT_TRUE(response_->waitForEndStream());
     EXPECT_EQ("413", response_->headers().getStatusValue());
-    waitForClientDisconnectOrReset();
+    if (downstreamProtocol() != Http::CodecType::HTTP3) {
+      waitForClientDisconnectOrReset();
+    }
     codec_client_->close();
   }
 
   // Foo upgrades are configured without the buffer filter, so should explicitly
   // allow large payload.
-  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     performUpgrade(upgradeRequestHeaders("foo"), upgradeResponseHeaders("foo"));
     codec_client_->sendData(*request_encoder_, large_req_str, false);
     ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, large_req_str));
@@ -406,48 +440,398 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
   }
 }
 
-TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
-  if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-      upstreamProtocol() == Http::CodecType::HTTP2) {
+TEST_P(WebsocketIntegrationTest, BidirectionalNoContentLengthNoTransferEncoding) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
 
-  auto request_headers = upgradeRequestHeaders();
-  request_headers.removeContentLength();
-  auto response_headers = upgradeResponseHeaders();
-  response_headers.removeContentLength();
-  performUpgrade(request_headers, response_headers);
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
 
-  // With content-length not present, the HTTP codec will send the request with
-  // transfer-encoding: chunked.
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(upstream_request_->headers().TransferEncoding() != nullptr);
-  }
+  // Send upgrade request without CL and TE headers
+  ASSERT_TRUE(tcp_client->write(
+      "GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n", false,
+      false));
 
-  // Send both a chunked request body and "websocket" payload.
-  std::string request_payload = "3\r\n123\r\n0\r\n\r\nSomeWebsocketRequestPayload";
-  codec_client_->sendData(*request_encoder_, request_payload, false);
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  std::string received_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
+  // Make sure Envoy did not add TE or CL headers
+  ASSERT_FALSE(absl::StrContains(received_data, "content-length"));
+  ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding"));
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n",
+      false));
 
-  // Send both a chunked response body and "websocket" payload.
-  std::string response_payload = "4\r\nabcd\r\n0\r\n\r\nSomeWebsocketResponsePayload";
-  upstream_request_->encodeData(response_payload, false);
-  response_->waitForBodyData(response_payload.size());
-  EXPECT_EQ(response_payload, response_->body());
+  tcp_client->waitForData("\r\n\r\n", false);
+  // Make sure Envoy did not add TE or CL on the response path
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "content-length"));
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "transfer-encoding"));
 
-  // Verify follow-up bidirectional data still works.
-  codec_client_->sendData(*request_encoder_, "FinalClientPayload", false);
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, request_payload + "FinalClientPayload"));
-  upstream_request_->encodeData("FinalServerPayload", false);
-  response_->waitForBodyData(response_->body().size() + 5);
-  EXPECT_EQ(response_payload + "FinalServerPayload", response_->body());
+  fake_upstream_connection->clearData();
+  // Send data and make sure Envoy did not add chunk framing
+  ASSERT_TRUE(tcp_client->write("foo bar", false, false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("foo bar")));
 
-  // Clean up.
-  codec_client_->close();
-  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
+  tcp_client->clearData();
+  // Send response data and make sure Envoy did not add chunk framing on the response path
+  ASSERT_TRUE(fake_upstream_connection->write("bar foo", false));
+  tcp_client->waitForData("bar foo");
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
+TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithTransferEncoding) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+
+  // Send upgrade request with TE: chunked header
+  ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: "
+                                "websocket\r\ntransfer-encoding: chunked\r\n\r\n",
+                                false, false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  std::string received_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
+  // Presently Envoy assumes upstream switches protocol and strips TE: chunked before proxying
+  // upgrade request to upstream.
+  ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding: chunked"));
+  ASSERT_FALSE(absl::StrContains(received_data, "content-length"));
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n",
+      false));
+
+  tcp_client->waitForData("\r\n\r\n", false);
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "content-length"));
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "transfer-encoding"));
+
+  fake_upstream_connection->clearData();
+  // Send data and make sure Envoy did not add chunk framing
+  ASSERT_TRUE(tcp_client->write("7\r\nfoo bar\r\n0\r\n\r\n", false, false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForMatch("7\r\nfoo bar\r\n0\r\n\r\n")));
+
+  tcp_client->clearData();
+  // Send response data and make sure Envoy did not add chunk framing on the response path
+  ASSERT_TRUE(fake_upstream_connection->write("bar foo", false));
+  tcp_client->waitForData("bar foo");
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeWithContentLength) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+
+  // Send upgrade request with TE: chunked header
+  ASSERT_TRUE(tcp_client->write("GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: "
+                                "websocket\r\ncontent-length: 7\r\n\r\n",
+                                false, false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  std::string received_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
+  // Presently Envoy assumes upstream switches protocol however still proxies CL to upstream.
+  ASSERT_TRUE(absl::StrContains(received_data, "content-length: 7"));
+  ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding"));
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n",
+      false));
+
+  tcp_client->waitForData("\r\n\r\n", false);
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "content-length"));
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "transfer-encoding"));
+
+  fake_upstream_connection->clearData();
+  // Send data and make sure Envoy did not add chunk framing
+  ASSERT_TRUE(tcp_client->write("foo bar", false, false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("foo bar")));
+
+  tcp_client->clearData();
+  // Send response data and make sure Envoy did not add chunk framing on the response path
+  ASSERT_TRUE(fake_upstream_connection->write("bar foo", false));
+  tcp_client->waitForData("bar foo");
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+// Verify that CONNECT requests are treated the same way as upgrades by H/1 codec.
+TEST_P(WebsocketIntegrationTest, BidirectionalConnectNoContentLengthNoTransferEncoding) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_http2_protocol_options()->set_allow_connect(true);
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_match()
+            ->mutable_connect_matcher();
+        hcm.add_upgrade_configs()->set_upgrade_type("CONNECT");
+      });
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+
+  // Send upgrade request without CL and TE headers
+  ASSERT_TRUE(tcp_client->write("CONNECT www.somewhere.com:80 HTTP/1.1\r\n\r\n", false, false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  std::string received_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
+  // Make sure Envoy did not add TE or CL headers
+  ASSERT_FALSE(absl::StrContains(received_data, "content-length"));
+  ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding"));
+  ASSERT_TRUE(fake_upstream_connection->write("HTTP/1.1 200 OK\r\n\r\n", false));
+
+  tcp_client->waitForData("\r\n\r\n", false);
+  // Make sure Envoy did not add TE or CL on the response path
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "content-length"));
+  ASSERT_FALSE(absl::StrContains(tcp_client->data(), "transfer-encoding"));
+
+  fake_upstream_connection->clearData();
+  // Send data and make sure Envoy did not add chunk framing
+  ASSERT_TRUE(tcp_client->write("foo bar", false, false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("foo bar")));
+
+  tcp_client->clearData();
+  // Send response data and make sure Envoy did not add chunk framing on the response path
+  ASSERT_TRUE(fake_upstream_connection->write("bar foo", false));
+  tcp_client->waitForData("bar foo");
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+// Test Websocket Upgrade in HTTP1 with 200 response code.
+TEST_P(WebsocketIntegrationTest, Http1UpgradeStatusCodeOK) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
+
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  auto in_correct_status_response_headers = upgradeResponseHeaders();
+  in_correct_status_response_headers.setStatus(200);
+
+  // The upgrade should be paused, but the response header is proxied back to downstream.
+  performUpgrade(upgradeRequestHeaders(), in_correct_status_response_headers, true);
+  EXPECT_EQ("200", response_->headers().Status()->value().getStringView());
+  EXPECT_EQ("upgrade", response_->headers().Connection()->value().getStringView());
+  EXPECT_EQ("websocket", response_->headers().Upgrade()->value().getStringView());
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 0);
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+// Test Websocket Upgrade with 200 response code from no HTTP1 upstream and downstream.
+TEST_P(WebsocketIntegrationTest, NonHttp1UpgradeStatusCodeOK) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1 ||
+      downstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
+
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  auto correct_status_response_headers = upgradeResponseHeaders();
+  correct_status_response_headers.setStatus(200);
+  performUpgrade(upgradeRequestHeaders(), correct_status_response_headers, true);
+
+  // HTTP2 upstream response 200 is converted to 101.
+  EXPECT_EQ("101", response_->headers().Status()->value().getStringView());
+  test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 1);
+  codec_client_->close();
+}
+
+// Test Websocket Upgrade with 201 response code from no HTTP1 upstream and downstream.
+// This patch will not impact no H/1 behaviors.
+TEST_P(WebsocketIntegrationTest, NoHttp1UpstreamUpgradeStatus201) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1 ||
+      downstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
+
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  auto correct_status_response_headers = upgradeResponseHeaders();
+  correct_status_response_headers.setStatus(201);
+  performUpgrade(upgradeRequestHeaders(), correct_status_response_headers, true);
+
+  EXPECT_EQ("201", response_->headers().Status()->value().getStringView());
+  test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 1);
+  codec_client_->close();
+}
+
+// Test Websocket Upgrade in HTTP1 with 426 response code.
+// Upgrade is a HTTP1 header.
+TEST_P(WebsocketIntegrationTest, Http1UpgradeStatusCodeUpgradeRequired) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
+
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  auto in_correct_status_response_headers = upgradeResponseHeaders();
+  in_correct_status_response_headers.setStatus(426);
+
+  // The upgrade should be paused, but the response header is proxied back to downstream.
+  performUpgrade(upgradeRequestHeaders(), in_correct_status_response_headers, true);
+  EXPECT_EQ("426", response_->headers().Status()->value().getStringView());
+  EXPECT_EQ("upgrade", response_->headers().Connection()->value().getStringView());
+  EXPECT_EQ("websocket", response_->headers().Upgrade()->value().getStringView());
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+  test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 0);
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+// Test data flow when websocket handshake failed.
+TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeFailedWithPrePayload) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
+
+  config_helper_.addConfigModifier(setRouteUsingWebsocket());
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+
+  // Send upgrade request with additional data.
+  ASSERT_TRUE(tcp_client->write(
+      "GET / HTTP/1.1\r\nHost: host\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\nfoo boo",
+      false, false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT(fake_upstream_connection != nullptr);
+  std::string received_data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &received_data));
+  // Make sure Envoy did not add TE or CL headers
+  ASSERT_FALSE(absl::StrContains(received_data, "content-length"));
+  ASSERT_FALSE(absl::StrContains(received_data, "transfer-encoding"));
+  ASSERT_TRUE(fake_upstream_connection->write(
+      "HTTP/1.1 426 Upgrade Required\r\nconnection: upgrade\r\nupgrade: websocket\r\n\r\n", false));
+
+  tcp_client->waitForData("\r\n\r\n", false);
+
+  // Should not receive any data before handshake is finished.
+  std::string received_data_prepayload;
+  ASSERT_FALSE(fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("foo boo"), nullptr, std::chrono::milliseconds(10)));
+
+  tcp_client->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(WebsocketIntegrationTest, WebsocketUpgradeWithDisabledSmallBufferFilter) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  const std::string WebsocketUpgradeWithDisabledSmallBufferConfig = R"EOF(
+    name: typed-per-filter-config-for-ws
+    virtual_hosts:
+    - name: app-ws
+      domains:
+      - "*"
+      routes:
+      - match:
+          prefix: "/websocket/test"
+        route:
+          cluster: cluster_0
+          upgrade_configs:
+          - upgrade_type: websocket
+        typed_per_filter_config:
+          buffer:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            disabled: true
+)EOF";
+
+  const std::string TinyBufferFilter = R"EOF(
+    name: buffer
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
+        max_request_bytes : 1
+)EOF";
+
+  config_helper_.prependFilter(TinyBufferFilter);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto route_config = hcm.mutable_route_config();
+        TestUtility::loadFromYaml(WebsocketUpgradeWithDisabledSmallBufferConfig, *route_config);
+      });
+  initialize();
+
+  performUpgrade(upgradeRequestHeaders(), upgradeResponseHeaders());
+  sendBidirectionalData();
+
+  // Send some final data from the client, and disconnect.
+  codec_client_->sendData(*request_encoder_, "bye!", false);
+  codec_client_->close();
+
+  // Verify the final data was received and that the connection is torn down.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hellobye!"));
+  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
+}
 } // namespace Envoy

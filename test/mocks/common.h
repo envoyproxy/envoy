@@ -2,7 +2,9 @@
 
 #include <cstdint>
 
+#include "envoy/common/backoff_strategy.h"
 #include "envoy/common/conn_pool.h"
+#include "envoy/common/key_value_store.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
@@ -66,6 +68,16 @@ public:
   Event::TestRealTimeSystem real_time_; // NO_CHECK_FORMAT(real_time)
 };
 
+class MockBackOffStrategy : public BackOffStrategy {
+public:
+  ~MockBackOffStrategy() override = default;
+
+  MOCK_METHOD(uint64_t, nextBackOffMs, ());
+  MOCK_METHOD(void, reset, ());
+  MOCK_METHOD(void, reset, (uint64_t base_interval));
+  MOCK_METHOD(bool, isOverTimeLimit, (uint64_t interval_ms), (const));
+};
+
 // Captures absl::string_view parameters into temp strings, for use
 // with gmock's SaveArg<n>. Providing an absl::string_view compiles,
 // but fails because by the time you examine the saved value, its
@@ -91,6 +103,7 @@ inline bool operator==(const StringViewSaver& saver, const char* str) {
 class MockScopeTrackedObject : public ScopeTrackedObject {
 public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+  MOCK_METHOD(OptRef<const StreamInfo::StreamInfo>, trackedStream, (), (const));
 };
 
 namespace ConnectionPool {
@@ -109,13 +122,49 @@ namespace Random {
 class MockRandomGenerator : public RandomGenerator {
 public:
   MockRandomGenerator();
+  MockRandomGenerator(uint64_t value);
   ~MockRandomGenerator() override;
 
   MOCK_METHOD(uint64_t, random, ());
   MOCK_METHOD(std::string, uuid, ());
 
+  uint64_t value_;
   const std::string uuid_{"a121e9e1-feae-4136-9e0e-6fac343d56c9"};
 };
+
 } // namespace Random
+
+class MockKeyValueStore : public KeyValueStore {
+public:
+  MOCK_METHOD(void, addOrUpdate,
+              (absl::string_view, absl::string_view, absl::optional<std::chrono::seconds> ttl));
+  MOCK_METHOD(void, remove, (absl::string_view));
+  MOCK_METHOD(absl::optional<absl::string_view>, get, (absl::string_view));
+  MOCK_METHOD(void, flush, ());
+  MOCK_METHOD(void, iterate, (ConstIterateCb), (const));
+};
+
+class MockKeyValueStoreFactory : public KeyValueStoreFactory {
+public:
+  MockKeyValueStoreFactory();
+  MOCK_METHOD(KeyValueStorePtr, createStore,
+              (const Protobuf::Message&, ProtobufMessage::ValidationVisitor&, Event::Dispatcher&,
+               Filesystem::Instance&));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+  std::string category() const override { return "envoy.common.key_value"; }
+  std::string name() const override { return "mock_key_value_store_factory"; }
+};
+
+struct MockLogSink : Logger::SinkDelegate {
+  MockLogSink(Logger::DelegatingLogSinkSharedPtr log_sink) : Logger::SinkDelegate(log_sink) {
+    setDelegate();
+  }
+  ~MockLogSink() override { restoreDelegate(); }
+
+  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
+  MOCK_METHOD(void, logWithStableName,
+              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
+  void flush() override {}
+};
 
 } // namespace Envoy

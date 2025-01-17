@@ -7,7 +7,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Access log implementation that writes to a file.
-# Public docs: docs/root/configuration/access_log.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log
 
 envoy_extension_package()
 
@@ -15,7 +15,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # TODO(#9953) determine if this is core or should be cleaned up.
+    # This is core code for the purposes of testing.
     extra_visibility = [
         "//test:__subpackages__",
     ],

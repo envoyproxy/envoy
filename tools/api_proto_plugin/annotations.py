@@ -1,9 +1,10 @@
 """Envoy API annotations."""
 
 import re
+from functools import partial
 
 # Key-value annotation regex.
-ANNOTATION_REGEX = re.compile('\[#([\w-]+?):\s*(.*?)\](\s?)', re.DOTALL)
+ANNOTATION_REGEX = re.compile(r'\[#([\w-]+?):\s*(.*?)\](\s?)', re.DOTALL)
 
 # Page/section titles with special prefixes in the proto comments
 DOC_TITLE_ANNOTATION = 'protodoc-title'
@@ -15,9 +16,6 @@ EXTENSION_CATEGORY_ANNOTATION = 'extension-category'
 # name that the extension registers as in the static registry, e.g.
 # envoy.filters.network.http_connection_manager.
 EXTENSION_ANNOTATION = 'extension'
-
-# Used to mark something as alpha, excluding it from the threat model.
-ALPHA_ANNOTATION = 'alpha'
 
 # Not implemented yet annotation on leading comments, leading to hiding of
 # field.
@@ -33,15 +31,19 @@ NEXT_MAJOR_VERSION_ANNOTATION = 'next-major-version'
 # Comment. Just used for adding text that will not go into the docs at all.
 COMMENT_ANNOTATION = 'comment'
 
+# Annotation on leading comments that permits fields to be declared with the
+# fully-qualified-name (FQN) type.
+ALLOW_FULLY_QUALIFIED_NAME_ANNOTATION = 'allow-fully-qualified-name'
+
 VALID_ANNOTATIONS = set([
     DOC_TITLE_ANNOTATION,
     EXTENSION_ANNOTATION,
-    ALPHA_ANNOTATION,
     EXTENSION_CATEGORY_ANNOTATION,
     NOT_IMPLEMENTED_HIDE_ANNOTATION,
     NEXT_FREE_FIELD_ANNOTATION,
     NEXT_MAJOR_VERSION_ANNOTATION,
     COMMENT_ANNOTATION,
+    ALLOW_FULLY_QUALIFIED_NAME_ANNOTATION,
 ])
 
 # These can propagate from file scope to message/enum scope (and be overridden).
@@ -81,6 +83,21 @@ def extract_annotations(s, inherited_annotations=None):
     return annotations
 
 
+def append(s, annotation, content):
+    return '%s[#%s: %s]\n' % (s, annotation, content)
+
+
+def xform_sub(annotation_xforms, present_annotations, match):
+    annotation, content, trailing = match.groups()
+    present_annotations.add(annotation)
+    annotation_xform = annotation_xforms.get(annotation)
+    if annotation_xform:
+        value = annotation_xform(annotation)
+        return '[#%s: %s]%s' % (annotation, value, trailing) if value is not None else ''
+    else:
+        return match.group(0)
+
+
 def xform_annotation(s, annotation_xforms):
     """Return transformed string with annotation transformers.
 
@@ -97,20 +114,7 @@ def xform_annotation(s, annotation_xforms):
     """
     present_annotations = set()
 
-    def xform(match):
-        annotation, content, trailing = match.groups()
-        present_annotations.add(annotation)
-        annotation_xform = annotation_xforms.get(annotation)
-        if annotation_xform:
-            value = annotation_xform(annotation)
-            return '[#%s: %s]%s' % (annotation, value, trailing) if value is not None else ''
-        else:
-            return match.group(0)
-
-    def append(s, annotation, content):
-        return '%s [#%s: %s]\n' % (s, annotation, content)
-
-    xformed = re.sub(ANNOTATION_REGEX, xform, s)
+    xformed = ANNOTATION_REGEX.sub(partial(xform_sub, annotation_xforms, present_annotations), s)
     for annotation, xform in sorted(annotation_xforms.items()):
         if annotation not in present_annotations:
             value = xform(None)

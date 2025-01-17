@@ -8,8 +8,8 @@ that Envoy is deployed for. The filter's main job is to follow the instructions 
 configured :ref:`route table <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`. In addition to forwarding and
 redirection, the filter also handles retry, statistics, etc.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.router.v3.Router``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.router.v3.Router>`
-* This filter should be configured with the name *envoy.filters.http.router*.
 
 .. _config_http_filters_router_headers_consumed:
 
@@ -27,8 +27,8 @@ ingress/response path. They are documented in this section.
 x-envoy-max-retries
 ^^^^^^^^^^^^^^^^^^^
 If a :ref:`route config retry policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>` or a
-:ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>` is in place, Envoy will default to retrying
-one time unless explicitly specified. The number of retries can be explicitly set in the virtual host retry config,
+:ref:`virtual host retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>` is in place,
+or the cluster is configured to use :ref:`HTTP/3 <arch_overview_http3>` to talk to the upstream server and an early-data request fails during connect or gets a TooEarly(425 response code) response, Envoy will default to retrying one time unless explicitly specified. The number of retries can be explicitly set in the virtual host retry config,
 the route retry config, or by using this header. If this header is used, its value takes precedence over the number of
 retries set in either retry policy. If a retry policy is not configured and :ref:`config_http_filters_router_x-envoy-retry-on`
 or :ref:`config_http_filters_router_x-envoy-retry-grpc-on` headers are not specified, Envoy will not retry a failed request.
@@ -89,6 +89,10 @@ gateway-error
 reset
   Envoy will attempt a retry if the upstream server does not respond at all (disconnect/reset/read timeout.)
 
+reset-before-request
+  Equivalent to *reset* but will only retry requests that have not been sent to the upstream server
+  (i.e. the headers have not been sent).
+
 connect-failure
   Envoy will attempt a retry if a request is failed because of a connection failure to the upstream
   server (connect timeout, etc.). (Included in *5xx*)
@@ -127,6 +131,9 @@ retriable-headers
   Envoy will attempt a retry if the upstream server response includes any headers matching in either
   :ref:`the retry policy <envoy_v3_api_field_config.route.v3.RetryPolicy.retriable_headers>` or in the
   :ref:`config_http_filters_router_x-envoy-retriable-header-names` header.
+
+http3-post-connect-failure:
+  Envoy will attempt a retry if a request is sent over HTTP/3 to the upstream server and failed after getting connected.
 
 The number of retries can be controlled via the
 :ref:`config_http_filters_router_x-envoy-max-retries` header or via the :ref:`route
@@ -339,6 +346,15 @@ request was sent, incrementing by one for each retry. Only set if the
 :ref:`include_attempt_count_in_response <envoy_v3_api_field_config.route.v3.VirtualHost.include_attempt_count_in_response>`
 flag is set to true.
 
+.. _config_http_filters_router_x-envoy-is-timeout-retry:
+
+x-envoy-is-timeout-retry
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Sent to the upstream to indicate that the request is a retry initiated due to timeouts. Only set if the
+:ref:`include_is_timeout_retry_header <envoy_v3_api_field_config.route.v3.VirtualHost.include_is_timeout_retry_header>`
+flag is set to true.
+
 .. _config_http_filters_router_x-envoy-expected-rq-timeout-ms:
 
 x-envoy-expected-rq-timeout-ms
@@ -359,6 +375,19 @@ If the route utilizes :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.R
 or :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rewrite>`,
 Envoy will put the original path header in this header. This can be useful for logging and
 debugging.
+
+.. _config_http_filters_router_x-envoy-upstream-stream-duration-ms:
+
+x-envoy-upstream-stream-duration-ms
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This value is used to configure the maximum upstream stream lifetime for the stream which has this header.
+If the stream exceeds this lifetime, it will be reset and a 408 response
+will be sent to downstream. If the value of the header is 0, then the lifetime will be
+infinite and no limit will be enforced. It is similar to
+:ref:`max_stream_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`,
+but that configuration applies to all streams to this cluster. If set, this header will
+override the cluster configuration. The value set for this header is set independently for other timeout related headers.
 
 HTTP response headers set on downstream responses
 -------------------------------------------------
@@ -404,6 +433,7 @@ owning HTTP connection manager.
   rq_direct_response, Counter, Total requests that resulted in a direct response
   rq_total, Counter, Total routed requests
   rq_reset_after_downstream_response_started, Counter, Total requests that were reset after downstream response had started
+  rq_overload_local_reply, Counter, Total requests that were load shed if downstream filter load shed point is configured
 
 .. _config_http_filters_router_vcluster_stats:
 
@@ -411,7 +441,7 @@ Virtual Clusters
 ^^^^^^^^^^^^^^^^
 
 Virtual cluster statistics are output in the
-*vhost.<virtual host name>.vcluster.<virtual cluster name>.* namespace and include the following
+``vhost.<virtual host name>.vcluster.<virtual cluster name>.`` namespace and include the following
 statistics:
 
 .. csv-table::

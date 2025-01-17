@@ -63,6 +63,13 @@ public:
   static std::vector<Network::Address::IpVersion> getIpVersionsForTest();
 
   /**
+   * Return a vector of spdlog loggers as parameters to test. Tests are mainly
+   * for the behavior consistency between default loggers and fine-grained loggers.
+   * @return std::vector<spdlog::logger*>
+   */
+  static std::vector<spdlog::logger*> getSpdLoggersForTest();
+
+  /**
    * Tests can be run with Envoy Grpc and Google Grpc or Envoy Grpc alone by setting compiler option
    * `--define google_grpc=disabled`.
    * @return a vector of Grpc versions to test.
@@ -188,11 +195,14 @@ public:
   jsonLoadFromString(const std::string& json,
                      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
 
+#ifndef TARGET_OS_IOS
   /**
    * Execute a program under ::system. Any failure is fatal.
    * @param args program path and arguments.
    */
+
   static void exec(const std::vector<std::string>& args);
+#endif
 
   /**
    * Dumps the contents of the string into a temporary file from temporaryDirectory() + filename.
@@ -200,11 +210,13 @@ public:
    * @param filename: the name of the file to use
    * @param contents: the data to go in the file.
    * @param fully_qualified_path: if true, will write to filename without prepending the tempdir.
+   * @param unlink: if true will delete any prior file before writing.
    * @return the fully qualified path of the output file.
    */
   static std::string writeStringToFileForTest(const std::string& filename,
                                               const std::string& contents,
-                                              bool fully_qualified_path = false);
+                                              bool fully_qualified_path = false,
+                                              bool unlink = true);
   /**
    * Dumps the contents of the file into the string.
    *
@@ -274,7 +286,7 @@ private:
   const std::string new_link_;
   const std::string target1_;
   const std::string target2_;
-  bool use_target1_;
+  bool use_target1_{true};
 };
 
 } // namespace Envoy

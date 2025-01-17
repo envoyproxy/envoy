@@ -28,7 +28,17 @@ namespace Stats {
  */
 class TagProducerImpl : public TagProducer {
 public:
-  TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config);
+  /**
+   * Create TagProducer instance. Check all tag names for conflicts to avoid
+   * unexpected tag name overwriting.
+   * @param config stats config.
+   * @param cli_tags tags that are provided by the cli
+   * @returns a tag producer or an error pointer if a conflict of tag names is found.
+   */
+  static absl::StatusOr<Stats::TagProducerPtr>
+  createTagProducer(const envoy::config::metrics::v3::StatsConfig& config,
+                    const Stats::TagVector& cli_tags);
+
   TagProducerImpl() = default;
 
   /**
@@ -39,7 +49,12 @@ public:
    */
   std::string produceTags(absl::string_view metric_name, TagVector& tags) const override;
 
+  const TagVector& fixedTags() const override { return fixed_tags_; }
+
 private:
+  TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                  const Stats::TagVector& cli_tags, absl::Status& creation_status);
+
   friend class DefaultTagRegexTester;
 
   /**
@@ -54,9 +69,9 @@ private:
    * more than one TagExtractor can be used to generate a given tag. The default
    * extractors are specified in common/config/well_known_names.cc.
    * @param name absl::string_view the extractor to add.
-   * @return int the number of matching extractors.
+   * @return Status ok if at least 1 matching extractor was found.
    */
-  int addExtractorsMatching(absl::string_view name);
+  absl::Status addExtractorsMatching(absl::string_view name);
 
   /**
    * Roughly estimate the size of the vectors.
@@ -65,15 +80,12 @@ private:
   void reserveResources(const envoy::config::metrics::v3::StatsConfig& config);
 
   /**
-   * Adds all default extractors from well_known_names.cc into the
-   * collection. Returns a set of names of all default extractors
-   * into a string-set for dup-detection against new stat names
-   * specified in the configuration.
+   * Adds all default extractors from well_known_names.cc into the collection.
+   *
    * @param config const envoy::config::metrics::v2::StatsConfig& the config.
-   * @return names absl::node_hash_set<std::string> the set of names to populate
+   * @return a status indicating if the default extractors were successfully added.
    */
-  absl::node_hash_set<std::string>
-  addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config);
+  absl::Status addDefaultExtractors(const envoy::config::metrics::v3::StatsConfig& config);
 
   /**
    * Iterates over every tag extractor that might possibly match stat_name, calling
@@ -98,7 +110,14 @@ private:
   // the storage for the prefix string is owned by the TagExtractor, which, depending on
   // implementation, may need make a copy of the prefix.
   absl::flat_hash_map<absl::string_view, std::vector<TagExtractorPtr>> tag_extractor_prefix_map_;
-  TagVector default_tags_;
+
+  // Keep track of which names have extractors. If an extractor is added and there's
+  // already one for that name, we set a bit in the extractor so we can decide whether
+  // we need do elide duplicate extractors during extraction. It is not valid to
+  // send duplicate tag names to Prometheus so this needs to be filtered out.
+  absl::flat_hash_map<absl::string_view, std::reference_wrapper<TagExtractor>> extractor_map_;
+
+  TagVector fixed_tags_;
 };
 
 } // namespace Stats

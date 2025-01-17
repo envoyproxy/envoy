@@ -4,8 +4,6 @@
 
 #include "source/common/event/dispatcher_impl.h"
 
-#include "dns.h"
-
 namespace Envoy {
 namespace Event {
 
@@ -19,19 +17,10 @@ public:
   ValidationDispatcher(const std::string& name, Api::Api& api, Event::TimeSystem& time_system)
       : DispatcherImpl(name, api, time_system) {}
 
-  Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstanceConstSharedPtr,
-                         Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override;
-  Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
-                                      bool bind_to_port) override;
-
-protected:
-  std::shared_ptr<Network::ValidationDnsResolver> dns_resolver_{
-      std::make_shared<Network::ValidationDnsResolver>()};
+  Network::ClientConnectionPtr createClientConnection(
+      Network::Address::InstanceConstSharedPtr, Network::Address::InstanceConstSharedPtr,
+      Network::TransportSocketPtr&&, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options) override;
 };
 
 } // namespace Event

@@ -10,7 +10,7 @@
 
 #include "source/common/http/codes.h"
 #include "source/common/stats/isolated_store_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "benchmark/benchmark.h"
 
@@ -20,7 +20,7 @@ namespace Http {
 template <class SymbolTableClass> class CodeUtilitySpeedTest {
 public:
   CodeUtilitySpeedTest()
-      : global_store_(symbol_table_), cluster_scope_(symbol_table_), code_stats_(symbol_table_),
+      : global_store_(symbol_table_), cluster_store_(symbol_table_), code_stats_(symbol_table_),
         pool_(symbol_table_), from_az_(pool_.add("from_az")), prefix_(pool_.add("prefix")),
         req_vcluster_name_(pool_.add("req_vcluster_name")),
         test_cluster_(pool_.add("test-cluster")), test_vhost_(pool_.add("test-vhost")),
@@ -29,11 +29,20 @@ public:
   void addResponse(uint64_t code, bool canary, bool internal_request,
                    Stats::StatName request_vhost_name = Stats::StatName(),
                    Stats::StatName request_vcluster_name = Stats::StatName(),
+                   Stats::StatName request_route_name = Stats::StatName(),
                    Stats::StatName from_az = Stats::StatName(),
                    Stats::StatName to_az = Stats::StatName()) {
-    Http::CodeStats::ResponseStatInfo info{
-        global_store_,      cluster_scope_,        prefix_, code,  internal_request,
-        request_vhost_name, request_vcluster_name, from_az, to_az, canary};
+    Http::CodeStats::ResponseStatInfo info{*global_store_.rootScope(),
+                                           *cluster_store_.rootScope(),
+                                           prefix_,
+                                           code,
+                                           internal_request,
+                                           request_vhost_name,
+                                           request_route_name,
+                                           request_vcluster_name,
+                                           from_az,
+                                           to_az,
+                                           canary};
 
     code_stats_.chargeResponseStat(info, false);
   }
@@ -52,16 +61,24 @@ public:
   }
 
   void responseTiming() {
-    Http::CodeStats::ResponseTimingInfo info{
-        global_store_, cluster_scope_, prefix_,     std::chrono::milliseconds(5),
-        true,          true,           vhost_name_, req_vcluster_name_,
-        from_az_,      to_az_};
+    Stats::StatName empty_stat_name;
+    Http::CodeStats::ResponseTimingInfo info{*global_store_.rootScope(),
+                                             *cluster_store_.rootScope(),
+                                             prefix_,
+                                             std::chrono::milliseconds(5),
+                                             true,
+                                             true,
+                                             vhost_name_,
+                                             empty_stat_name,
+                                             req_vcluster_name_,
+                                             from_az_,
+                                             to_az_};
     code_stats_.chargeResponseTiming(info);
   }
 
   SymbolTableClass symbol_table_;
   Stats::IsolatedStoreImpl global_store_;
-  Stats::IsolatedStoreImpl cluster_scope_;
+  Stats::IsolatedStoreImpl cluster_store_;
   Http::CodeStatsImpl code_stats_;
   Stats::StatNamePool pool_;
   const Stats::StatName from_az_;
@@ -81,6 +98,7 @@ static void BM_AddResponsesRealSymtab(benchmark::State& state) {
   Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
 
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.addResponses();
   }
 }
@@ -91,6 +109,7 @@ static void BM_ResponseTimingRealSymtab(benchmark::State& state) {
   Envoy::Http::CodeUtilitySpeedTest<Envoy::Stats::SymbolTableImpl> context;
 
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.responseTiming();
   }
 }

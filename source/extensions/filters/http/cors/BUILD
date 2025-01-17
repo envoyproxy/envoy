@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP filter which implements CORS processing (https://en.wikipedia.org/wiki/Cross-origin_resource_sharing)
-# Public docs: docs/root/configuration/http_filters/cors_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/cors_filter
 
 envoy_extension_package()
 
@@ -24,6 +24,9 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 
@@ -34,8 +37,10 @@ envoy_cc_extension(
     deps = [
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
+        "//source/common/router:config_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/cors:cors_filter_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/cors/v3:pkg_cc_proto",
     ],
 )

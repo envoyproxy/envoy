@@ -1,4 +1,6 @@
+#pragma once
+
 // NOLINT(namespace-envoy)
 constexpr char TEST_UPSTREAMLOCALHOST_CERT_HASH[] =
-    "8C:49:C0:6C:4C:02:39:29:EB:5B:37:C6:62:02:7A:81:77:22:35:DD:99:1D:62:78:4C:95:5B:38:36:6C:1F:"
-    "1E";
+    "FB:EB:F5:84:E2:C8:C9:85:97:E8:61:41:CE:80:72:41:32:4F:D7:58:C3:E1:74:0B:6C:50:18:46:1E:10:B9:"
+    "E5";

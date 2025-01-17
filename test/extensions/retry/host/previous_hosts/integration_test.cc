@@ -1,3 +1,6 @@
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.validate.h"
+
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 
@@ -17,7 +20,7 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP2, Network::Address::IpVersion::v4) {}
 
   void initialize() override {
-    setDeterministic();
+    setDeterministicValue();
 
     // Add the retry configuration to a new virtual host.
     const auto vhost_config = R"EOF(

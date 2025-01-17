@@ -37,17 +37,9 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
   server.cluster_manager_.initializeClusters({"fake_cluster"}, {});
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get()), nullptr);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(StatsConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.statsd";
-
-  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
-                         deprecated_name));
 }
 
 class StatsConfigParameterizedTest : public testing::TestWithParam<Network::Address::IpVersion> {};
@@ -78,7 +70,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
   ASSERT_NE(sink, nullptr);
 
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
@@ -109,7 +101,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
   ASSERT_NE(sink, nullptr);
 
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
@@ -131,7 +123,7 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
   server.cluster_manager_.initializeClusters({"fake_cluster"}, {});
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
   ASSERT_NE(sink, nullptr);
 
   auto tcp_sink = dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get());
@@ -155,7 +147,7 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
   server.cluster_manager_.initializeClusters({"fake_cluster"}, {});
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
   ASSERT_NE(sink, nullptr);
 
   auto tcp_sink = dynamic_cast<Common::Statsd::TcpStatsdSink*>(sink.get());
@@ -185,7 +177,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
   EXPECT_NE(sink, nullptr);
   EXPECT_NE(dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get()), nullptr);
   EXPECT_EQ(dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get())->getUseTagForTest(), false);
@@ -195,7 +187,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
 TEST(StatsdConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
   EXPECT_THROW(
-      StatsdSinkFactory().createStatsSink(envoy::config::metrics::v3::StatsdSink(), server),
+      StatsdSinkFactory().createStatsSink(envoy::config::metrics::v3::StatsdSink(), server).value(),
       ProtoValidationException);
 }
 

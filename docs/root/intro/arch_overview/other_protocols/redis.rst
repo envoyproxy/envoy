@@ -20,6 +20,7 @@ The Redis project offers a thorough reference on partitioning as it relates to R
 
 * `Redis protocol <https://redis.io/topics/protocol>`_ codec.
 * Hash-based partitioning.
+* Redis transaction support.
 * Ketama distribution.
 * Detailed command statistics.
 * Active and passive healthchecking.
@@ -62,10 +63,10 @@ close map to 5xx. All other responses from Redis are counted as a success.
 
 .. _arch_overview_redis_cluster_support:
 
-Redis Cluster Support (Experimental)
-----------------------------------------
+Redis Cluster Support
+---------------------
 
-Envoy currently offers experimental support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
+Envoy offers support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_.
 
 When using Envoy as a sidecar proxy for a Redis Cluster, the service can use a non-cluster Redis client
 implemented in any language to connect to the proxy as if it's a single node Redis instance.
@@ -80,6 +81,8 @@ following information:
 * List of known nodes.
 * The primaries for each shard.
 * Nodes entering or leaving the cluster.
+
+Envoy proxy supports identification of the nodes via both IP address and hostnames in the ``cluster slots`` command response. In case of failure to resolve a primary hostname, Envoy will retry resolution of all nodes periodically until success. Failure to resolve a replica simply skips that replica. On the other hand, if the :ref:`enable_redirection <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.enable_redirection>` option is set and a MOVED or ASK response containing a hostname is received Envoy will not automatically do a DNS lookup and instead bubble the error to the client verbatim. To have Envoy do the DNS lookup and follow the redirection, you need to configure the DNS cache option :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.network.redis_proxy.v3.RedisProxy.ConnPoolSettings.dns_cache_config>` under the connection pool settings. For a configuration example on how to enable DNS lookups for redirections, see the filter :ref:`configuration reference <config_network_filters_redis_proxy>`.
 
 For topology configuration details, see the Redis Cluster
 :ref:`v3 API reference <envoy_v3_api_msg_extensions.clusters.redis.v3.RedisClusterConfig>`.
@@ -107,19 +110,34 @@ Per-cluster command statistics can be enabled via the setting :ref:`enable_comma
   upstream_commands.[command].total, Counter, Total number of requests for a specific Redis command (sum of success and failure)
   upstream_commands.[command].latency, Histogram, Latency of requests for a specific Redis command
 
+Transactions
+------------
+
+Transactions (MULTI) are supported. Their use is no different from regular Redis: you start a transaction with MULTI,
+and you execute it with EXEC. Within the transaction only commands that are supported by Envoy (see below) and are single-key
+commands are supported, i.e. MGET and MSET are not supported. The DISCARD command is supported.
+
+When working in Redis Cluster mode, Envoy will relay all the commands in the transaction to the node handling the first
+key-based command in the transaction. It is the user's responsibility to ensure that all keys in the transaction are mapped
+to the same hashslot, as commands will not be redirected.
+
 Supported commands
 ------------------
 
-At the protocol level, pipelines are supported. MULTI (transaction block) is not.
+At the protocol level, pipelines are supported.
 Use pipelining wherever possible for the best performance.
 
-At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH and PING
+At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING and ECHO
 are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured,
 and no other commands will be processed until authentication is successful when a password has been
-configured. Envoy will transparently issue AUTH commands upon connecting to upstream servers, if upstream
-authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG.
-Arguments to PING are not allowed. All other supported commands must contain a key. Supported commands are
-functionally identical to the original Redis command except possibly in failure scenarios.
+configured. If an external authentication provider is set, Envoy will instead send the authentication arguments
+to an external service and act according to the authentication response. If a downstream password is set together
+with external authentication, the validation will be done still externally and the downstream password used for
+upstream authentication. Envoy will transparently issue AUTH commands upon connecting to upstream servers,
+if upstream authentication passwords are configured for the cluster. Envoy responds to PING immediately with PONG.
+Arguments to PING are not allowed. Envoy responds to ECHO immediately with the command argument.
+All other supported commands must contain a key. Supported commands are functionally identical to the
+original Redis command except possibly in failure scenarios.
 
 For details on each command's usage see the official
 `Redis command reference <https://redis.io/commands>`_.
@@ -129,17 +147,23 @@ For details on each command's usage see the official
   :widths: 1, 1
 
   AUTH, Authentication
+  ECHO, Connection
   PING, Connection
+  QUIT, Connection
   DEL, Generic
+  DISCARD, Transaction
   DUMP, Generic
+  EXEC, Transaction
   EXISTS, Generic
   EXPIRE, Generic
   EXPIREAT, Generic
+  KEYS, String
   PERSIST, Generic
   PEXPIRE, Generic
   PEXPIREAT, Generic
   PTTL, Generic
   RESTORE, Generic
+  SELECT, Generic
   TOUCH, Generic
   TTL, Generic
   TYPE, Generic
@@ -165,6 +189,8 @@ For details on each command's usage see the official
   HSETNX, Hash
   HSTRLEN, Hash
   HVALS, Hash
+  PFADD, HyperLogLog
+  PFCOUNT, HyperLogLog
   LINDEX, List
   LINSERT, List
   LLEN, List
@@ -175,9 +201,11 @@ For details on each command's usage see the official
   LREM, List
   LSET, List
   LTRIM, List
+  MULTI, Transaction
   RPOP, List
   RPUSH, List
   RPUSHX, List
+  PUBLISH, Pubsub
   EVAL, Scripting
   EVALSHA, Scripting
   SADD, Set
@@ -188,6 +216,8 @@ For details on each command's usage see the official
   SRANDMEMBER, Set
   SREM, Set
   SSCAN, Set
+  WATCH, String
+  UNWATCH, String
   ZADD, Sorted Set
   ZCARD, Sorted Set
   ZCOUNT, Sorted Set
@@ -217,6 +247,7 @@ For details on each command's usage see the official
   DECRBY, String
   GET, String
   GETBIT, String
+  GETDEL, String
   GETRANGE, String
   GETSET, String
   INCR, String
@@ -231,6 +262,26 @@ For details on each command's usage see the official
   SETNX, String
   SETRANGE, String
   STRLEN, String
+  XACK, Stream
+  XADD, Stream
+  XAUTOCLAIM, Stream
+  XCLAIM, Stream
+  XDEL, Stream
+  XLEN, Stream
+  XPENDING, Stream
+  XRANGE, Stream
+  XREVRANGE, Stream
+  XTRIM, Stream
+  BF.ADD, Bloom
+  BF.CARD, Bloom
+  BF.EXISTS, Bloom
+  BF.INFO, Bloom
+  BF.INSERT, Bloom
+  BF.LOADCHUNK, Bloom
+  BF.MADD, Bloom
+  BF.MEXISTS, Bloom
+  BF.RESERVE, Bloom
+  BF.SCANDUMP, Bloom
 
 Failure modes
 -------------
@@ -251,7 +302,7 @@ Envoy can also generate its own errors in response to the client.
   the connection."
   invalid request, "Command was rejected by the first stage of the command splitter due to
   datatype or length."
-  unsupported command, "The command was not recognized by Envoy and therefore cannot be serviced
+  ERR unknown command, "The command was not recognized by Envoy and therefore cannot be serviced
   because it cannot be hashed to a backend server."
   finished with n errors, "Fragmented commands which sum the response (e.g. DEL) will return the
   total number of errors received if any were received."
@@ -260,10 +311,11 @@ Envoy can also generate its own errors in response to the client.
   wrong number of arguments for command, "Certain commands check in Envoy that the number of
   arguments is correct."
   "NOAUTH Authentication required.", "The command was rejected because a downstream authentication
-  password has been set and the client has not successfully authenticated."
+  password or external authentication have been set and the client has not successfully authenticated."
   ERR invalid password, "The authentication command failed due to an invalid password."
+  ERR <external-message>, "The authentication command failed on the external auth provider."
   "ERR Client sent AUTH, but no password is set", "An authentication command was received, but no
-  downstream authentication password has been configured."
+  downstream authentication password or external authentication provider have been configured."
 
 
 In the case of MGET, each individual key that cannot be fetched will generate an error response.
@@ -278,3 +330,9 @@ response for each in place of the value.
   3) (error) upstream failure
   4) (error) upstream failure
   5) "echo"
+
+Protocol
+--------
+
+Although `RESP <https://redis.io/docs/reference/protocol-spec/>`_ is recommended for production use,
+`inline commands <https://redis.io/docs/reference/protocol-spec/#inline-commands>`_ are also supported.

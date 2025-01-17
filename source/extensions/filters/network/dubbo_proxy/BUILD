@@ -13,13 +13,11 @@ envoy_cc_library(
     name = "hessian_utils_lib",
     srcs = ["hessian_utils.cc"],
     hdrs = ["hessian_utils.h"],
-    external_deps = [
-        "hessian2_codec_codec_impl",
-        "hessian2_codec_object_codec_lib",
-    ],
     deps = [
         "//envoy/buffer:buffer_interface",
         "//source/common/singleton:const_singleton",
+        "@com_github_alibaba_hessian2_codec//hessian2:codec_impl_lib",
+        "@com_github_alibaba_hessian2_codec//hessian2/basic_codec:object_codec_lib",
     ],
 )
 
@@ -46,6 +44,7 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//source/common/singleton:const_singleton",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -77,6 +76,7 @@ envoy_cc_library(
         ":serializer_interface",
         "//source/common/singleton:const_singleton",
     ],
+    alwayslink = 1,
 )
 
 envoy_cc_library(
@@ -107,6 +107,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:config",
+        "//source/extensions/filters/network/dubbo_proxy/router:rds_lib",
         "//source/extensions/filters/network/dubbo_proxy/router:route_matcher",
         "//source/extensions/filters/network/dubbo_proxy/router:router_lib",
         "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
@@ -116,11 +117,11 @@ envoy_cc_extension(
 envoy_cc_library(
     name = "metadata_lib",
     hdrs = ["metadata.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":message_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 

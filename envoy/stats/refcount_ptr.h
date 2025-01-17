@@ -83,9 +83,15 @@ public:
   T& operator*() const { return *ptr_; }
   operator bool() const { return ptr_ != nullptr; }
   bool operator==(const T* ptr) const { return ptr_ == ptr; }
+// In C++20, operator!= can be defaulted and returns !(x == y) or !(y == x).
+// Defining it prevents the compiler from considering the reversed-operand
+// versions of equality comparisons, so leave it to be defaulted.
+#if __cplusplus < 202002L
   bool operator!=(const T* ptr) const { return ptr_ != ptr; }
+#endif
   bool operator==(const RefcountPtr& a) const { return ptr_ == a.ptr_; }
   bool operator!=(const RefcountPtr& a) const { return ptr_ != a.ptr_; }
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDelete)
   uint32_t use_count() const { return ptr_->use_count(); }
   void reset() {
     resetInternal();
@@ -104,12 +110,18 @@ private:
   T* ptr_;
 };
 
+// In C++20, reversed-operand versions of comparison operators are considered
+// during overload resolution, so these functions are no longer necessary and
+// cause segfaults due to attempting to infinitely reverse the operands back and
+// forth.
+#if __cplusplus < 202002L
 template <class T> static bool operator==(std::nullptr_t, const RefcountPtr<T>& a) {
-  return a == nullptr;
+  return a == nullptr; // NOLINT(clang-analyzer-cplusplus.Move)
 }
 template <class T> static bool operator!=(std::nullptr_t, const RefcountPtr<T>& a) {
   return a != nullptr;
 }
+#endif
 
 // Helper interface for classes to derive from, enabling implementation of the
 // three methods as part of derived classes. It is not necessary to inherit from

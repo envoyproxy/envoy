@@ -31,8 +31,9 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override {
-    headers.addCopy(Http::LowerCaseString("secret"),
-                    Config::DataSource::read(config_provider_->secret()->secret(), true, api_));
+    headers.addCopy(
+        Http::LowerCaseString("secret"),
+        Config::DataSource::read(config_provider_->secret()->secret(), true, api_).value());
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -67,19 +68,21 @@ public:
     grpc_service->mutable_envoy_grpc()->set_cluster_name("sds_cluster");
   }
 
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilter(const std::string&,
                Server::Configuration::FactoryContext& factory_context) override {
     auto secret_provider =
-        factory_context.clusterManager()
+        factory_context.serverFactoryContext()
+            .clusterManager()
             .clusterManagerFactory()
             .secretManager()
             .findOrCreateGenericSecretProvider(config_source_, "encryption_key",
-                                               factory_context.getTransportSocketFactoryContext());
+                                               factory_context.getTransportSocketFactoryContext(),
+                                               factory_context.initManager());
     return
         [&factory_context, secret_provider](Http::FilterChainFactoryCallbacks& callbacks) -> void {
           callbacks.addStreamDecoderFilter(std::make_shared<::Envoy::SdsGenericSecretTestFilter>(
-              factory_context.api(), secret_provider));
+              factory_context.serverFactoryContext().api(), secret_provider));
         };
   }
 
@@ -101,7 +104,7 @@ public:
       ConfigHelper::setHttp2(*sds_cluster);
     });
 
-    config_helper_.addFilter("{ name: sds-generic-secret-test }");
+    config_helper_.prependFilter("{ name: sds-generic-secret-test }");
 
     create_xds_upstream_ = true;
     HttpIntegrationTest::initialize();

@@ -16,20 +16,13 @@ namespace {
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(GrpcJsonTranscoderFilterConfig().createFilterFactoryFromProto(
-                   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder(),
-                   "stats", context),
-               ProtoValidationException);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(GrpcJsonTranscoderFilterConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.grpc_json_transcoder";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
+  EXPECT_THROW(
+      GrpcJsonTranscoderFilterConfig()
+          .createFilterFactoryFromProto(
+              envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder(),
+              "stats", context)
+          .value(),
+      ProtoValidationException);
 }
 
 } // namespace

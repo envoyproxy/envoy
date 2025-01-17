@@ -13,9 +13,9 @@
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
+using absl::Status;
+using absl::StatusCode;
 using Envoy::Protobuf::TextFormat;
-using Envoy::ProtobufUtil::Status;
-using Envoy::ProtobufUtil::StatusCode;
 using Envoy::ProtobufWkt::Empty;
 
 namespace Envoy {
@@ -32,19 +32,23 @@ public:
 
   void SetUp() override {
     setUpstreamProtocol(Http::CodecType::HTTP2);
-    const std::string filter =
-        R"EOF(
-            name: grpc_json_transcoder
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
-              proto_descriptor : "{}"
-              services : "bookstore.Bookstore"
-            )EOF";
-    config_helper_.addFilter(
-        fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+    config_helper_.prependFilter(filter());
   }
 
 protected:
+  static constexpr absl::string_view baseFilter() {
+    return R"EOF(
+name: grpc_json_transcoder
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+  proto_descriptor : "{}"
+  services : "bookstore.Bookstore"
+)EOF";
+  }
+  virtual std::string filter() {
+    return fmt::format(baseFilter(),
+                       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"));
+  }
   template <class RequestType, class ResponseType>
   void testTranscoding(Http::RequestHeaderMap&& request_headers, const std::string& request_body,
                        const std::vector<std::string>& expected_grpc_request_messages,
@@ -86,7 +90,7 @@ protected:
       if (!expected_grpc_request_messages.empty()) {
         Grpc::Decoder grpc_decoder;
         std::vector<Grpc::Frame> frames;
-        ASSERT_TRUE(grpc_decoder.decode(upstream_request_->body(), frames)) << dump;
+        ASSERT_TRUE(grpc_decoder.decode(upstream_request_->body(), frames).ok()) << dump;
         EXPECT_EQ(expected_grpc_request_messages.size(), frames.size());
 
         for (size_t i = 0; i < expected_grpc_request_messages.size(); ++i) {
@@ -110,7 +114,7 @@ protected:
       response_headers.setContentType("application/grpc");
       if (grpc_response_messages.empty() && !always_send_trailers) {
         response_headers.setGrpcStatus(static_cast<uint64_t>(grpc_status.code()));
-        response_headers.setGrpcMessage(grpc_status.message().as_string());
+        response_headers.setGrpcMessage(grpc_status.message());
         upstream_request_->encodeHeaders(response_headers, true);
       } else {
         response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Status");
@@ -124,14 +128,18 @@ protected:
         }
         Http::TestResponseTrailerMapImpl response_trailers;
         response_trailers.setGrpcStatus(static_cast<uint64_t>(grpc_status.code()));
-        response_trailers.setGrpcMessage(grpc_status.message().as_string());
+        response_trailers.setGrpcMessage(grpc_status.message());
         upstream_request_->encodeTrailers(response_trailers);
       }
       EXPECT_TRUE(upstream_request_->complete());
     }
 
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_EQ(response->complete(), expect_response_complete);
+    if (expect_response_complete) {
+      ASSERT_TRUE(response->waitForEndStream());
+      EXPECT_TRUE(response->complete());
+    } else {
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
+    }
 
     if (response->headers().get(Http::LowerCaseString("transfer-encoding")).empty() ||
         !absl::StartsWith(response->headers()
@@ -160,21 +168,41 @@ protected:
     if (!expected_response_body.empty()) {
       const bool isJsonResponse = response->headers().getContentTypeValue() == "application/json";
       if (full_response && isJsonResponse) {
-        const bool isStreamingResponse = response->body()[0] == '[';
-        EXPECT_TRUE(TestUtility::jsonStringEqual(response->body(), expected_response_body,
-                                                 isStreamingResponse))
-            << "Response mismatch. \nGot : " << response->body()
-            << "\nWant: " << expected_response_body;
+        const bool isArray = response->body()[0] == '[';
+
+        // test each line of the response for equality
+        std::stringstream response_body_stream(response->body());
+        std::stringstream expected_response_stream(expected_response_body);
+        std::string response_body_chunk;
+        std::string expected_response_chunk;
+        char delimiter = '\n';
+
+        while (std::getline(response_body_stream, response_body_chunk, delimiter)) {
+          std::getline(expected_response_stream, expected_response_chunk, delimiter);
+
+          EXPECT_TRUE(
+              TestUtility::jsonStringEqual(response_body_chunk, expected_response_chunk, isArray))
+              << "Response mismatch. \nGot : " << response_body_chunk
+              << "\nWant: " << expected_response_chunk;
+        }
+
+        // verify that both streams have been fully tested
+        EXPECT_EQ(response_body_stream.rdbuf()->in_avail(), 0);
+        EXPECT_EQ(expected_response_stream.rdbuf()->in_avail(), 0);
       } else if (full_response) {
         EXPECT_EQ(response->body(), expected_response_body);
       } else {
-        EXPECT_TRUE(absl::StartsWith(response->body(), expected_response_body));
+        EXPECT_TRUE(absl::StartsWith(response->body(), expected_response_body))
+            << "Response mismatch. \nGot : " << response->body()
+            << "\nWant: " << expected_response_body;
       }
     }
 
     codec_client_->close();
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    if (fake_upstream_connection_) {
+      ASSERT_TRUE(fake_upstream_connection_->close());
+      ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    }
   }
 
   // override configuration on per-route basis
@@ -191,14 +219,55 @@ protected:
                              ->Mutable(0)
                              ->mutable_typed_per_filter_config();
 
-          (*config)["envoy.filters.http.grpc_json_transcoder"].PackFrom(per_route_config);
+          (*config)["grpc_json_transcoder"].PackFrom(per_route_config);
         };
 
     config_helper_.addConfigModifier(modifier);
   }
 };
 
+class GrpcJsonTranscoderIntegrationTestWithSizeLimit : public GrpcJsonTranscoderIntegrationTest {
+protected:
+  std::string filter() override {
+    return fmt::format(baseFilter(),
+                       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")) +
+           fmt::format(+R"(
+  max_request_body_size: {}
+  max_response_body_size: {}
+)",
+                       maxBodySize(), maxBodySize());
+  }
+  virtual uint32_t maxBodySize() const PURE;
+};
+
+class GrpcJsonTranscoderIntegrationTestWithSizeLimit1024
+    : public GrpcJsonTranscoderIntegrationTestWithSizeLimit {
+protected:
+  uint32_t maxBodySize() const override { return 1024; }
+};
+
+class GrpcJsonTranscoderIntegrationTestWithSizeLimit1
+    : public GrpcJsonTranscoderIntegrationTestWithSizeLimit {
+protected:
+  uint32_t maxBodySize() const override { return 1; }
+};
+
+class GrpcJsonTranscoderIntegrationTestWithSizeLimit35
+    : public GrpcJsonTranscoderIntegrationTestWithSizeLimit {
+protected:
+  uint32_t maxBodySize() const override { return 35; }
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTestWithSizeLimit1024,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTestWithSizeLimit1,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTestWithSizeLimit35,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -218,18 +287,93 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
       R"({"id":"20","theme":"Children"})");
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, TestParamUnescapePlus) {
+  constexpr absl::string_view filter =
+      R"EOF(
+            name: grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              proto_descriptor : "{}"
+              services : "bookstore.Bookstore"
+              query_param_unescape_plus: true
+            )EOF";
+  config_helper_.prependFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+  // Test '+',  'query_param_unescape_plus' is true, '-' is converted to space.
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf?shelf.theme=Children+Books"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      "", {R"(shelf { theme: "Children Books" })"}, {R"(id: 20 theme: "Children" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"},
+          {"content-type", "application/json"},
+      },
+      R"({"id":"20","theme":"Children"})");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParamsDecodedName) {
+  HttpIntegrationTest::initialize();
+
+  // json_name = "search[decoded]", "search%5Bdecoded%5D" should work
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf?shelf.search%5Bdecoded%5D=Google"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      "", {R"(shelf { search_decoded: "Google" })"}, {R"(id: 20 theme: "Children" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"},
+          {"content-type", "application/json"},
+      },
+      R"({"id":"20","theme":"Children"})");
+
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf?shelf.search[decoded]=Google"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      "", {R"(shelf { search_decoded: "Google" })"}, {R"(id: 20 theme: "Children" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"},
+          {"content-type", "application/json"},
+      },
+      R"({"id":"20","theme":"Children"})");
+
+  // json_name = "search%5Bencoded%5D", "search[encode]" should fail.
+  // It is tested in test case "DecodedQueryParameterWithEncodedJsonName"
+  // in json_transcoder_filter_test.cc.
+
+  // json_name = "search%5Bencoded%5D", "search%5Bencoded%5D" should work.
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf?shelf.search%5Bencoded%5D=Google"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      "", {R"(shelf { search_encoded: "Google" })"}, {R"(id: 20 theme: "Children" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"},
+          {"content-type", "application/json"},
+      },
+      R"({"id":"20","theme":"Children"})");
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParams) {
   HttpIntegrationTest::initialize();
   // 1. Binding theme='Children' in CreateShelfRequest
   // Using the following HTTP template:
   //   POST /shelves
   //   body: shelf
+
+  // Test '+',  'query_param_unescape_plus' is false by default, '-' is not converted to space.
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/shelf?shelf.theme=Children"},
+                                     {":path", "/shelf?shelf.theme=Children+Books"},
                                      {":authority", "host"},
                                      {"content-type", "application/json"}},
-      "", {R"(shelf { theme: "Children" })"}, {R"(id: 20 theme: "Children" )"}, Status(),
+      "", {R"(shelf { theme: "Children+Books" })"}, {R"(id: 20 theme: "Children" )"}, Status(),
       Http::TestResponseHeaderMapImpl{
           {":status", "200"},
           {"content-type", "application/json"},
@@ -330,6 +474,111 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, QueryParams) {
       respBody);
 }
 
+// Test JSON to proto translation on proto enum value.
+// By default, a JSON enum value string has to match the case specified in the proto.
+// Normally proto enum values are specified in all upper case.
+TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueCaseMatch) {
+  HttpIntegrationTest::initialize();
+
+  // JSON enum value string "FEMALE" should work.
+  testTranscoding<bookstore::Author, bookstore::Author>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
+      R"({"id":"1234","gender":"FEMALE"})", {R"(id: 1234 gender: FEMALE)"},
+      {R"(id: 1234 gender: FEMALE)"}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "31"},
+                                      {"grpc-status", "0"}},
+      R"({"id":"1234","gender":"FEMALE"})");
+
+  // JSON enum value string "Female" should fail.
+  testTranscoding<bookstore::Author, bookstore::Author>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
+      R"({"id":"1234","gender":"Female"})", {}, {}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
+      "gender: invalid value \"Female\" for type type.googleapis.com/bookstore.Author.Gender",
+      false);
+}
+
+// Test JSON to proto translation on proto enum value.
+// By default, a JSON enum value string has to match the case specified in the proto.
+// Normally proto enum values are specified in all upper case.
+// After enable the "case_insensitive_enum_parsing" flag,
+// JSON enum value string can be in any case.
+TEST_P(GrpcJsonTranscoderIntegrationTest, TestEnumValueIgnoreCase) {
+  // Enable case_insensitive_enum_parsing flag
+  constexpr absl::string_view filter =
+      R"EOF(
+            name: grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              proto_descriptor : "{}"
+              services : "bookstore.Bookstore"
+              case_insensitive_enum_parsing : true
+            )EOF";
+  config_helper_.prependFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+
+  // JSON enum value string "FEMALE" should work.
+  testTranscoding<bookstore::Author, bookstore::Author>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
+      R"({"id":"1234","gender":"FEMALE"})", {R"(id: 1234 gender: FEMALE)"},
+      {R"(id: 1234 gender: FEMALE)"}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "31"},
+                                      {"grpc-status", "0"}},
+      R"({"id":"1234","gender":"FEMALE"})");
+
+  // JSON enum value string "Female" should work too.
+  testTranscoding<bookstore::Author, bookstore::Author>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"}, {":path", "/echoAuthor"}, {":authority", "host"}},
+      R"({"id":"1234","gender":"Female"})", {R"(id: 1234 gender: FEMALE)"},
+      {R"(id: 1234 gender: FEMALE)"}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "31"},
+                                      {"grpc-status", "0"}},
+      R"({"id":"1234","gender":"FEMALE"})");
+}
+
+// Test newline-delimited stream translation.
+// By default, streams are aggregated into a JSON Array.
+// Newline-delimited streams return each message with a newline termination instead.
+TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingNewlineDelimitedGet) {
+  // Enable stream_newline_delimited flag
+  constexpr absl::string_view filter =
+      R"EOF(
+            name: grpc_json_transcoder
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
+              proto_descriptor : "{}"
+              services : "bookstore.Bookstore"
+              print_options :
+                stream_newline_delimited : true
+            )EOF";
+  config_helper_.prependFilter(
+      fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
+  HttpIntegrationTest::initialize();
+
+  testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
+      "", {"shelf: 1"},
+      {R"(id: 1 author: "Neal Stephenson" title: "Reamde")",
+       R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
+      Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      R"({"id":"1","author":"Neal Stephenson","title":"Reamde"})"
+      "\n"
+      R"({"id":"2","author":"George R.R. Martin","title":"A Game of Thrones"})");
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
   HttpIntegrationTest::initialize();
   testTranscoding<Empty, bookstore::ListShelvesResponse>(
@@ -416,7 +665,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyMultipleFramesInData)
   Http::TestResponseTrailerMapImpl response_trailers;
   auto grpc_status = Status();
   response_trailers.setGrpcStatus(static_cast<uint64_t>(grpc_status.code()));
-  response_trailers.setGrpcMessage(grpc_status.message().as_string());
+  response_trailers.setGrpcMessage(grpc_status.message());
   upstream_request_->encodeTrailers(response_trailers);
   EXPECT_TRUE(upstream_request_->complete());
 
@@ -458,7 +707,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamGetHttpBodyFragmented) {
   Http::TestResponseTrailerMapImpl response_trailers;
   auto grpc_status = Status();
   response_trailers.setGrpcStatus(static_cast<uint64_t>(grpc_status.code()));
-  response_trailers.setGrpcMessage(grpc_status.message().as_string());
+  response_trailers.setGrpcMessage(grpc_status.message());
   upstream_request_->encodeTrailers(response_trailers);
   EXPECT_TRUE(upstream_request_->complete());
 
@@ -500,7 +749,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -509,7 +758,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
               services : "bookstore.Bookstore"
               ignore_unknown_query_parameters : true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
@@ -524,7 +773,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError1) {
 
 // Test an upstream that returns an error in a trailer-only response.
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -533,7 +782,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
               services: "bookstore.Bookstore"
               convert_grpc_status: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
@@ -549,7 +798,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorConvertedToJson) {
 
 // Upstream sends headers (e.g. sends metadata), and then sends trailer with an error.
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -558,7 +807,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
               services: "bookstore.Bookstore"
               convert_grpc_status: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
@@ -574,7 +823,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryErrorInTrailerConvertedToJson) {
 
 // Streaming backend returns an error in a trailer-only response.
 TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingErrorConvertedToJson) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -583,7 +832,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, StreamingErrorConvertedToJson) {
               services: "bookstore.Bookstore"
               convert_grpc_status: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::ListBooksRequest, bookstore::Shelf>(
@@ -608,6 +857,37 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryDelete) {
                                       {"content-length", "2"},
                                       {"grpc-status", "0"}},
       "{}");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTest, WrongBindingType) {
+  HttpIntegrationTest::initialize();
+  // Http template is "/shelves/{shelf}/books/{book.id}" and field "book.id" is int64.
+  // But path is "/shelves/456/books/abc" and the {book.id} segment is a string.
+  // The request should be rejected with 400.
+
+  // The bug reported in https://github.com/envoyproxy/envoy/issues/22926 is:
+  // if the request body is not empty, the request is rejected as expected.
+  // Buf if the request body is empty, the request is not rejected, the book.id field is ignored.
+
+  // This test to verify the bug has been fixed. The request in both cases should be rejected.
+
+  // Request with a non-empty request body.
+  testTranscoding<bookstore::UpdateBookRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "PATCH"}, {":path", "/shelves/456/books/abc"}, {":authority", "host"}},
+      "{}", {}, {}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
+      "book.id: invalid value \"abc\" for type TYPE_INT64", false);
+
+  // The request with an empty request body.
+  // The request is rejected in decodeHeaders so upstream connection is not created.
+  // Here we need to pass "expect_connection_to_upstream=false".
+  testTranscoding<bookstore::UpdateBookRequest, bookstore::Book>(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "PATCH"}, {":path", "/shelves/456/books/abc"}, {":authority", "host"}},
+      "", {}, {}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "400"}, {"content-type", "text/plain"}},
+      "book.id: invalid value \"abc\" for type TYPE_INT64", false, false, "", false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPatch) {
@@ -786,7 +1066,7 @@ std::string jsonStrToPbStrucStr(std::string json) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
-  // Lower the timeout for the 408 response.
+  // Lower the timeout for a incomplete response.
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -813,7 +1093,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"}, {":path", "/echoStruct"}, {":authority", "host"}},
       createDeepJson(100, true), {}, {}, Status(),
-      Http::TestResponseHeaderMapImpl{{":status", "408"}, {"content-type", "text/plain"}}, "");
+      Http::TestResponseHeaderMapImpl{{":status", "504"}, {"content-type", "text/plain"}}, "");
 
   // The invalid deep struct is detected.
   testTranscoding<bookstore::EchoStructReqResp, bookstore::EchoStructReqResp>(
@@ -836,7 +1116,7 @@ std::string createLargeJson(int level) {
     (*next->mutable_struct_value()->mutable_fields())["k"] = val;
     cur = next;
   }
-  return MessageUtil::getJsonStringFromMessageOrDie(*cur, false, false);
+  return MessageUtil::getJsonStringFromMessageOrError(*cur, false, false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, LargeStruct) {
@@ -967,7 +1247,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DisableRequestValidation) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownMethod) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -977,7 +1257,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownMethod) {
               request_validation_options:
                 reject_unknown_method: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
 
@@ -1020,7 +1300,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownMethod) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownQueryParam) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -1030,7 +1310,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownQueryParam) {
               request_validation_options:
                 reject_unknown_query_parameters: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
 
@@ -1074,7 +1354,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, RejectUnknownQueryParam) {
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, EnableRequestValidationIgnoreQueryParam) {
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF(
             name: grpc_json_transcoder
             typed_config:
@@ -1086,7 +1366,7 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, EnableRequestValidationIgnoreQueryPara
                 reject_unknown_method: true
                 reject_unknown_query_parameters: true
             )EOF";
-  config_helper_.addFilter(
+  config_helper_.prependFilter(
       fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   HttpIntegrationTest::initialize();
 
@@ -1128,10 +1408,87 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostRequestExceedsBufferLimit) {
       true, false, "", true);
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTestWithSizeLimit1024,
+       UnaryPostRequestExceedsBufferLimitButNotSizeLimitShouldWork) {
+  // Request body is more than 8 bytes, but size limit from config allows 1024 bytes.
+  config_helper_.setBufferLimits(8, 8);
+  HttpIntegrationTest::initialize();
+
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"theme": "Children"})", {R"(shelf { theme: "Children" })"},
+      {R"(id: 20 theme: "Children" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "30"},
+                                      {"grpc-status", "0"}},
+      R"({"id":"20","theme":"Children"})");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTestWithSizeLimit1,
+       UnaryPostRequestExceedsSizeLimitButNotBufferLimitShouldFail) {
+  // Request body is less than buffer 35 bytes, but size limit from config is too small.
+  config_helper_.setBufferLimits(2 << 20, 35);
+  HttpIntegrationTest::initialize();
+
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"theme" : "Children"})", {}, {}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "413"}},
+      "Request rejected because the transcoder's internal buffer size exceeds the configured "
+      "limit.",
+      true, false, "", true);
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPostResponseExceedsBufferLimit) {
   // Request body is less than 35 bytes.
   // Response body is more than 35 bytes.
   config_helper_.setBufferLimits(2 << 20, 35);
+  HttpIntegrationTest::initialize();
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"theme": "Children"})", {R"(shelf { theme: "Children" })"},
+      {R"(id: 20 theme: "Children 0123456789 0123456789 0123456789 0123456789" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{
+          {":status", "500"}, {"content-type", "text/plain"}, {"content-length", "99"}},
+      "Response not transcoded because the transcoder's internal buffer size exceeds the "
+      "configured limit.");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTestWithSizeLimit1024,
+       UnaryPostResponseExceedsBufferLimitButNotSizeLimitShouldWork) {
+  // Request body is less than 35 bytes.
+  // Response body is more than 35 bytes, but size limit from config allows 1024 bytes.
+  config_helper_.setBufferLimits(2 << 20, 35);
+  HttpIntegrationTest::initialize();
+  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/shelf"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"theme": "Children"})", {R"(shelf { theme: "Children" })"},
+      {R"(id: 20 theme: "Children 0123456789 0123456789 0123456789 0123456789" )"}, Status(),
+      Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                      {"content-type", "application/json"},
+                                      {"content-length", "74"},
+                                      {"grpc-status", "0"}},
+      R"({"id":"20","theme":"Children 0123456789 0123456789 0123456789 0123456789"})");
+}
+
+TEST_P(GrpcJsonTranscoderIntegrationTestWithSizeLimit35,
+       UnaryPostResponseExceedsSizeLimitButNotBufferLimitShouldFail) {
+  // Request body is less than 500 bytes and less than size limit 35.
+  // Response body is less than 500 bytes, but more than size limit 35.
+  config_helper_.setBufferLimits(2 << 20, 500);
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
@@ -1175,12 +1532,10 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) 
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       R"([{"id":"1","author":"Neal Stephenson","title":"Readme"}])");
 
-  // Over limit: The server streams two response messages. Even through the transcoder
-  // handles them independently, portions of the first message are still in the
-  // internal buffers while the second one is processed.
-  //
-  // Because the headers and body is already sent, the stream is closed with
-  // an incomplete response.
+  // Over limit: The server streams two response messages. Because this is
+  // larger than the buffer limits, we end up buffering both results in the
+  // codec towards the upstream. When we finally process the buffered data, we
+  // end up resetting the stream as we've over the transcoder limit.
   testTranscoding<bookstore::ListBooksRequest, bookstore::Book>(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"}, {":path", "/shelves/1/books"}, {":authority", "host"}},
@@ -1189,21 +1544,25 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetExceedsBufferLimit) 
        R"(id: 2 author: "George R.R. Martin" title: "A Game of Thrones")"},
       Status(),
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
-      // Incomplete response, not valid JSON.
-      R"([{"id":"1","author":"Neal Stephenson","title":"Readme"})", false, false, "", true,
+      /*expected_response_body=*/"", false, false, "", true,
       /*expect_response_complete=*/false);
 }
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, ServerStreamingGetUnderBufferLimit) {
-  const int num_messages = 20;
-  config_helper_.setBufferLimits(2 << 20, 80);
+  const int num_messages = 100;
+  const std::string grpc_response_message = R"(id: 1 author: "Neal Stephenson" title: "Readme")";
+  // The upstream will encode all of the response back to back, as such some of
+  // the responses will cluster together. It's unlikely that a majority of them
+  // will have been sent to the Envoy before it has streamed them to the
+  // downstream.
+  config_helper_.setBufferLimits(2 << 20, 60 * grpc_response_message.size());
   HttpIntegrationTest::initialize();
 
   // Craft multiple response messages. IF combined together, they exceed the buffer limit.
   std::vector<std::string> grpc_response_messages;
   grpc_response_messages.reserve(num_messages);
   for (int i = 0; i < num_messages; i++) {
-    grpc_response_messages.push_back(R"(id: 1 author: "Neal Stephenson" title: "Readme")");
+    grpc_response_messages.push_back(grpc_response_message);
   }
 
   // Craft expected response.
@@ -1258,16 +1617,17 @@ public:
               "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
               "proto_descriptor": ""
             )EOF";
-    config_helper_.addFilter(filter);
+    config_helper_.prependFilter(filter);
   }
 };
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, OverrideConfigGrpcJsonTranscoderIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
   // add bookstore per-route override
-  const std::string filter =
+  constexpr absl::string_view filter =
       R"EOF({{
               "services": ["bookstore.Bookstore"],
               "proto_descriptor": "{}"
@@ -1291,73 +1651,6 @@ TEST_P(OverrideConfigGrpcJsonTranscoderIntegrationTest, RouteOverride) {
                                       {"grpc-status", "0"}},
       R"({"shelves":[{"id":"20","theme":"Children"},{"id":"1","theme":"Foo"}]})");
 };
-
-// Tests to ensure transcoding buffer limits do not apply when the runtime feature is disabled.
-class BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest
-    : public GrpcJsonTranscoderIntegrationTest {
-public:
-  void SetUp() override {
-    setUpstreamProtocol(Http::CodecType::HTTP2);
-    const std::string filter =
-        R"EOF(
-            name: grpc_json_transcoder
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder
-              proto_descriptor : "{}"
-              services : "bookstore.Bookstore"
-            )EOF";
-    config_helper_.addFilter(
-        fmt::format(filter, TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
-
-    // Disable runtime feature.
-    config_helper_.addRuntimeOverride(
-        "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits", "false");
-  }
-};
-INSTANTIATE_TEST_SUITE_P(IpVersions, BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
-
-TEST_P(BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest, UnaryPostRequestExceedsBufferLimit) {
-  // Request body is more than 20 bytes.
-  config_helper_.setBufferLimits(2 << 20, 20);
-  HttpIntegrationTest::initialize();
-
-  // Transcoding succeeds.
-  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/shelf"},
-                                     {":authority", "host"},
-                                     {"content-type", "application/json"}},
-      R"({"theme": "Children 0123456789 0123456789 0123456789 0123456789"})",
-      {R"(shelf { theme: "Children 0123456789 0123456789 0123456789 0123456789" })"}, {R"(id: 1)"},
-      Status(),
-      Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                      {"content-type", "application/json"},
-                                      {"content-length", "10"},
-                                      {"grpc-status", "0"}},
-      R"({"id":"1"})");
-}
-
-TEST_P(BufferLimitsDisabledGrpcJsonTranscoderIntegrationTest, UnaryPostResponseExceedsBufferLimit) {
-  // Request body is less than 35 bytes.
-  // Response body is more than 35 bytes.
-  config_helper_.setBufferLimits(2 << 20, 35);
-  HttpIntegrationTest::initialize();
-
-  // Transcoding succeeds. However, the downstream client is unable to buffer the full response.
-  // We can tell these errors are NOT from the transcoder because the response body is too generic.
-  testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/shelf"},
-                                     {":authority", "host"},
-                                     {"content-type", "application/json"}},
-      R"({"theme": "Children"})", {R"(shelf { theme: "Children" })"},
-      {R"(id: 20 theme: "Children 0123456789 0123456789 0123456789 0123456789" )"}, Status(),
-      Http::TestResponseHeaderMapImpl{
-          {":status", "500"}, {"content-type", "text/plain"}, {"content-length", "21"}},
-      R"(Internal Server Error)");
-}
 
 } // namespace
 } // namespace Envoy

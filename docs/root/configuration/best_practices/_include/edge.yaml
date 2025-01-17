@@ -31,11 +31,13 @@ static_resources:
         address: 0.0.0.0
         port_value: 443
     listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
     # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
     # - name: envoy.filters.listener.proxy_protocol
     #   typed_config:
     #     "@type": type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+    - name: "envoy.filters.listener.tls_inspector"
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
     per_connection_buffer_limit_bytes: 32768  # 32 KiB
     filter_chains:
     - filter_chain_match:
@@ -48,6 +50,7 @@ static_resources:
             tls_certificates:
             - certificate_chain: {filename: "certs/servercert.pem"}
               private_key: {filename: "certs/serverkey.pem"}
+            alpn_protocols: ["h2,http/1.1"]
       filters:
       - name: envoy.filters.network.http_connection_manager
         typed_config:
@@ -68,6 +71,8 @@ static_resources:
           request_timeout: 300s  # 5 mins, must be disabled for long-lived and streaming requests
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           route_config:
             virtual_hosts:
             - name: default

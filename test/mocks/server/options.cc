@@ -2,6 +2,8 @@
 
 #include "envoy/admin/v3/server_info.pb.h"
 
+#include "source/common/config/well_known_names.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -18,7 +20,6 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
   ON_CALL(*this, configProto()).WillByDefault(ReturnRef(config_proto_));
   ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
-  ON_CALL(*this, bootstrapVersion()).WillByDefault(ReturnRef(bootstrap_version_));
   ON_CALL(*this, allowUnknownStaticFields()).WillByDefault(Invoke([this] {
     return allow_unknown_static_fields_;
   }));
@@ -28,6 +29,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, ignoreUnknownDynamicFields()).WillByDefault(Invoke([this] {
     return ignore_unknown_dynamic_fields_;
   }));
+  ON_CALL(*this, skipDeprecatedLogs()).WillByDefault(Return(false));
   ON_CALL(*this, adminAddressPath()).WillByDefault(ReturnRef(admin_address_path_));
   ON_CALL(*this, serviceClusterName()).WillByDefault(ReturnRef(service_cluster_name_));
   ON_CALL(*this, serviceNodeName()).WillByDefault(ReturnRef(service_node_name_));
@@ -46,6 +48,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   }));
   ON_CALL(*this, socketPath()).WillByDefault(ReturnRef(socket_path_));
   ON_CALL(*this, socketMode()).WillByDefault(ReturnPointee(&socket_mode_));
+  ON_CALL(*this, statsTags()).WillByDefault(ReturnRef(stats_tags_));
 }
 
 MockOptions::~MockOptions() = default;

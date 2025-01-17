@@ -11,9 +11,6 @@ envoy_package()
 envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
-    external_deps = [
-        "abseil_node_hash_map",
-    ],
     deps = [
         ":health_checker_interface",
         ":load_balancer_interface",
@@ -26,6 +23,7 @@ envoy_cc_library(
         "//envoy/grpc:async_client_manager_interface",
         "//envoy/http:async_client_interface",
         "//envoy/http:conn_pool_interface",
+        "//envoy/http:persistent_quic_info_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/secret:secret_manager_interface",
@@ -34,9 +32,19 @@ envoy_cc_library(
         "//envoy/singleton:manager_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/thread_local:thread_local_interface",
+        "@com_google_absl//absl/container:node_hash_map",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "health_check_event_sink_interface",
+    hdrs = ["health_check_event_sink.h"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:health_checker_config_interface",
     ],
 )
 
@@ -60,10 +68,12 @@ envoy_cc_library(
     deps = [
         ":health_check_host_monitor_interface",
         ":outlier_detection_interface",
+        ":resource_manager_interface",
         "//envoy/network:address_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/stats:primitive_stats_macros",
         "//envoy/stats:stats_macros",
+        "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -75,14 +85,6 @@ envoy_cc_library(
         ":upstream_interface",
         "//envoy/router:router_interface",
         "//envoy/upstream:types_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "load_balancer_type_interface",
-    hdrs = ["load_balancer_type.h"],
-    deps = [
-        "//source/common/protobuf",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
@@ -99,9 +101,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "outlier_detection_interface",
     hdrs = ["outlier_detection.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/common:time_interface",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],
 )
@@ -129,6 +131,7 @@ envoy_cc_library(
         ":load_balancer_interface",
         ":upstream_interface",
         "//envoy/http:async_client_interface",
+        "//envoy/tcp:async_tcp_client_interface",
     ],
 )
 
@@ -143,22 +146,23 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_interface",
     hdrs = ["upstream.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":health_check_host_monitor_interface",
-        ":load_balancer_type_interface",
         ":locality_lib",
         ":resource_manager_interface",
         "//envoy/common:callback",
         "//envoy/config:subscription_interface",
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:codec_interface",
+        "//envoy/http:filter_factory_interface",
+        "//envoy/http:header_validator_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/ssl:context_interface",
         "//envoy/ssl:context_manager_interface",
         "//envoy/upstream:types_interface",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -170,7 +174,6 @@ envoy_cc_library(
     deps = [
         ":cluster_manager_interface",
         ":health_check_host_monitor_interface",
-        ":load_balancer_type_interface",
         ":locality_lib",
         ":resource_manager_interface",
         ":upstream_interface",
@@ -184,5 +187,12 @@ envoy_cc_library(
         "//envoy/ssl:context_interface",
         "//envoy/ssl:context_manager_interface",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "scheduler_interface",
+    hdrs = ["scheduler.h"],
+    deps = [
     ],
 )

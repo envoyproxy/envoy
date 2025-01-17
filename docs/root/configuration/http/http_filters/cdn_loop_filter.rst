@@ -7,7 +7,7 @@ The CDN-Loop header filter participates in the cross-CDN loop detection protocol
 8586 <https://tools.ietf.org/html/rfc8586>`_. The CDN-Loop header filter performs two actions.
 First, the filter checks to see how many times a particular CDN identifier has appeared in the
 CDN-Loop header. Next, if the check passes, the filter then appends the CDN identifier to the
-CDN-Loop header and passes the request to the next upstream filter. If the check fails, the filter
+CDN-Loop header and passes the request to the next upstream HTTP filter. If the check fails, the filter
 stops processing on the request and returns an error response.
 
 RFC 8586 is particular in how the CDN-Loop header should be modified. As such:
@@ -24,9 +24,9 @@ The filter will coalesce multiple CDN-Loop headers into a single, comma-separate
 Configuration
 -------------
 
-The filter is configured with the name *envoy.filters.http.cdn_loop*.
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.cdn_loop.v3.CdnLoopConfig``.
 
-The `filter config <config_http_filters_cdn_loop>`_ has two fields.
+The :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.cdn_loop.v3.CdnLoopConfig>` has two fields.
 
 * The *cdn_id* field sets the identifier that the filter will look for within and append to the
   CDN-Loop header. RFC 8586 calls this field the "cdn-id"; "cdn-id" can either be a pseudonym or a

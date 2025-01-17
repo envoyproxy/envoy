@@ -137,4 +137,26 @@ TEST(HeaderHasValueRefTest, LowerCaseStringArguments) {
   EXPECT_THAT(header_map, HeaderHasValueRef(key, "value"));
   EXPECT_THAT(header_map, Not(HeaderHasValueRef(other_key, "wrong value")));
 }
+
+TEST(HeaderMatcherTest, OutputsActualHeadersOnMatchFailure) {
+  Http::TestRequestHeaderMapImpl header_map{{"test-header", "value"}};
+  Http::TestRequestHeaderMapImpl expected_header_map{{"test-header2", "value2"}};
+  {
+    // Check that actual headers are in the output if the match fails.
+    testing::StringMatchResultListener output;
+    EXPECT_FALSE(::testing::ExplainMatchResult(IsSupersetOfHeaders(expected_header_map), header_map,
+                                               &output));
+    EXPECT_THAT(output.str(), testing::HasSubstr(R"(
+Actual headers:
+'test-header', 'value')"));
+  }
+  {
+    // Check that actual headers are not output if the match succeeds.
+    testing::StringMatchResultListener output;
+    EXPECT_TRUE(
+        ::testing::ExplainMatchResult(IsSupersetOfHeaders(header_map), header_map, &output));
+    EXPECT_THAT(output.str(), testing::Not(testing::HasSubstr("Actual headers")));
+  }
+}
+
 } // namespace Envoy

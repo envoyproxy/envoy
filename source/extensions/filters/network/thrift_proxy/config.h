@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 
@@ -10,6 +11,7 @@
 #include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol_options_config.h"
+#include "source/extensions/filters/network/thrift_proxy/router/rds.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -51,7 +53,7 @@ private:
       const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 
-  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr> createProtocolOptionsTyped(
       const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions&
           proto_config,
       Server::Configuration::ProtocolOptionsFactoryContext&) override {
@@ -65,7 +67,8 @@ class ConfigImpl : public Config,
                    Logger::Loggable<Logger::Id::config> {
 public:
   ConfigImpl(const envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy& config,
-             Server::Configuration::FactoryContext& context);
+             Server::Configuration::FactoryContext& context,
+             Router::RouteConfigProviderManager& route_config_provider_manager);
 
   // ThriftFilters::FilterChainFactory
   void createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& callbacks) override;
@@ -73,7 +76,8 @@ public:
   // Router::Config
   Router::RouteConstSharedPtr route(const MessageMetadata& metadata,
                                     uint64_t random_value) const override {
-    return route_matcher_->route(metadata, random_value);
+    auto config = std::static_pointer_cast<const Router::Config>(route_config_provider_->config());
+    return config->route(metadata, random_value);
   }
 
   // Config
@@ -84,6 +88,8 @@ public:
   Router::Config& routerConfig() override { return *this; }
   bool payloadPassthrough() const override { return payload_passthrough_; }
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const override { return access_logs_; }
+  bool headerKeysPreserveCase() const override { return header_keys_preserve_case_; }
 
 private:
   void processFilter(
@@ -94,12 +100,14 @@ private:
   ThriftFilterStats stats_;
   const TransportType transport_;
   const ProtocolType proto_;
-  std::unique_ptr<Router::RouteMatcher> route_matcher_;
+  Rds::RouteConfigProviderSharedPtr route_config_provider_;
 
   std::list<ThriftFilters::FilterFactoryCb> filter_factories_;
   const bool payload_passthrough_;
 
   const uint64_t max_requests_per_connection_{};
+  AccessLog::InstanceSharedPtrVector access_logs_;
+  const bool header_keys_preserve_case_;
 };
 
 } // namespace ThriftProxy

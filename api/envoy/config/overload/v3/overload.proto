@@ -14,6 +14,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.overload.v3";
 option java_outer_classname = "OverloadProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/overload/v3;overloadv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Overload Manager]
@@ -55,7 +56,7 @@ message ThresholdTrigger {
 message ScaledTrigger {
   // If the resource pressure is greater than this value, the trigger will be in the
   // :ref:`scaling <arch_overview_overload_manager-triggers-state>` state with value
-  // `(pressure - scaling_threshold) / (saturation_threshold - scaling_threshold)`.
+  // ``(pressure - scaling_threshold) / (saturation_threshold - scaling_threshold)``.
   double scaling_threshold = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
 
   // If the resource pressure is greater than this value, the trigger will enter saturation.
@@ -102,6 +103,12 @@ message ScaleTimersOverloadActionConfig {
     // This affects the value of
     // :ref:`FilterChain.transport_socket_connect_timeout <envoy_v3_api_field_config.listener.v3.FilterChain.transport_socket_connect_timeout>`.
     TRANSPORT_SOCKET_CONNECT = 3;
+
+    // Adjusts the max connection duration timer for downstream HTTP connections.
+    // This affects the value of
+    // :ref:`HttpConnectionManager.common_http_protocol_options.max_connection_duration
+    // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`.
+    HTTP_DOWNSTREAM_CONNECTION_MAX = 4;
   }
 
   message ScaleTimer {
@@ -133,14 +140,58 @@ message OverloadAction {
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // A set of triggers for this action. The state of the action is the maximum
-  // state of all triggers, which can be scaling between 0 and 1 or saturated. Listeners
-  // are notified when the overload action changes state.
+  // state of all triggers, which can be scalar values between 0 and 1 or
+  // saturated. Listeners are notified when the overload action changes state.
+  // An overload manager action can only have one trigger for a given resource
+  // e.g. :ref:`Trigger.name
+  // <envoy_v3_api_field_config.overload.v3.Trigger.name>` must be unique
+  // in this list.
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
 
   // Configuration for the action being instantiated.
   google.protobuf.Any typed_config = 3;
 }
 
+// A point within the connection or request lifecycle that provides context on
+// whether to shed load at that given stage for the current entity at the
+// point.
+message LoadShedPoint {
+  // This is just a well-known string for the LoadShedPoint.
+  // Deployment specific LoadShedPoints e.g. within a custom extension should
+  // be prefixed by the company / deployment name to avoid colliding with any
+  // open source LoadShedPoints.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // A set of triggers for this LoadShedPoint. The LoadShedPoint will use the
+  // the maximum state of all triggers, which can be scalar values between 0 and
+  // 1 or saturated. A LoadShedPoint can only have one trigger for a given
+  // resource e.g. :ref:`Trigger.name
+  // <envoy_v3_api_field_config.overload.v3.Trigger.name>` must be unique in
+  // this list.
+  repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
+}
+
+// Configuration for which accounts the WatermarkBuffer Factories should
+// track.
+message BufferFactoryConfig {
+  // The minimum power of two at which Envoy starts tracking an account.
+  //
+  // Envoy has 8 power of two buckets starting with the provided exponent below.
+  // Concretely the 1st bucket contains accounts for streams that use
+  // [2^minimum_account_to_track_power_of_two,
+  // 2^(minimum_account_to_track_power_of_two + 1)) bytes.
+  // With the 8th bucket tracking accounts
+  // >= 128 * 2^minimum_account_to_track_power_of_two.
+  //
+  // The maximum value is 56, since we're using uint64_t for bytes counting,
+  // and that's the last value that would use the 8 buckets. In practice,
+  // we don't expect the proxy to be holding 2^56 bytes.
+  //
+  // If omitted, Envoy should not do any tracking.
+  uint32 minimum_account_to_track_power_of_two = 1 [(validate.rules).uint32 = {lte: 56 gte: 10}];
+}
+
+// [#next-free-field: 6]
 message OverloadManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadManager";
@@ -153,4 +204,10 @@ message OverloadManager {
 
   // The set of overload actions.
   repeated OverloadAction actions = 3;
+
+  // The set of load shed points.
+  repeated LoadShedPoint loadshed_points = 5;
+
+  // Configuration for buffer factory.
+  BufferFactoryConfig buffer_factory_config = 4;
 }

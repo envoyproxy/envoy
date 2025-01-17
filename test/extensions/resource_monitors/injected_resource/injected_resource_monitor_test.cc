@@ -26,7 +26,7 @@ public:
       const envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig&
           config,
       Server::Configuration::ResourceMonitorFactoryContext& context)
-      : InjectedResourceMonitor(config, context), dispatcher_(context.dispatcher()) {}
+      : InjectedResourceMonitor(config, context), dispatcher_(context.mainThreadDispatcher()) {}
 
 protected:
   void onFileChanged() override {
@@ -38,7 +38,7 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
-class MockedCallbacks : public Server::ResourceMonitor::Callbacks {
+class MockedCallbacks : public Server::ResourceUpdateCallbacks {
 public:
   MOCK_METHOD(void, onSuccess, (const Server::ResourceUsage&));
   MOCK_METHOD(void, onFailure, (const EnvoyException&));

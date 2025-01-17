@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
+#include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/network/address.h"
 
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
@@ -28,12 +28,6 @@ std::string getProtoName(const DnsTable::DnsServiceProtocol& protocol);
 absl::string_view getServiceFromName(const absl::string_view name);
 
 /**
- * @brief Extracts the protocol name from the fully qualified service name. The leading underscore
- * is discarded from the output
- */
-absl::string_view getProtoFromName(const absl::string_view name);
-
-/**
  * @brief Construct the full service name, including underscores, from the name, protocol and
  * domain fields.
  *
@@ -51,6 +45,13 @@ getAddressRecordType(const Network::Address::InstanceConstSharedPtr& ipaddr);
  * domain suffix.
  */
 absl::string_view getDomainSuffix(const absl::string_view name);
+
+/**
+ * @brief For given domain name return virtual domain name that will be used for internal
+ * resolution. Valid wildcard names are sanitized and converted to format to store in
+ * virtual domain config.
+ */
+absl::string_view getVirtualDomainName(const absl::string_view domain_name);
 
 } // namespace Utils
 } // namespace DnsFilter

@@ -13,7 +13,6 @@
 # canonical paths.
 
 import argparse
-import common
 import pathlib
 import re
 import sys
@@ -66,11 +65,11 @@ def reorder_headers(path):
     # Filters that define the #include blocks
     block_filters = [
         file_header_filter(),
-        regex_filter('<.*\.h>'),
-        regex_filter('<.*>'),
+        regex_filter(r'<.*\.h>'),
+        regex_filter(r'<.*>'),
     ]
     for subdir in include_dir_order:
-        block_filters.append(regex_filter('"' + subdir + '/.*"'))
+        block_filters.append(regex_filter(r'"' + subdir + r'/.*"'))
 
     blocks = []
     already_included = set([])
@@ -110,7 +109,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--include_dir_order',
         type=str,
-        default=','.join(common.include_dir_order()),
+        default='',
         help='specify the header block include directory order')
     args = parser.parse_args()
     target_path = args.path

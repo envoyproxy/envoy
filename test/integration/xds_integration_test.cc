@@ -1,12 +1,18 @@
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.h"
+#include "envoy/service/secret/v3/sds.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 
+#include "test/common/grpc/grpc_client_integration.h"
+#include "test/integration/filters/test_listener_filter.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -22,6 +28,7 @@ class XdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVer
                            public HttpIntegrationTest {
 public:
   XdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {
+    skip_tag_extraction_rule_check_ = false;
     setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 
@@ -102,14 +109,39 @@ TEST_P(UdpaXdsIntegrationTestListCollection, RouterRequestAndResponseWithBodyNoB
 }
 
 class LdsInplaceUpdateTcpProxyIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public BaseIntegrationTest {
 public:
   LdsInplaceUpdateTcpProxyIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + R"EOF(
+      : BaseIntegrationTest(std::get<0>(GetParam()), ConfigHelper::baseConfig() +
+                                                         (std::get<1>(GetParam()) ? R"EOF(
+    filter_chain_matcher:
+      matcher_tree:
+        input:
+          name: alpn
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+        exact_match_map:
+          map:
+            "'alpn0'":
+              action:
+                name: foo
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: foo
+            "'alpn1'":
+              action:
+                name: bar
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: bar
+)EOF"
+                                                                                  : "") +
+                                                         R"EOF(
     filter_chains:
     - filter_chain_match:
         application_protocols: ["alpn0"]
+      name: foo
       filters:
       - name: envoy.filters.network.tcp_proxy
         typed_config:
@@ -118,6 +150,7 @@ public:
           cluster: cluster_0
     - filter_chain_match:
         application_protocols: ["alpn1"]
+      name: bar
       filters:
       - name: envoy.filters.network.tcp_proxy
         typed_config:
@@ -136,12 +169,12 @@ public:
           "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
           stat_prefix: tcp_stats
           cluster: cluster_0
-)EOF") {}
+)EOF"),
+        matcher_(std::get<1>(GetParam())) {}
 
   void initialize() override {
     config_helper_.renameListener("tcp");
-    std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
-    config_helper_.addListenerFilter(tls_inspector_config);
+    config_helper_.addListenerFilter(ConfigHelper::testInspectorFilter());
 
     config_helper_.addSslConfig();
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -160,7 +193,7 @@ public:
     BaseIntegrationTest::initialize();
 
     context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
-        BaseIntegrationTest::timeSystem());
+        server_factory_context_);
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
   }
 
@@ -168,19 +201,23 @@ public:
                                                                 const std::string& request,
                                                                 std::string& response) {
     Buffer::OwnedImpl buffer(request);
+    TestListenerFilter::setAlpn(alpn);
     return std::make_unique<RawConnectionDriver>(
         lookupPort("tcp"), buffer,
         [&response](Network::ClientConnection&, const Buffer::Instance& data) -> void {
           response.append(data.toString());
         },
         version_, *dispatcher_,
-        context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-            absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})));
+        context_->createTransportSocket(
+            std::make_shared<Network::TransportSocketOptionsImpl>(
+                absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn}),
+            nullptr));
   }
 
   std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Network::TransportSocketFactoryPtr context_;
+  Network::UpstreamTransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
+  bool matcher_;
 };
 
 // Verify that tcp connection 1 is closed while client 0 survives when deleting filter chain 1.
@@ -189,22 +226,39 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
   initialize();
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
-  client_conn_0->waitForConnection();
+  ASSERT_TRUE(client_conn_0->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
   std::string response_1;
   auto client_conn_1 = createConnectionAndWrite("alpn1", "dummy", response_1);
-  client_conn_1->waitForConnection();
+  ASSERT_TRUE(client_conn_1->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_1;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_1));
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
         listener->mutable_filter_chains()->RemoveLast();
+        if (matcher_) {
+          TestUtility::loadFromYaml(R"EOF(
+      matcher_tree:
+        input:
+          name: alpn
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+        exact_match_map:
+          map:
+            "'alpn0'":
+              action:
+                name: foo
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: foo
+          )EOF",
+                                    *listener->mutable_filter_chain_matcher());
+        }
       });
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
@@ -220,7 +274,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigDeletingFilterChain)
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_0->close();
   while (!client_conn_0->closed()) {
@@ -237,12 +291,11 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
-  client_conn_0->waitForConnection();
+  ASSERT_TRUE(client_conn_0->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -250,6 +303,25 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
         *listener->mutable_filter_chains(2)
              ->mutable_filter_chain_match()
              ->mutable_application_protocols(0) = "alpn2";
+        listener->mutable_filter_chains(2)->set_name("baz");
+        if (matcher_) {
+          TestUtility::loadFromYaml(R"EOF(
+      matcher_tree:
+        input:
+          name: alpn
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+        exact_match_map:
+          map:
+            "'alpn2'":
+              action:
+                name: baz
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: baz
+          )EOF",
+                                    *listener->mutable_filter_chain_matcher());
+        }
       });
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
@@ -257,7 +329,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   std::string response_2;
   auto client_conn_2 = createConnectionAndWrite("alpn2", "hello2", response_2);
-  client_conn_2->waitForConnection();
+  ASSERT_TRUE(client_conn_2->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_2;
   ASSERT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_2));
   std::string observed_data_2;
@@ -266,7 +338,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   ASSERT_TRUE(fake_upstream_connection_2->write("world2"));
   while (response_2.find("world2") == std::string::npos) {
-    client_conn_2->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_2->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_2->close();
   while (!client_conn_2->closed()) {
@@ -279,7 +351,7 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 
   ASSERT_TRUE(fake_upstream_connection_0->write("world"));
   while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
+    ASSERT_TRUE(client_conn_0->run(Event::Dispatcher::RunType::NonBlock));
   }
   client_conn_0->close();
   while (!client_conn_0->closed()) {
@@ -288,19 +360,23 @@ TEST_P(LdsInplaceUpdateTcpProxyIntegrationTest, ReloadConfigAddingFilterChain) {
 }
 
 class LdsInplaceUpdateHttpIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
       public HttpIntegrationTest {
 public:
-  LdsInplaceUpdateHttpIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  LdsInplaceUpdateHttpIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())),
+        matcher_(std::get<1>(GetParam())) {}
 
   void inplaceInitialize(bool add_default_filter_chain = false) {
     autonomous_upstream_ = true;
     setUpstreamCount(2);
 
     config_helper_.renameListener("http");
-    std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
-    config_helper_.addListenerFilter(tls_inspector_config);
+    config_helper_.addListenerFilter(ConfigHelper::testInspectorFilter());
     config_helper_.addSslConfig();
+    config_helper_.addConfigModifier(
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) { hcm.mutable_stat_prefix()->assign("hcm0"); });
     config_helper_.addConfigModifier([this, add_default_filter_chain](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       if (!use_default_balancer_) {
@@ -313,6 +389,7 @@ public:
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
       *filter_chain_0->mutable_filter_chain_match()->mutable_application_protocols()->Add() =
           "alpn0";
+      filter_chain_0->set_name("alpn0");
       auto* filter_chain_1 = bootstrap.mutable_static_resources()
                                  ->mutable_listeners(0)
                                  ->mutable_filter_chains()
@@ -322,6 +399,7 @@ public:
       // filter chain 1
       // alpn1, route to cluster_1
       *filter_chain_1->mutable_filter_chain_match()->mutable_application_protocols(0) = "alpn1";
+      filter_chain_1->set_name("alpn1");
 
       auto* config_blob = filter_chain_1->mutable_filters(0)->mutable_typed_config();
 
@@ -335,6 +413,7 @@ public:
           ->mutable_routes(0)
           ->mutable_route()
           ->set_cluster("cluster_1");
+      hcm_config.mutable_stat_prefix()->assign("hcm1");
       config_blob->PackFrom(hcm_config);
       bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(
           *bootstrap.mutable_static_resources()->mutable_clusters(0));
@@ -345,23 +424,59 @@ public:
                                         ->mutable_listeners(0)
                                         ->mutable_default_filter_chain();
         default_filter_chain->MergeFrom(*filter_chain_0);
+        default_filter_chain->set_name("default");
+      }
+      if (matcher_) {
+        TestUtility::loadFromYaml(R"EOF(
+      matcher_tree:
+        input:
+          name: alpn
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+        exact_match_map:
+          map:
+            "'alpn0'":
+              action:
+                name: alpn0
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: alpn0
+            "'alpn1'":
+              action:
+                name: alpn1
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: alpn1
+            "'alpn2'":
+              action:
+                name: alpn2
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: alpn2
+          )EOF",
+                                  *bootstrap.mutable_static_resources()
+                                       ->mutable_listeners(0)
+                                       ->mutable_filter_chain_matcher());
       }
     });
 
     BaseIntegrationTest::initialize();
 
-    context_manager_ =
-        std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
+    context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+        server_factory_context_);
     context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
     address_ = Ssl::getSslAddress(version_, lookupPort("http"));
   }
 
   IntegrationCodecClientPtr createHttpCodec(const std::string& alpn) {
+    TestListenerFilter::setAlpn(alpn);
     auto ssl_conn = dispatcher_->createClientConnection(
         address_, Network::Address::InstanceConstSharedPtr(),
-        context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
-            absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn})),
-        nullptr);
+        context_->createTransportSocket(
+            std::make_shared<Network::TransportSocketOptionsImpl>(
+                absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{alpn}),
+            nullptr),
+        nullptr, nullptr);
     return makeHttpConnection(std::move(ssl_conn));
   }
 
@@ -381,21 +496,22 @@ public:
     }
   }
 
-  void expectConnenctionServed(std::string alpn = "alpn0") {
+  void expectConnectionServed(std::string alpn = "alpn0") {
     auto codec_client_after_config_update = createHttpCodec(alpn);
     expectResponseHeaderConnectionClose(*codec_client_after_config_update, false);
     codec_client_after_config_update->close();
   }
 
   std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Network::TransportSocketFactoryPtr context_;
+  Network::UpstreamTransportSocketFactoryPtr context_;
   testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   Network::Address::InstanceConstSharedPtr address_;
   bool use_default_balancer_{false};
+  bool matcher_;
 };
 
 // Verify that http response on filter chain 1 and default filter chain have "Connection: close"
-// header when these 2 filter chains are  deleted during the listener update.
+// header when these 2 filter chains are deleted during the listener update.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   inplaceInitialize(/*add_default_filter_chain=*/true);
 
@@ -403,14 +519,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   auto codec_client_0 = createHttpCodec("alpn0");
   auto codec_client_default = createHttpCodec("alpndefault");
 
-  Cleanup cleanup([c1 = codec_client_1.get(), c0 = codec_client_0.get(),
-                   c_default = codec_client_default.get()]() {
-    c1->close();
-    c0->close();
-    c_default->close();
-  });
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -422,12 +531,20 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigDeletingFilterChain) {
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
 
+  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 1);
+  test_server_->waitForGaugeGe("http.hcm1.downstream_cx_active", 1);
+
   expectResponseHeaderConnectionClose(*codec_client_1, true);
   expectResponseHeaderConnectionClose(*codec_client_default, true);
 
   test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 0);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
-  expectConnenctionServed();
+  expectConnectionServed();
+
+  codec_client_1->close();
+  test_server_->waitForGaugeDestroyed("http.hcm1.downstream_cx_active");
+  codec_client_0->close();
+  codec_client_default->close();
 }
 
 // Verify that http clients of filter chain 0 survives if new listener config adds new filter
@@ -438,18 +555,23 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
 
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup0([c0 = codec_client_0.get()]() { c0->close(); });
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 1);
+
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(1));
+    // Note that HCM2 copies the stats prefix from HCM0
+    listener->mutable_filter_chains()->Add()->MergeFrom(*listener->mutable_filter_chains(0));
     *listener->mutable_filter_chains(2)
          ->mutable_filter_chain_match()
          ->mutable_application_protocols(0) = "alpn2";
+    listener->mutable_filter_chains(2)->set_name("alpn2");
+
     auto default_filter_chain =
         bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_default_filter_chain();
     default_filter_chain->MergeFrom(*listener->mutable_filter_chains(1));
+    default_filter_chain->set_name("default");
   });
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
@@ -458,6 +580,9 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   auto codec_client_2 = createHttpCodec("alpn2");
   auto codec_client_default = createHttpCodec("alpndefault");
 
+  // 1 connection from filter chain 0 and 1 connection from filter chain 2.
+  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 2);
+
   Cleanup cleanup2([c2 = codec_client_2.get(), c_default = codec_client_default.get()]() {
     c2->close();
     c_default->close();
@@ -465,7 +590,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigAddingFilterChain) {
   expectResponseHeaderConnectionClose(*codec_client_2, false);
   expectResponseHeaderConnectionClose(*codec_client_default, false);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
-  expectConnenctionServed();
+  expectConnectionServed();
 }
 
 // Verify that http clients of default filter chain is drained and recreated if the default filter
@@ -476,8 +601,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterCha
 
   auto codec_client_default = createHttpCodec("alpndefault");
   Cleanup cleanup0([c_default = codec_client_default.get()]() { c_default->close(); });
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
                                           -> void {
     auto default_filter_chain =
@@ -493,7 +617,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, ReloadConfigUpdatingDefaultFilterCha
   Cleanup cleanup2([c_default_v3 = codec_client_default_v3.get()]() { c_default_v3->close(); });
   expectResponseHeaderConnectionClose(*codec_client_default, true);
   expectResponseHeaderConnectionClose(*codec_client_default_v3, false);
-  expectConnenctionServed();
+  expectConnectionServed();
 }
 
 // Verify that balancer is inherited. Test only default balancer because ExactConnectionBalancer
@@ -504,8 +628,7 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConne
 
   auto codec_client_0 = createHttpCodec("alpn0");
   Cleanup cleanup([c0 = codec_client_0.get()]() { c0->close(); });
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -515,18 +638,20 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConne
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
   expectResponseHeaderConnectionClose(*codec_client_0, false);
-  expectConnenctionServed();
+  expectConnectionServed();
 }
 
 // Verify default filter chain update is filter chain only update.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, DefaultFilterChainUpdate) {}
-INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateHttpIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndMatcher, LdsInplaceUpdateHttpIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false, true)));
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateTcpProxyIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndMatcher, LdsInplaceUpdateTcpProxyIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false, true)));
 
 using LdsIntegrationTest = HttpProtocolIntegrationTest;
 
@@ -537,6 +662,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, LdsIntegrationTest,
 
 // Sample test making sure our config framework correctly reloads listeners.
 TEST_P(LdsIntegrationTest, ReloadConfig) {
+  config_helper_.disableDelayClose();
   autonomous_upstream_ = true;
   initialize();
   // Given we're using LDS in this test, initialize() will not complete until
@@ -549,8 +675,7 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
 
   // Create a new config with HTTP/1.0 proxying.
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) {
@@ -581,14 +706,15 @@ TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
   // Reserve a port that we can then use on the integration listener with reuse_port.
   auto addr_socket =
       Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        listener->mutable_address()->mutable_socket_address()->set_port_value(
-            addr_socket.second->addressProvider().localAddress()->ip()->port());
-        auto socket_option = listener->add_socket_options();
+        auto* new_listener = bootstrap.mutable_static_resources()->add_listeners();
+        new_listener->MergeFrom(bootstrap.static_resources().listeners(0));
+        new_listener->set_name("new_listener");
+        new_listener->mutable_address()->mutable_socket_address()->set_port_value(
+            addr_socket.second->connectionInfoProvider().localAddress()->ip()->port());
+        auto socket_option = new_listener->add_socket_options();
         socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
         socket_option->set_level(10000);     // Invalid level.
         socket_option->set_int_value(10000); // Invalid value.
@@ -612,12 +738,14 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
 class LdsStsIntegrationTest : public Event::SimulatedTimeSystem,
                               public LdsInplaceUpdateTcpProxyIntegrationTest {};
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, LdsStsIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndMatcher, LdsStsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(false, true)));
 
 // Verify that the listener in place update will accomplish anyway if the listener is removed.
-TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
+// https://github.com/envoyproxy/envoy/issues/22489
+TEST_P(LdsStsIntegrationTest, DISABLED_TcpListenerRemoveFilterChainCalledAfterListenerIsRemoved) {
   // The in place listener update takes 2 seconds. We will remove the listener.
   drain_time_ = std::chrono::seconds(2);
   // 1. Start the first in place listener update.
@@ -625,12 +753,11 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
   initialize();
   std::string response_0;
   auto client_conn_0 = createConnectionAndWrite("alpn0", "hello", response_0);
-  client_conn_0->waitForConnection();
+  ASSERT_TRUE(client_conn_0->waitForConnection());
   FakeRawConnectionPtr fake_upstream_connection_0;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_0));
 
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  ConfigHelper new_config_helper(version_, config_helper_.bootstrap());
   new_config_helper.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -640,34 +767,223 @@ TEST_P(LdsStsIntegrationTest, TcpListenerRemoveFilterChainCalledAfterListenerIsR
 
   // 2. Remove the tcp listener immediately. This listener update should stack in the same poller
   // cycle so that this listener update has the same time stamp as the first update.
-  ConfigHelper new_config_helper1(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
-  new_config_helper1.addConfigModifier(
-      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_static_resources()->mutable_listeners(0)->Swap(
-            bootstrap.mutable_static_resources()->mutable_listeners(1));
-        bootstrap.mutable_static_resources()->mutable_listeners()->RemoveLast();
-      });
-  new_config_helper1.setLds("2");
-
-  std::string observed_data_0;
-  ASSERT_TRUE(fake_upstream_connection_0->waitForData(5, &observed_data_0));
-  EXPECT_EQ("hello", observed_data_0);
-
-  ASSERT_TRUE(fake_upstream_connection_0->write("world"));
-  while (response_0.find("world") == std::string::npos) {
-    client_conn_0->run(Event::Dispatcher::RunType::NonBlock);
-  }
-  client_conn_0->close();
+  ConfigHelper new_config_helper1(version_, config_helper_.bootstrap());
   while (!client_conn_0->closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  // Wait for the filter chain removal start. Ideally we have `drain_time_` to detect the
-  // value 1. Increase the drain_time_ at the beginning of the test if the test is flaky.
-  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 1);
   // Wait for the filter chain removal at worker thread. When the value drops from 1, all pending
   // removal at the worker is completed. This is the end of the in place update.
   test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
 }
+
+constexpr char XDS_CLUSTER_NAME_1[] = "xds_cluster_1.lyft.com";
+constexpr char XDS_CLUSTER_NAME_2[] = "xds_cluster_2.lyft.com";
+constexpr char CLIENT_CERT_NAME[] = "client_cert";
+
+class XdsSotwMultipleAuthoritiesTest : public HttpIntegrationTest,
+                                       public Grpc::GrpcClientIntegrationParamTest {
+public:
+  XdsSotwMultipleAuthoritiesTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
+                            ConfigHelper::baseConfigNoListeners()) {
+    use_lds_ = false;
+    sotw_or_delta_ = Grpc::SotwOrDelta::Sotw;
+    skip_tag_extraction_rule_check_ = true;
+
+    // Make the default cluster HTTP2.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      ConfigHelper::setHttp2(*bootstrap.mutable_static_resources()->mutable_clusters(0));
+    });
+
+    // Add a second cluster.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+      *cluster = bootstrap.mutable_static_resources()->clusters(0);
+      cluster->set_name("cluster_1");
+      cluster->mutable_load_assignment()->set_cluster_name("cluster_1");
+    });
+
+    // Add two xDS clusters.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      addXdsCluster(bootstrap, std::string(XDS_CLUSTER_NAME_1));
+      addXdsCluster(bootstrap, std::string(XDS_CLUSTER_NAME_2));
+    });
+
+    // Set up the two static clusters with SSL using SDS.
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      setUpClusterSsl(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                      std::string(XDS_CLUSTER_NAME_1), getXdsUpstream1());
+      setUpClusterSsl(*bootstrap.mutable_static_resources()->mutable_clusters(1),
+                      std::string(XDS_CLUSTER_NAME_2), getXdsUpstream2());
+    });
+  }
+
+  void initialize() override {
+    HttpIntegrationTest::initialize();
+    registerTestServerPorts({});
+  }
+
+  void TearDown() override {
+    closeConnection(xds_connection_1_);
+    closeConnection(xds_connection_2_);
+    cleanupUpstreamAndDownstream();
+    codec_client_.reset();
+    test_server_.reset();
+    fake_upstreams_.clear();
+  }
+
+  void createUpstreams() override {
+    // Static cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // Static cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // XDS Cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    // XDS Cluster.
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+
+protected:
+  FakeUpstream& getXdsUpstream1() { return *fake_upstreams_[2]; }
+  FakeUpstream& getXdsUpstream2() { return *fake_upstreams_[3]; }
+
+  void addXdsCluster(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                     const std::string& cluster_name) {
+    auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+    xds_cluster->set_name(cluster_name);
+    xds_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
+    ConfigHelper::setHttp2(*xds_cluster);
+  }
+
+  void setUpClusterSsl(envoy::config::cluster::v3::Cluster& cluster,
+                       const std::string& cluster_name, FakeUpstream& cluster_upstream) {
+    auto* transport_socket = cluster.mutable_transport_socket();
+    envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+    tls_context.set_sni("lyft.com");
+    auto* secret_config =
+        tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+    setUpSdsConfig(secret_config, CLIENT_CERT_NAME, cluster_name, cluster_upstream);
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    transport_socket->mutable_typed_config()->PackFrom(tls_context);
+  }
+
+  void initXdsStream(FakeUpstream& upstream, FakeHttpConnectionPtr& connection,
+                     FakeStreamPtr& stream) {
+    AssertionResult result = upstream.waitForHttpConnection(*dispatcher_, connection);
+    RELEASE_ASSERT(result, result.message());
+    result = connection->waitForNewStream(*dispatcher_, stream);
+    RELEASE_ASSERT(result, result.message());
+    stream->startGrpcStream();
+  }
+
+  void closeConnection(FakeHttpConnectionPtr& connection) {
+    AssertionResult result = connection->close();
+    RELEASE_ASSERT(result, result.message());
+    result = connection->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    connection.reset();
+  }
+
+  void setUpSdsConfig(envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig* secret_config,
+                      const std::string& secret_name, const std::string& cluster_name,
+                      FakeUpstream& cluster_upstream) {
+    secret_config->set_name(secret_name);
+    auto* config_source = secret_config->mutable_sds_config();
+    config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* api_config_source = config_source->mutable_api_config_source();
+    api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+    auto* grpc_service = api_config_source->add_grpc_services();
+    setGrpcService(*grpc_service, cluster_name, cluster_upstream.localAddress());
+  }
+
+  envoy::extensions::transport_sockets::tls::v3::Secret
+  getClientSecret(const std::string& secret_name) {
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    secret.set_name(secret_name);
+    auto* tls_certificate = secret.mutable_tls_certificate();
+    tls_certificate->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+    tls_certificate->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+    return secret;
+  }
+
+  envoy::admin::v3::ConfigDump getSecretsFromConfigDump() {
+    auto response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "GET", "/config_dump?resource=dynamic_active_secrets", "",
+        downstreamProtocol(), version_);
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
+    envoy::admin::v3::ConfigDump config_dump;
+    TestUtility::loadFromJson(loader->asJsonString(), config_dump);
+    return config_dump;
+  }
+
+  FakeHttpConnectionPtr xds_connection_1_;
+  FakeStreamPtr xds_stream_1_;
+  FakeHttpConnectionPtr xds_connection_2_;
+  FakeStreamPtr xds_stream_2_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, XdsSotwMultipleAuthoritiesTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Verifies that if two different xDS servers send resources of the same name and same type, Envoy
+// still treats them as two separate resources.
+TEST_P(XdsSotwMultipleAuthoritiesTest, SameResourceNameAndTypeFromMultipleAuthorities) {
+  const std::string cert_name{CLIENT_CERT_NAME};
+
+  on_server_init_function_ = [this, &cert_name]() {
+    {
+      // SDS for the first cluster.
+      initXdsStream(getXdsUpstream1(), xds_connection_1_, xds_stream_1_);
+      EXPECT_TRUE(compareSotwDiscoveryRequest(
+          /*expected_type_url=*/Config::TypeUrl::get().Secret,
+          /*expected_version=*/"",
+          /*expected_resource_names=*/{cert_name}, /*expect_node=*/true,
+          Grpc::Status::WellKnownGrpcStatus::Ok,
+          /*expected_error_message=*/"", xds_stream_1_.get()));
+      auto sds_resource = getClientSecret(cert_name);
+      sendSotwDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
+          Config::TypeUrl::get().Secret, {sds_resource}, "1", xds_stream_1_.get());
+    }
+    {
+      // SDS for the second cluster.
+      initXdsStream(getXdsUpstream2(), xds_connection_2_, xds_stream_2_);
+      EXPECT_TRUE(compareSotwDiscoveryRequest(
+          /*expected_type_url=*/Config::TypeUrl::get().Secret,
+          /*expected_version=*/"",
+          /*expected_resource_names=*/{cert_name}, /*expect_node=*/true,
+          Grpc::Status::WellKnownGrpcStatus::Ok,
+          /*expected_error_message=*/"", xds_stream_2_.get()));
+      auto sds_resource = getClientSecret(cert_name);
+      sendSotwDiscoveryResponse<envoy::extensions::transport_sockets::tls::v3::Secret>(
+          Config::TypeUrl::get().Secret, {sds_resource}, "1", xds_stream_2_.get());
+    }
+  };
+
+  initialize();
+
+  // Wait until the discovery responses have been processed.
+  test_server_->waitForCounterGe(
+      "cluster.cluster_0.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
+  test_server_->waitForCounterGe(
+      "cluster.cluster_1.client_ssl_socket_factory.ssl_context_update_by_sds", 1);
+
+  auto config_dump = getSecretsFromConfigDump();
+  // Two xDS resources with the same name and same type.
+  ASSERT_EQ(config_dump.configs_size(), 2);
+  envoy::admin::v3::SecretsConfigDump::DynamicSecret dynamic_secret;
+  ASSERT_OK(MessageUtil::unpackTo(config_dump.configs(0), dynamic_secret));
+  EXPECT_EQ(cert_name, dynamic_secret.name());
+  EXPECT_EQ("1", dynamic_secret.version_info());
+  ASSERT_OK(MessageUtil::unpackTo(config_dump.configs(1), dynamic_secret));
+  EXPECT_EQ(cert_name, dynamic_secret.name());
+  EXPECT_EQ("1", dynamic_secret.version_info());
+}
+
 } // namespace
 } // namespace Envoy

@@ -6,6 +6,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/utility.h"
@@ -23,41 +24,43 @@ HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
     GrpcCommon::GrpcAccessLoggerSharedPtr logger)
     : logger_(std::move(logger)) {}
 
-HttpGrpcAccessLog::HttpGrpcAccessLog(
-    AccessLog::FilterPtr&& filter,
-    envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
-    ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-    Stats::Scope& scope)
-    : Common::ImplBase(std::move(filter)), scope_(scope), config_(std::move(config)),
+HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
+                                     const HttpGrpcAccessLogConfig config,
+                                     ThreadLocal::SlotAllocator& tls,
+                                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache)
+    : Common::ImplBase(std::move(filter)),
+      config_(std::make_shared<const HttpGrpcAccessLogConfig>(std::move(config))),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
-  for (const auto& header : config_.additional_request_headers_to_log()) {
+  for (const auto& header : config_->additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
   }
 
-  for (const auto& header : config_.additional_response_headers_to_log()) {
+  for (const auto& header : config_->additional_response_headers_to_log()) {
     response_headers_to_log_.emplace_back(header);
   }
 
-  for (const auto& header : config_.additional_response_trailers_to_log()) {
+  for (const auto& header : config_->additional_response_trailers_to_log()) {
     response_trailers_to_log_.emplace_back(header);
   }
-
-  tls_slot_->set([this, transport_version = Envoy::Config::Utility::getAndCheckTransportVersion(
-                            config_.common_config())](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config_.common_config(), transport_version, Common::GrpcAccessLoggerType::HTTP, scope_));
-  });
+  THROW_IF_NOT_OK(Envoy::Config::Utility::checkTransportVersion(config_->common_config()));
+  tls_slot_->set(
+      [config = config_, access_logger_cache = access_logger_cache_](Event::Dispatcher&) {
+        return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(
+            config->common_config(), Common::GrpcAccessLoggerType::HTTP));
+      });
 }
 
-void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
-                                const Http::ResponseHeaderMap& response_headers,
-                                const Http::ResponseTrailerMap& response_trailers,
+void HttpGrpcAccessLog::emitLog(const Formatter::HttpFormatterContext& context,
                                 const StreamInfo::StreamInfo& stream_info) {
   // Common log properties.
   // TODO(mattklein123): Populate sample_rate field.
   envoy::data::accesslog::v3::HTTPAccessLogEntry log_entry;
-  GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
-                                                        stream_info, config_.common_config());
+
+  const auto& request_headers = context.requestHeaders();
+
+  GrpcCommon::Utility::extractCommonAccessLogProperties(
+      *log_entry.mutable_common_properties(), request_headers, stream_info,
+      config_->common_config(), context.accessLogType());
 
   if (stream_info.protocol()) {
     switch (stream_info.protocol().value()) {
@@ -80,52 +83,61 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   // TODO(mattklein123): Populate port field.
   auto* request_properties = log_entry.mutable_request();
   if (request_headers.Scheme() != nullptr) {
-    request_properties->set_scheme(std::string(request_headers.getSchemeValue()));
+    request_properties->set_scheme(
+        MessageUtil::sanitizeUtf8String(request_headers.getSchemeValue()));
   }
   if (request_headers.Host() != nullptr) {
-    request_properties->set_authority(std::string(request_headers.getHostValue()));
+    request_properties->set_authority(
+        MessageUtil::sanitizeUtf8String(request_headers.getHostValue()));
   }
   if (request_headers.Path() != nullptr) {
-    request_properties->set_path(std::string(request_headers.getPathValue()));
+    request_properties->set_path(MessageUtil::sanitizeUtf8String(request_headers.getPathValue()));
   }
   if (request_headers.UserAgent() != nullptr) {
-    request_properties->set_user_agent(std::string(request_headers.getUserAgentValue()));
+    request_properties->set_user_agent(
+        MessageUtil::sanitizeUtf8String(request_headers.getUserAgentValue()));
   }
   if (request_headers.getInline(referer_handle.handle()) != nullptr) {
     request_properties->set_referer(
-        std::string(request_headers.getInlineValue(referer_handle.handle())));
+        MessageUtil::sanitizeUtf8String(request_headers.getInlineValue(referer_handle.handle())));
   }
   if (request_headers.ForwardedFor() != nullptr) {
-    request_properties->set_forwarded_for(std::string(request_headers.getForwardedForValue()));
+    request_properties->set_forwarded_for(
+        MessageUtil::sanitizeUtf8String(request_headers.getForwardedForValue()));
   }
   if (request_headers.RequestId() != nullptr) {
-    request_properties->set_request_id(std::string(request_headers.getRequestIdValue()));
+    request_properties->set_request_id(
+        MessageUtil::sanitizeUtf8String(request_headers.getRequestIdValue()));
   }
   if (request_headers.EnvoyOriginalPath() != nullptr) {
-    request_properties->set_original_path(std::string(request_headers.getEnvoyOriginalPathValue()));
+    request_properties->set_original_path(
+        MessageUtil::sanitizeUtf8String(request_headers.getEnvoyOriginalPathValue()));
   }
   request_properties->set_request_headers_bytes(request_headers.byteSize());
   request_properties->set_request_body_bytes(stream_info.bytesReceived());
+
   if (request_headers.Method() != nullptr) {
     envoy::config::core::v3::RequestMethod method = envoy::config::core::v3::METHOD_UNSPECIFIED;
-    envoy::config::core::v3::RequestMethod_Parse(std::string(request_headers.getMethodValue()),
-                                                 &method);
+    envoy::config::core::v3::RequestMethod_Parse(
+        MessageUtil::sanitizeUtf8String(request_headers.getMethodValue()), &method);
     request_properties->set_request_method(method);
   }
   if (!request_headers_to_log_.empty()) {
     auto* logged_headers = request_properties->mutable_request_headers();
 
     for (const auto& header : request_headers_to_log_) {
-      const auto entry = request_headers.get(header);
-      if (!entry.empty()) {
-        // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
-        // values.
-        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
+      const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(request_headers, header);
+      if (all_values.result().has_value()) {
+        logged_headers->insert(
+            {header.get(), MessageUtil::sanitizeUtf8String(all_values.result().value())});
       }
     }
   }
 
   // HTTP response properties.
+  const auto& response_headers = context.responseHeaders();
+  const auto& response_trailers = context.responseTrailers();
+
   auto* response_properties = log_entry.mutable_response();
   if (stream_info.responseCode()) {
     response_properties->mutable_response_code()->set_value(stream_info.responseCode().value());
@@ -139,11 +151,10 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     auto* logged_headers = response_properties->mutable_response_headers();
 
     for (const auto& header : response_headers_to_log_) {
-      const auto entry = response_headers.get(header);
-      if (!entry.empty()) {
-        // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
-        // values.
-        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
+      const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(response_headers, header);
+      if (all_values.result().has_value()) {
+        logged_headers->insert(
+            {header.get(), MessageUtil::sanitizeUtf8String(all_values.result().value())});
       }
     }
   }
@@ -152,13 +163,22 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     auto* logged_headers = response_properties->mutable_response_trailers();
 
     for (const auto& header : response_trailers_to_log_) {
-      const auto entry = response_trailers.get(header);
-      if (!entry.empty()) {
-        // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
-        // values.
-        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
+      const auto all_values =
+          Http::HeaderUtility::getAllOfHeaderAsString(response_trailers, header);
+      if (all_values.result().has_value()) {
+        logged_headers->insert(
+            {header.get(), MessageUtil::sanitizeUtf8String(all_values.result().value())});
       }
     }
+  }
+
+  if (const auto& bytes_meter = stream_info.getDownstreamBytesMeter(); bytes_meter != nullptr) {
+    request_properties->set_downstream_header_bytes_received(bytes_meter->headerBytesReceived());
+    response_properties->set_downstream_header_bytes_sent(bytes_meter->headerBytesSent());
+  }
+  if (const auto& bytes_meter = stream_info.getUpstreamBytesMeter(); bytes_meter != nullptr) {
+    request_properties->set_upstream_header_bytes_sent(bytes_meter->headerBytesSent());
+    response_properties->set_upstream_header_bytes_received(bytes_meter->headerBytesReceived());
   }
 
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));

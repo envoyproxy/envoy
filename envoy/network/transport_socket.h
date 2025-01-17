@@ -2,19 +2,37 @@
 
 #include <vector>
 
+#include "envoy/api/io_error.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/io_handle.h"
+#include "envoy/network/listen_socket.h"
 #include "envoy/network/post_io_action.h"
 #include "envoy/network/proxy_protocol.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/ssl/context.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/types/optional.h"
 
+#ifdef ENVOY_ENABLE_QUIC
+namespace quic {
+class QuicCryptoClientConfig;
+}
+#endif
+
 namespace Envoy {
+
+namespace Upstream {
+class HostDescription;
+}
+namespace Ssl {
+class ClientContextConfig;
+}
+
 namespace Network {
 
-class TransportSocketFactory;
 class Connection;
 enum class ConnectionEvent;
 
@@ -22,6 +40,15 @@ enum class ConnectionEvent;
  * Result of each I/O event.
  */
 struct IoResult {
+  IoResult(PostIoAction action, uint64_t bytes_processed, bool end_stream_read)
+      : action_(action), bytes_processed_(bytes_processed), end_stream_read_(end_stream_read),
+        err_code_(absl::nullopt) {}
+
+  IoResult(PostIoAction action, uint64_t bytes_processed, bool end_stream_read,
+           absl::optional<Api::IoError::IoErrorCode> err_code)
+      : action_(action), bytes_processed_(bytes_processed), end_stream_read_(end_stream_read),
+        err_code_(err_code) {}
+
   PostIoAction action_;
 
   /**
@@ -34,6 +61,11 @@ struct IoResult {
    * can only be true for read operations.
    */
   bool end_stream_read_;
+
+  /**
+   * The underlying I/O error code.
+   */
+  absl::optional<Api::IoError::IoErrorCode> err_code_;
 };
 
 /**
@@ -118,6 +150,15 @@ public:
   virtual bool canFlushClose() PURE;
 
   /**
+   * Connect the underlying transport.
+   * @param socket provides the socket to connect.
+   * @return int the result from connect.
+   */
+  virtual Api::SysCallIntResult connect(Network::ConnectionSocket& socket) {
+    return socket.connect(socket.connectionInfoProvider().remoteAddress());
+  }
+
+  /**
    * Closes the transport socket.
    * @param event supplies the connection event that is closing the socket.
    */
@@ -156,6 +197,17 @@ public:
    * @return boolean indicating if the transport socket was able to start secure transport.
    */
   virtual bool startSecureTransport() PURE;
+
+  /**
+   * Try to configure the connection's initial congestion window.
+   * The operation is advisory - the connection may not support it, even if it's supported, it may
+   * not do anything after the first few network round trips with the peer.
+   * @param bandwidth_bits_per_sec The estimated bandwidth between the two endpoints of the
+   * connection.
+   * @param rtt The estimated round trip time between the two endpoints of the connection.
+   */
+  virtual void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                                std::chrono::microseconds rtt) PURE;
 };
 
 using TransportSocketPtr = std::unique_ptr<TransportSocket>;
@@ -208,50 +260,115 @@ public:
    */
   virtual absl::optional<Network::ProxyProtocolData> proxyProtocolOptions() const PURE;
 
+  // Information for use by the http_11_proxy transport socket.
+  struct Http11ProxyInfo {
+    Http11ProxyInfo(std::string hostname, Network::Address::InstanceConstSharedPtr address)
+        : hostname(hostname), proxy_address(address) {}
+    // The hostname of the original request, to be used in CONNECT request if
+    // the underlying transport is TLS.
+    std::string hostname;
+    // The address of the proxy, where connections should be routed to.
+    Network::Address::InstanceConstSharedPtr proxy_address;
+  };
+
   /**
-   * @param key supplies a vector of bytes to which the option should append hash key data that will
-   *        be used to separate connections based on the option. Any data already in the key vector
-   *        must not be modified.
-   * @param factory supplies the factor which will be used for creating the transport socket.
+   * @return any proxy information if sending to an intermediate proxy over HTTP/1.1.
    */
-  virtual void hashKey(std::vector<uint8_t>& key,
-                       const Network::TransportSocketFactory& factory) const PURE;
+  virtual OptRef<const Http11ProxyInfo> http11ProxyInfo() const PURE;
+
+  /**
+   * @return filter state objects from the downstream request or connection
+   * that are marked as shared with the upstream connection.
+   */
+  virtual const StreamInfo::FilterState::Objects& downstreamSharedFilterStateObjects() const PURE;
 };
 
 using TransportSocketOptionsConstSharedPtr = std::shared_ptr<const TransportSocketOptions>;
 
 /**
- * A factory for creating transport socket. It will be associated to filter chains and clusters.
- */
-class TransportSocketFactory {
+ * A factory for creating transport sockets.
+ **/
+class TransportSocketFactoryBase {
 public:
-  virtual ~TransportSocketFactory() = default;
+  virtual ~TransportSocketFactoryBase() = default;
 
   /**
    * @return bool whether the transport socket implements secure transport.
    */
   virtual bool implementsSecureTransport() const PURE;
+};
+
+/**
+ * A factory for creating upstream transport sockets. It will be associated to clusters.
+ */
+class UpstreamTransportSocketFactory : public virtual TransportSocketFactoryBase {
+public:
+  ~UpstreamTransportSocketFactory() override = default;
 
   /**
    * @param options for creating the transport socket
-   * @return Network::TransportSocketPtr a transport socket to be passed to connection.
+   * @param host description for the destination upstream host
+   * @return Network::TransportSocketPtr a transport socket to be passed to client connection.
    */
   virtual TransportSocketPtr
-  createTransportSocket(TransportSocketOptionsConstSharedPtr options) const PURE;
-
-  /**
-   * @return bool whether the transport socket will use proxy protocol options.
-   */
-  virtual bool usesProxyProtocolOptions() const PURE;
+  createTransportSocket(TransportSocketOptionsConstSharedPtr options,
+                        std::shared_ptr<const Upstream::HostDescription> host) const PURE;
 
   /**
    * Returns true if the transport socket created by this factory supports some form of ALPN
    * negotiation.
    */
   virtual bool supportsAlpn() const { return false; }
+
+  /**
+   * Returns the default SNI for transport sockets created by this factory.
+   * This will return an empty string view if the transport sockets created are
+   * not client-side TLS sockets.
+   */
+  virtual absl::string_view defaultServerNameIndication() const PURE;
+
+  /**
+   * @param key supplies a vector of bytes to which the option should append hash key data that will
+   *        be used to separate connections based on the option. Any data already in the key vector
+   *        must not be modified.
+   * @param options supplies the transport socket options.
+   */
+  virtual void hashKey(std::vector<uint8_t>& key,
+                       TransportSocketOptionsConstSharedPtr options) const PURE;
+
+  /*
+   * @return the pointer to the SSL context, or nullptr for non-TLS factories.
+   */
+  virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() { return nullptr; }
+
+  /*
+   * @return the ClientContextConfig, or absl::nullopt for non-TLS factories.
+   */
+  virtual OptRef<const Ssl::ClientContextConfig> clientContextConfig() const { return {}; }
+
+#ifdef ENVOY_ENABLE_QUIC
+  /*
+   * @return the QuicCryptoClientConfig or nullptr for non-QUIC factories.
+   */
+  virtual std::shared_ptr<quic::QuicCryptoClientConfig> getCryptoConfig() { return nullptr; }
+#endif
 };
 
-using TransportSocketFactoryPtr = std::unique_ptr<TransportSocketFactory>;
+/**
+ * A factory for creating downstream transport sockets. It will be associated to listeners.
+ */
+class DownstreamTransportSocketFactory : public virtual TransportSocketFactoryBase {
+public:
+  ~DownstreamTransportSocketFactory() override = default;
+
+  /**
+   * @return Network::TransportSocketPtr a transport socket to be passed to server connection.
+   */
+  virtual TransportSocketPtr createDownstreamTransportSocket() const PURE;
+};
+
+using UpstreamTransportSocketFactoryPtr = std::unique_ptr<UpstreamTransportSocketFactory>;
+using DownstreamTransportSocketFactoryPtr = std::unique_ptr<DownstreamTransportSocketFactory>;
 
 } // namespace Network
 } // namespace Envoy

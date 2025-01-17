@@ -19,6 +19,7 @@ using Common::Aws::MockSigner;
 using ::testing::An;
 using ::testing::InSequence;
 using ::testing::NiceMock;
+using ::testing::Return;
 using ::testing::StrictMock;
 
 class MockFilterConfig : public FilterConfig {
@@ -32,7 +33,7 @@ public:
 
   std::shared_ptr<Common::Aws::MockSigner> signer_;
   Stats::IsolatedStoreImpl stats_store_;
-  FilterStats stats_{Filter::generateStats("test", stats_store_)};
+  FilterStats stats_{Filter::generateStats("test", *stats_store_.rootScope())};
   std::string host_rewrite_;
   bool use_unsigned_payload_;
 };
@@ -54,7 +55,8 @@ public:
 // Verify filter functionality when signing works for header only request.
 TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), signEmptyPayload(An<Http::RequestHeaderMap&>()));
+  EXPECT_CALL(*(filter_config_->signer_),
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
@@ -65,7 +67,8 @@ TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
 TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayload) {
   setup();
   filter_config_->use_unsigned_payload_ = true;
-  EXPECT_CALL(*(filter_config_->signer_), signUnsignedPayload(An<Http::RequestHeaderMap&>()));
+  EXPECT_CALL(*(filter_config_->signer_),
+              signUnsignedPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
@@ -75,7 +78,8 @@ TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayload) {
 TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayloadHeaderOnly) {
   setup();
   filter_config_->use_unsigned_payload_ = true;
-  EXPECT_CALL(*(filter_config_->signer_), signUnsignedPayload(An<Http::RequestHeaderMap&>()));
+  EXPECT_CALL(*(filter_config_->signer_),
+              signUnsignedPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
@@ -109,7 +113,8 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsEmptyPayloadAndContinues) {
   Buffer::OwnedImpl buffer;
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*(filter_config_->signer_), sign(HeaderMapEqualRef(&headers), hash));
+  EXPECT_CALL(*(filter_config_->signer_),
+              sign(HeaderMapEqualRef(&headers), hash, An<absl::string_view>()));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_added_.value());
   EXPECT_EQ(1UL, filter_config_->stats_.payload_signing_added_.value());
@@ -127,7 +132,8 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsPayloadAndContinues) {
   Buffer::OwnedImpl buffer("Action=SignThis");
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*(filter_config_->signer_), sign(HeaderMapEqualRef(&headers), hash));
+  EXPECT_CALL(*(filter_config_->signer_),
+              sign(HeaderMapEqualRef(&headers), hash, An<absl::string_view>()));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
@@ -135,7 +141,8 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsPayloadAndContinues) {
 TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
   setup();
   filter_config_->host_rewrite_ = "foo";
-  EXPECT_CALL(*(filter_config_->signer_), signEmptyPayload(An<Http::RequestHeaderMap&>()));
+  EXPECT_CALL(*(filter_config_->signer_),
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
@@ -146,8 +153,11 @@ TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
 // Verify filter functionality when signing fails in decodeHeaders.
 TEST_F(AwsRequestSigningFilterTest, SignFails) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), signEmptyPayload(An<Http::RequestHeaderMap&>()))
-      .WillOnce(Invoke([](Http::HeaderMap&) -> void { throw EnvoyException("failed"); }));
+  EXPECT_CALL(*(filter_config_->signer_),
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
+        return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
+      }));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
@@ -164,10 +174,12 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignFails) {
   Buffer::OwnedImpl buffer;
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*(filter_config_->signer_),
-              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>()))
-      .WillOnce(Invoke(
-          [](Http::HeaderMap&, const std::string&) -> void { throw EnvoyException("failed"); }));
+  EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(),
+                                               An<const std::string&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
+                          const absl::string_view) -> absl::Status {
+        return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
+      }));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
   EXPECT_EQ(1UL, filter_config_->stats_.signing_failed_.value());
@@ -179,12 +191,31 @@ TEST_F(AwsRequestSigningFilterTest, FilterConfigImplGetters) {
   Stats::IsolatedStoreImpl stats;
   auto signer = std::make_unique<Common::Aws::MockSigner>();
   const auto* signer_ptr = signer.get();
-  FilterConfigImpl config(std::move(signer), "prefix", stats, "foo", true);
+  FilterConfigImpl config(std::move(signer), "prefix", *stats.rootScope(), "foo", true);
 
   EXPECT_EQ(signer_ptr, &config.signer());
   EXPECT_EQ(0UL, config.stats().signing_added_.value());
   EXPECT_EQ("foo", config.hostRewrite());
   EXPECT_EQ(true, config.useUnsignedPayload());
+}
+
+// Verify filter functionality when a host rewrite happens on route-level config.
+TEST_F(AwsRequestSigningFilterTest, PerRouteConfigSignWithHostRewrite) {
+  setup();
+  filter_config_->host_rewrite_ = "original-host";
+
+  Stats::IsolatedStoreImpl stats;
+  auto signer = std::make_unique<Common::Aws::MockSigner>();
+  EXPECT_CALL(*(signer), signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
+
+  FilterConfigImpl per_route_config(std::move(signer), "prefix", *stats.rootScope(),
+                                    "overridden-host", false);
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(&per_route_config));
+
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ("overridden-host", headers.getHostValue());
 }
 
 } // namespace

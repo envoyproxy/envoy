@@ -25,14 +25,14 @@ public:
       Server::Configuration::ResourceMonitorFactoryContext& context);
 
   // Server::ResourceMonitor
-  void updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) override;
+  void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
 protected:
   virtual void onFileChanged();
 
 private:
   const std::string filename_;
-  bool file_changed_;
+  bool file_changed_{true};
   Filesystem::WatcherPtr watcher_;
   absl::optional<double> pressure_;
   absl::optional<EnvoyException> error_;

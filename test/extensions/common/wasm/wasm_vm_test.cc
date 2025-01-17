@@ -1,9 +1,11 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/common/wasm/wasm_runtime_factory.h"
 #include "source/extensions/common/wasm/wasm_vm.h"
 
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -16,6 +18,7 @@ using proxy_wasm::WasmCallVoid; // NOLINT
 using proxy_wasm::WasmCallWord; // NOLINT
 using proxy_wasm::Word;         // NOLINT
 using testing::HasSubstr;       // NOLINT
+using testing::IsEmpty;         // NOLINT
 using testing::Return;          // NOLINT
 
 namespace Envoy {
@@ -23,6 +26,17 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 namespace {
+
+TEST(EnvoyWasmVmIntegrationTest, EnvoyWasmVmIntegrationTest) {
+  {
+    EnvoyWasmVmIntegration wasm_vm_integration;
+    for (const auto l : {spdlog::level::trace, spdlog::level::debug, spdlog::level::info,
+                         spdlog::level::warn, spdlog::level::err, spdlog::level::critical}) {
+      Logger::Registry::getLog(Logger::Id::wasm).set_level(l);
+      EXPECT_EQ(wasm_vm_integration.getLogLevel(), static_cast<proxy_wasm::LogLevel>(l));
+    }
+  }
+}
 
 class TestNullVmPlugin : public proxy_wasm::NullVmPlugin {
 public:
@@ -40,6 +54,28 @@ proxy_wasm::RegisterNullVmPluginFactory register_test_null_vm_plugin("test_null_
   return plugin;
 });
 
+class ClearWasmRuntimeFactories {
+public:
+  ClearWasmRuntimeFactories() {
+    saved_factories_ = Registry::FactoryRegistry<WasmRuntimeFactory>::factories();
+    Registry::FactoryRegistry<WasmRuntimeFactory>::factories().clear();
+    Registry::InjectFactory<WasmRuntimeFactory>::resetTypeMappings();
+  }
+
+  ~ClearWasmRuntimeFactories() {
+    Registry::FactoryRegistry<WasmRuntimeFactory>::factories() = saved_factories_;
+    Registry::InjectFactory<WasmRuntimeFactory>::resetTypeMappings();
+  }
+
+private:
+  absl::flat_hash_map<std::string, WasmRuntimeFactory*> saved_factories_;
+};
+
+TEST(WasmEngineTest, NoAvailableEngine) {
+  ClearWasmRuntimeFactories clear_factories;
+  EXPECT_THAT(getFirstAvailableWasmEngineName(), IsEmpty());
+}
+
 class BaseVmTest : public testing::Test {
 public:
   BaseVmTest() : scope_(Stats::ScopeSharedPtr(stats_store.createScope("wasm."))) {}
@@ -49,18 +85,28 @@ protected:
   Stats::ScopeSharedPtr scope_;
 };
 
-TEST_F(BaseVmTest, NoRuntime) { EXPECT_EQ(createWasmVm(""), nullptr); }
+TEST_F(BaseVmTest, UnspecifiedRuntime) {
+  auto wasm_vm = createWasmVm("");
+  absl::string_view first_wasm_engine_name = getFirstAvailableWasmEngineName();
+  // Envoy is built with "--define wasm=disabled", so no Wasm engine is available
+  if (first_wasm_engine_name.empty()) {
+    EXPECT_TRUE(wasm_vm.get() == nullptr);
+  } else {
+    ASSERT_TRUE(wasm_vm.get() != nullptr);
+    EXPECT_THAT(std::string(first_wasm_engine_name), HasSubstr(wasm_vm->getEngineName()));
+  }
+}
 
 TEST_F(BaseVmTest, BadRuntime) { EXPECT_EQ(createWasmVm("envoy.wasm.runtime.invalid"), nullptr); }
 
 TEST_F(BaseVmTest, NullVmStartup) {
   auto wasm_vm = createWasmVm("envoy.wasm.runtime.null");
   EXPECT_TRUE(wasm_vm != nullptr);
-  EXPECT_TRUE(wasm_vm->runtime() == "null");
+  EXPECT_TRUE(wasm_vm->getEngineName() == "null");
   EXPECT_TRUE(wasm_vm->cloneable() == Cloneable::InstantiatedModule);
   auto wasm_vm_clone = wasm_vm->clone();
   EXPECT_TRUE(wasm_vm_clone != nullptr);
-  EXPECT_EQ(wasm_vm->runtime(), "null");
+  EXPECT_EQ(wasm_vm->getEngineName(), "null");
   std::function<void()> f;
   EXPECT_FALSE(wasm_vm->integration()->getNullVmFunction("bad_function", false, 0, nullptr, &f));
 }
@@ -184,7 +230,7 @@ TEST_P(WasmVmTest, V8BadCode) { ASSERT_FALSE(init("bad code")); }
 
 TEST_P(WasmVmTest, V8Load) {
   ASSERT_TRUE(init());
-  EXPECT_TRUE(wasm_vm_->runtime() == "v8");
+  EXPECT_TRUE(wasm_vm_->getEngineName() == "v8");
   EXPECT_TRUE(wasm_vm_->cloneable() == Cloneable::CompiledBytecode);
   EXPECT_TRUE(wasm_vm_->clone() != nullptr);
 }

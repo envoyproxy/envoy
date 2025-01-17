@@ -7,7 +7,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/refcount_ptr.h"
-#include "envoy/stats/symbol_table.h"
 #include "envoy/stats/tag.h"
 
 #include "absl/strings/string_view.h"
@@ -16,7 +15,21 @@ namespace Envoy {
 namespace Stats {
 
 /**
+ * Runtime representation of an encoded stat name.
+ */
+class StatName;
+
+/**
+ * Holds a set of symbols used to compose hierarchical names.
+ */
+class SymbolTable;
+
+/**
  * General interface for all stats objects.
+ *
+ * Note: some methods must match those in `PrimitiveMetricMetadata` because stats sinks
+ * use templates to handle either type. The interface is not used for size/performance
+ * reasons.
  */
 class Metric : public RefcountInterface {
 public:
@@ -25,10 +38,7 @@ public:
    * Returns the full name of the Metric. This is intended for most uses, such
    * as streaming out the name to a stats sink or admin request, or comparing
    * against it in a test. Independent of the evolution of the data
-   * representation for the name, this method will be available. For storing the
-   * name as a map key, however, nameCStr() is a better choice, albeit one that
-   * might change in the future to return a symbolized representation of the
-   * elaborated string.
+   * representation for the name, this method will be available.
    */
   virtual std::string name() const PURE;
 
@@ -84,6 +94,11 @@ public:
   virtual bool used() const PURE;
 
   /**
+   * Indicates whether this metric is hidden.
+   */
+  virtual bool hidden() const PURE;
+
+  /**
    * Flags:
    * Used: used by all stats types to figure out whether they have been used.
    * Logic...: used by gauges to cache how they should be combined with a parent's value.
@@ -92,6 +107,7 @@ public:
     static constexpr uint8_t Used = 0x01;
     static constexpr uint8_t LogicAccumulate = 0x02;
     static constexpr uint8_t NeverImport = 0x04;
+    static constexpr uint8_t Hidden = 0x08;
   };
   virtual SymbolTable& symbolTable() PURE;
   virtual const SymbolTable& constSymbolTable() const PURE;
@@ -120,10 +136,12 @@ using CounterSharedPtr = RefcountPtr<Counter>;
  */
 class Gauge : public Metric {
 public:
+  // TODO(diazalan): Rename ImportMode to more generic name
   enum class ImportMode {
-    Uninitialized, // Gauge was discovered during hot-restart transfer.
-    NeverImport,   // On hot-restart, each process starts with gauge at 0.
-    Accumulate,    // Transfers gauge state on hot-restart.
+    Uninitialized,    // Gauge was discovered during hot-restart transfer.
+    NeverImport,      // On hot-restart, each process starts with gauge at 0.
+    Accumulate,       // Transfers gauge state on hot-restart.
+    HiddenAccumulate, // Will be transferred on hot-restart and ignored by admin/stats-sink
   };
 
   ~Gauge() override = default;
@@ -133,6 +151,15 @@ public:
   virtual void inc() PURE;
   virtual void set(uint64_t value) PURE;
   virtual void sub(uint64_t amount) PURE;
+  // When adjusting a gauge both ways (e.g. buffer size update when simultaneously
+  // streaming in and out), using this helper avoids touching the atomic twice.
+  inline void adjust(uint64_t add_amount, uint64_t sub_amount) {
+    if (add_amount > sub_amount) {
+      add(add_amount - sub_amount);
+    } else {
+      sub(sub_amount - add_amount);
+    }
+  }
   virtual uint64_t value() const PURE;
 
   /**
@@ -190,5 +217,68 @@ public:
 
 using TextReadoutSharedPtr = RefcountPtr<TextReadout>;
 
+/**
+ * Callback invoked to provide size of stats container.
+ */
+using SizeFn = std::function<void(std::size_t)>;
+
+/**
+ * Callback invoked for each stat during iteration.
+ */
+template <typename Stat> using StatFn = std::function<void(Stat&)>;
+
+/**
+ * Interface for stats lazy initialization.
+ * To save memory and CPU consumption on blocks of stats that are never referenced throughout the
+ * process lifetime, they can be encapsulated in a DeferredCreationCompatibleInterface. Then the
+Envoy
+ * bootstrap configuration can be set to defer the instantiation of those block. Note that when the
+ * blocks of stats are created, they carry an extra 60~100 byte overhead (depending on worker thread
+ * count) due to internal bookkeeping data structures. The overhead when deferred stats are disabled
+ * is just 8 bytes.
+* See more context: https://github.com/envoyproxy/envoy/issues/23575
+ */
+template <typename StatsStructType> class DeferredCreationCompatibleInterface {
+public:
+  /**
+   * Returns an already existing StatsStructType, or creates a new one and returns it.
+   *
+   * @return The new or already existing StatsStructType.
+   */
+  virtual StatsStructType& getOrCreate() PURE;
+
+  /**
+   * Returns whether or not the underlying stats have been initialized yet.
+   *
+   * @return If the underlying stats have been initialized.
+   */
+  virtual bool isPresent() const PURE;
+
+  virtual ~DeferredCreationCompatibleInterface() = default;
+};
+
+// A helper class for a lazy compatible stats struct type.
+template <typename StatsStructType> class DeferredCreationCompatibleStats {
+public:
+  explicit DeferredCreationCompatibleStats(
+      std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> d)
+      : data_(std::move(d)) {}
+  // Allows move construct and assign.
+  DeferredCreationCompatibleStats& operator=(DeferredCreationCompatibleStats&&) noexcept = default;
+  DeferredCreationCompatibleStats(DeferredCreationCompatibleStats&&) noexcept = default;
+
+  inline StatsStructType* operator->() { return &data_->getOrCreate(); };
+  inline StatsStructType& operator*() { return data_->getOrCreate(); };
+
+  /**
+   * Returns whether or not the underlying data_ has been initialized yet.
+   *
+   * @return If the underlying data_ has been initialized.
+   */
+  bool isPresent() const { return data_->isPresent(); }
+
+private:
+  std::unique_ptr<DeferredCreationCompatibleInterface<StatsStructType>> data_;
+};
 } // namespace Stats
 } // namespace Envoy

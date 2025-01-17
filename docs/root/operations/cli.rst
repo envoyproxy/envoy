@@ -3,14 +3,14 @@
 Command line options
 ====================
 
-Envoy is driven both by a JSON configuration file as well as a set of command line options. The
+Envoy is driven both by a configuration file as well as a set of command line options. The
 following are the command line options that Envoy supports.
 
 .. option:: -c <path string>, --config-path <path string>
 
-  *(optional)* The path to the v2 :ref:`JSON/YAML/proto3 configuration
+  *(optional)* The path to the :ref:`JSON/YAML/proto3 configuration
   file <config>`. If this flag is missing, :option:`--config-yaml` is required.
-  This will be parsed as a :ref:`v2 bootstrap configuration file
+  This will be parsed as a :ref:`bootstrap configuration file
   <config_overview_bootstrap>`.
   Valid extensions are ``.json``, ``.yaml``, ``.pb`` and ``.pb_text``, which indicate
   JSON, YAML, `binary proto3
@@ -30,13 +30,6 @@ following are the command line options that Envoy supports.
     .. code-block:: console
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
-
-.. option:: --bootstrap-version <integer>
-
-   *(optional)* The API version to load the bootstrap as. The value should be a single integer, e.g.
-   to parse the bootstrap configuration as V3, specify ``--bootstrap-version 3``. If unset, Envoy will
-   attempt to load the bootstrap as the previous API version and upgrade it to the latest. If that fails,
-   Envoy will attempt to load the configuration as the latest version.
 
 .. option:: --mode <string>
 
@@ -74,6 +67,25 @@ following are the command line options that Envoy supports.
   :option:`--restart-epoch` is non-zero. Instead, for subsequent hot restarts, set
   :option:`--base-id` option with the selected base ID. See :option:`--base-id-path`.
 
+.. option:: --skip-hot-restart-on-no-parent
+
+  *(optional)* In conjunction with :option:`--restart-epoch`, this flag allows for a failing hot
+  restart to fall back to normal startup behavior. When this flag is false, if the parent instance
+  was terminated, the child instance will also terminate during startup.
+
+  This only impacts if the parent instance was terminated before the new instance is initialized -
+  an unexpected parent termination after interprocess communication is established will still cause
+  the child instance to terminate due to failing communication.
+
+.. option:: --skip-hot-restart-parent-stats
+
+  *(optional)* In conjunction with :option:`--restart-epoch`, this flag allows for hot restart
+  to proceed without duplicating stats from the parent instance. Transferring stats can be an
+  expensive operation; skipping it can prevent overloading the main thread with this work, or
+  potentially dramatically increased memory load.
+
+  Has no effect if hot restarting is not in use.
+
 .. option:: --base-id-path <path_string>
 
   *(optional)* Writes the base ID to the given path. While this option is compatible with
@@ -97,6 +109,7 @@ following are the command line options that Envoy supports.
   never set this option. For example, if you want ``upstream`` component to run at ``debug`` level and
   ``connection`` component to run at ``trace`` level, you should pass ``upstream:debug,connection:trace`` to
   this flag. See ``ALL_LOGGER_IDS`` in :repo:`/source/common/common/logger.h` for a list of components.
+  This option is incompatible with :option:`--enable-fine-grain-logging`.
 
 .. option:: --cpuset-threads
 
@@ -164,7 +177,7 @@ following are the command line options that Envoy supports.
   *(optional)* This flag enables application log sanitization to escape C-style escape sequences.
   This can be used to prevent a single log line from spanning multiple lines in the underlying log.
   This sanitizes all escape sequences in `this list <https://en.cppreference.com/w/cpp/language/escape>`_.
-  Note that each line's trailing whitespace characters (such as EOL characters) will not be escaped.
+  Note that each line's final EOL character will not be escaped to preserve line format.
 
 .. option:: --restart-epoch <integer>
 
@@ -181,7 +194,7 @@ following are the command line options that Envoy supports.
   interface. If enabled, main log macros including ``ENVOY_LOG``, ``ENVOY_CONN_LOG``, ``ENVOY_STREAM_LOG`` and
   ``ENVOY_FLUSH_LOG`` will use a per-file logger, and the usage doesn't need ``Envoy::Logger::Loggable`` any
   more. The administration interface usage is similar. Please see :ref:`Administration interface
-  <operations_admin_interface>` for more detail.
+  <operations_admin_interface>` for more detail. This option is incompatible with :option:`--component-log-level`.
 
 .. option:: --socket-path <path string>
 
@@ -327,6 +340,21 @@ following are the command line options that Envoy supports.
   or count occurrences of unknown fields, in the interest of configuration processing speed. If
   :option:`--reject-unknown-dynamic-fields` is set to true, this flag has no effect.
 
+  .. attention::
+
+    In addition to not logging warnings or counting occurrences of unknown fields, setting this
+    option also disables counting and warnings of deprecated fields as well as work-in-progress
+    message and fields. It is *strongly* recommended that this option is not set on at least a
+    small portion of the fleet (staging, canary, etc.) in order to monitor for unknown,
+    deprecated, or work-in-progress usage.
+
+.. option:: --skip-deprecated-logs
+
+  *(optional)* This option disables the logging of deprecated field warnings during Protobuf message validation.
+  When enabled, deprecated fields will be silently ignored without generating log messages, which can be useful
+  for reducing log verbosity in production environments. By default, deprecated warnings are logged. The suppression
+  of these warnings is only activated when this CLI option is explicitly used.
+
 .. option:: --disable-extensions <extension list>
 
   *(optional)* This flag disabled the provided list of comma-separated extension names. Disabled
@@ -358,3 +386,9 @@ following are the command line options that Envoy supports.
   It enables core dumps by invoking `prctl <https://man7.org/linux/man-pages/man2/prctl.2.html>`_ using the
   PR_SET_DUMPABLE option. This is useful for container environments when using capabilities, given that when
   Envoy has more capabilities than its base environment core dumping will be disabled by the kernel.
+
+.. option:: --stats-tag
+
+  *(optional)* This flag provides a universal tag for all stats generated by Envoy. The format is ``tag:value``. Only
+  alphanumeric values are allowed for tag names. For tag values all characters are permitted except for '.' (dot).
+  This flag can be repeated multiple times to set multiple universal tags. Multiple values for the same tag name are not allowed.

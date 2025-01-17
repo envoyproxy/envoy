@@ -17,11 +17,10 @@
 #include "source/common/stats/null_counter.h"
 #include "source/common/stats/null_gauge.h"
 #include "source/common/stats/null_text_readout.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
 #include "circllhist.h"
 
 namespace Envoy {
@@ -61,11 +60,12 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() final { return symbol_table_; }
   bool used() const override { return used_; }
+  bool hidden() const override { return false; }
 
 private:
   Histogram::Unit unit_;
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
-  uint64_t current_active_;
+  uint64_t current_active_{0};
   histogram_t* histograms_[2];
   std::atomic<bool> used_;
   std::thread::id created_thread_id_;
@@ -104,12 +104,19 @@ public:
   const HistogramStatistics& cumulativeStatistics() const override {
     return cumulative_statistics_;
   }
-  const std::string quantileSummary() const override;
-  const std::string bucketSummary() const override;
+  std::string quantileSummary() const override;
+  std::string bucketSummary() const override;
+  std::vector<Bucket> detailedTotalBuckets() const override {
+    return detailedlBucketsHelper(*cumulative_histogram_);
+  }
+  std::vector<Bucket> detailedIntervalBuckets() const override {
+    return detailedlBucketsHelper(*interval_histogram_);
+  }
 
   // Stats::Metric
   SymbolTable& symbolTable() override;
   bool used() const override;
+  bool hidden() const override;
 
   // RefcountInterface
   void incRefCount() override;
@@ -122,6 +129,8 @@ public:
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
+  static std::vector<Stats::ParentHistogram::Bucket>
+  detailedlBucketsHelper(const histogram_t& histogram);
 
   Histogram::Unit unit_;
   ThreadLocalStoreImpl& thread_local_store_;
@@ -131,7 +140,7 @@ private:
   HistogramStatisticsImpl cumulative_statistics_;
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ ABSL_GUARDED_BY(merge_lock_);
-  bool merged_;
+  bool merged_{false};
   std::atomic<bool> shutting_down_{false};
   std::atomic<uint32_t> ref_count_{0};
   const uint64_t id_; // Index into TlsCache::histogram_cache_.
@@ -145,104 +154,35 @@ using ParentHistogramImplSharedPtr = RefcountPtr<ParentHistogramImpl>;
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
+  static const char DeleteScopeSync[];
+  static const char IterateScopeSync[];
   static const char MainDispatcherCleanupSync[];
 
   ThreadLocalStoreImpl(Allocator& alloc);
   ~ThreadLocalStoreImpl() override;
-
-  // Stats::Scope
-  Counter& counterFromStatNameWithTags(const StatName& name,
-                                       StatNameTagVectorOptConstRef tags) override {
-    return default_scope_->counterFromStatNameWithTags(name, tags);
-  }
-  Counter& counterFromString(const std::string& name) override {
-    return default_scope_->counterFromString(name);
-  }
-  ScopePtr createScope(const std::string& name) override;
-  ScopePtr scopeFromStatName(StatName name) override;
-  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
-    return default_scope_->deliverHistogramToSinks(histogram, value);
-  }
-  Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                   Gauge::ImportMode import_mode) override {
-    return default_scope_->gaugeFromStatNameWithTags(name, tags, import_mode);
-  }
-  Gauge& gaugeFromString(const std::string& name, Gauge::ImportMode import_mode) override {
-    return default_scope_->gaugeFromString(name, import_mode);
-  }
-  Histogram& histogramFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
-                                           Histogram::Unit unit) override {
-    return default_scope_->histogramFromStatNameWithTags(name, tags, unit);
-  }
-  Histogram& histogramFromString(const std::string& name, Histogram::Unit unit) override {
-    return default_scope_->histogramFromString(name, unit);
-  }
-  TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
-                                               StatNameTagVectorOptConstRef tags) override {
-    return default_scope_->textReadoutFromStatNameWithTags(name, tags);
-  }
-  TextReadout& textReadoutFromString(const std::string& name) override {
-    return default_scope_->textReadoutFromString(name);
-  }
-  NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
+  // Stats::Store
+  NullCounterImpl& nullCounter() override { return null_counter_; }
+  NullGaugeImpl& nullGauge() override { return null_gauge_; }
+  ScopeSharedPtr rootScope() override { return default_scope_; }
+  ConstScopeSharedPtr constRootScope() const override { return default_scope_; }
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
-  const TagProducer& tagProducer() const { return *tag_producer_; }
-  CounterOptConstRef findCounter(StatName name) const override {
-    CounterOptConstRef found_counter;
-    Thread::LockGuard lock(lock_);
-    for (ScopeImpl* scope : scopes_) {
-      found_counter = scope->findCounter(name);
-      if (found_counter.has_value()) {
-        return found_counter;
-      }
-    }
-    return absl::nullopt;
-  }
-  GaugeOptConstRef findGauge(StatName name) const override {
-    GaugeOptConstRef found_gauge;
-    Thread::LockGuard lock(lock_);
-    for (ScopeImpl* scope : scopes_) {
-      found_gauge = scope->findGauge(name);
-      if (found_gauge.has_value()) {
-        return found_gauge;
-      }
-    }
-    return absl::nullopt;
-  }
-  HistogramOptConstRef findHistogram(StatName name) const override {
-    HistogramOptConstRef found_histogram;
-    Thread::LockGuard lock(lock_);
-    for (ScopeImpl* scope : scopes_) {
-      found_histogram = scope->findHistogram(name);
-      if (found_histogram.has_value()) {
-        return found_histogram;
-      }
-    }
-    return absl::nullopt;
-  }
-  TextReadoutOptConstRef findTextReadout(StatName name) const override {
-    TextReadoutOptConstRef found_text_readout;
-    Thread::LockGuard lock(lock_);
-    for (ScopeImpl* scope : scopes_) {
-      found_text_readout = scope->findTextReadout(name);
-      if (found_text_readout.has_value()) {
-        return found_text_readout;
-      }
-    }
-    return absl::nullopt;
-  }
 
   bool iterate(const IterateFn<Counter>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<Gauge>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
 
-  // Stats::Store
   std::vector<CounterSharedPtr> counters() const override;
   std::vector<GaugeSharedPtr> gauges() const override;
   std::vector<TextReadoutSharedPtr> textReadouts() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
+
+  void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
+  void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
+  void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+  void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
+  void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -255,8 +195,17 @@ public:
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
   void mergeHistograms(PostMergeCb merge_cb) override;
+  void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
 
   Histogram& tlsHistogram(ParentHistogramImpl& parent, uint64_t id);
+
+  void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
+  void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
+  void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+  void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
+
+  void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override;
+  OptRef<SinkPredicates> sinkPredicates() override { return sink_predicates_; }
 
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.
@@ -270,6 +219,12 @@ public:
 
   bool decHistogramRefCount(ParentHistogramImpl& histogram, std::atomic<uint32_t>& ref_count);
   void releaseHistogramCrossThread(uint64_t histogram_id);
+
+  const TagProducer& tagProducer() const { return *tag_producer_; }
+  void extractAndAppendTags(StatName name, StatNamePool& pool, StatNameTagVector& tags) override;
+  void extractAndAppendTags(absl::string_view name, StatNamePool& pool,
+                            StatNameTagVector& tags) override;
+  const TagVector& fixedTags() override { return tag_producer_->fixedTags(); };
 
 private:
   friend class ThreadLocalStoreTestingPeer;
@@ -328,7 +283,6 @@ private:
     // Stats::Scope
     Counter& counterFromStatNameWithTags(const StatName& name,
                                          StatNameTagVectorOptConstRef tags) override;
-    void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
     Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                      Gauge::ImportMode import_mode) override;
     Histogram& histogramFromStatNameWithTags(const StatName& name,
@@ -336,13 +290,8 @@ private:
                                              Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
-    ScopePtr createScope(const std::string& name) override {
-      return parent_.createScope(symbolTable().toString(prefix_.statName()) + "." + name);
-    }
-    ScopePtr scopeFromStatName(StatName name) override {
-      SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
-      return parent_.scopeFromStatName(StatName(joined.get()));
-    }
+    ScopeSharedPtr createScope(const std::string& name) override;
+    ScopeSharedPtr scopeFromStatName(StatName name) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -364,8 +313,6 @@ private:
       return textReadoutFromStatName(storage.statName());
     }
 
-    NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
-
     template <class StatMap, class StatFn> bool iterHelper(StatFn fn, const StatMap& map) const {
       for (auto& iter : map) {
         if (!fn(iter.second)) {
@@ -376,17 +323,36 @@ private:
     }
 
     bool iterate(const IterateFn<Counter>& fn) const override {
-      return iterHelper(fn, central_cache_->counters_);
+      Thread::LockGuard lock(parent_.lock_);
+      return iterateLockHeld(fn);
     }
     bool iterate(const IterateFn<Gauge>& fn) const override {
-      return iterHelper(fn, central_cache_->gauges_);
+      Thread::LockGuard lock(parent_.lock_);
+      return iterateLockHeld(fn);
     }
     bool iterate(const IterateFn<Histogram>& fn) const override {
-      return iterHelper(fn, central_cache_->histograms_);
+      Thread::LockGuard lock(parent_.lock_);
+      return iterateLockHeld(fn);
     }
     bool iterate(const IterateFn<TextReadout>& fn) const override {
-      return iterHelper(fn, central_cache_->text_readouts_);
+      Thread::LockGuard lock(parent_.lock_);
+      return iterateLockHeld(fn);
     }
+
+    bool iterateLockHeld(const IterateFn<Counter>& fn) const {
+      return iterHelper(fn, centralCacheLockHeld()->counters_);
+    }
+    bool iterateLockHeld(const IterateFn<Gauge>& fn) const {
+      return iterHelper(fn, centralCacheLockHeld()->gauges_);
+    }
+    bool iterateLockHeld(const IterateFn<Histogram>& fn) const {
+      return iterHelper(fn, centralCacheLockHeld()->histograms_);
+    }
+    bool iterateLockHeld(const IterateFn<TextReadout>& fn) const {
+      return iterHelper(fn, centralCacheLockHeld()->text_readouts_);
+    }
+    ThreadLocalStoreImpl& store() override { return parent_; }
+    const ThreadLocalStoreImpl& constStore() const override { return parent_; }
 
     // NOTE: The find methods assume that `name` is fully-qualified.
     // Implementations will not add the scope prefix.
@@ -394,6 +360,8 @@ private:
     GaugeOptConstRef findGauge(StatName name) const override;
     HistogramOptConstRef findHistogram(StatName name) const override;
     TextReadoutOptConstRef findTextReadout(StatName name) const override;
+
+    HistogramOptConstRef findHistogramLockHeld(StatName name) const;
 
     template <class StatType>
     using MakeStatFn = std::function<RefcountPtr<StatType>(
@@ -436,12 +404,43 @@ private:
     template <class StatType>
     StatTypeOptConstRef<StatType>
     findStatLockHeld(StatName name,
-                     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
+                     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const {
+      auto iter = central_cache_map.find(name);
+      if (iter == central_cache_map.end()) {
+        return absl::nullopt;
+      }
+
+      return std::cref(*iter->second);
+    }
+
+    StatName prefix() const override { return prefix_.statName(); }
+
+    // Returns the central cache, asserting that the parent lock is held.
+    //
+    // When a ThreadLocalStore method takes lock_ and then accesses
+    // scope->central_cache_, the analysis system cannot understand that the
+    // scope's parent_.lock_ is held, so we assert that here.
+    const CentralCacheEntrySharedPtr& centralCacheLockHeld() const
+        ABSL_ASSERT_EXCLUSIVE_LOCK(parent_.lock_) {
+      return central_cache_;
+    }
+
+    // Returns the central cache, bypassing thread analysis.
+    //
+    // This is used only when passing references to maps held in the central
+    // cache to safeMakeStat, which takes the lock only if those maps are
+    // actually referenced, due to the lookup missing the TLS cache.
+    const CentralCacheEntrySharedPtr&
+    centralCacheNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
+      return central_cache_;
+    }
 
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
+
+  private:
     StatNameStorage prefix_;
-    mutable CentralCacheEntrySharedPtr central_cache_;
+    mutable CentralCacheEntrySharedPtr central_cache_ ABSL_GUARDED_BY(parent_.lock_);
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -462,14 +461,28 @@ private:
     absl::flat_hash_map<uint64_t, TlsHistogramSharedPtr> tls_histogram_cache_;
   };
 
-  template <class StatFn> bool iterHelper(StatFn fn) const {
+  using ScopeImplSharedPtr = std::shared_ptr<ScopeImpl>;
+
+  /**
+   * Calls fn_lock_held for every scope with, lock_ held. This avoids iterate/destruct
+   * races for scopes.
+   *
+   * @param fn_lock_held function to be called, with lock_ held, on every scope, until
+   *   fn_lock_held() returns false.
+   * @return true if the iteration completed with fn_lock_held never returning false.
+   */
+  bool iterateScopes(const std::function<bool(const ScopeImplSharedPtr&)> fn_lock_held) const {
     Thread::LockGuard lock(lock_);
-    for (ScopeImpl* scope : scopes_) {
-      if (!scope->iterate(fn)) {
-        return false;
-      }
-    }
-    return true;
+    return iterateScopesLockHeld(fn_lock_held);
+  }
+
+  bool iterateScopesLockHeld(const std::function<bool(const ScopeImplSharedPtr&)> fn) const
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+
+  // The Store versions of iterate cover all the scopes in the store.
+  template <class StatFn> bool iterHelper(StatFn fn) const {
+    return iterateScopes(
+        [fn](const ScopeImplSharedPtr& scope) -> bool { return scope->iterateLockHeld(fn); });
   }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
@@ -483,18 +496,23 @@ private:
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
+  template <class StatSharedPtr>
+  void removeRejectedStats(StatNameHashMap<StatSharedPtr>& map,
+                           std::function<void(const StatSharedPtr&)> f_deletion);
   bool checkAndRememberRejection(StatName name, StatsMatcher::FastResult fast_reject_result,
                                  StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
   TlsCache& tlsCache() { return **tls_cache_; }
+  void addScope(std::shared_ptr<ScopeImpl>& new_scope);
 
+  OptRef<SinkPredicates> sink_predicates_;
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;
   ThreadLocal::TypedSlotPtr<TlsCache> tls_cache_;
   mutable Thread::MutexBasicLockable lock_;
-  absl::flat_hash_set<ScopeImpl*> scopes_ ABSL_GUARDED_BY(lock_);
-  ScopePtr default_scope_;
+  absl::flat_hash_map<ScopeImpl*, std::weak_ptr<ScopeImpl>> scopes_ ABSL_GUARDED_BY(lock_);
+  ScopeSharedPtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
   StatsMatcherPtr stats_matcher_;
@@ -502,7 +520,6 @@ private:
   std::atomic<bool> threading_ever_initialized_{};
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
-  AllocatorImpl heap_allocator_;
   OptRef<ThreadLocal::Instance> tls_;
 
   NullCounterImpl null_counter_;
@@ -510,7 +527,7 @@ private:
   NullHistogramImpl null_histogram_;
   NullTextReadoutImpl null_text_readout_;
 
-  Thread::ThreadSynchronizer sync_;
+  mutable Thread::ThreadSynchronizer sync_;
   std::atomic<uint64_t> next_scope_id_{};
   uint64_t next_histogram_id_ ABSL_GUARDED_BY(hist_mutex_) = 0;
 
@@ -518,6 +535,7 @@ private:
 
   mutable Thread::MutexBasicLockable hist_mutex_;
   StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
+  StatSet<ParentHistogramImpl> sinked_histograms_ ABSL_GUARDED_BY(hist_mutex_);
 
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats
@@ -527,10 +545,7 @@ private:
   // It seems like it would be better to have each client that expects a stat
   // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
   // but that would be fairly complex to change.
-  std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(lock_);
-  std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(lock_);
   std::vector<HistogramSharedPtr> deleted_histograms_ ABSL_GUARDED_BY(lock_);
-  std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(lock_);
 
   // Scope IDs and central cache entries that are queued for cross-scope release.
   // Because there can be a large number of scopes, all of which are released at once,

@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/filter/thrift/router/v2alpha1/router.pb.h"
 #include "envoy/config/filter/thrift/router/v2alpha1/router.pb.validate.h"
 #include "envoy/tcp/conn_pool.h"
@@ -18,12 +19,14 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::AtLeast;
+using testing::Bool;
 using testing::Combine;
 using testing::ContainsRegex;
 using testing::Eq;
@@ -104,26 +107,37 @@ public:
           return protocol;
         }),
         transport_register_(transport_factory_), protocol_register_(protocol_factory_) {
-    context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
+    context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
   }
 
-  void initializeRouter(bool use_real_shadow_writer = false) {
+  void initializeRouter(ShadowWriter& shadow_writer, bool close_downstream_on_error) {
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    if (!use_real_shadow_writer) {
-      router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
-                                         context_.runtime(), shadow_writer_);
-    } else {
-      shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(context_.clusterManager(), "test",
-                                                               context_.scope(), dispatcher_);
-      router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
-                                         context_.runtime(), *shadow_writer_impl_);
-    }
+    router_ = std::make_unique<Router>(context_.server_factory_context_.cluster_manager_, *stats_,
+                                       context_.server_factory_context_.runtime_loader_,
+                                       shadow_writer, close_downstream_on_error);
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
+    router_->onAboveWriteBufferHighWatermark();
+    router_->onBelowWriteBufferLowWatermark();
 
     router_->setDecoderFilterCallbacks(callbacks_);
+  }
+
+  void initializeRouter(bool close_downstream_on_error = true) {
+    stats_ = std::make_shared<const RouterStats>("test", context_.scope(),
+                                                 context_.server_factory_context_.localInfo());
+    initializeRouter(shadow_writer_, close_downstream_on_error);
+  }
+
+  void initializeRouterWithShadowWriter() {
+    stats_ = std::make_shared<const RouterStats>("test", context_.scope(),
+                                                 context_.server_factory_context_.localInfo());
+    shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(
+        context_.server_factory_context_.clusterManager(), *stats_, dispatcher_,
+        context_.server_factory_context_.threadLocal());
+    initializeRouter(*shadow_writer_impl_, true);
   }
 
   void initializeMetadata(MessageType msg_type, std::string method = "method",
@@ -134,6 +148,104 @@ public:
     metadata_->setMethodName(method);
     metadata_->setMessageType(msg_type_);
     metadata_->setSequenceId(sequence_id);
+  }
+
+  void verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match) {
+    ProtobufWkt::Struct request_struct;
+    ProtobufWkt::Value val;
+
+    // Populate metadata like StreamInfo.setDynamicMetadata() would.
+    auto& fields_map = *request_struct.mutable_fields();
+    val.set_string_value("v3.1");
+    fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
+    val.set_string_value("1");
+    fields_map["xkey_in_request"] = val;
+    (*callbacks_.stream_info_.metadata_
+          .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+        request_struct;
+
+    // Populate route entry's metadata which will be overridden.
+    val.set_string_value("v3.0");
+    fields_map = *request_struct.mutable_fields();
+    fields_map["version"] = val;
+    fields_map.erase("xkey_in_request");
+    Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(request_struct);
+
+    if (route_entry_has_match) {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(&route_entry_matches));
+    } else {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+    }
+
+    auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+    EXPECT_EQ(match.size(), 3);
+    auto it = match.begin();
+
+    // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+    // below matters.
+
+    // `stage` was only set by the request, not by the route entry.
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    // `version` should be what came from the request and override the route entry's.
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+    it++;
+
+    // `xkey_in_request` was only set by the request
+    EXPECT_EQ((*it)->name(), "xkey_in_request");
+    EXPECT_EQ((*it)->value().value().string_value(), "1");
+  }
+
+  void verifyMetadataMatchCriteriaFromRoute(bool route_entry_has_match) {
+    ProtobufWkt::Struct route_struct;
+    ProtobufWkt::Value val;
+
+    auto& fields_map = *route_struct.mutable_fields();
+    val.set_string_value("v3.1");
+    fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
+
+    Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(route_struct);
+
+    if (route_entry_has_match) {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(&route_entry_matches));
+
+      EXPECT_NE(nullptr, router_->metadataMatchCriteria());
+      auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+      EXPECT_EQ(match.size(), 2);
+      auto it = match.begin();
+
+      // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+      // below matters.
+
+      // `stage` was set by the route entry.
+      EXPECT_EQ((*it)->name(), "stage");
+      EXPECT_EQ((*it)->value().value().string_value(), "devel");
+      it++;
+
+      // `version` was set by the route entry.
+      EXPECT_EQ((*it)->name(), "version");
+      EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+    } else {
+      ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
+          .WillByDefault(Return(nullptr));
+
+      EXPECT_EQ(nullptr, router_->metadataMatchCriteria());
+    }
+  }
+
+  void initializeUpstreamZone() {
+    upstream_locality_.set_zone("other_zone_name");
+    ON_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                 .host_,
+            locality())
+        .WillByDefault(ReturnRef(upstream_locality_));
   }
 
   void startRequest(MessageType msg_type, std::string method = "method",
@@ -171,18 +283,21 @@ public:
   }
 
   void connectUpstream() {
-    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+    EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.connection_data_,
                 addUpstreamCallbacks(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
         }));
 
     conn_state_.reset();
-    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+    EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.connection_data_,
                 connectionState())
         .WillRepeatedly(
             Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
-    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+    EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.connection_data_,
                 setConnectionState_(_))
         .WillOnce(Invoke(
             [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state_.swap(cs); }));
@@ -195,7 +310,8 @@ public:
         }));
 
     EXPECT_CALL(callbacks_, continueDecoding());
-    context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(upstream_connection_);
+    context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+        .poolReady(upstream_connection_);
 
     EXPECT_NE(nullptr, upstream_callbacks_);
   }
@@ -209,7 +325,8 @@ public:
 
     initializeMetadata(msg_type, "method", sequence_id);
 
-    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+    EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.connection_data_,
                 addUpstreamCallbacks(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
@@ -218,7 +335,8 @@ public:
     if (!conn_state_) {
       conn_state_ = std::make_unique<ThriftConnectionState>();
     }
-    EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+    EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.connection_data_,
                 connectionState())
         .WillRepeatedly(
             Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
@@ -249,12 +367,15 @@ public:
           }));
     };
     EXPECT_CALL(callbacks_, continueDecoding()).Times(0);
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+    EXPECT_CALL(
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+        newConnection(_))
         .WillOnce(
             Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-              context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
-              context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
-                  upstream_connection_);
+              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .newConnectionImpl(cb);
+              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .poolReady(upstream_connection_);
               return nullptr;
             }));
 
@@ -340,7 +461,7 @@ public:
       EXPECT_EQ(FilterStatus::Continue, router_->stringValue(v));
     } break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 
@@ -416,6 +537,13 @@ public:
     EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
   }
 
+  void sendPassthroughData() {
+    Buffer::OwnedImpl buffer;
+    buffer.add("hello");
+
+    EXPECT_EQ(FilterStatus::Continue, router_->passthroughData(buffer));
+  }
+
   void completeRequest() {
     for (auto& protocol : all_protocols_) {
       EXPECT_CALL(*protocol, writeMessageEnd(_));
@@ -428,15 +556,17 @@ public:
     EXPECT_CALL(upstream_connection_, write(_, false));
 
     if (msg_type_ == MessageType::Oneway) {
-      EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
-                  released(Ref(upstream_connection_)));
+      EXPECT_CALL(
+          context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+          released(Ref(upstream_connection_)));
     }
 
     EXPECT_EQ(FilterStatus::Continue, router_->messageEnd());
     EXPECT_EQ(FilterStatus::Continue, router_->transportEnd());
   }
 
-  void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true) {
+  void returnResponse(MessageType msg_type = MessageType::Reply, bool is_success = true,
+                      bool is_drain = false, bool is_partial = false) {
     Buffer::OwnedImpl buffer;
 
     EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
@@ -444,6 +574,8 @@ public:
     auto metadata = std::make_shared<MessageMetadata>();
     metadata->setMessageType(msg_type);
     metadata->setSequenceId(1);
+    metadata->setDraining(is_drain);
+
     ON_CALL(callbacks_, responseMetadata()).WillByDefault(Return(metadata));
     ON_CALL(callbacks_, responseSuccess()).WillByDefault(Return(is_success));
 
@@ -451,16 +583,57 @@ public:
         .WillOnce(Return(ThriftFilters::ResponseStatus::MoreData));
     upstream_callbacks_->onUpstreamData(buffer, false);
 
+    if (is_partial) {
+      return;
+    }
+
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
         .WillOnce(Return(ThriftFilters::ResponseStatus::Complete));
-    EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
-                released(Ref(upstream_connection_)));
+    EXPECT_CALL(
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+        released(Ref(upstream_connection_)));
+
+    if (is_drain) {
+      EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush))
+          .WillOnce(Invoke([&](Network::ConnectionCloseType) -> void {
+            // Simulate the upstream connection being closed.
+            upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+          }));
+    }
+
     upstream_callbacks_->onUpstreamData(buffer, false);
   }
 
   void destroyRouter() {
     router_->onDestroy();
     router_.reset();
+  }
+
+  void expectStatCalls(Stats::MockStore& cluster_store) {
+    Stats::MockScope& cluster_scope = cluster_store.mockScope();
+    ON_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+            statsScope())
+        .WillByDefault(ReturnRef(cluster_scope));
+
+    EXPECT_CALL(cluster_store, counter("thrift.upstream_rq_call")).Times(AtLeast(1));
+    EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_reply")).Times(AtLeast(1));
+    EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_success")).Times(AtLeast(1));
+
+    EXPECT_CALL(cluster_store,
+                histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
+    EXPECT_CALL(cluster_store,
+                deliverHistogramToSinks(
+                    testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
+
+    EXPECT_CALL(cluster_store, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
+    EXPECT_CALL(cluster_store,
+                deliverHistogramToSinks(
+                    testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
+    EXPECT_CALL(cluster_store,
+                histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
+    EXPECT_CALL(cluster_store,
+                deliverHistogramToSinks(
+                    testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
   }
 
   TestNamedTransportConfigFactory transport_factory_;
@@ -475,6 +648,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 
   std::unique_ptr<Router> router_;
+  std::shared_ptr<const RouterStats> stats_;
   MockShadowWriter shadow_writer_;
   std::shared_ptr<ShadowWriterImpl> shadow_writer_impl_;
 
@@ -489,7 +663,7 @@ public:
   int32_t protocols_requested_{};
   NiceMock<MockRoute>* route_{};
   NiceMock<MockRouteEntry> route_entry_;
-  NiceMock<Upstream::MockHostDescription>* host_{};
+  envoy::config::core::v3::Locality upstream_locality_;
   Tcp::ConnectionPool::ConnectionStatePtr conn_state_;
 
   RouteConstSharedPtr route_ptr_;
@@ -557,105 +731,203 @@ INSTANTIATE_TEST_SUITE_P(DownstreamUpstreamTypes, ThriftRouterPassthroughTest,
                                  Values(ProtocolType::Binary, ProtocolType::Twitter)),
                          downstreamUpstreamTypesToString);
 
-TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
-  initializeRouter();
+class ThriftRouterRainidayTest : public testing::TestWithParam<bool>,
+                                 public ThriftRouterTestBase {};
+
+INSTANTIATE_TEST_SUITE_P(CloseDownstreamOnError, ThriftRouterRainidayTest, Bool());
+
+TEST_P(ThriftRouterRainidayTest, PoolRemoteConnectionFailure) {
+  initializeRouter(GetParam());
 
   startRequest(MessageType::Call);
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_THAT(app_ex.what(),
+                    ContainsRegex(
+                        ".*connection failure before response start: remote connection failure.*"));
+        EXPECT_EQ(GetParam(), end_stream);
       }));
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  EXPECT_CALL(callbacks_, continueDecoding()).Times(GetParam() ? 0 : 1);
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception_local.remote_connection_failure")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception_local")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception")
+                .value());
+  EXPECT_EQ(0UL, context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.host_->stats_.rq_error_.value());
 }
 
-TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, PoolLocalConnectionFailure) {
+  initializeRouter(GetParam());
 
   startRequest(MessageType::Call);
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception_local.local_connection_failure")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception_local")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception")
+                .value());
+  EXPECT_EQ(0UL, context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.host_->stats_.rq_error_.value());
 }
 
-TEST_F(ThriftRouterTest, PoolTimeout) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, PoolTimeout) {
+  initializeRouter(GetParam());
 
   startRequest(MessageType::Call);
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_THAT(app_ex.what(),
+                    ContainsRegex(".*connection failure before response start: timeout.*"));
+        EXPECT_EQ(GetParam(), end_stream);
       }));
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::Timeout);
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::Timeout);
+
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception_local.timeout")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception_local")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception")
+                .value());
+  EXPECT_EQ(0UL, context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.host_->stats_.rq_error_.value());
 }
 
-TEST_F(ThriftRouterTest, PoolOverflowFailure) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, PoolOverflowFailure) {
+  initializeRouter(GetParam());
 
   startRequest(MessageType::Call);
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*too many connections.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_FALSE(end_stream);
       }));
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::Overflow, true);
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::Overflow, true);
+
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception_local.overflow")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception_local")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception")
+                .value());
+  EXPECT_EQ(0UL, context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.host_->stats_.rq_error_.value());
 }
 
-TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, PoolConnectionFailureWithOnewayMessage) {
+  initializeRouter(GetParam());
   startRequest(MessageType::Oneway);
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_oneway")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_oneway")
+                .value());
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _)).Times(0);
-  EXPECT_CALL(callbacks_, resetDownstreamConnection());
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  EXPECT_CALL(callbacks_, sendLocalReply(_, Eq(GetParam())));
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception")
+                .value());
+  EXPECT_EQ(0UL, context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.host_->stats_.rq_error_.value());
 
   destroyRouter();
 }
 
-TEST_F(ThriftRouterTest, NoRoute) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, NoRoute) {
+  initializeRouter(GetParam());
   initializeMetadata(MessageType::Call);
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
@@ -664,40 +936,79 @@ TEST_F(ThriftRouterTest, NoRoute) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::UnknownMethod, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.route_missing").value());
 }
 
-TEST_F(ThriftRouterTest, NoCluster) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, NoCluster) {
+  initializeRouter(GetParam());
   initializeMetadata(MessageType::Call);
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(context_.cluster_manager_, getThreadLocalCluster(Eq(cluster_name_)))
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster(Eq(cluster_name_)))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
 }
 
-TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
+// Test the case where both dynamic metadata match criteria
+// and route metadata match criteria is not empty.
+TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRequest) {
   initializeRouter();
+  initializeMetadata(MessageType::Call);
+
+  verifyMetadataMatchCriteriaFromRequest(true);
+}
+
+// Test the case where route metadata match criteria is empty
+// but with non-empty dynamic metadata match criteria.
+TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
+  initializeRouter();
+  initializeMetadata(MessageType::Call);
+
+  verifyMetadataMatchCriteriaFromRequest(false);
+}
+
+// Test the case where dynamic metadata match criteria is empty
+// but with non-empty route metadata match criteria.
+TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRoute) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+
+  verifyMetadataMatchCriteriaFromRoute(true);
+}
+
+// Test the case where both dynamic metadata match criteria
+// and route metadata match criteria is empty.
+TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRouteNoRouteEntryMatch) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+
+  verifyMetadataMatchCriteriaFromRoute(false);
+}
+
+TEST_P(ThriftRouterRainidayTest, ClusterMaintenanceMode) {
+  initializeRouter(GetParam());
   initializeMetadata(MessageType::Call);
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, maintenanceMode())
+  EXPECT_CALL(
+      *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+      maintenanceMode())
       .WillOnce(Return(true));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
@@ -705,23 +1016,26 @@ TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.upstream_rq_maintenance_mode").value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
 }
 
-TEST_F(ThriftRouterTest, NoHealthyHosts) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, NoHealthyHosts) {
+  initializeRouter(GetParam());
   initializeMetadata(MessageType::Call);
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _))
       .WillOnce(Return(absl::nullopt));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
@@ -729,14 +1043,16 @@ TEST_F(ThriftRouterTest, NoHealthyHosts) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no healthy upstream.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_EQ(GetParam(), end_stream);
       }));
 
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
   EXPECT_EQ(1U, context_.scope().counterFromString("test.no_healthy_upstream").value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
 }
 
 TEST_F(ThriftRouterTest, TruncatedResponse) {
@@ -751,28 +1067,19 @@ TEST_F(ThriftRouterTest, TruncatedResponse) {
   EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
   EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
       .WillOnce(Return(ThriftFilters::ResponseStatus::MoreData));
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
-              released(Ref(upstream_connection_)));
+  EXPECT_CALL(
+      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+      released(Ref(upstream_connection_)));
   EXPECT_CALL(callbacks_, resetDownstreamConnection());
 
   upstream_callbacks_->onUpstreamData(buffer, true);
   destroyRouter();
-}
 
-TEST_F(ThriftRouterTest, UpstreamRemoteCloseMidResponse) {
-  initializeRouter();
-  startRequest(MessageType::Call);
-  connectUpstream();
-
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
-      }));
-  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
-  destroyRouter();
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.downstream_cx_underflow_response_close")
+                .value());
 }
 
 TEST_F(ThriftRouterTest, UpstreamLocalCloseMidResponse) {
@@ -813,8 +1120,8 @@ TEST_F(ThriftRouterTest, UpstreamDataTriggersReset) {
   destroyRouter();
 }
 
-TEST_F(ThriftRouterTest, UnexpectedUpstreamRemoteClose) {
-  initializeRouter();
+TEST_P(ThriftRouterRainidayTest, UnexpectedUpstreamRemoteClose) {
+  initializeRouter(GetParam());
   startRequest(MessageType::Call);
   connectUpstream();
   sendTrivialStruct(FieldType::String);
@@ -823,31 +1130,26 @@ TEST_F(ThriftRouterTest, UnexpectedUpstreamRemoteClose) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_THAT(app_ex.what(),
+                    ContainsRegex(
+                        ".*connection failure before response start: remote connection failure.*"));
+        EXPECT_EQ(GetParam(), end_stream);
       }));
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  EXPECT_CALL(callbacks_, onReset()).Times(0);
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-TEST_F(ThriftRouterTest, UnexpectedUpstreamLocalClose) {
-  initializeRouter();
+TEST_F(ThriftRouterRainidayTest, UnexpectedUpstreamRemoteCloseCompletedRequest) {
+  initializeRouter(false);
   startRequest(MessageType::Call);
   connectUpstream();
-  sendTrivialStruct(FieldType::String);
+  completeRequest();
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-        EXPECT_TRUE(end_stream);
-      }));
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  EXPECT_CALL(callbacks_, sendLocalReply(_, false));
+  EXPECT_CALL(callbacks_, onReset());
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -862,7 +1164,9 @@ TEST_F(ThriftRouterTest, DontCloseConnectionTwice) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(),
+                    ContainsRegex(
+                        ".*connection failure before response start: remote connection failure.*"));
         EXPECT_TRUE(end_stream);
       }));
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -876,8 +1180,10 @@ TEST_F(ThriftRouterTest, UnexpectedRouterDestroyBeforeUpstreamConnect) {
   initializeRouter();
   startRequest(MessageType::Call);
 
-  EXPECT_EQ(1, context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.handles_.size());
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.handles_.front(),
+  EXPECT_EQ(1, context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .tcp_conn_pool_.handles_.size());
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .handles_.front(),
               cancel(Tcp::ConnectionPool::CancelPolicy::Default));
   destroyRouter();
 }
@@ -891,46 +1197,51 @@ TEST_F(ThriftRouterTest, UnexpectedRouterDestroy) {
 }
 
 TEST_F(ThriftRouterTest, ProtocolUpgrade) {
-  Stats::MockStore cluster_scope;
-  ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
+  Stats::MockStore cluster_store;
+  Stats::MockScope& cluster_scope{cluster_store.mockScope()};
+  ON_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+          statsScope())
       .WillByDefault(ReturnRef(cluster_scope));
 
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call"));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply"));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_rq_call"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_reply"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_success"));
 
   initializeRouter();
   startRequest(MessageType::Call);
 
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+  EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .tcp_conn_pool_.connection_data_,
               addUpstreamCallbacks(_))
       .WillOnce(Invoke(
           [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; }));
 
   conn_state_.reset();
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+  EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .tcp_conn_pool_.connection_data_,
               connectionState())
       .WillRepeatedly(
           Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+  EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .tcp_conn_pool_.connection_data_,
               setConnectionState_(_))
       .WillOnce(Invoke(
           [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state_.swap(cs); }));
 
   EXPECT_CALL(*protocol_, supportsUpgrade()).WillOnce(Return(true));
 
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
 
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
 
@@ -947,7 +1258,8 @@ TEST_F(ThriftRouterTest, ProtocolUpgrade) {
         EXPECT_EQ("upgrade request", buffer.toString());
       }));
 
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(upstream_connection_);
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
+      upstream_connection_);
   EXPECT_NE(nullptr, upstream_callbacks_);
 
   Buffer::OwnedImpl buffer;
@@ -977,17 +1289,20 @@ TEST_F(ThriftRouterTest, ProtocolUpgrade) {
 TEST_F(ThriftRouterTest, ProtocolUpgradeOnExistingUnusedConnection) {
   initializeRouter();
 
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+  EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .tcp_conn_pool_.connection_data_,
               addUpstreamCallbacks(_))
       .WillOnce(Invoke(
           [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; }));
 
   conn_state_.reset();
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+  EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .tcp_conn_pool_.connection_data_,
               connectionState())
       .WillRepeatedly(
           Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+  EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .tcp_conn_pool_.connection_data_,
               setConnectionState_(_))
       .WillOnce(Invoke(
           [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state_.swap(cs); }));
@@ -1000,10 +1315,13 @@ TEST_F(ThriftRouterTest, ProtocolUpgradeOnExistingUnusedConnection) {
       }));
 
   // Simulate an existing connection that's never been used.
-  EXPECT_CALL(context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_, newConnection(_))
+  EXPECT_CALL(
+      context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
+      newConnection(_))
       .WillOnce(
           Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.newConnectionImpl(cb);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .newConnectionImpl(cb);
 
             EXPECT_CALL(*protocol_, supportsUpgrade()).WillOnce(Return(true));
 
@@ -1014,8 +1332,8 @@ TEST_F(ThriftRouterTest, ProtocolUpgradeOnExistingUnusedConnection) {
                   return ThriftObjectPtr{upgrade_response};
                 }));
 
-            context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
-                upstream_connection_);
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                .poolReady(upstream_connection_);
             return nullptr;
           }));
 
@@ -1044,28 +1362,36 @@ TEST_F(ThriftRouterTest, ProtocolUpgradeOnExistingUnusedConnection) {
   returnResponse();
   destroyRouter();
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_reply")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_success")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_reply")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_success")
+                .value());
 }
 
 TEST_F(ThriftRouterTest, ProtocolUpgradeSkippedOnExistingConnection) {
   initializeRouter();
   startRequest(MessageType::Call);
 
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+  EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .tcp_conn_pool_.connection_data_,
               addUpstreamCallbacks(_))
       .WillOnce(Invoke(
           [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; }));
 
   conn_state_ = std::make_unique<ThriftConnectionState>();
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.connection_data_,
+  EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                   .tcp_conn_pool_.connection_data_,
               connectionState())
       .WillRepeatedly(
           Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
@@ -1085,7 +1411,8 @@ TEST_F(ThriftRouterTest, ProtocolUpgradeSkippedOnExistingConnection) {
       }));
   EXPECT_CALL(callbacks_, continueDecoding());
 
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(upstream_connection_);
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(
+      upstream_connection_);
   EXPECT_NE(nullptr, upstream_callbacks_);
 
   // Then the actual request...
@@ -1094,32 +1421,43 @@ TEST_F(ThriftRouterTest, ProtocolUpgradeSkippedOnExistingConnection) {
   returnResponse();
   destroyRouter();
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_reply")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_success")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_reply")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_success")
+                .value());
 }
 
 TEST_F(ThriftRouterTest, PoolTimeoutUpstreamTimeMeasurement) {
   initializeRouter();
 
-  Stats::MockStore cluster_scope;
-  ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
+  Stats::MockStore cluster_store;
+  Stats::MockScope& cluster_scope{cluster_store.mockScope()};
+  ON_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+          statsScope())
       .WillByDefault(ReturnRef(cluster_scope));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_rq_call"));
 
   startRequest(MessageType::Call);
 
-  dispatcher_.time_system_.advanceTimeWait(std::chrono::milliseconds(500));
-  EXPECT_CALL(cluster_scope,
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_exception"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_exception_local"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_exception_local.timeout"));
+  EXPECT_CALL(cluster_store,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds))
       .Times(0);
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), 500))
       .Times(0);
@@ -1127,11 +1465,12 @@ TEST_F(ThriftRouterTest, PoolTimeoutUpstreamTimeMeasurement) {
       .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_THAT(app_ex.what(),
+                    ContainsRegex(".*connection failure before response start: timeout.*"));
         EXPECT_TRUE(end_stream);
       }));
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::Timeout);
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::Timeout);
 }
 
 TEST_P(ThriftRouterFieldTypeTest, OneWay) {
@@ -1140,20 +1479,24 @@ TEST_P(ThriftRouterFieldTypeTest, OneWay) {
   initializeRouter();
   startRequest(MessageType::Oneway);
 
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
   connectUpstream();
   sendTrivialStruct(field_type);
   completeRequest();
   destroyRouter();
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_oneway")
-                     .value());
-  EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_reply")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_oneway")
+                .value());
+  EXPECT_EQ(0UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_reply")
+                .value());
 }
 
 TEST_P(ThriftRouterFieldTypeTest, Call) {
@@ -1162,28 +1505,34 @@ TEST_P(ThriftRouterFieldTypeTest, Call) {
   initializeRouter();
   startRequest(MessageType::Call);
 
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
   connectUpstream();
   sendTrivialStruct(field_type);
   completeRequest();
 
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
   returnResponse();
   destroyRouter();
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_reply")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_success")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_reply")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_success")
+                .value());
 }
 
 TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
@@ -1191,19 +1540,21 @@ TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
 
   initializeRouter();
 
-  Stats::MockStore cluster_scope;
-  ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
+  Stats::MockStore cluster_store;
+  Stats::MockScope& cluster_scope{cluster_store.mockScope()};
+  ON_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+          statsScope())
       .WillByDefault(ReturnRef(cluster_scope));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call"));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply"));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_rq_call"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_reply"));
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_resp_success"));
 
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
 
@@ -1212,10 +1563,10 @@ TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
   sendTrivialStruct(field_type);
   completeRequest();
 
-  dispatcher_.time_system_.advanceTimeWait(std::chrono::milliseconds(500));
-  EXPECT_CALL(cluster_scope,
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+  EXPECT_CALL(cluster_store,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(cluster_scope,
+  EXPECT_CALL(cluster_store,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), 500));
   returnResponse();
@@ -1228,31 +1579,39 @@ TEST_P(ThriftRouterFieldTypeTest, Call_Error) {
   initializeRouter();
   startRequest(MessageType::Call);
 
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
   connectUpstream();
   sendTrivialStruct(field_type);
   completeRequest();
 
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
   returnResponse(MessageType::Reply, false);
   destroyRouter();
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_reply")
-                     .value());
-  EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_success")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_error")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_reply")
+                .value());
+  EXPECT_EQ(0UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_success")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_error")
+                .value());
 }
 
 TEST_P(ThriftRouterFieldTypeTest, Exception) {
@@ -1261,25 +1620,34 @@ TEST_P(ThriftRouterFieldTypeTest, Exception) {
   initializeRouter();
   startRequest(MessageType::Call);
 
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
   connectUpstream();
   sendTrivialStruct(field_type);
   completeRequest();
 
-  EXPECT_CALL(
-      context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->outlier_detector_,
-      putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+                  .host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
   returnResponse(MessageType::Exception);
   destroyRouter();
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_exception")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_exception_remote")
+                .value());
 }
 
 TEST_P(ThriftRouterFieldTypeTest, UnknownMessageTypes) {
@@ -1293,12 +1661,16 @@ TEST_P(ThriftRouterFieldTypeTest, UnknownMessageTypes) {
   returnResponse(MessageType::Call);
   destroyRouter();
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_invalid_type")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_invalid_type")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_invalid_type")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_invalid_type")
+                .value());
 }
 
 // Ensure the service name gets stripped when strip_service_name = true.
@@ -1316,15 +1688,21 @@ TEST_P(ThriftRouterFieldTypeTest, StripServiceNameEnabled) {
   returnResponse();
   destroyRouter();
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_reply")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_success")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_reply")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_success")
+                .value());
 }
 
 // Ensure the service name prefix isn't stripped when strip_service_name = false.
@@ -1342,15 +1720,21 @@ TEST_P(ThriftRouterFieldTypeTest, StripServiceNameDisabled) {
   returnResponse();
   destroyRouter();
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_reply")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_success")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_reply")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_success")
+                .value());
 }
 
 TEST_F(ThriftRouterTest, CallWithExistingConnection) {
@@ -1368,15 +1752,21 @@ TEST_F(ThriftRouterTest, CallWithExistingConnection) {
   returnResponse();
   destroyRouter();
 
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_rq_call")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_reply")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_success")
-                     .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_rq_call")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_reply")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.upstream_resp_success")
+                .value());
 }
 
 TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
@@ -1435,7 +1825,7 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
     EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 
   EXPECT_CALL(*protocol_, writeFieldEnd(_));
@@ -1458,7 +1848,7 @@ TEST_P(ThriftRouterPassthroughTest, PassthroughEnable) {
   std::tie(downstream_transport_type, downstream_protocol_type, upstream_transport_type,
            upstream_protocol_type) = GetParam();
 
-  const std::string yaml_string = R"EOF(
+  constexpr absl::string_view yaml_string = R"EOF(
   transport: {}
   protocol: {}
   )EOF";
@@ -1470,8 +1860,9 @@ TEST_P(ThriftRouterPassthroughTest, PassthroughEnable) {
                             configuration);
 
   const auto protocol_option = std::make_shared<ProtocolOptionsConfigImpl>(configuration);
-  EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
-              extensionProtocolOptions(_))
+  EXPECT_CALL(
+      *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+      extensionProtocolOptions(_))
       .WillRepeatedly(Return(protocol_option));
 
   initializeRouter();
@@ -1494,41 +1885,66 @@ TEST_P(ThriftRouterPassthroughTest, PassthroughEnable) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
         EXPECT_TRUE(end_stream);
       }));
-  context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
-      ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+      .poolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
 TEST_F(ThriftRouterTest, RequestResponseSize) {
   initializeRouter();
 
-  Stats::MockStore cluster_scope;
-  ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
-      .WillByDefault(ReturnRef(cluster_scope));
-
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call")).Times(AtLeast(1));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply")).Times(AtLeast(1));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success")).Times(AtLeast(1));
-
-  EXPECT_CALL(cluster_scope,
-              histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(cluster_scope,
-              deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
-
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
-              deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_size"), _));
-  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
-  EXPECT_CALL(cluster_scope,
-              deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
+  Stats::MockStore cluster_store;
+  expectStatCalls(cluster_store);
 
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
   completeRequest();
   returnResponse();
   destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, UpstreamDraining) {
+  TestScopedRuntime scoped_runtime;
+
+  initializeRouter();
+
+  Stats::MockStore cluster_store;
+  expectStatCalls(cluster_store);
+  EXPECT_CALL(cluster_store, counter("thrift.upstream_cx_drain_close")).Times(AtLeast(1));
+  // Keep the downstream connection.
+  EXPECT_CALL(callbacks_, resetDownstreamConnection()).Times(0);
+  startRequestWithExistingConnection(MessageType::Call);
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Reply, true, true /* is_drain */);
+  destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, UpstreamPartialResponse) {
+  initializeRouter();
+
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
+        EXPECT_THAT(
+            app_ex.what(),
+            ContainsRegex(
+                ".*connection failure before response complete: local connection failure.*"));
+        EXPECT_TRUE(end_stream);
+      }));
+
+  startRequestWithExistingConnection(MessageType::Call);
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Reply, true, false, true /* is_partial*/);
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+  destroyRouter();
+
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("thrift.downstream_cx_partial_response_close")
+                .value());
 }
 
 TEST_F(ThriftRouterTest, ShadowRequests) {
@@ -1548,7 +1964,8 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
     auto& upstream_connection = shadow_cluster_info->connection;
     auto& conn_state = shadow_cluster_info->conn_state;
 
-    ON_CALL(context_.cluster_manager_, getThreadLocalCluster(absl::string_view(name)))
+    ON_CALL(context_.server_factory_context_.cluster_manager_,
+            getThreadLocalCluster(absl::string_view(name)))
         .WillByDefault(Return(&shadow_cluster));
     EXPECT_CALL(shadow_cluster.tcp_conn_pool_, newConnection(_))
         .WillOnce(
@@ -1572,7 +1989,7 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
     route_entry_.policies_.push_back(policy);
   }
 
-  initializeRouter(true);
+  initializeRouterWithShadowWriter();
 
   // Set sequence id to 0, since that's what the new connections used for shadow requests will use.
   startRequestWithExistingConnection(MessageType::Call, 0);
@@ -1587,12 +2004,112 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   sendTrivialMap();
   sendTrivialList();
   sendTrivialSet();
+  sendPassthroughData();
 
   completeRequest();
   returnResponse();
   destroyRouter();
 
   shadow_writer_impl_ = nullptr;
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallSuccess) {
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse();
+
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_reply")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_success")
+                .value());
+  EXPECT_EQ(1UL, context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.host_->stats_.rq_success_.value());
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallError) {
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Reply, false);
+
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_reply")
+                .value());
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_error")
+                .value());
+  EXPECT_EQ(1UL, context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.host_->stats_.rq_error_.value());
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallException) {
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Exception);
+  EXPECT_EQ(1UL,
+            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+                ->statsScope()
+                .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_exception")
+                .value());
+  EXPECT_EQ(1UL, context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                     .tcp_conn_pool_.host_->stats_.rq_error_.value());
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallWithRqTime) {
+  NiceMock<Stats::MockStore> cluster_store;
+  Stats::MockScope& cluster_scope{cluster_store.mockScope()};
+  ON_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
+          statsScope())
+      .WillByDefault(ReturnRef(cluster_scope));
+
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+  EXPECT_CALL(cluster_store, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_store,
+              deliverHistogramToSinks(
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
+
+  EXPECT_CALL(cluster_store,
+              histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
+  EXPECT_CALL(cluster_store,
+              deliverHistogramToSinks(
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
+
+  EXPECT_CALL(cluster_store, histogram("zone.zone_name.other_zone_name.thrift.upstream_rq_time",
+                                       Stats::Histogram::Unit::Milliseconds));
+  EXPECT_CALL(cluster_store,
+              deliverHistogramToSinks(
+                  testing::Property(&Stats::Metric::name,
+                                    "zone.zone_name.other_zone_name.thrift.upstream_rq_time"),
+                  500));
+  returnResponse();
 }
 
 } // namespace Router

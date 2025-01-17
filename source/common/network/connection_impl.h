@@ -22,7 +22,7 @@ class TestPauseFilter;
 
 namespace Network {
 
-class HappyEyeballsConnectionImpl;
+class MultiConnectionBaseImpl;
 
 /**
  * Utility functions for the connection implementation.
@@ -65,23 +65,39 @@ public:
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
-  bool isHalfCloseEnabled() override { return enable_half_close_; }
+  bool isHalfCloseEnabled() const override { return enable_half_close_; }
   void close(ConnectionCloseType type) final;
+  void close(ConnectionCloseType type, absl::string_view details) override {
+    if (!details.empty()) {
+      setLocalCloseReason(details);
+    }
+    close(type);
+  }
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
-  void readDisable(bool disable) override;
+  ReadDisableStatus readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
-  const SocketAddressProvider& addressProvider() const override {
-    return socket_->addressProvider();
+  ConnectionInfoSetter& connectionInfoSetter() override {
+    return socket_->connectionInfoProvider();
   }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return socket_->addressProviderSharedPtr();
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return socket_->connectionInfoProvider();
+  }
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return socket_->connectionInfoProviderSharedPtr();
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
-  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override {
+    // SSL info may be overwritten by a filter in the provider.
+    return socket_->connectionInfoProvider().sslConnection();
+  }
   State state() const override;
-  bool connecting() const override { return connecting_; }
+  bool connecting() const override {
+    ENVOY_CONN_LOG_EVENT(debug, "connection_connecting_state", "current connecting state: {}",
+                         *this, connecting_);
+    return connecting_;
+  }
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
   uint32_t bufferLimit() const override { return read_buffer_limit_; }
@@ -95,6 +111,9 @@ public:
   absl::string_view transportFailureReason() const override;
   bool startSecureTransport() override { return transport_socket_->startSecureTransport(); }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
+  void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                        std::chrono::microseconds rtt) override;
+  absl::optional<uint64_t> congestionWindowInBytes() const override;
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
@@ -130,6 +149,8 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
 
+  DetectedCloseType detectedCloseType() const override { return detected_close_type_; }
+
 protected:
   // A convenience function which returns true if
   // 1) The read disable count is zero or
@@ -148,6 +169,13 @@ protected:
   void onReadBufferHighWatermark();
   void onWriteBufferLowWatermark();
   void onWriteBufferHighWatermark();
+
+  // This is called when the underlying socket is connected, not when the
+  // connected event is raised.
+  virtual void onConnected();
+
+  void setFailureReason(absl::string_view failure_reason);
+  const std::string& failureReason() const { return failure_reason_; }
 
   TransportSocketPtr transport_socket_;
   ConnectionSocketPtr socket_;
@@ -170,7 +198,7 @@ protected:
   bool bind_error_{false};
 
 private:
-  friend class HappyEyeballsConnectionImpl;
+  friend class MultiConnectionBaseImpl;
   friend class Envoy::RandomPauseFilter;
   friend class Envoy::TestPauseFilter;
 
@@ -187,9 +215,14 @@ private:
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
 
+  // Set the detected close type for this connection.
+  void setDetectedCloseType(DetectedCloseType close_type);
+
   static std::atomic<uint64_t> next_global_id_;
 
   std::list<BytesSentCb> bytes_sent_callbacks_;
+  // Should be set with setFailureReason.
+  std::string failure_reason_;
   // Tracks the number of times reads have been disabled. If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
@@ -197,6 +230,7 @@ private:
   uint64_t last_write_buffer_size_{};
   Buffer::Instance* current_write_buffer_{};
   uint32_t read_disable_count_{0};
+  DetectedCloseType detected_close_type_{DetectedCloseType::Normal};
   bool write_buffer_above_high_watermark_ : 1;
   bool detect_early_close_ : 1;
   bool enable_half_close_ : 1;
@@ -216,13 +250,13 @@ private:
 class ServerConnectionImpl : public ConnectionImpl, virtual public ServerConnection {
 public:
   ServerConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
-                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
-                       bool connected);
+                       TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info);
 
   // ServerConnection impl
   void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
                                         Stats::Counter& timeout_stat) override;
   void raiseEvent(ConnectionEvent event) override;
+  bool initializeReadFilters() override;
 
 private:
   void onTransportSocketConnectTimeout();
@@ -243,12 +277,21 @@ public:
                        const Address::InstanceConstSharedPtr& remote_address,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const Network::TransportSocketOptionsConstSharedPtr& transport_options);
+
+  ClientConnectionImpl(Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
+                       const Address::InstanceConstSharedPtr& source_address,
+                       Network::TransportSocketPtr&& transport_socket,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options,
+                       const Network::TransportSocketOptionsConstSharedPtr& transport_options);
 
   // Network::ClientConnection
   void connect() override;
 
 private:
+  void onConnected() override;
+
   StreamInfo::StreamInfoImpl stream_info_;
 };
 

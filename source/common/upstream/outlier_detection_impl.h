@@ -20,7 +20,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/outlier_detection.h"
-#include "envoy/upstream/upstream.h"
+
+#include "source/common/upstream/upstream_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -29,32 +30,14 @@ namespace Upstream {
 namespace Outlier {
 
 /**
- * Null host monitor implementation.
- */
-class DetectorHostMonitorNullImpl : public DetectorHostMonitor {
-public:
-  // Upstream::Outlier::DetectorHostMonitor
-  uint32_t numEjections() override { return 0; }
-  void putHttpResponseCode(uint64_t) override {}
-  void putResult(Result, absl::optional<uint64_t>) override {}
-  void putResponseTime(std::chrono::milliseconds) override {}
-  const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
-  const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
-  double successRate(SuccessRateMonitorType) const override { return -1; }
-
-private:
-  const absl::optional<MonotonicTime> time_{};
-};
-
-/**
  * Factory for creating a detector from a proto configuration.
  */
 class DetectorImplFactory {
 public:
-  static DetectorSharedPtr
+  static absl::StatusOr<DetectorSharedPtr>
   createForCluster(Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
                    Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                   EventLoggerSharedPtr event_logger);
+                   EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
 };
 
 /**
@@ -107,7 +90,7 @@ private:
 class SuccessRateMonitor {
 public:
   SuccessRateMonitor(envoy::data::cluster::v3::OutlierEjectionType ejection_type)
-      : ejection_type_(ejection_type), success_rate_(-1) {
+      : ejection_type_(ejection_type) {
     // Point the success_rate_accumulator_bucket_ pointer to a bucket.
     updateCurrentSuccessRateBucket();
   }
@@ -128,7 +111,7 @@ private:
   SuccessRateAccumulator success_rate_accumulator_;
   std::atomic<SuccessRateAccumulatorBucket*> success_rate_accumulator_bucket_;
   envoy::data::cluster::v3::OutlierEjectionType ejection_type_;
-  double success_rate_;
+  double success_rate_{-1};
 };
 
 class DetectorImpl;
@@ -183,6 +166,12 @@ public:
   void localOriginFailure();
   void localOriginNoFailure();
 
+  // handlers for setting and getting jitter, used to add a random value
+  // to outlier eject time in order to prevent a connection storm when
+  // hosts are unejected
+  void setJitter(const std::chrono::milliseconds jitter) { jitter_ = jitter; }
+  std::chrono::milliseconds getJitter() const { return jitter_; }
+
 private:
   std::weak_ptr<DetectorImpl> detector_;
   std::weak_ptr<Host> host_;
@@ -200,6 +189,9 @@ private:
 
   // counters for local origin failures
   std::atomic<uint32_t> consecutive_local_origin_failure_{0};
+
+  // jitter for outlier ejection time
+  std::chrono::milliseconds jitter_;
 
   // success rate monitors:
   // - external_origin: for all events when external/local are not split
@@ -283,6 +275,8 @@ constexpr absl::string_view SuccessRateStdevFactorRuntime =
     "outlier_detection.success_rate_stdev_factor";
 constexpr absl::string_view FailurePercentageThresholdRuntime =
     "outlier_detection.failure_percentage_threshold";
+constexpr absl::string_view MaxEjectionTimeJitterMsRuntime =
+    "outlier_detection.max_ejection_time_jitter_ms";
 
 /**
  * Configuration for the outlier detection.
@@ -296,6 +290,7 @@ public:
   uint64_t consecutive5xx() const { return consecutive_5xx_; }
   uint64_t consecutiveGatewayFailure() const { return consecutive_gateway_failure_; }
   uint64_t maxEjectionPercent() const { return max_ejection_percent_; }
+  bool alwaysEjectOneHost() const { return always_eject_one_host_; }
   uint64_t successRateMinimumHosts() const { return success_rate_minimum_hosts_; }
   uint64_t successRateRequestVolume() const { return success_rate_request_volume_; }
   uint64_t successRateStdevFactor() const { return success_rate_stdev_factor_; }
@@ -318,6 +313,10 @@ public:
   }
   uint64_t enforcingLocalOriginSuccessRate() const { return enforcing_local_origin_success_rate_; }
   uint64_t maxEjectionTimeMs() const { return max_ejection_time_ms_; }
+  uint64_t maxEjectionTimeJitterMs() const { return max_ejection_time_jitter_ms_; }
+  bool successfulActiveHealthCheckUnejectHost() const {
+    return successful_active_health_check_uneject_host_;
+  }
 
 private:
   const uint64_t interval_ms_;
@@ -325,6 +324,7 @@ private:
   const uint64_t consecutive_5xx_;
   const uint64_t consecutive_gateway_failure_;
   const uint64_t max_ejection_percent_;
+  const bool always_eject_one_host_;
   const uint64_t success_rate_minimum_hosts_;
   const uint64_t success_rate_request_volume_;
   const uint64_t success_rate_stdev_factor_;
@@ -341,6 +341,8 @@ private:
   const uint64_t enforcing_consecutive_local_origin_failure_;
   const uint64_t enforcing_local_origin_success_rate_;
   const uint64_t max_ejection_time_ms_;
+  const uint64_t max_ejection_time_jitter_ms_;
+  const bool successful_active_health_check_uneject_host_;
 
   static constexpr uint64_t DEFAULT_INTERVAL_MS = 10000;
   static constexpr uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;
@@ -362,6 +364,7 @@ private:
   static constexpr uint64_t DEFAULT_ENFORCING_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 100;
   static constexpr uint64_t DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE = 100;
   static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_MS = 10 * DEFAULT_BASE_EJECTION_TIME_MS;
+  static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_JITTER_MS = 0;
 };
 
 /**
@@ -371,10 +374,10 @@ private:
  */
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
-  static std::shared_ptr<DetectorImpl>
-  create(const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
+  static absl::StatusOr<std::shared_ptr<DetectorImpl>>
+  create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-         EventLoggerSharedPtr event_logger);
+         EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
   ~DetectorImpl() override;
 
   void onConsecutive5xx(HostSharedPtr host);
@@ -382,6 +385,7 @@ public:
   void onConsecutiveLocalOriginFailure(HostSharedPtr host);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
+  void unejectHost(HostSharedPtr host);
 
   // Upstream::Outlier::Detector
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
@@ -412,17 +416,21 @@ public:
                                const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
                                double success_rate_stdev_factor);
 
+  const absl::node_hash_map<HostSharedPtr, DetectorHostMonitorImpl*>& getHostMonitors() {
+    return host_monitors_;
+  }
+
 private:
   DetectorImpl(const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-               EventLoggerSharedPtr event_logger);
+               EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
 
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();
   void checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor, MonotonicTime now);
   void ejectHost(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type);
   static DetectionStats generateStats(Stats::Scope& scope);
-  void initialize(const Cluster& cluster);
+  void initialize(Cluster& cluster);
   void onConsecutiveErrorWorker(HostSharedPtr host,
                                 envoy::data::cluster::v3::OutlierEjectionType type);
   void notifyMainThreadConsecutiveError(HostSharedPtr host,
@@ -462,6 +470,7 @@ private:
   absl::node_hash_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
   Common::CallbackHandlePtr member_update_cb_;
+  Random::RandomGenerator& random_generator_;
 
   // EjectionPair for external and local origin events.
   // When external/local origin events are not split, external_origin_sr_num_ are used for
@@ -484,17 +493,24 @@ private:
 
 class EventLoggerImpl : public EventLogger {
 public:
-  EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
-                  TimeSource& time_source)
-      : file_(log_manager.createAccessLog(
-            Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name})),
-        time_source_(time_source) {}
-
+  static absl::StatusOr<std::unique_ptr<EventLoggerImpl>>
+  create(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
+         TimeSource& time_source) {
+    auto file_or_error = log_manager.createAccessLog(
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
+    RETURN_IF_NOT_OK_REF(file_or_error.status());
+    return std::unique_ptr<EventLoggerImpl>(
+        new EventLoggerImpl(std::move(*file_or_error), time_source));
+  }
   // Upstream::Outlier::EventLogger
   void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
                 envoy::data::cluster::v3::OutlierEjectionType type, bool enforced) override;
 
   void logUneject(const HostDescriptionConstSharedPtr& host) override;
+
+protected:
+  EventLoggerImpl(AccessLog::AccessLogFileSharedPtr&& file, TimeSource& time_source)
+      : file_(std::move(file)), time_source_(time_source) {}
 
 private:
   void setCommonEventParams(envoy::data::cluster::v3::OutlierDetectionEvent& event,

@@ -10,7 +10,7 @@ namespace Tap {
 
 ExtensionConfigBase::ExtensionConfigBase(
     const envoy::extensions::common::tap::v3::CommonExtensionConfig proto_config,
-    TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+    TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_thread_dispatcher)
     : proto_config_(proto_config), config_factory_(std::move(config_factory)), tls_slot_(tls) {
@@ -37,9 +37,9 @@ ExtensionConfigBase::ExtensionConfigBase(
     ENVOY_LOG(debug, "initializing tap extension with static config");
     break;
   }
-  default: {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  case envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::
+      CONFIG_TYPE_NOT_SET:
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 }
 
@@ -65,9 +65,11 @@ void ExtensionConfigBase::installNewTap(const envoy::config::tap::v3::TapConfig&
                                         Sink* admin_streamer) {
   TapConfigSharedPtr new_config =
       config_factory_->createConfigFromProto(proto_config, admin_streamer);
-  tls_slot_.runOnAllThreads([new_config](OptRef<TlsFilterConfig> tls_filter_config) {
-    tls_filter_config->config_ = new_config;
-  });
+  tls_slot_.runOnAllThreads(
+      [new_config](OptRef<TlsFilterConfig> tls_filter_config) {
+        tls_filter_config->config_ = new_config;
+      },
+      []() -> void { ENVOY_LOG(debug, "New tap installed on all workers."); });
 }
 
 void ExtensionConfigBase::newTapConfig(const envoy::config::tap::v3::TapConfig& proto_config,

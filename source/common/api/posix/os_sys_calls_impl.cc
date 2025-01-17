@@ -5,7 +5,19 @@
 #include <cerrno>
 #include <string>
 
+#include "envoy/network/socket.h"
+
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/network/address_impl.h"
+
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wold-style-cast"
+namespace android {
+#include "third_party/android/ifaddrs-android.h"
+} // namespace android
+#pragma clang diagnostic pop
+#endif
 
 namespace Envoy {
 namespace Api {
@@ -41,6 +53,23 @@ SysCallSizeResult OsSysCallsImpl::readv(os_fd_t fd, const iovec* iov, int num_io
   return {rc, rc != -1 ? 0 : errno};
 }
 
+SysCallSizeResult OsSysCallsImpl::pwrite(os_fd_t fd, const void* buffer, size_t length,
+                                         off_t offset) const {
+  const ssize_t rc = ::pwrite(fd, buffer, length, offset);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
+                                        off_t offset) const {
+  const ssize_t rc = ::pread(fd, buffer, length, offset);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallSizeResult OsSysCallsImpl::send(os_fd_t socket, void* buffer, size_t length, int flags) {
+  const ssize_t rc = ::send(socket, buffer, length, flags);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
 SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t length, int flags) {
   const ssize_t rc = ::recv(socket, buffer, length, flags);
   return {rc, rc != -1 ? 0 : errno};
@@ -62,7 +91,7 @@ SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec
   UNREFERENCED_PARAMETER(vlen);
   UNREFERENCED_PARAMETER(flags);
   UNREFERENCED_PARAMETER(timeout);
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return {false, EOPNOTSUPP};
 #endif
 }
 
@@ -80,9 +109,6 @@ bool OsSysCallsImpl::supportsUdpGro() const {
 #else
   static const bool is_supported = [] {
     int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-    if (fd < 0) {
-      return false;
-    }
     int val = 1;
     bool result = (0 == ::setsockopt(fd, IPPROTO_UDP, UDP_GRO, &val, sizeof(val)));
     ::close(fd);
@@ -98,9 +124,6 @@ bool OsSysCallsImpl::supportsUdpGso() const {
 #else
   static const bool is_supported = [] {
     int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-    if (fd < 0) {
-      return false;
-    }
     int optval;
     socklen_t optlen = sizeof(optval);
     bool result = (0 <= ::getsockopt(fd, IPPROTO_UDP, UDP_SEGMENT, &optval, &optlen));
@@ -111,8 +134,9 @@ bool OsSysCallsImpl::supportsUdpGso() const {
 #endif
 }
 
-bool OsSysCallsImpl::supportsIpTransparent() const {
-#if !defined(__linux__) || !defined(IPV6_TRANSPARENT)
+bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion ip_version) const {
+#if !defined(__linux__)
+  UNREFERENCED_PARAMETER(ip_version);
   return false;
 #else
   // The linux kernel supports IP_TRANSPARENT by following patch(starting from v2.6.28) :
@@ -122,32 +146,38 @@ bool OsSysCallsImpl::supportsIpTransparent() const {
   // https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/net/ipv6/ipv6_sockglue.c?id=6c46862280c5f55eda7750391bc65cd7e08c7535
   //
   // So, almost recent linux kernel supports both IP_TRANSPARENT and IPV6_TRANSPARENT options.
+  // But there are also has ipv4 only or ipv6 only scenarios.
   //
   // And these socket options need CAP_NET_ADMIN capability to be applied.
   // The CAP_NET_ADMIN capability should be applied by root user before call this function.
-  static const bool is_supported = [] {
-    // Check ipv4 case
-    int fd = ::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-    if (fd < 0) {
-      return false;
-    }
+
+  static constexpr auto transparent_supported = [](int family) {
+    auto opt_tp = family == AF_INET ? ENVOY_SOCKET_IP_TRANSPARENT : ENVOY_SOCKET_IPV6_TRANSPARENT;
+    int fd = ::socket(family, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
     int val = 1;
-    bool result = (0 == ::setsockopt(fd, IPPROTO_IP, IP_TRANSPARENT, &val, sizeof(val)));
-    ::close(fd);
-    if (!result) {
-      return false;
-    }
-    // Check ipv6 case
-    fd = ::socket(AF_INET6, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
-    if (fd < 0) {
-      return false;
-    }
-    val = 1;
-    result = (0 == ::setsockopt(fd, IPPROTO_IPV6, IPV6_TRANSPARENT, &val, sizeof(val)));
+    bool result = (0 == ::setsockopt(fd, opt_tp.level(), opt_tp.option(), &val, sizeof(val)));
     ::close(fd);
     return result;
-  }();
-  return is_supported;
+  };
+  // Check ipv4 case
+  static const bool ipv4_is_supported = transparent_supported(AF_INET);
+  // Check ipv6 case
+  static const bool ipv6_is_supported = transparent_supported(AF_INET6);
+  return ip_version == Network::Address::IpVersion::v4 ? ipv4_is_supported : ipv6_is_supported;
+#endif
+}
+
+bool OsSysCallsImpl::supportsMptcp() const {
+#if !defined(__linux__)
+  return false;
+#else
+  int fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP);
+  if (fd < 0) {
+    return false;
+  }
+
+  ::close(fd);
+  return true;
 #endif
 }
 
@@ -164,6 +194,11 @@ SysCallPtrResult OsSysCallsImpl::mmap(void* addr, size_t length, int prot, int f
 
 SysCallIntResult OsSysCallsImpl::stat(const char* pathname, struct stat* buf) {
   const int rc = ::stat(pathname, buf);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallIntResult OsSysCallsImpl::fstat(os_fd_t fd, struct stat* buf) {
+  const int rc = ::fstat(fd, buf);
   return {rc, rc != -1 ? 0 : errno};
 }
 
@@ -223,6 +258,34 @@ SysCallIntResult OsSysCallsImpl::connect(os_fd_t sockfd, const sockaddr* addr, s
   return {rc, rc != -1 ? 0 : errno};
 }
 
+SysCallIntResult OsSysCallsImpl::open(const char* pathname, int flags) const {
+  const int rc = ::open(pathname, flags);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallIntResult OsSysCallsImpl::open(const char* pathname, int flags, mode_t mode) const {
+  const int rc = ::open(pathname, flags, mode);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallIntResult OsSysCallsImpl::unlink(const char* pathname) const {
+  const int rc = ::unlink(pathname);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallIntResult OsSysCallsImpl::linkat(os_fd_t olddirfd, const char* oldpath, os_fd_t newdirfd,
+                                        const char* newpath, int flags) const {
+  const int rc = ::linkat(olddirfd, oldpath, newdirfd, newpath, flags);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+SysCallIntResult OsSysCallsImpl::mkstemp(char* tmplate) const {
+  const int rc = ::mkstemp(tmplate);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+bool OsSysCallsImpl::supportsAllPosixFileOperations() const { return true; }
+
 SysCallIntResult OsSysCallsImpl::shutdown(os_fd_t sockfd, int how) {
   const int rc = ::shutdown(sockfd, how);
   return {rc, rc != -1 ? 0 : errno};
@@ -253,17 +316,12 @@ SysCallSocketResult OsSysCallsImpl::accept(os_fd_t sockfd, sockaddr* addr, sockl
 
 #if defined(__linux__)
   rc = ::accept4(sockfd, addr, addrlen, SOCK_NONBLOCK);
-  // If failed with EINVAL try without flags
-  if (rc >= 0 || errno != EINVAL) {
-    return {rc, rc != -1 ? 0 : errno};
-  }
-#endif
-
+#else
   rc = ::accept(sockfd, addr, addrlen);
   if (rc >= 0) {
     setsocketblocking(rc, false);
   }
-
+#endif
   return {rc, rc != -1 ? 0 : errno};
 }
 
@@ -275,12 +333,91 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   auto result = ::getsockopt(sockfd, IPPROTO_TCP, TCP_INFO, &unix_tcp_info, &len);
   if (!SOCKET_FAILURE(result)) {
     tcp_info->tcpi_rtt = std::chrono::microseconds(unix_tcp_info.tcpi_rtt);
+
+    const uint64_t mss = (unix_tcp_info.tcpi_snd_mss > 0) ? unix_tcp_info.tcpi_snd_mss : 1460;
+    // Convert packets to bytes.
+    tcp_info->tcpi_snd_cwnd = unix_tcp_info.tcpi_snd_cwnd * mss;
   }
   return {!SOCKET_FAILURE(result), !SOCKET_FAILURE(result) ? 0 : errno};
-#endif
-
+#else
   return {false, EOPNOTSUPP};
+#endif
 }
+
+bool OsSysCallsImpl::supportsGetifaddrs() const { return true; }
+
+SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+  struct android::ifaddrs* ifaddr;
+  struct android::ifaddrs* ifa;
+
+  const int rc = android::getifaddrs(&ifaddr);
+  if (rc == -1) {
+    return {rc, errno};
+  }
+
+  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) {
+      continue;
+    }
+
+    if (ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) {
+      const sockaddr_storage* ss = reinterpret_cast<sockaddr_storage*>(ifa->ifa_addr);
+      size_t ss_len =
+          ifa->ifa_addr->sa_family == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
+      StatusOr<Network::Address::InstanceConstSharedPtr> address =
+          Network::Address::addressFromSockAddr(*ss, ss_len, ifa->ifa_addr->sa_family == AF_INET6);
+      if (address.ok()) {
+        interfaces.emplace_back(ifa->ifa_name, ifa->ifa_flags, *address);
+      }
+    }
+  }
+
+  if (ifaddr) {
+    android::freeifaddrs(ifaddr);
+  }
+  return {rc, 0};
+#else
+  struct ifaddrs* ifaddr;
+  struct ifaddrs* ifa;
+
+  const int rc = ::getifaddrs(&ifaddr);
+  if (rc == -1) {
+    return {rc, errno};
+  }
+
+  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) {
+      continue;
+    }
+
+    if (ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) {
+      const sockaddr_storage* ss = reinterpret_cast<sockaddr_storage*>(ifa->ifa_addr);
+      size_t ss_len =
+          ifa->ifa_addr->sa_family == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
+      StatusOr<Network::Address::InstanceConstSharedPtr> address =
+          Network::Address::addressFromSockAddr(*ss, ss_len, ifa->ifa_addr->sa_family == AF_INET6);
+      if (address.ok()) {
+        interfaces.emplace_back(ifa->ifa_name, ifa->ifa_flags, *address);
+      }
+    }
+  }
+
+  if (ifaddr) {
+    ::freeifaddrs(ifaddr);
+  }
+
+  return {rc, 0};
+#endif
+}
+
+SysCallIntResult OsSysCallsImpl::getaddrinfo(const char* node, const char* service,
+                                             const addrinfo* hints, addrinfo** res) {
+  const int rc = ::getaddrinfo(node, service, hints, res);
+  return {rc, errno};
+}
+
+void OsSysCallsImpl::freeaddrinfo(addrinfo* res) { ::freeaddrinfo(res); }
 
 } // namespace Api
 } // namespace Envoy

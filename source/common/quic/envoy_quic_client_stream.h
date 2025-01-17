@@ -2,19 +2,15 @@
 
 #include "envoy/buffer/buffer.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/core/http/quic_spdy_client_stream.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include "source/common/quic/envoy_quic_stream.h"
+
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+#include "source/common/quic/http_datagram_handler.h"
+#endif
+#include "quiche/common/simple_buffer_allocator.h"
+#include "quiche/quic/core/http/quic_spdy_client_stream.h"
+#include "quiche/quic/core/qpack/qpack_encoder.h"
+#include "quiche/quic/core/qpack/qpack_instruction_encoder.h"
 
 namespace Envoy {
 namespace Quic {
@@ -22,7 +18,8 @@ namespace Quic {
 // This class is a quic stream and also a request encoder.
 class EnvoyQuicClientStream : public quic::QuicSpdyClientStream,
                               public EnvoyQuicStream,
-                              public Http::RequestEncoder {
+                              public Http::RequestEncoder,
+                              public quic::QuicSpdyStream::MetadataVisitor {
 public:
   EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
@@ -31,8 +28,6 @@ public:
   void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = &decoder; }
 
   // Http::StreamEncoder
-  void encodeData(Buffer::Instance& data, bool end_stream) override;
-  void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) override;
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return absl::nullopt;
   }
@@ -46,16 +41,23 @@ public:
   void resetStream(Http::StreamResetReason reason) override;
   void setFlushTimeout(std::chrono::milliseconds) override {}
 
+  // quic::QuicStream
+  void OnStreamFrame(const quic::QuicStreamFrame& frame) override;
+  bool OnStopSending(quic::QuicResetStreamError error) override;
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
-  void Reset(quic::QuicRstStreamErrorCode error) override;
+  void ResetWithError(quic::QuicResetStreamError error) override;
   void OnClose() override;
   void OnCanWrite() override;
   // quic::Stream
-  void OnConnectionClosed(quic::QuicErrorCode error, quic::ConnectionCloseSource source) override;
+  void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
+                          quic::ConnectionCloseSource source) override;
 
   void clearWatermarkBuffer();
+
+  // quic::QuicSpdyStream::MetadataVisitor
+  void OnMetadataComplete(size_t frame_len, const quic::QuicHeaderList& header_list) override;
 
 protected:
   // EnvoyQuicStream
@@ -69,6 +71,13 @@ protected:
                                 const quic::QuicHeaderList& header_list) override;
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
+  void OnInvalidHeaders() override;
+
+  // Http::MultiplexedStreamImplBase
+  bool hasPendingData() override;
+
+  void onStreamError(absl::optional<bool> should_close_connection,
+                     quic::QuicRstStreamErrorCode rst_code) override;
 
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
@@ -76,14 +85,19 @@ private:
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
 
-  // Either reset the stream or close the connection according to
-  // should_close_connection and configured http3 options.
-  void onStreamError(absl::optional<bool> should_close_connection,
-                     quic::QuicRstStreamErrorCode rst_code);
+#ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
+  // Makes the QUIC stream use Capsule Protocol. Once this method is called, any calls to encodeData
+  // are expected to contain capsules which will be sent along as HTTP Datagrams. Also, the stream
+  // starts to receive HTTP/3 Datagrams and decode into Capsules.
+  void useCapsuleProtocol();
+#endif
 
   Http::ResponseDecoder* response_decoder_{nullptr};
+  bool decoded_1xx_{false};
 
-  bool decoded_100_continue_{false};
+  // When an HTTP Upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".
+  // It will be empty, when no such request is active.
+  std::string upgrade_protocol_;
 };
 
 } // namespace Quic

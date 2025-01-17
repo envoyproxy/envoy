@@ -29,23 +29,28 @@ public:
   IntegrationTcpClient(Event::Dispatcher& dispatcher, MockBufferFactory& factory, uint32_t port,
                        Network::Address::IpVersion version, bool enable_half_close,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       Network::Address::InstanceConstSharedPtr source_address = nullptr);
+                       Network::Address::InstanceConstSharedPtr source_address = nullptr,
+                       absl::string_view destination_address = "");
 
   void close();
+  void close(Network::ConnectionCloseType close_type);
   void waitForData(const std::string& data, bool exact_match = true);
   // wait for at least `length` bytes to be received
   ABSL_MUST_USE_RESULT AssertionResult
   waitForData(size_t length, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void waitForDisconnect(bool ignore_spurious_events = false);
-  void waitForHalfClose();
+  void waitForHalfClose(bool ignore_spurious_events = false);
+  void waitForHalfClose(std::chrono::milliseconds timeout, bool ignore_spurious_events = false);
   void readDisable(bool disabled);
   ABSL_MUST_USE_RESULT AssertionResult
   write(const std::string& data, bool end_stream = false, bool verify = true,
         std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   const std::string& data() { return payload_reader_->data(); }
   bool connected() const { return !disconnected_; }
   // clear up to the `count` number of bytes of received data
   void clearData(size_t count = std::string::npos) { payload_reader_->clearData(count); }
+  Network::Connection* connection() const { return connection_.get(); }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {

@@ -16,15 +16,21 @@ namespace Router {
 ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::thrift_proxy::router::v3::Router& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
-  UNREFERENCED_PARAMETER(proto_config);
+  auto& server_context = context.serverFactoryContext();
 
-  auto shadow_writer = std::make_shared<ShadowWriterImpl>(context.clusterManager(), stat_prefix,
-                                                          context.scope(), context.dispatcher());
+  auto stats =
+      std::make_shared<const RouterStats>(stat_prefix, context.scope(), server_context.localInfo());
+  auto shadow_writer = std::make_shared<ShadowWriterImpl>(server_context.clusterManager(), *stats,
+                                                          server_context.mainThreadDispatcher(),
+                                                          server_context.threadLocal());
+  bool close_downstream_on_error =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, close_downstream_on_upstream_error, true);
 
-  return [&context, stat_prefix,
-          shadow_writer](ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [&context, stats, shadow_writer, close_downstream_on_error](
+             ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addDecoderFilter(std::make_shared<Router>(
-        context.clusterManager(), stat_prefix, context.scope(), context.runtime(), *shadow_writer));
+        context.serverFactoryContext().clusterManager(), *stats,
+        context.serverFactoryContext().runtime(), *shadow_writer, close_downstream_on_error));
   };
 }
 

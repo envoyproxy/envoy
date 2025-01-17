@@ -30,9 +30,23 @@ public:
   virtual ~TransportSocketFactoryContext() = default;
 
   /**
-   * @return Server::Admin& the server's admin interface.
+   * @return ServerFactoryContext& the server factory context.
    */
-  virtual Server::Admin& admin() PURE;
+  virtual ServerFactoryContext& serverFactoryContext() PURE;
+
+  /**
+   * @return Upstream::ClusterManager& singleton for use by the entire server.
+   * TODO(wbpcode): clusterManager() of ServerFactoryContext still be invalid when loading
+   * static cluster. So we need to provide an cluster manager reference here.
+   * This could be removed after https://github.com/envoyproxy/envoy/issues/26653 is resolved.
+   */
+  virtual Upstream::ClusterManager& clusterManager() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for cluster configuration
+   * messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
   /**
    * @return Ssl::ContextManager& the SSL context manager.
@@ -42,7 +56,7 @@ public:
   /**
    * @return Stats::Scope& the transport socket's stats scope.
    */
-  virtual Stats::Scope& scope() PURE;
+  virtual Stats::Scope& statsScope() PURE;
 
   /**
    * Return the instance of secret manager.
@@ -50,56 +64,12 @@ public:
   virtual Secret::SecretManager& secretManager() PURE;
 
   /**
-   * @return the instance of ClusterManager.
-   */
-  virtual Upstream::ClusterManager& clusterManager() PURE;
-
-  /**
-   * @return information about the local environment the server is running in.
-   */
-  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
-
-  /**
-   * @return Event::Dispatcher& the main thread's dispatcher.
-   */
-  virtual Event::Dispatcher& dispatcher() PURE;
-
-  /**
-   * @return Server::Options& the command-line options that Envoy was started with.
-   */
-  virtual const Options& options() PURE;
-
-  /**
-   * @return the server-wide stats store.
-   */
-  virtual Stats::Store& stats() PURE;
-
-  /**
-   * @return a reference to the instance of an init manager.
+   * @return the init manager of the particular context.
    */
   virtual Init::Manager& initManager() PURE;
-
-  /**
-   * @return the server's singleton manager.
-   */
-  virtual Singleton::Manager& singletonManager() PURE;
-
-  /**
-   * @return the server's TLS slot allocator.
-   */
-  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
-   *         messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
-
-  /**
-   * @return reference to the Api object
-   */
-  virtual Api::Api& api() PURE;
 };
+
+using TransportSocketFactoryContextPtr = std::unique_ptr<TransportSocketFactoryContext>;
 
 class TransportSocketConfigFactory : public Config::TypedFactory {
 public:
@@ -117,13 +87,13 @@ public:
    * @param config const Protobuf::Message& supplies the config message for the transport socket
    *        implementation.
    * @param context TransportSocketFactoryContext& supplies the transport socket's context.
-   * @return Network::TransportSocketFactoryPtr the transport socket factory instance. The returned
-   *         TransportSocketFactoryPtr should not be nullptr.
+   * @return absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr> the transport socket factory
+   * instance or error status. The returned TransportSocketFactoryPtr should not be nullptr.
    *
    * @throw EnvoyException if the implementation is unable to produce a factory with the provided
    *        parameters.
    */
-  virtual Network::TransportSocketFactoryPtr
+  virtual absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context) PURE;
 
@@ -143,13 +113,13 @@ public:
    * @param config const Protobuf::Message& supplies the config message for the transport socket
    *        implementation.
    * @param context TransportSocketFactoryContext& supplies the transport socket's context.
-   * @return Network::TransportSocketFactoryPtr the transport socket factory instance. The returned
-   *         TransportSocketFactoryPtr should not be nullptr.
+   * @return absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr> the transport socket
+   * factory instance. The returned TransportSocketFactoryPtr should not be nullptr.
    *
    * @throw EnvoyException if the implementation is unable to produce a factory with the provided
    *        parameters.
    */
-  virtual Network::TransportSocketFactoryPtr
+  virtual absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;

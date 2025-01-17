@@ -5,6 +5,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
@@ -47,12 +48,15 @@ public:
   MOCK_METHOD(Thread::ThreadFactory&, threadFactory, ());
   MOCK_METHOD(Stats::Scope&, rootScope, ());
   MOCK_METHOD(Random::RandomGenerator&, randomGenerator, ());
+  MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, bootstrap, (), (const));
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
+  MOCK_METHOD(Stats::CustomStatNamespaces&, customStatNamespaces, ());
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;
   Event::GlobalTimeSystem time_system_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   testing::NiceMock<Random::MockRandomGenerator> random_;
+  envoy::config::bootstrap::v3::Bootstrap empty_bootstrap_;
 };
 
 class MockOsSysCalls : public OsSysCallsImpl {
@@ -77,6 +81,11 @@ public:
   MOCK_METHOD(SysCallSizeResult, writev, (os_fd_t, const iovec*, int));
   MOCK_METHOD(SysCallSizeResult, sendmsg, (os_fd_t fd, const msghdr* msg, int flags));
   MOCK_METHOD(SysCallSizeResult, readv, (os_fd_t, const iovec*, int));
+  MOCK_METHOD(SysCallSizeResult, pwrite,
+              (os_fd_t fd, const void* buffer, size_t length, off_t offset), (const));
+  MOCK_METHOD(SysCallSizeResult, pread, (os_fd_t fd, void* buffer, size_t length, off_t offset),
+              (const));
+  MOCK_METHOD(SysCallSizeResult, send, (os_fd_t socket, void* buffer, size_t length, int flags));
   MOCK_METHOD(SysCallSizeResult, recv, (os_fd_t socket, void* buffer, size_t length, int flags));
   MOCK_METHOD(SysCallSizeResult, recvmsg, (os_fd_t socket, msghdr* msg, int flags));
   MOCK_METHOD(SysCallIntResult, recvmmsg,
@@ -86,6 +95,7 @@ public:
   MOCK_METHOD(SysCallPtrResult, mmap,
               (void* addr, size_t length, int prot, int flags, int fd, off_t offset));
   MOCK_METHOD(SysCallIntResult, stat, (const char* name, struct stat* stat));
+  MOCK_METHOD(SysCallIntResult, fstat, (os_fd_t fd, struct stat* stat));
   MOCK_METHOD(SysCallIntResult, chmod, (const std::string& name, mode_t mode));
   MOCK_METHOD(int, setsockopt_,
               (os_fd_t sockfd, int level, int optname, const void* optval, socklen_t optlen));
@@ -97,6 +107,15 @@ public:
   MOCK_METHOD(SysCallIntResult, getpeername, (os_fd_t sockfd, sockaddr* name, socklen_t* namelen));
   MOCK_METHOD(SysCallIntResult, setsocketblocking, (os_fd_t sockfd, bool block));
   MOCK_METHOD(SysCallIntResult, connect, (os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen));
+  MOCK_METHOD(SysCallIntResult, open, (const char* pathname, int flags), (const));
+  MOCK_METHOD(SysCallIntResult, open, (const char* pathname, int flags, mode_t mode), (const));
+  MOCK_METHOD(SysCallIntResult, unlink, (const char* pathname), (const));
+  MOCK_METHOD(SysCallIntResult, linkat,
+              (os_fd_t olddirfd, const char* oldpath, os_fd_t newdirfd, const char* newpath,
+               int flags),
+              (const));
+  MOCK_METHOD(SysCallIntResult, mkstemp, (char* tmplate), (const));
+  MOCK_METHOD(bool, supportsAllPosixFileOperations, (), (const));
   MOCK_METHOD(SysCallIntResult, shutdown, (os_fd_t sockfd, int how));
   MOCK_METHOD(SysCallIntResult, socketpair, (int domain, int type, int protocol, os_fd_t sv[2]));
   MOCK_METHOD(SysCallIntResult, listen, (os_fd_t sockfd, int backlog));
@@ -105,7 +124,13 @@ public:
   MOCK_METHOD(SysCallBoolResult, socketTcpInfo, (os_fd_t sockfd, EnvoyTcpInfo* tcp_info));
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
-  MOCK_METHOD(bool, supportsIpTransparent, (), (const));
+  MOCK_METHOD(bool, supportsIpTransparent, (Network::Address::IpVersion version), (const));
+  MOCK_METHOD(bool, supportsMptcp, (), (const));
+  MOCK_METHOD(bool, supportsGetifaddrs, (), (const));
+  MOCK_METHOD(SysCallIntResult, getifaddrs, (InterfaceAddressVector & interfaces));
+  MOCK_METHOD(SysCallIntResult, getaddrinfo,
+              (const char* node, const char* service, const addrinfo* hints, addrinfo** res));
+  MOCK_METHOD(void, freeaddrinfo, (addrinfo * res));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<os_fd_t, int, int>;

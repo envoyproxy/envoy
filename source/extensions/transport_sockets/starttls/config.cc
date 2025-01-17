@@ -7,7 +7,8 @@ namespace Extensions {
 namespace TransportSockets {
 namespace StartTls {
 
-Network::TransportSocketFactoryPtr DownstreamStartTlsSocketFactory::createTransportSocketFactory(
+absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
+DownstreamStartTlsSocketFactory::createTransportSocketFactory(
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
   const auto& outer_config = MessageUtil::downcastAndValidate<
@@ -17,19 +18,20 @@ Network::TransportSocketFactoryPtr DownstreamStartTlsSocketFactory::createTransp
   auto& raw_socket_config_factory = rawSocketConfigFactory();
   auto& tls_socket_config_factory = tlsSocketConfigFactory();
 
-  Network::TransportSocketFactoryPtr raw_socket_factory =
-      raw_socket_config_factory.createTransportSocketFactory(outer_config.cleartext_socket_config(),
-                                                             context, server_names);
+  auto raw_or_error = raw_socket_config_factory.createTransportSocketFactory(
+      outer_config.cleartext_socket_config(), context, server_names);
+  RETURN_IF_NOT_OK_REF(raw_or_error.status());
 
-  Network::TransportSocketFactoryPtr tls_socket_factory =
-      tls_socket_config_factory.createTransportSocketFactory(outer_config.tls_socket_config(),
-                                                             context, server_names);
+  auto factory_or_error = tls_socket_config_factory.createTransportSocketFactory(
+      outer_config.tls_socket_config(), context, server_names);
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
 
-  return std::make_unique<StartTlsSocketFactory>(std::move(raw_socket_factory),
-                                                 std::move(tls_socket_factory));
+  return std::make_unique<StartTlsDownstreamSocketFactory>(std::move(raw_or_error.value()),
+                                                           std::move(factory_or_error.value()));
 }
 
-Network::TransportSocketFactoryPtr UpstreamStartTlsSocketFactory::createTransportSocketFactory(
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
+UpstreamStartTlsSocketFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
 
@@ -39,23 +41,23 @@ Network::TransportSocketFactoryPtr UpstreamStartTlsSocketFactory::createTranspor
   auto& raw_socket_config_factory = rawSocketConfigFactory();
   auto& tls_socket_config_factory = tlsSocketConfigFactory();
 
-  Network::TransportSocketFactoryPtr raw_socket_factory =
-      raw_socket_config_factory.createTransportSocketFactory(outer_config.cleartext_socket_config(),
-                                                             context);
+  auto raw_or_error = raw_socket_config_factory.createTransportSocketFactory(
+      outer_config.cleartext_socket_config(), context);
+  RETURN_IF_NOT_OK_REF(raw_or_error.status());
 
-  Network::TransportSocketFactoryPtr tls_socket_factory =
-      tls_socket_config_factory.createTransportSocketFactory(outer_config.tls_socket_config(),
-                                                             context);
+  auto factory_or_error = tls_socket_config_factory.createTransportSocketFactory(
+      outer_config.tls_socket_config(), context);
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
 
-  return std::make_unique<StartTlsSocketFactory>(std::move(raw_socket_factory),
-                                                 std::move(tls_socket_factory));
+  return std::make_unique<StartTlsSocketFactory>(std::move(raw_or_error.value()),
+                                                 std::move(factory_or_error.value()));
 }
 
-REGISTER_FACTORY(DownstreamStartTlsSocketFactory,
-                 Server::Configuration::DownstreamTransportSocketConfigFactory){"starttls"};
+LEGACY_REGISTER_FACTORY(DownstreamStartTlsSocketFactory,
+                        Server::Configuration::DownstreamTransportSocketConfigFactory, "starttls");
 
-REGISTER_FACTORY(UpstreamStartTlsSocketFactory,
-                 Server::Configuration::UpstreamTransportSocketConfigFactory){"starttls"};
+LEGACY_REGISTER_FACTORY(UpstreamStartTlsSocketFactory,
+                        Server::Configuration::UpstreamTransportSocketConfigFactory, "starttls");
 
 } // namespace StartTls
 } // namespace TransportSockets

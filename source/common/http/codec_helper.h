@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
 
 #include "source/common/common/assert.h"
@@ -36,7 +38,7 @@ public:
     }
   }
 
-  void runResetCallbacks(StreamResetReason reason) {
+  void runResetCallbacks(StreamResetReason reason, absl::string_view details) {
     // Reset callbacks are a special case, and the only StreamCallbacks allowed
     // to run after local_end_stream_.
     if (reset_callbacks_started_) {
@@ -46,7 +48,7 @@ public:
     reset_callbacks_started_ = true;
     for (StreamCallbacks* callbacks : callbacks_) {
       if (callbacks) {
-        callbacks->onResetStream(reason, absl::string_view());
+        callbacks->onResetStream(reason, details);
       }
     }
   }
@@ -80,6 +82,63 @@ private:
   absl::InlinedVector<StreamCallbacks*, 8> callbacks_;
   bool reset_callbacks_started_{};
   uint32_t high_watermark_callbacks_{};
+};
+
+// A base class shared between Http2 codec and Http3 codec to set a timeout for locally ended stream
+// with buffered data and register the stream adapter.
+class MultiplexedStreamImplBase : public Stream, public StreamCallbackHelper {
+public:
+  MultiplexedStreamImplBase(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+  ~MultiplexedStreamImplBase() override { ASSERT(stream_idle_timer_ == nullptr); }
+  // TODO(mattklein123): Optimally this would be done in the destructor but there are currently
+  // deferred delete lifetime issues that need sorting out if the destructor of the stream is
+  // going to be able to refer to the parent connection.
+  virtual void destroy() { disarmStreamIdleTimer(); }
+
+  void onLocalEndStream() {
+    ASSERT(local_end_stream_);
+    if (hasPendingData()) {
+      createPendingFlushTimer();
+    }
+  }
+
+  void disarmStreamIdleTimer() {
+    if (stream_idle_timer_ != nullptr) {
+      // To ease testing and the destructor assertion.
+      stream_idle_timer_->disableTimer();
+      stream_idle_timer_.reset();
+    }
+  }
+
+  CodecEventCallbacks* registerCodecEventCallbacks(CodecEventCallbacks* codec_callbacks) override {
+    std::swap(codec_callbacks, codec_callbacks_);
+    return codec_callbacks;
+  }
+
+protected:
+  void setFlushTimeout(std::chrono::milliseconds timeout) override {
+    stream_idle_timeout_ = timeout;
+  }
+
+  void createPendingFlushTimer() {
+    ASSERT(stream_idle_timer_ == nullptr);
+    if (stream_idle_timeout_.count() > 0) {
+      stream_idle_timer_ = dispatcher_.createTimer([this] { onPendingFlushTimer(); });
+      stream_idle_timer_->enableTimer(stream_idle_timeout_);
+    }
+  }
+
+  virtual void onPendingFlushTimer() { stream_idle_timer_.reset(); }
+
+  virtual bool hasPendingData() PURE;
+
+  CodecEventCallbacks* codec_callbacks_{nullptr};
+
+private:
+  Event::Dispatcher& dispatcher_;
+  // See HttpConnectionManager.stream_idle_timeout.
+  std::chrono::milliseconds stream_idle_timeout_{};
+  Event::TimerPtr stream_idle_timer_;
 };
 
 } // namespace Http

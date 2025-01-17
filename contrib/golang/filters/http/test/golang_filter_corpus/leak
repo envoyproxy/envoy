@@ -1,0 +1,11 @@
+config {
+  library_id: "test"
+  library_path: "test"
+  plugin_name: "test"
+}
+request_data {
+  http_body {
+    data: "\177\023"
+  }
+}
+

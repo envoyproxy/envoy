@@ -1,34 +1,22 @@
 # Process for becoming a maintainer
 
-## Your organization is not yet a maintainer
+Becoming a maintainer generally means that you are going to be spending substantial time on
+Envoy for the foreseeable future. You should have domain expertise and be extremely proficient in C++.
 
-* Express interest to the senior maintainers that your organization is interested in becoming a
-  maintainer. Becoming a maintainer generally means that you are going to be spending substantial
-  time (>25%) on Envoy for the foreseeable future. You should have domain expertise and be extremely
-  proficient in C++. Ultimately your goal is to become a senior maintainer that will represent your
-  organization.
+* Express interest to the
+  [envoy-maintainers](https://groups.google.com/forum/#!forum/envoy-maintainers)
+  that you are interested in becoming a maintainer and, if your company does not have pre-existing maintainers,
+  that your organization is interested in and willing to sponsoring a maintainer.
 * We will expect you to start contributing increasingly complicated PRs, under the guidance
-  of the existing senior maintainers.
-* We may ask you to do some PRs from our backlog.
+  of the existing maintainers.
+* We may ask you to fix some issues from our backlog.
 * As you gain experience with the code base and our standards, we will ask you to do code reviews
   for incoming PRs (i.e., all maintainers are expected to shoulder a proportional share of
   community reviews).
-* After a period of approximately 2-3 months of working together and making sure we see eye to eye,
-  the existing senior maintainers will confer and decide whether to grant maintainer status or not.
-  We make no guarantees on the length of time this will take, but 2-3 months is the approximate
-  goal.
-
-## Your organization is currently a maintainer
-
-* First decide whether your organization really needs more people with maintainer access. Valid
-  reasons are "blast radius", a large organization that is working on multiple unrelated projects,
-  etc.
-* Contact a senior maintainer for your organization and express interest.
-* Start doing PRs and code reviews under the guidance of your senior maintainer.
-* After a period of 1-2 months the existing senior maintainers will discuss granting "standard"
-  maintainer access.
-* "Standard" maintainer access can be upgraded to "senior" maintainer access after another 1-2
-  months of work and another conference of the existing senior committers.
+* After a period of approximately 2-3 months of contributions demonstrating understanding of (at least parts of)
+  the Envoy code base, reach back out to the maintainers list asking for feedback.  At this point, you will either
+  be granted maintainer status, or be given actionable feedback on any remaining gaps between the contributions
+  demonstrated and those expected of maintainers, at which point you can close those gaps and reach back out.
 
 ## Maintainer responsibilities
 
@@ -37,8 +25,8 @@
 * Triage GitHub issues and perform pull request reviews for other maintainers and the community.
   The areas of specialization listed in [OWNERS.md](OWNERS.md) can be used to help with routing
   an issue/question to the right person.
-* Triage build and CI issues. Monitor #envoy-ci and #test-flaky and file issues for failing builds,
-  flaky tests or new bugs, and either fix or find someone to fix any main build breakages.
+* Triage build and CI issues. Monitor #envoy-ci and file issues for flaking or failing builds,
+  or new bugs, and either fix or find someone to fix any main build breakages.
 * During GitHub issue triage, apply all applicable [labels](https://github.com/envoyproxy/envoy/labels)
   to each new issue. Labels are extremely useful for future issue follow up. Which labels to apply
   is somewhat subjective so just use your best judgment. A few of the most important labels that are
@@ -67,83 +55,6 @@
 * The on-call rotation is tracked at Opsgenie. The calendar is visible
 [here](https://calendar.google.com/calendar/embed?src=d6glc0l5rc3v235q9l2j29dgovh3dn48%40import.calendar.google.com&ctz=America%2FNew_York)
 or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.com/webapi/webcal/getRecentSchedule?webcalToken=39dd1a892faa8d0d689f889b9d09ae787355ddff894396546726a5a02bac5b26&scheduleId=a3505963-c064-4c97-8865-947dfcb06060)
-
-## Cutting a release
-
-* We do releases every 3 months, at the end of each quarter, as described in the
-  [release schedule](RELEASES.md#release-schedule).
-* Take a look at open issues tagged with the current release, by
-  [searching](https://github.com/envoyproxy/envoy/issues) for
-  "is:open is:issue milestone:[current milestone]" and either hold off until
-  they are fixed or bump them to the next milestone.
-* Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
-  particularly risky PRs until after the release is tagged. This is because we aim for main to be
-  at release candidate quality at all times.
-* Do a final check of the [release notes](docs/root/version_history/current.rst):
-  * Make any needed corrections (grammar, punctuation, formatting, etc.).
-  * Check to see if any security/stable version release notes are duplicated in
-    the major version release notes. These should not be duplicated.
-  * If the "Deprecated" section is empty, delete it.
-  * Remove the "Pending" tags and add dates to the top of the [release notes for this version](docs/root/version_history/current.rst).
-  * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
-    "1.6.0".
-  * Update the [RELEASES](RELEASES.md) doc with the relevant dates. Now, or after you cut the
-    release, please also make sure there's a stable maintainer signed up for next quarter,
-    and the deadline for the next release is documented in the release schedule.
-  * Get a review and merge.
-* Wait for tests to pass on [main](https://dev.azure.com/cncf/envoy/_build).
-* Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
-  start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
-  [VERSION](VERSION).**
-* From the envoy [landing page](https://github.com/envoyproxy/envoy) use the branch drop-down to create a branch
-  from the tagged release, e.g. "release/v1.6". It will be used for the
-  [stable releases](RELEASES.md#stable-releases).
-* Monitor the AZP tag build to make sure that the final docker images get pushed along with
-  the final docs. The final documentation will end up in the
-  [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/main/docs/envoy).
-* Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
-* Craft a witty/uplifting email and send it to all the email aliases including envoy-announce@.
-* Make sure we tweet the new release: either have Matt do it or email social@cncf.io and ask them to do an Envoy account
-  post.
-* Do a new PR to setup the next version
-  * Update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev".
-  * `git mv docs/root/version_history/current.rst docs/root/version_history/v1.6.0.rst`, filling in the previous
-    release version number in the filename and delete empty sections (like Incompatible Behavior Changes, Minor Bahavior Changes, etc).
-    Add an entry for the new file in the `toctree` in
-    [version_history.rst](docs/root/version_history/version_history.rst).
-  * Create a new "current" version history file at the [release
-  notes](docs/root/version_history/current.rst) for the following version. E.g., "1.7.0 (pending)". Use
-  this text as the template for the new file:
-```
-1.7.0 (Pending)
-===============
-
-Incompatible Behavior Changes
------------------------------
-*Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-Minor Behavior Changes
-----------------------
-*Changes that may cause incompatibilities for some users, but should not for most*
-
-Bug Fixes
----------
-*Changes expected to improve the state of the world and are unlikely to have negative effects*
-
-Removed Config or Runtime
--------------------------
-*Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-New Features
-------------
-
-Deprecated
-----------
-```
-* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh`)
-  to file tracking issues for runtime guarded code which can be removed.
-* Check source/common/runtime/runtime_features.cc and see if any runtime guards in
-  disabled_runtime_features should be reassessed, and ping on the relevant issues.
 
 ## When does a maintainer lose maintainer status
 

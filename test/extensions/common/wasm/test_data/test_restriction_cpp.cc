@@ -27,7 +27,6 @@ WASM_EXPORT(void, proxy_on_context_create, (uint32_t context_id, uint32_t parent
   (void)(parent_context_id);
   std::string log_message = "after proxy_on_context_create: written by proxy_log";
   proxy_log(LogLevel::info, log_message.c_str(), log_message.size());
-  return;
 }
 
 END_WASM_PLUGIN

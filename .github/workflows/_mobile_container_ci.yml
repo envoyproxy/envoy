@@ -1,0 +1,159 @@
+name: Mobile CI
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      app-id:
+      app-key:
+      rbe-key:
+      ssh-key-extra:
+    inputs:
+      args:
+        type: string
+      catch-errors:
+        type: boolean
+        default: false
+      checkout-extra:
+        type: string
+        default:
+      command:
+        type: string
+        default: ./bazelw
+      concurrency-suffix:
+        type: string
+        default: -mobile
+      container:
+        type: string
+      container-output:
+        type: string
+        default:
+      container-command:
+        type: string
+        default: >-
+          docker run
+          --volume=${PWD}:/source
+          --volume=${TMP_ENTRYPOINT}:/tmp/mobile-entrypoint.sh
+          --volume=/tmp/cache:/root/.cache
+          --volume=/tmp/container-output:/tmp/container-output
+          --workdir=/source/mobile
+          --entrypoint=/tmp/mobile-entrypoint.sh
+          -e GITHUB_TOKEN
+          -e CC
+          -e CXX
+          -e COVERAGE_THRESHOLD
+          -e BAZEL_BUILD_OPTION_LIST
+          -e MOBILE_DOCS_CHECKOUT_DIR
+      diskspace-hack:
+        type: boolean
+        default: false
+      downloads:
+        type: string
+        default:
+      entrypoint:
+        type: string
+        default:
+      entrypoint-DEFAULT:
+        type: string
+        default: |
+          #!/bin/bash -e
+          export PATH=/opt/llvm/bin:$PATH
+          exec "$@"
+      error-match:
+        type: string
+        default: |
+          ERROR
+          error:
+          Error:
+      notice-match:
+        type: string
+        default: |
+          NOTICE
+          Streaming build results
+      output-path:
+        type: string
+        default: /tmp/container-output
+      rbe:
+        type: boolean
+        default: true
+      ref:
+        type: string
+      request:
+        type: string
+        required: true
+      runs-on:
+        type: string
+      skip:
+        type: boolean
+        default: false
+      source:
+        type: string
+        default:
+      steps-pre:
+        type: string
+      steps-pre-name:
+        type: string
+      steps-post:
+        type: string
+        default:
+      steps-post-name:
+        type: string
+      target:
+        type: string
+        required: true
+      temp-dir:
+        type: string
+      timeout-minutes:
+        type: number
+      trusted:
+        type: boolean
+        default: false
+      upload-name:
+        type: string
+      upload-path:
+        type: string
+      warning-match:
+        type: string
+        default: |
+          WARNING
+          warning:
+          Warning:
+
+
+jobs:
+  ci:
+    uses: ./.github/workflows/_run.yml
+    name: ${{ inputs.target }}
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      ssh-key-extra: ${{ secrets.ssh-key-extra }}
+    with:
+      args: ${{ inputs.args }}
+      rbe: ${{ inputs.rbe }}
+      # This always just caches the main build image, the mobile one is layered on top
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      catch-errors: ${{ inputs.catch-errors }}
+      container-command: ${{ inputs.container-command }} ${{ inputs.container || fromJSON(inputs.request).request.build-image.default }}
+      container-output: ${{ inputs.container-output }}
+      command: ${{ inputs.command }}
+      concurrency-suffix: ${{ inputs.concurrency-suffix }}
+      docker-ipv6: false
+      entrypoint: ${{ inputs.entrypoint || inputs.entrypoint-DEFAULT }}
+      downloads: ${{ inputs.downloads }}
+      error-match: ${{ inputs.error-match }}
+      notice-match: ${{ inputs.notice-match }}
+      output-path: ${{ inputs.output-path }}
+      request: ${{ inputs.request }}
+      source: ${{ inputs.source }}
+      steps-pre: ${{ inputs.steps-pre }}
+      steps-post: ${{ inputs.steps-post }}
+      target: ${{ inputs.target }}
+      timeout-minutes: ${{ inputs.timeout-minutes }}
+      trusted: ${{ fromJSON(inputs.request).request.trusted }}
+      upload-name: ${{ inputs.upload-name }}
+      upload-path: ${{ inputs.upload-path }}
+      warning-match: ${{ inputs.warning-match }}

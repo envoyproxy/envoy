@@ -3,6 +3,7 @@
 #include <functional>
 #include <vector>
 
+#include "envoy/common/conn_pool.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -46,6 +47,11 @@ public:
   size_t size() const;
 
   /**
+   * @return true if the pools are empty.
+   */
+  bool empty() const;
+
+  /**
    * Destroys all mapped pools.
    */
   void clear();
@@ -59,14 +65,9 @@ public:
   void addIdleCallback(const IdleCb& cb);
 
   /**
-   * See `Envoy::ConnectionPool::Instance::startDrain()`.
-   */
-  void startDrain();
-
-  /**
    * See `Envoy::ConnectionPool::Instance::drainConnections()`.
    */
-  void drainConnections();
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior);
 
 private:
   /**
@@ -83,9 +84,10 @@ private:
   absl::flat_hash_map<KEY_TYPE, std::unique_ptr<POOL_TYPE>> active_pools_;
   Event::Dispatcher& thread_local_dispatcher_;
   std::vector<IdleCb> cached_callbacks_;
-  Common::DebugRecursionChecker recursion_checker_;
   const HostConstSharedPtr host_;
+  // Keep smaller fields near the end to reduce padding
   const ResourcePriority priority_;
+  Common::DebugRecursionChecker recursion_checker_;
 };
 
 } // namespace Upstream

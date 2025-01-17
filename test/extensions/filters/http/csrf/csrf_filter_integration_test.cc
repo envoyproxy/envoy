@@ -74,12 +74,14 @@ protected:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(Protocols, CsrfFilterIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+// TODO(#26236): Fix test suite for HTTP/3.
+INSTANTIATE_TEST_SUITE_P(
+    Protocols, CsrfFilterIntegrationTest,
+    testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
+    HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(CsrfFilterIntegrationTest, TestCsrfSuccess) {
-  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
+  config_helper_.prependFilter(CSRF_FILTER_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{
       {":method", "PUT"},
       {":path", "/"},
@@ -93,7 +95,7 @@ TEST_P(CsrfFilterIntegrationTest, TestCsrfSuccess) {
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestCsrfDisabled) {
-  config_helper_.addFilter(CSRF_DISABLED_CONFIG);
+  config_helper_.prependFilter(CSRF_DISABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{
       {":method", "PUT"},
       {":path", "/"},
@@ -107,7 +109,7 @@ TEST_P(CsrfFilterIntegrationTest, TestCsrfDisabled) {
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestNonMutationMethod) {
-  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
+  config_helper_.prependFilter(CSRF_FILTER_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{
       {":method", "GET"},
       {":path", "/"},
@@ -121,7 +123,7 @@ TEST_P(CsrfFilterIntegrationTest, TestNonMutationMethod) {
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestOriginMismatch) {
-  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
+  config_helper_.prependFilter(CSRF_FILTER_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{
       {":method", "PUT"},
       {":path", "/"},
@@ -135,7 +137,7 @@ TEST_P(CsrfFilterIntegrationTest, TestOriginMismatch) {
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestEnforcesPost) {
-  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
+  config_helper_.prependFilter(CSRF_FILTER_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{
       {":method", "POST"},
       {":path", "/"},
@@ -149,7 +151,7 @@ TEST_P(CsrfFilterIntegrationTest, TestEnforcesPost) {
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestEnforcesDelete) {
-  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
+  config_helper_.prependFilter(CSRF_FILTER_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{
       {":method", "DELETE"},
       {":path", "/"},
@@ -163,7 +165,7 @@ TEST_P(CsrfFilterIntegrationTest, TestEnforcesDelete) {
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestEnforcesPatch) {
-  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
+  config_helper_.prependFilter(CSRF_FILTER_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{
       {":method", "PATCH"},
       {":path", "/"},
@@ -177,7 +179,7 @@ TEST_P(CsrfFilterIntegrationTest, TestEnforcesPatch) {
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestRefererFallback) {
-  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
+  config_helper_.prependFilter(CSRF_FILTER_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{":method", "DELETE"},
                                             {":path", "/"},
                                             {":scheme", "http"},
@@ -189,7 +191,7 @@ TEST_P(CsrfFilterIntegrationTest, TestRefererFallback) {
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestMissingOrigin) {
-  config_helper_.addFilter(CSRF_FILTER_ENABLED_CONFIG);
+  config_helper_.prependFilter(CSRF_FILTER_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {
       {{":method", "DELETE"}, {":path", "/"}, {":scheme", "http"}, {"host", "test-origin"}}};
   const auto& response = sendRequest(headers);
@@ -198,7 +200,7 @@ TEST_P(CsrfFilterIntegrationTest, TestMissingOrigin) {
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestShadowOnlyMode) {
-  config_helper_.addFilter(CSRF_SHADOW_ENABLED_CONFIG);
+  config_helper_.prependFilter(CSRF_SHADOW_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{
       {":method", "PUT"},
       {":path", "/"},
@@ -212,7 +214,7 @@ TEST_P(CsrfFilterIntegrationTest, TestShadowOnlyMode) {
 }
 
 TEST_P(CsrfFilterIntegrationTest, TestFilterAndShadowEnabled) {
-  config_helper_.addFilter(CSRF_ENABLED_CONFIG);
+  config_helper_.prependFilter(CSRF_ENABLED_CONFIG);
   Http::TestRequestHeaderMapImpl headers = {{
       {":method", "PUT"},
       {":path", "/"},

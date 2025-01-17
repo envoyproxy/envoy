@@ -7,6 +7,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.formatter.metadata.v3";
 option java_outer_classname = "MetadataProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/formatter/metadata/v3;metadatav3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Formatter extension for printing various types of metadata]
@@ -19,6 +20,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * DYNAMIC
 // * CLUSTER
 // * ROUTE
+// * UPSTREAM_HOST
+// * LISTENER
+// * VIRTUAL_HOST
 //
 // See :ref:`here <config_access_log>` for more information on access log configuration.
 
@@ -26,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    :ref:`Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
 //    where TYPE is type of metadata (see above for supported types),
 //    NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
-//    lookup up key in the namespace with the option of specifying nested keys separated by ':',
+//    lookup key in the namespace with the option of specifying nested keys separated by ':',
 //    and Z is an optional parameter denoting string truncation up to Z characters long.
 //    The data will be logged as a JSON string. For example, for the following ROUTE metadata:
 //
@@ -50,7 +54,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //  .. note::
 //
 //    METADATA(DYNAMIC:NAMESPACE:KEY):Z is equivalent to :ref:`DYNAMIC_METADATA(NAMESPACE:KEY):Z<config_access_log_format_dynamic_metadata>`
-//    METADATA(CLUSTER:NAMESPACE:KEY):Z is equivalent to :ref:`CLUSTER_METADATA(NAMASPACE:KEY):Z<config_access_log_format_cluster_metadata>`
+//    METADATA(CLUSTER:NAMESPACE:KEY):Z is equivalent to :ref:`CLUSTER_METADATA(NAMESPACE:KEY):Z<config_access_log_format_cluster_metadata>`
+//    METADATA(UPSTREAM_HOST:NAMESPACE:KEY):Z is equivalent to :ref:`UPSTREAM_METADATA(NAMESPACE:KEY):Z<config_access_log_format_upstream_host_metadata>`
 
 message Metadata {
 }

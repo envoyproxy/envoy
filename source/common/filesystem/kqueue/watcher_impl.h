@@ -23,11 +23,11 @@ namespace Filesystem {
  */
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::file> {
 public:
-  WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api);
+  WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& file_system);
   ~WatcherImpl();
 
   // Filesystem::Watcher
-  void addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
+  absl::Status addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
 
 private:
   struct FileWatch : LinkedObject<FileWatch> {
@@ -42,12 +42,12 @@ private:
 
   using FileWatchPtr = std::shared_ptr<FileWatch>;
 
-  void onKqueueEvent();
-  FileWatchPtr addWatch(absl::string_view path, uint32_t events, Watcher::OnChangedCb cb,
-                        bool pathMustExist);
+  absl::Status onKqueueEvent();
+  absl::StatusOr<FileWatchPtr> addWatch(absl::string_view path, uint32_t events,
+                                        Watcher::OnChangedCb cb, bool pathMustExist);
   void removeWatch(FileWatchPtr& watch);
 
-  Api::Api& api_;
+  Filesystem::Instance& file_system_;
   int queue_;
   absl::node_hash_map<int, FileWatchPtr> watches_;
   Event::FileEventPtr kqueue_event_;

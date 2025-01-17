@@ -9,7 +9,7 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace HttpInspector {
 
-DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzWithDataTestCase& input) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
@@ -18,10 +18,10 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCas
   }
 
   Stats::IsolatedStoreImpl store;
-  ConfigSharedPtr cfg = std::make_shared<Config>(store);
+  ConfigSharedPtr cfg = std::make_shared<Config>(*store.rootScope());
   auto filter = std::make_unique<Filter>(cfg);
 
-  ListenerFilterFuzzer fuzzer;
+  ListenerFilterWithDataFuzzer fuzzer;
   fuzzer.fuzz(std::move(filter), input);
 }
 

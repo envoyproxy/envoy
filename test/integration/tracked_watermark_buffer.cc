@@ -1,5 +1,6 @@
 #include "test/integration/tracked_watermark_buffer.h"
 
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/thread/thread.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/thread_local/thread_local_object.h"
@@ -8,6 +9,18 @@
 
 namespace Envoy {
 namespace Buffer {
+
+TrackedWatermarkBufferFactory::TrackedWatermarkBufferFactory() : TrackedWatermarkBufferFactory(0) {}
+
+TrackedWatermarkBufferFactory::TrackedWatermarkBufferFactory(
+    uint32_t minimum_account_to_track_power_of_two)
+    : WatermarkBufferFactory([minimum_account_to_track_power_of_two]() {
+        auto config = envoy::config::overload::v3::BufferFactoryConfig();
+        if (minimum_account_to_track_power_of_two > 0) {
+          config.set_minimum_account_to_track_power_of_two(minimum_account_to_track_power_of_two);
+        }
+        return config;
+      }()) {}
 
 TrackedWatermarkBufferFactory::~TrackedWatermarkBufferFactory() {
   ASSERT(active_buffer_count_ == 0);
@@ -22,6 +35,7 @@ TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_wate
   ++active_buffer_count_;
   BufferInfo& buffer_info = buffer_infos_[idx];
   return std::make_unique<TrackedWatermarkBuffer>(
+      // update_size
       [this, &buffer_info](uint64_t current_size) {
         absl::MutexLock lock(&mutex_);
         total_buffer_size_ = total_buffer_size_ + current_size - buffer_info.current_size_;
@@ -32,10 +46,12 @@ TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_wate
 
         checkIfExpectedBalancesMet();
       },
+      // update_high_watermark
       [this, &buffer_info](uint32_t watermark) {
         absl::MutexLock lock(&mutex_);
         buffer_info.watermark_ = watermark;
       },
+      // on_delete
       [this, &buffer_info](TrackedWatermarkBuffer* buffer) {
         absl::MutexLock lock(&mutex_);
         ASSERT(active_buffer_count_ > 0);
@@ -63,6 +79,7 @@ TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_wate
           }
         }
       },
+      // on_bind
       [this](BufferMemoryAccountSharedPtr& account, TrackedWatermarkBuffer* buffer) {
         absl::MutexLock lock(&mutex_);
         // Only track non-null accounts.
@@ -77,13 +94,15 @@ TrackedWatermarkBufferFactory::createBuffer(std::function<void()> below_low_wate
 BufferMemoryAccountSharedPtr
 TrackedWatermarkBufferFactory::createAccount(Http::StreamResetHandler& reset_handler) {
   auto account = WatermarkBufferFactory::createAccount(reset_handler);
-  absl::MutexLock lock(&mutex_);
-  ++total_accounts_created_;
+  if (account != nullptr) {
+    absl::MutexLock lock(&mutex_);
+    ++total_accounts_created_;
+  }
   return account;
 }
 
 void TrackedWatermarkBufferFactory::unregisterAccount(const BufferMemoryAccountSharedPtr& account,
-                                                      int current_class) {
+                                                      absl::optional<uint32_t> current_class) {
   WatermarkBufferFactory::unregisterAccount(account, current_class);
   absl::MutexLock lock(&mutex_);
   ++total_accounts_unregistered_;

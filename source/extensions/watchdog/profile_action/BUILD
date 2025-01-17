@@ -13,9 +13,6 @@ envoy_cc_library(
     name = "profile_action_lib",
     srcs = ["profile_action.cc"],
     hdrs = ["profile_action.h"],
-    external_deps = [
-        "abseil_optional",
-    ],
     deps = [
         "//envoy/api:api_interface",
         "//envoy/common:time_interface",
@@ -25,7 +22,8 @@ envoy_cc_library(
         "//source/common/profiler:profiler_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
-        "@envoy_api//envoy/extensions/watchdog/profile_action/v3alpha:pkg_cc_proto",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/extensions/watchdog/profile_action/v3:pkg_cc_proto",
     ],
 )
 
@@ -40,6 +38,6 @@ envoy_cc_extension(
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:message_validator_lib",
-        "@envoy_api//envoy/extensions/watchdog/profile_action/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/watchdog/profile_action/v3:pkg_cc_proto",
     ],
 )

@@ -9,18 +9,20 @@
 #include <vector>
 
 #include "envoy/common/callback.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/filter_factory.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/health_check_host_monitor.h"
-#include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/locality.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
@@ -28,9 +30,90 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "fmt/format.h"
 
 namespace Envoy {
+namespace Http {
+class FilterChainManager;
+}
+
 namespace Upstream {
+
+/**
+ * A bundle struct for address and socket options.
+ */
+struct UpstreamLocalAddress {
+public:
+  Network::Address::InstanceConstSharedPtr address_;
+  Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+};
+
+/**
+ * Interface to select upstream local address based on the endpoint address.
+ */
+class UpstreamLocalAddressSelector {
+public:
+  virtual ~UpstreamLocalAddressSelector() = default;
+
+  /**
+   * Return UpstreamLocalAddress based on the endpoint address.
+   * @param endpoint_address is the address used to select upstream local address.
+   * @param socket_options applied to the selected address.
+   * @return UpstreamLocalAddress which includes the selected upstream local address and socket
+   * options.
+   */
+  UpstreamLocalAddress
+  getUpstreamLocalAddress(const Network::Address::InstanceConstSharedPtr& endpoint_address,
+                          const Network::ConnectionSocket::OptionsSharedPtr& socket_options) const {
+    UpstreamLocalAddress local_address = getUpstreamLocalAddressImpl(endpoint_address);
+    Network::ConnectionSocket::OptionsSharedPtr connection_options =
+        std::make_shared<Network::ConnectionSocket::Options>(
+            socket_options ? *socket_options
+                           : std::vector<Network::ConnectionSocket::OptionConstSharedPtr>{});
+    return {local_address.address_,
+            local_address.socket_options_ != nullptr
+                ? Network::Socket::appendOptions(connection_options, local_address.socket_options_)
+                : connection_options};
+  }
+
+private:
+  /*
+   * The implementation is responsible for picking the ``UpstreamLocalAddress``
+   * based on the ``endpoint_address``. However adding the connection socket
+   * options is the responsibility of the base class.
+   */
+  virtual UpstreamLocalAddress getUpstreamLocalAddressImpl(
+      const Network::Address::InstanceConstSharedPtr& endpoint_address) const PURE;
+};
+
+using UpstreamLocalAddressSelectorConstSharedPtr =
+    std::shared_ptr<const UpstreamLocalAddressSelector>;
+
+class UpstreamLocalAddressSelectorFactory : public Config::TypedFactory {
+public:
+  ~UpstreamLocalAddressSelectorFactory() override = default;
+
+  /**
+   * @param cluster_name is set to the name of the cluster if ``bind_config`` is
+   *   from cluster config. If the bind config from the cluster manager, the param
+   *   is empty.
+   */
+  virtual absl::StatusOr<UpstreamLocalAddressSelectorConstSharedPtr>
+  createLocalAddressSelector(std::vector<UpstreamLocalAddress> upstream_local_addresses,
+                             absl::optional<std::string> cluster_name) const PURE;
+
+  std::string category() const override { return "envoy.upstream.local_address_selector"; }
+};
+
+/**
+ * RAII handle for tracking the host usage by the connection pools.
+ **/
+class HostHandle {
+public:
+  virtual ~HostHandle() = default;
+};
+
+using HostHandlePtr = std::unique_ptr<HostHandle>;
 
 /**
  * An upstream host.
@@ -65,7 +148,9 @@ public:
   /* is not meant to be routed to. */                                            \
   m(EXCLUDED_VIA_IMMEDIATE_HC_FAIL, 0x80)                                        \
   /* The host failed active HC due to timeout. */                                \
-  m(ACTIVE_HC_TIMEOUT, 0x100)
+  m(ACTIVE_HC_TIMEOUT, 0x100)                                                    \
+  /* The host is currently marked as draining by EDS */                          \
+  m(EDS_STATUS_DRAINING, 0x200)
   // clang-format on
 
 #define DECLARE_ENUM(name, value) name = value,
@@ -129,6 +214,18 @@ public:
    */
   virtual void healthFlagSet(HealthFlag flag) PURE;
 
+  /**
+   * Atomically get multiple health flags that are set for a host. Flags are specified
+   * as a bitset of HealthFlags.
+   */
+  virtual uint32_t healthFlagsGetAll() const PURE;
+
+  /**
+   * Atomically set the health flag for a host. Flags are specified as a bitset
+   * of HealthFlags.
+   */
+  virtual void healthFlagsSetAll(uint32_t bits) PURE;
+
   enum class Health {
     /**
      * Host is unhealthy and is not able to serve traffic. A host may be marked as unhealthy either
@@ -148,24 +245,28 @@ public:
   };
 
   /**
-   * @return the health of the host.
+   * @return the coarse health status of the host.
    */
-  virtual Health health() const PURE;
+  virtual Health coarseHealth() const PURE;
+
+  using HealthStatus = envoy::config::core::v3::HealthStatus;
 
   /**
-   * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
-   * a new monitor must be installed before the host is used across threads. Thus,
-   * this routine should only be called on the main thread before the host is used across threads.
+   * @return more specific health status of host. This status is hybrid of EDS status and runtime
+   * active status (from active health checker or outlier detection). Active status will be taken as
+   * a priority.
    */
-  virtual void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) PURE;
+  virtual HealthStatus healthStatus() const PURE;
 
   /**
-   * Set the host's outlier detector monitor. Outlier detector monitors are assumed to be thread
-   * safe, however a new outlier detector monitor must be installed before the host is used across
-   * threads. Thus, this routine should only be called on the main thread before the host is used
-   * across threads.
+   * Set the EDS health status of the host. This is used when the host status is updated via EDS.
    */
-  virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
+  virtual void setEdsHealthStatus(HealthStatus health_status) PURE;
+
+  /**
+   * @return the EDS health status of the host.
+   */
+  virtual HealthStatus edsHealthStatus() const PURE;
 
   /**
    * @return the current load balancing weight of the host, in the range 1-128 (see
@@ -180,14 +281,25 @@ public:
   virtual void weight(uint32_t new_weight) PURE;
 
   /**
-   * @return the current boolean value of host being in use.
+   * @return the current boolean value of host being in use by any connection pool.
    */
   virtual bool used() const PURE;
 
   /**
-   * @param new_used supplies the new value of host being in use to be stored.
+   * Creates a handle for a host. Deletion of the handle signals that the
+   * connection pools no longer need this host.
    */
-  virtual void used(bool new_used) PURE;
+  virtual HostHandlePtr acquireHandle() const PURE;
+
+  /**
+   * @return true if active health check is disabled.
+   */
+  virtual bool disableActiveHealthCheck() const PURE;
+
+  /**
+   * Set true to disable active health check for the host.
+   */
+  virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -197,6 +309,8 @@ using HealthyHostVector = Phantom<HostVector, Healthy>;
 using DegradedHostVector = Phantom<HostVector, Degraded>;
 using ExcludedHostVector = Phantom<HostVector, Excluded>;
 using HostMap = absl::flat_hash_map<std::string, Upstream::HostSharedPtr>;
+using HostMapSharedPtr = std::shared_ptr<HostMap>;
+using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -225,7 +339,10 @@ public:
   /**
    * @return const std::vector<HostVector>& list of hosts organized per
    *         locality. The local locality is the first entry if
-   *         hasLocalLocality() is true.
+   *         hasLocalLocality() is true. All hosts within the same entry have the same locality
+   *         and all hosts with a given locality are in the same entry. With the exception of
+   *         the local locality entry (if present), all entries are sorted by locality with
+   *         those considered less by the LocalityLess comparator ordered earlier in the list.
    */
   virtual const std::vector<HostVector>& get() const PURE;
 
@@ -378,6 +495,11 @@ public:
    * @return uint32_t the overprovisioning factor of this host set.
    */
   virtual uint32_t overprovisioningFactor() const PURE;
+
+  /**
+   * @return true to use host weights to calculate the health of a priority.
+   */
+  virtual bool weightedPriorityHealth() const PURE;
 };
 
 using HostSetPtr = std::unique_ptr<HostSet>;
@@ -389,10 +511,10 @@ using HostSetPtr = std::unique_ptr<HostSet>;
 class PrioritySet {
 public:
   using MemberUpdateCb =
-      std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>;
+      std::function<absl::Status(const HostVector& hosts_added, const HostVector& hosts_removed)>;
 
-  using PriorityUpdateCb = std::function<void(uint32_t priority, const HostVector& hosts_added,
-                                              const HostVector& hosts_removed)>;
+  using PriorityUpdateCb = std::function<absl::Status(
+      uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed)>;
 
   virtual ~PrioritySet() = default;
 
@@ -425,6 +547,12 @@ public:
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
 
   /**
+   * @return HostMapConstSharedPtr read only cross priority host map that indexed by host address
+   * string.
+   */
+  virtual HostMapConstSharedPtr crossPriorityHostMap() const PURE;
+
+  /**
    * Parameter class for updateHosts.
    */
   struct UpdateHostsParams {
@@ -446,12 +574,18 @@ public:
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
-   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+   * @param seed a random number to initialize the locality load-balancing algorithm.
+   * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
+   * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
+   * @param cross_priority_host_map read only cross-priority host map which is created in the main
+   * thread and shared by all the worker threads.
    */
-  virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+  virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
-                           absl::optional<uint32_t> overprovisioning_factor) PURE;
+                           uint64_t seed, absl::optional<bool> weighted_priority_health,
+                           absl::optional<uint32_t> overprovisioning_factor,
+                           HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
   /**
    * Callback provided during batch updates that can be used to update hosts.
@@ -467,11 +601,13 @@ public:
      * @param locality_weights supplies a map from locality to associated weight.
      * @param hosts_added supplies the hosts added since the last update.
      * @param hosts_removed supplies the hosts removed since the last update.
-     * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
+     * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
+     * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
      */
-    virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_host_params,
+    virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
+                             uint64_t seed, absl::optional<bool> weighted_priority_health,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
   };
 
@@ -500,12 +636,38 @@ public:
 };
 
 /**
- * All cluster stats. @see stats_macros.h
+ * All cluster config update related stats.
+ * See https://github.com/envoyproxy/envoy/issues/23575 for details. Stats from ClusterInfo::stats()
+ * will be split into subgroups "config-update", "lb", "endpoint" and "the rest"(which are mainly
+ * upstream related), roughly based on their semantics.
  */
-#define ALL_CLUSTER_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                       \
+#define ALL_CLUSTER_CONFIG_UPDATE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)         \
   COUNTER(assignment_stale)                                                                        \
   COUNTER(assignment_timeout_received)                                                             \
-  COUNTER(bind_errors)                                                                             \
+  COUNTER(assignment_use_cached)                                                                   \
+  COUNTER(update_attempt)                                                                          \
+  COUNTER(update_empty)                                                                            \
+  COUNTER(update_failure)                                                                          \
+  COUNTER(update_no_rebuild)                                                                       \
+  COUNTER(update_success)                                                                          \
+  GAUGE(version, NeverImport)                                                                      \
+  GAUGE(warming_state, NeverImport)
+
+/**
+ * All cluster endpoints related stats.
+ */
+#define ALL_CLUSTER_ENDPOINT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)              \
+  GAUGE(max_host_weight, NeverImport)                                                              \
+  COUNTER(membership_change)                                                                       \
+  GAUGE(membership_degraded, NeverImport)                                                          \
+  GAUGE(membership_excluded, NeverImport)                                                          \
+  GAUGE(membership_healthy, NeverImport)                                                           \
+  GAUGE(membership_total, NeverImport)
+
+/**
+ * All cluster load balancing related stats.
+ */
+#define ALL_CLUSTER_LB_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)                    \
   COUNTER(lb_healthy_panic)                                                                        \
   COUNTER(lb_local_cluster_not_ok)                                                                 \
   COUNTER(lb_recalculate_zone_structures)                                                          \
@@ -520,18 +682,20 @@ public:
   COUNTER(lb_zone_routing_all_directly)                                                            \
   COUNTER(lb_zone_routing_cross_zone)                                                              \
   COUNTER(lb_zone_routing_sampled)                                                                 \
-  COUNTER(membership_change)                                                                       \
+  GAUGE(lb_subsets_active, Accumulate)
+
+/**
+ * All cluster stats. @see stats_macros.h
+ */
+#define ALL_CLUSTER_TRAFFIC_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)               \
+  COUNTER(bind_errors)                                                                             \
   COUNTER(original_dst_host_invalid)                                                               \
   COUNTER(retry_or_shadow_abandoned)                                                               \
-  COUNTER(update_attempt)                                                                          \
-  COUNTER(update_empty)                                                                            \
-  COUNTER(update_failure)                                                                          \
-  COUNTER(update_no_rebuild)                                                                       \
-  COUNTER(update_success)                                                                          \
   COUNTER(upstream_cx_close_notify)                                                                \
   COUNTER(upstream_cx_connect_attempts_exceeded)                                                   \
   COUNTER(upstream_cx_connect_fail)                                                                \
   COUNTER(upstream_cx_connect_timeout)                                                             \
+  COUNTER(upstream_cx_connect_with_0_rtt)                                                          \
   COUNTER(upstream_cx_destroy)                                                                     \
   COUNTER(upstream_cx_destroy_local)                                                               \
   COUNTER(upstream_cx_destroy_local_with_active_rq)                                                \
@@ -542,6 +706,7 @@ public:
   COUNTER(upstream_cx_http2_total)                                                                 \
   COUNTER(upstream_cx_http3_total)                                                                 \
   COUNTER(upstream_cx_idle_timeout)                                                                \
+  COUNTER(upstream_cx_max_duration_reached)                                                        \
   COUNTER(upstream_cx_max_requests)                                                                \
   COUNTER(upstream_cx_none_healthy)                                                                \
   COUNTER(upstream_cx_overflow)                                                                    \
@@ -563,7 +728,9 @@ public:
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
+  COUNTER(upstream_rq_0rtt)                                                                        \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
+  COUNTER(upstream_rq_per_try_idle_timeout)                                                        \
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_backoff_exponential)                                                   \
   COUNTER(upstream_rq_retry_backoff_ratelimited)                                                   \
@@ -574,28 +741,25 @@ public:
   COUNTER(upstream_rq_timeout)                                                                     \
   COUNTER(upstream_rq_total)                                                                       \
   COUNTER(upstream_rq_tx_reset)                                                                    \
-  GAUGE(lb_subsets_active, Accumulate)                                                             \
-  GAUGE(max_host_weight, NeverImport)                                                              \
-  GAUGE(membership_degraded, NeverImport)                                                          \
-  GAUGE(membership_excluded, NeverImport)                                                          \
-  GAUGE(membership_healthy, NeverImport)                                                           \
-  GAUGE(membership_total, NeverImport)                                                             \
+  COUNTER(upstream_http3_broken)                                                                   \
   GAUGE(upstream_cx_active, Accumulate)                                                            \
   GAUGE(upstream_cx_rx_bytes_buffered, Accumulate)                                                 \
   GAUGE(upstream_cx_tx_bytes_buffered, Accumulate)                                                 \
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
-  GAUGE(version, NeverImport)                                                                      \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
   HISTOGRAM(upstream_cx_length_ms, Milliseconds)
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
- * stats sink. See envoy.api.v2.endpoint.ClusterStats for the definition of upstream_rq_dropped.
- * These are latched by LoadStatsReporter, independent of the normal stats sink flushing.
+ * stats sink. See envoy.config.endpoint.v3.ClusterStats for the definition of
+ * total_dropped_requests and dropped_requests, which correspond to the upstream_rq_dropped and
+ * upstream_rq_drop_overload counter here. These are latched by LoadStatsReporter, independent of
+ * the normal stats sink flushing.
  */
 #define ALL_CLUSTER_LOAD_REPORT_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME)           \
-  COUNTER(upstream_rq_dropped)
+  COUNTER(upstream_rq_dropped)                                                                     \
+  COUNTER(upstream_rq_drop_overload)
 
 /**
  * Cluster circuit breakers gauges. Note that we do not generate a stats
@@ -638,10 +802,31 @@ public:
   HISTOGRAM(upstream_rq_timeout_budget_per_try_percent_used, Unspecified)
 
 /**
- * Struct definition for all cluster stats. @see stats_macros.h
+ * Struct definition for cluster config update stats. @see stats_macros.h
  */
-MAKE_STAT_NAMES_STRUCT(ClusterStatNames, ALL_CLUSTER_STATS);
-MAKE_STATS_STRUCT(ClusterStats, ClusterStatNames, ALL_CLUSTER_STATS);
+MAKE_STAT_NAMES_STRUCT(ClusterConfigUpdateStatNames, ALL_CLUSTER_CONFIG_UPDATE_STATS);
+MAKE_STATS_STRUCT(ClusterConfigUpdateStats, ClusterConfigUpdateStatNames,
+                  ALL_CLUSTER_CONFIG_UPDATE_STATS);
+
+/**
+ * Struct definition for cluster endpoint related stats. @see stats_macros.h
+ */
+MAKE_STAT_NAMES_STRUCT(ClusterEndpointStatNames, ALL_CLUSTER_ENDPOINT_STATS);
+MAKE_STATS_STRUCT(ClusterEndpointStats, ClusterEndpointStatNames, ALL_CLUSTER_ENDPOINT_STATS);
+
+/**
+ * Struct definition for cluster load balancing stats. @see stats_macros.h
+ */
+MAKE_STAT_NAMES_STRUCT(ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
+MAKE_STATS_STRUCT(ClusterLbStats, ClusterLbStatNames, ALL_CLUSTER_LB_STATS);
+
+/**
+ * Struct definition for all cluster traffic stats. @see stats_macros.h
+ */
+MAKE_STAT_NAMES_STRUCT(ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
+MAKE_STATS_STRUCT(ClusterTrafficStats, ClusterTrafficStatNames, ALL_CLUSTER_TRAFFIC_STATS);
+using DeferredCreationCompatibleClusterTrafficStats =
+    Stats::DeferredCreationCompatibleStats<ClusterTrafficStats>;
 
 MAKE_STAT_NAMES_STRUCT(ClusterLoadReportStatNames, ALL_CLUSTER_LOAD_REPORT_STATS);
 MAKE_STATS_STRUCT(ClusterLoadReportStats, ClusterLoadReportStatNames,
@@ -692,10 +877,22 @@ using ProtocolOptionsConfigConstSharedPtr = std::shared_ptr<const ProtocolOption
  */
 class ClusterTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
+class LoadBalancerConfig;
+class TypedLoadBalancerFactory;
+
+/**
+ * This is a function used by upstream binding config to select the source address based on the
+ * target address. Given the target address through the parameter expect the source address
+ * returned.
+ */
+using AddressSelectFn = std::function<const Network::Address::InstanceConstSharedPtr(
+    const Network::Address::InstanceConstSharedPtr&)>;
+
 /**
  * Information about a given upstream cluster.
+ * This includes the information and interfaces for building an upstream filter chain.
  */
-class ClusterInfo {
+class ClusterInfo : public Http::FilterChainFactory {
 public:
   struct Features {
     // Whether the upstream supports HTTP2. This is used when creating connection pools.
@@ -712,7 +909,7 @@ public:
     static constexpr uint64_t HTTP3 = 0x10;
   };
 
-  virtual ~ClusterInfo() = default;
+  ~ClusterInfo() override = default;
 
   /**
    * @return bool whether the cluster was added via API (if false the cluster was present in the
@@ -726,9 +923,19 @@ public:
   virtual std::chrono::milliseconds connectTimeout() const PURE;
 
   /**
-   * @return the idle timeout for upstream connection pool connections.
+   * @return the idle timeout for upstream HTTP connection pool connections.
    */
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return the idle timeout for each connection in TCP connection pool.
+   */
+  virtual const absl::optional<std::chrono::milliseconds> tcpPoolIdleTimeout() const PURE;
+
+  /**
+   * @return optional maximum connection duration timeout for manager connections.
+   */
+  virtual const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
 
   /**
    * @return how many streams should be anticipated per each current stream.
@@ -787,15 +994,22 @@ public:
   }
 
   /**
+   * @return OptRef<const LoadBalancerConfig> the validated load balancing policy configuration to
+   * use for this cluster.
+   */
+  virtual OptRef<const LoadBalancerConfig> loadBalancerConfig() const PURE;
+
+  /**
+   * @return the load balancer factory for this cluster. Cluster will always has a valid load
+   * balancer factory if it is created successfully.
+   */
+  virtual TypedLoadBalancerFactory& loadBalancerFactory() const PURE;
+
+  /**
    * @return const envoy::config::cluster::v3::Cluster::CommonLbConfig& the common configuration for
    * all load balancers for this cluster.
    */
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
-
-  /**
-   * @return the type of load balancing that the cluster should use.
-   */
-  virtual LoadBalancerType lbType() const PURE;
 
   /**
    * @return the service discovery type to use for resolving the cluster.
@@ -805,41 +1019,14 @@ public:
   /**
    * @return the type of cluster, only used for custom discovery types.
    */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType>&
+  virtual OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>
   clusterType() const PURE;
-
-  /**
-   * @return configuration for least request load balancing, only used if LB type is least request.
-   */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
-  lbLeastRequestConfig() const PURE;
-
-  /**
-   * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
-   */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
-  lbRingHashConfig() const PURE;
-
-  /**
-   * @return configuration for maglev load balancing, only used if type is set to maglev_lb.
-   */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&
-  lbMaglevConfig() const PURE;
-
-  /**
-   * @return const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>& the
-   * configuration for the Original Destination load balancing policy, only used if type is set to
-   *         ORIGINAL_DST_LB.
-   */
-  virtual const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&
-  lbOriginalDstConfig() const PURE;
 
   /**
    * @return const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& the configuration
    *         for the upstream, if a custom upstream is configured.
    */
-  virtual const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
-  upstreamConfig() const PURE;
+  virtual OptRef<const envoy::config::core::v3::TypedExtensionConfig> upstreamConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.
@@ -861,6 +1048,11 @@ public:
    * reset if the number of headers exceeds this value.
    */
   virtual uint32_t maxResponseHeadersCount() const PURE;
+
+  /**
+   * @return uint32_t the maximum total size of response headers in KB.
+   */
+  virtual absl::optional<uint16_t> maxResponseHeadersKb() const PURE;
 
   /**
    * @return the human readable name of the cluster.
@@ -888,10 +1080,24 @@ public:
   virtual TransportSocketMatcher& transportSocketMatcher() const PURE;
 
   /**
-   * @return ClusterStats& strongly named stats for this cluster.
+   * @return ClusterConfigUpdateStats& config update stats for this cluster.
    */
-  virtual ClusterStats& stats() const PURE;
+  virtual ClusterConfigUpdateStats& configUpdateStats() const PURE;
 
+  /**
+   * @return ClusterLbStats& load-balancer-related stats for this cluster.
+   */
+  virtual ClusterLbStats& lbStats() const PURE;
+
+  /**
+   * @return ClusterEndpointStats& endpoint related stats for this cluster.
+   */
+  virtual ClusterEndpointStats& endpointStats() const PURE;
+
+  /**
+   * @return  all traffic related stats for this cluster.
+   */
+  virtual DeferredCreationCompatibleClusterTrafficStats& trafficStats() const PURE;
   /**
    * @return the stats scope that contains all cluster stats. This can be used to produce dynamic
    *         stats that will be freed when the cluster is removed.
@@ -899,7 +1105,7 @@ public:
   virtual Stats::Scope& statsScope() const PURE;
 
   /**
-   * @return ClusterLoadReportStats& strongly named load report stats for this cluster.
+   * @return ClusterLoadReportStats& load report stats for this cluster.
    */
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
@@ -916,16 +1122,14 @@ public:
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
   /**
-   * Returns an optional source address for upstream connections to bind to.
-   *
-   * @return a source address to bind to or nullptr if no bind need occur.
+   * @return true if this cluster should produce per-endpoint stats.
    */
-  virtual const Network::Address::InstanceConstSharedPtr& sourceAddress() const PURE;
+  virtual bool perEndpointStatsEnabled() const PURE;
 
   /**
-   * @return the configuration for load balancer subsets.
+   * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
    */
-  virtual const LoadBalancerSubsetInfo& lbSubsetInfo() const PURE;
+  virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the configuration metadata for this cluster.
@@ -936,13 +1140,6 @@ public:
    * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.
    */
   virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
-
-  /**
-   *
-   * @return const Network::ConnectionSocket::OptionsSharedPtr& socket options for all
-   *         connections for this cluster.
-   */
-  virtual const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const PURE;
 
   /**
    * @return whether to skip waiting for health checking before draining connections
@@ -963,9 +1160,15 @@ public:
   virtual bool warmHosts() const PURE;
 
   /**
-   * @return eds cluster service_name of the cluster.
+   * @return true if this cluster is configured to set local interface name on upstream connections.
    */
-  virtual absl::optional<std::string> edsServiceName() const PURE;
+  virtual bool setLocalInterfaceNameOnUpstreamConnections() const PURE;
+
+  /**
+   * @return const std::string& eds cluster service_name of the cluster. Empty if not an EDS
+   * cluster or eds cluster service_name is not set.
+   */
+  virtual const std::string& edsServiceName() const PURE;
 
   /**
    * Create network filters on a new upstream connection.
@@ -987,7 +1190,7 @@ public:
   /**
    * @return alternate protocols cache options for upstream connections.
    */
-  virtual const absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>&
+  virtual const absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions>&
   alternateProtocolsCacheOptions() const PURE;
 
   /**
@@ -1004,6 +1207,24 @@ public:
    * @return the Http3 Codec Stats.
    */
   virtual Http::Http3::CodecStats& http3CodecStats() const PURE;
+
+  /**
+   * @return create header validator based on cluster configuration. Returns nullptr if
+   * ENVOY_ENABLE_UHV is undefined.
+   */
+  virtual Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
+
+  /**
+   * @return OptRef<const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig>
+   * an optional value of the configuration for happy eyeballs for this cluster.
+   */
+  virtual OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  happyEyeballsConfig() const PURE;
+
+  /**
+   * @return Reference to the optional config for LRS endpoint metric reporting.
+   */
+  virtual OptRef<const std::vector<std::string>> lrsReportMetricNames() const PURE;
 
 protected:
   /**
@@ -1056,7 +1277,7 @@ public:
    *        time initialization. E.g., for a dynamic DNS cluster the initialize callback will be
    *        called when initial DNS resolution is complete.
    */
-  virtual void initialize(std::function<void()> callback) PURE;
+  virtual void initialize(std::function<absl::Status()> callback) PURE;
 
   /**
    * @return the phase in which the cluster is initialized at boot. This mechanism is used such that
@@ -1074,6 +1295,26 @@ public:
    * @return the const PrioritySet for the cluster.
    */
   virtual const PrioritySet& prioritySet() const PURE;
+
+  /**
+   * @return the cluster drop_overload configuration.
+   */
+  virtual UnitFloat dropOverload() const PURE;
+
+  /**
+   * @return the cluster drop_category_ configuration.
+   */
+  virtual const std::string& dropCategory() const PURE;
+
+  /**
+   * Set up the drop_overload value for the cluster.
+   */
+  virtual void setDropOverload(UnitFloat drop_overload) PURE;
+
+  /**
+   * Set up the drop_category value for the thread local cluster.
+   */
+  virtual void setDropCategory(absl::string_view drop_category) PURE;
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
@@ -1081,3 +1322,19 @@ using ClusterConstOptRef = absl::optional<std::reference_wrapper<const Cluster>>
 
 } // namespace Upstream
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+
+// fmt formatter class for Host
+template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_view> {
+  template <typename FormatContext>
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) const -> decltype(ctx.out()) {
+    absl::string_view out = !host.hostname().empty() ? host.hostname()
+                            : host.address()         ? host.address()->asStringView()
+                                                     : "<empty>";
+    return formatter<absl::string_view>().format(out, ctx);
+  }
+};
+
+} // namespace fmt

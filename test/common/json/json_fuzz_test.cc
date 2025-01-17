@@ -3,19 +3,21 @@
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Fuzz {
 
-// We have multiple third party JSON parsers in Envoy, nlohmann/JSON, RapidJSON and Protobuf.
-// We fuzz nlohmann/JSON and protobuf and compare their results, since RapidJSON is deprecated and
-// has known limitations. See https://github.com/envoyproxy/envoy/issues/4705.
+static const size_t MaxInputSize = 64 * 1024;
+
+// We have multiple third party JSON parsers in Envoy, nlohmann/JSON and Protobuf.
+// We fuzz nlohmann/JSON and protobuf and compare their results.
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-  TestScopedRuntime runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.remove_legacy_json", "true"}});
+  // protect against overly large JSON files
+  if (len > MaxInputSize) {
+    ENVOY_LOG_MISC(debug, "Buffer length is over {}KiB, skipping test.", MaxInputSize / 1024);
+    return;
+  }
 
   std::string json_string{reinterpret_cast<const char*>(buf), len};
 
@@ -39,10 +41,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // round-trip.
     std::string yaml = MessageUtil::getYamlStringFromMessage(message);
     ProtobufWkt::Struct yaml_message;
-    MessageUtil::loadFromYaml(yaml, yaml_message);
+    TestUtility::loadFromYaml(yaml, yaml_message);
 
     ProtobufWkt::Struct message3;
-    MessageUtil::loadFromYaml(MessageUtil::getYamlStringFromMessage(yaml_message), message3);
+    TestUtility::loadFromYaml(MessageUtil::getYamlStringFromMessage(yaml_message), message3);
     FUZZ_ASSERT(TestUtility::protoEqual(yaml_message, message3));
   } catch (const Envoy::EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Failed due to {}", e.what());

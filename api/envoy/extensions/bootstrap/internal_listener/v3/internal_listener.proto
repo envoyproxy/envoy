@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.extensions.bootstrap.internal_listener.v3;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.bootstrap.internal_listener.v3";
+option java_outer_classname = "InternalListenerProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/internal_listener/v3;internal_listenerv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Internal Listener]
+// Internal Listener :ref:`overview <config_internal_listener>`.
+// [#extension: envoy.bootstrap.internal_listener]
+
+// Configuration for internal listener.
+message InternalListener {
+  // The internal listener client connection buffer size in KiB.
+  // For example, if ``buffer_size_kb`` is set to 5, then the actual buffer size is
+  // 5 KiB = 5 * 1024 bytes.
+  // If the ``buffer_size_kb`` is not specified, the buffer size is set to 1024 KiB.
+  google.protobuf.UInt32Value buffer_size_kb = 1 [(validate.rules).uint32 = {lte: 8192 gte: 1}];
+}

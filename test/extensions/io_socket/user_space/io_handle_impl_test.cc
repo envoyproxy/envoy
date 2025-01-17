@@ -2,8 +2,8 @@
 #include "envoy/event/file_event.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/common/fancy_logger.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -19,6 +19,8 @@ namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
 namespace {
+
+constexpr int CONNECTED = 0;
 
 MATCHER(IsInvalidAddress, "") {
   return arg.err_->getErrorCode() == Api::IoError::IoErrorCode::NoSupport;
@@ -54,6 +56,8 @@ public:
   std::unique_ptr<IoHandleImpl> io_handle_peer_;
   absl::FixedArray<char> buf_;
 };
+
+TEST_F(IoHandleImplTest, InterfaceName) { ASSERT_FALSE(io_handle_->interfaceName().has_value()); }
 
 // Test recv side effects.
 TEST_F(IoHandleImplTest, BasicRecv) {
@@ -178,6 +182,23 @@ TEST_F(IoHandleImplTest, ReadContent) {
   EXPECT_EQ(4, result.return_value_);
   ASSERT_EQ(7, buf.length());
   ASSERT_EQ(0, io_handle_->getWriteBuffer()->length());
+}
+
+TEST_F(IoHandleImplTest, WriteClearsDrainTrackers) {
+  Buffer::OwnedImpl buf_to_write("abcdefg");
+  {
+    bool called = false;
+    // This drain tracker should be called as soon as the write happens; not on read.
+    buf_to_write.addDrainTracker([&called]() { called = true; });
+    io_handle_peer_->write(buf_to_write);
+    EXPECT_TRUE(called);
+  }
+  // Now the drain tracker refers to a stack variable that no longer exists. If the drain tracker
+  // is called subsequently, this will fail in ASan.
+  Buffer::OwnedImpl buf;
+  auto result = io_handle_->read(buf, 10);
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(7, result.return_value_);
 }
 
 // Test read throttling on watermark buffer.
@@ -306,11 +327,11 @@ TEST_F(IoHandleImplTest, FlowControl) {
   auto& internal_buffer = *io_handle_->getWriteBuffer();
   while (internal_buffer.length() > 0) {
     SCOPED_TRACE(internal_buffer.length());
-    FANCY_LOG(debug, "internal buffer length = {}", internal_buffer.length());
+    ENVOY_LOG_MISC(debug, "internal buffer length = {}", internal_buffer.length());
     EXPECT_TRUE(io_handle_->isReadable());
     bool writable = io_handle_->isWritable();
-    FANCY_LOG(debug, "internal buffer length = {}, writable = {}", internal_buffer.length(),
-              writable);
+    ENVOY_LOG_MISC(debug, "internal buffer length = {}, writable = {}", internal_buffer.length(),
+                   writable);
     if (writable) {
       writable_flipped = true;
     } else {
@@ -389,6 +410,26 @@ TEST_F(IoHandleImplTest, RepeatedShutdownWR) {
 TEST_F(IoHandleImplTest, ShutDownOptionsNotSupported) {
   ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RD), "");
   ASSERT_DEBUG_DEATH(io_handle_peer_->shutdown(ENVOY_SHUT_RDWR), "");
+}
+
+// This test is ensure the memory created by BufferFragment won't be released
+// after the write.
+TEST_F(IoHandleImplTest, WriteBufferFragement) {
+  Buffer::OwnedImpl buf("a");
+  bool released = false;
+  auto buf_frag = Buffer::OwnedBufferFragmentImpl::create(
+      std::string(255, 'b'), [&released](const Buffer::OwnedBufferFragmentImpl* fragment) {
+        released = true;
+        delete fragment;
+      });
+  buf.addBufferFragment(*buf_frag.release());
+
+  auto result = io_handle_->write(buf);
+  EXPECT_FALSE(released);
+  EXPECT_EQ(0, buf.length());
+  io_handle_peer_->read(buf, absl::nullopt);
+  buf.drain(buf.length());
+  EXPECT_TRUE(released);
 }
 
 TEST_F(IoHandleImplTest, WriteByMove) {
@@ -472,7 +513,7 @@ TEST_F(IoHandleImplTest, WriteErrorAfterShutdown) {
   // Write after shutdown.
   io_handle_->shutdown(ENVOY_SHUT_WR);
   auto result = io_handle_->write(buf);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
   EXPECT_EQ(10, buf.length());
 }
 
@@ -481,7 +522,7 @@ TEST_F(IoHandleImplTest, WriteErrorAfterClose) {
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->isOpen());
   auto result = io_handle_->write(buf);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 // Test writev return error code. Ignoring the side effect of event scheduling.
@@ -537,7 +578,7 @@ TEST_F(IoHandleImplTest, WritevErrorAfterShutdown) {
   // Writev after shutdown.
   io_handle_->shutdown(ENVOY_SHUT_WR);
   auto result = io_handle_->writev(&slice, 1);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 TEST_F(IoHandleImplTest, WritevErrorAfterClose) {
@@ -546,7 +587,7 @@ TEST_F(IoHandleImplTest, WritevErrorAfterClose) {
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->isOpen());
   auto result = io_handle_->writev(&slice, 1);
-  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::UnknownError);
+  ASSERT_EQ(result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
 }
 
 TEST_F(IoHandleImplTest, WritevToPeer) {
@@ -571,8 +612,12 @@ TEST_F(IoHandleImplTest, EventScheduleBasic) {
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read | Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
   schedulable_cb->invokeCallback();
@@ -587,8 +632,12 @@ TEST_F(IoHandleImplTest, SetEnabledTriggerEventSchedule) {
     EXPECT_CALL(*schedulable_cb, enabled());
     EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration()).Times(0);
     io_handle_->initializeFileEvent(
-        dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-        Event::FileReadyType::Read);
+        dispatcher_,
+        [this](uint32_t events) {
+          cb_.called(events);
+          return absl::OkStatus();
+        },
+        Event::FileTriggerType::Edge, Event::FileReadyType::Read);
     testing::Mock::VerifyAndClearExpectations(schedulable_cb);
   }
   {
@@ -623,8 +672,12 @@ TEST_F(IoHandleImplTest, ReadAndWriteAreEdgeTriggered) {
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read | Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
   schedulable_cb->invokeCallback();
@@ -650,8 +703,12 @@ TEST_F(IoHandleImplTest, SetDisabledBlockEventSchedule) {
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Write);
   ASSERT_TRUE(schedulable_cb->enabled_);
 
   // The write event is cleared and the read event is not ready.
@@ -669,8 +726,12 @@ TEST_F(IoHandleImplTest, EventResetClearCallback) {
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Write);
   ASSERT_TRUE(schedulable_cb->enabled_);
   io_handle_->resetFileEvents();
 }
@@ -692,8 +753,12 @@ TEST_F(IoHandleImplTest, DrainToLowWaterMarkTriggerReadEvent) {
   // No event is available.
   EXPECT_CALL(*schedulable_cb, cancel());
   io_handle_peer_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read | Event::FileReadyType::Write);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
   // Neither readable nor writable.
   ASSERT_FALSE(schedulable_cb->enabled_);
 
@@ -756,6 +821,7 @@ TEST_F(IoHandleImplTest, Close) {
             should_close = true;
           }
         }
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
   schedulable_cb_->invokeCallback();
@@ -800,6 +866,7 @@ TEST_F(IoHandleImplTest, ShutDownRaiseEvent) {
             should_close = true;
           }
         }
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   schedulable_cb_->invokeCallback();
@@ -840,6 +907,7 @@ TEST_F(IoHandleImplTest, WriteScheduleWritableEvent) {
             should_close = true;
           }
         }
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
   schedulable_cb_->invokeCallback();
@@ -880,6 +948,7 @@ TEST_F(IoHandleImplTest, WritevScheduleWritableEvent) {
             should_close = true;
           }
         }
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
   schedulable_cb_->invokeCallback();
@@ -925,6 +994,7 @@ TEST_F(IoHandleImplTest, ReadAfterShutdownWrite) {
             should_close = true;
           }
         }
+        return absl::OkStatus();
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
@@ -952,14 +1022,18 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
   EXPECT_FALSE(io_handle_peer_->isWritable());
 
   io_handle_->shutdown(ENVOY_SHUT_WR);
-  FANCY_LOG(debug, "after {} shutdown write", static_cast<void*>(io_handle_.get()));
+  ENVOY_LOG_MISC(debug, "after {} shutdown write", static_cast<void*>(io_handle_.get()));
 
   auto schedulable_cb = new Event::MockSchedulableCallback(&dispatcher_);
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, scheduleCallbackNextIteration());
   io_handle_peer_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); }, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read);
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
   schedulable_cb->invokeCallback();
   EXPECT_FALSE(schedulable_cb->enabled_);
@@ -985,12 +1059,12 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
 }
 
 TEST_F(IoHandleImplTest, ReturnValidInternalAddress) {
-  const auto& local_address = io_handle_->localAddress();
+  const auto local_address = *io_handle_->localAddress();
   ASSERT_NE(nullptr, local_address);
   ASSERT_EQ(nullptr, local_address->ip());
   ASSERT_EQ(nullptr, local_address->pipe());
   ASSERT_NE(nullptr, local_address->envoyInternalAddress());
-  const auto& remote_address = io_handle_->peerAddress();
+  const auto remote_address = *io_handle_->peerAddress();
   ASSERT_NE(nullptr, remote_address);
   ASSERT_EQ(nullptr, remote_address->ip());
   ASSERT_EQ(nullptr, remote_address->pipe());
@@ -1007,16 +1081,81 @@ TEST_F(IoHandleImplTest, Connect) {
   auto address_is_ignored =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_id");
   EXPECT_EQ(0, io_handle_->connect(address_is_ignored).return_value_);
+
+  // Below is emulation of the connect().
+  int immediate_error_value = -1;
+  socklen_t error_value_len = 0;
+  EXPECT_EQ(0, io_handle_->getOption(SOL_SOCKET, SO_ERROR, &immediate_error_value, &error_value_len)
+                   .return_value_);
+  EXPECT_EQ(sizeof(int), error_value_len);
+  EXPECT_EQ(CONNECTED, immediate_error_value);
+
+  // If the peer shutdown write but not yet closes, this io_handle should consider it
+  // as connected because the socket may be readable.
+  immediate_error_value = -1;
+  error_value_len = 0;
+  EXPECT_EQ(io_handle_peer_->shutdown(ENVOY_SHUT_WR).return_value_, 0);
+  EXPECT_EQ(0, io_handle_->getOption(SOL_SOCKET, SO_ERROR, &immediate_error_value, &error_value_len)
+                   .return_value_);
+  EXPECT_EQ(sizeof(int), error_value_len);
+  EXPECT_EQ(CONNECTED, immediate_error_value);
+}
+
+TEST_F(IoHandleImplTest, ConnectToClosedIoHandle) {
+  auto address_is_ignored =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("listener_id");
+  io_handle_peer_->close();
+  auto result = io_handle_->connect(address_is_ignored);
+  EXPECT_EQ(-1, result.return_value_);
+  EXPECT_EQ(SOCKET_ERROR_INVAL, result.errno_);
+
+  // Below is emulation of the connect().
+  int immediate_error_value = -1;
+  socklen_t error_value_len = 0;
+  EXPECT_EQ(0, io_handle_->getOption(SOL_SOCKET, SO_ERROR, &immediate_error_value, &error_value_len)
+                   .return_value_);
+  EXPECT_EQ(sizeof(int), error_value_len);
+  EXPECT_NE(CONNECTED, immediate_error_value);
 }
 
 TEST_F(IoHandleImplTest, ActivateEvent) {
   schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   io_handle_->initializeFileEvent(
-      dispatcher_, [&, handle = io_handle_.get()](uint32_t) {}, Event::FileTriggerType::Edge,
-      Event::FileReadyType::Read);
+      dispatcher_, [&, handle = io_handle_.get()](uint32_t) { return absl::OkStatus(); },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   EXPECT_FALSE(schedulable_cb_->enabled());
   io_handle_->activateFileEvents(Event::FileReadyType::Read);
   ASSERT_TRUE(schedulable_cb_->enabled());
+}
+
+// This is a compatibility test for Envoy Connection. When a connection is destroyed, the Envoy
+// connection may close the underlying handle but not destroy that io handle. Meanwhile, the
+// Connection object does not expect any further event be invoked because the connection in destroy
+// pending state can not support read/write.
+TEST_F(IoHandleImplTest, EventCallbackIsNotInvokedIfHandleIsClosed) {
+  testing::MockFunction<void()> check_event_cb;
+  testing::MockFunction<void()> check_schedulable_cb_destroyed;
+
+  schedulable_cb_ =
+      new NiceMock<Event::MockSchedulableCallback>(&dispatcher_, &check_schedulable_cb_destroyed);
+  io_handle_->initializeFileEvent(
+      dispatcher_,
+      [&, handle = io_handle_.get()](uint32_t) {
+        check_event_cb.Call();
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  EXPECT_FALSE(schedulable_cb_->enabled());
+  io_handle_->activateFileEvents(Event::FileReadyType::Read);
+  EXPECT_TRUE(schedulable_cb_->enabled());
+
+  {
+    EXPECT_CALL(check_event_cb, Call()).Times(0);
+    EXPECT_CALL(check_schedulable_cb_destroyed, Call());
+    io_handle_->close();
+    // Verify that the schedulable_cb is destroyed along with close(), not later.
+    testing::Mock::VerifyAndClearExpectations(&check_schedulable_cb_destroyed);
+  }
 }
 
 TEST_F(IoHandleImplTest, DeathOnActivatingDestroyedEvents) {
@@ -1031,10 +1170,10 @@ TEST_F(IoHandleImplTest, DeathOnEnablingDestroyedEvents) {
                      "Null user_file_event_");
 }
 
-TEST_F(IoHandleImplTest, NotImplementDuplicate) { ASSERT_DEATH(io_handle_->duplicate(), ""); }
+TEST_F(IoHandleImplTest, NotImplementDuplicate) { EXPECT_ENVOY_BUG(io_handle_->duplicate(), ""); }
 
 TEST_F(IoHandleImplTest, NotImplementAccept) {
-  ASSERT_DEATH(io_handle_->accept(nullptr, nullptr), "");
+  EXPECT_ENVOY_BUG(io_handle_->accept(nullptr, nullptr), "");
 }
 
 TEST_F(IoHandleImplTest, LastRoundtripTimeNullOpt) {
@@ -1048,10 +1187,45 @@ TEST_F(IoHandleImplTest, CreatePlatformDefaultTriggerTypeFailOnWindows) {
   EXPECT_CALL(*schedulable_cb, enabled());
   EXPECT_CALL(*schedulable_cb, cancel());
   io_handle_->initializeFileEvent(
-      dispatcher_, [this](uint32_t events) { cb_.called(events); },
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
       Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
   io_handle_->close();
   io_handle_peer_->close();
+}
+
+class TestObject : public StreamInfo::FilterState::Object {
+public:
+  TestObject(int value) : value_(value) {}
+  int value_;
+};
+
+TEST_F(IoHandleImplTest, PassthroughState) {
+  auto source_metadata = std::make_unique<envoy::config::core::v3::Metadata>();
+  ProtobufWkt::Struct& map = (*source_metadata->mutable_filter_metadata())["envoy.test"];
+  ProtobufWkt::Value val;
+  val.set_string_value("val");
+  (*map.mutable_fields())["key"] = val;
+  StreamInfo::FilterState::Objects source_filter_state;
+  auto object = std::make_shared<TestObject>(1000);
+  source_filter_state.push_back(
+      {object, StreamInfo::FilterState::StateType::ReadOnly,
+       StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection, "object_key"});
+  ASSERT_NE(nullptr, io_handle_->passthroughState());
+  io_handle_->passthroughState()->initialize(std::move(source_metadata), source_filter_state);
+
+  StreamInfo::FilterStateImpl dest_filter_state(StreamInfo::FilterState::LifeSpan::Connection);
+  envoy::config::core::v3::Metadata dest_metadata;
+  ASSERT_NE(nullptr, io_handle_peer_->passthroughState());
+  io_handle_peer_->passthroughState()->mergeInto(dest_metadata, dest_filter_state);
+  ASSERT_EQ("val",
+            dest_metadata.filter_metadata().at("envoy.test").fields().at("key").string_value());
+  auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
+  ASSERT_NE(nullptr, dest_object);
+  ASSERT_EQ(object->value_, dest_object->value_);
 }
 
 class IoHandleImplNotImplementedTest : public testing::Test {
@@ -1087,13 +1261,14 @@ TEST_F(IoHandleImplNotImplementedTest, ErrorOnSendmsg) {
 
 TEST_F(IoHandleImplNotImplementedTest, ErrorOnRecvmsg) {
   Network::IoHandle::RecvMsgOutput output_is_ignored(1, nullptr);
-  EXPECT_THAT(io_handle_->recvmsg(&slice_, 0, 0, output_is_ignored), IsInvalidAddress());
+  EXPECT_THAT(io_handle_->recvmsg(&slice_, 0, 0, {}, output_is_ignored), IsInvalidAddress());
 }
 
 TEST_F(IoHandleImplNotImplementedTest, ErrorOnRecvmmsg) {
   RawSliceArrays slices_is_ignored(1, absl::FixedArray<Buffer::RawSlice>({slice_}));
   Network::IoHandle::RecvMsgOutput output_is_ignored(1, nullptr);
-  EXPECT_THAT(io_handle_->recvmmsg(slices_is_ignored, 0, output_is_ignored), IsInvalidAddress());
+  EXPECT_THAT(io_handle_->recvmmsg(slices_is_ignored, 0, {}, output_is_ignored),
+              IsInvalidAddress());
 }
 
 TEST_F(IoHandleImplNotImplementedTest, ErrorOnBind) {

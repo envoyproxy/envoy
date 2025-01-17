@@ -14,25 +14,37 @@ namespace Fault {
 Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  FaultFilterConfigSharedPtr filter_config(new FaultFilterConfig(
-      config, context.runtime(), stats_prefix, context.scope(), context.timeSource()));
+  auto& server_context = context.serverFactoryContext();
+
+  FaultFilterConfigSharedPtr filter_config(
+      std::make_shared<FaultFilterConfig>(config, stats_prefix, context.scope(), server_context));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoWithServerContextTyped(
+    const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
+    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
+  FaultFilterConfigSharedPtr filter_config(std::make_shared<FaultFilterConfig>(
+      config, stats_prefix, server_context.scope(), server_context));
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
+  };
+}
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 FaultFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const Fault::FaultSettings>(config);
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<const Fault::FaultSettings>(config, context);
 }
 
 /**
  * Static registration for the fault filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(FaultFilterFactory,
-                 Server::Configuration::NamedHttpFilterConfigFactory){"envoy.fault"};
+LEGACY_REGISTER_FACTORY(FaultFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory,
+                        "envoy.fault");
 
 } // namespace Fault
 } // namespace HttpFilters

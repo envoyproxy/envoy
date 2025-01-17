@@ -7,9 +7,9 @@
 namespace Envoy {
 
 LogLevelSetter::LogLevelSetter(spdlog::level::level_enum log_level) {
-  if (Logger::Context::useFancyLogger()) {
-    previous_fancy_levels_ = getFancyContext().getAllFancyLogLevelsForTest();
-    getFancyContext().setAllFancyLoggers(log_level);
+  if (Logger::Context::useFineGrainLogger()) {
+    previous_fine_grain_levels_ = getFineGrainLogContext().getAllFineGrainLogLevelsForTest();
+    getFineGrainLogContext().setAllFineGrainLoggers(log_level);
   } else {
     for (Logger::Logger& logger : Logger::Registry::loggers()) {
       previous_levels_.push_back(logger.level());
@@ -19,9 +19,9 @@ LogLevelSetter::LogLevelSetter(spdlog::level::level_enum log_level) {
 }
 
 LogLevelSetter::~LogLevelSetter() {
-  if (Logger::Context::useFancyLogger()) {
-    for (const auto& it : previous_fancy_levels_) {
-      getFancyContext().setFancyLogger(it.first, it.second);
+  if (Logger::Context::useFineGrainLogger()) {
+    for (const auto& it : previous_fine_grain_levels_) {
+      getFineGrainLogContext().setFineGrainLogger(it.first, it.second);
     }
   } else {
     auto prev_level = previous_levels_.begin();
@@ -41,8 +41,8 @@ LogRecordingSink::LogRecordingSink(Logger::DelegatingLogSinkSharedPtr log_sink)
 
 LogRecordingSink::~LogRecordingSink() { restoreDelegate(); }
 
-void LogRecordingSink::log(absl::string_view msg) {
-  previousDelegate()->log(msg);
+void LogRecordingSink::log(absl::string_view msg, const spdlog::details::log_msg& log_msg) {
+  previousDelegate()->log(msg, log_msg);
 
   absl::MutexLock ml(&mtx_);
   messages_.push_back(std::string(msg));

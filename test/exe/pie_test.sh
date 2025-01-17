@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -10,6 +10,10 @@ if [[ $(uname) == "Darwin" ]]; then
 fi
 
 if readelf -hW "${ENVOY_BIN}" | grep "Type" | grep -o "DYN (Shared object file)"; then
+  echo "${ENVOY_BIN} is a PIE!"
+  exit 0
+fi
+if readelf -hW "${ENVOY_BIN}" | grep "Type" | grep -o "DYN (Position-Independent Executable file)"; then
   echo "${ENVOY_BIN} is a PIE!"
   exit 0
 fi

@@ -30,44 +30,21 @@ To configure traffic tapping, add an ``envoy.transport_sockets.tap`` transport s
 :ref:`configuration <envoy_v3_api_msg_extensions.filters.http.tap.v3.Tap>` to the listener
 or cluster. For a plain text socket this might look like:
 
-.. code-block:: yaml
-
-  transport_socket:
-    name: envoy.transport_sockets.tap
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tap.v3.Tap
-      common_config:
-        static_config:
-          match_config:
-            any_match: true
-          output_config:
-            sinks:
-              - format: PROTO_BINARY
-                file_per_tap:
-                  path_prefix: /some/tap/path
-      transport_socket:
-        name: envoy.transport_sockets.raw_buffer
+.. literalinclude:: _include/traffic_tapping_plain_text.yaml
+   :language: yaml
+   :lines: 29-45
+   :linenos:
+   :lineno-start: 29
+   :caption: :download:`traffic_tapping_plain_text.yaml <_include/traffic_tapping_plain_text.yaml>`
 
 For a TLS socket, this will be:
 
-.. code-block:: yaml
-
-  transport_socket:
-    name: envoy.transport_sockets.tap
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tap.v3.Tap
-      common_config:
-        static_config:
-          match_config:
-            any_match: true
-          output_config:
-            sinks:
-              - format: PROTO_BINARY
-                file_per_tap:
-                  path_prefix: /some/tap/path
-      transport_socket:
-        name: envoy.transport_sockets.tls
-        typed_config: <TLS context>
+.. literalinclude:: _include/traffic_tapping_ssl.yaml
+   :language: yaml
+   :lines: 44-60
+   :linenos:
+   :lineno-start: 44
+   :caption: :download:`traffic_tapping_ssl.yaml <_include/traffic_tapping_ssl.yaml>`
 
 where the TLS context configuration replaces any existing :ref:`downstream
 <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.DownstreamTlsContext>` or :ref:`upstream
@@ -113,7 +90,7 @@ analysis with tools such as `Wireshark <https://www.wireshark.org/>`_ with the
 
 .. code-block:: bash
 
-  bazel run @envoy_api_canonical//tools:tap2pcap /some/tap/path_0.pb path_0.pcap
+  bazel run @envoy_api//tools:tap2pcap /some/tap/path_0.pb path_0.pcap
   tshark -r path_0.pcap -d "tcp.port==10000,http2" -P
     1   0.000000    127.0.0.1 → 127.0.0.1    HTTP2 157 Magic, SETTINGS, WINDOW_UPDATE, HEADERS
     2   0.013713    127.0.0.1 → 127.0.0.1    HTTP2 91 SETTINGS, SETTINGS, WINDOW_UPDATE

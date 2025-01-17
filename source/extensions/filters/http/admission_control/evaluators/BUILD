@@ -17,10 +17,12 @@ envoy_cc_library(
         "response_evaluator.h",
         "success_criteria_evaluator.h",
     ],
-    visibility = ["//visibility:public"],
     deps = [
+        "//envoy/common:exception_lib",
+        "//envoy/common:pure_lib",
         "//envoy/grpc:status",
         "//source/common/common:enum_to_int",
-        "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
+        "//source/common/common:fmt_lib",
+        "@envoy_api//envoy/extensions/filters/http/admission_control/v3:pkg_cc_proto",
     ],
 )

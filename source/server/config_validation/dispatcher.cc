@@ -10,20 +10,11 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
     Network::Address::InstanceConstSharedPtr remote_address,
     Network::Address::InstanceConstSharedPtr source_address,
     Network::TransportSocketPtr&& transport_socket,
-    const Network::ConnectionSocket::OptionsSharedPtr& options) {
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_options) {
   return std::make_unique<Network::ConfigValidateConnection>(*this, remote_address, source_address,
-                                                             std::move(transport_socket), options);
-}
-
-Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>&,
-    const envoy::config::core::v3::DnsResolverOptions&) {
-  return dns_resolver_;
-}
-
-Network::ListenerPtr ValidationDispatcher::createListener(Network::SocketSharedPtr&&,
-                                                          Network::TcpListenerCallbacks&, bool) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+                                                             std::move(transport_socket), options,
+                                                             transport_options);
 }
 
 } // namespace Event

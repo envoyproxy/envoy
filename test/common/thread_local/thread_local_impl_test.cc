@@ -4,32 +4,45 @@
 #include "source/common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 
 using testing::_;
 using testing::InSequence;
+using testing::NiceMock;
 using testing::Ref;
+using testing::Return;
 using testing::ReturnPointee;
 
 namespace Envoy {
 namespace ThreadLocal {
 
 TEST(MainThreadVerificationTest, All) {
-  // Before threading is on, assertion on main thread should be true.
-  EXPECT_TRUE(Thread::MainThread::isMainThread());
-  EXPECT_TRUE(Thread::MainThread::isWorkerThread());
+  // Before threading is on, we are in the test thread, not the main thread.
+  EXPECT_FALSE(Thread::MainThread::isMainThread());
+#if TEST_THREAD_SUPPORTED
+  EXPECT_TRUE(Thread::TestThread::isTestThread());
+  EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+#endif
   {
     InstanceImpl tls;
     // Tls instance has been initialized.
     // Call to main thread verification should succeed in main thread.
     EXPECT_TRUE(Thread::MainThread::isMainThread());
-    EXPECT_FALSE(Thread::MainThread::isWorkerThread());
+#if TEST_THREAD_SUPPORTED
+    EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+    EXPECT_TRUE(Thread::TestThread::isTestThread());
+#endif
     tls.shutdownGlobalThreading();
     tls.shutdownThread();
   }
-  // After threading is off, assertion on main thread should be true.
-  EXPECT_TRUE(Thread::MainThread::isMainThread());
+  // After threading is off, assertion we are again in the test thread, not the main thread.
+  EXPECT_FALSE(Thread::MainThread::isMainThread());
+#if TEST_THREAD_SUPPORTED
+  EXPECT_TRUE(Thread::TestThread::isTestThread());
+  EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+#endif
 }
 
 class TestThreadLocalObject : public ThreadLocalObject {
@@ -42,10 +55,14 @@ public:
 class ThreadLocalInstanceImplTest : public testing::Test {
 public:
   ThreadLocalInstanceImplTest() {
-    tls_.registerThread(main_dispatcher_, true);
-    EXPECT_EQ(&main_dispatcher_, &tls_.dispatcher());
+    EXPECT_CALL(main_dispatcher_, isThreadSafe()).WillRepeatedly(Return(true));
+
     EXPECT_CALL(thread_dispatcher_, post(_));
     tls_.registerThread(thread_dispatcher_, false);
+    // Register the main thread after the worker thread to ensure that the
+    // thread_local_data_.dispatcher_ of current test thread is set to the main thread dispatcher.
+    tls_.registerThread(main_dispatcher_, true);
+    EXPECT_EQ(&main_dispatcher_, &tls_.dispatcher());
   }
 
   MOCK_METHOD(ThreadLocalObjectSharedPtr, createThreadLocal, (Event::Dispatcher & dispatcher));
@@ -65,8 +82,8 @@ public:
   int freeSlotIndexesListSize() { return tls_.free_slot_indexes_.size(); }
   InstanceImpl tls_;
 
-  Event::MockDispatcher main_dispatcher_{"test_main_thread"};
-  Event::MockDispatcher thread_dispatcher_{"test_worker_thread"};
+  NiceMock<Event::MockDispatcher> main_dispatcher_{"test_main_thread"};
+  NiceMock<Event::MockDispatcher> thread_dispatcher_{"test_worker_thread"};
 };
 
 TEST_F(ThreadLocalInstanceImplTest, All) {
@@ -120,7 +137,7 @@ protected:
   CallbackNotInvokedAfterDeletionTest() : slot_(TypedSlot<>::makeUnique(tls_)) {
     EXPECT_CALL(thread_dispatcher_, post(_)).Times(4).WillRepeatedly(Invoke([&](Event::PostCb cb) {
       // Holds the posted callback.
-      holder_.push_back(cb);
+      holder_.push_back(std::move(cb));
     }));
 
     slot_->set([this](Event::Dispatcher&) {
@@ -304,11 +321,117 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
         EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
         // Verify that it is inside the worker thread.
         EXPECT_FALSE(Thread::MainThread::isMainThread());
+    // Verify that is is not in the test thread either.
+#if TEST_THREAD_SUPPORTED
+        EXPECT_FALSE(Thread::TestThread::isTestThread());
+        EXPECT_FALSE(Thread::MainThread::isMainOrTestThread());
+#endif
+
+        ASSERT_IS_NOT_TEST_THREAD();
+        ASSERT_IS_NOT_MAIN_OR_TEST_THREAD();
+        {
+          Thread::SkipAsserts skip;
+          ASSERT_IS_NOT_TEST_THREAD();
+          ASSERT_IS_NOT_MAIN_OR_TEST_THREAD();
+          ASSERT_IS_TEST_THREAD();
+          ASSERT_IS_MAIN_OR_TEST_THREAD();
+          TRY_ASSERT_MAIN_THREAD {}
+          END_TRY
+          catch (const std::exception&) {
+          }
+        }
       });
   thread->join();
 
   // Verify we still have the expected dispatcher for the main thread.
   EXPECT_EQ(main_dispatcher.get(), &tls.dispatcher());
+
+  tls.shutdownGlobalThreading();
+  tls.shutdownThread();
+}
+
+TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorker) {
+  InstanceImpl tls;
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher main_dispatcher{"test_main_thread"};
+  Event::DispatcherPtr thread_dispatcher(api->allocateDispatcher("test_worker_thread"));
+
+  tls.registerThread(main_dispatcher, true);
+  tls.registerThread(*thread_dispatcher, false);
+
+  // Verify we have the expected dispatcher for the main thread.
+  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
+
+  auto slot = TypedSlot<>::makeUnique(tls);
+
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread(
+      [&main_dispatcher, &thread_dispatcher, &tls, &slot]() {
+        // Ensure that the dispatcher update in tls posted during the above registerThread happens.
+        thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+        // Verify we have the expected dispatcher for the new thread thread.
+        EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
+
+        // Skip the asserts in the thread. Because the mock dispatcher will call
+        // callbacks directly in current thread and make the ASSERT_IS_MAIN_OR_TEST_THREAD fail.
+        Thread::SkipAsserts skip;
+
+        EXPECT_CALL(main_dispatcher, isThreadSafe()).WillOnce(Return(false));
+        // Destroy the slot on worker thread and expect the post() of main dispatcher to be called.
+        // Override the behavior to do nothing, because the default mock behavior asserts that the
+        // callback must run on the same thread as the dispatcher.
+        EXPECT_CALL(main_dispatcher, post(_)).WillOnce([]() {});
+
+        slot.reset();
+
+        thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+      });
+  thread->join();
+
+  // Verify we still have the expected dispatcher for the main thread.
+  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
+
+  tls.shutdownGlobalThreading();
+  tls.shutdownThread();
+}
+
+TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorkerButDisableRuntimeFeature) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.restart_features.allow_slot_destroy_on_worker_threads", "false"}});
+
+  InstanceImpl tls;
+
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::MockDispatcher main_dispatcher{"test_main_thread"};
+  Event::DispatcherPtr thread_dispatcher(api->allocateDispatcher("test_worker_thread"));
+
+  tls.registerThread(main_dispatcher, true);
+  tls.registerThread(*thread_dispatcher, false);
+
+  // Verify we have the expected dispatcher for the main thread.
+  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
+
+  auto slot = TypedSlot<>::makeUnique(tls);
+
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread(
+      [&main_dispatcher, &thread_dispatcher, &tls, &slot]() {
+        // Ensure that the dispatcher update in tls posted during the above registerThread happens.
+        thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+        // Verify we have the expected dispatcher for the new thread thread.
+        EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
+
+        // Skip the asserts in the thread.
+        Thread::SkipAsserts skip;
+        // Destroy the slot on worker thread will not call post() of main dispatcher.
+        EXPECT_CALL(main_dispatcher, post(_)).Times(0);
+        slot.reset();
+
+        thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+      });
+  thread->join();
+
+  // Verify we still have the expected dispatcher for the main thread.
+  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
 
   tls.shutdownGlobalThreading();
   tls.shutdownThread();

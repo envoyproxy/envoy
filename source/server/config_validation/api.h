@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
 
@@ -17,7 +18,9 @@ class ValidationImpl : public Impl {
 public:
   ValidationImpl(Thread::ThreadFactory& thread_factory, Stats::Store& stats_store,
                  Event::TimeSystem& time_system, Filesystem::Instance& file_system,
-                 Random::RandomGenerator& random_generator);
+                 Random::RandomGenerator& random_generator,
+                 const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                 const ProcessContextOptRef& process_context = absl::nullopt);
 
   Event::DispatcherPtr allocateDispatcher(const std::string& name) override;
   Event::DispatcherPtr allocateDispatcher(const std::string& name,

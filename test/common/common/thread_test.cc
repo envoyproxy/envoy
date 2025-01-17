@@ -1,9 +1,14 @@
 #include <functional>
 
+#if defined(__linux__) || defined(__APPLE__)
+#include "source/common/common/posix/thread_impl.h"
+#endif
+
 #include "source/common/common/thread.h"
 #include "source/common/common/thread_synchronizer.h"
 
 #include "test/test_common/thread_factory_for_test.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/notification.h"
@@ -245,6 +250,70 @@ TEST_F(ThreadAsyncPtrTest, NameNotSpecifiedWait) {
 #endif
   thread->join();
 }
+
+#if defined(__linux__) || defined(__APPLE__)
+TEST(PosixThreadTest, PThreadId) {
+  auto thread_factory = PosixThreadFactory::create();
+  ThreadId thread_id;
+  auto thread =
+      thread_factory->createThread([&]() { thread_id = thread_factory->currentPthreadId(); },
+                                   /* options= */ absl::nullopt, /* crash_on_failure= */ false);
+  auto threadId = thread->pthreadId();
+  thread->join();
+
+  EXPECT_EQ(threadId, thread_id);
+  EXPECT_NE(threadId, thread_factory->currentThreadId());
+}
+
+TEST(PosixThreadTest, Joinable) {
+  auto thread_factory = PosixThreadFactory::create();
+  auto thread = thread_factory->createThread([&]() {}, /* options= */ absl::nullopt,
+                                             /* crash_on_failure= */ true);
+
+  EXPECT_TRUE(thread->joinable());
+  thread->join();
+  EXPECT_FALSE(thread->joinable());
+}
+
+TEST(PosixThreadTest, ThreadPriority) {
+  auto thread_factory = PosixThreadFactory::create();
+  Options options;
+  options.priority_ = 15;
+  double thread_priority;
+  auto thread = thread_factory->createThread(
+      [&]() { thread_priority = thread_factory->currentThreadPriority(); }, options,
+      /* crash_on_failure= */ false);
+  thread->join();
+
+  EXPECT_EQ(thread_priority, options.priority_);
+}
+
+TEST(PosixThreadTest, InvalidThreadPriority) {
+  auto thread_factory = PosixThreadFactory::create();
+  Options options;
+  options.priority_ = -200;
+  double thread_priority;
+  auto thread = thread_factory->createThread(
+      [&]() { thread_priority = thread_factory->currentThreadPriority(); }, options,
+      /* crash_on_failure= */ false);
+  thread->join();
+
+  EXPECT_NE(thread_priority, options.priority_);
+}
+
+class PosixThreadFactoryFailCreate : public PosixThreadFactory {
+protected:
+  int createPthread(ThreadHandle*) override { return 1; }
+};
+
+TEST(PosixThreadTest, FailCreate) {
+  PosixThreadFactoryFailCreate thread_factory;
+  EXPECT_ENVOY_BUG(thread_factory.createThread([&]() {}, /* options= */ absl::nullopt,
+                                               /* crash_on_failure= */ false),
+                   "Unable to create a thread with return code: 1");
+}
+
+#endif
 
 } // namespace
 } // namespace Thread

@@ -9,6 +9,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.aws_lambda.v3";
 option java_outer_classname = "AwsLambdaProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/aws_lambda/v3;aws_lambdav3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: AWS Lambda]
@@ -16,6 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.aws_lambda]
 
 // AWS Lambda filter config
+// [#next-free-field: 7]
 message Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.aws_lambda.v2alpha.Config";
@@ -41,6 +43,51 @@ message Config {
 
   // Determines the way to invoke the Lambda function.
   InvocationMode invocation_mode = 3 [(validate.rules).enum = {defined_only: true}];
+
+  // Indicates that before signing headers, the host header will be swapped with
+  // this value. If not set or empty, the original host header value
+  // will be used and no rewrite will happen.
+  //
+  // Note: this rewrite affects both signing and host header forwarding. However, this
+  // option shouldn't be used with
+  // :ref:`HCM host rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>` given that the
+  // value set here would be used for signing whereas the value set in the HCM would be used
+  // for host header forwarding which is not the desired outcome.
+  // Changing the value of the host header can result in a different route to be selected
+  // if an HTTP filter after AWS lambda re-evaluates the route (clears route cache).
+  string host_rewrite = 4;
+
+  // Specifies the credentials profile to be used from the AWS credentials file.
+  // This parameter is optional. If set, it will override the value set in the AWS_PROFILE env variable and
+  // the provider chain is limited to the AWS credentials file Provider.
+  // If credentials configuration is provided, this configuration will be ignored.
+  // If this field is provided, then the default providers chain specified in the documentation will be ignored.
+  // (See :ref:`default credentials providers <config_http_filters_aws_lambda_credentials>`).
+  string credentials_profile = 5;
+
+  // Specifies the credentials to be used. This parameter is optional and if it is set,
+  // it will override other providers and will take precedence over credentials_profile.
+  // The provider chain is limited to the configuration credentials provider.
+  // If this field is provided, then the default providers chain specified in the documentation will be ignored.
+  // (See :ref:`default credentials providers <config_http_filters_aws_lambda_credentials>`).
+  //
+  // .. warning::
+  //   Distributing the AWS credentials via this configuration should not be done in production.
+  Credentials credentials = 6;
+}
+
+// AWS Lambda Credentials config.
+message Credentials {
+  // AWS access key id.
+  string access_key_id = 1 [(validate.rules).string = {min_len: 1}];
+
+  // AWS secret access key.
+  string secret_access_key = 2 [(validate.rules).string = {min_len: 1}];
+
+  // AWS session token.
+  // This parameter is optional. If it is set to empty string it will not be consider in the request.
+  // It is required if temporary security credentials retrieved directly from AWS STS operations are used.
+  string session_token = 3;
 }
 
 // Per-route configuration for AWS Lambda. This can be useful when invoking a different Lambda function or a different

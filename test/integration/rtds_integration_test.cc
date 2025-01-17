@@ -12,7 +12,7 @@ namespace {
 
 // TODO(fredlas) set_node_on_first_message_only was true; the delta+SotW unification
 //               work restores it here.
-std::string tdsBootstrapConfig(absl::string_view api_type) {
+std::string rtdsBootstrapConfig(absl::string_view api_type) {
   return fmt::format(R"EOF(
 static_resources:
   clusters:
@@ -56,10 +56,8 @@ layered_runtime:
     rtds_layer:
       name: some_rtds_layer
       rtds_config:
-        resource_api_version: V3
         api_config_source:
           api_type: {}
-          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: rtds_cluster
@@ -85,13 +83,25 @@ public:
   RtdsIntegrationTest()
       : HttpIntegrationTest(
             Http::CodecType::HTTP2, ipVersion(),
-            tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+            rtdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
+                                    ? "GRPC"
+                                    : "DELTA_GRPC")) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
+                                      (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                                          ? "true"
+                                          : "false");
     use_lds_ = false;
     create_xds_upstream_ = true;
     sotw_or_delta_ = sotwOrDelta();
   }
 
-  void TearDown() override { cleanUpXdsConnection(); }
+  void TearDown() override {
+    if (xds_connection_ != nullptr) {
+      cleanUpXdsConnection();
+    }
+  }
 
   void initialize() override {
     // The tests infra expects the xDS server to be the second fake upstream, so
@@ -119,9 +129,9 @@ public:
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
-    auto entries = loader->getObject("entries");
+    auto entries = loader->getObject("entries").value();
     if (entries->hasObject(key)) {
-      return entries->getObject(key)->getString("final_value");
+      return entries->getObject(key).value()->getString("final_value").value();
     }
     return "";
   }
@@ -132,6 +142,78 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, RtdsIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+#ifndef WIN32
+// TODO): The directory rotation via TestEnvironment::renameFile() fails on Windows. The
+// renameFile() implementation does not correctly handle symlinks.
+
+// This test mimics what K8s does when it swaps a ConfigMap. The K8s directory structure looks like:
+// 1. ConfigMap mounted to `/config_map/xds`
+// 2. Real data directory `/config_map/xds/real_data`
+// 3. Real file `/config_map/xds/real_data/xds.yaml`
+// 4. Symlink `/config_map/xds/..data` -> `/config_map/xds/real_data`
+// 5. Symlink `/config_map/xds/xds.yaml -> `/config_map/xds/..data/xds.yaml`
+//
+// 2 symlinks are used so that multiple files can be updated in a single atomic swap of ..data to
+// a new real target.
+TEST_P(RtdsIntegrationTest, FileRtdsReload) {
+  // Create an initial setup that looks similar to a K8s ConfigMap deployment. This is a file
+  // contained in a directory and referenced via an intermediate symlink on the directory.
+  const std::string temp_path{TestEnvironment::temporaryDirectory() + "/rtds_test"};
+  TestEnvironment::createPath(temp_path + "/data_1");
+  TestEnvironment::writeStringToFileForTest(temp_path + "/data_1/rtds.yaml", R"EOF(
+resources:
+- "@type": type.googleapis.com/envoy.service.runtime.v3.Runtime
+  name: file_rtds
+  layer:
+ )EOF",
+                                            true);
+  TestEnvironment::createSymlink(temp_path + "/data_1", temp_path + "/..data");
+  TestEnvironment::createSymlink(temp_path + "/..data/rtds.yaml", temp_path + "/rtds.yaml");
+
+  // Create a file based RTDS xDS watch that watches the owning directory for symlink swaps,
+  // similar to what would be done when watching a K8s ConfigMap for a swap.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Clear existing layers before adding the file based layer.
+    bootstrap.mutable_layered_runtime()->Clear();
+
+    auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
+    layer->set_name("file_rtds");
+    auto* rtds_layer = layer->mutable_rtds_layer();
+    rtds_layer->set_name("file_rtds");
+    auto* rtds_config = rtds_layer->mutable_rtds_config();
+    rtds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* path_config_source = rtds_config->mutable_path_config_source();
+    path_config_source->set_path(temp_path + "/rtds.yaml");
+    path_config_source->mutable_watched_directory()->set_path(temp_path);
+  });
+
+  initialize();
+
+  EXPECT_EQ(0, test_server_->counter("runtime.load_error")->value());
+  EXPECT_EQ(1, test_server_->gauge("runtime.num_layers")->value());
+
+  // Create a new directory and file and then swap at the directory level.
+  TestEnvironment::createPath(temp_path + "/data_2");
+  TestEnvironment::writeStringToFileForTest(temp_path + "/data_2/rtds.yaml", R"EOF(
+resources:
+- "@type": type.googleapis.com/envoy.service.runtime.v3.Runtime
+  name: file_rtds
+  layer:
+    foo: bar
+ )EOF",
+                                            true);
+  TestEnvironment::createSymlink(temp_path + "/data_2", temp_path + "/..data.new");
+  TestEnvironment::renameFile(temp_path + "/..data.new", temp_path + "/..data");
+
+  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+  EXPECT_EQ(1, test_server_->gauge("runtime.num_layers")->value());
+  EXPECT_EQ(1, test_server_->gauge("runtime.num_keys")->value());
+  EXPECT_EQ("bar", getRuntimeKey("foo"));
+
+  TestEnvironment::removePath(temp_path);
+}
+#endif
 
 TEST_P(RtdsIntegrationTest, RtdsReload) {
   initialize();
@@ -181,6 +263,40 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ(0, test_server_->counter("runtime.update_failure")->value());
   EXPECT_EQ(initial_load_success_ + 2, test_server_->counter("runtime.load_success")->value());
   EXPECT_EQ(2, test_server_->counter("runtime.update_success")->value());
+  EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
+  EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
+}
+
+// Test Rtds update with Resource wrapper.
+TEST_P(RtdsIntegrationTest, RtdsUpdate) {
+  initialize();
+  acceptXdsConnection();
+
+  EXPECT_EQ("whatevs", getRuntimeKey("foo"));
+  EXPECT_EQ("yar", getRuntimeKey("bar"));
+  EXPECT_EQ("", getRuntimeKey("baz"));
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+                                      {"some_rtds_layer"}, {}, true));
+  auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_rtds_layer
+    layer:
+      foo: bar
+      baz: meh
+  )EOF");
+
+  // Use the Resource wrapper no matter if it is Sotw or Delta.
+  sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
+      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1",
+      {{"test", ProtobufWkt::Any()}});
+  test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
+
+  EXPECT_EQ("bar", getRuntimeKey("foo"));
+  EXPECT_EQ("yar", getRuntimeKey("bar"));
+  EXPECT_EQ("meh", getRuntimeKey("baz"));
+
+  EXPECT_EQ(0, test_server_->counter("runtime.load_error")->value());
+  EXPECT_EQ(initial_load_success_ + 1, test_server_->counter("runtime.load_success")->value());
   EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
 }

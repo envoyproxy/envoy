@@ -4,8 +4,8 @@ gRPC Statistics
 ===============
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.grpc_stats.v3.FilterConfig``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.grpc_stats.v3.FilterConfig>`
-* This filter should be configured with the name *envoy.filters.http.grpc_stats*.
 * This filter can be enabled to emit a :ref:`filter state object
   <envoy_v3_api_msg_extensions.filters.http.grpc_stats.v3.FilterObject>`
 * The filter state object textual representation is ``request_message_count,response_message_count``.
@@ -30,6 +30,12 @@ and :ref:`stats_for_all_methods <envoy_v3_api_field_extensions.filters.http.grpc
 
 To enable *upstream_rq_time* (v3 API only) see :ref:`enable_upstream_stats <envoy_v3_api_field_extensions.filters.http.grpc_stats.v3.FilterConfig.enable_upstream_stats>`.
 
+Connect RPC
+-----------
+
+In addition to supporting gRPC, this filter also transparently supports telemetry for RPC calls using the `Connect protocol <https://connectrpc.com>`_.
+
+Connect calls will be counted in the same stats as equivalent gRPC calls.
 
 .. csv-table::
   :header: Name, Type, Description

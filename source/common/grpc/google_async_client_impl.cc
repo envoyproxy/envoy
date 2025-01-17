@@ -1,11 +1,14 @@
 #include "source/common/grpc/google_async_client_impl.h"
 
+#include "envoy/common/time.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/http/protocol.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/common/utility.h"
 #include "source/common/config/datasource.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/google_grpc_creds_impl.h"
@@ -13,6 +16,7 @@
 #include "source/common/router/header_parser.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
+#include "absl/strings/str_cat.h"
 #include "grpcpp/support/proto_buffer_reader.h"
 
 namespace Envoy {
@@ -54,7 +58,7 @@ void GoogleAsyncClientThreadLocal::completionThread() {
     const auto& google_async_tag = *reinterpret_cast<GoogleAsyncTag*>(tag);
     const GoogleAsyncTag::Operation op = google_async_tag.op_;
     GoogleAsyncStreamImpl& stream = google_async_tag.stream_;
-    ENVOY_LOG(trace, "completionThread CQ event {} {}", op, ok);
+    ENVOY_LOG(trace, "completionThread CQ event {} {}", static_cast<int>(op), ok);
     Thread::LockGuard lock(stream.completed_ops_lock_);
 
     // It's an invariant that there must only be one pending post for arbitrary
@@ -78,18 +82,22 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              GoogleStubFactory& stub_factory,
                                              Stats::ScopeSharedPtr scope,
                                              const envoy::config::core::v3::GrpcService& config,
-                                             Api::Api& api, const StatNames& stat_names)
+                                             Server::Configuration::CommonFactoryContext& context,
+                                             const StatNames& stat_names)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
-      scope_(scope),
+      target_uri_(config.google_grpc().target_uri()), scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)),
-      metadata_parser_(
-          Router::HeaderParser::configure(config.initial_metadata(), /*append=*/false)) {
+      metadata_parser_(THROW_OR_RETURN_VALUE(
+          Router::HeaderParser::configure(
+              config.initial_metadata(),
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
+          Router::HeaderParserPtr)) {
   // We rebuild the channel each time we construct the channel. It appears that the gRPC library is
   // smart enough to do connection pooling and reuse with identical channel args, so this should
   // have comparable overhead to what we are doing in Grpc::AsyncClientImpl, i.e. no expensive
   // new connection implied.
-  std::shared_ptr<grpc::Channel> channel = GoogleGrpcUtils::createChannel(config, api);
+  std::shared_ptr<grpc::Channel> channel = GoogleGrpcUtils::createChannel(config, context);
   // Get state with try_to_connect = true to try connection at channel creation.
   // This is for initializing gRPC channel at channel creation. This GetState(true) is used to poke
   // the gRPC lb at channel creation, it doesn't have any effect no matter it succeeds or fails. But
@@ -108,6 +116,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
 }
 
 GoogleAsyncClientImpl::~GoogleAsyncClientImpl() {
+  ASSERT(isThreadSafe());
   ENVOY_LOG(debug, "Client teardown, resetting streams");
   while (!active_streams_.empty()) {
     active_streams_.front()->resetStream();
@@ -120,6 +129,7 @@ AsyncRequest* GoogleAsyncClientImpl::sendRaw(absl::string_view service_full_name
                                              RawAsyncRequestCallbacks& callbacks,
                                              Tracing::Span& parent_span,
                                              const Http::AsyncClient::RequestOptions& options) {
+  ASSERT(isThreadSafe());
   auto* const async_request = new GoogleAsyncRequestImpl(
       *this, service_full_name, method_name, std::move(request), callbacks, parent_span, options);
   GoogleAsyncStreamImplPtr grpc_stream{async_request};
@@ -137,6 +147,7 @@ RawAsyncStream* GoogleAsyncClientImpl::startRaw(absl::string_view service_full_n
                                                 absl::string_view method_name,
                                                 RawAsyncStreamCallbacks& callbacks,
                                                 const Http::AsyncClient::StreamOptions& options) {
+  ASSERT(isThreadSafe());
   auto grpc_stream = std::make_unique<GoogleAsyncStreamImpl>(*this, service_full_name, method_name,
                                                              callbacks, options);
 
@@ -156,7 +167,28 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
                                              const Http::AsyncClient::StreamOptions& options)
     : parent_(parent), tls_(parent_.tls_), dispatcher_(parent_.dispatcher_), stub_(parent_.stub_),
       service_full_name_(service_full_name), method_name_(method_name), callbacks_(callbacks),
-      options_(options) {}
+      options_(options), unused_stream_info_(Http::Protocol::Http2, dispatcher_.timeSource(),
+                                             Network::ConnectionInfoProviderSharedPtr{},
+                                             StreamInfo::FilterState::LifeSpan::FilterChain) {
+  // TODO(cainelli): add a common library for tracing tags between gRPC implementations.
+  if (options.parent_span_ != nullptr) {
+    const std::string child_span_name =
+        options.child_span_name_.empty()
+            ? absl::StrCat("async ", service_full_name, ".", method_name, " egress")
+            : options.child_span_name_;
+    current_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(), child_span_name,
+                                                     parent.timeSource().systemTime());
+    current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.stat_prefix_);
+    current_span_->setTag(Tracing::Tags::get().UpstreamAddress, parent.target_uri_);
+    current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
+  } else {
+    current_span_ = std::make_unique<Tracing::NullSpan>();
+  }
+
+  if (options.sampled_.has_value()) {
+    current_span_->setSampled(options.sampled_.value());
+  }
+}
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
@@ -177,7 +209,17 @@ void GoogleAsyncStreamImpl::initialize(bool /*buffer_body_for_retry*/) {
   ctxt_.set_deadline(abs_deadline);
   // Fill service-wide initial metadata.
   auto initial_metadata = Http::RequestHeaderMapImpl::create();
+  // TODO(cpakulski): Find a better way to access requestHeaders
+  // request headers should not be stored in stream_info.
+  // Maybe put it to parent_context?
   parent_.metadata_parser_->evaluateHeaders(*initial_metadata, options_.parent_context.stream_info);
+  Tracing::HttpTraceContext trace_context(*initial_metadata);
+  Tracing::UpstreamContext upstream_context(nullptr,                          // host_
+                                            nullptr,                          // cluster_
+                                            Tracing::ServiceType::GoogleGrpc, // service_type_
+                                            true                              // async_client_span_
+  );
+  current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(*initial_metadata);
   initial_metadata->iterate([this](const Http::HeaderEntry& header) {
     ctxt_.AddMetadata(std::string(header.key().getStringView()),
@@ -210,6 +252,11 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
     parent_.stats_.streams_closed_[grpc_status]->inc();
   }
   ENVOY_LOG(debug, "notifyRemoteClose {} {}", grpc_status, message);
+  current_span_->setTag(Tracing::Tags::get().GrpcStatusCode, std::to_string(grpc_status));
+  if (grpc_status != Status::WellKnownGrpcStatus::Ok) {
+    current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  }
+  current_span_->finishSpan();
   callbacks_.onReceiveTrailingMetadata(trailing_metadata ? std::move(trailing_metadata)
                                                          : Http::ResponseTrailerMapImpl::create());
   callbacks_.onRemoteClose(grpc_status, message);
@@ -225,12 +272,22 @@ void GoogleAsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& request, bool e
 
 void GoogleAsyncStreamImpl::closeStream() {
   // Empty EOS write queued.
+  current_span_->setTag(Tracing::Tags::get().Status, Tracing::Tags::get().Canceled);
+  current_span_->finishSpan();
+
   write_pending_queue_.emplace();
   writeQueued();
 }
 
 void GoogleAsyncStreamImpl::resetStream() {
   ENVOY_LOG(debug, "resetStream");
+  // The gRPC API requires calling Finish() at the end of a stream, even
+  // if the stream is cancelled.
+  if (!finish_pending_) {
+    finish_pending_ = true;
+    rw_->Finish(&status_, &finish_tag_);
+    ++inflight_tags_;
+  }
   cleanup();
 }
 
@@ -279,7 +336,8 @@ void GoogleAsyncStreamImpl::onCompletedOps() {
 }
 
 void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, bool ok) {
-  ENVOY_LOG(trace, "handleOpCompletion op={} ok={} inflight={}", op, ok, inflight_tags_);
+  ENVOY_LOG(trace, "handleOpCompletion op={} ok={} inflight={}", static_cast<int>(op), ok,
+            inflight_tags_);
   ASSERT(inflight_tags_ > 0);
   --inflight_tags_;
   if (draining_cq_) {
@@ -357,7 +415,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   }
   case GoogleAsyncTag::Operation::Finish: {
     ASSERT(finish_pending_);
-    ENVOY_LOG(debug, "Finish with grpc-status code {}", status_.error_code());
+    ENVOY_LOG(debug, "Finish with grpc-status code {}", static_cast<int>(status_.error_code()));
     Http::ResponseTrailerMapPtr trailing_metadata = Http::ResponseTrailerMapImpl::create();
     metadataTranslate(ctxt_.GetServerTrailingMetadata(), *trailing_metadata);
     notifyRemoteClose(static_cast<Status::GrpcStatus>(status_.error_code()),
@@ -365,8 +423,6 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     cleanup();
     break;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -422,10 +478,12 @@ GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
     Tracing::Span& parent_span, const Http::AsyncClient::RequestOptions& options)
     : GoogleAsyncStreamImpl(parent, service_full_name, method_name, *this, options),
       request_(std::move(request)), callbacks_(callbacks) {
-  current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
-                                         "async " + parent.stat_prefix_ + " egress",
-                                         parent.timeSource().systemTime());
+  current_span_ =
+      parent_span.spawnChild(Tracing::EgressConfig::get(),
+                             absl::StrCat("async ", service_full_name, ".", method_name, " egress"),
+                             parent.timeSource().systemTime());
   current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.stat_prefix_);
+  current_span_->setTag(Tracing::Tags::get().UpstreamAddress, parent.target_uri_);
   current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 }
 
@@ -444,7 +502,13 @@ void GoogleAsyncRequestImpl::cancel() {
 }
 
 void GoogleAsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  current_span_->injectContext(metadata);
+  Tracing::HttpTraceContext trace_context(metadata);
+  Tracing::UpstreamContext upstream_context(nullptr,                          // host_
+                                            nullptr,                          // cluster_
+                                            Tracing::ServiceType::GoogleGrpc, // service_type_
+                                            true                              // async_client_span_
+  );
+  current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(metadata);
 }
 

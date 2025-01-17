@@ -22,8 +22,11 @@ envoy_cc_mock(
         "//source/common/http/http1:codec_stats_lib",
         "//source/common/http/http2:codec_stats_lib",
         "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/router:upstream_codec_filter_lib",
+        "//source/common/stats:deferred_creation",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -35,6 +38,7 @@ envoy_cc_mock(
     name = "host_mocks",
     srcs = ["host.cc"],
     hdrs = ["host.h"],
+    rbe_pool = "6gig",
     deps = [
         ":cluster_info_mocks",
         "//envoy/upstream:upstream_interface",
@@ -72,6 +76,7 @@ envoy_cc_mock(
     deps = [
         ":basic_resource_limit_mocks",
         ":cds_api_mocks",
+        ":cluster_discovery_callback_handle_mocks",
         ":cluster_info_factory_mocks",
         ":cluster_manager_factory_mocks",
         ":cluster_manager_mocks",
@@ -85,6 +90,9 @@ envoy_cc_mock(
         ":host_set_mocks",
         ":load_balancer_context_mock",
         ":load_balancer_mocks",
+        ":missing_cluster_notifier_mocks",
+        ":od_cds_api_handle_mocks",
+        ":od_cds_api_mocks",
         ":priority_set_mocks",
         ":retry_host_predicate_mocks",
         ":retry_priority_factory_mocks",
@@ -93,6 +101,7 @@ envoy_cc_mock(
         ":thread_aware_load_balancer_mocks",
         ":thread_local_cluster_mocks",
         ":transport_socket_match_mocks",
+        ":typed_load_balancer_factory_mocks",
         "//envoy/http:async_client_interface",
         "//envoy/upstream:cluster_factory_interface",
         "//envoy/upstream:cluster_manager_interface",
@@ -189,6 +198,7 @@ envoy_cc_mock(
     name = "load_balancer_mocks",
     srcs = ["load_balancer.cc"],
     hdrs = ["load_balancer.h"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/upstream:load_balancer_interface",
         "//test/mocks/upstream:host_mocks",
@@ -205,9 +215,20 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "typed_load_balancer_factory_mocks",
+    srcs = ["typed_load_balancer_factory.cc"],
+    hdrs = ["typed_load_balancer_factory.h"],
+    deps = [
+        "//envoy/upstream:load_balancer_interface",
+        "//source/common/upstream:load_balancer_factory_base_lib",
+    ],
+)
+
+envoy_cc_mock(
     name = "thread_local_cluster_mocks",
     srcs = ["thread_local_cluster.cc"],
     hdrs = ["thread_local_cluster.h"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/upstream:thread_local_cluster_interface",
         "//test/mocks/http:conn_pool_mocks",
@@ -224,7 +245,10 @@ envoy_cc_mock(
     hdrs = ["cluster_manager_factory.h"],
     deps = [
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
+        "//source/common/singleton:manager_impl_lib",
         "//test/mocks/secret:secret_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
     ],
 )
 
@@ -241,6 +265,7 @@ envoy_cc_mock(
     name = "cluster_manager_mocks",
     srcs = ["cluster_manager.cc"],
     hdrs = ["cluster_manager.h"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/upstream:cluster_manager_interface",
         "//test/mocks/config:config_mocks",
@@ -248,6 +273,7 @@ envoy_cc_mock(
         "//test/mocks/http:http_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_manager_factory_mocks",
+        "//test/mocks/upstream:od_cds_api_handle_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
     ],
 )
@@ -274,6 +300,43 @@ envoy_cc_mock(
     name = "cds_api_mocks",
     srcs = ["cds_api.cc"],
     hdrs = ["cds_api.h"],
+    deps = [
+        "//envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "missing_cluster_notifier_mocks",
+    srcs = ["missing_cluster_notifier.cc"],
+    hdrs = ["missing_cluster_notifier.h"],
+    deps = [
+        "//source/common/upstream:od_cds_api_lib",
+    ],
+)
+
+envoy_cc_mock(
+    name = "od_cds_api_mocks",
+    srcs = ["od_cds_api.cc"],
+    hdrs = ["od_cds_api.h"],
+    deps = [
+        "//source/common/upstream:od_cds_api_lib",
+    ],
+)
+
+envoy_cc_mock(
+    name = "od_cds_api_handle_mocks",
+    srcs = ["od_cds_api_handle.cc"],
+    hdrs = ["od_cds_api_handle.h"],
+    deps = [
+        ":cluster_discovery_callback_handle_mocks",
+        "//envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_mock(
+    name = "cluster_discovery_callback_handle_mocks",
+    srcs = ["cluster_discovery_callback_handle.cc"],
+    hdrs = ["cluster_discovery_callback_handle.h"],
     deps = [
         "//envoy/upstream:cluster_manager_interface",
     ],

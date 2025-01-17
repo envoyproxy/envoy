@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <list>
 #include <memory>
 
 #include "envoy/network/connection_handler.h"
@@ -54,6 +55,7 @@ protected:
   Network::Socket& listen_socket_;
   Network::UdpListenerPtr udp_listener_;
   UdpListenerStats udp_stats_;
+  Network::UdpListenerWorkerRouter& udp_listener_worker_router_;
 };
 
 /**
@@ -64,9 +66,6 @@ class ActiveRawUdpListener : public ActiveUdpListenerBase,
                              public Network::UdpReadFilterCallbacks,
                              Logger::Loggable<Logger::Id::conn_handler> {
 public:
-  ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
-                       Network::UdpConnectionHandler& parent, Event::Dispatcher& dispatcher,
-                       Network::ListenerConfig& config);
   ActiveRawUdpListener(uint32_t worker_index, uint32_t concurrency,
                        Network::UdpConnectionHandler& parent,
                        Network::SocketSharedPtr listen_socket_ptr, Event::Dispatcher& dispatcher,
@@ -88,6 +87,10 @@ public:
     // TODO(mattklein123) change this to a reasonable number if needed.
     return Network::MAX_NUM_PACKETS_PER_EVENT_LOOP;
   }
+  const Network::IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const override {
+    static const Network::IoHandle::UdpSaveCmsgConfig empty_config{};
+    return empty_config;
+  }
 
   // Network::UdpWorker
   void onDataWorker(Network::UdpRecvData&& data) override;
@@ -95,13 +98,21 @@ public:
   // ActiveListenerImplBase
   void pauseListening() override { udp_listener_->disable(); }
   void resumeListening() override { udp_listener_->enable(); }
-  void shutdownListener() override {
+  void shutdownListener(const Network::ExtraShutdownListenerOptions&) override {
     // The read filter should be deleted before the UDP listener is deleted.
     // The read filter refers to the UDP listener to send packets to downstream.
     // If the UDP listener is deleted before the read filter, the read filter may try to use it
     // after deletion.
-    read_filter_.reset();
+    read_filters_.clear();
     udp_listener_.reset();
+  }
+  // These two are unreachable because a config will be rejected if it configures both this listener
+  // and any L4 filter chain.
+  void updateListenerConfig(Network::ListenerConfig&) override {
+    IS_ENVOY_BUG("unexpected call to updateListenerConfig");
+  }
+  void onFilterChainDraining(const std::list<const Network::FilterChain*>&) override {
+    IS_ENVOY_BUG("unexpected call to onFilterChainDraining");
   }
 
   // Network::UdpListenerFilterManager
@@ -111,7 +122,7 @@ public:
   Network::UdpListener& udpListener() override;
 
 private:
-  Network::UdpListenerReadFilterPtr read_filter_;
+  std::list<Network::UdpListenerReadFilterPtr> read_filters_;
   Network::UdpPacketWriterPtr udp_packet_writer_;
 };
 

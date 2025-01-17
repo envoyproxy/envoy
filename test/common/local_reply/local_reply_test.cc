@@ -23,7 +23,11 @@ const absl::string_view TestInitContentType = "content-type";
 
 class LocalReplyTest : public testing::Test {
 public:
-  LocalReplyTest() : stream_info_(time_system_.timeSystem(), nullptr) { resetData(TestInitCode); }
+  LocalReplyTest()
+      : stream_info_(time_system_.timeSystem(), nullptr,
+                     StreamInfo::FilterState::LifeSpan::FilterChain) {
+    resetData(TestInitCode);
+  }
 
   void resetData(Http::Code code) {
     code_ = code;
@@ -51,7 +55,7 @@ TEST_F(LocalReplyTest, TestEmptyConfig) {
 
   local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
-  EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
+  EXPECT_EQ(stream_info_.responseCode(), static_cast<uint32_t>(TestInitCode));
   EXPECT_EQ(response_headers_.Status()->value().getStringView(),
             std::to_string(enumToInt(TestInitCode)));
   EXPECT_EQ(body_, TestInitBody);
@@ -64,7 +68,7 @@ TEST_F(LocalReplyTest, TestDefaultLocalReply) {
 
   local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
-  EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
+  EXPECT_EQ(stream_info_.responseCode(), static_cast<uint32_t>(TestInitCode));
   EXPECT_EQ(response_headers_.Status()->value().getStringView(),
             std::to_string(enumToInt(TestInitCode)));
   EXPECT_EQ(body_, TestInitBody);
@@ -114,7 +118,7 @@ TEST_F(LocalReplyTest, TestDefaultTextFormatter) {
 
   local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
-  EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
+  EXPECT_EQ(stream_info_.responseCode(), static_cast<uint32_t>(TestInitCode));
   EXPECT_EQ(response_headers_.Status()->value().getStringView(),
             std::to_string(enumToInt(TestInitCode)));
   EXPECT_EQ(body_, "Init body text 200");
@@ -136,7 +140,7 @@ TEST_F(LocalReplyTest, TestDefaultJsonFormatter) {
 
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
-  EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
+  EXPECT_EQ(stream_info_.responseCode(), static_cast<uint32_t>(TestInitCode));
   EXPECT_EQ(response_headers_.Status()->value().getStringView(),
             std::to_string(enumToInt(TestInitCode)));
   EXPECT_EQ(content_type_, "application/json");
@@ -205,7 +209,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   resetData(400);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(401));
-  EXPECT_EQ(stream_info_.response_code_, 401U);
+  EXPECT_EQ(stream_info_.responseCode(), 401U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "401");
   EXPECT_EQ(body_, "400 body text");
   EXPECT_EQ(content_type_, "text/plain");
@@ -215,7 +219,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   body_ = "original body text";
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(403));
-  EXPECT_EQ(stream_info_.response_code_, 403U);
+  EXPECT_EQ(stream_info_.responseCode(), 403U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "403");
   EXPECT_EQ(body_, "");
   EXPECT_EQ(content_type_, "text/plain");
@@ -224,7 +228,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   resetData(410);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(410));
-  EXPECT_EQ(stream_info_.response_code_, 410U);
+  EXPECT_EQ(stream_info_.responseCode(), 410U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "410");
   EXPECT_EQ(body_, "410 body text");
   EXPECT_EQ(content_type_, "text/plain");
@@ -233,7 +237,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   resetData(420);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(421));
-  EXPECT_EQ(stream_info_.response_code_, 421U);
+  EXPECT_EQ(stream_info_.responseCode(), 421U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "421");
   EXPECT_EQ(body_, TestInitBody);
   EXPECT_EQ(content_type_, "text/plain");
@@ -242,7 +246,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
   resetData(430);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(430));
-  EXPECT_EQ(stream_info_.response_code_, 430U);
+  EXPECT_EQ(stream_info_.responseCode(), 430U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "430");
   EXPECT_EQ(body_, TestInitBody);
   EXPECT_EQ(content_type_, "text/plain");
@@ -273,7 +277,7 @@ TEST_F(LocalReplyTest, DEPRECATED_FEATURE_TEST(TestMapperRewriteDeprecatedTextFo
   body_ = "original body text";
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(404));
-  EXPECT_EQ(stream_info_.response_code_, 404U);
+  EXPECT_EQ(stream_info_.responseCode(), 404U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "404");
   EXPECT_EQ(body_, "");
   EXPECT_EQ(content_type_, "text/plain");
@@ -321,7 +325,7 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
   resetData(400);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(401));
-  EXPECT_EQ(stream_info_.response_code_, 401U);
+  EXPECT_EQ(stream_info_.responseCode(), 401U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "401");
   EXPECT_EQ(content_type_, "application/json");
 
@@ -338,7 +342,7 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
   resetData(410);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(411));
-  EXPECT_EQ(stream_info_.response_code_, 411U);
+  EXPECT_EQ(stream_info_.responseCode(), 411U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "411");
   EXPECT_EQ(body_, "411 body text 411 default formatter");
   EXPECT_EQ(content_type_, "text/plain");
@@ -359,28 +363,34 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
         - header:
             key: foo-1
             value: bar1
-          append: true
+          append_action: APPEND_IF_EXISTS_OR_ADD
         - header:
             key: foo-2
             value: override-bar2
-          append: false
+          append_action: OVERWRITE_IF_EXISTS_OR_ADD
         - header:
             key: foo-3
             value: append-bar3
-          append: true
+          append_action: APPEND_IF_EXISTS_OR_ADD
+        - header:
+            key: local-reply-req-id
+            value: '%REQ(req-id)%'
 )";
   TestUtility::loadFromYaml(yaml, config_);
   auto local = Factory::create(config_, context_);
 
   response_headers_.addCopy("foo-2", "bar2");
   response_headers_.addCopy("foo-3", "bar3");
-  local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
+  Http::TestRequestHeaderMapImpl request_headers_with_req_id{{"req-id", "123"}};
+  local->rewrite(&request_headers_with_req_id, response_headers_, stream_info_, code_, body_,
+                 content_type_);
   EXPECT_EQ(code_, TestInitCode);
-  EXPECT_EQ(stream_info_.response_code_, static_cast<uint32_t>(TestInitCode));
+  EXPECT_EQ(stream_info_.responseCode(), static_cast<uint32_t>(TestInitCode));
   EXPECT_EQ(content_type_, "text/plain");
 
   EXPECT_EQ(response_headers_.get_("foo-1"), "bar1");
   EXPECT_EQ(response_headers_.get_("foo-2"), "override-bar2");
+  EXPECT_EQ(response_headers_.get_("local-reply-req-id"), "123");
   const auto out = response_headers_.get(Http::LowerCaseString("foo-3"));
   ASSERT_EQ(out.size(), 2);
   ASSERT_EQ(out[0]->value().getStringView(), "bar3");
@@ -442,7 +452,7 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
   resetData(400);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(401));
-  EXPECT_EQ(stream_info_.response_code_, 401U);
+  EXPECT_EQ(stream_info_.responseCode(), 401U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "401");
   EXPECT_EQ(body_, "<h1>401 body text</h1>");
   EXPECT_EQ(content_type_, "text/html; charset=UTF-8");
@@ -453,7 +463,7 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
   resetData(410);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(411));
-  EXPECT_EQ(stream_info_.response_code_, 411U);
+  EXPECT_EQ(stream_info_.responseCode(), 411U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "411");
   EXPECT_EQ(body_, "<h1>411 body text</h1> 411 default formatter");
   EXPECT_EQ(content_type_, "text/html; charset=UTF-8");
@@ -464,7 +474,7 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
   resetData(420);
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, static_cast<Http::Code>(421));
-  EXPECT_EQ(stream_info_.response_code_, 421U);
+  EXPECT_EQ(stream_info_.responseCode(), 421U);
   EXPECT_EQ(response_headers_.Status()->value().getStringView(), "421");
   EXPECT_EQ(body_, "421 body text");
   EXPECT_EQ(content_type_, "text/plain");

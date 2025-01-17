@@ -153,12 +153,10 @@ void registerFatalActions(FatalAction::FatalActionPtrList safe_actions,
                           FatalAction::FatalActionPtrList unsafe_actions,
                           Thread::ThreadFactory& thread_factory) {
   // Create a FatalActionManager and store it.
-  FatalAction::FatalActionManager* previous_manager =
-      fatal_action_manager.exchange(new FatalAction::FatalActionManager(
-          std::move(safe_actions), std::move(unsafe_actions), thread_factory));
-
-  // Previous manager should be NULL.
-  ASSERT(!previous_manager);
+  if (!fatal_action_manager) {
+    fatal_action_manager.exchange(new FatalAction::FatalActionManager(
+        std::move(safe_actions), std::move(unsafe_actions), thread_factory));
+  }
 }
 
 FatalAction::Status runSafeActions() { return runFatalActions(FatalActionType::Safe); }

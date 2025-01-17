@@ -38,6 +38,24 @@ public:
 
   /**
    * @param headers the headers to parse.
+   * @return bool indicating whether Connect-Protocol-Version is present.
+   */
+  static bool hasConnectProtocolVersionHeader(const Http::RequestOrResponseHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether content-type is connect streaming.
+   */
+  static bool hasConnectStreamingContentType(const Http::RequestOrResponseHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether content-type is Protobuf.
+   */
+  static bool hasProtobufContentType(const Http::RequestOrResponseHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
    * @return bool indicating whether the header is a gRPC request header.
    * Currently headers are considered gRPC request headers if they have the gRPC
    * content type, and have a path header.
@@ -46,10 +64,38 @@ public:
 
   /**
    * @param headers the headers to parse.
+   * @return bool indicating whether the header is a Connect request header.
+   * This is determined by checking for the connect protocol version header and a path header.
+   */
+  static bool isConnectRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether the header is a Connect streaming request header.
+   * This is determined by checking for the connect streaming content type and a path header.
+   */
+  static bool isConnectStreamingRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether the header is a protobuf request header.
+   * Currently headers are considered gRPC request headers if they have the protobuf
+   * content type, and have a path header.
+   */
+  static bool isProtobufRequestHeaders(const Http::RequestHeaderMap& headers);
+
+  /**
+   * @param headers the headers to parse.
    * @param bool indicating whether the header is at end_stream.
    * @return bool indicating whether the header is a gRPC response header
    */
   static bool isGrpcResponseHeaders(const Http::ResponseHeaderMap& headers, bool end_stream);
+
+  /**
+   * @param headers the headers to parse.
+   * @return bool indicating whether the header is a Connect streaming response header.
+   */
+  static bool isConnectStreamingResponseHeaders(const Http::ResponseHeaderMap& headers);
 
   /**
    * Returns the GrpcStatus code from a given set of trailers, if present.
@@ -127,14 +173,9 @@ public:
    * Prepare headers for protobuf service.
    */
   static Http::RequestMessagePtr
-  prepareHeaders(const std::string& upstream_cluster, const std::string& service_full_name,
-                 const std::string& method_name,
+  prepareHeaders(absl::string_view upstream_cluster, absl::string_view service_full_name,
+                 absl::string_view method_name,
                  const absl::optional<std::chrono::milliseconds>& timeout);
-
-  /**
-   * Basic validation of gRPC response, @throws Grpc::Exception in case of non successful response.
-   */
-  static void validateResponse(Http::ResponseMessage& http_response);
 
   /**
    * @return const std::string& type URL prefix.
@@ -146,7 +187,7 @@ public:
    * @param qualified_name packagename.messagename.
    * @return qualified_name prefixed with typeUrlPrefix + "/".
    */
-  static std::string typeUrl(const std::string& qualified_name);
+  static std::string typeUrl(absl::string_view qualified_name);
 
   /**
    * Prepend a gRPC frame header to a Buffer::Instance containing a single gRPC frame.
@@ -177,8 +218,6 @@ public:
   static absl::optional<RequestNames> resolveServiceAndMethod(const Http::HeaderEntry* path);
 
 private:
-  static void checkForHeaderOnlyError(Http::ResponseMessage& http_response);
-
   static constexpr size_t MAX_GRPC_TIMEOUT_VALUE = 99999999;
 };
 

@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.postgres_proxy.v3alpha;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.postgres_proxy.v3alpha";
+option java_outer_classname = "PostgresProxyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha";
+option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Postgres proxy]
+// Postgres Proxy :ref:`configuration overview
+// <config_network_filters_postgres_proxy>`.
+// [#extension: envoy.filters.network.postgres_proxy]
+
+message PostgresProxy {
+  // Upstream SSL operational modes.
+  enum SSLMode {
+    // Do not encrypt upstream connection to the server.
+    DISABLE = 0;
+
+    // Establish upstream SSL connection to the server. If the server does not
+    // accept the request for SSL connection, the session is terminated.
+    REQUIRE = 1;
+  }
+
+  // The human readable prefix to use when emitting :ref:`statistics
+  // <config_network_filters_postgres_proxy_stats>`.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Controls whether SQL statements received in Frontend Query messages
+  // are parsed. Parsing is required to produce Postgres proxy filter
+  // metadata. Defaults to true.
+  google.protobuf.BoolValue enable_sql_parsing = 2;
+
+  // Controls whether to terminate SSL session initiated by a client.
+  // If the value is false, the Postgres proxy filter will not try to
+  // terminate SSL session, but will pass all the packets to the upstream server.
+  // If the value is true, the Postgres proxy filter will try to terminate SSL
+  // session. In order to do that, the filter chain must use :ref:`starttls transport socket
+  // <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.StartTlsConfig>`.
+  // If the filter does not manage to terminate the SSL session, it will close the connection from the client.
+  // Refer to official documentation for details
+  // `SSL Session Encryption Message Flow <https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.5.7.11>`_.
+  bool terminate_ssl = 3;
+
+  // Controls whether to establish upstream SSL connection to the server.
+  // Envoy will try to establish upstream SSL connection to the server only when
+  // Postgres filter is able to read Postgres payload in clear-text. It happens when
+  // a client established a clear-text connection to Envoy or when a client established
+  // SSL connection to Envoy and Postgres filter is configured to terminate SSL.
+  // In order for upstream encryption to work, the corresponding cluster must be configured to use
+  // :ref:`starttls transport socket <envoy_v3_api_msg_extensions.transport_sockets.starttls.v3.UpstreamStartTlsConfig>`.
+  // Defaults to ``SSL_DISABLE``.
+  SSLMode upstream_ssl = 4;
+}

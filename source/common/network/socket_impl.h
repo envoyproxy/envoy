@@ -1,6 +1,8 @@
 #pragma once
 
+#include "envoy/network/listener.h"
 #include "envoy/network/socket.h"
+#include "envoy/network/socket_interface.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
@@ -8,12 +10,12 @@
 namespace Envoy {
 namespace Network {
 
-class SocketAddressSetterImpl : public SocketAddressSetter {
+class ConnectionInfoSetterImpl : public ConnectionInfoSetter {
 public:
-  SocketAddressSetterImpl(const Address::InstanceConstSharedPtr& local_address,
-                          const Address::InstanceConstSharedPtr& remote_address)
-      : local_address_(local_address), remote_address_(remote_address),
-        direct_remote_address_(remote_address) {}
+  ConnectionInfoSetterImpl(const Address::InstanceConstSharedPtr& local_address,
+                           const Address::InstanceConstSharedPtr& remote_address)
+      : local_address_(local_address), direct_local_address_(local_address),
+        remote_address_(remote_address), direct_remote_address_(remote_address) {}
 
   void setDirectRemoteAddressForTest(const Address::InstanceConstSharedPtr& direct_remote_address) {
     direct_remote_address_ = direct_remote_address;
@@ -21,15 +23,18 @@ public:
 
   void dumpState(std::ostream& os, int indent_level) const override {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "SocketAddressSetterImpl " << this
+    os << spaces << "ConnectionInfoSetterImpl " << this
        << DUMP_NULLABLE_MEMBER(remote_address_, remote_address_->asStringView())
        << DUMP_NULLABLE_MEMBER(direct_remote_address_, direct_remote_address_->asStringView())
        << DUMP_NULLABLE_MEMBER(local_address_, local_address_->asStringView())
        << DUMP_MEMBER(server_name_) << "\n";
   }
 
-  // SocketAddressSetter
+  // ConnectionInfoSetter
   const Address::InstanceConstSharedPtr& localAddress() const override { return local_address_; }
+  const Address::InstanceConstSharedPtr& directLocalAddress() const override {
+    return direct_local_address_;
+  }
   void setLocalAddress(const Address::InstanceConstSharedPtr& local_address) override {
     local_address_ = local_address;
   }
@@ -51,46 +56,85 @@ public:
   }
   absl::optional<uint64_t> connectionID() const override { return connection_id_; }
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
+  absl::optional<absl::string_view> interfaceName() const override { return interface_name_; }
+  void enableSettingInterfaceName(const bool enable) override {
+    allow_syscall_for_interface_name_ = enable;
+  }
+  void maybeSetInterfaceName(IoHandle& io_handle) override {
+    if (allow_syscall_for_interface_name_) {
+      interface_name_ = io_handle.interfaceName();
+    }
+  }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override { return ssl_info_; }
   void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
     ssl_info_ = ssl_connection_info;
   }
+  absl::string_view ja3Hash() const override { return ja3_hash_; }
+  void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
+  const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
+    return round_trip_time_;
+  }
+  void setRoundTripTime(std::chrono::milliseconds round_trip_time) override {
+    round_trip_time_ = round_trip_time;
+  }
+  OptRef<const FilterChainInfo> filterChainInfo() const override {
+    return makeOptRefFromPtr<const FilterChainInfo>(filter_chain_info_.get());
+  }
+  void setFilterChainInfo(FilterChainInfoConstSharedPtr filter_chain_info) override {
+    filter_chain_info_ = std::move(filter_chain_info);
+  }
+  OptRef<const ListenerInfo> listenerInfo() const override {
+    return makeOptRefFromPtr<const ListenerInfo>(listener_info_.get());
+  }
+  void setListenerInfo(ListenerInfoConstSharedPtr listener_info) override {
+    listener_info_ = std::move(listener_info);
+  }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
+  Address::InstanceConstSharedPtr direct_local_address_;
   bool local_address_restored_{false};
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr direct_remote_address_;
   std::string server_name_;
   absl::optional<uint64_t> connection_id_;
+  bool allow_syscall_for_interface_name_{false};
+  absl::optional<std::string> interface_name_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
+  std::string ja3_hash_;
+  absl::optional<std::chrono::milliseconds> round_trip_time_;
+  FilterChainInfoConstSharedPtr filter_chain_info_;
+  ListenerInfoConstSharedPtr listener_info_;
 };
 
 class SocketImpl : public virtual Socket {
 public:
   SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr& address_for_io_handle,
-             const Address::InstanceConstSharedPtr& remote_address);
+             const Address::InstanceConstSharedPtr& remote_address,
+             const SocketCreationOptions& options);
 
   // Network::Socket
-  SocketAddressSetter& addressProvider() override { return *address_provider_; }
-  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return address_provider_;
+  ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return *connection_info_provider_;
+  }
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return connection_info_provider_;
   }
   SocketPtr duplicate() override {
     // Implementing the functionality here for all sockets is tricky because it leads
     // into object slicing issues.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
 
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
-    if (io_handle_->isOpen()) {
+    if (io_handle_ && io_handle_->isOpen()) {
       io_handle_->close();
     }
   }
-  bool isOpen() const override { return io_handle_->isOpen(); }
+  bool isOpen() const override { return io_handle_ && io_handle_->isOpen(); }
   void ensureOptions() {
     if (!options_) {
       options_ = std::make_shared<std::vector<OptionConstSharedPtr>>();
@@ -128,7 +172,7 @@ protected:
              const Address::InstanceConstSharedPtr& remote_address);
 
   const IoHandlePtr io_handle_;
-  const std::shared_ptr<SocketAddressSetterImpl> address_provider_;
+  const std::shared_ptr<ConnectionInfoSetterImpl> connection_info_provider_;
   OptionsSharedPtr options_;
   Socket::Type sock_type_;
   Address::Type addr_type_;

@@ -1,0 +1,19 @@
+date: October 10, 2023
+
+behavior_changes:
+- area: http
+  change: |
+    Close HTTP/2 and HTTP/3 connections that prematurely reset streams. The runtime key
+    ``overload.premature_reset_min_stream_lifetime_seconds`` determines the interval where received stream
+    reset is considered premature (with 1 second default). The runtime key ``overload.premature_reset_total_stream_count``,
+    with the default value of 500, determines the number of requests received from a connection before the check for premature
+    resets is applied. The connection is disconnected if more than 50% of resets are premature.
+    Setting the runtime key ``envoy.restart_features.send_goaway_for_premature_rst_streams`` to ``false`` completely disables
+    this check.
+- area: http
+  change: |
+    Add runtime flag ``http.max_requests_per_io_cycle`` for setting the limit on the number of HTTP requests processed
+    from a single connection in a single I/O cycle. Requests over this limit are processed in subsequent I/O cycles. This
+    mitigates CPU starvation by connections that simultaneously send high number of requests by allowing requests from other
+    connections to make progress. This runtime value can be set to 1 in the presence of abusive HTTP/2 or HTTP/3 connections.
+    By default this limit is disabled.

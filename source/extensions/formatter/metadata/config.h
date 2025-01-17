@@ -9,7 +9,8 @@ namespace Formatter {
 class MetadataFormatterFactory : public ::Envoy::Formatter::CommandParserFactory {
 public:
   ::Envoy::Formatter::CommandParserPtr
-  createCommandParserFromProto(const Protobuf::Message&) override;
+  createCommandParserFromProto(const Protobuf::Message&,
+                               Server::Configuration::GenericFactoryContext&) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override;
 };

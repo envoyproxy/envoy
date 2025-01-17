@@ -9,6 +9,10 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
+#include "source/common/common/statusor.h"
+
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Json {
 class Object;
@@ -26,6 +30,8 @@ public:
   Exception(const std::string& message) : EnvoyException(message) {}
 };
 
+using ValueType = absl::variant<bool, int64_t, double, std::string>;
+
 /**
  * Wraps an individual JSON node.
  */
@@ -38,14 +44,21 @@ public:
    * with arrays of arrays.
    * @return std::vector<ObjectSharedPtr> the converted object.
    */
-  virtual std::vector<ObjectSharedPtr> asObjectArray() const PURE;
+  virtual absl::StatusOr<std::vector<ObjectSharedPtr>> asObjectArray() const PURE;
+
+  /**
+   * Get a bool, integer, double or string value by name.
+   * @param name supplies the key name.
+   * @return bool the value.
+   */
+  virtual absl::StatusOr<ValueType> getValue(const std::string& name) const PURE;
 
   /**
    * Get a boolean value by name.
    * @param name supplies the key name.
    * @return bool the value.
    */
-  virtual bool getBoolean(const std::string& name) const PURE;
+  virtual absl::StatusOr<bool> getBoolean(const std::string& name) const PURE;
 
   /**
    * Get a boolean value by name.
@@ -53,14 +66,14 @@ public:
    * @param default_value supplies the value to return if the name does not exist.
    * @return bool the value.
    */
-  virtual bool getBoolean(const std::string& name, bool default_value) const PURE;
+  virtual absl::StatusOr<bool> getBoolean(const std::string& name, bool default_value) const PURE;
 
   /**
    * Get an integer value by name.
    * @param name supplies the key name.
    * @return int64_t the value.
    */
-  virtual int64_t getInteger(const std::string& name) const PURE;
+  virtual absl::StatusOr<int64_t> getInteger(const std::string& name) const PURE;
 
   /**
    * Get an integer value by name or return a default if name does not exist.
@@ -68,7 +81,8 @@ public:
    * @param default_value supplies the value to return if name does not exist.
    * @return int64_t the value.
    */
-  virtual int64_t getInteger(const std::string& name, int64_t default_value) const PURE;
+  virtual absl::StatusOr<int64_t> getInteger(const std::string& name,
+                                             int64_t default_value) const PURE;
 
   /**
    * Get a sub-object by name.
@@ -77,7 +91,8 @@ public:
    * exist.
    * @return ObjectObjectSharedPtr the sub-object.
    */
-  virtual ObjectSharedPtr getObject(const std::string& name, bool allow_empty = false) const PURE;
+  virtual absl::StatusOr<ObjectSharedPtr> getObject(const std::string& name,
+                                                    bool allow_empty = false) const PURE;
 
   /**
    * Determine if an object has type Object.
@@ -97,15 +112,15 @@ public:
    * @param allow_empty specifies whether to return an empty array if the key does not exist.
    * @return std::vector<ObjectSharedPtr> the array of JSON  objects.
    */
-  virtual std::vector<ObjectSharedPtr> getObjectArray(const std::string& name,
-                                                      bool allow_empty = false) const PURE;
+  virtual absl::StatusOr<std::vector<ObjectSharedPtr>>
+  getObjectArray(const std::string& name, bool allow_empty = false) const PURE;
 
   /**
    * Get a string value by name.
    * @param name supplies the key name.
    * @return std::string the value.
    */
-  virtual std::string getString(const std::string& name) const PURE;
+  virtual absl::StatusOr<std::string> getString(const std::string& name) const PURE;
 
   /**
    * Get a string value by name or return a default if name does not exist.
@@ -113,8 +128,8 @@ public:
    * @param default_value supplies the value to return if name does not exist.
    * @return std::string the value.
    */
-  virtual std::string getString(const std::string& name,
-                                const std::string& default_value) const PURE;
+  virtual absl::StatusOr<std::string> getString(const std::string& name,
+                                                const std::string& default_value) const PURE;
 
   /**
    * Get a string array by name.
@@ -122,15 +137,15 @@ public:
    * @param allow_empty specifies whether to return an empty array if the key does not exist.
    * @return std::vector<std::string> the array of strings.
    */
-  virtual std::vector<std::string> getStringArray(const std::string& name,
-                                                  bool allow_empty = false) const PURE;
+  virtual absl::StatusOr<std::vector<std::string>>
+  getStringArray(const std::string& name, bool allow_empty = false) const PURE;
 
   /**
    * Get a double value by name.
    * @param name supplies the key name.
    * @return double the value.
    */
-  virtual double getDouble(const std::string& name) const PURE;
+  virtual absl::StatusOr<double> getDouble(const std::string& name) const PURE;
 
   /**
    * Get a double value by name.
@@ -138,7 +153,8 @@ public:
    * @param default_value supplies the value to return if name does not exist.
    * @return double the value.
    */
-  virtual double getDouble(const std::string& name, double default_value) const PURE;
+  virtual absl::StatusOr<double> getDouble(const std::string& name,
+                                           double default_value) const PURE;
 
   /**
    * @return a hash of the JSON object.
@@ -154,7 +170,7 @@ public:
   /**
    * Iterate over key-value pairs in an Object and call callback on each pair.
    */
-  virtual void iterate(const ObjectCallback& callback) const PURE;
+  virtual absl::Status iterate(const ObjectCallback& callback) const PURE;
 
   /**
    * @return TRUE if the Object contains the key.
@@ -173,7 +189,7 @@ public:
   /**
    * @return the value of the object as a string (where the object is a string).
    */
-  virtual std::string asString() const PURE;
+  virtual absl::StatusOr<std::string> asString() const PURE;
 
   /**
    * @return the JSON string representation of the object.

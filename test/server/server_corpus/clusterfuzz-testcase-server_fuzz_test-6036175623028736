@@ -17,7 +17,6 @@ dynamic_resources {
 }
 flags_path: "\'"
 admin {
-  access_log_path: "@"
   address {
     pipe {
       path: "^"

@@ -2,7 +2,7 @@
 
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
-#include "envoy/watchdog/v3alpha/abort_action.pb.h"
+#include "envoy/watchdog/v3/abort_action.pb.h"
 
 namespace Envoy {
 namespace Watchdog {
@@ -12,7 +12,7 @@ namespace Watchdog {
  */
 class AbortAction : public Server::Configuration::GuardDogAction {
 public:
-  AbortAction(envoy::watchdog::v3alpha::AbortActionConfig& config,
+  AbortAction(envoy::watchdog::v3::AbortActionConfig& config,
               Server::Configuration::GuardDogActionFactoryContext& context);
 
   void run(envoy::config::bootstrap::v3::Watchdog::WatchdogAction::WatchdogEvent event,

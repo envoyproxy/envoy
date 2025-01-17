@@ -1,6 +1,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -9,7 +10,7 @@
 
 #include "source/common/common/utility.h"
 
-#include "test/common/stats/stat_test_utility.h"
+#include "test/common/memory/memory_test_utility.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -28,6 +29,19 @@ using testing::Not;
 #endif
 
 namespace Envoy {
+
+TEST(TimeSpecToChrono, convertsCorrectly) {
+  struct timespec t;
+  t.tv_nsec = 456789;
+  t.tv_sec = 1673368198;
+  auto expected =
+      SystemTime{} + std::chrono::seconds{t.tv_sec} + std::chrono::microseconds{t.tv_nsec / 1000};
+  EXPECT_EQ(expected, timespecToChrono(t));
+  t.tv_sec++;
+  EXPECT_NE(expected, timespecToChrono(t));
+  expected += std::chrono::seconds{1};
+  EXPECT_EQ(expected, timespecToChrono(t));
+}
 
 TEST(IntUtil, roundUpToMultiple) {
   // Round up to non-power-of-2
@@ -127,6 +141,35 @@ TEST(StringUtil, atoull) {
   EXPECT_EQ(18446744073709551615U, out);
 }
 
+TEST(StringUtil, hasEmptySpace) {
+  EXPECT_FALSE(StringUtil::hasEmptySpace("1234567890_-+=][|\"&*^%$#@!"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233 789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\t789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\f789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\v789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\n789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\r789"));
+
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233 \t\f789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\v\n\r789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\f\v\n789"));
+}
+
+TEST(StringUtil, replaceAllEmptySpace) {
+  EXPECT_EQ("1234567890_-+=][|\"&*^%$#@!",
+            StringUtil::replaceAllEmptySpace("1234567890_-+=][|\"&*^%$#@!"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233 789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\t789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\f789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\v789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\n789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\r789"));
+
+  EXPECT_EQ("1233___789", StringUtil::replaceAllEmptySpace("1233 \t\f789"));
+  EXPECT_EQ("1233___789", StringUtil::replaceAllEmptySpace("1233\v\n\r789"));
+  EXPECT_EQ("1233___789", StringUtil::replaceAllEmptySpace("1233\f\v\n789"));
+}
+
 TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
   DangerousDeprecatedTestTime test_time;
@@ -185,7 +228,7 @@ TEST(OutputBufferStream, CannotOverwriteBuffer) {
 TEST(OutputBufferStream, DoesNotAllocateMemoryEvenIfWeTryToOverflowBuffer) {
   constexpr char data[] = "123";
   std::array<char, 2> buffer;
-  Stats::TestUtil::MemoryTest memory_test;
+  Memory::TestUtil::MemoryTest memory_test;
 
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   ostream << data << std::endl;
@@ -214,17 +257,17 @@ TEST(InputConstMemoryStream, All) {
 }
 
 TEST(StringUtil, WhitespaceChars) {
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, ' '));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\t'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\f'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\v'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\n'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\r'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), ' '));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\t'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\f'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\v'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\n'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\r'));
 }
 
 TEST(StringUtil, itoa) {
   char buf[32];
-  EXPECT_THROW(StringUtil::itoa(buf, 20, 1), std::invalid_argument);
+  EXPECT_ENVOY_BUG(EXPECT_EQ(StringUtil::itoa(buf, 20, 1), 0), "itoa buffer too small");
 
   EXPECT_EQ(1UL, StringUtil::itoa(buf, sizeof(buf), 0));
   EXPECT_STREQ("0", buf);
@@ -422,7 +465,7 @@ TEST(StringUtil, StringViewFindToken) {
 }
 
 TEST(StringUtil, StringViewCaseInsensitiveHash) {
-  EXPECT_EQ(8972312556107145900U, StringUtil::CaseInsensitiveHash()("hello world"));
+  EXPECT_EQ(13876786532495509697U, StringUtil::CaseInsensitiveHash()("hello world"));
 }
 
 TEST(StringUtil, StringViewCaseInsensitiveCompare) {
@@ -559,6 +602,25 @@ TEST(AccessLogDateTimeFormatter, fromTime) {
   EXPECT_EQ("2018-04-03T23:06:09.999Z", AccessLogDateTimeFormatter::fromTime(time3));
   SystemTime time4(std::chrono::milliseconds(1522796768999));
   EXPECT_EQ("2018-04-03T23:06:08.999Z", AccessLogDateTimeFormatter::fromTime(time4));
+}
+
+TEST(AccessLogDateTimeFormatter, fromTimeLocalTimeZone) {
+  SystemTime time1(std::chrono::seconds(1522796769));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time1), absl::LocalTimeZone()),
+      AccessLogDateTimeFormatter::fromTime(time1, true));
+  SystemTime time2(std::chrono::milliseconds(1522796769123));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time2), absl::LocalTimeZone()),
+      AccessLogDateTimeFormatter::fromTime(time2, true));
+  SystemTime time3(std::chrono::milliseconds(1522796769999));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time3), absl::LocalTimeZone()),
+      AccessLogDateTimeFormatter::fromTime(time3, true));
+  SystemTime time4(std::chrono::milliseconds(1522796768999));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time4), absl::LocalTimeZone()),
+      AccessLogDateTimeFormatter::fromTime(time4, true));
 }
 
 TEST(Primes, isPrime) {
@@ -902,6 +964,41 @@ TEST(IntervalSet, testIntervalTargeted) {
   EXPECT_EQ("[15, 20), [25, 30), [35, 40), [41, 43)", test(41, 43));
 }
 
+TEST(IntervalSet, testTest) {
+  IntervalSetImpl<uint32_t> set;
+  set.insert(4, 6);
+  EXPECT_FALSE(set.test(0));
+  set.insert(0, 2);
+  EXPECT_TRUE(set.test(0));
+  EXPECT_TRUE(set.test(1));
+  EXPECT_FALSE(set.test(2));
+  EXPECT_FALSE(set.test(3));
+  EXPECT_TRUE(set.test(4));
+  EXPECT_TRUE(set.test(5));
+  EXPECT_FALSE(set.test(6));
+  EXPECT_FALSE(set.test(7));
+}
+
+TEST(IntervalSet, testTestDouble) {
+  IntervalSetImpl<double> set;
+  set.insert(4.0, 6.0);
+  EXPECT_FALSE(set.test(0));
+  EXPECT_FALSE(set.test(3.9999));
+  EXPECT_TRUE(set.test(4.0));
+  EXPECT_TRUE(set.test(4.0001));
+  EXPECT_TRUE(set.test(5.9999));
+  EXPECT_FALSE(set.test(6.0));
+  set.insert(0, 2);
+  EXPECT_TRUE(set.test(0));
+  EXPECT_TRUE(set.test(1));
+  EXPECT_TRUE(set.test(1.999));
+  EXPECT_FALSE(set.test(3));
+  EXPECT_TRUE(set.test(4));
+  EXPECT_TRUE(set.test(5));
+  EXPECT_FALSE(set.test(6));
+  EXPECT_FALSE(set.test(7));
+}
+
 TEST(WelfordStandardDeviation, AllEntriesTheSame) {
   WelfordStandardDeviation wsd;
   wsd.update(10);
@@ -947,6 +1044,75 @@ TEST(DateFormatter, FromTime) {
   const SystemTime time2(std::chrono::seconds(0));
   EXPECT_EQ("1970-01-01T00:00:00.000Z", DateFormatter("%Y-%m-%dT%H:%M:%S.000Z").fromTime(time2));
   EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
+
+  const SystemTime time3(std::chrono::milliseconds(1522796769321));
+  EXPECT_EQ("2018-04-03T23:06:09.321Z", DateFormatter("%Y-%m-%dT%H:%M:%E3SZ").fromTime(time3));
+  EXPECT_EQ("aaa23", DateFormatter(std::string(3, 'a') + "%H").fromTime(time1));
+  const SystemTime time4(std::chrono::seconds(0));
+  EXPECT_EQ("1970-01-01T00:00:00.000Z", DateFormatter("%Y-%m-%dT%H:%M:%E3SZ").fromTime(time4));
+  EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
+
+  const SystemTime time5(std::chrono::milliseconds(321));
+  EXPECT_EQ("1970-01-01T00:00:00.321Z", DateFormatter("%Y-%m-%dT%H:%M:%E3SZ").fromTime(time5));
+  EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
+}
+
+TEST(DateFormatter, DateFormatterVsAbslFormatTime) {
+  const std::string format = "%Y-%m-%dT%H:%M:%E3SZ %Ez %E*z %E8S %E*S %E5f %E*f %E4Y %ET";
+
+  SystemTime zero_time(std::chrono::seconds(0));
+
+  EXPECT_EQ(DateFormatter(format).fromTime(zero_time),
+            absl::FormatTime(format, absl::FromChrono(zero_time), absl::UTCTimeZone()));
+
+  std::mt19937 prng(1);
+  std::uniform_int_distribution<long> distribution(-10, 20);
+
+  SystemTime now = std::chrono::system_clock::now(); // NO_CHECK_FORMAT(real_time)
+
+  for (size_t i = 0; i < 20; i++) {
+    auto time = now + std::chrono::milliseconds(static_cast<int>(distribution(prng)));
+    // UTC time zone.
+    EXPECT_EQ(DateFormatter(format).fromTime(time),
+              absl::FormatTime(format, absl::FromChrono(time), absl::UTCTimeZone()));
+
+    // Local time zone.
+    EXPECT_EQ(DateFormatter(format, true).fromTime(time),
+              absl::FormatTime(format, absl::FromChrono(time), absl::LocalTimeZone()));
+  }
+}
+
+TEST(DateFormatter, HybridAbsl) {
+  const std::string format = "%Y-%m-%dT%H:%M:%E3SZ %E6S %E*S %E4f %E*f %S. %s %3f %6f %9f";
+
+  const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::microseconds(123450));
+
+  EXPECT_EQ(
+      "2018-04-03T23:06:09.123Z 09.123450 09.12345 1234 12345 09. 1522796769 123 123450 123450000",
+      DateFormatter(format).fromTime(time1));
+
+  const SystemTime time2(std::chrono::seconds(0));
+  EXPECT_EQ("1970-01-01T00:00:00.000Z 00.000000 00 0000 0 00. 0 000 000000 000000000",
+            DateFormatter(format).fromTime(time2));
+}
+
+TEST(DateFormatter, FromTimeLocalTimeZone) {
+  const SystemTime time1(std::chrono::seconds(1522796769));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%S.000Z", absl::FromChrono(time1), absl::LocalTimeZone()),
+      DateFormatter("%Y-%m-%dT%H:%M:%S.000Z", true).fromTime(time1));
+  EXPECT_EQ(absl::FormatTime("aaa%H", absl::FromChrono(time1), absl::LocalTimeZone()),
+            DateFormatter(std::string(3, 'a') + "%H", true).fromTime(time1));
+  const SystemTime time2(std::chrono::seconds(0));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%S.000Z", absl::FromChrono(time2), absl::LocalTimeZone()),
+      DateFormatter("%Y-%m-%dT%H:%M:%S.000Z", true).fromTime(time2));
+  EXPECT_EQ(absl::FormatTime("aaa%H", absl::FromChrono(time2), absl::LocalTimeZone()),
+            DateFormatter(std::string(3, 'a') + "%H", true).fromTime(time2));
+  SystemTime time3(std::chrono::milliseconds(1522796769999));
+  EXPECT_EQ(
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time3), absl::LocalTimeZone()),
+      DateFormatter("%Y-%m-%dT%H:%M:%S.%3f%z", true).fromTime(time3));
 }
 
 // Check the time complexity. Make sure DateFormatter can finish parsing long messy string without
@@ -969,60 +1135,12 @@ TEST(DateFormatter, ParseLongString) {
   EXPECT_EQ(expected_output, output);
 }
 
-// Verify that two DateFormatter patterns with the same ??? patterns but
-// different format strings don't false share cache entries. This is a
-// regression test for when they did.
 TEST(DateFormatter, FromTimeSameWildcard) {
   const SystemTime time1(std::chrono::seconds(1522796769) + std::chrono::milliseconds(142));
   EXPECT_EQ("2018-04-03T23:06:09.000Z142",
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%3f").fromTime(time1));
   EXPECT_EQ("2018-04-03T23:06:09.000Z114",
             DateFormatter("%Y-%m-%dT%H:%M:%S.000Z%1f%2f").fromTime(time1));
-}
-
-TEST(TrieLookupTable, AddItems) {
-  TrieLookupTable<const char*> trie;
-  const char* cstr_a = "a";
-  const char* cstr_b = "b";
-  const char* cstr_c = "c";
-
-  EXPECT_TRUE(trie.add("foo", cstr_a));
-  EXPECT_TRUE(trie.add("bar", cstr_b));
-  EXPECT_EQ(cstr_a, trie.find("foo"));
-  EXPECT_EQ(cstr_b, trie.find("bar"));
-
-  // overwrite_existing = false
-  EXPECT_FALSE(trie.add("foo", cstr_c, false));
-  EXPECT_EQ(cstr_a, trie.find("foo"));
-
-  // overwrite_existing = true
-  EXPECT_TRUE(trie.add("foo", cstr_c));
-  EXPECT_EQ(cstr_c, trie.find("foo"));
-}
-
-TEST(TrieLookupTable, LongestPrefix) {
-  TrieLookupTable<const char*> trie;
-  const char* cstr_a = "a";
-  const char* cstr_b = "b";
-  const char* cstr_c = "c";
-
-  EXPECT_TRUE(trie.add("foo", cstr_a));
-  EXPECT_TRUE(trie.add("bar", cstr_b));
-  EXPECT_TRUE(trie.add("baro", cstr_c));
-
-  EXPECT_EQ(cstr_a, trie.find("foo"));
-  EXPECT_EQ(cstr_a, trie.findLongestPrefix("foo"));
-  EXPECT_EQ(cstr_a, trie.findLongestPrefix("foosball"));
-
-  EXPECT_EQ(cstr_b, trie.find("bar"));
-  EXPECT_EQ(cstr_b, trie.findLongestPrefix("bar"));
-  EXPECT_EQ(cstr_b, trie.findLongestPrefix("baritone"));
-  EXPECT_EQ(cstr_c, trie.findLongestPrefix("barometer"));
-
-  EXPECT_EQ(nullptr, trie.find("toto"));
-  EXPECT_EQ(nullptr, trie.findLongestPrefix("toto"));
-  EXPECT_EQ(nullptr, trie.find(" "));
-  EXPECT_EQ(nullptr, trie.findLongestPrefix(" "));
 }
 
 TEST(InlineStorageTest, InlineString) {

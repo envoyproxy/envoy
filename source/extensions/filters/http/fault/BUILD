@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that injects faults into the request flow
-# Public docs: docs/root/configuration/http_filters/fault_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/fault_filter
 
 envoy_extension_package()
 
@@ -32,10 +32,12 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
+        "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/filters/common/fault:fault_config_lib",
         "//source/extensions/filters/http/common:stream_rate_limiter_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/fault/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],

@@ -2,9 +2,13 @@
 
 #include <memory>
 
+#include "envoy/common/backoff_strategy.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/custom_config_validators.h"
+#include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/subscription.h"
+#include "envoy/grpc/async_client.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/cleanup.h"
@@ -100,11 +104,26 @@ public:
   virtual GrpcMuxWatchPtr addWatch(const std::string& type_url,
                                    const absl::flat_hash_set<std::string>& resources,
                                    SubscriptionCallbacks& callbacks,
-                                   OpaqueResourceDecoder& resource_decoder,
+                                   OpaqueResourceDecoderSharedPtr resource_decoder,
                                    const SubscriptionOptions& options) PURE;
 
   virtual void requestOnDemandUpdate(const std::string& type_url,
                                      const absl::flat_hash_set<std::string>& for_update) PURE;
+
+  /**
+   * Returns an EdsResourcesCache for this GrpcMux if there is one.
+   * @return EdsResourcesCacheOptRef optional eds resources cache for the gRPC-mux.
+   */
+  virtual EdsResourcesCacheOptRef edsResourcesCache() PURE;
+
+  /**
+   * Updates the current gRPC-Mux object to use a new gRPC client, and config.
+   */
+  virtual absl::Status
+  updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
+                  Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+                  BackOffStrategyPtr&& backoff_strategy,
+                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;
@@ -127,8 +146,11 @@ public:
   /**
    * For the GrpcStream to prompt the context to take appropriate action in response to
    * failure to establish the gRPC stream.
+   * @param next_attempt_may_send_initial_resource_version a flag indicating whether the
+   *        next reconnection attempt will be to the same source that was previously successful
+   *        or not (used to pass primary/failover reconnection information to the GrpcMux).
    */
-  virtual void onEstablishmentFailure() PURE;
+  virtual void onEstablishmentFailure(bool next_attempt_may_send_initial_resource_version) PURE;
 
   /**
    * For the GrpcStream to pass received protos to the context.

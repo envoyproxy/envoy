@@ -9,9 +9,11 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/common/wasm/wasm.h"
 #include "source/extensions/filters/http/wasm/config.h"
+#include "source/extensions/filters/http/wasm/wasm_filter.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 
@@ -29,16 +31,32 @@ using Common::Wasm::WasmException;
 namespace HttpFilters {
 namespace Wasm {
 
-class WasmFilterConfigTest : public Event::TestUsingSimulatedTime,
-                             public testing::TestWithParam<std::string> {
+class WasmFilterConfigTest
+    : public Event::TestUsingSimulatedTime,
+      public testing::TestWithParam<std::tuple<std::string, std::string, bool>> {
 protected:
   WasmFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
-    ON_CALL(context_, api()).WillByDefault(ReturnRef(*api_));
-    ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_store_));
-    ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
-    EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager_));
-    ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    if (std::get<2>(GetParam())) {
+      ON_CALL(context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+      ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_scope_));
+      ON_CALL(context_, listenerInfo()).WillByDefault(ReturnRef(listener_info_));
+      ON_CALL(listener_info_, metadata()).WillByDefault(ReturnRef(listener_metadata_));
+      EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager_));
+      ON_CALL(context_.server_factory_context_, clusterManager())
+          .WillByDefault(ReturnRef(cluster_manager_));
+      ON_CALL(context_.server_factory_context_, mainThreadDispatcher())
+          .WillByDefault(ReturnRef(dispatcher_));
+    } else {
+      ON_CALL(upstream_factory_context_.server_factory_context_, api())
+          .WillByDefault(ReturnRef(*api_));
+      ON_CALL(upstream_factory_context_, scope()).WillByDefault(ReturnRef(stats_scope_));
+      EXPECT_CALL(upstream_factory_context_, initManager())
+          .WillRepeatedly(ReturnRef(init_manager_));
+      ON_CALL(upstream_factory_context_.server_factory_context_, clusterManager())
+          .WillByDefault(ReturnRef(cluster_manager_));
+      ON_CALL(upstream_factory_context_.server_factory_context_, mainThreadDispatcher())
+          .WillByDefault(ReturnRef(dispatcher_));
+    }
   }
 
   void SetUp() override { Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting(); }
@@ -52,8 +70,59 @@ protected:
     }));
   }
 
-  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  void initializeContextInitManager(Init::ExpectableWatcherImpl& init_watcher) {
+    if (std::get<2>(GetParam())) {
+      context_.initManager().initialize(init_watcher);
+    } else {
+      upstream_factory_context_.initManager().initialize(init_watcher);
+    }
+  }
+
+  Init::Manager::State getContextInitManagerState() {
+    if (std::get<2>(GetParam())) {
+      return context_.initManager().state();
+    }
+    return upstream_factory_context_.initManager().state();
+  }
+
+  void setupContextInitManager(Init::ManagerImpl& manager) {
+    if (std::get<2>(GetParam())) {
+      EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(manager));
+    } else {
+      EXPECT_CALL(upstream_factory_context_, initManager()).WillRepeatedly(ReturnRef(manager));
+    }
+  }
+
+  void
+  setupContextServerFactoryThreadLocal(NiceMock<Envoy::ThreadLocal::MockInstance>& threadlocal) {
+    if (std::get<2>(GetParam())) {
+      EXPECT_CALL(context_.server_factory_context_, threadLocal())
+          .WillRepeatedly(ReturnRef(threadlocal));
+    } else {
+      EXPECT_CALL(upstream_factory_context_.server_factory_context_, threadLocal())
+          .WillRepeatedly(ReturnRef(threadlocal));
+    }
+  }
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  getFilterFactoryCb(const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config,
+                     WasmFilterConfig& factory) {
+    if (std::get<2>(GetParam())) {
+      return factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+    }
+    return factory.createFilterFactoryFromProto(proto_config, "stats", upstream_factory_context_);
+  }
+  std::unique_ptr<FilterConfig>
+  getFilterConfig(const envoy::extensions::filters::http::wasm::v3::Wasm& proto_config) {
+    if (std::get<2>(GetParam())) {
+      return std::make_unique<FilterConfig>(proto_config, context_);
+    }
+    return std::make_unique<FilterConfig>(proto_config, upstream_factory_context_);
+  }
+
+  NiceMock<Network::MockListenerInfo> listener_info_;
   Stats::IsolatedStoreImpl stats_store_;
+  Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   Api::ApiPtr api_;
   envoy::config::core::v3::Metadata listener_metadata_;
   Init::ManagerImpl init_manager_{"init_manager"};
@@ -62,25 +131,26 @@ protected:
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
+
+private:
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context_;
 };
 
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFilterConfigTest,
-                         Envoy::Extensions::Common::Wasm::sandbox_runtime_values);
+INSTANTIATE_TEST_SUITE_P(
+    Runtimes, WasmFilterConfigTest,
+    Envoy::Extensions::Common::Wasm::dual_filter_sandbox_runtime_and_cpp_values,
+    Envoy::Extensions::Common::Wasm::wasmDualFilterTestParamsToString);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmFilterConfigTest);
 
 TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
-  const std::string json = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  const std::string json =
+      TestEnvironment::substitute(absl::StrCat(R"EOF(
   {
   "config" : {
   "vm_config": {
     "runtime": "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF(",
+                                               std::get<0>(GetParam()), R"EOF(",
     "configuration": {
        "@type": "type.googleapis.com/google.protobuf.StringValue",
        "value": "some configuration"
@@ -96,10 +166,10 @@ TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
   envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
   TestUtility::loadFromJson(json, proto_config);
   WasmFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
@@ -107,17 +177,11 @@ TEST_P(WasmFilterConfigTest, JsonLoadFromFileWasm) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       configuration:
          "@type": "type.googleapis.com/google.protobuf.StringValue"
          value: "some configuration"
@@ -134,12 +198,11 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
   // we have to make sure that contexts still hold valid WasmVMs in these cases.
   std::shared_ptr<Envoy::Extensions::Common::Wasm::Context> context = nullptr;
   {
-    WasmFilterConfig factory;
-    Http::FilterFactoryCb cb =
-        factory.createFilterFactoryFromProto(proto_config, "stats", context_);
     EXPECT_CALL(init_watcher_, ready());
-    context_.initManager().initialize(init_watcher_);
-    EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+    WasmFilterConfig factory;
+    Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
+    initializeContextInitManager(init_watcher_);
+    EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
     Http::MockFilterChainFactoryCallbacks filter_callback;
     EXPECT_CALL(filter_callback, addStreamFilter(_))
         .WillOnce([&context](Http::StreamFilterSharedPtr filter) {
@@ -151,21 +214,17 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasm) {
   // Check if the context still holds a valid Wasm even after the factory is destroyed.
   EXPECT_TRUE(context);
   EXPECT_TRUE(context->wasm());
+  // Check if the custom stat namespace is registered during the initialization.
+  EXPECT_TRUE(api_->customStatNamespaces().registered("wasmcustom"));
 }
 
-TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
+TEST_P(WasmFilterConfigTest, DEPRECATED_FEATURE_TEST(YamlLoadFromFileWasmFailOpenOk)) {
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     fail_open: true
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       configuration:
          "@type": "type.googleapis.com/google.protobuf.StringValue"
          value: "some configuration"
@@ -176,11 +235,89 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {
 
   envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
-  WasmFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  WasmFilterConfig factory;
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  cb(filter_callback);
+}
+
+TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenPolicyOk) {
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    failure_policy: FAIL_OPEN
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  EXPECT_CALL(init_watcher_, ready());
+  WasmFilterConfig factory;
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  EXPECT_CALL(filter_callback, addAccessLogHandler(_));
+  cb(filter_callback);
+}
+
+TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
+  const std::string invalid_yaml =
+      TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                               std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+    configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "invalid"
+  )EOF"));
+
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(invalid_yaml, proto_config);
+  WasmFilterConfig factory;
+  EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
+                            WasmException, "Unable to create Wasm plugin ");
+  const std::string valid_yaml =
+      TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                               std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+    configuration:
+      "@type": "type.googleapis.com/google.protobuf.StringValue"
+      value: "valid"
+  )EOF"));
+  TestUtility::loadFromYaml(valid_yaml, proto_config);
+  EXPECT_CALL(init_watcher_, ready());
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
@@ -188,12 +325,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromFileWasmFailOpenOk) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadInlineWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   EXPECT_FALSE(code.empty());
@@ -201,7 +332,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineWasm) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                        GetParam(), R"EOF("
+                                        std::get<0>(GetParam()), R"EOF("
       code:
         local: { inline_bytes: ")EOF",
                                         Base64::encode(code.data(), code.size()), R"EOF(" }
@@ -209,10 +340,10 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineWasm) {
   envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   WasmFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
@@ -224,7 +355,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineBadCode) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                        GetParam(), R"EOF("
+                                        std::get<0>(GetParam()), R"EOF("
       code:
         local:
           inline_string: "bad code"
@@ -233,17 +364,11 @@ TEST_P(WasmFilterConfigTest, YamlLoadInlineBadCode) {
   envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   WasmFilterConfig factory;
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context_),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+  EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
+                            WasmException, "Unable to create Wasm plugin ");
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -252,7 +377,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -282,10 +407,10 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
             return &request;
           }));
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
@@ -293,12 +418,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -308,7 +427,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
     vm_config:
       nack_on_code_cache_miss: true
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -338,23 +457,23 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
             return &request;
           }));
 
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context_),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+  EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
 
   Init::ManagerImpl init_manager2{"init_manager2"};
   Init::ExpectableWatcherImpl init_watcher2;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager2));
+  setupContextInitManager(init_manager2);
 
-  auto cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  auto cb = getFilterFactoryCb(proto_config, factory).value();
 
   EXPECT_CALL(init_watcher2, ready());
   init_manager2.initialize(init_watcher2);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -365,12 +484,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -380,7 +493,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
     vm_config:
       nack_on_code_cache_miss: true
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -420,30 +533,30 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
           }));
 
   // Case 1: fail and fetch in the background, got 503, cache failure.
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context_),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+  EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
+                            WasmException, "Unable to create Wasm plugin ");
   // Fail a second time because we are in-progress.
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context_),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+  EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
+                            WasmException, "Unable to create Wasm plugin ");
   async_callbacks->onSuccess(
       request, Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
 
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
 
   // Case 2: fail immediately with negatively cached result.
   Init::ManagerImpl init_manager2{"init_manager2"};
   Init::ExpectableWatcherImpl init_watcher2;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager2));
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context_),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+  setupContextInitManager(init_manager2);
+  EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher2, ready());
   init_manager2.initialize(init_watcher2);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
 
   // Wait for negative cache to timeout.
   ::Envoy::Extensions::Common::Wasm::setTimeOffsetForCodeCacheForTesting(std::chrono::seconds(10));
@@ -464,26 +577,26 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
   Init::ManagerImpl init_manager3{"init_manager3"};
   Init::ExpectableWatcherImpl init_watcher3;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager3));
+  setupContextInitManager(init_manager3);
 
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config, "stats", context_),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+  EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher3, ready());
   init_manager3.initialize(init_watcher3);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
 
   // Case 4: success from cache.
   Init::ManagerImpl init_manager4{"init_manager4"};
   Init::ExpectableWatcherImpl init_watcher4;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager4));
+  setupContextInitManager(init_manager4);
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
 
   EXPECT_CALL(init_watcher4, ready());
   init_manager4.initialize(init_watcher4);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
@@ -497,12 +610,13 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 
   // Case 5: flush the stale cache.
   const std::string sha256_2 = sha256 + "new";
-  const std::string yaml2 = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  const std::string yaml2 =
+      TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
       nack_on_code_cache_miss: true
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                     GetParam(), R"EOF("
+                                               std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -512,7 +626,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
           retry_policy:
             num_retries: 0
           sha256: )EOF",
-                                                                     sha256_2));
+                                               sha256_2));
 
   envoy::extensions::filters::http::wasm::v3::Wasm proto_config2;
   TestUtility::loadFromYaml(yaml2, proto_config2);
@@ -520,38 +634,36 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
   Init::ManagerImpl init_manager5{"init_manager4"};
   Init::ExpectableWatcherImpl init_watcher5;
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager5));
+  setupContextInitManager(init_manager5);
 
-  EXPECT_THROW_WITH_MESSAGE(factory.createFilterFactoryFromProto(proto_config2, "stats", context_),
-                            WasmException, "Unable to create Wasm HTTP filter ");
+  EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config2, factory).status().IgnoreError(),
+                            WasmException, "Unable to create Wasm plugin ");
 
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
 
   // Case 6: fail and fetch in the background, got 200, cache success.
   Init::ManagerImpl init_manager6{"init_manager6"};
   Init::ExpectableWatcherImpl init_watcher6;
+  setupContextInitManager(init_manager6);
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager6));
-
-  factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  getFilterFactoryCb(proto_config, factory).value();
 
   EXPECT_CALL(init_watcher6, ready());
-  init_manager6.initialize(init_watcher6);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  initializeContextInitManager(init_watcher6);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
 
   // Case 7: success from cache.
   Init::ManagerImpl init_manager7{"init_manager7"};
   Init::ExpectableWatcherImpl init_watcher7;
+  setupContextInitManager(init_manager7);
 
-  EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager7));
-
-  Http::FilterFactoryCb cb2 = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  Http::FilterFactoryCb cb2 = getFilterFactoryCb(proto_config, factory).value();
 
   EXPECT_CALL(init_watcher7, ready());
   init_manager7.initialize(init_watcher7);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
 
   Http::MockFilterChainFactoryCallbacks filter_callback2;
   EXPECT_CALL(filter_callback2, addStreamFilter(_));
@@ -563,12 +675,6 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -577,7 +683,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -605,18 +711,12 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
             return &request;
           }));
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  initializeContextInitManager(init_watcher_);
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -625,7 +725,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -656,18 +756,12 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
             return &request;
           }));
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  initializeContextInitManager(init_watcher_);
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
   const std::string sha256 = Hex::encode(
@@ -676,7 +770,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -707,18 +801,12 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
             return &request;
           }));
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  initializeContextInitManager(init_watcher_);
 }
 
 TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
-#if defined(__aarch64__)
-  // TODO(PiotrSikora): There are no Emscripten releases for arm64.
-  if (GetParam() != "null") {
-    return;
-  }
-#endif
   initializeForRemote();
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
@@ -728,7 +816,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -781,10 +869,10 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
       }));
   EXPECT_CALL(*retry_timer_, disableTimer());
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
-  EXPECT_EQ(context_.initManager().state(), Init::Manager::State::Initialized);
+  initializeContextInitManager(init_watcher_);
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
@@ -799,7 +887,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
   config:
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -829,9 +917,9 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
             return nullptr;
           }));
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  initializeContextInitManager(init_watcher_);
 
   // Fail closed.
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -860,7 +948,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
             proxy_wasm::FilterHeadersStatus::StopAllIterationAndWatermark);
 }
 
-TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpen) {
+TEST_P(WasmFilterConfigTest, DEPRECATED_FEATURE_TEST(YamlLoadFromRemoteSuccessBadcodeFailOpen)) {
   const std::string code = "foo";
   const std::string sha256 = Hex::encode(
       Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
@@ -869,7 +957,7 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpen) {
     fail_open: true
     vm_config:
       runtime: "envoy.wasm.runtime.)EOF",
-                                                                    GetParam(), R"EOF("
+                                                                    std::get<0>(GetParam()), R"EOF("
       code:
         remote:
           http_uri:
@@ -899,12 +987,172 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpen) {
             return nullptr;
           }));
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
-  context_.initManager().initialize(init_watcher_);
+  initializeContextInitManager(init_watcher_);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   // The filter is not registered.
   cb(filter_callback);
+}
+
+TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpenPolicy) {
+  const std::string code = "foo";
+  const std::string sha256 = Hex::encode(
+      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    failure_policy: FAIL_OPEN
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      code:
+        remote:
+          http_uri:
+            uri: https://example.com/data
+            cluster: cluster_1
+            timeout: 5s
+          sha256: )EOF",
+                                                                    sha256));
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  WasmFilterConfig factory;
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+
+  cluster_manager_.initializeThreadLocalClusters({"cluster_1"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            Http::ResponseMessagePtr response(
+                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+            response->body().add(code);
+            callbacks.onSuccess(request, std::move(response));
+            return nullptr;
+          }));
+
+  Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
+  EXPECT_CALL(init_watcher_, ready());
+  initializeContextInitManager(init_watcher_);
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  // The filter is not registered.
+  cb(filter_callback);
+}
+
+TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmcreateContext) {
+  const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"));
+  const std::string sha256 = Hex::encode(
+      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(Buffer::OwnedImpl(code)));
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      code:
+        remote:
+          http_uri:
+            uri: https://example.com/data
+            cluster: cluster_1
+            timeout: 5s
+          sha256: )EOF",
+                                                                    sha256));
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  WasmFilterConfig factory;
+  NiceMock<Http::MockAsyncClient> client;
+  NiceMock<Http::MockAsyncClientRequest> request(&client);
+
+  cluster_manager_.initializeThreadLocalClusters({"cluster_1"});
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
+      .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
+  Http::AsyncClient::Callbacks* async_callbacks = nullptr;
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            if (!async_callbacks) {
+              async_callbacks = &callbacks;
+            }
+            return &request;
+          }));
+  NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
+  setupContextServerFactoryThreadLocal(threadlocal);
+  threadlocal.registered_ = false;
+  auto filter_config = getFilterConfig(proto_config);
+  EXPECT_EQ(filter_config->createContext(), nullptr);
+  EXPECT_CALL(init_watcher_, ready());
+  initializeContextInitManager(init_watcher_);
+  auto response = Http::ResponseMessagePtr{new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}})};
+  response->body().add(code);
+  async_callbacks->onSuccess(request, std::move(response));
+  EXPECT_EQ(getContextInitManagerState(), Init::Manager::State::Initialized);
+  threadlocal.registered_ = true;
+  EXPECT_NE(filter_config->createContext(), nullptr);
+}
+
+TEST_P(WasmFilterConfigTest, DEPRECATED_FEATURE_TEST(FailedToGetThreadLocalPlugin)) {
+  NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    fail_open: true
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  setupContextServerFactoryThreadLocal(threadlocal);
+  threadlocal.registered_ = true;
+  auto filter_config = getFilterConfig(proto_config);
+  ASSERT_EQ(threadlocal.current_slot_, 1);
+  ASSERT_NE(filter_config->createContext(), nullptr);
+
+  // If the thread local plugin handle returns nullptr, `createContext` should return nullptr
+  threadlocal.data_[0] =
+      std::make_shared<Extensions::Common::Wasm::PluginHandleSharedPtrThreadLocal>(nullptr);
+  EXPECT_EQ(filter_config->createContext(), nullptr);
+}
+
+TEST_P(WasmFilterConfigTest, FailedToGetThreadLocalPluginOpenPolicy) {
+  NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
+  const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
+  config:
+    failure_policy: FAIL_OPEN
+    vm_config:
+      runtime: "envoy.wasm.runtime.)EOF",
+                                                                    std::get<0>(GetParam()), R"EOF("
+      configuration:
+         "@type": "type.googleapis.com/google.protobuf.StringValue"
+         value: "some configuration"
+      code:
+        local:
+          filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+  )EOF"));
+
+  envoy::extensions::filters::http::wasm::v3::Wasm proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+  setupContextServerFactoryThreadLocal(threadlocal);
+  threadlocal.registered_ = true;
+  auto filter_config = getFilterConfig(proto_config);
+  ASSERT_EQ(threadlocal.current_slot_, 1);
+  ASSERT_NE(filter_config->createContext(), nullptr);
+
+  // If the thread local plugin handle returns nullptr, `createContext` should return nullptr
+  threadlocal.data_[0] =
+      std::make_shared<Extensions::Common::Wasm::PluginHandleSharedPtrThreadLocal>(nullptr);
+  EXPECT_EQ(filter_config->createContext(), nullptr);
 }
 
 } // namespace Wasm

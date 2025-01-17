@@ -21,7 +21,7 @@ std::string PayloadOptions::modeName() const {
   case DriverMode::Exception:
     return "exception";
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 
@@ -34,7 +34,7 @@ std::string PayloadOptions::transportName() const {
   case TransportType::Header:
     return "header";
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 
@@ -44,10 +44,8 @@ std::string PayloadOptions::protocolName() const {
     return "binary";
   case ProtocolType::Compact:
     return "compact";
-  case ProtocolType::Twitter:
-    return "finagle";
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 
@@ -104,7 +102,7 @@ void BaseThriftIntegrationTest::preparePayloads(const PayloadOptions& options,
 void BaseThriftIntegrationTest::readAll(std::string file, Buffer::Instance& buffer) {
   file = TestEnvironment::substitute(file, version_);
 
-  std::string data = api_->fileSystem().fileReadToEnd(file);
+  std::string data = api_->fileSystem().fileReadToEnd(file).value();
   buffer.add(data);
 }
 

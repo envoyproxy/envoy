@@ -5,16 +5,21 @@
 #include "envoy/stream_info/filter_state.h"
 
 namespace Envoy {
+
+namespace Regex {
+class Engine;
+}
+
 namespace Http {
 
 /**
- * Implementation of HashPolicy that reads from the proto route config and only currently supports
- * hashing on an HTTP header.
+ * Implementation of HashPolicy that reads from the proto route config.
  */
 class HashPolicyImpl : public HashPolicy {
 public:
-  explicit HashPolicyImpl(
-      absl::Span<const envoy::config::route::v3::RouteAction::HashPolicy* const> hash_policy);
+  static absl::StatusOr<std::unique_ptr<HashPolicyImpl>>
+  create(absl::Span<const envoy::config::route::v3::RouteAction::HashPolicy* const> hash_policy,
+         Regex::Engine& regex_engine);
 
   // Http::HashPolicy
   absl::optional<uint64_t>
@@ -35,6 +40,11 @@ public:
   };
 
   using HashMethodPtr = std::unique_ptr<HashMethod>;
+
+protected:
+  explicit HashPolicyImpl(
+      absl::Span<const envoy::config::route::v3::RouteAction::HashPolicy* const> hash_policy,
+      Regex::Engine& regex_engine, absl::Status& creation_status);
 
 private:
   std::vector<HashMethodPtr> hash_impls_;

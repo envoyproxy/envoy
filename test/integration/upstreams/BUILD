@@ -10,7 +10,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "per_host_upstream_config",
-    srcs = [
+    hdrs = [
         "per_host_upstream_config.h",
     ],
     deps = [
@@ -23,7 +23,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/router:router_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/upstreams/http/http:upstream_request_lib",
         "//source/extensions/upstreams/http/tcp:upstream_request_lib",
     ],

@@ -6,6 +6,8 @@ Squash
 Squash is an HTTP filter which enables Envoy to integrate with Squash microservices debugger.
 Code: https://github.com/solo-io/squash, API Docs: https://squash.solo.io/
 
+The Squash filter is only included in :ref:`contrib images <install_contrib>`
+
 Overview
 --------
 
@@ -20,8 +22,8 @@ request, before the request arrive to the application code, without any changes 
 Configuration
 -------------
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.squash.v3.Squash``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.squash.v3.Squash>`
-* This filter should be configured with the name *envoy.filters.http.squash*.
 
 How it works
 ------------

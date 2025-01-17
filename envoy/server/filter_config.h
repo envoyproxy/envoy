@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <string>
 
 #include "envoy/config/typed_config.h"
 #include "envoy/extensions/filters/common/dependency/v3/dependency.pb.h"
@@ -76,6 +77,55 @@ public:
 };
 
 /**
+ * Implemented by each UDP session filter and registered via Registry::registerFactory or the
+ * convenience class RegisterFactory.
+ */
+class NamedUdpSessionFilterConfigFactory : public Envoy::Config::TypedFactory {
+public:
+  ~NamedUdpSessionFilterConfigFactory() override = default;
+
+  /**
+   * Create a particular UDP session filter factory implementation. If the implementation is
+   * unable to produce a factory with the provided parameters, it should throw an EnvoyException
+   * in the case of general error. The returned callback should always be initialized.
+   * @param config supplies the configuration for the filter
+   * @param context supplies the filter's context.
+   * @return UdpSessionFilterFactoryCb the factory creation function.
+   */
+  virtual Network::UdpSessionFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               Server::Configuration::FactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.filters.udp.session"; }
+};
+
+/**
+ * Implemented by each QUIC listener filter and registered via Registry::registerFactory()
+ * or the convenience class RegisterFactory.
+ */
+class NamedQuicListenerFilterConfigFactory : public ListenerFilterConfigFactoryBase {
+public:
+  ~NamedQuicListenerFilterConfigFactory() override = default;
+
+  /**
+   * Create a particular listener filter factory implementation. If the implementation is unable to
+   * produce a factory with the provided parameters, it should throw an EnvoyException in the case
+   * of general error or a Json::Exception if the json configuration is erroneous. The returned
+   * callback should always be initialized.
+   * @param config supplies the general protobuf configuration for the filter.
+   * @param listener_filter_matcher supplies the matcher to decide when filter is enabled.
+   * @param context supplies the filter's context.
+   * @return Network::QuicListenerFilterFactoryCb the factory creation function.
+   */
+  virtual Network::QuicListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message& config,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      ListenerFactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.filters.quic_listener"; }
+};
+
+/**
  * Implemented by filter factories that require more options to process the protocol used by the
  * upstream cluster.
  */
@@ -90,8 +140,9 @@ public:
    * @param config supplies the protobuf configuration for the filter
    * @param validation_visitor message validation visitor instance.
    * @return Upstream::ProtocolOptionsConfigConstSharedPtr the protocol options
+   * or an error message.
    */
-  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
+  virtual absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
   createProtocolOptionsConfig(const Protobuf::Message& config,
                               ProtocolOptionsFactoryContext& factory_context) {
     UNREFERENCED_PARAMETER(config);
@@ -120,9 +171,9 @@ public:
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
    * @param filter_chain_factory_context supplies the filter's context.
-   * @return Network::FilterFactoryCb the factory creation function.
+   * @return Network::FilterFactoryCb the factory creation function or an error status.
    */
-  virtual Network::FilterFactoryCb
+  virtual absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                FactoryContext& filter_chain_factory_context) PURE;
 
@@ -131,7 +182,9 @@ public:
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
    */
-  virtual bool isTerminalFilterByProto(const Protobuf::Message&, FactoryContext&) { return false; }
+  virtual bool isTerminalFilterByProto(const Protobuf::Message&, ServerFactoryContext&) {
+    return false;
+  }
 };
 
 /**
@@ -147,10 +200,18 @@ public:
    * unable to produce a factory with the provided parameters, it should throw an EnvoyException in
    * the case of general error. The returned callback should always be initialized.
    */
-  virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                CommonFactoryContext& context) PURE;
+  virtual Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               UpstreamFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.filters.upstream_network"; }
+
+  /**
+   * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
+   */
+  virtual bool isTerminalFilterByProto(const Protobuf::Message&, ServerFactoryContext&) {
+    return false;
+  }
 };
 
 using FilterDependenciesPtr =
@@ -162,23 +223,9 @@ using MatchingRequirementsPtr =
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedHttpFilterConfigFactory : public ProtocolOptionsFactory {
+class HttpFilterConfigFactoryBase : public ProtocolOptionsFactory {
 public:
-  ~NamedHttpFilterConfigFactory() override = default;
-
-  /**
-   * Create a particular http filter factory implementation. If the implementation is unable to
-   * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
-   * callback should always be initialized.
-   * @param config supplies the general Protobuf message to be marshaled into a filter-specific
-   * configuration.
-   * @param stat_prefix prefix for stat logging
-   * @param context supplies the filter's context.
-   * @return Http::FilterFactoryCb the factory creation function.
-   */
-  virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                             const std::string& stat_prefix,
-                                                             FactoryContext& context) PURE;
+  ~HttpFilterConfigFactoryBase() override = default;
 
   /**
    * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weighted
@@ -195,18 +242,13 @@ public:
    * @return RouteSpecificFilterConfigConstSharedPtr allow the filter to pre-process per route
    * config. Returned object will be stored in the loaded route configuration.
    */
-  virtual Router::RouteSpecificFilterConfigConstSharedPtr
+  virtual absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfig(const Protobuf::Message&, ServerFactoryContext&,
                                   ProtobufMessage::ValidationVisitor&) {
     return nullptr;
   }
 
   std::string category() const override { return "envoy.filters.http"; }
-
-  /**
-   * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
-   */
-  virtual bool isTerminalFilterByProto(const Protobuf::Message&, FactoryContext&) { return false; }
 
   /**
    * @return FilterDependenciesPtr specification of dependencies required or
@@ -231,6 +273,77 @@ public:
     return std::make_unique<
         envoy::extensions::filters::common::dependency::v3::MatchingRequirements>();
   }
+
+  std::set<std::string> configTypes() override {
+    auto config_types = TypedFactory::configTypes();
+
+    if (auto message = createEmptyRouteConfigProto(); message != nullptr) {
+      config_types.emplace(createReflectableMessage(*message)->GetDescriptor()->full_name());
+    }
+
+    return config_types;
+  }
+
+  /**
+   * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
+   */
+  virtual bool isTerminalFilterByProto(const Protobuf::Message&,
+                                       Server::Configuration::ServerFactoryContext&) {
+    return false;
+  }
+};
+
+class NamedHttpFilterConfigFactory : public virtual HttpFilterConfigFactoryBase {
+public:
+  /**
+   * Create a particular http filter factory implementation. If the implementation is unable to
+   * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
+   * callback should always be initialized.
+   * @param config supplies the general Protobuf message to be marshaled into a filter-specific
+   * configuration.
+   * @param stat_prefix prefix for stat logging
+   * @param context supplies the filter's context.
+   * @return  absl::StatusOr<Http::FilterFactoryCb> the factory creation function or an error if
+   * creation fails.
+   */
+  virtual absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
+                               Server::Configuration::FactoryContext& context) PURE;
+
+  /**
+   * Create a particular http filter factory implementation. If the implementation is unable to
+   * produce a factory with the provided parameters or this method is not supported, it should throw
+   * an EnvoyException. The returned callback should always be initialized.
+   * @param config supplies the general Protobuf message to be marshaled into a filter-specific
+   * configuration.
+   * @param stat_prefix prefix for stat logging
+   * @param context supplies the filter's ServerFactoryContext.
+   * @return Http::FilterFactoryCb the factory creation function.
+   */
+  virtual Http::FilterFactoryCb
+  createFilterFactoryFromProtoWithServerContext(const Protobuf::Message&, const std::string&,
+                                                Server::Configuration::ServerFactoryContext&) {
+    ExceptionUtil::throwEnvoyException(
+        "Creating filter factory from server factory context is not supported");
+    return nullptr;
+  }
+};
+
+class UpstreamHttpFilterConfigFactory : public virtual HttpFilterConfigFactoryBase {
+public:
+  /**
+   * Create a particular http filter factory implementation. If the implementation is unable to
+   * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
+   * callback should always be initialized.
+   * @param config supplies the general Protobuf message to be marshaled into a filter-specific
+   * configuration.
+   * @param stat_prefix prefix for stat logging
+   * @param context supplies the filter's context.
+   * @return Http::FilterFactoryCb the factory creation function.
+   */
+  virtual absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
+                               Server::Configuration::UpstreamFactoryContext& context) PURE;
 };
 
 } // namespace Configuration

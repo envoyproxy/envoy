@@ -4,7 +4,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -15,6 +14,7 @@ namespace HttpFilters {
 namespace Compressor {
 namespace {
 
+using envoy::extensions::filters::http::compressor::v3::CompressorPerRoute;
 using testing::NiceMock;
 using testing::Return;
 
@@ -64,8 +64,8 @@ public:
     TestUtility::loadFromJson(json, compressor);
     auto compressor_factory = std::make_unique<TestCompressorFactory>("test");
     compressor_factory_ = compressor_factory.get();
-    config_ = std::make_shared<CompressorFilterConfig>(compressor, "test.", stats_, runtime_,
-                                                       std::move(compressor_factory));
+    config_ = std::make_shared<CompressorFilterConfig>(compressor, "test.", *stats_.rootScope(),
+                                                       runtime_, std::move(compressor_factory));
     filter_ = std::make_unique<CompressorFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -134,15 +134,14 @@ public:
   }
 
   void doResponse(Http::TestResponseHeaderMapImpl& headers, bool with_compression,
-                  bool with_trailers) {
+                  bool with_trailers = false) {
     uint64_t buffer_content_size;
     if (!absl::SimpleAtoi(headers.get_("content-length"), &buffer_content_size)) {
       buffer_content_size = 1000;
     }
     populateBuffer(buffer_content_size);
     Http::TestResponseHeaderMapImpl continue_headers;
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-              filter_->encode100ContinueHeaders(continue_headers));
+    EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(continue_headers));
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
     EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
@@ -184,8 +183,36 @@ public:
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 };
 
-// Test if Runtime Feature is Disabled
-TEST_F(CompressorFilterTest, DecodeHeadersWithRuntimeDisabled) {
+enum class PerRouteConfig { None, Empty, Enabled, Disabled };
+
+struct EnablementParams {
+  bool runtime_enabled_;
+  PerRouteConfig per_route_enabled_;
+  bool expect_compression_;
+};
+
+class CompresorFilterEnablementTest : public CompressorFilterTest,
+                                      public testing::WithParamInterface<EnablementParams> {};
+
+INSTANTIATE_TEST_SUITE_P(CompresorFilterEnablementTest, CompresorFilterEnablementTest,
+                         testing::ValuesIn<EnablementParams>(
+                             {// no per-route config, so runtime flag controls
+                              {true, PerRouteConfig::None, true},
+                              {false, PerRouteConfig::None, false},
+                              // empty CompressorPerRoute.overrides, so runtime flag controls
+                              {true, PerRouteConfig::Empty, true},
+                              {false, PerRouteConfig::Empty, false},
+                              // enabled by empty CompressorPerRoute.overrides.
+                              // This must remain true no matter what fields ever get added.
+                              {true, PerRouteConfig::Enabled, true},
+                              {false, PerRouteConfig::Enabled, true},
+                              // disabled by CompressorPerRoute.disabled
+                              {true, PerRouteConfig::Disabled, false},
+                              {false, PerRouteConfig::Disabled, false}}));
+
+// common_config.enabled should enable/disable compression, unless a CompressorPerRoute config
+// overrides it.
+TEST_P(CompresorFilterEnablementTest, DecodeHeadersWithRuntimeDisabled) {
   setUpFilter(R"EOF(
 {
   "response_direction_config": {
@@ -205,13 +232,35 @@ TEST_F(CompressorFilterTest, DecodeHeadersWithRuntimeDisabled) {
 }
 )EOF");
   response_stats_prefix_ = "response.";
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
-      .Times(2)
-      .WillRepeatedly(Return(false));
+  ON_CALL(runtime_.snapshot_, getBoolean("foo_key", true))
+      .WillByDefault(Return(GetParam().runtime_enabled_));
+  CompressorPerRoute per_route_proto;
+  bool use_per_route_proto = true;
+  switch (GetParam().per_route_enabled_) {
+  case PerRouteConfig::None:
+    use_per_route_proto = false;
+    break;
+  case PerRouteConfig::Empty:
+    per_route_proto.mutable_overrides();
+    break;
+  case PerRouteConfig::Enabled:
+    per_route_proto.mutable_overrides()->mutable_response_direction_config();
+    break;
+  case PerRouteConfig::Disabled:
+    per_route_proto.set_disabled(true);
+    break;
+  }
+  std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config;
+  if (use_per_route_proto) {
+    per_route_config = std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+  }
+
   doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
   Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
-  doResponseNoCompression(headers);
-  EXPECT_FALSE(headers.has("vary"));
+  doResponse(headers, GetParam().expect_compression_);
+  EXPECT_EQ(headers.has("vary"), GetParam().expect_compression_);
 }
 
 // Default config values.
@@ -220,8 +269,8 @@ TEST_F(CompressorFilterTest, DefaultConfigValues) {
   EXPECT_EQ(30, config_->requestDirectionConfig().minimumLength());
   EXPECT_EQ(false, config_->responseDirectionConfig().disableOnEtagHeader());
   EXPECT_EQ(false, config_->responseDirectionConfig().removeAcceptEncodingHeader());
-  EXPECT_EQ(18, config_->responseDirectionConfig().contentTypeValues().size());
-  EXPECT_EQ(18, config_->requestDirectionConfig().contentTypeValues().size());
+  EXPECT_EQ(20, config_->responseDirectionConfig().contentTypeValues().size());
+  EXPECT_EQ(20, config_->requestDirectionConfig().contentTypeValues().size());
 }
 
 TEST_F(CompressorFilterTest, CompressRequest) {
@@ -258,28 +307,6 @@ TEST_F(CompressorFilterTest, CompressRequestAndResponseNoContentLength) {
   doRequestCompression({{":method", "post"}, {"accept-encoding", "deflate, test"}}, false);
   Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
   doResponseCompression(headers, false);
-}
-
-TEST_F(CompressorFilterTest, CompressRequestAndResponseNoContentLengthRuntimeDisabled) {
-  setUpFilter(R"EOF(
-{
-  "request_direction_config": {},
-  "response_direction_config": {},
-  "compressor_library": {
-    "name": "test",
-    "typed_config": {
-      "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
-    }
-  }
-}
-)EOF");
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.enable_compression_without_content_length_header", "false"}});
-  response_stats_prefix_ = "response.";
-  doRequestNoCompression({{":method", "get"}, {"accept-encoding", "deflate, test"}});
-  Http::TestResponseHeaderMapImpl headers{{":status", "200"}};
-  doResponseNoCompression(headers);
 }
 
 TEST_F(CompressorFilterTest, CompressRequestWithTrailers) {
@@ -321,6 +348,40 @@ TEST_F(CompressorFilterTest, NoAcceptEncodingHeader) {
   doResponseNoCompression(headers);
   EXPECT_EQ(1, stats_.counter("test.compressor.test.test.no_accept_header").value());
   EXPECT_EQ("Accept-Encoding", headers.get_("vary"));
+}
+
+TEST_F(CompressorFilterTest, NoAcceptEncodingAndMinmunContentLength) {
+  doRequestNoCompression({{":method", "get"}, {}});
+  Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "15"}};
+  doResponseNoCompression(headers);
+  EXPECT_EQ(0, stats_.counter("test.compressor.test.test.no_accept_header").value());
+  EXPECT_EQ("", headers.get_("vary"));
+}
+
+TEST_F(CompressorFilterTest, NoAcceptEncodingAndCompressionDisabled) {
+  setUpFilter(R"EOF(
+{
+  "response_direction_config": {
+    "common_config": {
+      "enabled": {
+        "default_value": false,
+      }
+    }
+  },
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+  response_stats_prefix_ = "response.";
+  doRequestNoCompression({{":method", "get"}, {}});
+  Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
+  doResponseNoCompression(headers);
+  EXPECT_EQ(0, stats_.counter("test.compressor.test.test.no_accept_header").value());
+  EXPECT_EQ("", headers.get_("vary"));
 }
 
 TEST_F(CompressorFilterTest, CacheIdentityDecision) {
@@ -369,6 +430,7 @@ TEST_F(CompressorFilterTest, EmptyResponse) {
 
 // Verify removeAcceptEncoding header.
 TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
+  // Filter true, no response direction overrides. Header is removed.
   {
     Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
     setUpFilter(R"EOF(
@@ -381,9 +443,12 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
   }
 }
 )EOF");
+
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_FALSE(headers.has("accept-encoding"));
   }
+
+  // Filter false, no response direction overrides. Header is present.
   {
     Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
     setUpFilter(R"EOF(
@@ -395,6 +460,169 @@ TEST_F(CompressorFilterTest, RemoveAcceptEncodingHeader) {
   }
 }
 )EOF");
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_TRUE(headers.has("accept-encoding"));
+    EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));
+  }
+
+  // Filter true, response direction overrides present but no override. Header is removed.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "remove_accept_encoding_header": true,
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()->mutable_response_direction_config();
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_FALSE(headers.has("accept-encoding"));
+  }
+
+  // Filter false, response direction overrides present but no override. Header is present.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()->mutable_response_direction_config();
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_TRUE(headers.has("accept-encoding"));
+    EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));
+  }
+
+  // Filter true, per-route override true. Header is removed.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "remove_accept_encoding_header": true,
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()
+        ->mutable_response_direction_config()
+        ->mutable_remove_accept_encoding_header()
+        ->set_value(true);
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_FALSE(headers.has("accept-encoding"));
+  }
+
+  // Filter true, per-route override false. Header is present.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "remove_accept_encoding_header": true,
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()
+        ->mutable_response_direction_config()
+        ->mutable_remove_accept_encoding_header()
+        ->set_value(false);
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_TRUE(headers.has("accept-encoding"));
+    EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));
+  }
+
+  // Filter false, per-route override true. Header is removed.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()
+        ->mutable_response_direction_config()
+        ->mutable_remove_accept_encoding_header()
+        ->set_value(true);
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    EXPECT_FALSE(headers.has("accept-encoding"));
+  }
+
+  // Filter false, per-route override false. Header is present.
+  {
+    Http::TestRequestHeaderMapImpl headers = {{"accept-encoding", "deflate, test, gzip, br"}};
+    setUpFilter(R"EOF(
+{
+  "compressor_library": {
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+    CompressorPerRoute per_route_proto;
+    per_route_proto.mutable_overrides()
+        ->mutable_response_direction_config()
+        ->mutable_remove_accept_encoding_header()
+        ->set_value(false);
+
+    std::unique_ptr<CompressorPerRouteFilterConfig> per_route_config =
+        std::make_unique<CompressorPerRouteFilterConfig>(per_route_proto);
+    ON_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(Return(per_route_config.get()));
+
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
     EXPECT_TRUE(headers.has("accept-encoding"));
     EXPECT_EQ("deflate, test, gzip, br", headers.get_("accept-encoding"));
@@ -701,8 +929,8 @@ protected:
                               compressor);
     auto compressor_factory1 = std::make_unique<TestCompressorFactory>("test1");
     compressor_factory1->setExpectedCompressCalls(0);
-    auto config1 = std::make_shared<CompressorFilterConfig>(compressor, "test1.", stats1_, runtime_,
-                                                            std::move(compressor_factory1));
+    auto config1 = std::make_shared<CompressorFilterConfig>(
+        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1));
     filter1_ = std::make_unique<CompressorFilter>(config1);
 
     TestUtility::loadFromJson(R"EOF(
@@ -718,8 +946,8 @@ protected:
                               compressor);
     auto compressor_factory2 = std::make_unique<TestCompressorFactory>("test2");
     compressor_factory2->setExpectedCompressCalls(0);
-    auto config2 = std::make_shared<CompressorFilterConfig>(compressor, "test2.", stats2_, runtime_,
-                                                            std::move(compressor_factory2));
+    auto config2 = std::make_shared<CompressorFilterConfig>(
+        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2));
     filter2_ = std::make_unique<CompressorFilter>(config2);
   }
 
@@ -801,6 +1029,147 @@ TEST_F(MultipleFiltersTest, UseFirstRegisteredFilterWhenWildcard) {
   EXPECT_EQ(1, stats2_.counter("test2.compressor.test2.test.header_wildcard").value());
 }
 
+// TODO(giantcroc): Refactor the code of MultipleFiltersTest and CompressorFilterTest due to many
+// duplicate methods
+class ChooseFirstTest : public MultipleFiltersTest,
+                        public testing::WithParamInterface<
+                            std::tuple<std::string, std::string, std::string, bool, std::string>> {
+protected:
+  // ChooseFirstTest Helpers
+  void setUpFilter(const std::string& choose_first1, const std::string& choose_first2) {
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor;
+    TestUtility::loadFromJson(fmt::format(R"EOF(
+{{
+  "choose_first": {},
+  "compressor_library": {{
+     "name": "test1",
+     "typed_config": {{
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }}
+  }}
+}}
+)EOF",
+                                          choose_first1),
+                              compressor);
+    auto compressor_factory1 = std::make_unique<TestCompressorFactory>("test1");
+    auto config1 = std::make_shared<CompressorFilterConfig>(
+        compressor, "test1.", *stats1_.rootScope(), runtime_, std::move(compressor_factory1));
+    filter1_ = std::make_unique<CompressorFilter>(config1);
+
+    TestUtility::loadFromJson(fmt::format(R"EOF(
+{{
+  "choose_first": {},
+  "compressor_library": {{
+     "name": "test2",
+     "typed_config": {{
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }}
+  }}
+}}
+)EOF",
+                                          choose_first2),
+                              compressor);
+    auto compressor_factory2 = std::make_unique<TestCompressorFactory>("test2");
+    auto config2 = std::make_shared<CompressorFilterConfig>(
+        compressor, "test2.", *stats2_.rootScope(), runtime_, std::move(compressor_factory2));
+    filter2_ = std::make_unique<CompressorFilter>(config2);
+  }
+
+  void populateBuffer(uint64_t size) {
+    data_.drain(data_.length());
+    TestUtility::feedBufferWithRandomCharacters(data_, size);
+    expected_str_ = data_.toString();
+  }
+
+  void verifyCompressedData() {
+    EXPECT_EQ(expected_str_.length(),
+              stats1_
+                  .counter(fmt::format("test1.compressor.test1.test.{}total_uncompressed_bytes",
+                                       response_stats_prefix_))
+                  .value());
+    EXPECT_EQ(data_.length(),
+              stats1_
+                  .counter(fmt::format("test1.compressor.test1.test.{}total_compressed_bytes",
+                                       response_stats_prefix_))
+                  .value());
+  }
+
+  void doRequest(Http::TestRequestHeaderMapImpl&& headers) {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter1_->decodeHeaders(headers, false));
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter1_->decodeData(data_, false));
+  }
+
+  void doResponse(Http::TestResponseHeaderMapImpl& headers, bool with_compression,
+                  bool with_trailers, const std::string& content_encoding) {
+    uint64_t buffer_content_size;
+    if (!absl::SimpleAtoi(headers.get_("content-length"), &buffer_content_size)) {
+      buffer_content_size = 1000;
+    }
+    populateBuffer(buffer_content_size);
+    Http::TestResponseHeaderMapImpl continue_headers;
+    EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter1_->encode1xxHeaders(continue_headers));
+    Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter1_->encodeMetadata(metadata_map));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter1_->encodeHeaders(headers, false));
+
+    if (with_compression) {
+      EXPECT_EQ("", headers.get_("content-length"));
+      EXPECT_EQ(content_encoding, headers.get_("content-encoding"));
+      EXPECT_EQ(Http::FilterDataStatus::Continue, filter1_->encodeData(data_, !with_trailers));
+      if (with_trailers) {
+        EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
+            .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
+        Http::TestResponseTrailerMapImpl trailers;
+        EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter1_->encodeTrailers(trailers));
+      }
+      verifyCompressedData();
+      EXPECT_EQ(1, stats1_
+                       .counter(fmt::format("test1.compressor.test1.test.{}compressed",
+                                            response_stats_prefix_))
+                       .value());
+    } else {
+      EXPECT_EQ(content_encoding, headers.get_("content-encoding"));
+      EXPECT_EQ(Http::FilterDataStatus::Continue, filter1_->encodeData(data_, false));
+      EXPECT_EQ(1, stats1_
+                       .counter(fmt::format("test1.compressor.test1.test.{}not_compressed",
+                                            response_stats_prefix_))
+                       .value());
+    }
+  }
+
+  Buffer::OwnedImpl data_;
+  std::string expected_str_;
+  std::string response_stats_prefix_{};
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    ChooseFirstTestSuite, ChooseFirstTest,
+    testing::Values(std::make_tuple("true", "false", "test1", true, "test1"),
+                    std::make_tuple("true", "false", "test2, test1", true, "test1"),
+                    std::make_tuple("true", "false", "test2;q=1, test1;q=1", true, "test1"),
+                    std::make_tuple("true", "false", "test2;q=1, test1;q=0.5", false, ""),
+                    std::make_tuple("true", "true", "test2, test1", true, "test1"),
+                    std::make_tuple("true", "true", "test2;q=1, test1;q=0.5", false, "")));
+
+TEST_P(ChooseFirstTest, Validate) {
+  const std::string& choose_first1 = std::get<0>(GetParam());
+  const std::string& choose_first2 = std::get<1>(GetParam());
+  const std::string& accept_encoding = std::get<2>(GetParam());
+  const bool is_compression_expected = std::get<3>(GetParam());
+  const std::string& content_encoding = std::get<4>(GetParam());
+
+  setUpFilter(choose_first1, choose_first2);
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter1_->setDecoderFilterCallbacks(decoder_callbacks);
+  filter1_->setEncoderFilterCallbacks(encoder_callbacks_);
+  filter2_->setDecoderFilterCallbacks(decoder_callbacks);
+
+  doRequest({{":method", "get"}, {"accept-encoding", accept_encoding}});
+  Http::TestResponseHeaderMapImpl headers{{":method", "get"}, {"content-length", "256"}};
+  doResponse(headers, is_compression_expected, false, content_encoding);
+}
+
 TEST(CompressorFilterConfigTests, MakeCompressorTest) {
   const envoy::extensions::filters::http::compressor::v3::Compressor compressor_cfg;
   NiceMock<Runtime::MockLoader> runtime;
@@ -809,7 +1178,7 @@ TEST(CompressorFilterConfigTests, MakeCompressorTest) {
   EXPECT_CALL(*compressor_factory, createCompressor());
   EXPECT_CALL(*compressor_factory, statsPrefix());
   EXPECT_CALL(*compressor_factory, contentEncoding());
-  CompressorFilterConfig config(compressor_cfg, "test.compressor.", stats, runtime,
+  CompressorFilterConfig config(compressor_cfg, "test.compressor.", *stats.rootScope(), runtime,
                                 std::move(compressor_factory));
   Envoy::Compression::Compressor::CompressorPtr compressor = config.makeCompressor();
 }

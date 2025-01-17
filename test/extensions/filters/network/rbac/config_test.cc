@@ -3,12 +3,14 @@
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 
 #include "source/extensions/filters/network/rbac/config.h"
+#include "source/extensions/filters/network/rbac/rbac_filter.h"
 
 #include "test/mocks/server/factory_context.h"
 
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "xds/type/matcher/v3/matcher.pb.h"
 
 using testing::_;
 using testing::NiceMock;
@@ -23,6 +25,9 @@ const std::string header = R"EOF(
 { "header": {"name": "key", "exact_match": "value"} }
 )EOF";
 
+constexpr absl::string_view header_key = "key";
+constexpr absl::string_view header_value = "value";
+
 } // namespace
 
 class RoleBasedAccessControlNetworkFilterConfigFactoryTest : public testing::Test {
@@ -30,6 +35,8 @@ public:
   void validateRule(const std::string& policy_json) {
     checkRule(fmt::sprintf(policy_json, header));
   }
+
+  void validateMatcher(const std::string& matcher_yaml) { checkMatcher(matcher_yaml); }
 
 private:
   void checkRule(const std::string& policy_json) {
@@ -42,11 +49,36 @@ private:
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
     RoleBasedAccessControlNetworkFilterConfigFactory factory;
-    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), Envoy::EnvoyException);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context).IgnoreError(),
+                 Envoy::EnvoyException);
 
     config.clear_rules();
     (*config.mutable_shadow_rules()->mutable_policies())["foo"] = policy_proto;
-    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context), Envoy::EnvoyException);
+    EXPECT_THROW(factory.createFilterFactoryFromProto(config, context).IgnoreError(),
+                 Envoy::EnvoyException);
+  }
+
+  void checkMatcher(const std::string& matcher_yaml) {
+    xds::type::matcher::v3::Matcher matcher_proto{};
+    TestUtility::loadFromYaml(matcher_yaml, matcher_proto);
+
+    envoy::extensions::filters::network::rbac::v3::RBAC config{};
+    config.set_stat_prefix("test");
+    *config.mutable_matcher() = matcher_proto;
+
+    Stats::IsolatedStoreImpl store;
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+    EXPECT_THROW(
+        std::make_shared<RoleBasedAccessControlFilterConfig>(
+            config, *store.rootScope(), context, ProtobufMessage::getStrictValidationVisitor()),
+        Envoy::EnvoyException);
+
+    config.clear_matcher();
+    *config.mutable_shadow_matcher() = matcher_proto;
+    EXPECT_THROW(
+        std::make_shared<RoleBasedAccessControlFilterConfig>(
+            config, *store.rootScope(), context, ProtobufMessage::getStrictValidationVisitor()),
+        Envoy::EnvoyException);
   }
 };
 
@@ -60,7 +92,28 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidProto) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   RoleBasedAccessControlNetworkFilterConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context).value();
+  Network::MockConnection connection;
+  EXPECT_CALL(connection, addReadFilter(_));
+  cb(connection);
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, ValidMatcherProto) {
+  envoy::config::rbac::v3::Action action;
+  action.set_name("foo");
+  action.set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+
+  xds::type::matcher::v3::Matcher matcher;
+  auto matcher_action = matcher.mutable_on_no_match()->mutable_action();
+  matcher_action->set_name("action");
+  matcher_action->mutable_typed_config()->PackFrom(action);
+  envoy::extensions::filters::network::rbac::v3::RBAC config;
+  config.set_stat_prefix("stats");
+  *config.mutable_matcher() = matcher;
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  RoleBasedAccessControlNetworkFilterConfigFactory factory;
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context).value();
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
@@ -130,6 +183,44 @@ TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, InvalidPrincipal) {
   "permissions": [ { "any": true } ]
 }
 )EOF");
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterConfigFactoryTest, InvalidMatcher) {
+  validateMatcher(fmt::format(R"EOF(
+matcher_tree:
+  input:
+    name: source-ip
+    typed_config:
+      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+      header_name: {}
+  exact_match_map:
+    map:
+      "{}":
+        action:
+          name: action
+          typed_config:
+            '@type': type.googleapis.com/envoy.config.rbac.v3.Action
+            name: deny
+)EOF",
+                              header_key, header_value));
+
+  validateMatcher(fmt::format(R"EOF(
+matcher_tree:
+  input:
+    name: source-ip
+    typed_config:
+      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput
+      header_name: {}
+  exact_match_map:
+    map:
+      "{}":
+        action:
+          name: action
+          typed_config:
+            '@type': type.googleapis.com/envoy.config.rbac.v3.Action
+            name: deny
+)EOF",
+                              header_key, header_value));
 }
 
 } // namespace RBACFilter

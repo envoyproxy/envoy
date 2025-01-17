@@ -3,8 +3,8 @@
 Tap
 ===
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.tap.v3.Tap>`
-* This filter should be configured with the name *envoy.filters.http.tap*.
 
 .. attention::
 
@@ -199,10 +199,13 @@ An example of a streaming admin tap configuration that uses the :ref:`JSON_BODY_
         - format: JSON_BODY_AS_STRING
           streaming_admin: {}
 
-Buffered body limits
---------------------
+Buffering Data
+--------------
 
-For buffered taps, Envoy will limit the amount of body data that is tapped to avoid OOM situations.
+Buffering data in tap requests can be done at two levels of granularity - buffering individual traces (downstream request & upstream response bodies) or buffering a set of traces.
+Both levels of granularity have separate controls to limit the amount of data buffered.
+
+When buffering individual traces, Envoy will limit the amount of body data that is tapped to avoid exhausting server memory.
 The default limit is 1KiB for both received (request) and transmitted (response) data. This is
 configurable via the :ref:`max_buffered_rx_bytes
 <envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_rx_bytes>` and
@@ -210,6 +213,27 @@ configurable via the :ref:`max_buffered_rx_bytes
 <envoy_v3_api_field_config.tap.v3.OutputConfig.max_buffered_tx_bytes>` settings.
 
 .. _config_http_filters_tap_streaming:
+
+Envoy also supports buffering multiple traces internally via the ``buffered_admin`` sink type.
+This form of buffering is particularly useful for taps specifying a match configuration that is satisfied frequently.
+The post body using a buffered admin sink should specify ``max_traces`` which is the number of traces to buffer,
+and can optionally specify a ``timeout`` in seconds (Protobuf Duration), which is the maximum time the server
+should wait to accumulate ``max_traces`` before flushing the traces buffered so far to the client. Each individual
+buffered trace also adheres to the single trace buffer limits from above. This buffering behavior can also be implemented client side but
+requires non-trivial code for interpreting trace streams as they are not delimited.
+An example of a buffered admin tap configuration:
+
+.. code-block:: yaml
+
+  config_id: test_config_id
+  tap_config:
+    match_config:
+      any_match: true
+    output_config:
+      sinks:
+        - buffered_admin:
+            max_traces: 3
+            timeout: 0.2s
 
 Streaming matching
 ------------------
@@ -283,7 +307,7 @@ Etc.
 Statistics
 ----------
 
-The tap filter outputs statistics in the *http.<stat_prefix>.tap.* namespace. The :ref:`stat prefix
+The tap filter outputs statistics in the ``http.<stat_prefix>.tap.`` namespace. The :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
 comes from the owning HTTP connection manager.
 

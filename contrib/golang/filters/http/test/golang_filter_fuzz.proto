@@ -1,0 +1,11 @@
+syntax = "proto3";
+package envoy.extensions.filters.http.golang;
+
+import "test/fuzz/common.proto";
+import "validate/validate.proto";
+
+// We only fuzz a single request per iteration.
+message GolangFilterTestCase {
+  // HTTP request data.
+  test.fuzz.HttpData request_data = 1 [(validate.rules).message = {required: true}];
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -9,8 +10,10 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/protobuf/message_validator.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "xds/type/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
 
@@ -21,6 +24,18 @@ class ServerFactoryContext;
 } // namespace Server
 
 namespace Matcher {
+
+// Abstract interface for custom matching data.
+// Overrides this interface to provide custom matcher specific implementation.
+class CustomMatchData {
+public:
+  virtual ~CustomMatchData() = default;
+};
+
+using MatchingDataType =
+    absl::variant<absl::monostate, std::string, std::shared_ptr<CustomMatchData>>;
+
+inline constexpr absl::string_view DefaultMatchingDataType = "string";
 
 // This file describes a MatchTree<DataType>, which traverses a tree of matches until it
 // either matches (resulting in either an action or a new tree to traverse) or doesn't match.
@@ -49,6 +64,8 @@ namespace Matcher {
 template <class DataType> class MatchTree;
 
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;
+template <class DataType> using MatchTreePtr = std::unique_ptr<MatchTree<DataType>>;
+template <class DataType> using MatchTreeFactoryCb = std::function<MatchTreePtr<DataType>()>;
 
 /**
  * Action provides the interface for actions to perform when a match occurs. It provides no
@@ -90,6 +107,21 @@ public:
 template <class DataType> struct OnMatch {
   const ActionFactoryCb action_cb_;
   const MatchTreeSharedPtr<DataType> matcher_;
+};
+template <class DataType> using OnMatchFactoryCb = std::function<OnMatch<DataType>()>;
+
+template <class DataType> class OnMatchFactory {
+public:
+  virtual ~OnMatchFactory() = default;
+
+  // Instantiates a nested matcher sub-tree or an action.
+  // Returns absl::nullopt if neither sub-tree or action is specified.
+  virtual absl::optional<OnMatchFactoryCb<DataType>>
+  createOnMatch(const xds::type::matcher::v3::Matcher::OnMatch&) PURE;
+  // Instantiates a nested matcher sub-tree or an action.
+  // Returns absl::nullopt if neither sub-tree or action is specified.
+  virtual absl::optional<OnMatchFactoryCb<DataType>>
+  createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch&) PURE;
 };
 
 /**
@@ -140,10 +172,22 @@ public:
 
   /**
    * Whether the provided input is a match.
-   * @param absl::optional<absl::string_view> the value to match on. Will be absl::nullopt if the
+   * @param Matcher::MatchingDataType the value to match on. Will be absl::monostate() if the
    * lookup failed.
    */
-  virtual bool match(absl::optional<absl::string_view> input) PURE;
+  virtual bool match(const Matcher::MatchingDataType& input) PURE;
+
+  /**
+   * A set of data input types supported by InputMatcher.
+   * String is default supported data input type because almost all the derived objects support
+   * string only. The name of core types (e.g., std::string, int) is defined string constrant which
+   * produces human-readable form (e.g., "string", "int").
+   *
+   * Override this function to provide matcher specific supported data input types.
+   */
+  virtual absl::flat_hash_set<std::string> supportedDataInputTypes() const {
+    return absl::flat_hash_set<std::string>{std::string(DefaultMatchingDataType)};
+  }
 };
 
 using InputMatcherPtr = std::unique_ptr<InputMatcher>;
@@ -180,16 +224,20 @@ struct DataInputGetResult {
   };
 
   DataAvailability data_availability_;
-  // The resulting data. This will be absl::nullopt if we don't have sufficient data available (as
-  // per data_availability_) or because no value was extracted. For example, consider a DataInput
-  // which attempts to look a key up in the map: if we don't have access to the map yet, we return
-  // absl::nullopt with NotAvailable. If we have the entire map, but the key doesn't exist in the
-  // map, we return absl::nullopt with AllDataAvailable.
-  absl::optional<std::string> data_;
+  // The resulting data. This will be absl::monostate() if we don't have sufficient data available
+  // (as per data_availability_) or because no value was extracted. For example, consider a
+  // DataInput which attempts to look a key up in the map: if we don't have access to the map yet,
+  // we return absl::monostate() with NotAvailable. If we have the entire map, but the key doesn't
+  // exist in the map, we return absl::monostate() with AllDataAvailable.
+  MatchingDataType data_;
 
   // For pretty printing.
   friend std::ostream& operator<<(std::ostream& out, const DataInputGetResult& result) {
-    out << "data input: " << (result.data_ ? result.data_.value() : "n/a");
+    out << "data input: "
+        << (absl::holds_alternative<std::string>(result.data_)
+                ? absl::get<std::string>(result.data_)
+                : "n/a");
+
     switch (result.data_availability_) {
     case DataInputGetResult::DataAvailability::NotAvailable:
       out << " (not available)";
@@ -212,6 +260,16 @@ public:
   virtual ~DataInput() = default;
 
   virtual DataInputGetResult get(const DataType& data) const PURE;
+
+  /**
+   * Input type of DataInput.
+   * String is default data input type since nearly all the DataInput's derived objects' input type
+   * is string. The name of core types (e.g., std::string, int) is defined string constrant which
+   * produces human-readable form (e.g., "string", "int").
+   *
+   * Override this function to provide matcher specific data input type.
+   */
+  virtual absl::string_view dataInputType() const { return DefaultMatchingDataType; }
 };
 
 template <class DataType> using DataInputPtr = std::unique_ptr<DataInput<DataType>>;
@@ -248,7 +306,7 @@ public:
 class CommonProtocolInput {
 public:
   virtual ~CommonProtocolInput() = default;
-  virtual absl::optional<std::string> get() PURE;
+  virtual MatchingDataType get() PURE;
 };
 using CommonProtocolInputPtr = std::unique_ptr<CommonProtocolInput>;
 using CommonProtocolInputFactoryCb = std::function<CommonProtocolInputPtr()>;
@@ -268,5 +326,30 @@ public:
   std::string category() const override { return "envoy.matching.common_inputs"; }
 };
 
+/**
+ * Factory for registering custom matchers.
+ */
+template <class DataType> class CustomMatcherFactory : public Config::TypedFactory {
+public:
+  virtual MatchTreeFactoryCb<DataType>
+  createCustomMatcherFactoryCb(const Protobuf::Message& config,
+                               Server::Configuration::ServerFactoryContext& factory_context,
+                               DataInputFactoryCb<DataType> data_input,
+                               absl::optional<OnMatchFactoryCb<DataType>> on_no_match,
+                               OnMatchFactory<DataType>& on_match_factory) PURE;
+  std::string category() const override {
+    // Static assert to guide implementors to understand what is required.
+    static_assert(std::is_convertible<absl::string_view, decltype(DataType::name())>(),
+                  "DataType must implement valid name() function");
+    return fmt::format("envoy.matching.{}.custom_matchers", DataType::name());
+  }
+};
+
 } // namespace Matcher
 } // namespace Envoy
+
+// NOLINT(namespace-envoy)
+namespace fmt {
+// Allow fmtlib to use operator << defined in DataInputGetResult
+template <> struct formatter<::Envoy::Matcher::DataInputGetResult> : ostream_formatter {};
+} // namespace fmt

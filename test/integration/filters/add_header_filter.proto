@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+import "validate/validate.proto";
+
+message AddHeaderFilterConfig {
+  string header_key = 1 [(validate.rules).string = {min_len: 1}];
+  // Minimum length of 2 is applied for cases that test configuration
+  // update failure when the validation requirement is not met.
+  string header_value = 2 [(validate.rules).string = {min_len: 2}];
+}

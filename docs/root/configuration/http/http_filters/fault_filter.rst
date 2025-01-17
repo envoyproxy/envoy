@@ -24,8 +24,8 @@ Configuration
   The fault injection filter must be inserted before any other filter,
   including the router filter.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.fault.v3.HTTPFault>`
-* This filter should be configured with the name *envoy.filters.http.fault*.
 
 .. _config_http_filters_fault_injection_http_header:
 
@@ -210,7 +210,7 @@ which defaults to the config settings.
 Statistics
 ----------
 
-The fault filter outputs statistics in the *http.<stat_prefix>.fault.* namespace. The :ref:`stat prefix
+The fault filter outputs statistics in the ``http.<stat_prefix>.fault.`` namespace. The :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
 owning HTTP connection manager.
 

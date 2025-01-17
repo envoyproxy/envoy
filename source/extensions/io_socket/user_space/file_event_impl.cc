@@ -14,7 +14,7 @@ FileEventImpl::FileEventImpl(Event::Dispatcher& dispatcher, Event::FileReadyCb c
         auto ephemeral_events = event_listener_.getAndClearEphemeralEvents();
         ENVOY_LOG(trace, "User space event {} invokes callbacks on events = {}",
                   static_cast<void*>(this), ephemeral_events);
-        cb(ephemeral_events);
+        THROW_IF_NOT_OK(cb(ephemeral_events));
       })),
       io_source_(io_source) {
   setEnabled(events);
@@ -57,8 +57,8 @@ void FileEventImpl::setEnabled(uint32_t events) {
   }
   ENVOY_LOG(
       trace,
-      "User space file event {} set enabled events {} and events {} is active. Will {} reschedule.",
-      static_cast<void*>(this), events, was_enabled ? "not " : "");
+      "User space file event {} set enabled events {} and events {} is active. Will {}reschedule.",
+      static_cast<void*>(this), events, events_to_notify, was_enabled ? "not " : "");
 }
 
 void FileEventImpl::activateIfEnabled(uint32_t events) {

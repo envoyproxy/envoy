@@ -1,0 +1,13 @@
+date: July 13, 2023
+
+bug_fixes:
+- area: dependency
+  change: |
+    update gRPC -> 1.49.0 to resolve:
+
+    - `CVE-2023-1428 <https://nvd.nist.gov/vuln/detail/CVE-2023-1428>`_.
+    - `CVE-2023-32731 <https://nvd.nist.gov/vuln/detail/CVE-2023-32731>`_.
+- area: http2
+  change: |
+    Fix memory leak in nghttp2 when scheduled requests are cancelled due to the ``GOAWAY`` frame being received from the
+    upstream service. Fix `CVE-2023-35945 <https://nvd.nist.gov/vuln/detail/CVE-2023-35945>`_..

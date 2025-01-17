@@ -168,7 +168,10 @@ uint32_t GradientController::calculateNewLimit() {
   const auto buffered_min_rtt = min_rtt_.count() + min_rtt_.count() * config_.minRTTBufferPercent();
   const double raw_gradient = static_cast<double>(buffered_min_rtt) / sample_rtt_.count();
   const double gradient = std::max<double>(0.5, std::min<double>(2.0, raw_gradient));
-  stats_.gradient_.set(gradient);
+
+  // Scale the value by 1000 when reporting it to maintain the granularity of its details
+  // See: https://github.com/envoyproxy/envoy/issues/31695
+  stats_.gradient_.set(gradient * 1000);
 
   const double limit = concurrencyLimit() * gradient;
   const double burst_headroom = sqrt(limit);

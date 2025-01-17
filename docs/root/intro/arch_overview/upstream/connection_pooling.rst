@@ -50,32 +50,71 @@ pool will drain the affected connection. Once a connection reaches its :ref:`max
 stream limit <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.max_concurrent_streams>`, it
 will be marked as busy until a stream is available. New connections are established anytime there is
 a pending request without a connection that can be dispatched to (up to circuit breaker limits for
-connections). HTTP/3 upstream support is currently only usable in situations where HTTP/3 is guaranteed
-to work, but automatic failover to TCP is coming soon!.
+connections).
 
 Automatic protocol selection
 ----------------------------
 
 For Envoy acting as a forward proxy, the preferred configuration is the
-`AutoHttpConfig <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig>`
+:ref:`AutoHttpConfig <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig>`
 , configued via
-`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
+:ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
 By default it will use TCP and ALPN to select the best available protocol of HTTP/2 and HTTP/1.1.
 
-.. _arch_overview_http3_upstream:
+.. _arch_overview_http3_pooling_upstream:
 
-If HTTP/3 is configured in the automatic pool it will currently attempt an QUIC connection first,
+For auto-http with HTTP/3, an alternate protocol cache must be configured via
+:ref:`alternate_protocols_cache_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig.alternate_protocols_cache_options>`.  HTTP/3 connections will only be attempted to servers which
+advertise HTTP/3 support either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_, (eventually
+the `HTTPS DNS resource record <https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>`_ or "QUIC hints"
+which will be manually configured).
+If no such advertisement exists, then HTTP/2 or HTTP/1 will be used instead.
+
+When HTTP/3 is attempted, Envoy will currently attempt an QUIC connection first,
 then 300ms later, if a QUIC connection is not established, will also attempt to establish a TCP connection.
 Whichever handshake succeeds will be used for the initial
 stream, but if both TCP and QUIC connections are established, QUIC will eventually be preferred.
 
-Upcoming versions of HTTP/3 support will include only selecting HTTP/3 if the upstream advertises support
-either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_,
-`HTTPS DNS RR <https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>`_, or "QUIC hints" which
-will be manually configured. This path is alpha and rapidly undergoing improvements with the goal of having
-the default behavior result in optimal latency for internet environments, so please be patient and follow along with Envoy release notes
-to stay aprised of the latest and greatest changes.
+Further as HTTP/3 runs over QUIC (which uses UDP) and not over TCP (which HTTP/1 and HTTP/2 use).
+It is not uncommon for network devices to block UDP traffic, and hence block HTTP/3. This
+means that upstream HTTP/3 connection attempts might be blocked by the network and will fall
+back to using HTTP/2 or HTTP/1.  This code path is still considered alpha until it has significant
+production burn time, but is considered ready for use.
 
+.. _arch_overview_happy_eyeballs:
+
+Happy Eyeballs Support
+----------------------
+
+Envoy supports Happy Eyeballs, `RFC8305 <https://tools.ietf.org/html/rfc8305>`_,
+for upstream TCP connections. For clusters which use
+:ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
+this behavior is configured by setting the DNS IP address resolution policy in
+:ref:`config.cluster.v3.Cluster.DnsLookupFamily <envoy_v3_api_enum_config.cluster.v3.Cluster.DnsLookupFamily>`
+to the :ref:`ALL <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.ALL>` option to return
+both IPv4 and IPv6 addresses. For clusters which use
+:ref:`EDS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.EDS>`, this behavior is configured
+by specifying additional IP addresses for a host using the
+:ref:`additional_addresses <envoy_v3_api_field_config.endpoint.v3.Endpoint.additional_addresses>` field.
+The addresses specified in this field will be appended in a list to the one specified in
+:ref:`address <envoy_v3_api_field_config.endpoint.v3.Endpoint.address>`
+
+The list of all addresses will be sorted according the the Happy Eyeballs
+specification and a connection will be attempted to the first in the list. If this connection succeeds,
+it will be used. If it fails, an attempt will be made to the next on the list. If after 300ms the connection
+is still connecting, then a backup connection attempt will be made to the next address on the list.
+
+Eventually an attempt will succeed to one of the addresses in which case that connection will be used, or else
+all attempts will fail in which case a connection error will be reported.
+
+HTTP/3 has limited Happy-Eyeballs-like support.
+When using ref:`auto_config <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>`
+for HTTP/3 with TCP-failover, Envoy will make a best-effort attempt to try two address families. As with TCP
+Happy Eyeballs support, Envoy allows 300ms for the first HTTP/3 attempt to connect. If the connection explicitly
+fails or the 300ms timeout expires, if DNS resolution results in the first two resolved addresses being of
+different address families, a second HTTP/3 connection pool using the second address will be created and Envoy
+will attempt to establish an HTTP/3 connection using the alternate address family. In this case HTTP/3 will only
+be marked broken if TCP connectivity is established and both HTTP/3 connections fail.
 
 .. _arch_overview_conn_pool_how_many:
 
@@ -90,6 +129,8 @@ connection pools are also allocated for each of the following features:
 * :ref:`Routing priority <arch_overview_http_routing_priority>`
 * :ref:`Socket options <envoy_v3_api_field_config.core.v3.BindConfig.socket_options>`
 * :ref:`Transport socket (e.g. TLS) options <envoy_v3_api_msg_config.core.v3.TransportSocket>`
+* Downstream :ref:`filter state objects <arch_overview_advanced_filter_state_sharing>` that are hashable
+  and marked as shared with the upstream connection.
 
 Each worker thread maintains its own connection pools for each cluster, so if an Envoy has two
 threads and a cluster with both HTTP/1 and HTTP/2 support, there will be at least 4 connection pools.

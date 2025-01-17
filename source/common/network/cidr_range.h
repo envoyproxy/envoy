@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -7,6 +8,8 @@
 #include "envoy/network/address.h"
 
 #include "source/common/protobuf/protobuf.h"
+
+#include "xds/core/v3/cidr.pb.h"
 
 namespace Envoy {
 namespace Network {
@@ -25,10 +28,8 @@ public:
    */
   CidrRange();
 
-  /**
-   * Copies an existing CidrRange.
-   */
-  CidrRange(const CidrRange& other);
+  CidrRange(const CidrRange& other) = default;
+  CidrRange(CidrRange&& other) = default;
 
   /**
    * Overwrites this with other.
@@ -67,37 +68,34 @@ public:
   std::string asString() const;
 
   /**
-   * @return true if this instance is valid; address != nullptr && length is appropriate for the
-   *         IP version (these are checked during construction, and reduced down to a check of
-   *         the length).
-   */
-  bool isValid() const { return length_ >= 0; }
-
-  /**
-   * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    * @return a CidrRange instance with the specified address and length, modified so that the only
    *         bits that might be non-zero are in the high-order length bits, and so that length is
    *         in the appropriate range (0 to 32 for IPv4, 0 to 128 for IPv6). If the address or
    *         length is invalid, then the range will be invalid (i.e. length == -1).
    */
-  static CidrRange create(InstanceConstSharedPtr address, int length);
-  static CidrRange create(const std::string& address, int length);
+  static absl::StatusOr<CidrRange>
+  create(InstanceConstSharedPtr address, int length,
+         absl::optional<absl::string_view> original_address_str = "");
+  static absl::StatusOr<CidrRange> create(const std::string& address, int length);
 
   /**
    * Constructs an CidrRange from a string with this format (same as returned
    * by CidrRange::asString above):
    *      <address>/<length>    e.g. "10.240.0.0/16" or "1234:5678::/64"
-   * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    * @return a CidrRange instance with the specified address and length if parsed successfully,
    *         else with no address and a length of -1.
    */
-  static CidrRange create(const std::string& range);
+  static absl::StatusOr<CidrRange> create(const std::string& range);
 
   /**
    * Constructs a CidrRange from envoy::config::core::v3::CidrRange.
-   * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    */
-  static CidrRange create(const envoy::config::core::v3::CidrRange& cidr);
+  static absl::StatusOr<CidrRange> create(const envoy::config::core::v3::CidrRange& cidr);
+
+  /**
+   * Constructs a CidrRange from xds::core::v3::CidrRange.
+   */
+  static absl::StatusOr<CidrRange> create(const xds::core::v3::CidrRange& cidr);
 
   /**
    * Given an IP address and a length of high order bits to keep, returns an address
@@ -113,6 +111,13 @@ public:
                                                            int* length_io);
 
 private:
+  /**
+   * @return true if this instance is valid; address != nullptr && length is appropriate for the
+   *         IP version (these are checked during construction, and reduced down to a check of
+   *         the length).
+   */
+  bool isValid() const { return length_ >= 0; }
+
   CidrRange(InstanceConstSharedPtr address, int length);
 
   InstanceConstSharedPtr address_;
@@ -125,14 +130,22 @@ private:
  */
 class IpList {
 public:
-  explicit IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs);
+  static absl::StatusOr<std::unique_ptr<IpList>>
+  create(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs);
+  static absl::StatusOr<std::unique_ptr<IpList>>
+  create(const Protobuf::RepeatedPtrField<xds::core::v3::CidrRange>& cidrs);
+
   IpList() = default;
 
   bool contains(const Instance& address) const;
-  bool empty() const { return ip_list_.empty(); }
+  size_t getIpListSize() const { return ip_list_.size(); };
+  const std::string& error() const { return error_; }
 
 private:
+  IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs);
+  IpList(const Protobuf::RepeatedPtrField<xds::core::v3::CidrRange>& cidrs);
   std::vector<CidrRange> ip_list_;
+  std::string error_;
 };
 
 } // namespace Address

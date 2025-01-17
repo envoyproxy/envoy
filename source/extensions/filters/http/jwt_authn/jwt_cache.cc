@@ -23,9 +23,10 @@ public:
       : time_source_(time_source) {
     if (enable_cache) {
       // if cache_size is 0, it is not specified in the config, use default
-      cache_size_ = config.jwt_cache_size() == 0 ? kJwtCacheDefaultSize : config.jwt_cache_size();
+      auto cache_size =
+          config.jwt_cache_size() == 0 ? kJwtCacheDefaultSize : config.jwt_cache_size();
       jwt_lru_cache_ =
-          std::make_unique<SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>>(cache_size_);
+          std::make_unique<SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>>(cache_size);
     }
   }
 
@@ -39,19 +40,19 @@ public:
     if (!jwt_lru_cache_) {
       return nullptr;
     }
-    ::google::jwt_verify::Jwt* found_jwt{};
     SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>::ScopedLookup lookup(
         jwt_lru_cache_.get(), token);
     if (lookup.found()) {
-      found_jwt = lookup.value();
+      ::google::jwt_verify::Jwt* const found_jwt = lookup.value();
       ASSERT(found_jwt != nullptr);
-      if (found_jwt->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) ==
+      if (found_jwt->verifyTimeConstraint(DateUtil::nowToSeconds(time_source_)) !=
           ::google::jwt_verify::Status::JwtExpired) {
+        return found_jwt;
+      } else {
         jwt_lru_cache_->remove(token);
-        found_jwt = nullptr;
       }
     }
-    return found_jwt;
+    return nullptr;
   }
 
   void insert(const std::string& token, std::unique_ptr<::google::jwt_verify::Jwt>&& jwt) override {
@@ -64,7 +65,6 @@ public:
 private:
   std::unique_ptr<SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>> jwt_lru_cache_;
   TimeSource& time_source_;
-  int cache_size_{};
 };
 } // namespace
 

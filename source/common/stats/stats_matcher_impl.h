@@ -8,7 +8,7 @@
 
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/strings/string_view.h"
 
@@ -20,8 +20,8 @@ namespace Stats {
  */
 class StatsMatcherImpl : public StatsMatcher {
 public:
-  StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig& config,
-                   SymbolTable& symbol_table);
+  StatsMatcherImpl(const envoy::config::metrics::v3::StatsConfig& config, SymbolTable& symbol_table,
+                   Server::Configuration::CommonFactoryContext& context);
 
   // Default constructor simply allows everything.
   StatsMatcherImpl() = default;

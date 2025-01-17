@@ -12,18 +12,65 @@ namespace Envoy {
 class SocketInterfaceSwap {
 public:
   // Object of this class hold the state determining the IoHandle which
-  // should return EAGAIN from the `writev` call.
+  // should return the supplied return from the `writev` or `sendmsg` calls.
   struct IoHandleMatcher {
-    bool shouldReturnEgain(Envoy::Network::TestIoSocketHandle* io_handle) {
+    explicit IoHandleMatcher(Network::Socket::Type type) : socket_type_(type) {}
+
+    Api::IoErrorPtr
+    returnOverride(Envoy::Network::TestIoSocketHandle* io_handle,
+                   Network::Address::InstanceConstSharedPtr& peer_address_override_out) {
       absl::MutexLock lock(&mutex_);
-      if (writev_returns_egain_ && (io_handle->localAddress()->ip()->port() == src_port_ ||
-                                    io_handle->peerAddress()->ip()->port() == dst_port_)) {
+      if (absl::StatusOr<Network::Address::InstanceConstSharedPtr> addr = io_handle->localAddress();
+          socket_type_ == io_handle->getSocketType() && error_ &&
+          ((addr.ok() && (*addr)->ip()->port() == src_port_) ||
+           (dst_port_ && (*io_handle->peerAddress())->ip()->port() == dst_port_))) {
         ASSERT(matched_iohandle_ == nullptr || matched_iohandle_ == io_handle,
                "Matched multiple io_handles, expected at most one to match.");
         matched_iohandle_ = io_handle;
-        return true;
+        return (error_->getSystemErrorCode() == EAGAIN)
+                   ? Envoy::Network::IoSocketError::getIoSocketEagainError()
+                   : Envoy::Network::IoSocketError::create(error_->getSystemErrorCode());
       }
-      return false;
+
+      if (orig_dnat_address_ != nullptr && *orig_dnat_address_ == **io_handle->peerAddress()) {
+        ASSERT(translated_dnat_address_ != nullptr);
+        peer_address_override_out = translated_dnat_address_;
+      }
+
+      return Api::IoError::none();
+    }
+
+    Api::IoErrorPtr
+    returnConnectOverride(Envoy::Network::TestIoSocketHandle* io_handle,
+                          Network::Address::InstanceConstSharedPtr& peer_address_override_out) {
+      absl::MutexLock lock(&mutex_);
+      if (absl::StatusOr<Network::Address::InstanceConstSharedPtr> addr = io_handle->localAddress();
+          block_connect_ && socket_type_ == io_handle->getSocketType() &&
+          ((addr.ok() && (*addr)->ip()->port() == src_port_) ||
+           (dst_port_ && (*io_handle->peerAddress())->ip()->port() == dst_port_))) {
+        return Network::IoSocketError::getIoSocketEagainError();
+      }
+
+      if (orig_dnat_address_ != nullptr && peer_address_override_out != nullptr &&
+          *orig_dnat_address_ == *peer_address_override_out) {
+        ASSERT(translated_dnat_address_ != nullptr);
+        peer_address_override_out = translated_dnat_address_;
+      }
+
+      return Api::IoError::none();
+    }
+
+    void readOverride(Network::IoHandle::RecvMsgOutput& output) {
+      absl::MutexLock lock(&mutex_);
+      if (translated_dnat_address_ != nullptr) {
+        for (auto& pkt : output.msg_) {
+          // Reverse DNAT when receiving packets.
+          if (pkt.peer_address_ != nullptr && *pkt.peer_address_ == *translated_dnat_address_) {
+            ASSERT(orig_dnat_address_ != nullptr);
+            pkt.peer_address_ = orig_dnat_address_;
+          }
+        }
+      }
     }
 
     // Source port to match. The port specified should be associated with a listener.
@@ -40,10 +87,28 @@ public:
       dst_port_ = port;
     }
 
-    void setWritevReturnsEgain() {
+    void setWriteReturnsEgain() {
+      setWriteOverride(Network::IoSocketError::getIoSocketEagainError());
+    }
+
+    // The caller is responsible for memory management.
+    void setWriteOverride(Api::IoErrorPtr error) {
       absl::WriterMutexLock lock(&mutex_);
       ASSERT(src_port_ != 0 || dst_port_ != 0);
-      writev_returns_egain_ = true;
+      error_ = std::move(error);
+    }
+
+    void setConnectBlock(bool block) {
+      absl::WriterMutexLock lock(&mutex_);
+      ASSERT(src_port_ != 0 || dst_port_ != 0);
+      block_connect_ = block;
+    }
+
+    void setDnat(Network::Address::InstanceConstSharedPtr orig_address,
+                 Network::Address::InstanceConstSharedPtr translated_address) {
+      absl::WriterMutexLock lock(&mutex_);
+      orig_dnat_address_ = orig_address;
+      translated_dnat_address_ = translated_address;
     }
 
     void setResumeWrites();
@@ -52,22 +117,18 @@ public:
     mutable absl::Mutex mutex_;
     uint32_t src_port_ ABSL_GUARDED_BY(mutex_) = 0;
     uint32_t dst_port_ ABSL_GUARDED_BY(mutex_) = 0;
-    bool writev_returns_egain_ ABSL_GUARDED_BY(mutex_) = false;
+    Api::IoErrorPtr error_ ABSL_GUARDED_BY(mutex_) = Api::IoError::none();
     Network::TestIoSocketHandle* matched_iohandle_{};
+    Network::Socket::Type socket_type_;
+    bool block_connect_ ABSL_GUARDED_BY(mutex_) = false;
+    Network::Address::InstanceConstSharedPtr orig_dnat_address_ ABSL_GUARDED_BY(mutex_);
+    Network::Address::InstanceConstSharedPtr translated_dnat_address_ ABSL_GUARDED_BY(mutex_);
   };
 
-  SocketInterfaceSwap();
+  explicit SocketInterfaceSwap(Network::Socket::Type socket_type);
 
-  ~SocketInterfaceSwap() {
-    test_socket_interface_loader_.reset();
-    Envoy::Network::SocketInterfaceSingleton::initialize(previous_socket_interface_);
-  }
-
-protected:
-  Envoy::Network::SocketInterface* const previous_socket_interface_{
-      Envoy::Network::SocketInterfaceSingleton::getExisting()};
-  std::shared_ptr<IoHandleMatcher> writev_matcher_{std::make_shared<IoHandleMatcher>()};
-  std::unique_ptr<Envoy::Network::SocketInterfaceLoader> test_socket_interface_loader_;
+  std::shared_ptr<IoHandleMatcher> write_matcher_;
+  StackedScopedInjectableLoaderForTest<Network::SocketInterface> test_socket_interface_loader_;
 };
 
 } // namespace Envoy

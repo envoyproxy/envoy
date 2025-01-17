@@ -1,14 +1,16 @@
 #pragma once
 
-#include <http_parser.h>
-
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/codec.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/http1/balsa_parser.h"
+#include "source/common/http/http1/legacy_parser_impl.h"
+#include "source/common/http/http1/parser.h"
 
 #include "absl/container/flat_hash_set.h"
 
@@ -52,10 +54,46 @@ public:
 
   const HttpInspectorStats& stats() const { return stats_; }
 
-  static constexpr uint32_t MAX_INSPECT_SIZE = 8192;
+  static constexpr uint32_t DEFAULT_INITIAL_BUFFER_SIZE = 8 * 1024;
+  static constexpr uint32_t MAX_INSPECT_SIZE = 64 * 1024;
 
 private:
   HttpInspectorStats stats_;
+};
+
+class NoOpParserCallbacks : public Http::Http1::ParserCallbacks {
+public:
+  Http::Http1::CallbackResult onMessageBegin() override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onUrl(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onStatus(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onHeaderField(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onHeaderValue(const char* /*data*/, size_t /*length*/) override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  Http::Http1::CallbackResult onHeadersComplete() override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  void bufferBody(const char* /*data*/, size_t /*length*/) override {}
+
+  Http::Http1::CallbackResult onMessageComplete() override {
+    return Http::Http1::CallbackResult::Success;
+  }
+
+  void onChunkHeader(bool /*is_final_chunk*/) override {}
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -69,11 +107,13 @@ public:
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
+  Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
+
+  size_t maxReadBytes() const override { return requested_read_bytes_; }
 
 private:
   static const absl::string_view HTTP2_CONNECTION_PREFACE;
 
-  ParseState onRead();
   void done(bool success);
   ParseState parseHttpHeader(absl::string_view data);
 
@@ -83,11 +123,12 @@ private:
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{nullptr};
   absl::string_view protocol_;
-  http_parser parser_;
-  static http_parser_settings settings_;
 
-  // Use static thread_local to avoid allocating buffer over and over again.
-  static thread_local uint8_t buf_[Config::MAX_INSPECT_SIZE];
+  std::unique_ptr<Http::Http1::Parser> parser_;
+  NoOpParserCallbacks no_op_callbacks_;
+  ssize_t nread_ = 0;
+  size_t requested_read_bytes_ = 0;
+  uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
 };
 
 } // namespace HttpInspector

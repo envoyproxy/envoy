@@ -11,6 +11,7 @@ namespace Upstream {
 
 using ::testing::_;
 using ::testing::Invoke;
+using ::testing::ReturnPointee;
 using ::testing::ReturnRef;
 
 MockPrioritySet::MockPrioritySet() {
@@ -25,6 +26,7 @@ MockPrioritySet::MockPrioritySet() {
       .WillByDefault(Invoke([this](PrioritySet::PriorityUpdateCb cb) -> Common::CallbackHandlePtr {
         return priority_update_cb_helper_.add(cb);
       }));
+  ON_CALL(*this, crossPriorityHostMap()).WillByDefault(ReturnPointee(&cross_priority_host_map_));
 }
 
 MockPrioritySet::~MockPrioritySet() = default;
@@ -38,6 +40,7 @@ HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
           host_set->addMemberUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
                                              const HostVector& hosts_removed) {
             runUpdateCallbacks(priority, hosts_added, hosts_removed);
+            return absl::OkStatus();
           }));
     }
   }
@@ -46,8 +49,8 @@ HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
 
 void MockPrioritySet::runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
                                          const HostVector& hosts_removed) {
-  member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
-  priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+  THROW_IF_NOT_OK(member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed));
+  THROW_IF_NOT_OK(priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed));
 }
 
 } // namespace Upstream

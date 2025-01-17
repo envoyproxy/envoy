@@ -40,6 +40,25 @@ private:
   static ActionRegistrationImpl* debug_assertion_failure_record_action_;
 };
 
+class EnvoyBugState {
+public:
+  static EnvoyBugState& get() { MUTABLE_CONSTRUCT_ON_FIRST_USE(EnvoyBugState); }
+
+  void clear() {
+    absl::MutexLock lock(&mutex_);
+    counters_.clear();
+  }
+
+  uint64_t inc(absl::string_view bug_name) {
+    absl::MutexLock lock(&mutex_);
+    return ++counters_[bug_name];
+  }
+
+private:
+  absl::Mutex mutex_;
+  absl::flat_hash_map<std::string, uint64_t> counters_ ABSL_GUARDED_BY(mutex_);
+};
+
 // This class implements the logic for triggering ENVOY_BUG logs and actions. Logging and actions
 // will be triggered with exponential back-off per file and line bug.
 class EnvoyBugRegistrationImpl : public ActionRegistration {
@@ -49,8 +68,7 @@ public:
     envoy_bug_failure_record_action_ = this;
 
     // Reset counters when a registration is added.
-    absl::MutexLock lock(&mutex_);
-    counters_.clear();
+    EnvoyBugState::get().clear();
   }
 
   ~EnvoyBugRegistrationImpl() override {
@@ -69,11 +87,7 @@ public:
   // understand and debug, and test behavior is predictable.
   static bool shouldLogAndInvoke(absl::string_view bug_name) {
     // Increment counter, inserting first if counter does not exist.
-    uint64_t counter_value = 0;
-    {
-      absl::MutexLock lock(&mutex_);
-      counter_value = ++counters_[bug_name];
-    }
+    const uint64_t counter_value = EnvoyBugState::get().inc(bug_name);
 
     // Check if counter is power of two by its bitwise representation.
     return (counter_value & (counter_value - 1)) == 0;
@@ -92,12 +106,7 @@ public:
     }
   }
 
-  static void resetEnvoyBugCounters() {
-    {
-      absl::MutexLock lock(&mutex_);
-      counters_.clear();
-    }
-  }
+  static void resetEnvoyBugCounters() { EnvoyBugState::get().clear(); }
 
 private:
   std::function<void(const char* location)> action_;
@@ -105,16 +114,10 @@ private:
 
   // Pointer to the first action in the chain or nullptr if no action is currently registered.
   static EnvoyBugRegistrationImpl* envoy_bug_failure_record_action_;
-
-  using EnvoyBugMap = absl::flat_hash_map<std::string, uint64_t>;
-  static absl::Mutex mutex_;
-  static EnvoyBugMap counters_ ABSL_GUARDED_BY(mutex_);
 };
 
 ActionRegistrationImpl* ActionRegistrationImpl::debug_assertion_failure_record_action_ = nullptr;
 EnvoyBugRegistrationImpl* EnvoyBugRegistrationImpl::envoy_bug_failure_record_action_ = nullptr;
-EnvoyBugRegistrationImpl::EnvoyBugMap EnvoyBugRegistrationImpl::counters_;
-absl::Mutex EnvoyBugRegistrationImpl::mutex_;
 
 ActionRegistrationPtr
 addDebugAssertionFailureRecordAction(const std::function<void(const char* location)>& action) {

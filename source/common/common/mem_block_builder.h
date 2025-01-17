@@ -53,7 +53,7 @@ public:
    * @param object the object to append.
    */
   void appendOne(T object) {
-    SECURITY_ASSERT(write_span_.size() >= 1, "insufficient capacity");
+    SECURITY_ASSERT(!write_span_.empty(), "insufficient capacity");
     *write_span_.data() = object;
     write_span_.remove_prefix(1);
   }

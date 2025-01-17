@@ -5,13 +5,15 @@ licenses(["notice"])  # Apache 2
 api_cc_test(
     name = "build_test",
     srcs = ["build_test.cc"],
+    # Workaround for https://github.com/bazelbuild/bazel/issues/13819
+    linkstatic = True,
     deps = [
         "//envoy/api/v2:pkg_cc_proto",
         "//envoy/service/accesslog/v2:pkg_cc_proto",
         "//envoy/service/discovery/v2:pkg_cc_proto",
         "//envoy/service/metrics/v2:pkg_cc_proto",
         "//envoy/service/ratelimit/v2:pkg_cc_proto",
-        "@com_github_cncf_udpa//udpa/service/orca/v1:pkg_cc_proto",
+        "@com_github_cncf_xds//udpa/service/orca/v1:pkg_cc_proto",
     ],
 )
 

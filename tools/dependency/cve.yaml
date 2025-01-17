@@ -1,0 +1,54 @@
+# We only look back a few years, since we shouldn't have any ancient deps.
+start_year: 2018
+
+# These CVEs are false positives for the match heuristics. An explanation is
+# required when adding a new entry to this list as a comment.
+ignored_cves:
+# Node.js issue unrelated to http-parser (napi_ API implementation).
+- CVE-2020-8174
+# Node.js HTTP desync attack. Request smuggling due to CR and hyphen
+# conflation in llhttp
+# (https://github.com/nodejs/llhttp/commit/9d9da1d0f18599ceddd8f484df5a5ad694d23361).
+# This was a result of using llparses toLowerUnsafe() for header keys.
+# http-parser uses a TOKEN method that doesnt have the same issue for
+# header fields.
+- CVE-2020-8201
+# Node.js issue unrelated to http-parser. This is a DoS due to a lack of
+# request/connection timeouts, see
+# https://github.com/nodejs/node/commit/753f3b247a.
+- CVE-2020-8251
+# Node.js issue unrelated to http-parser (libuv).
+- CVE-2020-8252
+# Node.js issue rooted in a c-ares bug. Does not appear to affect
+# http-parser or our use of c-ares, c-ares has been bumped regardless.
+- CVE-2020-8277
+# Node.js issue unrelated to http-parser, see
+# https://github.com/mhart/StringStream/issues/7.
+- CVE-2018-21270
+# Node.js issue unrelated to http-parser (Node TLS).
+- CVE-2020-8265
+# Node.js request smuggling.
+# https://github.com/envoyproxy/envoy/pull/14686 validates that this does
+# not apply to Envoy.
+- CVE-2020-8287
+# Envoy is operating post Brotli 1.0.9 release, so not affected by this.
+- CVE-2020-8927
+# Node.js issue unrelated to http-parser (*).
+- CVE-2021-22883
+- CVE-2021-22884
+# Node.js issues unrelated to http-parser.
+# See https://nvd.nist.gov/vuln/detail/CVE-2021-22918
+# See https://nvd.nist.gov/vuln/detail/CVE-2021-22921
+# See https://nvd.nist.gov/vuln/detail/CVE-2021-22931
+# See https://nvd.nist.gov/vuln/detail/CVE-2021-22939
+# See https://nvd.nist.gov/vuln/detail/CVE-2021-22940
+- CVE-2021-22918
+- CVE-2021-22921
+- CVE-2021-22930
+- CVE-2021-22931
+- CVE-2021-22939
+- CVE-2021-22940
+- CVE-2021-43803
+# This CVE assumes an untrusted client that can affect a shared connection between an intervening proxy and
+# gRPC server, and does not affect Envoy directly
+- CVE-2023-32732

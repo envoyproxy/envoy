@@ -14,4 +14,3 @@ diff -u -r a/CMakeLists.txt b/CMakeLists.txt
  endif()
  # AC_TYPE_UINT8_T
  # AC_TYPE_UINT16_T
-Only in b: CMakeLists.txt.orig

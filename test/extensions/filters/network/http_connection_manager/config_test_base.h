@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/date_provider_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/filters/http/common/factory_base.h"
@@ -14,6 +14,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -24,29 +25,40 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
-parseHttpConnectionManagerFromYaml(const std::string& yaml, bool avoid_boosting = true) {
+parseHttpConnectionManagerFromYaml(const std::string& yaml) {
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       http_connection_manager;
-  TestUtility::loadFromYamlAndValidate(yaml, http_connection_manager, false, avoid_boosting);
+  TestUtility::loadFromYamlAndValidate(yaml, http_connection_manager);
   return http_connection_manager;
 }
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
+  HttpConnectionManagerConfigTest() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
+    ON_CALL(context_, listenerInfo()).WillByDefault(testing::ReturnRef(listener_info_));
+  }
+  NiceMock<Network::MockListenerInfo> listener_info_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
+  Http::SlowDateProviderImpl date_provider_{
+      context_.server_factory_context_.mainThreadDispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
-  NiceMock<Tracing::MockHttpTracerManager> http_tracer_manager_;
-  Filter::Http::FilterConfigProviderManagerImpl filter_config_provider_manager_;
-  std::shared_ptr<NiceMock<Tracing::MockHttpTracer>> http_tracer_{
-      std::make_shared<NiceMock<Tracing::MockHttpTracer>>()};
+  NiceMock<Tracing::MockTracerManager> tracer_manager_;
+  Filter::HttpFilterConfigProviderManagerImpl filter_config_provider_manager_;
+  std::shared_ptr<NiceMock<Tracing::MockTracer>> tracer_{
+      std::make_shared<NiceMock<Tracing::MockTracer>>()};
+  TestScopedRuntime scoped_runtime_;
   void createHttpConnectionManagerConfig(const std::string& yaml) {
+    creation_status_ = absl::OkStatus();
     HttpConnectionManagerConfig(parseHttpConnectionManagerFromYaml(yaml), context_, date_provider_,
                                 route_config_provider_manager_,
-                                scoped_routes_config_provider_manager_, http_tracer_manager_,
-                                filter_config_provider_manager_);
+                                &scoped_routes_config_provider_manager_, tracer_manager_,
+                                filter_config_provider_manager_, creation_status_);
+    THROW_IF_NOT_OK(creation_status_);
   }
+  absl::Status creation_status_{absl::OkStatus()};
 };
 
 class PassThroughFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<

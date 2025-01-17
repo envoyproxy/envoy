@@ -50,9 +50,8 @@ public:
    * @param value supplies the MOVED error response
    * @param host_address supplies the redirection host address and port
    * @param ask_redirection indicates if this is a ASK redirection
-   * @return bool true if the request is successfully redirected, false otherwise
    */
-  virtual bool onRedirection(RespValuePtr&& value, const std::string& host_address,
+  virtual void onRedirection(RespValuePtr&& value, const std::string& host_address,
                              bool ask_redirection) PURE;
 };
 
@@ -65,9 +64,7 @@ public:
   // ClientCallbacks
   void onResponse(Common::Redis::RespValuePtr&&) override {}
   void onFailure() override {}
-  bool onRedirection(Common::Redis::RespValuePtr&&, const std::string&, bool) override {
-    return false;
-  }
+  void onRedirection(Common::Redis::RespValuePtr&&, const std::string&, bool) override {}
 };
 
 /**
@@ -184,9 +181,12 @@ public:
    * @return the read policy the proxy should use.
    */
   virtual ReadPolicy readPolicy() const PURE;
+
+  virtual bool connectionRateLimitEnabled() const PURE;
+  virtual uint32_t connectionRateLimitPerSec() const PURE;
 };
 
-using ConfigSharedPtr = std::shared_ptr<Config>;
+using ConfigSharedPtr = std::shared_ptr<const Config>;
 
 /**
  * A factory for individual redis client connections.
@@ -203,13 +203,78 @@ public:
    * @param redis_command_stats supplies the redis command stats.
    * @param scope supplies the stats scope.
    * @param auth password for upstream host.
+   * @param is_transaction_client true if this client was created to relay a transaction.
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                           const Config& config,
+                           const ConfigSharedPtr& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
                            Stats::Scope& scope, const std::string& auth_username,
-                           const std::string& auth_password) PURE;
+                           const std::string& auth_password, bool is_transaction_client) PURE;
+};
+
+// A MULTI command sent when starting a transaction.
+struct MultiRequest : public Extensions::NetworkFilters::Common::Redis::RespValue {
+public:
+  MultiRequest() {
+    type(Extensions::NetworkFilters::Common::Redis::RespType::Array);
+    std::vector<NetworkFilters::Common::Redis::RespValue> values(1);
+    values[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+    values[0].asString() = "MULTI";
+    asArray().swap(values);
+  }
+};
+
+// An empty array sent when a transaction is empty.
+struct EmptyArray : public Extensions::NetworkFilters::Common::Redis::RespValue {
+public:
+  EmptyArray() {
+    type(Extensions::NetworkFilters::Common::Redis::RespType::Array);
+    std::vector<NetworkFilters::Common::Redis::RespValue> values;
+    asArray().swap(values);
+  }
+};
+
+// A struct representing a Redis transaction.
+
+struct Transaction {
+  Transaction(Network::ConnectionCallbacks* connection_cb) : connection_cb_(connection_cb) {}
+  ~Transaction() { close(); }
+
+  void start() { active_ = true; }
+
+  void close() {
+    active_ = false;
+    key_.clear();
+    if (connection_established_) {
+      for (auto& client : clients_) {
+        client->close();
+      }
+      connection_established_ = false;
+    }
+    should_close_ = false;
+  }
+
+  bool active_{false};
+  bool connection_established_{false};
+  bool should_close_{false};
+
+  // The key which represents the transaction hash slot.
+  std::string key_;
+  // clients_[0] represents the main connection, clients_[1..n] are for
+  // the mirroring policies.
+  std::vector<ClientPtr> clients_;
+  Network::ConnectionCallbacks* connection_cb_;
+
+  // This index represents the current client on which traffic is being sent to.
+  // When sending to the main redis server it will be 0, and when sending to one of
+  // the mirror servers it will be 1..n.
+  uint32_t current_client_idx_{0};
+};
+
+class NoOpTransaction : public Transaction {
+public:
+  NoOpTransaction() : Transaction(nullptr) {}
 };
 
 } // namespace Client

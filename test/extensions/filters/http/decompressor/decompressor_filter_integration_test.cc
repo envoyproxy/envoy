@@ -30,7 +30,7 @@ public:
 
   void initializeFilter(const std::string& config) {
     setUpstreamProtocol(Http::CodecType::HTTP2);
-    config_helper_.addFilter(config);
+    config_helper_.prependFilter(config);
     HttpIntegrationTest::initialize();
     codec_client_ = makeHttpConnection(lookupPort("http"));
   }
@@ -284,6 +284,145 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
       compressed_response_length);
   test_server_->waitForCounterGe(
       "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", 3);
+}
+
+// Buffer the request after it's been decompressed.
+TEST_P(DecompressorIntegrationTest, DecompressAndBuffer) {
+
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter }");
+
+  config_helper_.prependFilter(R"EOF(
+  name: envoy.filters.http.decompressor
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
+    decompressor_library:
+      name: gzip_default
+      typed_config:
+        "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+        window_bits: 15
+        chunk_size: 8192
+    request_direction_config:
+      common_config:
+        enabled:
+          default_value: true
+          runtime_key: request_decompressor_enabled
+    response_direction_config:
+      common_config:
+        enabled:
+          default_value: false
+          runtime_key: response_decompressor_enabled
+  )EOF");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {"content-encoding", "gzip"},
+                                                                 {":authority", "host"}});
+
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Compressed JSON.
+  constexpr uint8_t buffer[] = {0x1f, 0x8b, 0x08, 0x00, 0x9c, 0xb3, 0x38, 0x61, 0x00, 0x03, 0xab,
+                                0x56, 0x50, 0xca, 0xad, 0x4c, 0x29, 0xcd, 0xcd, 0xad, 0x54, 0x52,
+                                0xb0, 0x52, 0x50, 0xca, 0x2a, 0xce, 0xcf, 0x53, 0x52, 0xa8, 0xe5,
+                                0x02, 0x00, 0xa6, 0x6a, 0x24, 0x99, 0x17, 0x00, 0x00, 0x00};
+  Buffer::OwnedImpl data(buffer, 43);
+  codec_client_->sendData(*request_encoder, data, true);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(10, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  Stats::Store& stats = test_server_->server().stats();
+  Stats::CounterSharedPtr counter = TestUtility::findCounter(
+      stats, "http.config_test.decompressor.gzip_default.gzip.request.decompressed");
+  ASSERT_NE(nullptr, counter);
+  EXPECT_EQ(1L, counter->value());
+}
+
+// Stop decompressing when output-buffer's size exceeds the number of
+// 'max_inflate_ratio*input-data-size'.
+TEST_P(DecompressorIntegrationTest, LimitMaxDecompressOutputSize) {
+  // Set max_inflate_ratio = 10.
+  initializeFilter(R"EOF(
+  name: envoy.filters.http.decompressor
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor
+    decompressor_library:
+      name: testlib
+      typed_config:
+        "@type": "type.googleapis.com/envoy.extensions.compression.gzip.decompressor.v3.Gzip"
+        max_inflate_ratio: 10
+  )EOF");
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {"content-encoding", "gzip"},
+                                                                 {":authority", "host"}});
+
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Compressed 20K zero bytes data.
+  constexpr uint8_t buffer[] = {0x1f, 0x8b, 0x08, 0x08, 0x8a, 0x51, 0xda, 0x62, 0x00, 0x03, 0x66,
+                                0x69, 0x6c, 0x65, 0x2e, 0x74, 0x78, 0x74, 0x00, 0xed, 0xc1, 0x31,
+                                0x01, 0x00, 0x00, 0x00, 0xc2, 0xa0, 0xf5, 0x4f, 0x6d, 0x0a, 0x3f,
+                                0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0xb7,
+                                0x01, 0x60, 0x83, 0xbc, 0xe6, 0x00, 0x50, 0x00, 0x00};
+
+  // Note that the threshold is max_inflate_ratio*sizeof(buffer) which is less than 20K.
+  int compressed_data_length = sizeof(buffer);
+  Buffer::OwnedImpl data(buffer, compressed_data_length);
+  codec_client_->sendData(*request_encoder, data, true);
+
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(10, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("gzip", upstream_request_->headers()
+                        .get(Http::LowerCaseString("accept-encoding"))[0]
+                        ->value()
+                        .getStringView());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("content-encoding")).empty());
+
+  // Only 4096 bytes(one chunk) decompressed.
+  EXPECT_EQ(4096, upstream_request_->bodyLength());
+  EXPECT_EQ(std::to_string(compressed_data_length),
+            upstream_request_->trailers()
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
+                ->value()
+                .getStringView());
+  EXPECT_EQ("4096",
+            upstream_request_->trailers()
+                ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-uncompressed-bytes"))[0]
+                ->value()
+                .getStringView());
+
+  // Verify stats
+  test_server_->waitForCounterEq("http.config_test.decompressor.testlib.gzip.request.decompressed",
+                                 1);
+  test_server_->waitForCounterEq(
+      "http.config_test.decompressor.testlib.gzip.request.not_decompressed", 0);
+  test_server_->waitForCounterEq(
+      "http.config_test.decompressor.testlib.gzip.request.total_compressed_bytes",
+      compressed_data_length);
+  test_server_->waitForCounterEq(
+      "http.config_test.decompressor.testlib.gzip.request.total_uncompressed_bytes", 4096);
+  test_server_->waitForCounterGe(
+      "http.config_test.decompressor.testlib.gzip.decompressor_library.zlib_data_error", 1);
 }
 
 } // namespace Envoy

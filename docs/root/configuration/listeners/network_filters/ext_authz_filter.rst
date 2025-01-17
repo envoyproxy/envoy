@@ -4,8 +4,8 @@ External Authorization
 ======================
 
 * External authorization :ref:`architecture overview <arch_overview_ext_authz>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.network.ext_authz.v3.ExtAuthz``.
 * :ref:`Network filter v3 API reference <envoy_v3_api_msg_extensions.filters.network.ext_authz.v3.ExtAuthz>`
-* This filter should be configured with the name *envoy.filters.network.ext_authz*.
 
 The external authorization network filter calls an external authorization service to check if the
 incoming request is authorized or not. If the request is deemed unauthorized by the network filter
@@ -58,6 +58,30 @@ A sample filter configuration could be:
                   address: 127.0.0.1
                   port_value: 10003
 
+A sample request body to the specified auth service looks like
+
+.. code-block:: json
+
+  {
+    "source":{
+      "address":{
+        "socket_address":{
+          "address": "172.17.0.1",
+          "port_value": 56746
+        }
+      }
+    }
+    "destination":{
+      "service": "www.bing.com",
+      "address":{
+        "socket_address": {
+          "address": "127.0.0.1",
+          "port_value": 10003
+        }
+      }
+    }
+  }
+
 Statistics
 ----------
 
@@ -83,5 +107,5 @@ Dynamic Metadata
 
 The External Authorization filter emits dynamic metadata as an opaque ``google.protobuf.Struct``
 *only* when the gRPC authorization server returns a :ref:`CheckResponse
-<envoy_v3_api_msg_service.auth.v3.CheckResponse>` with a filled :ref:`dynamic_metadata
+<envoy_v3_api_msg_service.auth.v3.CheckResponse>` with a non-empty :ref:`dynamic_metadata
 <envoy_v3_api_field_service.auth.v3.CheckResponse.dynamic_metadata>` field.

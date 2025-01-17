@@ -18,8 +18,9 @@ namespace {
 
 TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   NiceMock<MockTransportSocketFactoryContext> factory_context;
-  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
-  EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
+  Singleton::ManagerImpl singleton_manager;
+  EXPECT_CALL(factory_context.server_context_, singletonManager())
+      .WillRepeatedly(ReturnRef(singleton_manager));
   UpstreamAltsTransportSocketConfigFactory factory;
 
   ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
@@ -30,7 +31,7 @@ TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
   )EOF";
   TestUtility::loadFromYaml(yaml, *config);
 
-  auto socket_factory = factory.createTransportSocketFactory(*config, factory_context);
+  auto socket_factory = factory.createTransportSocketFactory(*config, factory_context).value();
 
   EXPECT_NE(nullptr, socket_factory);
   EXPECT_TRUE(socket_factory->implementsSecureTransport());
@@ -38,8 +39,9 @@ TEST(UpstreamAltsConfigTest, CreateSocketFactory) {
 
 TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   NiceMock<MockTransportSocketFactoryContext> factory_context;
-  Singleton::ManagerImpl singleton_manager{Thread::threadFactoryForTest()};
-  EXPECT_CALL(factory_context, singletonManager()).WillRepeatedly(ReturnRef(singleton_manager));
+  Singleton::ManagerImpl singleton_manager;
+  EXPECT_CALL(factory_context.server_context_, singletonManager())
+      .WillRepeatedly(ReturnRef(singleton_manager));
   DownstreamAltsTransportSocketConfigFactory factory;
 
   ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
@@ -50,7 +52,7 @@ TEST(DownstreamAltsConfigTest, CreateSocketFactory) {
   )EOF";
   TestUtility::loadFromYaml(yaml, *config);
 
-  auto socket_factory = factory.createTransportSocketFactory(*config, factory_context, {});
+  auto socket_factory = factory.createTransportSocketFactory(*config, factory_context, {}).value();
 
   EXPECT_NE(nullptr, socket_factory);
   EXPECT_TRUE(socket_factory->implementsSecureTransport());

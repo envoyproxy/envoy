@@ -70,20 +70,21 @@ private:
 
 class PerHostHttpConnPool : public Extensions::Upstreams::Http::Http::HttpConnPool {
 public:
-  PerHostHttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
-                      const Router::RouteEntry& route_entry,
+  PerHostHttpConnPool(Upstream::HostConstSharedPtr host,
+                      Upstream::ThreadLocalCluster& thread_local_cluster,
+                      Upstream::ResourcePriority priority,
                       absl::optional<Envoy::Http::Protocol> downstream_protocol,
                       Upstream::LoadBalancerContext* ctx)
-      : HttpConnPool(thread_local_cluster, is_connect, route_entry, downstream_protocol, ctx) {}
+      : HttpConnPool(host, thread_local_cluster, priority, downstream_protocol, ctx) {}
 
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
-                   Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
+                   Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
                    absl::optional<Http::Protocol> protocol) override {
     conn_pool_stream_handle_ = nullptr;
     auto upstream = std::make_unique<PerHostHttpUpstream>(callbacks_->upstreamToDownstream(),
                                                           &callbacks_encoder, host);
     callbacks_->onPoolReady(std::move(upstream), host,
-                            callbacks_encoder.getStream().connectionLocalAddress(), info, protocol);
+                            callbacks_encoder.getStream().connectionInfoProvider(), info, protocol);
   }
 };
 
@@ -95,16 +96,18 @@ public:
   std::string name() const override { return "envoy.filters.connection_pools.http.per_host"; }
   std::string category() const override { return "envoy.upstreams"; }
   Router::GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster, bool is_connect,
-                        const Router::RouteEntry& route_entry,
+  createGenericConnPool(Upstream::HostConstSharedPtr host,
+                        Upstream::ThreadLocalCluster& thread_local_cluster,
+                        Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
+                        Upstream::ResourcePriority priority,
                         absl::optional<Envoy::Http::Protocol> downstream_protocol,
                         Upstream::LoadBalancerContext* ctx) const override {
-    if (is_connect) {
-      // This example factory doesn't support terminating CONNECT stream.
+    if (upstream_protocol != UpstreamProtocol::HTTP) {
+      // This example factory doesn't support terminating CONNECT/CONNECT-UDP stream.
       return nullptr;
     }
     auto upstream_http_conn_pool = std::make_unique<PerHostHttpConnPool>(
-        thread_local_cluster, is_connect, route_entry, downstream_protocol, ctx);
+        host, thread_local_cluster, priority, downstream_protocol, ctx);
     return (upstream_http_conn_pool->valid() ? std::move(upstream_http_conn_pool) : nullptr);
   }
 

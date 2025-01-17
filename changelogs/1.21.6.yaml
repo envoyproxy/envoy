@@ -1,0 +1,15 @@
+date: November 28, 2022
+
+bug_fixes:
+- area: bazel
+  change: |
+    updated to 5.0.0.
+- area: ci
+  change: |
+    assorted fixes.
+- area: dependencies
+  change: |
+    update Curl, Kafka, Wasm to mitigate CVEs.
+- area: docker
+  change: |
+    update Docker images (``distroless`` -> ``4b22ca3c6``) to resolve CVE issues in container packages.

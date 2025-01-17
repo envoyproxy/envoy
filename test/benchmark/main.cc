@@ -14,6 +14,7 @@
 using namespace Envoy;
 
 static bool skip_expensive_benchmarks = false;
+static std::function<void()> cleanup_hook = []() {};
 
 // Boilerplate main(), which discovers benchmarks and runs them. This uses two
 // different flag parsers, so the order of flags matters: flags defined here
@@ -25,17 +26,19 @@ int main(int argc, char** argv) {
   bool contains_help_flag = false;
 
   // Checking if any of the command-line arguments contains `--help`
-  for (int i = 1; i < argc; ++i) {
+  for (int i = 1; i < argc; ++i) { // NOLINT(clang-analyzer-optin.cplusplus.VirtualCall)
     if (strcmp(argv[i], "--help") == 0) {
       contains_help_flag = true;
       break;
     }
   }
 
-  // if the `--help` flag isn't considered separately, it runs "benchmark --help"
-  // (Google Benchmark Help) and the help output doesn't contains details about
-  // custom defined flags like `--skip_expensive_benchmarks`, `--runtime_feature`, etc
-  if (!contains_help_flag) {
+  if (contains_help_flag) { // NOLINT(clang-analyzer-optin.cplusplus.VirtualCall)
+    // if the `--help` flag isn't considered separately, it runs "benchmark --help"
+    // (Google Benchmark Help) and the help output doesn't contains details about
+    // custom defined flags like `--skip_expensive_benchmarks`, `--runtime_feature`, etc
+    ::benchmark::PrintDefaultHelp();
+  } else {
     // Passing the arguments of the program to Google Benchmark.
     // That way Google benchmark options would also be supported, along with the
     // custom defined custom flags
@@ -69,21 +72,18 @@ int main(int argc, char** argv) {
   }
 
   // Reduce logs so benchmark output is readable.
-  Thread::MutexBasicLockable lock;
-  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFancyLogFormat(), lock,
-                                  false};
+  Envoy::Thread::MutexBasicLockable lock;
+  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
+                                  lock, false};
 
   skip_expensive_benchmarks = skip_switch.getValue();
 
+  TestScopedRuntime runtime;
   // Initialize scoped_runtime if a runtime_feature argument is present. This
   // allows benchmarks to use their own scoped_runtime in case no runtime flag is
   // passed as an argument.
-  std::unique_ptr<TestScopedRuntime> scoped_runtime = nullptr;
   const auto& runtime_features_args = runtime_features.getValue();
   for (const absl::string_view runtime_feature_arg : runtime_features_args) {
-    if (scoped_runtime == nullptr) {
-      scoped_runtime = std::make_unique<TestScopedRuntime>();
-    }
     // Make sure the argument contains a single ":" character.
     const std::vector<std::string> runtime_feature_split = absl::StrSplit(runtime_feature_arg, ':');
     if (runtime_feature_split.size() != 2) {
@@ -93,9 +93,9 @@ int main(int argc, char** argv) {
                      runtime_feature_arg);
       return 1;
     }
-    const auto feature_name = runtime_feature_split[0];
-    const auto feature_val = runtime_feature_split[1];
-    Runtime::LoaderSingleton::getExisting()->mergeValues({{feature_name, feature_val}});
+    const auto& feature_name = runtime_feature_split[0];
+    const auto& feature_val = runtime_feature_split[1];
+    runtime.mergeValues({{feature_name, feature_val}});
   }
 
   if (skip_expensive_benchmarks) {
@@ -104,6 +104,8 @@ int main(int argc, char** argv) {
         "Expensive benchmarks are being skipped; see test/README.md for more information");
   }
   ::benchmark::RunSpecifiedBenchmarks();
+  cleanup_hook();
 }
 
+void Envoy::benchmark::setCleanupHook(std::function<void()> hook) { cleanup_hook = hook; }
 bool Envoy::benchmark::skipExpensiveBenchmarks() { return skip_expensive_benchmarks; }

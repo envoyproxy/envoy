@@ -18,39 +18,16 @@
 namespace Envoy {
 namespace Http {
 
+bool HeaderStringValidator::disable_validation_for_tests_ = false;
+
 namespace {
-// This includes the NULL (StringUtil::itoa technically only needs 21).
-constexpr size_t MaxIntegerLength{32};
 
 constexpr absl::string_view DelimiterForInlineHeaders{","};
 constexpr absl::string_view DelimiterForInlineCookies{"; "};
+const static int kMinHeadersForLazyMap = 3; // Optimal hard-coded value based on benchmarks.
 
-void validateCapacity(uint64_t new_capacity) {
-  // If the resizing will cause buffer overflow due to hitting uint32_t::max, an OOM is likely
-  // imminent. Fast-fail rather than allow a buffer overflow attack (issue #1421)
-  RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max(),
-                 "Trying to allocate overly large headers.");
-}
-
-absl::string_view getStrView(const VariantHeader& buffer) {
-  return absl::get<absl::string_view>(buffer);
-}
-
-InlineHeaderVector& getInVec(VariantHeader& buffer) {
-  return absl::get<InlineHeaderVector>(buffer);
-}
-
-const InlineHeaderVector& getInVec(const VariantHeader& buffer) {
-  return absl::get<InlineHeaderVector>(buffer);
-}
-
-bool validatedLowerCaseString(absl::string_view str) {
-  auto lower_case_str = LowerCaseString(str);
-  return lower_case_str == str;
-}
-
-absl::string_view delimiterByHeader(const LowerCaseString& key, bool correctly_coalesce_cookies) {
-  if (correctly_coalesce_cookies && key == Http::Headers::get().Cookie) {
+absl::string_view delimiterByHeader(const LowerCaseString& key) {
+  if (key == Http::Headers::get().Cookie) {
     return DelimiterForInlineCookies;
   }
   return DelimiterForInlineHeaders;
@@ -58,134 +35,16 @@ absl::string_view delimiterByHeader(const LowerCaseString& key, bool correctly_c
 
 } // namespace
 
-// Initialize as a Type::Inline
-HeaderString::HeaderString() : buffer_(InlineHeaderVector()) {
-  ASSERT((getInVec(buffer_).capacity()) >= MaxIntegerLength);
+// Initialize as a Type::Reference
+HeaderString::HeaderString(const LowerCaseString& ref_value) noexcept
+    : UnionStringBase(absl::string_view(ref_value.get().c_str(), ref_value.get().size())) {
   ASSERT(valid());
 }
 
-// Initialize as a Type::Reference
-HeaderString::HeaderString(const LowerCaseString& ref_value)
-    : buffer_(absl::string_view(ref_value.get().c_str(), ref_value.get().size())) {
-  ASSERT(valid());
-}
-
-// Initialize as a Type::Reference
-HeaderString::HeaderString(absl::string_view ref_value) : buffer_(ref_value) { ASSERT(valid()); }
-
-HeaderString::HeaderString(HeaderString&& move_value) noexcept
-    : buffer_(std::move(move_value.buffer_)) {
+HeaderString::HeaderString(UnionString&& move_value) noexcept {
+  buffer_ = std::move(move_value.storage());
   move_value.clear();
   ASSERT(valid());
-}
-
-bool HeaderString::valid() const { return validHeaderString(getStringView()); }
-
-void HeaderString::append(const char* data, uint32_t data_size) {
-  // Make sure the requested memory allocation is below uint32_t::max
-  const uint64_t new_capacity = static_cast<uint64_t>(data_size) + size();
-  validateCapacity(new_capacity);
-  ASSERT(validHeaderString(absl::string_view(data, data_size)));
-
-  switch (type()) {
-  case Type::Reference: {
-    // Rather than be too clever and optimize this uncommon case, we switch to
-    // Inline mode and copy.
-    const absl::string_view prev = getStrView(buffer_);
-    buffer_ = InlineHeaderVector();
-    // Assigning new_capacity to avoid resizing when appending the new data
-    getInVec(buffer_).reserve(new_capacity);
-    getInVec(buffer_).assign(prev.begin(), prev.end());
-    break;
-  }
-  case Type::Inline: {
-    getInVec(buffer_).reserve(new_capacity);
-    break;
-  }
-  }
-  getInVec(buffer_).insert(getInVec(buffer_).end(), data, data + data_size);
-}
-
-void HeaderString::rtrim() {
-  ASSERT(type() == Type::Inline);
-  absl::string_view original = getStringView();
-  absl::string_view rtrimmed = StringUtil::rtrim(original);
-  if (original.size() != rtrimmed.size()) {
-    getInVec(buffer_).resize(rtrimmed.size());
-  }
-}
-
-absl::string_view HeaderString::getStringView() const {
-  if (type() == Type::Reference) {
-    return getStrView(buffer_);
-  }
-  ASSERT(type() == Type::Inline);
-  return {getInVec(buffer_).data(), getInVec(buffer_).size()};
-}
-
-void HeaderString::clear() {
-  if (type() == Type::Inline) {
-    getInVec(buffer_).clear();
-  }
-}
-
-void HeaderString::setCopy(const char* data, uint32_t size) {
-  ASSERT(validHeaderString(absl::string_view(data, size)));
-
-  if (!absl::holds_alternative<InlineHeaderVector>(buffer_)) {
-    // Switching from Type::Reference to Type::Inline
-    buffer_ = InlineHeaderVector();
-  }
-
-  getInVec(buffer_).reserve(size);
-  getInVec(buffer_).assign(data, data + size);
-  ASSERT(valid());
-}
-
-void HeaderString::setCopy(absl::string_view view) {
-  this->setCopy(view.data(), static_cast<uint32_t>(view.size()));
-}
-
-void HeaderString::setInteger(uint64_t value) {
-  // Initialize the size to the max length, copy the actual data, and then
-  // reduce the size (but not the capacity) as needed
-  // Note: instead of using the inner_buffer, attempted the following:
-  // resize buffer_ to MaxIntegerLength, apply StringUtil::itoa to the buffer_.data(), and then
-  // resize buffer_ to int_length (the number of digits in value).
-  // However it was slower than the following approach.
-  char inner_buffer[MaxIntegerLength];
-  const uint32_t int_length = StringUtil::itoa(inner_buffer, MaxIntegerLength, value);
-
-  if (type() == Type::Reference) {
-    // Switching from Type::Reference to Type::Inline
-    buffer_ = InlineHeaderVector();
-  }
-  ASSERT((getInVec(buffer_).capacity()) > MaxIntegerLength);
-  getInVec(buffer_).assign(inner_buffer, inner_buffer + int_length);
-}
-
-void HeaderString::setReference(absl::string_view ref_value) {
-  buffer_ = ref_value;
-  ASSERT(valid());
-}
-
-uint32_t HeaderString::size() const {
-  if (type() == Type::Reference) {
-    return getStrView(buffer_).size();
-  }
-  ASSERT(type() == Type::Inline);
-  return getInVec(buffer_).size();
-}
-
-HeaderString::Type HeaderString::type() const {
-  // buffer_.index() is correlated with the order of Reference and Inline in the
-  // enum.
-  ASSERT(buffer_.index() == 0 || buffer_.index() == 1);
-  ASSERT((buffer_.index() == 0 && absl::holds_alternative<absl::string_view>(buffer_)) ||
-         (buffer_.index() != 0));
-  ASSERT((buffer_.index() == 1 && absl::holds_alternative<InlineHeaderVector>(buffer_)) ||
-         (buffer_.index() != 1));
-  return Type(buffer_.index());
 }
 
 // Specialization needed for HeaderMapImpl::HeaderList::insert() when key is LowerCaseString.
@@ -197,7 +56,7 @@ template <> bool HeaderMapImpl::HeaderList::isPseudoHeader(const LowerCaseString
 
 bool HeaderMapImpl::HeaderList::maybeMakeMap() {
   if (lazy_map_.empty()) {
-    if (headers_.size() < lazy_map_min_size_) {
+    if (headers_.size() < kMinHeadersForLazyMap) {
       return false;
     }
     // Add all entries from the list into the map.
@@ -260,19 +119,21 @@ template <> HeaderMapImpl::StaticLookupTable<RequestHeaderMap>::StaticLookupTabl
   INLINE_REQ_HEADERS(REGISTER_DEFAULT_REQUEST_HEADER)
   INLINE_REQ_RESP_HEADERS(REGISTER_DEFAULT_REQUEST_HEADER)
 
-  finalizeTable();
+  auto input = finalizedTable();
 
   // Special case where we map a legacy host header to :authority.
   const auto handle =
       CustomInlineHeaderRegistry::getInlineHeader<RequestHeaderMap::header_map_type>(
           Headers::get().Host);
-  add(Headers::get().HostLegacy.get().c_str(), [handle](HeaderMapImpl& h) -> StaticLookupResponse {
-    return {&h.inlineHeaders()[handle.value().it_->second], &handle.value().it_->first};
-  });
+  input.emplace_back(
+      Headers::get().HostLegacy.get(), [handle](HeaderMapImpl& h) -> StaticLookupResponse {
+        return {&h.inlineHeaders()[handle.value().it_->second], &handle.value().it_->first};
+      });
+  compile(std::move(input));
 }
 
 template <> HeaderMapImpl::StaticLookupTable<RequestTrailerMap>::StaticLookupTable() {
-  finalizeTable();
+  compile(finalizedTable());
 }
 
 template <> HeaderMapImpl::StaticLookupTable<ResponseHeaderMap>::StaticLookupTable() {
@@ -283,7 +144,7 @@ template <> HeaderMapImpl::StaticLookupTable<ResponseHeaderMap>::StaticLookupTab
   INLINE_REQ_RESP_HEADERS(REGISTER_RESPONSE_HEADER)
   INLINE_RESP_HEADERS_TRAILERS(REGISTER_RESPONSE_HEADER)
 
-  finalizeTable();
+  compile(finalizedTable());
 }
 
 template <> HeaderMapImpl::StaticLookupTable<ResponseTrailerMap>::StaticLookupTable() {
@@ -292,7 +153,7 @@ template <> HeaderMapImpl::StaticLookupTable<ResponseTrailerMap>::StaticLookupTa
       Headers::get().name);
   INLINE_RESP_HEADERS_TRAILERS(REGISTER_RESPONSE_TRAILER)
 
-  finalizeTable();
+  compile(finalizedTable());
 }
 
 uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data,
@@ -378,8 +239,7 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
     if (*lookup.value().entry_ == nullptr) {
       maybeCreateInline(lookup.value().entry_, *lookup.value().key_, std::move(value));
     } else {
-      const auto delimiter =
-          delimiterByHeader(*lookup.value().key_, header_map_correctly_coalesce_cookies_);
+      const auto delimiter = delimiterByHeader(*lookup.value().key_);
       const uint64_t added_size =
           appendToHeader((*lookup.value().entry_)->value(), value.getStringView(), delimiter);
       addSize(added_size);
@@ -446,7 +306,7 @@ void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view val
   // TODO(#9221): converge on and document a policy for coalescing multiple headers.
   auto entry = getExisting(key);
   if (!entry.empty()) {
-    const auto delimiter = delimiterByHeader(key, header_map_correctly_coalesce_cookies_);
+    const auto delimiter = delimiterByHeader(key);
     const uint64_t added_size = appendToHeader(entry[0]->value(), value, delimiter);
     addSize(added_size);
   } else {
@@ -641,6 +501,17 @@ size_t HeaderMapImpl::removeInline(HeaderEntryImpl** ptr_to_entry) {
   return 1;
 }
 
+ProtobufTypes::MessagePtr TunnelResponseHeadersOrTrailersImpl::serializeAsProto() const {
+  auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
+  value().iterate([&proto_out](const HeaderEntry& e) -> HeaderMap::Iterate {
+    auto* new_header = proto_out->add_headers();
+    new_header->set_key(std::string(e.key().getStringView()));
+    new_header->set_value(std::string(e.value().getStringView()));
+    return HeaderMap::Iterate::Continue;
+  });
+  return proto_out;
+}
+
 namespace {
 template <class T>
 HeaderMapImplUtility::HeaderMapImplInfo makeHeaderMapImplInfo(absl::string_view name) {
@@ -666,62 +537,6 @@ HeaderMapImplUtility::getAllHeaderMapImplInfo() {
   ret.push_back(makeHeaderMapImplInfo<ResponseHeaderMapImpl>("response header map"));
   ret.push_back(makeHeaderMapImplInfo<ResponseTrailerMapImpl>("response trailer map"));
   return ret;
-}
-
-absl::string_view RequestHeaderMapImpl::protocol() const { return getProtocolValue(); }
-
-absl::string_view RequestHeaderMapImpl::authority() const { return getHostValue(); }
-
-absl::string_view RequestHeaderMapImpl::path() const { return getPathValue(); }
-
-absl::string_view RequestHeaderMapImpl::method() const { return getMethodValue(); }
-
-void RequestHeaderMapImpl::forEach(Tracing::TraceContext::IterateCallback callback) const {
-  HeaderMapImpl::iterate([cb = std::move(callback)](const HeaderEntry& entry) {
-    if (cb(entry.key().getStringView(), entry.value().getStringView())) {
-      return HeaderMap::Iterate::Continue;
-    }
-    return HeaderMap::Iterate::Break;
-  });
-}
-
-absl::optional<absl::string_view> RequestHeaderMapImpl::getByKey(absl::string_view key) const {
-  ASSERT(validatedLowerCaseString(key));
-  auto result = const_cast<RequestHeaderMapImpl*>(this)->getExisting(key);
-
-  if (result.empty()) {
-    return absl::nullopt;
-  }
-  return result[0]->value().getStringView();
-}
-
-void RequestHeaderMapImpl::setByKey(absl::string_view key, absl::string_view val) {
-  ASSERT(validatedLowerCaseString(key));
-  HeaderMapImpl::removeExisting(key);
-
-  HeaderString new_key;
-  new_key.setCopy(key);
-  HeaderString new_val;
-  new_val.setCopy(val);
-
-  HeaderMapImpl::insertByKey(std::move(new_key), std::move(new_val));
-}
-
-void RequestHeaderMapImpl::setByReferenceKey(absl::string_view key, absl::string_view val) {
-  ASSERT(validatedLowerCaseString(key));
-  HeaderMapImpl::removeExisting(key);
-
-  HeaderString new_val;
-  new_val.setCopy(val);
-
-  HeaderMapImpl::insertByKey(HeaderString(key), std::move(new_val));
-}
-
-void RequestHeaderMapImpl::setByReference(absl::string_view key, absl::string_view val) {
-  ASSERT(validatedLowerCaseString(key));
-  HeaderMapImpl::removeExisting(key);
-
-  HeaderMapImpl::insertByKey(HeaderString(key), HeaderString(val));
 }
 
 } // namespace Http

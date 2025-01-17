@@ -9,7 +9,7 @@
 #include "envoy/stats/timespan.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/common/utility.h"
+#include "source/common/common/trie_lookup_table.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
@@ -59,7 +59,8 @@ public:
 
   virtual SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request,
                                        SplitCallbacks& callbacks, CommandStats& command_stats,
-                                       TimeSource& time_source, bool delay_command_latency) PURE;
+                                       TimeSource& time_source, bool delay_command_latency,
+                                       const StreamInfo::StreamInfo& stream_info) PURE;
 };
 
 class CommandHandlerBase {
@@ -121,7 +122,8 @@ protected:
 class ErrorFaultRequest : public SingleServerRequest {
 public:
   static SplitRequestPtr create(SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool has_delaydelay_command_latency_fault);
+                                TimeSource& time_source, bool has_delaydelay_command_latency_fault,
+                                const StreamInfo::StreamInfo& stream_info);
 
 private:
   ErrorFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
@@ -136,7 +138,8 @@ class DelayFaultRequest : public SplitRequestBase, public SplitCallbacks {
 public:
   static std::unique_ptr<DelayFaultRequest>
   create(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
-         Event::Dispatcher& dispatcher, std::chrono::milliseconds delay);
+         Event::Dispatcher& dispatcher, std::chrono::milliseconds delay,
+         const StreamInfo::StreamInfo& stream_info);
 
   DelayFaultRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
                     Event::Dispatcher& dispatcher, std::chrono::milliseconds delay)
@@ -146,11 +149,13 @@ public:
 
   // SplitCallbacks
   bool connectionAllowed() override { return callbacks_.connectionAllowed(); }
+  void onQuit() override { callbacks_.onQuit(); }
   void onAuth(const std::string& password) override { callbacks_.onAuth(password); }
   void onAuth(const std::string& username, const std::string& password) override {
     callbacks_.onAuth(username, password);
   }
   void onResponse(Common::Redis::RespValuePtr&& response) override;
+  Common::Redis::Client::Transaction& transaction() override { return callbacks_.transaction(); }
 
   // RedisProxy::CommandSplitter::SplitRequest
   void cancel() override;
@@ -173,7 +178,8 @@ class SimpleRequest : public SingleServerRequest {
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool delay_command_latency);
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
 
 private:
   SimpleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
@@ -188,11 +194,30 @@ class EvalRequest : public SingleServerRequest {
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool delay_command_latency);
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
 
 private:
   EvalRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
               bool delay_command_latency)
+      : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+};
+
+/**
+ * TransactionRequest handles commands that are part of a Redis transaction.
+ * This includes MULTI, EXEC, DISCARD, and also all the commands that are
+ * part of the transaction.
+ */
+class TransactionRequest : public SingleServerRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  TransactionRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
+                     TimeSource& time_source, bool delay_command_latency)
       : SingleServerRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 };
 
@@ -247,13 +272,34 @@ class MGETRequest : public FragmentedRequest {
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool delay_command_latency);
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
 
 private:
   MGETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
               bool delay_command_latency)
       : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 
+  // RedisProxy::CommandSplitter::FragmentedRequest
+  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
+};
+
+/**
+ * KeysRequest sends the command to all Redis server. The response from each Redis (which
+ * must be an array) is merged and returned to the user. If there is any error or failure in
+ * processing the fragmented commands, an error will be returned.
+ */
+class KeysRequest : public FragmentedRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  KeysRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
   // RedisProxy::CommandSplitter::FragmentedRequest
   void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
 };
@@ -268,7 +314,8 @@ class SplitKeysSumResultRequest : public FragmentedRequest {
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool delay_command_latency);
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
 
 private:
   SplitKeysSumResultRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -290,7 +337,8 @@ class MSETRequest : public FragmentedRequest {
 public:
   static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                 SplitCallbacks& callbacks, CommandStats& command_stats,
-                                TimeSource& time_source, bool delay_command_latency);
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
 
 private:
   MSETRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
@@ -311,9 +359,10 @@ public:
   CommandHandlerFactory(Router& router) : CommandHandlerBase(router) {}
   SplitRequestPtr startRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
                                CommandStats& command_stats, TimeSource& time_source,
-                               bool delay_command_latency) override {
+                               bool delay_command_latency,
+                               const StreamInfo::StreamInfo& stream_info) override {
     return RequestClass::create(router_, std::move(request), callbacks, command_stats, time_source,
-                                delay_command_latency);
+                                delay_command_latency, stream_info);
   }
 };
 
@@ -339,7 +388,8 @@ public:
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
-                              Event::Dispatcher& dispatcher) override;
+                              Event::Dispatcher& dispatcher,
+                              const StreamInfo::StreamInfo& stream_info) override;
 
 private:
   friend class RedisCommandSplitterImplTest;
@@ -360,7 +410,9 @@ private:
   CommandHandlerFactory<EvalRequest> eval_command_handler_;
   CommandHandlerFactory<MGETRequest> mget_handler_;
   CommandHandlerFactory<MSETRequest> mset_handler_;
+  CommandHandlerFactory<KeysRequest> keys_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
+  CommandHandlerFactory<TransactionRequest> transaction_handler_;
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;

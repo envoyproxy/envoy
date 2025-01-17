@@ -5,7 +5,7 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
 
 #include "absl/strings/match.h"
@@ -25,8 +25,8 @@ namespace Envoy {
  *
  * By convention, starting with #7083, we sort the lines of this macro block, so
  * all the counters are grouped together, then all the gauges, etc. We do not
- * use clang-format-on/off etc. "./tools/code_format/check_format.py fix" will take care of
- * lining up the backslashes.
+ * use clang-format-on/off etc. "bazel run //tools/code_format:check_format -- fix" will take
+ * care of lining up the backslashes.
  *
  * Now actually put these stats somewhere, usually as a member of a struct:
  *   struct MyCoolStats {
@@ -108,6 +108,12 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define GENERATE_STAT_NAME_STRUCT(NAME, ...) Envoy::Stats::StatName NAME##_;
 #define GENERATE_STAT_NAME_INIT(NAME, ...) , NAME##_(pool_.add(#NAME))
 
+// Used for defining constrcutors of stat objects
+#define GENERATE_CONSTRUCTOR_PARAM(NAME) Envoy::Stats::Counter &NAME,
+#define GENERATE_CONSTRUCTOR_COUNTER_PARAM(NAME) Envoy::Stats::Counter &NAME,
+#define GENERATE_CONSTRUCTOR_GAUGE_PARAM(NAME, ...) Envoy::Stats::Gauge &NAME,
+#define GENERATE_CONSTRUCTOR_INIT_LIST(NAME, ...) , NAME##_(NAME)
+
 // Macros for declaring stat-structures using StatNames, for those that must be
 // instantiated during operation, and where speed and scale matters. These
 // macros are not for direct use; they are only for use from
@@ -152,6 +158,9 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
  */
 #define MAKE_STATS_STRUCT(StatsStruct, StatNamesStruct, ALL_STATS)                                 \
   struct StatsStruct {                                                                             \
+    /* Also referenced in Stats::createDeferredCompatibleStats. */                                 \
+    using StatNameType = StatNamesStruct;                                                          \
+    static const absl::string_view typeName() { return #StatsStruct; }                             \
     StatsStruct(const StatNamesStruct& stat_names, Envoy::Stats::Scope& scope,                     \
                 Envoy::Stats::StatName prefix = Envoy::Stats::StatName())                          \
         : stat_names_(stat_names)                                                                  \
@@ -159,9 +168,8 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
                         MAKE_STATS_STRUCT_HISTOGRAM_HELPER_,                                       \
                         MAKE_STATS_STRUCT_TEXT_READOUT_HELPER_,                                    \
                         MAKE_STATS_STRUCT_STATNAME_HELPER_) {}                                     \
-    const StatNamesStruct& stat_names_;                                                            \
+    const StatNameType& stat_names_;                                                               \
     ALL_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT,           \
               GENERATE_TEXT_READOUT_STRUCT, GENERATE_STATNAME_STRUCT)                              \
   }
-
 } // namespace Envoy

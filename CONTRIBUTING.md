@@ -83,7 +83,8 @@ versioning guidelines:
   conforms to the public interface documentation should continue to compile and work within the
   deprecation window. Within this window, a warning of deprecation should be carefully logged (some
   features might need rate limiting for logging this). We make no guarantees about code or deployments
-  that rely on undocumented behavior.
+  that rely on undocumented behavior. See [extension removal policy](./EXTENSION_POLICY.md#removing-existing-extensions)
+  for more information.
 * All deprecations/breaking changes will be clearly listed in the [version history](docs/root/version_history/).
 * High risk deprecations/breaking changes may be announced to the
   [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce) email list but by default
@@ -109,7 +110,7 @@ versioning guidelines:
   build. If your PR cannot have 100% coverage for some reason please clearly explain why when you
   open it.
 * Any PR that changes user-facing behavior **must** have associated documentation in [docs](docs) as
-  well as [release notes](docs/root/version_history/current.rst). API changes should be documented
+  well as [release notes](changelogs/current.yaml). API changes should be documented
   inline with protos as per the [API contribution guidelines](api/CONTRIBUTING.md). If a change applies
   to multiple sections of the release notes, it should be noted in the first (most important) section
   that applies. For instance, a bug fix that introduces incompatible behavior should be noted in
@@ -132,15 +133,25 @@ versioning guidelines:
   for further details.
 * When all of the tests are passing and all other conditions described herein are satisfied, a
   maintainer will be assigned to review and merge the PR.
-* Once you submit a PR, *please do not rebase it*. It's much easier to review if subsequent commits
-  are new commits and/or merges. We squash rebase the final merged commit so the number of commits
-  you have in the PR don't matter.
+* Once your PR is under review, *please do not rebase it*. If you rebase, you will need to force push to
+  github, and github's user interface will force your reviewer to review the PR
+  from scratch rather than simply look at your latest changes.  It's much easier to review
+  new commits and/or merges. We squash rebase the final merged commit so the number of commits
+  you have in the PR don't matter. Again once your PR is assigned a reviewer, unless you need to fix DCO
+  *please do not force push*.  If you need to pull recent changes you can run
+  ```
+  branch=$(git status|head -1|cut -f3 -d\ )
+  git checkout main
+  git pull
+  git checkout "$branch"
+  git merge main
+  ```
 * We expect that once a PR is opened, it will be actively worked on until it is merged or closed.
   We reserve the right to close PRs that are not making progress. This is generally defined as no
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
   Closing stale PRs helps us to keep on top of all of the work currently in flight.
 * If a commit deprecates a feature, the commit message must mention what has been deprecated.
-  Additionally, the [version history](docs/root/version_history/current.rst) must be updated with
+  Additionally, the [version history](changelogs/current.yaml) must be updated with
   relevant RST links for fields and messages as part of the commit.
 * Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)
   mailing list.
@@ -190,14 +201,18 @@ Runtime guarded features may either set true (running the new code by default) i
 after a testing interval, or during the next release cycle, at the PR author's and reviewing
 maintainer's discretion. Generally all runtime guarded features will be set true when a
 release is cut. Old code paths for refactors can be cleaned up after a release and there has been
-some production run time. Old code for behavioral changes will be deprecated after six months.
+some production run time. Old code for behavioral changes will be deprecated after six months if no
+Envoy operators have raised concerns. If the behavioral change is problematic for any Envoy users,
+the maintainers team will work to find a satisfactory resolution, generally in the form of a permanent
+configuration knob for the behavioral differences.
+
 Runtime features are set true by default by inclusion in
 [source/common/runtime/runtime_features.cc](https://github.com/envoyproxy/envoy/blob/main/source/common/runtime/runtime_features.cc)
 
 There are four suggested options for testing new runtime features:
 
 1. Create a per-test Runtime::LoaderSingleton as done in [DeprecatedFieldsTest.IndividualFieldDisallowedWithRuntimeOverride](https://github.com/envoyproxy/envoy/blob/main/test/common/protobuf/utility_test.cc)
-2. Create a [parameterized test](https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#how-to-write-value-parameterized-tests)
+2. Create a [parameterized test](https://github.com/google/googletest/blob/master/docs/advanced.md#how-to-write-value-parameterized-tests)
    where the set up of the test sets the new runtime value explicitly to
    GetParam() as outlined in (1).
 3. Set up integration tests with custom runtime defaults as documented in the
@@ -209,21 +224,32 @@ Runtime code is held to the same standard as regular Envoy code, so both the old
 path and the new should have 100% coverage both with the feature defaulting true
 and false.
 
+Please note that if adding a runtime guarded feature, your [release notes](changelogs/current.yaml) should include both the functional change, and how to revert it, for example
+
+```yaml
+- area: config
+  change: |
+      type URL is used to lookup extensions regardless of the name field. This may cause problems for empty filter configurations or mis-matched protobuf as the typed configurations. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.no_extension_lookup_by_name`` to false.
+```
+
 # PR review policy for maintainers
 
 * Typically we try to turn around reviews within one business day.
 * See [OWNERS.md](OWNERS.md) for the current list of maintainers.
-* It is generally expected that a senior maintainer should review every PR.
+* It is generally expected that a senior maintainer should review every PR to
+  core code. Changes which only touch tests, extensions, tools, docs or comments
+  need only be reviewed by a maintainer, or senior extension maintainer.
 * It is also generally expected that a "domain expert" for the code the PR touches should review the
   PR. This person does not necessarily need to have commit access.
-* The previous two points generally mean that every PR should have two approvals. (Exceptions can
-  be made by the senior maintainers).
-* The above rules may be waived for PRs which only update docs or comments, or trivial changes to
-  tests and tools (where trivial is decided by the maintainer in question).
-* In general, we should also attempt to make sure that at least one of the approvals is *from an
+* For new extensions (contrib or otherwise) and features, at least one of the approvals should be *from an
   organization different from the PR author.* E.g., if Lyft authors a PR, at least one approver
   should be from an organization other than Lyft. This helps us make sure that we aren't putting
   organization specific shortcuts into the code.
+  new HTTP/3 features are largely exempt from cross-company approvals as all of the
+  area experts work at a single company, but HTTP/3 changes which impact general
+  functionality still merit a cross-company check.
+* contrib extensions do not need senior maintainer or maintainer review only contrib owner review and
+  a maintainer stamp to merge.
 * If there is a question on who should review a PR please discuss in Slack.
 * Anyone is welcome to review any PR that they want, whether they are a maintainer or not.
 * Please make sure that the PR title, commit message, and description are updated if the PR changes
@@ -253,16 +279,21 @@ Extension configuration should be located in a directory structure like
 The code for the extension should be located under the equivalent
 `source/extensions/area/plugin`, and include an *envoy_cc_extension* with the
 configuration and tagged with the appropriate security posture, and an
-*envoy_cc_library* with the code. More details on how to add a new extension
-API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-api):
+*envoy_cc_library* with the code.
 
-Other changes will likely include
+More details on how to add a new extension API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-api):
 
-  * Editing [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl) to include the new extensions
-  * Editing [source/extensions/extensions_metadata.yaml](source/extensions/extensions_metadata.yaml) to include metadata for the new extensions
-  * Editing [docs/root/api-v3/config/config.rst](docs/root/api-v3/config/config.rst) to add area/area
-  * Adding `docs/root/api-v3/config/area/area.rst` to add a table of contents for the API docs
-  * Adding `source/extensions/area/well_known_names.h` for registered plugins
+# Adding contrib extensions
+
+See [EXTENSION_POLICY.md](EXTENSION_POLICY.md) for more information on contrib. Adding a contrib
+extension mostly mirrors adding a normal extension above. Some differences are noted here:
+
+* API files should be added in `api/contrib/envoy/`, but the protos' namespaces should still be as
+  in normal extensions (which will make file movement easier later if the extension gets promoted
+  to core).
+* Build config and metadata should be included in [contrib/contrib_build_config.bzl](contrib/contrib_build_config.bzl)
+  and [contrib/extensions_metadata.yaml](contrib/extensions_metadata.yaml).
+* An entrypoint should be added in `docs/root/api-v3/config/contrib/contrib.rst`
 
 # DCO: Sign your work
 
@@ -375,3 +406,11 @@ re-run all the CI tasks. Consider adding an alias into your `.gitconfig` file:
 
 Once you add this alias you can issue the command `git kick-ci` and the PR
 will be sent back for a retest.
+
+# Repo Etiquette
+
+Contributors with push-access to the Envoy project should prefer pushing changes to a personal fork,
+including when creating branches for pull requests.
+
+This helps keep the Envoy repo as lean as possible, which can speed up cloning and synchronizing
+operations for both developers and CI.

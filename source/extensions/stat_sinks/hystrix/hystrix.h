@@ -9,7 +9,7 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
 
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,8 +48,8 @@ using ClusterStatsCachePtr = std::unique_ptr<ClusterStatsCache>;
 class HystrixSink : public Stats::Sink, public Logger::Loggable<Logger::Id::hystrix> {
 public:
   HystrixSink(Server::Configuration::ServerFactoryContext& server, uint64_t num_buckets);
-  Http::Code handlerHystrixEventStream(absl::string_view, Http::ResponseHeaderMap& response_headers,
-                                       Buffer::Instance&, Server::AdminStream& admin_stream);
+  Http::Code handlerHystrixEventStream(Http::ResponseHeaderMap& response_headers, Buffer::Instance&,
+                                       Server::AdminStream& admin_stream);
   void flush(Stats::MetricSnapshot& snapshot) override;
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override{};
 

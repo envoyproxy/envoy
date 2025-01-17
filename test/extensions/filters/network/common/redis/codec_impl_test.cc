@@ -427,6 +427,424 @@ TEST_F(RedisEncoderDecoderImplTest, InvalidBulkStringExpectLF) {
   EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
 }
 
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleWord) {
+  RespValue ping;
+  ping.type(RespType::BulkString);
+  ping.asString() = "ping";
+
+  buffer_.add("ping\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(ping, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandMultipleWords) {
+  RespValue echo;
+  echo.type(RespType::BulkString);
+  echo.asString() = "echo";
+
+  RespValue hello;
+  hello.type(RespType::BulkString);
+  hello.asString() = "hello";
+
+  buffer_.add("echo hello\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(2UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(echo, decoded_values_[0]->asArray()[0]);
+  EXPECT_EQ(hello, decoded_values_[0]->asArray()[1]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandNumericWord) {
+  RespValue answer;
+  answer.type(RespType::BulkString);
+  answer.asString() = "42";
+
+  buffer_.add("42\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(answer, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandNumericArgument) {
+  RespValue echo;
+  echo.type(RespType::BulkString);
+  echo.asString() = "echo";
+
+  RespValue answer;
+  answer.type(RespType::BulkString);
+  answer.asString() = "42";
+
+  buffer_.add("echo 42\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(2UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(echo, decoded_values_[0]->asArray()[0]);
+  EXPECT_EQ(answer, decoded_values_[0]->asArray()[1]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandTrimWhitespace) {
+  RespValue ping;
+  ping.type(RespType::BulkString);
+  ping.asString() = "ping";
+
+  buffer_.add("   ping   \r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(ping, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedEmpty) {
+  RespValue empty;
+  empty.type(RespType::BulkString);
+  empty.asString() = "";
+
+  buffer_.add("\"\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(empty, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedCommand) {
+  RespValue ping;
+  ping.type(RespType::BulkString);
+  ping.asString() = "ping";
+
+  buffer_.add("\"ping\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(ping, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedArgument) {
+  RespValue echo;
+  echo.type(RespType::BulkString);
+  echo.asString() = "echo";
+
+  RespValue hello;
+  hello.type(RespType::BulkString);
+  hello.asString() = "hello world";
+
+  buffer_.add("echo \"hello world\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(2UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(echo, decoded_values_[0]->asArray()[0]);
+  EXPECT_EQ(hello, decoded_values_[0]->asArray()[1]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedEmptyArgument) {
+  RespValue echo;
+  echo.type(RespType::BulkString);
+  echo.asString() = "echo";
+
+  RespValue empty;
+  empty.type(RespType::BulkString);
+  empty.asString() = "";
+
+  buffer_.add("echo \"\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(2UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(echo, decoded_values_[0]->asArray()[0]);
+  EXPECT_EQ(empty, decoded_values_[0]->asArray()[1]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedWhitespace) {
+  RespValue set;
+  set.type(RespType::BulkString);
+  set.asString() = "set";
+
+  RespValue foobarbaz;
+  foobarbaz.type(RespType::BulkString);
+  foobarbaz.asString() = "foo 'bar' baz";
+
+  RespValue quux;
+  quux.type(RespType::BulkString);
+  quux.asString() = "quux";
+
+  buffer_.add("set \"foo 'bar' baz\" quux\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(3UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(set, decoded_values_[0]->asArray()[0]);
+  EXPECT_EQ(foobarbaz, decoded_values_[0]->asArray()[1]);
+  EXPECT_EQ(quux, decoded_values_[0]->asArray()[2]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedTrimWhitespace) {
+  RespValue echo;
+  echo.type(RespType::BulkString);
+  echo.asString() = "echo";
+
+  buffer_.add("   \"echo\"   \r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(echo, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedEscapes) {
+  RespValue unescaped;
+  unescaped.type(RespType::BulkString);
+  unescaped.asString() = "\\\"\x01\n\r\t\b\a";
+
+  buffer_.add("\"\\\\\\\"\\x01\\n\\r\\t\\b\\a\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedInvalidEscapes) {
+  RespValue unescaped;
+  unescaped.type(RespType::BulkString);
+  unescaped.asString() = "xyucx0";
+
+  buffer_.add("\"\\xyu\\c\\x0\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleQuotedCommand) {
+  RespValue echo;
+  echo.type(RespType::BulkString);
+  echo.asString() = "echo";
+
+  buffer_.add("'echo'\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(echo, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleQuotedArgument) {
+  RespValue echo;
+  echo.type(RespType::BulkString);
+  echo.asString() = "echo";
+
+  RespValue hello;
+  hello.type(RespType::BulkString);
+  hello.asString() = "hello world";
+
+  buffer_.add("echo 'hello world'\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(2UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(echo, decoded_values_[0]->asArray()[0]);
+  EXPECT_EQ(hello, decoded_values_[0]->asArray()[1]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleQuotedEmptyArgument) {
+  RespValue echo;
+  echo.type(RespType::BulkString);
+  echo.asString() = "echo";
+
+  RespValue hello;
+  hello.type(RespType::BulkString);
+  hello.asString() = "";
+
+  buffer_.add("echo ''\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(2UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(echo, decoded_values_[0]->asArray()[0]);
+  EXPECT_EQ(hello, decoded_values_[0]->asArray()[1]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleQuotedWhitespace) {
+  RespValue set;
+  set.type(RespType::BulkString);
+  set.asString() = "set";
+
+  RespValue foobarbaz;
+  foobarbaz.type(RespType::BulkString);
+  foobarbaz.asString() = "foo \"bar\" baz";
+
+  RespValue quux;
+  quux.type(RespType::BulkString);
+  quux.asString() = "quux";
+
+  buffer_.add("set 'foo \"bar\" baz' quux\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(3UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(set, decoded_values_[0]->asArray()[0]);
+  EXPECT_EQ(foobarbaz, decoded_values_[0]->asArray()[1]);
+  EXPECT_EQ(quux, decoded_values_[0]->asArray()[2]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleQuotedTrimWhitespace) {
+  RespValue echo;
+  echo.type(RespType::BulkString);
+  echo.asString() = "echo";
+
+  buffer_.add("   'echo'   \r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(echo, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleQuotedEscapes) {
+  RespValue unescaped;
+  unescaped.type(RespType::BulkString);
+  unescaped.asString() = "'";
+
+  buffer_.add("'\\''\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleQuotedInvalidEscapes) {
+  RespValue unescaped;
+  unescaped.type(RespType::BulkString);
+  unescaped.asString() = "\\x01";
+
+  buffer_.add("'\\x01'\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InterleaveInlineCommand) {
+  RespValue echo;
+  echo.type(RespType::BulkString);
+  echo.asString() = "echo";
+
+  RespValue foo;
+  foo.type(RespType::BulkString);
+  foo.asString() = "foo";
+
+  RespValue set;
+  set.type(RespType::BulkString);
+  set.asString() = "set";
+
+  RespValue foobar;
+  foobar.type(RespType::BulkString);
+  foobar.asString() = "foo bar";
+
+  RespValue baz;
+  baz.type(RespType::BulkString);
+  baz.asString() = "baz";
+
+  RespValue ping;
+  ping.type(RespType::BulkString);
+  ping.asString() = "ping";
+
+  buffer_.add("*2\r\n$4\r\necho\r\n$3\r\nfoo\r\nset baz \"foo bar\"\r\n*1\r\n$4\r\nping\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(3UL, decoded_values_.size());
+
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(2UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(echo, decoded_values_[0]->asArray()[0]);
+  EXPECT_EQ(foo, decoded_values_[0]->asArray()[1]);
+
+  EXPECT_EQ(RespType::Array, decoded_values_[1]->type());
+  EXPECT_EQ(3UL, decoded_values_[1]->asArray().size());
+  EXPECT_EQ(set, decoded_values_[1]->asArray()[0]);
+  EXPECT_EQ(baz, decoded_values_[1]->asArray()[1]);
+  EXPECT_EQ(foobar, decoded_values_[1]->asArray()[2]);
+
+  EXPECT_EQ(RespType::Array, decoded_values_[2]->type());
+  EXPECT_EQ(1UL, decoded_values_[2]->asArray().size());
+  EXPECT_EQ(ping, decoded_values_[2]->asArray()[0]);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandQuoting1) {
+  buffer_.add("\"\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandQuoting2) {
+  buffer_ = Buffer::OwnedImpl();
+  buffer_.add("\"\"\"\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandQuoting3) {
+  buffer_ = Buffer::OwnedImpl();
+  buffer_.add("\"foo\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandQuoting4) {
+  buffer_ = Buffer::OwnedImpl();
+  buffer_.add("\" foo\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandQuoting5) {
+  buffer_ = Buffer::OwnedImpl();
+  buffer_.add("\"fo\"o\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting1) {
+  buffer_.add("'\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting2) {
+  buffer_ = Buffer::OwnedImpl();
+  buffer_.add("'''\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting3) {
+  buffer_ = Buffer::OwnedImpl();
+  buffer_.add("'foo\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting4) {
+  buffer_ = Buffer::OwnedImpl();
+  buffer_.add("' foo\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InvalidInlineCommandSingleQuoting5) {
+  buffer_ = Buffer::OwnedImpl();
+  buffer_.add("'fo'o\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
+TEST_F(RedisEncoderDecoderImplTest, InvalidInterjectedInlineCommand) {
+  buffer_.add("*1\r\nECHO\r\n");
+  EXPECT_THROW(decoder_.decode(buffer_), ProtocolError);
+}
+
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters

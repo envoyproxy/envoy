@@ -30,7 +30,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
     // We don't support other lookups other than A and AAAA. Set success here so that we don't
     // retry for something that we are certain will fail.
     ENVOY_LOG(debug, "Unknown query type [{}] for upstream lookup", domain_query->type_);
-    ctx.query_context->resolution_status_ = Network::DnsResolver::ResolutionStatus::Success;
+    ctx.query_context->resolution_status_ = Network::DnsResolver::ResolutionStatus::Completed;
     ctx.resolver_status = DnsFilterResolverStatus::Complete;
     invokeCallback(ctx);
     return;
@@ -59,7 +59,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
   // Define the callback that is executed when resolution completes
   // Resolve the address in the query and add to the resolved_hosts vector
   resolver_->resolve(domain_query->name_, lookup_family,
-                     [this, id](Network::DnsResolver::ResolutionStatus status,
+                     [this, id](Network::DnsResolver::ResolutionStatus status, absl::string_view,
                                 std::list<Network::DnsResponse>&& response) -> void {
                        auto ctx_iter = lookups_.find(id);
 
@@ -87,13 +87,15 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
                        ctx.resolver_status = DnsFilterResolverStatus::Complete;
 
                        // C-ares doesn't expose the TTL in the data available here.
-                       if (status == Network::DnsResolver::ResolutionStatus::Success) {
+                       if (status == Network::DnsResolver::ResolutionStatus::Completed) {
                          ctx.resolved_hosts.reserve(response.size());
                          for (const auto& resp : response) {
-                           ASSERT(resp.address_ != nullptr);
+                           const auto& addrinfo = resp.addrInfo();
+                           ASSERT(addrinfo.address_ != nullptr);
                            ENVOY_LOG(trace, "Resolved address: {} for {}",
-                                     resp.address_->ip()->addressAsString(), ctx.query_rec->name_);
-                           ctx.resolved_hosts.emplace_back(std::move(resp.address_));
+                                     addrinfo.address_->ip()->addressAsString(),
+                                     ctx.query_rec->name_);
+                           ctx.resolved_hosts.emplace_back(std::move(addrinfo.address_));
                          }
                        }
                        // Invoke the filter callback notifying it of resolved addresses

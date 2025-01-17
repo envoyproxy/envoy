@@ -51,38 +51,27 @@ using ::testing::SaveArg;
 } // namespace
 
 inline Config constructConfigFromYaml(const std::string& yaml,
-                                      Server::Configuration::FactoryContext& context,
-                                      bool avoid_boosting = true) {
+                                      Server::Configuration::FactoryContext& context) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy, false, avoid_boosting);
-  return Config(tcp_proxy, context);
+  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy);
+  return {tcp_proxy, context};
 }
 
-inline Config constructConfigFromV3Yaml(const std::string& yaml,
-                                        Server::Configuration::FactoryContext& context,
-                                        bool avoid_boosting = true) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  TestUtility::loadFromYamlAndValidate(yaml, tcp_proxy, false, avoid_boosting);
-  return Config(tcp_proxy, context);
-}
-
-class TcpProxyTestBase : public testing::Test {
+class TcpProxyTestBase : public testing::TestWithParam<bool> {
 public:
   TcpProxyTestBase() {
-    ON_CALL(*factory_context_.access_log_manager_.file_, write(_))
+    scoped_runtime_.mergeValues({{"envoy.restart_features.upstream_http_filters_with_tcp_proxy",
+                                  GetParam() ? "true" : "false"}});
+    ON_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
-    ON_CALL(filter_callbacks_.connection_.stream_info_, onUpstreamHostSelected(_))
-        .WillByDefault(Invoke(
-            [this](Upstream::HostDescriptionConstSharedPtr host) { upstream_host_ = host; }));
-    ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamHost())
-        .WillByDefault(ReturnPointee(&upstream_host_));
     ON_CALL(filter_callbacks_.connection_.stream_info_, setUpstreamClusterInfo(_))
         .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
           upstream_cluster_ = cluster_info;
         }));
     ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamClusterInfo())
         .WillByDefault(ReturnPointee(&upstream_cluster_));
-    factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
+    factory_context_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"fake_cluster"});
   }
 
   ~TcpProxyTestBase() override {
@@ -98,8 +87,7 @@ public:
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy defaultConfig() {
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
     config.set_stat_prefix("name");
-    auto* route = config.mutable_hidden_envoy_deprecated_deprecated_v1()->mutable_routes()->Add();
-    route->set_cluster("fake_cluster");
+    config.set_cluster("fake_cluster");
     return config;
   }
 
@@ -135,7 +123,7 @@ public:
   void raiseEventUpstreamConnected(uint32_t conn_index) {
     EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
     EXPECT_CALL(*upstream_connection_data_.at(conn_index), addUpstreamCallbacks(_))
-        .WillOnce(Invoke([=](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
+        .WillOnce(Invoke([=, this](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
 
           // Simulate TCP conn pool upstream callbacks. This is safe because the TCP proxy never
@@ -148,9 +136,12 @@ public:
                       upstream_hosts_.at(conn_index));
   }
 
-  void raiseEventUpstreamConnectFailed(uint32_t conn_index,
-                                       ConnectionPool::PoolFailureReason reason) {
-    conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, "", upstream_hosts_.at(conn_index));
+  void raiseEventUpstreamConnectFailed(
+      uint32_t conn_index, ConnectionPool::PoolFailureReason reason,
+      absl::optional<absl::string_view> failure_message = absl::nullopt) {
+    conn_pool_callbacks_.at(conn_index)
+        ->onPoolFailure(reason, failure_message ? *failure_message : "",
+                        upstream_hosts_.at(conn_index));
   }
 
   Tcp::ConnectionPool::Cancellable* onNewConnection(Tcp::ConnectionPool::Cancellable* connection) {
@@ -162,7 +153,9 @@ public:
     return connection;
   }
 
-  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
+  Event::TestTimeSystem& timeSystem() {
+    return factory_context_.server_factory_context_.timeSystem();
+  }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   ConfigSharedPtr config_;
@@ -184,6 +177,7 @@ public:
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   Upstream::ClusterInfoConstSharedPtr upstream_cluster_{};
   std::string redirect_records_data_ = "some data";
+  TestScopedRuntime scoped_runtime_;
 };
 
 } // namespace TcpProxy

@@ -3,14 +3,15 @@
 #include "envoy/event/file_event.h"
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/proxy_protocol.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/filters/listener//proxy_protocol/proxy_protocol_header.h"
 
 #include "absl/container/flat_hash_map.h"
-#include "proxy_protocol_header.h"
 
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_ADDR_LEN_UNIX;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V2_HEADER_LEN;
@@ -23,19 +24,80 @@ namespace ProxyProtocol {
 using KeyValuePair =
     envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol::KeyValuePair;
 
+using ProxyProtocolVersion = Envoy::Network::ProxyProtocolVersion;
+
+enum class ReadOrParseState { Done, TryAgainLater, Error, Denied };
+
 /**
- * All stats for the proxy protocol. @see stats_macros.h
+ * Legacy stats that are under the root scope, not under the filter's scope.
+ * Kept for backwards compatibility.
+ * @deprecated Use GeneralProxyProtocolStats instead.
+ * @see stats_macros.h
  */
 // clang-format off
-#define ALL_PROXY_PROTOCOL_STATS(COUNTER)                                                          \
+#define LEGACY_PROXY_PROTOCOL_STATS(COUNTER)                                          \
   COUNTER(downstream_cx_proxy_proto_error)
 // clang-format on
+
+struct LegacyProxyProtocolStats {
+  LEGACY_PROXY_PROTOCOL_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * Stats reported for the filter, rooted under the filter's scope.
+ * @see stats_macros.h
+ */
+// clang-format off
+#define GENERAL_PROXY_PROTOCOL_STATS(COUNTER)                                         \
+  COUNTER(not_found_allowed)                                                          \
+  COUNTER(not_found_disallowed)
+// clang-format on
+
+struct GeneralProxyProtocolStats {
+  GENERAL_PROXY_PROTOCOL_STATS(GENERATE_COUNTER_STRUCT)
+
+  /**
+   * Increment the stats for the given filter decision.
+   */
+  void increment(ReadOrParseState decision);
+};
+
+/**
+ * Stats reported for each version of the proxy protocol.
+ * @see stats_macros.h
+ */
+// clang-format off
+#define VERSIONED_PROXY_PROTOCOL_STATS(COUNTER)  \
+  COUNTER(found)                                 \
+  COUNTER(disallowed)                            \
+  COUNTER(error)
+// clang-format on
+
+struct VersionedProxyProtocolStats {
+  VERSIONED_PROXY_PROTOCOL_STATS(GENERATE_COUNTER_STRUCT)
+
+  /**
+   * Increment the stats for the given filter decision.
+   */
+  void increment(ReadOrParseState decision);
+};
 
 /**
  * Definition of all stats for the proxy protocol. @see stats_macros.h
  */
 struct ProxyProtocolStats {
-  ALL_PROXY_PROTOCOL_STATS(GENERATE_COUNTER_STRUCT)
+  LegacyProxyProtocolStats legacy_;
+  GeneralProxyProtocolStats general_;
+  VersionedProxyProtocolStats v1_;
+  VersionedProxyProtocolStats v2_;
+
+  /**
+   * Create an instance of the stats struct with all stats for the filter.
+   *
+   * For backwards compatibility, the legacy stats are rooted under their own scope.
+   * The general and versioned stats are correctly rooted at this filter's own scope.
+   */
+  static ProxyProtocolStats create(Stats::Scope& scope, absl::string_view stat_prefix);
 };
 
 /**
@@ -60,15 +122,33 @@ public:
    */
   size_t numberOfNeededTlvTypes() const;
 
+  /**
+   * Return true if the type of TLV is needed for pass-through.
+   */
+  bool isPassThroughTlvTypeNeeded(uint8_t type) const;
+
+  /**
+   * Filter configuration that determines if we should pass-through requests without
+   * proxy protocol. Should only be configured to true for trusted downstreams.
+   */
+  bool allowRequestsWithoutProxyProtocol() const;
+
+  /**
+   * Filter configuration that determines if a version is disallowed.
+   */
+  bool isVersionV1Allowed() const;
+  bool isVersionV2Allowed() const;
+
 private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
+  const bool allow_requests_without_proxy_protocol_;
+  const bool pass_all_tlvs_;
+  absl::flat_hash_set<uint8_t> pass_through_tlvs_{};
+  bool allow_v1_{true};
+  bool allow_v2_{true};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
-
-enum ProxyProtocolVersion { Unknown = -1, InProgress = -2, V1 = 1, V2 = 2 };
-
-enum class ReadOrParseState { Done, TryAgainLater, Error };
 
 /**
  * Implementation the PROXY Protocol listener filter
@@ -86,6 +166,8 @@ public:
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
+  Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
+  size_t maxReadBytes() const override { return max_proxy_protocol_len_; }
 
 private:
   static const size_t MAX_PROXY_PROTO_LEN_V2 =
@@ -93,57 +175,40 @@ private:
   static const size_t MAX_PROXY_PROTO_LEN_V1 = 108;
 
   void onRead();
-  ReadOrParseState onReadWorker();
+  ReadOrParseState parseBuffer(Network::ListenerFilterBuffer& buffer);
 
   /**
    * Helper function that attempts to read the proxy header
    * (delimited by \r\n if V1 format, or with length if V2)
-   * @return bool true valid header, false if more data is needed or socket errors occurred.
+   * @return ReadOrParseState
    */
-  ReadOrParseState readProxyHeader(Network::IoHandle& io_handle);
+  ReadOrParseState readProxyHeader(Network::ListenerFilterBuffer& buffer);
 
-  /**
-   * Parse (and discard unknown) header extensions (until hdr.extensions_length == 0)
-   */
-  ReadOrParseState parseExtensions(Network::IoHandle& io_handle, uint8_t* buf, size_t buf_size,
-                                   size_t* buf_off = nullptr);
-  bool parseTlvs(const std::vector<uint8_t>& tlvs);
-  ReadOrParseState readExtensions(Network::IoHandle& io_handle);
+  bool parseTlvs(const uint8_t* buf, size_t len);
+  ReadOrParseState readExtensions(Network::ListenerFilterBuffer& buffer);
 
   /**
    * Given a char * & len, parse the header as per spec.
    * @return bool true if parsing succeeded, false if parsing failed.
    */
-  bool parseV1Header(char* buf, size_t len);
-  bool parseV2Header(char* buf);
-  absl::optional<size_t> lenV2Address(char* buf);
+  bool parseV1Header(const char* buf, size_t len);
+  bool parseV2Header(const char* buf);
+  absl::optional<size_t> lenV2Address(const char* buf);
 
   Network::ListenerFilterCallbacks* cb_{};
-
-  // The offset in buf_ that has been fully read
-  size_t buf_off_{};
 
   // The index in buf_ where the search for '\r\n' should continue from
   size_t search_index_{1};
 
-  ProxyProtocolVersion header_version_{Unknown};
-
-  // Stores the portion of the first line that has been read so far.
-  char buf_[MAX_PROXY_PROTO_LEN_V2];
-
-  /**
-   * Store the extension TLVs if they need to be read.
-   */
-  std::vector<uint8_t> buf_tlv_;
-
-  /**
-   * The index in buf_tlv_ that has been fully read.
-   */
-  size_t buf_tlv_off_{};
+  ProxyProtocolVersion header_version_{ProxyProtocolVersion::NotFound};
 
   ConfigSharedPtr config_;
 
   absl::optional<WireHeader> proxy_protocol_header_;
+  size_t max_proxy_protocol_len_{MAX_PROXY_PROTO_LEN_V2};
+
+  // Store the parsed proxy protocol TLVs.
+  Network::ProxyProtocolTLVVector parsed_tlvs_;
 };
 
 } // namespace ProxyProtocol

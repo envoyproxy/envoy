@@ -11,7 +11,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 # HTTP L7 filter that performs oauth.
-# Public docs: docs/root/configuration/http_filters/oauth_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter
 
 envoy_cc_library(
     name = "oauth_callback_interface",
@@ -31,6 +31,7 @@ envoy_cc_library(
         ":oauth_response_cc_proto",
         "//envoy/http:async_client_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:base64_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:message_validator_lib",
@@ -47,15 +48,18 @@ envoy_cc_library(
         ":oauth_client",
         "//envoy/server:filter_config_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:base64_lib",
         "//source/common/common:empty_string",
-        "//source/common/config:datasource_lib",
+        "//source/common/common:matchers_lib",
+        "//source/common/crypto:utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
-        "//source/common/http:rest_api_fetcher_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/common/crypto:utility_lib",
+        "//source/common/secret:secret_provider_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@com_github_google_jwt_verify//:jwt_verify_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/oauth2/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
 )
 
@@ -67,6 +71,6 @@ envoy_cc_extension(
         ":oauth_lib",
         "//envoy/registry",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/oauth2/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/oauth2/v3:pkg_cc_proto",
     ],
 )

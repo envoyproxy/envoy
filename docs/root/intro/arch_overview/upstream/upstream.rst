@@ -1,3 +1,5 @@
+.. _arch_overview_clusters:
+
 Upstream clusters
 =================
 
@@ -15,3 +17,4 @@ Upstream clusters
   circuit_breaking
   upstream_filters
   load_reporting_service
+  load_balancing_policies

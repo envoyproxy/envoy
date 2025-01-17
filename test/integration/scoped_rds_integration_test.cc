@@ -7,256 +7,173 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/api_version.h"
-#include "source/common/config/version_converter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/scoped_rds.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
+#include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace {
 
-class ScopedRdsIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::DeltaSotwIntegrationParamTest {
+class InlineScopedRoutesIntegrationTest
+    : public HttpIntegrationTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
-  struct FakeUpstreamInfo {
-    FakeHttpConnectionPtr connection_;
-    FakeUpstream* upstream_{};
-    absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
-  };
+  InlineScopedRoutesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  ScopedRdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
-
-  ~ScopedRdsIntegrationTest() override { resetConnections(); }
-
-  void initialize() override {
-    // Setup two upstream hosts, one for each cluster.
-    setUpstreamCount(2);
-
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Add the static cluster to serve SRDS.
-      auto* cluster_1 = bootstrap.mutable_static_resources()->add_clusters();
-      cluster_1->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      cluster_1->set_name("cluster_1");
-
-      // Add the static cluster to serve SRDS.
-      auto* scoped_rds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      scoped_rds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      scoped_rds_cluster->set_name("srds_cluster");
-      ConfigHelper::setHttp2(*scoped_rds_cluster);
-
-      // Add the static cluster to serve RDS.
-      auto* rds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      rds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      rds_cluster->set_name("rds_cluster");
-      ConfigHelper::setHttp2(*rds_cluster);
-    });
-
+  void setScopedRoutesConfig(absl::string_view config_yaml) {
     config_helper_.addConfigModifier(
-        [this](
+        [config_yaml](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                http_connection_manager) {
-          const std::string& scope_key_builder_config_yaml = R"EOF(
-fragments:
-  - header_value_extractor:
-      name: Addr
-      element_separator: ;
-      element:
-        key: x-foo-key
-        separator: =
-)EOF";
-          envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-              ScopeKeyBuilder scope_key_builder;
-          TestUtility::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
-          auto* scoped_routes = http_connection_manager.mutable_scoped_routes();
-          scoped_routes->set_name(srds_config_name_);
-          *scoped_routes->mutable_scope_key_builder() = scope_key_builder;
-
-          // Set resource api version for rds.
-          envoy::config::core::v3::ConfigSource* rds_config_source =
-              scoped_routes->mutable_rds_config_source();
-          rds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-
-          // Set transport api version for rds.
-          envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
-              rds_config_source->mutable_api_config_source();
-          rds_api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-
-          // Add grpc service for rds.
-          rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-          envoy::config::core::v3::GrpcService* grpc_service =
-              rds_api_config_source->add_grpc_services();
-          setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
-
-          // Set resource api version for scoped rds.
-          envoy::config::core::v3::ConfigSource* srds_config_source =
-              scoped_routes->mutable_scoped_rds()->mutable_scoped_rds_config_source();
-          srds_config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-          if (!srds_resources_locator_.empty()) {
-            scoped_routes->mutable_scoped_rds()->set_srds_resources_locator(
-                srds_resources_locator_);
-          }
-
-          // Set Transport api version for scoped_rds.
-          envoy::config::core::v3::ApiConfigSource* srds_api_config_source =
-              srds_config_source->mutable_api_config_source();
-          srds_api_config_source->set_transport_api_version(
-              envoy::config::core::v3::ApiVersion::V3);
-
-          // Add grpc service for scoped rds.
-          if (isDelta()) {
-            srds_api_config_source->set_api_type(
-                envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
-          } else {
-            srds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-          }
-          srds_api_config_source->set_transport_api_version(
-              envoy::config::core::v3::ApiVersion::V3);
-          grpc_service = srds_api_config_source->add_grpc_services();
-          setGrpcService(*grpc_service, "srds_cluster", getScopedRdsFakeUpstream().localAddress());
+                hcm) {
+          envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes*
+              scoped_routes = hcm.mutable_scoped_routes();
+          const std::string scoped_routes_yaml = absl::StrCat(R"EOF(
+name: foo-scoped-routes
+scope_key_builder:
+  fragments:
+    - header_value_extractor:
+        name: Addr
+        element_separator: ;
+        element:
+          key: x-foo-key
+          separator: =
+)EOF",
+                                                              config_yaml);
+          TestUtility::loadFromYaml(scoped_routes_yaml, *scoped_routes);
         });
-    HttpIntegrationTest::initialize();
   }
-
-  void createUpstreams() override {
-    HttpIntegrationTest::createUpstreams();
-    // Create the SRDS upstream.
-    addFakeUpstream(Http::CodecType::HTTP2);
-    // Create the RDS upstream.
-    addFakeUpstream(Http::CodecType::HTTP2);
-  }
-
-  void resetFakeUpstreamInfo(FakeUpstreamInfo* upstream_info) {
-    if (upstream_info->upstream_ == nullptr) {
-      return;
-    }
-
-    AssertionResult result = upstream_info->connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = upstream_info->connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-    upstream_info->connection_.reset();
-  }
-
-  void resetConnections() {
-    if (rds_upstream_info_.upstream_ != nullptr) {
-      resetFakeUpstreamInfo(&rds_upstream_info_);
-    }
-    resetFakeUpstreamInfo(&scoped_rds_upstream_info_);
-  }
-
-  FakeUpstream& getRdsFakeUpstream() const { return *fake_upstreams_[3]; }
-
-  FakeUpstream& getScopedRdsFakeUpstream() const { return *fake_upstreams_[2]; }
-
-  void createStream(FakeUpstreamInfo* upstream_info, FakeUpstream& upstream,
-                    const std::string& resource_name) {
-    if (upstream_info->upstream_ == nullptr) {
-      // bind upstream if not yet.
-      upstream_info->upstream_ = &upstream;
-      AssertionResult result =
-          upstream_info->upstream_->waitForHttpConnection(*dispatcher_, upstream_info->connection_);
-      RELEASE_ASSERT(result, result.message());
-    }
-    if (!upstream_info->stream_by_resource_name_.try_emplace(resource_name, nullptr).second) {
-      RELEASE_ASSERT(false,
-                     fmt::format("stream with resource name '{}' already exists!", resource_name));
-    }
-    auto result = upstream_info->connection_->waitForNewStream(
-        *dispatcher_, upstream_info->stream_by_resource_name_[resource_name]);
-    RELEASE_ASSERT(result, result.message());
-    upstream_info->stream_by_resource_name_[resource_name]->startGrpcStream();
-  }
-
-  void createRdsStream(const std::string& resource_name) {
-    createStream(&rds_upstream_info_, getRdsFakeUpstream(), resource_name);
-  }
-
-  void createScopedRdsStream() {
-    createStream(&scoped_rds_upstream_info_, getScopedRdsFakeUpstream(), srds_config_name_);
-  }
-
-  void sendRdsResponse(const std::string& route_config, const std::string& version) {
-    envoy::service::discovery::v3::DiscoveryResponse response;
-    std::string route_conguration_type_url =
-        "type.googleapis.com/envoy.config.route.v3.RouteConfiguration";
-    response.set_version_info(version);
-    response.set_type_url(route_conguration_type_url);
-    auto route_configuration =
-        TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
-    response.add_resources()->PackFrom(route_configuration);
-    ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
-    rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
-        response);
-  }
-
-  void sendSrdsResponse(const std::vector<std::string>& sotw_list,
-                        const std::vector<std::string>& to_add_list,
-                        const std::vector<std::string>& to_delete_list,
-                        const std::string& version) {
-    if (isDelta()) {
-      sendDeltaScopedRdsResponse(to_add_list, to_delete_list, version);
-    } else {
-      sendSotwScopedRdsResponse(sotw_list, version);
-    }
-  }
-
-  void sendDeltaScopedRdsResponse(const std::vector<std::string>& to_add_list,
-                                  const std::vector<std::string>& to_delete_list,
-                                  const std::string& version) {
-    ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
-    std::string scoped_route_configuration_type_url =
-        "type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration";
-    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
-    response.set_system_version_info(version);
-    response.set_type_url(scoped_route_configuration_type_url);
-
-    for (const auto& scope_name : to_delete_list) {
-      *response.add_removed_resources() = scope_name;
-    }
-    for (const auto& resource_proto : to_add_list) {
-      envoy::config::route::v3::ScopedRouteConfiguration scoped_route_proto;
-      TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
-      auto resource = response.add_resources();
-      resource->set_name(scoped_route_proto.name());
-      resource->set_version(version);
-      resource->mutable_resource()->PackFrom(scoped_route_proto);
-    }
-    scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
-        response);
-  }
-
-  void sendSotwScopedRdsResponse(const std::vector<std::string>& resource_protos,
-                                 const std::string& version) {
-    ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
-
-    std::string scoped_route_configuration_type_url =
-        "type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration";
-    envoy::service::discovery::v3::DiscoveryResponse response;
-    response.set_version_info(version);
-    response.set_type_url(scoped_route_configuration_type_url);
-
-    for (const auto& resource_proto : resource_protos) {
-      envoy::config::route::v3::ScopedRouteConfiguration scoped_route_proto;
-      TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
-      response.add_resources()->PackFrom(scoped_route_proto);
-    }
-    scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
-        response);
-  }
-
-  bool isDelta() { return sotwOrDelta() == Grpc::SotwOrDelta::Delta; }
-
-  const std::string srds_config_name_{"foo-scoped-routes"};
-  FakeUpstreamInfo scoped_rds_upstream_info_;
-  FakeUpstreamInfo rds_upstream_info_;
-  std::string srds_resources_locator_;
 };
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, InlineScopedRoutesIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(InlineScopedRoutesIntegrationTest, NoScopeFound) {
+  absl::string_view config_yaml = R"EOF(
+scoped_route_configurations_list:
+  scoped_route_configurations:
+    - name: foo-scope
+      route_configuration:
+        name: foo
+        virtual_hosts:
+          - name: bar
+            domains: ["*"]
+            routes:
+              - match: { prefix: "/" }
+                route: { cluster: cluster_0 }
+      key:
+        fragments: { string_key: foo }
+)EOF";
+  setScopedRoutesConfig(config_yaml);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     // "xyz-route" is not a configured scope key.
+                                     {"Addr", "x-foo-key=xyz-route"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(InlineScopedRoutesIntegrationTest, ScopeWithSingleRouteConfiguration) {
+  absl::string_view config_yaml = R"EOF(
+scoped_route_configurations_list:
+  scoped_route_configurations:
+    - name: foo-scope
+      route_configuration:
+        name: foo
+        virtual_hosts:
+          - name: bar
+            domains: ["*"]
+            routes:
+              - match: { prefix: "/" }
+                route: { cluster: cluster_0 }
+      key:
+        fragments: { string_key: foo }
+)EOF";
+  setScopedRoutesConfig(config_yaml);
+  initialize();
+
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo"}},
+      /*request_size=*/0, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo"}},
+      /*response_size=*/0,
+      /*backend_idx=*/0);
+}
+
+TEST_P(InlineScopedRoutesIntegrationTest, ScopeWithMultipleRouteConfigurations) {
+  absl::string_view config_yaml = R"EOF(
+scoped_route_configurations_list:
+  scoped_route_configurations:
+    - name: foo-scope
+      route_configuration:
+        name: foo
+        virtual_hosts:
+          - name: bar
+            domains: ["*"]
+            routes:
+              - match: { prefix: "/" }
+                route: { cluster: cluster_0 }
+            response_headers_to_add:
+              header: { key: route-name, value: foo }
+      key:
+        fragments: { string_key: foo }
+    - name: baz-scope
+      route_configuration:
+        name: baz
+        virtual_hosts:
+          - name: bar
+            domains: ["*"]
+            routes:
+              - match: { prefix: "/" }
+                route: { cluster: cluster_0 }
+            response_headers_to_add:
+              header: { key: route-name, value: baz }
+      key:
+        fragments: { string_key: baz }
+
+)EOF";
+  setScopedRoutesConfig(config_yaml);
+  initialize();
+
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=baz"}},
+      /*request_size=*/0, Http::TestResponseHeaderMapImpl{{":status", "200"}},
+      /*response_size=*/0,
+      /*backend_idx=*/0, Http::TestResponseHeaderMapImpl{{"route-name", "baz"}});
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo"}},
+      /*request_size=*/0, Http::TestResponseHeaderMapImpl{{":status", "200"}},
+      /*response_size=*/0,
+      /*backend_idx=*/0, Http::TestResponseHeaderMapImpl{{"route-name", "foo"}});
+  ;
+}
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ScopedRdsIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -264,7 +181,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ScopedRdsIntegrationTest,
 // Test that a SRDS DiscoveryResponse is successfully processed.
 
 TEST_P(ScopedRdsIntegrationTest, BasicSuccess) {
-  const std::string scope_tmpl = R"EOF(
+  constexpr absl::string_view scope_tmpl = R"EOF(
 name: {}
 route_configuration_name: {}
 key:
@@ -274,7 +191,7 @@ key:
   const std::string scope_route1 = fmt::format(scope_tmpl, "foo_scope1", "foo_route1", "foo-route");
   const std::string scope_route2 = fmt::format(scope_tmpl, "foo_scope2", "foo_route1", "bar-route");
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -409,6 +326,110 @@ key:
       /*cluster_1 */ 1);
 }
 
+TEST_P(ScopedRdsIntegrationTest, SrdsWithInlineRouteConfiguration) {
+  constexpr absl::string_view scoped_route_with_inline_route_config_tmpl = R"EOF(
+name: {}
+route_configuration:
+  name: route_config
+  virtual_hosts:
+    - name: integration
+      domains: ["*"]
+      routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: {} }}
+key:
+  fragments:
+    - string_key: {}
+)EOF";
+  const std::string scoped_route1 = fmt::format(scoped_route_with_inline_route_config_tmpl,
+                                                "scoped_route_0", "cluster_0", "foo-route");
+  const std::string scoped_route2 = fmt::format(scoped_route_with_inline_route_config_tmpl,
+                                                "scoped_route_0", "cluster_1", "bar-route");
+  const std::string scoped_route3 = fmt::format(scoped_route_with_inline_route_config_tmpl,
+                                                "scoped_route_1", "cluster_0", "foo-route");
+
+  const std::string scoped_route_with_rds_subscription = R"EOF(
+name: scoped_route_0
+route_configuration_name: route_config
+key:
+  fragments:
+    - string_key: foo-route
+)EOF";
+  const std::string route_config = R"EOF(
+      name: route_config
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: { prefix: "/" }
+          route: { cluster: cluster_1 }
+)EOF";
+
+  on_server_init_function_ = [&]() {
+    createScopedRdsStream();
+    sendSrdsResponse({scoped_route1}, {scoped_route1}, {}, "1");
+  };
+  initialize();
+  registerTestServerPorts({"http"});
+
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}},
+      /*request_size=*/0, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo"}},
+      /*response_size=*/0,
+      /*backend_idx=*/0);
+
+  // Replace foo-scope with a scoped route using an RDS subscription.
+  sendSrdsResponse({scoped_route_with_rds_subscription}, {scoped_route_with_rds_subscription}, {},
+                   "2");
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 2);
+  createRdsStream("route_config");
+  test_server_->waitForCounterGe("http.config_test.rds.route_config.update_attempt", 1);
+  sendRdsResponse(route_config, "1");
+  test_server_->waitForCounterGe("http.config_test.rds.route_config.update_success", 1);
+
+  // foo-route now goes to cluster_1.
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}},
+      /*request_size=*/0, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo"}},
+      /*response_size=*/0,
+      /*backend_idx=*/1);
+
+  // Replace foo-scope with bar-scope, which uses an inlined RouteConfiguration.
+  sendSrdsResponse({scoped_route2}, {scoped_route2}, {}, "3");
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 3);
+
+  // foo-route now returns 404.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+
+  // bar-route now returns 200 and is routed to cluster_1.
+  sendRequestAndVerifyResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=bar-route"}},
+      /*request_size=*/0, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo"}},
+      /*response_size=*/0,
+      /*backend_idx=*/1);
+}
+
 // Test that a bad config update updates the corresponding stats.
 TEST_P(ScopedRdsIntegrationTest, ConfigUpdateFailure) {
   // 'name' will fail to validate due to empty string.
@@ -449,7 +470,7 @@ key:
   sendSrdsResponse({scope_route2}, {scope_route2}, {}, "1");
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
   createRdsStream("foo_route1");
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -472,7 +493,7 @@ key:
 }
 
 TEST_P(ScopedRdsIntegrationTest, RejectUnknownHttpFilterInPerFilterTypedConfig) {
-  const std::string scope_tmpl = R"EOF(
+  constexpr absl::string_view scope_tmpl = R"EOF(
 name: {}
 route_configuration_name: {}
 key:
@@ -481,7 +502,7 @@ key:
 )EOF";
   const std::string scope_route = fmt::format(scope_tmpl, "foo_scope1", "foo_route", "foo-route");
 
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -514,63 +535,6 @@ key:
                                      {"Addr", "x-foo-key=foo-route"}});
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
-  cleanupUpstreamAndDownstream();
-}
-
-TEST_P(ScopedRdsIntegrationTest, IgnoreUnknownOptionalHttpFilterInPerFilterTypedConfig) {
-  const std::string scope_tmpl = R"EOF(
-name: {}
-route_configuration_name: {}
-key:
-  fragments:
-    - string_key: {}
-)EOF";
-  const std::string scope_route = fmt::format(scope_tmpl, "foo_scope1", "foo_route", "foo-route");
-
-  const std::string route_config_tmpl = R"EOF(
-      name: {}
-      virtual_hosts:
-      - name: integration
-        domains: ["*"]
-        routes:
-        - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
-        typed_per_filter_config:
-          filter.unknown:
-            "@type": type.googleapis.com/google.protobuf.Struct
-)EOF";
-
-  on_server_init_function_ = [&]() {
-    createScopedRdsStream();
-    sendSrdsResponse({scope_route}, {scope_route}, {}, "1");
-    createRdsStream("foo_route");
-    // CreateRdsStream waits for connection which is fired by RDS subscription.
-    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route", "cluster_0"), "1");
-  };
-
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             http_connection_manager) {
-        auto* filter = http_connection_manager.mutable_http_filters()->Add();
-        filter->set_name("filter.unknown");
-        filter->set_is_optional(true);
-        // keep router the last
-        auto size = http_connection_manager.http_filters_size();
-        http_connection_manager.mutable_http_filters()->SwapElements(size - 2, size - 1);
-      });
-
-  initialize();
-  registerTestServerPorts({"http"});
-
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route.update_attempt", 1);
-  sendRequestAndVerifyResponse(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":authority", "host"},
-                                     {":scheme", "http"},
-                                     {"Addr", "x-foo-key=foo-route"}},
-      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "bluh"}}, 123,
-      /*cluster_0*/ 0);
   cleanupUpstreamAndDownstream();
 }
 
@@ -616,7 +580,7 @@ key:
   fragments:
     - string_key: foo
 )EOF";
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -647,65 +611,10 @@ key:
       /*cluster_0*/ 0);
 }
 
-// Test that a scoped route config update is performed on demand and http request will succeed.
-TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateSuccess) {
-  config_helper_.addFilter(R"EOF(
-    name: envoy.filters.http.on_demand
-    )EOF");
-  const std::string scope_route1 = R"EOF(
-name: foo_scope1
-route_configuration_name: foo_route1
-on_demand: true
-key:
-  fragments:
-    - string_key: foo
-)EOF";
-  on_server_init_function_ = [this, &scope_route1]() {
-    createScopedRdsStream();
-    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
-  };
-  initialize();
-  registerTestServerPorts({"http"});
-
-  const std::string route_config_tmpl = R"EOF(
-      name: {}
-      virtual_hosts:
-      - name: integration
-        domains: ["*"]
-        routes:
-        - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
-)EOF";
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Request that match lazily loaded scope will trigger on demand loading.
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":authority", "host"},
-                                     {":scheme", "http"},
-                                     {"Addr", "x-foo-key=foo"}});
-  createRdsStream("foo_route1");
-  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
-
-  waitForNextUpstreamRequest();
-  // Send response headers, and end_stream if there is no response body.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-
-  response->waitForHeaders();
-  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-
-  cleanupUpstreamAndDownstream();
-}
-
-// With on demand update filter configured, scope not match should still return 404
-TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateScopeNotMatch) {
-
-  config_helper_.addFilter(R"EOF(
-    name: envoy.filters.http.on_demand
-    )EOF");
-
-  const std::string scope_tmpl = R"EOF(
+// Two listeners with the same rds config but different scope_key_builder should use their own
+// scope_key_builder to calculate the scope key and routes.
+TEST_P(ScopedRdsIntegrationTest, ListenersWithDifferentScopeKeyBuilder) {
+  constexpr absl::string_view scope_tmpl = R"EOF(
 name: {}
 route_configuration_name: {}
 key:
@@ -713,169 +622,9 @@ key:
     - string_key: {}
 )EOF";
   const std::string scope_route1 = fmt::format(scope_tmpl, "foo_scope1", "foo_route1", "foo-route");
+  const std::string scope_route2 = fmt::format(scope_tmpl, "foo_scope2", "foo_route1", "bar-route");
 
-  const std::string route_config_tmpl = R"EOF(
-      name: {}
-      virtual_hosts:
-      - name: integration
-        domains: ["*"]
-        routes:
-        - match: {{ prefix: "/meh" }}
-          route: {{ cluster: {} }}
-)EOF";
-
-  on_server_init_function_ = [&]() {
-    createScopedRdsStream();
-    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
-    createRdsStream("foo_route1");
-    // CreateRdsStream waits for connection which is fired by RDS subscription.
-    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
-  };
-  initialize();
-  registerTestServerPorts({"http"});
-
-  // No scope key matches "bar".
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/meh"},
-                                     {":authority", "host"},
-                                     {":scheme", "http"},
-                                     {"Addr", "x-foo-key=bar"}});
-  ASSERT_TRUE(response->waitForEndStream());
-  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
-  cleanupUpstreamAndDownstream();
-}
-
-// With on demand update filter configured, scope match but virtual host don't match, should still
-// return 404
-TEST_P(ScopedRdsIntegrationTest, OnDemandUpdatePrimaryVirtualHostNotMatch) {
-
-  config_helper_.addFilter(R"EOF(
-    name: envoy.filters.http.on_demand
-    )EOF");
-
-  const std::string scope_tmpl = R"EOF(
-name: {}
-route_configuration_name: {}
-key:
-  fragments:
-    - string_key: {}
-)EOF";
-  const std::string scope_route1 = fmt::format(scope_tmpl, "foo_scope1", "foo_route1", "foo-route");
-
-  const std::string route_config_tmpl = R"EOF(
-      name: {}
-      virtual_hosts:
-      - name: integration
-        domains: ["*"]
-        routes:
-        - match: {{ prefix: "/meh" }}
-          route: {{ cluster: {} }}
-)EOF";
-
-  on_server_init_function_ = [&]() {
-    createScopedRdsStream();
-    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
-    createRdsStream("foo_route1");
-    // CreateRdsStream waits for connection which is fired by RDS subscription.
-    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
-  };
-  initialize();
-  registerTestServerPorts({"http"});
-
-  // No virtual host matches "neh".
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/neh"},
-                                     {":authority", "host"},
-                                     {":scheme", "http"},
-                                     {"Addr", "x-foo-key=foo"}});
-  ASSERT_TRUE(response->waitForEndStream());
-  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
-  cleanupUpstreamAndDownstream();
-}
-
-// With on demand update filter configured, scope match but virtual host don't match, should still
-// return 404
-TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateVirtualHostNotMatch) {
-
-  config_helper_.addFilter(R"EOF(
-    name: envoy.filters.http.on_demand
-    )EOF");
-
-  const std::string scope_route1 = R"EOF(
-name: foo_scope
-route_configuration_name: foo_route1
-key:
-  fragments:
-    - string_key: foo
-)EOF";
-  const std::string scope_route2 = R"EOF(
-name: bar_scope
-route_configuration_name: foo_route1
-on_demand: true
-key:
-  fragments:
-    - string_key: bar
-)EOF";
-  const std::string route_config_tmpl = R"EOF(
-      name: {}
-      virtual_hosts:
-      - name: integration
-        domains: ["*"]
-        routes:
-        - match: {{ prefix: "/meh" }}
-          route: {{ cluster: {} }}
-)EOF";
-
-  on_server_init_function_ = [&]() {
-    createScopedRdsStream();
-    sendSrdsResponse({scope_route1, scope_route2}, {scope_route1, scope_route2}, {}, "1");
-    createRdsStream("foo_route1");
-    // CreateRdsStream waits for connection which is fired by RDS subscription.
-    sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
-  };
-  initialize();
-  registerTestServerPorts({"http"});
-
-  // No scope key matches "bar".
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/neh"},
-                                     {":authority", "host"},
-                                     {":scheme", "http"},
-                                     {"Addr", "x-foo-key=bar"}});
-  ASSERT_TRUE(response->waitForEndStream());
-  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
-  cleanupUpstreamAndDownstream();
-}
-
-// Eager and lazy scopes share the same route configuration
-TEST_P(ScopedRdsIntegrationTest, DifferentPriorityScopeShareRoute) {
-  config_helper_.addFilter(R"EOF(
-    name: envoy.filters.http.on_demand
-    )EOF");
-
-  const std::string scope_route1 = R"EOF(
-name: foo_scope
-route_configuration_name: foo_route1
-key:
-  fragments:
-    - string_key: foo
-)EOF";
-  const std::string scope_route2 = R"EOF(
-name: bar_scope
-route_configuration_name: foo_route1
-on_demand: true
-key:
-  fragments:
-    - string_key: bar
-)EOF";
-
-  const std::string route_config_tmpl = R"EOF(
+  constexpr absl::string_view route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: integration
@@ -892,69 +641,80 @@ key:
     // CreateRdsStream waits for connection which is fired by RDS subscription.
     sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
   };
+  // add listener_1 with different scope_key_builder
+  add_listener_ = true;
   initialize();
-  registerTestServerPorts({"http"});
+  registerTestServerPorts({"http", "listener_1"});
+
+  // listener_0 can't match using "," as separator
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
-  cleanupUpstreamAndDownstream();
-  // "foo" request should succeed because the foo scope is loaded eagerly by default.
-  // "bar" request will initialize rds provider on demand and also succeed.
-  for (const std::string& scope_key : std::vector<std::string>{"foo", "bar"}) {
-    sendRequestAndVerifyResponse(
-        Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                       {":path", "/meh"},
-                                       {":authority", "host"},
-                                       {":scheme", "http"},
-                                       {"Addr", fmt::format("x-foo-key={}", scope_key)}},
-        456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", scope_key}}, 123, 0);
-  }
-}
-
-TEST_P(ScopedRdsIntegrationTest, OnDemandUpdateAfterActiveStreamDestroyed) {
-  config_helper_.addFilter(R"EOF(
-    name: envoy.filters.http.on_demand
-    )EOF");
-  const std::string scope_route1 = R"EOF(
-name: foo_scope1
-route_configuration_name: foo_route1
-on_demand: true
-key:
-  fragments:
-    - string_key: foo
-)EOF";
-  on_server_init_function_ = [this, &scope_route1]() {
-    createScopedRdsStream();
-    sendSrdsResponse({scope_route1}, {scope_route1}, {}, "1");
-  };
-  initialize();
-  registerTestServerPorts({"http"});
-
-  const std::string route_config_tmpl = R"EOF(
-      name: {}
-      virtual_hosts:
-      - name: integration
-        domains: ["*"]
-        routes:
-        - match: {{ prefix: "/" }}
-          route: {{ cluster: {} }}
-)EOF";
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // A request that match lazily loaded scope will trigger on demand loading.
   auto response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                      {":path", "/meh"},
                                      {":authority", "host"},
                                      {":scheme", "http"},
-                                     {"Addr", "x-foo-key=foo"}});
-  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_attempt", 1);
-  // Close the connection and destroy the active stream.
+                                     {"Addr", "x-foo-key,foo-route"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
   cleanupUpstreamAndDownstream();
-  // Push rds update, on demand updated callback is post to worker thread.
-  // There is no exception thrown even when active stream is dead because weak_ptr can't be
-  // locked.
-  createRdsStream("foo_route1");
-  sendRdsResponse(fmt::format(route_config_tmpl, "foo_route1", "cluster_0"), "1");
+
   test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+
+  // listener_0 can match using "=" as separator
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  response = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}},
+      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo-route"}}, 123, 0);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200",
+                 Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo-route"}},
+                 std::string(123, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(456, upstream_request_->bodyLength());
+  cleanupUpstreamAndDownstream();
+
+  // listener_1 can't match using "=" as separator
+  codec_client_ = makeHttpConnection(lookupPort("listener_1"));
+  response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key=foo-route"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "404", Http::TestResponseHeaderMapImpl{}, "");
+  cleanupUpstreamAndDownstream();
+
+  test_server_->waitForCounterGe("http.config_test.rds.foo_route1.update_success", 1);
+
+  // listener_1 can match using "," as separator
+  codec_client_ = makeHttpConnection(lookupPort("listener_1"));
+  response = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/meh"},
+                                     {":authority", "host"},
+                                     {":scheme", "http"},
+                                     {"Addr", "x-foo-key,foo-route"}},
+      456, Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo-route"}}, 123, 0);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200",
+                 Http::TestResponseHeaderMapImpl{{":status", "200"}, {"service", "foo-route"}},
+                 std::string(123, 'a'));
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(456, upstream_request_->bodyLength());
+  cleanupUpstreamAndDownstream();
+
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt",
+                                 // update_attempt only increase after a response
+                                 isDelta() ? 1 : 2);
+  test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 1);
+  // The version gauge should be set to xxHash64("1").
+  test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",
+                               13237225503670494420UL);
 }
 
 } // namespace

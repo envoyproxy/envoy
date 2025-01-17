@@ -5,81 +5,82 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/resolver_impl.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_option_factory.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/upstream/health_checker_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Upstream {
 
-namespace {
+absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
+ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
+                               Server::Configuration::ServerFactoryContext& server_context,
+                               ClusterManager& cm, LazyCreateDnsResolver dns_resolver_fn,
+                               Ssl::ContextManager& ssl_context_manager,
+                               Outlier::EventLoggerSharedPtr outlier_event_logger,
+                               bool added_via_api) {
+  std::string cluster_name;
+  std::string cluster_config_type_name;
 
-Stats::ScopePtr generateStatsScope(const envoy::config::cluster::v3::Cluster& config,
-                                   Stats::Store& stats) {
-  return stats.createScope(fmt::format(
-      "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
-}
-
-} // namespace
-
-std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
-    const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cluster_manager,
-    Stats::Store& stats, ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
-    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-    Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
-    const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
-    Singleton::Manager& singleton_manager, Outlier::EventLoggerSharedPtr outlier_event_logger,
-    bool added_via_api, ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-    const Server::Options& options) {
-  std::string cluster_type;
-
-  if (!cluster.has_cluster_type()) {
-    switch (cluster.type()) {
-    case envoy::config::cluster::v3::Cluster::STATIC:
-      cluster_type = "envoy.cluster.static";
-      break;
-    case envoy::config::cluster::v3::Cluster::STRICT_DNS:
-      cluster_type = "envoy.cluster.strict_dns";
-      break;
-    case envoy::config::cluster::v3::Cluster::LOGICAL_DNS:
-      cluster_type = "envoy.cluster.logical_dns";
-      break;
-    case envoy::config::cluster::v3::Cluster::ORIGINAL_DST:
-      cluster_type = "envoy.cluster.original_dst";
-      break;
-    case envoy::config::cluster::v3::Cluster::EDS:
-      cluster_type = "envoy.cluster.eds";
-      break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+  ClusterFactory* factory;
+  // try to look up by typed_config
+  if (cluster.has_cluster_type() && cluster.cluster_type().has_typed_config() &&
+      (TypeUtil::typeUrlToDescriptorFullName(cluster.cluster_type().typed_config().type_url()) !=
+       ProtobufWkt::Struct::GetDescriptor()->full_name())) {
+    cluster_config_type_name =
+        TypeUtil::typeUrlToDescriptorFullName(cluster.cluster_type().typed_config().type_url());
+    factory = Registry::FactoryRegistry<ClusterFactory>::getFactoryByType(cluster_config_type_name);
+    if (factory == nullptr) {
+      return absl::InvalidArgumentError(
+          fmt::format("Didn't find a registered cluster factory implementation for type: '{}'",
+                      cluster_config_type_name));
     }
   } else {
-    cluster_type = cluster.cluster_type().name();
+    if (!cluster.has_cluster_type()) {
+      switch (cluster.type()) {
+        PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+      case envoy::config::cluster::v3::Cluster::STATIC:
+        cluster_name = "envoy.cluster.static";
+        break;
+      case envoy::config::cluster::v3::Cluster::STRICT_DNS:
+        cluster_name = "envoy.cluster.strict_dns";
+        break;
+      case envoy::config::cluster::v3::Cluster::LOGICAL_DNS:
+        cluster_name = "envoy.cluster.logical_dns";
+        break;
+      case envoy::config::cluster::v3::Cluster::ORIGINAL_DST:
+        cluster_name = "envoy.cluster.original_dst";
+        break;
+      case envoy::config::cluster::v3::Cluster::EDS:
+        cluster_name = "envoy.cluster.eds";
+        break;
+      }
+    } else {
+      cluster_name = cluster.cluster_type().name();
+    }
+    factory = Registry::FactoryRegistry<ClusterFactory>::getFactory(cluster_name);
+    if (factory == nullptr) {
+      return absl::InvalidArgumentError(fmt::format(
+          "Didn't find a registered cluster factory implementation for name: '{}'", cluster_name));
+    }
   }
 
   if (cluster.common_lb_config().has_consistent_hashing_lb_config() &&
       cluster.common_lb_config().consistent_hashing_lb_config().use_hostname_for_hashing() &&
       cluster.type() != envoy::config::cluster::v3::Cluster::STRICT_DNS) {
-    throw EnvoyException(fmt::format(
+    return absl::InvalidArgumentError(fmt::format(
         "Cannot use hostname for consistent hashing loadbalancing for cluster of type: '{}'",
-        cluster_type));
-  }
-  ClusterFactory* factory = Registry::FactoryRegistry<ClusterFactory>::getFactory(cluster_type);
-
-  if (factory == nullptr) {
-    throw EnvoyException(fmt::format(
-        "Didn't find a registered cluster factory implementation for name: '{}'", cluster_type));
+        cluster_name));
   }
 
-  ClusterFactoryContextImpl context(
-      cluster_manager, stats, tls, std::move(dns_resolver), ssl_context_manager, runtime,
-      dispatcher, log_manager, local_info, admin, singleton_manager,
-      std::move(outlier_event_logger), added_via_api, validation_visitor, api, options);
+  ClusterFactoryContextImpl context(server_context, cm, dns_resolver_fn, ssl_context_manager,
+                                    std::move(outlier_event_logger), added_via_api);
   return factory->create(cluster, context);
 }
 
-Network::DnsResolverSharedPtr
+absl::StatusOr<Network::DnsResolverSharedPtr>
 ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Cluster& cluster,
                                           ClusterFactoryContext& context) {
   // We make this a shared pointer to deal with the distinct ownership
@@ -88,65 +89,55 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
   // where 'dns_resolvers' is specified, we have per-cluster DNS
   // resolvers that are created here but ownership resides with
   // StrictDnsClusterImpl/LogicalDnsCluster.
-  if ((cluster.has_dns_resolution_config() &&
+  if ((cluster.has_typed_dns_resolver_config() &&
+       !(cluster.typed_dns_resolver_config().typed_config().type_url().empty())) ||
+      (cluster.has_dns_resolution_config() &&
        !cluster.dns_resolution_config().resolvers().empty()) ||
       !cluster.dns_resolvers().empty()) {
-    envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-    std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::Address> resolver_addrs;
-    if (cluster.has_dns_resolution_config()) {
-      dns_resolver_options.CopyFrom(cluster.dns_resolution_config().dns_resolver_options());
-      resolver_addrs.CopyFrom(cluster.dns_resolution_config().resolvers());
-    } else {
-      /* if `cluster.dns_resolution_config` is not set. */
-      // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward
-      // compatible utilize cluster.use_tcp_for_dns_lookups().
-      dns_resolver_options.set_use_tcp_for_dns_lookups(cluster.use_tcp_for_dns_lookups());
-      // Field repeated Address `dns_resolvers` will be deprecated in future. To be backward
-      // compatible utilize cluster.dns_resolvers().
-      resolver_addrs.CopyFrom(cluster.dns_resolvers());
-    }
 
-    if (!resolver_addrs.empty()) {
-      resolvers.reserve(resolver_addrs.size());
-      for (const auto& resolver_addr : resolver_addrs) {
-        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
-      }
-    }
-    return context.dispatcher().createDnsResolver(resolvers, dns_resolver_options);
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDnsResolverFactoryFromProto(cluster, typed_dns_resolver_config);
+    auto& server_context = context.serverFactoryContext();
+    return dns_resolver_factory.createDnsResolver(server_context.mainThreadDispatcher(),
+                                                  server_context.api(), typed_dns_resolver_config);
   }
 
   return context.dnsResolver();
 }
 
-std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
 ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
                                ClusterFactoryContext& context) {
-  auto stats_scope = generateStatsScope(cluster, context.stats());
-  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
-      context.localInfo(), context.dispatcher(), context.stats(), context.singletonManager(),
-      context.tls(), context.messageValidationVisitor(), context.api(), context.options());
 
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      createClusterImpl(cluster, context, factory_context, std::move(stats_scope));
+  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
+      status_or_cluster = createClusterImpl(cluster, context);
+  RETURN_IF_NOT_OK_REF(status_or_cluster.status());
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>& new_cluster_pair =
+      status_or_cluster.value();
+
+  auto& server_context = context.serverFactoryContext();
 
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.
     if (cluster.health_checks().size() != 1) {
-      throw EnvoyException("Multiple health checks not supported");
+      return absl::InvalidArgumentError("Multiple health checks not supported");
     } else {
-      new_cluster_pair.first->setHealthChecker(HealthCheckerFactory::create(
-          cluster.health_checks()[0], *new_cluster_pair.first, context.runtime(),
-          context.dispatcher(), context.logManager(), context.messageValidationVisitor(),
-          context.api()));
+      auto checker_or_error = HealthCheckerFactory::create(cluster.health_checks()[0],
+                                                           *new_cluster_pair.first, server_context);
+      RETURN_IF_NOT_OK_REF(checker_or_error.status());
+      new_cluster_pair.first->setHealthChecker(checker_or_error.value());
     }
   }
 
-  new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
-      *new_cluster_pair.first, cluster, context.dispatcher(), context.runtime(),
-      context.outlierEventLogger()));
-  return new_cluster_pair;
+  auto detector_or_error = Outlier::DetectorImplFactory::createForCluster(
+      *new_cluster_pair.first, cluster, server_context.mainThreadDispatcher(),
+      server_context.runtime(), context.outlierEventLogger(),
+      server_context.api().randomGenerator());
+  RETURN_IF_NOT_OK_REF(detector_or_error.status());
+  new_cluster_pair.first->setOutlierDetector(detector_or_error.value());
+
+  return status_or_cluster;
 }
 
 } // namespace Upstream

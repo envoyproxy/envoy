@@ -109,7 +109,7 @@ class Context : public proxy_wasm::ContextBase,
                 public Http::StreamFilter,
                 public Network::ConnectionCallbacks,
                 public Network::Filter,
-                public google::api::expr::runtime::BaseActivation,
+                public Filters::Common::Expr::StreamActivation,
                 public std::enable_shared_from_this<Context> {
 public:
   Context();                                          // Testing.
@@ -148,10 +148,8 @@ public:
                                      const std::shared_ptr<PluginBase>& plugin); // deprecated
 
   // AccessLog::Instance
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info) override;
+  void log(const Formatter::HttpFormatterContext& log_context,
+           const StreamInfo::StreamInfo& info) override;
 
   uint32_t getLogLevel() override;
 
@@ -185,7 +183,7 @@ public:
   void setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(::Envoy::Buffer::Instance& data, bool end_stream) override;
@@ -206,6 +204,8 @@ public:
   // State accessors
   WasmResult getProperty(std::string_view path, std::string* result) override;
   WasmResult setProperty(std::string_view path, std::string_view value) override;
+  WasmResult setEnvoyFilterState(std::string_view path, std::string_view value,
+                                 StreamInfo::FilterState::LifeSpan life_span);
   WasmResult declareProperty(std::string_view path,
                              Filters::Common::Expr::CelStatePrototypeConstPtr state_prototype);
 
@@ -217,8 +217,8 @@ public:
                                Pairs additional_headers, uint32_t grpc_status,
                                std::string_view details) override;
   void clearRouteCache() override {
-    if (decoder_callbacks_) {
-      decoder_callbacks_->clearRouteCache();
+    if (decoder_callbacks_ && decoder_callbacks_->downstreamCallbacks()) {
+      decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
   }
 
@@ -244,7 +244,7 @@ public:
   // HTTP
   WasmResult httpCall(std::string_view cluster, const Pairs& request_headers,
                       std::string_view request_body, const Pairs& request_trailers,
-                      int timeout_millisconds, uint32_t* token_ptr) override;
+                      int timeout_milliseconds, uint32_t* token_ptr) override;
 
   // Stats/Metrics
   WasmResult defineMetric(uint32_t type, std::string_view name, uint32_t* metric_id_ptr) override;
@@ -272,25 +272,10 @@ public:
   void onStatsUpdate(Envoy::Stats::MetricSnapshot& snapshot);
 
   // CEL evaluation
-  std::vector<const google::api::expr::runtime::CelFunction*>
-  FindFunctionOverloads(absl::string_view) const override {
-    return {};
-  }
   absl::optional<google::api::expr::runtime::CelValue>
   findValue(absl::string_view name, Protobuf::Arena* arena, bool last) const;
   absl::optional<google::api::expr::runtime::CelValue>
-  FindValue(absl::string_view name, Protobuf::Arena* arena) const override {
-    return findValue(name, arena, false);
-  }
-  bool IsPathUnknown(absl::string_view) const override { return false; }
-  const std::vector<google::api::expr::runtime::CelAttributePattern>&
-  unknown_attribute_patterns() const override {
-    static const std::vector<google::api::expr::runtime::CelAttributePattern> empty;
-    return empty;
-  }
-  const Protobuf::FieldMask& unknown_paths() const override {
-    return Protobuf::FieldMask::default_instance();
-  }
+  FindValue(absl::string_view name, Protobuf::Arena* arena) const override;
 
   // Foreign function state
   virtual void setForeignData(absl::string_view data_name, std::unique_ptr<StorageObject> data) {
@@ -303,12 +288,6 @@ public:
     }
     return dynamic_cast<T*>(it->second.get());
   }
-
-  uint32_t nextGrpcCallToken();
-  uint32_t nextGrpcStreamToken();
-  uint32_t nextHttpCallToken();
-  void setNextGrpcTokenForTesting(uint32_t token) { next_grpc_token_ = token; }
-  void setNextHttpCallTokenForTesting(uint32_t token) { next_http_call_token_ = token; }
 
 protected:
   friend class Wasm;
@@ -392,11 +371,16 @@ protected:
   void onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus& status,
                           const std::string_view message);
 
-  bool isGrpcStreamToken(uint32_t token) { return (token & 1) == 0; }
-  bool isGrpcCallToken(uint32_t token) { return (token & 1) == 1; }
-
   Http::HeaderMap* getMap(WasmHeaderMapType type);
   const Http::HeaderMap* getConstMap(WasmHeaderMapType type);
+
+  void onHeadersModified(WasmHeaderMapType type) {
+    if (type != WasmHeaderMapType::RequestHeaders ||
+        abi_version_ > proxy_wasm::AbiVersion::ProxyWasm_0_2_1) {
+      return;
+    }
+    clearRouteCache();
+  }
 
   const LocalInfo::LocalInfo* root_local_info_{nullptr}; // set only for root_context.
   PluginHandleSharedPtr plugin_handle_{nullptr};
@@ -473,6 +457,8 @@ protected:
   // Filter state prototype declaration.
   absl::flat_hash_map<std::string, Filters::Common::Expr::CelStatePrototypeConstPtr>
       state_prototypes_;
+
+  proxy_wasm::AbiVersion abi_version_{proxy_wasm::AbiVersion::Unknown};
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 

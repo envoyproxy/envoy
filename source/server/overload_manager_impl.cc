@@ -11,7 +11,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/server/resource_monitor_config_impl.h"
 
 #include "absl/container/node_hash_map.h"
@@ -19,38 +19,11 @@
 
 namespace Envoy {
 namespace Server {
-
-/**
- * Thread-local copy of the state of each configured overload action.
- */
-class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
-public:
-  explicit ThreadLocalOverloadStateImpl(const NamedOverloadActionSymbolTable& action_symbol_table)
-      : action_symbol_table_(action_symbol_table),
-        actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())) {}
-
-  const OverloadActionState& getState(const std::string& action) override {
-    if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {
-      return actions_[symbol->index()];
-    }
-    return always_inactive_;
-  }
-
-  void setState(NamedOverloadActionSymbolTable::Symbol action, OverloadActionState state) {
-    actions_[action.index()] = state;
-  }
-
-private:
-  static const OverloadActionState always_inactive_;
-  const NamedOverloadActionSymbolTable& action_symbol_table_;
-  std::vector<OverloadActionState> actions_;
-};
-
-const OverloadActionState ThreadLocalOverloadStateImpl::always_inactive_{UnitFloat::min()};
-
 namespace {
 
-class ThresholdTriggerImpl final : public OverloadAction::Trigger {
+using TriggerPtr = std::unique_ptr<Trigger>;
+
+class ThresholdTriggerImpl final : public Trigger {
 public:
   ThresholdTriggerImpl(const envoy::config::overload::v3::ThresholdTrigger& config)
       : threshold_(config.value()), state_(OverloadActionState::inactive()) {}
@@ -71,15 +44,14 @@ private:
   OverloadActionState state_;
 };
 
-class ScaledTriggerImpl final : public OverloadAction::Trigger {
+class ScaledTriggerImpl final : public Trigger {
 public:
-  ScaledTriggerImpl(const envoy::config::overload::v3::ScaledTrigger& config)
-      : scaling_threshold_(config.scaling_threshold()),
-        saturated_threshold_(config.saturation_threshold()),
-        state_(OverloadActionState::inactive()) {
-    if (scaling_threshold_ >= saturated_threshold_) {
-      throw EnvoyException("scaling_threshold must be less than saturation_threshold");
+  static absl::StatusOr<std::unique_ptr<ScaledTriggerImpl>>
+  create(const envoy::config::overload::v3::ScaledTrigger& config) {
+    if (config.scaling_threshold() >= config.saturation_threshold()) {
+      return absl::InvalidArgumentError("scaling_threshold must be less than saturation_threshold");
     }
+    return std::unique_ptr<ScaledTriggerImpl>(new ScaledTriggerImpl(config));
   }
 
   bool updateValue(double value) override {
@@ -101,15 +73,45 @@ public:
   OverloadActionState actionState() const override { return state_; }
 
 private:
+  ScaledTriggerImpl(const envoy::config::overload::v3::ScaledTrigger& config)
+      : scaling_threshold_(config.scaling_threshold()),
+        saturated_threshold_(config.saturation_threshold()),
+        state_(OverloadActionState::inactive()) {}
+
   const double scaling_threshold_;
   const double saturated_threshold_;
   OverloadActionState state_;
 };
 
-Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
-  Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
-                                          scope.symbolTable());
+absl::StatusOr<TriggerPtr>
+createTriggerFromConfig(const envoy::config::overload::v3::Trigger& trigger_config) {
+  TriggerPtr trigger;
+
+  switch (trigger_config.trigger_oneof_case()) {
+  case envoy::config::overload::v3::Trigger::TriggerOneofCase::kThreshold:
+    trigger = std::make_unique<ThresholdTriggerImpl>(trigger_config.threshold());
+    break;
+  case envoy::config::overload::v3::Trigger::TriggerOneofCase::kScaled: {
+    auto trigger_or_error = ScaledTriggerImpl::create(trigger_config.scaled());
+    RETURN_IF_NOT_OK(trigger_or_error.status());
+    trigger = std::move(trigger_or_error.value());
+    break;
+  }
+  case envoy::config::overload::v3::Trigger::TriggerOneofCase::TRIGGER_ONEOF_NOT_SET:
+    return absl::InvalidArgumentError(
+        absl::StrCat("action not set for trigger ", trigger_config.name()));
+  }
+
+  return trigger;
+}
+
+Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view name_of_stat) {
+  Stats::StatNameManagedStorage stat_name(name_of_stat, scope.symbolTable());
   return scope.counterFromStatName(stat_name.statName());
+}
+
+Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
+  return makeCounter(scope, absl::StrCat("overload.", a, ".", b));
 }
 
 Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_view b,
@@ -119,7 +121,13 @@ Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_v
   return scope.gaugeFromStatName(stat_name.statName(), import_mode);
 }
 
-Event::ScaledTimerType parseTimerType(
+Stats::Histogram& makeHistogram(Stats::Scope& scope, absl::string_view name,
+                                Stats::Histogram::Unit unit) {
+  Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", name), scope.symbolTable());
+  return scope.histogramFromStatName(stat_name.statName(), unit);
+}
+
+absl::StatusOr<Event::ScaledTimerType> parseTimerType(
     envoy::config::overload::v3::ScaleTimersOverloadActionConfig::TimerType config_timer_type) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
 
@@ -130,12 +138,15 @@ Event::ScaledTimerType parseTimerType(
     return Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout;
   case Config::TRANSPORT_SOCKET_CONNECT:
     return Event::ScaledTimerType::TransportSocketConnectTimeout;
+  case Config::HTTP_DOWNSTREAM_CONNECTION_MAX:
+    return Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout;
   default:
-    throw EnvoyException(fmt::format("Unknown timer type {}", config_timer_type));
+    return absl::InvalidArgumentError(
+        fmt::format("Unknown timer type {}", static_cast<int>(config_timer_type)));
   }
 }
 
-Event::ScaledTimerTypeMap
+absl::StatusOr<Event::ScaledTimerTypeMap>
 parseTimerMinimums(const ProtobufWkt::Any& typed_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
@@ -145,7 +156,9 @@ parseTimerMinimums(const ProtobufWkt::Any& typed_config,
   Event::ScaledTimerTypeMap timer_map;
 
   for (const auto& scale_timer : action_config.timer_scale_factors()) {
-    const Event::ScaledTimerType timer_type = parseTimerType(scale_timer.timer());
+    auto timer_or_error = parseTimerType(scale_timer.timer());
+    RETURN_IF_NOT_OK(timer_or_error.status());
+    const Event::ScaledTimerType& timer_type = *timer_or_error;
 
     const Event::ScaledTimerMinimum minimum =
         scale_timer.has_min_timeout()
@@ -157,8 +170,8 @@ parseTimerMinimums(const ProtobufWkt::Any& typed_config,
     auto [_, inserted] = timer_map.insert(std::make_pair(timer_type, minimum));
     UNREFERENCED_PARAMETER(_);
     if (!inserted) {
-      throw EnvoyException(fmt::format("Found duplicate entry for timer type {}",
-                                       Config::TimerType_Name(scale_timer.timer())));
+      return absl::InvalidArgumentError(fmt::format("Found duplicate entry for timer type {}",
+                                                    Config::TimerType_Name(scale_timer.timer())));
     }
   }
 
@@ -166,6 +179,78 @@ parseTimerMinimums(const ProtobufWkt::Any& typed_config,
 }
 
 } // namespace
+
+/**
+ * Thread-local copy of the state of each configured overload action.
+ */
+class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
+public:
+  explicit ThreadLocalOverloadStateImpl(
+      const NamedOverloadActionSymbolTable& action_symbol_table,
+      std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>&
+          proactive_resources)
+      : action_symbol_table_(action_symbol_table),
+        actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())),
+        proactive_resources_(proactive_resources) {}
+
+  const OverloadActionState& getState(const std::string& action) override {
+    if (const auto symbol = action_symbol_table_.lookup(action); symbol != absl::nullopt) {
+      return actions_[symbol->index()];
+    }
+    return always_inactive_;
+  }
+
+  void setState(NamedOverloadActionSymbolTable::Symbol action, OverloadActionState state) {
+    actions_[action.index()] = state;
+  }
+
+  bool tryAllocateResource(OverloadProactiveResourceName resource_name,
+                           int64_t increment) override {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    if (proactive_resource == proactive_resources_->end()) {
+      ENVOY_LOG_MISC(warn, "Failed to allocate resource usage, resource monitor is not configured");
+      return false;
+    }
+
+    return proactive_resource->second.tryAllocateResource(increment);
+  }
+
+  bool tryDeallocateResource(OverloadProactiveResourceName resource_name,
+                             int64_t decrement) override {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    if (proactive_resource == proactive_resources_->end()) {
+      ENVOY_LOG_MISC(warn,
+                     "Failed to deallocate resource usage, resource monitor is not configured");
+      return false;
+    }
+
+    return proactive_resource->second.tryDeallocateResource(decrement);
+  }
+
+  bool isResourceMonitorEnabled(OverloadProactiveResourceName resource_name) override {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    return proactive_resource != proactive_resources_->end();
+  }
+
+  ProactiveResourceMonitorOptRef
+  getProactiveResourceMonitorForTest(OverloadProactiveResourceName resource_name) override {
+    const auto proactive_resource = proactive_resources_->find(resource_name);
+    if (proactive_resource == proactive_resources_->end()) {
+      ENVOY_LOG_MISC(warn, "Failed to get resource usage, resource monitor is not configured");
+      return makeOptRefFromPtr<ProactiveResourceMonitor>(nullptr);
+    }
+    return proactive_resource->second.getProactiveResourceMonitorForTest();
+  }
+
+private:
+  static const OverloadActionState always_inactive_;
+  const NamedOverloadActionSymbolTable& action_symbol_table_;
+  std::vector<OverloadActionState> actions_;
+  std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>
+      proactive_resources_;
+};
+
+const OverloadActionState ThreadLocalOverloadStateImpl::always_inactive_{UnitFloat::min()};
 
 NamedOverloadActionSymbolTable::Symbol
 NamedOverloadActionSymbolTable::get(absl::string_view string) {
@@ -193,35 +278,30 @@ const absl::string_view NamedOverloadActionSymbolTable::name(Symbol symbol) cons
   return names_.at(symbol.index());
 }
 
-bool operator==(const NamedOverloadActionSymbolTable::Symbol& lhs,
-                const NamedOverloadActionSymbolTable::Symbol& rhs) {
-  return lhs.index() == rhs.index();
+absl::StatusOr<std::unique_ptr<OverloadAction>>
+OverloadAction::create(const envoy::config::overload::v3::OverloadAction& config,
+                       Stats::Scope& stats_scope) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret =
+      std::unique_ptr<OverloadAction>(new OverloadAction(config, stats_scope, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 
 OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
-                               Stats::Scope& stats_scope)
+                               Stats::Scope& stats_scope, absl::Status& creation_status)
     : state_(OverloadActionState::inactive()),
       active_gauge_(
-          makeGauge(stats_scope, config.name(), "active", Stats::Gauge::ImportMode::Accumulate)),
+          makeGauge(stats_scope, config.name(), "active", Stats::Gauge::ImportMode::NeverImport)),
       scale_percent_gauge_(makeGauge(stats_scope, config.name(), "scale_percent",
-                                     Stats::Gauge::ImportMode::Accumulate)) {
+                                     Stats::Gauge::ImportMode::NeverImport)) {
   for (const auto& trigger_config : config.triggers()) {
-    TriggerPtr trigger;
-
-    switch (trigger_config.trigger_oneof_case()) {
-    case envoy::config::overload::v3::Trigger::TriggerOneofCase::kThreshold:
-      trigger = std::make_unique<ThresholdTriggerImpl>(trigger_config.threshold());
-      break;
-    case envoy::config::overload::v3::Trigger::TriggerOneofCase::kScaled:
-      trigger = std::make_unique<ScaledTriggerImpl>(trigger_config.scaled());
-      break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-
-    if (!triggers_.try_emplace(trigger_config.name(), std::move(trigger)).second) {
-      throw EnvoyException(
+    absl::StatusOr<TriggerPtr> trigger_or_error = createTriggerFromConfig(trigger_config);
+    SET_AND_RETURN_IF_NOT_OK(trigger_or_error.status(), creation_status);
+    if (!triggers_.try_emplace(trigger_config.name(), std::move(*trigger_or_error)).second) {
+      creation_status = absl::InvalidArgumentError(
           absl::StrCat("Duplicate trigger resource for overload action ", config.name()));
+      return;
     }
   }
 
@@ -258,27 +338,139 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
 
 OverloadActionState OverloadAction::getState() const { return state_; }
 
+absl::StatusOr<std::unique_ptr<LoadShedPointImpl>>
+LoadShedPointImpl::create(const envoy::config::overload::v3::LoadShedPoint& config,
+                          Stats::Scope& stats_scope, Random::RandomGenerator& random_generator) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<LoadShedPointImpl>(
+      new LoadShedPointImpl(config, stats_scope, random_generator, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+LoadShedPointImpl::LoadShedPointImpl(const envoy::config::overload::v3::LoadShedPoint& config,
+                                     Stats::Scope& stats_scope,
+                                     Random::RandomGenerator& random_generator,
+                                     absl::Status& creation_status)
+    : scale_percent_(makeGauge(stats_scope, config.name(), "scale_percent",
+                               Stats::Gauge::ImportMode::NeverImport)),
+      shed_load_counter_(makeCounter(stats_scope, config.name(), "shed_load_count")),
+      random_generator_(random_generator) {
+  for (const auto& trigger_config : config.triggers()) {
+    auto trigger_or_error = createTriggerFromConfig(trigger_config);
+    SET_AND_RETURN_IF_NOT_OK(trigger_or_error.status(), creation_status);
+    if (!triggers_.try_emplace(trigger_config.name(), std::move(*trigger_or_error)).second) {
+      creation_status = absl::InvalidArgumentError(
+          absl::StrCat("Duplicate trigger resource for LoadShedPoint ", config.name()));
+      return;
+    }
+  }
+};
+
+void LoadShedPointImpl::updateResource(absl::string_view resource_name,
+                                       double resource_utilization) {
+  auto it = triggers_.find(resource_name);
+  if (it == triggers_.end()) {
+    return;
+  }
+
+  it->second->updateValue(resource_utilization);
+  updateProbabilityShedLoad();
+}
+
+void LoadShedPointImpl::updateProbabilityShedLoad() {
+  float max_unit_float = 0.0f;
+  for (const auto& trigger : triggers_) {
+    max_unit_float = std::max(trigger.second->actionState().value().value(), max_unit_float);
+  }
+
+  probability_shed_load_.store(max_unit_float);
+
+  // Update stats.
+  scale_percent_.set(100 * max_unit_float);
+}
+
+bool LoadShedPointImpl::shouldShedLoad() {
+  float unit_float_probability_shed_load = probability_shed_load_.load();
+  // This should be ok as we're using unit float which saturates at 1.0f.
+  if (unit_float_probability_shed_load == 1.0f) {
+    shed_load_counter_.inc();
+    return true;
+  }
+
+  if (random_generator_.bernoulli(UnitFloat(unit_float_probability_shed_load))) {
+    shed_load_counter_.inc();
+    return true;
+  }
+  return false;
+}
+
+absl::StatusOr<std::unique_ptr<OverloadManagerImpl>>
+OverloadManagerImpl::create(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
+                            ThreadLocal::SlotAllocator& slot_allocator,
+                            const envoy::config::overload::v3::OverloadManager& config,
+                            ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
+                            const Server::Options& options) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<OverloadManagerImpl>(
+      new OverloadManagerImpl(dispatcher, stats_scope, slot_allocator, config, validation_visitor,
+                              api, options, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
 OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                                          ThreadLocal::SlotAllocator& slot_allocator,
                                          const envoy::config::overload::v3::OverloadManager& config,
                                          ProtobufMessage::ValidationVisitor& validation_visitor,
-                                         Api::Api& api, const Server::Options& options)
-    : started_(false), dispatcher_(dispatcher), tls_(slot_allocator),
+                                         Api::Api& api, const Server::Options& options,
+                                         absl::Status& creation_status)
+    : dispatcher_(dispatcher), time_source_(api.timeSource()), tls_(slot_allocator),
       refresh_interval_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))),
+      refresh_interval_delays_(makeHistogram(stats_scope, "refresh_interval_delay",
+                                             Stats::Histogram::Unit::Milliseconds)),
+      proactive_resources_(
+          std::make_unique<
+              absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>()) {
   Configuration::ResourceMonitorFactoryContextImpl context(dispatcher, options, api,
                                                            validation_visitor);
+  // We should hide impl details from users, for them there should be no distinction between
+  // proactive and regular resource monitors in configuration API. But internally we will maintain
+  // two distinct collections of proactive and regular resources. Proactive resources are not
+  // subject to periodic flushes and can be recalculated/updated on demand by invoking
+  // `tryAllocateResource/tryDeallocateResource` via thread local overload state.
   for (const auto& resource : config.resource_monitors()) {
     const auto& name = resource.name();
-    ENVOY_LOG(debug, "Adding resource monitor for {}", name);
-    auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(resource);
-    auto config = Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
-    auto monitor = factory.createResourceMonitor(*config, context);
-
-    auto result = resources_.try_emplace(name, name, std::move(monitor), *this, stats_scope);
-    if (!result.second) {
-      throw EnvoyException(absl::StrCat("Duplicate resource monitor ", name));
+    // Check if it is a proactive resource.
+    auto proactive_resource_it =
+        OverloadProactiveResources::get().proactive_action_name_to_resource_.find(name);
+    ENVOY_LOG(debug, "Evaluating resource {}", name);
+    bool result = false;
+    if (proactive_resource_it !=
+        OverloadProactiveResources::get().proactive_action_name_to_resource_.end()) {
+      ENVOY_LOG(debug, "Adding proactive resource monitor for {}", name);
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::ProactiveResourceMonitorFactory>(
+              resource);
+      auto config =
+          Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
+      auto monitor = factory.createProactiveResourceMonitor(*config, context);
+      result =
+          proactive_resources_
+              ->try_emplace(proactive_resource_it->second, name, std::move(monitor), stats_scope)
+              .second;
+    } else {
+      ENVOY_LOG(debug, "Adding resource monitor for {}", name);
+      auto& factory =
+          Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(resource);
+      auto config =
+          Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
+      auto monitor = factory.createResourceMonitor(*config, context);
+      result = resources_.try_emplace(name, name, std::move(monitor), *this, stats_scope).second;
+    }
+    if (!result) {
+      creation_status =
+          absl::InvalidArgumentError(absl::StrCat("Duplicate resource monitor ", name));
+      return;
     }
   }
 
@@ -286,33 +478,83 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     const auto& name = action.name();
     const auto symbol = action_symbol_table_.get(name);
     ENVOY_LOG(debug, "Adding overload action {}", name);
+
+    // Validate that this is a well known overload action.
+    const auto& well_known_actions = OverloadActionNames::get().WellKnownActions;
+    if (std::find(well_known_actions.begin(), well_known_actions.end(), name) ==
+        well_known_actions.end()) {
+      creation_status =
+          absl::InvalidArgumentError(absl::StrCat("Unknown Overload Manager Action ", name));
+      return;
+    }
+
     // TODO: use in place construction once https://github.com/abseil/abseil-cpp/issues/388 is
     // addressed
-    // We cannot currently use in place construction as the OverloadAction constructor may throw,
+    // We cannot currently use in place construction as the OverloadAction constructor may fail,
     // causing an inconsistent internal state of the actions_ map, which on destruction results in
     // an invalid free.
-    auto result = actions_.try_emplace(symbol, OverloadAction(action, stats_scope));
+    auto action_or_error = OverloadAction::create(action, stats_scope);
+    SET_AND_RETURN_IF_NOT_OK(action_or_error.status(), creation_status);
+    auto result = actions_.try_emplace(symbol, std::move(*action_or_error));
     if (!result.second) {
-      throw EnvoyException(absl::StrCat("Duplicate overload action ", name));
+      creation_status =
+          absl::InvalidArgumentError(absl::StrCat("Duplicate overload action ", name));
+      return;
     }
 
     if (name == OverloadActionNames::get().ReduceTimeouts) {
-      timer_minimums_ = std::make_shared<const Event::ScaledTimerTypeMap>(
-          parseTimerMinimums(action.typed_config(), validation_visitor));
+      auto timer_or_error = parseTimerMinimums(action.typed_config(), validation_visitor);
+      SET_AND_RETURN_IF_NOT_OK(timer_or_error.status(), creation_status);
+      timer_minimums_ =
+          std::make_shared<const Event::ScaledTimerTypeMap>(std::move(*timer_or_error));
+    } else if (name == OverloadActionNames::get().ResetStreams) {
+      if (!config.has_buffer_factory_config()) {
+        creation_status = absl::InvalidArgumentError(
+            fmt::format("Overload action \"{}\" requires buffer_factory_config.", name));
+        return;
+      }
+      makeCounter(api.rootScope(), OverloadActionStatsNames::get().ResetStreamsCount);
     } else if (action.has_typed_config()) {
-      throw EnvoyException(fmt::format(
+      creation_status = absl::InvalidArgumentError(fmt::format(
           "Overload action \"{}\" has an unexpected value for the typed_config field", name));
+      return;
     }
 
     for (const auto& trigger : action.triggers()) {
       const std::string& resource = trigger.name();
+      auto proactive_resource_it =
+          OverloadProactiveResources::get().proactive_action_name_to_resource_.find(resource);
 
-      if (resources_.find(resource) == resources_.end()) {
-        throw EnvoyException(
+      if (resources_.find(resource) == resources_.end() &&
+          proactive_resource_it ==
+              OverloadProactiveResources::get().proactive_action_name_to_resource_.end()) {
+        creation_status = absl::InvalidArgumentError(
             fmt::format("Unknown trigger resource {} for overload action {}", resource, name));
+        return;
       }
-
       resource_to_actions_.insert(std::make_pair(resource, symbol));
+    }
+  }
+
+  // Validate the trigger resources for Load shedPoints.
+  for (const auto& point : config.loadshed_points()) {
+    for (const auto& trigger : point.triggers()) {
+      if (!resources_.contains(trigger.name())) {
+        creation_status = absl::InvalidArgumentError(fmt::format(
+            "Unknown trigger resource {} for loadshed point {}", trigger.name(), point.name()));
+        return;
+      }
+    }
+
+    auto load_shed_or_error =
+        LoadShedPointImpl::create(point, api.rootScope(), api.randomGenerator());
+    SET_AND_RETURN_IF_NOT_OK(load_shed_or_error.status(), creation_status);
+    const auto result = loadshed_points_.try_emplace(point.name(), *std::move(load_shed_or_error));
+
+    if (!result.second) {
+      creation_status =
+          absl::InvalidArgumentError(absl::StrCat("Duplicate loadshed point ", point.name()));
+      return;
     }
   }
 }
@@ -322,7 +564,8 @@ void OverloadManagerImpl::start() {
   started_ = true;
 
   tls_.set([this](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_);
+    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_,
+                                                          proactive_resources_);
   });
 
   if (resources_.empty()) {
@@ -342,8 +585,17 @@ void OverloadManagerImpl::start() {
       resource.second.update(flush_epoch_);
     }
 
+    // Record delay.
+    auto now = time_source_.monotonicTime();
+    std::chrono::milliseconds delay =
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - time_resources_last_measured_);
+    refresh_interval_delays_.recordValue(delay.count());
+    time_resources_last_measured_ = now;
+
     timer_->enableTimer(refresh_interval_);
   });
+
+  time_resources_last_measured_ = time_source_.monotonicTime();
   timer_->enableTimer(refresh_interval_);
 }
 
@@ -355,6 +607,8 @@ void OverloadManagerImpl::stop() {
 
   // Clear the resource map to block on any pending updates.
   resources_.clear();
+
+  // TODO(nezdolik): wrap proactive monitors into atomic? and clear it here
 }
 
 bool OverloadManagerImpl::registerForAction(const std::string& action,
@@ -389,6 +643,13 @@ Event::ScaledRangeTimerManagerFactory OverloadManagerImpl::scaledTimerFactory() 
   };
 }
 
+LoadShedPoint* OverloadManagerImpl::getLoadShedPoint(absl::string_view point_name) {
+  if (auto it = loadshed_points_.find(point_name); it != loadshed_points_.end()) {
+    return it->second.get();
+  }
+  return nullptr;
+}
+
 Event::ScaledRangeTimerManagerPtr OverloadManagerImpl::createScaledRangeTimerManager(
     Event::Dispatcher& dispatcher,
     const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) const {
@@ -403,9 +664,9 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
     const NamedOverloadActionSymbolTable::Symbol action = entry.second;
     auto action_it = actions_.find(action);
     ASSERT(action_it != actions_.end());
-    const OverloadActionState old_state = action_it->second.getState();
-    if (action_it->second.updateResourcePressure(resource, pressure)) {
-      const auto state = action_it->second.getState();
+    const OverloadActionState old_state = action_it->second->getState();
+    if (action_it->second->updateResourcePressure(resource, pressure)) {
+      const auto state = action_it->second->getState();
 
       if (old_state.isSaturated() != state.isSaturated()) {
         ENVOY_LOG(debug, "Overload action {} became {}", action_symbol_table_.name(action),
@@ -426,6 +687,10 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
       });
     }
   });
+
+  for (auto& loadshed_point : loadshed_points_) {
+    loadshed_point.second->updateResource(resource, pressure);
+  }
 
   // Eagerly flush updates if this is the last call to updateResourcePressure expected for the
   // current epoch. This assert is always valid because flush_awaiting_updates_ is initialized
@@ -461,7 +726,7 @@ void OverloadManagerImpl::flushResourceUpdates() {
 
 OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitorPtr monitor,
                                         OverloadManagerImpl& manager, Stats::Scope& stats_scope)
-    : name_(name), monitor_(std::move(monitor)), manager_(manager), pending_update_(false),
+    : name_(name), monitor_(std::move(monitor)), manager_(manager),
       pressure_gauge_(
           makeGauge(stats_scope, name, "pressure", Stats::Gauge::ImportMode::NeverImport)),
       failed_updates_counter_(makeCounter(stats_scope, name, "failed_updates")),

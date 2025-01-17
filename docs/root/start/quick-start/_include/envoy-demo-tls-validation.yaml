@@ -14,6 +14,8 @@ static_resources:
           stat_prefix: ingress_http
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           route_config:
             name: local_route
             virtual_hosts:
@@ -48,5 +50,7 @@ static_resources:
           validation_context:
             trusted_ca:
               filename: certs/cacert.pem
-            match_subject_alt_names:
-            - exact: proxy-postgres-backend.example.com
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: proxy-postgres-backend.example.com

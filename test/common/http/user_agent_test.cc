@@ -19,6 +19,7 @@ namespace {
 
 TEST(UserAgentTest, All) {
   Stats::MockStore stat_store;
+  Stats::Scope& scope = *stat_store.rootScope();
   NiceMock<Stats::MockHistogram> original_histogram;
   original_histogram.unit_ = Stats::Histogram::Unit::Milliseconds;
   Event::SimulatedTimeSystem time_system;
@@ -41,9 +42,9 @@ TEST(UserAgentTest, All) {
   {
     UserAgent ua(context);
     ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa iOS bbb"}}, prefix,
-                             stat_store);
+                             scope);
     ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, prefix,
-                             stat_store);
+                             scope);
     ua.completeConnectionLength(span);
   }
 
@@ -61,24 +62,23 @@ TEST(UserAgentTest, All) {
   {
     UserAgent ua(context);
     ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, prefix,
-                             stat_store);
+                             scope);
     ua.completeConnectionLength(span);
     ua.onConnectionDestroy(Network::ConnectionEvent::RemoteClose, true);
   }
 
   {
     UserAgent ua(context);
-    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa bbb"}}, prefix,
-                             stat_store);
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa bbb"}}, prefix, scope);
     ua.initializeFromHeaders(TestRequestHeaderMapImpl{{"user-agent", "aaa android bbb"}}, prefix,
-                             stat_store);
+                             scope);
     ua.completeConnectionLength(span);
     ua.onConnectionDestroy(Network::ConnectionEvent::RemoteClose, false);
   }
 
   {
     UserAgent ua(context);
-    ua.initializeFromHeaders(TestRequestHeaderMapImpl{}, prefix, stat_store);
+    ua.initializeFromHeaders(TestRequestHeaderMapImpl{}, prefix, scope);
     ua.completeConnectionLength(span);
   }
 }

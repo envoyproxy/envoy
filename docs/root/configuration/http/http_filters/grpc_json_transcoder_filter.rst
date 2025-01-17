@@ -4,8 +4,8 @@ gRPC-JSON transcoder
 ====================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder>`
-* This filter should be configured with the name *envoy.filters.http.grpc_json_transcoder*.
 
 This is a filter which allows a RESTful JSON API client to send requests to Envoy over HTTP
 and get proxied to a gRPC service. The HTTP mapping for the gRPC service has to be defined by
@@ -39,7 +39,7 @@ Then run protoc to generate the descriptor set. For example using the test
 
 .. code-block:: console
 
-  $ protoc -I$(GOOGLEAPIS_DIR) -I. --include_imports --include_source_info \
+  $ protoc -I${GOOGLEAPIS_DIR} -I. --include_imports --include_source_info \
       --descriptor_set_out=proto.pb test/proto/bookstore.proto
 
 If you have more than one proto source files, you can pass all of them in one command.
@@ -104,3 +104,5 @@ gRPC or RESTful JSON requests to localhost:51051.
 
 .. literalinclude:: _include/grpc-transcoder-filter.yaml
     :language: yaml
+    :linenos:
+    :caption: :download:`grpc-transcoder-filter.yaml <_include/grpc-transcoder-filter.yaml>`

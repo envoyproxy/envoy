@@ -28,23 +28,32 @@ private:
   PerSocketTapperPtr tapper_;
 };
 
-class TapSocketFactory : public Network::TransportSocketFactory,
-                         public Common::Tap::ExtensionConfigBase {
+class TapSocketFactory : public Common::Tap::ExtensionConfigBase, public PassthroughFactory {
 public:
   TapSocketFactory(const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
-                   Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+                   Common::Tap::TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
                    Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
                    Event::Dispatcher& main_thread_dispatcher,
-                   Network::TransportSocketFactoryPtr&& transport_socket_factory);
+                   Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory);
 
-  // Network::TransportSocketFactory
+  // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
-  bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr host) const override;
+};
 
-private:
-  Network::TransportSocketFactoryPtr transport_socket_factory_;
+class DownstreamTapSocketFactory : public Common::Tap::ExtensionConfigBase,
+                                   public DownstreamPassthroughFactory {
+public:
+  DownstreamTapSocketFactory(
+      const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
+      Common::Tap::TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
+      Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+      Event::Dispatcher& main_thread_dispatcher,
+      Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory);
+
+  // Network::UpstreamTransportSocketFactory
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override;
 };
 
 } // namespace Tap

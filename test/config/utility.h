@@ -9,11 +9,14 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/http/codes.h"
 
@@ -32,6 +35,8 @@ class ConfigHelper {
 public:
   using HttpConnectionManager =
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
+  using UdpProxyConfig = envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig;
+
   struct ServerSslOptions {
     ServerSslOptions& setAllowExpiredCertificate(bool allow) {
       allow_expired_certificate_ = allow;
@@ -53,6 +58,11 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setEcdsaCertName(const std::string& ecdsa_cert_name) {
+      ecdsa_cert_name_ = ecdsa_cert_name;
+      return *this;
+    }
+
     ServerSslOptions& setEcdsaCertOcspStaple(bool ecdsa_cert_ocsp_staple) {
       ecdsa_cert_ocsp_staple_ = ecdsa_cert_ocsp_staple;
       return *this;
@@ -68,6 +78,21 @@ public:
       return *this;
     }
 
+    ServerSslOptions& setPreferClientCiphers(bool prefer_client_ciphers) {
+      prefer_client_ciphers_ = prefer_client_ciphers;
+      return *this;
+    }
+
+    ServerSslOptions& setCiphers(const std::vector<std::string>& ciphers) {
+      ciphers_ = ciphers;
+      return *this;
+    }
+
+    ServerSslOptions& setCurves(const std::vector<std::string>& curves) {
+      curves_ = curves;
+      return *this;
+    }
+
     ServerSslOptions& setExpectClientEcdsaCert(bool expect_client_ecdsa_cert) {
       expect_client_ecdsa_cert_ = expect_client_ecdsa_cert;
       return *this;
@@ -80,60 +105,127 @@ public:
     }
 
     ServerSslOptions&
-    setSanMatchers(std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers) {
+    setSanMatchers(std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+                       san_matchers) {
       san_matchers_ = san_matchers;
       return *this;
     }
 
+    ServerSslOptions& setClientWithIntermediateCert(bool client_intermediate_cert) {
+      client_with_intermediate_cert_ = client_intermediate_cert;
+      return *this;
+    }
+
+    ServerSslOptions& setVerifyDepth(absl::optional<uint32_t> depth) {
+      max_verify_depth_ = depth;
+      return *this;
+    }
+
+    ServerSslOptions& setTlsKeyLogFilter(bool local, bool remote, bool local_negative,
+                                         bool remote_negative, std::string log_path,
+                                         bool multiple_ips, Network::Address::IpVersion version) {
+      keylog_local_filter_ = local;
+      keylog_remote_filter_ = remote;
+      keylog_local_negative_ = local_negative;
+      keylog_remote_negative_ = remote_negative;
+      keylog_path_ = log_path;
+      keylog_multiple_ips_ = multiple_ips;
+      ip_version_ = version;
+      return *this;
+    }
+
+    ServerSslOptions& setTrustRootOnly(bool trust_root_only) {
+      trust_root_only_ = trust_root_only;
+      return *this;
+    }
+
+    ServerSslOptions& setTlsCertSelector(std::string yaml) {
+      tls_cert_selector_yaml_ = yaml;
+      return *this;
+    }
+
     bool allow_expired_certificate_{};
-    envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_;
+    envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
     bool rsa_cert_{true};
     bool rsa_cert_ocsp_staple_{true};
     bool ecdsa_cert_{false};
+    std::string ecdsa_cert_name_{"server_ecdsa"};
     bool ecdsa_cert_ocsp_staple_{false};
+    bool prefer_client_ciphers_{false};
     bool ocsp_staple_required_{false};
     bool tlsv1_3_{false};
+    std::vector<std::string> curves_;
+    std::vector<std::string> ciphers_;
     bool expect_client_ecdsa_cert_{false};
-    std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_{};
+    bool keylog_local_filter_{false};
+    bool keylog_remote_filter_{false};
+    bool keylog_local_negative_{false};
+    bool keylog_remote_negative_{false};
+    bool keylog_multiple_ips_{false};
+    std::string keylog_path_;
+    Network::Address::IpVersion ip_version_{Network::Address::IpVersion::v4};
+    std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+        san_matchers_{};
+    std::string tls_cert_selector_yaml_{""};
+    bool client_with_intermediate_cert_{false};
+    bool trust_root_only_{false};
+    absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   };
+
+  // Sets up config with the provided bootstrap.
+  ConfigHelper(const Network::Address::IpVersion version,
+               const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
 
   // Set up basic config, using the specified IpVersion for all connections: listeners, upstream,
   // and admin connections.
   //
   // By default, this runs with an L7 proxy config, but config can be set to TCP_PROXY_CONFIG
   // to test L4 proxying.
-  ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
-               const std::string& config = httpProxyConfig(false));
+  ConfigHelper(const Network::Address::IpVersion version, Api::Api&,
+               const std::string& config = httpProxyConfig(false, false));
 
   static void
   initializeTls(const ServerSslOptions& options,
-                envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context);
+                envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_context,
+                bool http3);
 
+  static void initializeTlsKeyLog(
+      envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context,
+      const ServerSslOptions& options);
   using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3::Bootstrap&)>;
   using HttpModifierFunction = std::function<void(HttpConnectionManager&)>;
+  using UdpProxyModifierFunction = std::function<void(UdpProxyConfig&)>;
+
+  // A basic configuration (admin port, cluster_0, no listeners) with no network filters.
+  static std::string baseConfigNoListeners();
 
   // A basic configuration (admin port, cluster_0, one listener) with no network filters.
-  static std::string baseConfig();
+  static std::string baseConfig(bool multiple_addresses = false);
 
   // A basic configuration (admin port, cluster_0, one udp listener) with no network filters.
-  static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0");
+  static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0",
+                                           bool multiple_addresses = false);
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
-  static std::string tlsInspectorFilter();
+  static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false);
+
+  // A string for the test inspector filter.
+  static std::string testInspectorFilter();
 
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();
   // A basic configuration for L7 proxying.
-  static std::string httpProxyConfig(bool downstream_use_quic = false);
+  static std::string httpProxyConfig(bool downstream_use_quic = false,
+                                     bool multiple_addresses = false);
   // A basic configuration for L7 proxying with QUIC transport.
-  static std::string quicHttpProxyConfig();
-  // A string for a basic buffer filter, which can be used with addFilter()
+  static std::string quicHttpProxyConfig(bool multiple_addresses = false);
+  // A string for a basic buffer filter, which can be used with prependFilter()
   static std::string defaultBufferFilter();
-  // A string for a small buffer filter, which can be used with addFilter()
+  // A string for a small buffer filter, which can be used with prependFilter()
   static std::string smallBufferFilter();
-  // A string for a health check filter which can be used with addFilter()
+  // A string for a health check filter which can be used with prependFilter()
   static std::string defaultHealthCheckFilter();
-  // A string for a squash filter which can be used with addFilter()
+  // A string for a squash filter which can be used with prependFilter()
   static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
@@ -144,39 +236,52 @@ public:
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
-  static std::string adsBootstrap(const std::string& api_type,
-                                  envoy::config::core::v3::ApiVersion resource_api_version,
-                                  envoy::config::core::v3::ApiVersion transport_api_version =
-                                      envoy::config::core::v3::ApiVersion::AUTO);
+  // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
+  // but there are no listeners.
+  static std::string clustersNoListenerBootstrap(const std::string& api_type);
+  static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
-  static envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, int port,
-                                                                const std::string& address);
+  static envoy::config::cluster::v3::Cluster
+  buildStaticCluster(const std::string& name, int port, const std::string& address,
+                     const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                         envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+
+  static envoy::config::cluster::v3::Cluster buildH1ClusterWithHighCircuitBreakersLimits(
+      const std::string& name, int port, const std::string& address,
+      const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy);
 
   // ADS configurations
-  static envoy::config::cluster::v3::Cluster buildCluster(
-      const std::string& name, const std::string& lb_policy = "ROUND_ROBIN",
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::cluster::v3::Cluster
+  buildCluster(const std::string& name,
+               const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                   envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
-  static envoy::config::cluster::v3::Cluster buildTlsCluster(
-      const std::string& name, const std::string& lb_policy = "ROUND_ROBIN",
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::cluster::v3::Cluster
+  buildTlsCluster(const std::string& name,
+                  const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy =
+                      envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
-  static envoy::config::endpoint::v3::ClusterLoadAssignment buildClusterLoadAssignment(
-      const std::string& name, const std::string& ip_version, uint32_t port,
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignment(const std::string& name, const std::string& ip_version, uint32_t port);
 
-  static envoy::config::listener::v3::Listener buildBaseListener(
-      const std::string& name, const std::string& address, const std::string& filter_chains = "",
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignmentWithLeds(const std::string& name,
+                                     const std::string& leds_collection_name);
 
-  static envoy::config::listener::v3::Listener buildListener(
-      const std::string& name, const std::string& route_config, const std::string& address,
-      const std::string& stat_prefix,
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::endpoint::v3::LbEndpoint buildLbEndpoint(const std::string& address,
+                                                                 uint32_t port);
 
-  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(
-      const std::string& name, const std::string& cluster,
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::listener::v3::Listener
+  buildBaseListener(const std::string& name, const std::string& address,
+                    const std::string& filter_chains = "");
+
+  static envoy::config::listener::v3::Listener buildListener(const std::string& name,
+                                                             const std::string& route_config,
+                                                             const std::string& address,
+                                                             const std::string& stat_prefix);
+
+  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
+                                                                       const std::string& cluster);
 
   // Builds a standard Endpoint suitable for population by finalize().
   static envoy::config::endpoint::v3::Endpoint buildEndpoint(const std::string& address);
@@ -186,6 +291,9 @@ public:
   // Ports are assigned by looping through clusters, hosts, and addresses in the
   // order they are stored in |bootstrap_|
   void finalize(const std::vector<uint32_t>& ports);
+
+  // Called by finalize to set up the ports.
+  void setPorts(const std::vector<uint32_t>& ports, bool override_port_zero = false);
 
   // Set source_address in the bootstrap bind config.
   void setSourceAddress(const std::string& address_string);
@@ -211,6 +319,10 @@ public:
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
+  // Disable delay close. This is especially useful for tests doing raw TCP for
+  // HTTP/1.1 which functionally frame by connection close.
+  void disableDelayClose();
+
   // Set the max_requests_per_connection for downstream through the HttpConnectionManager.
   void setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection);
 
@@ -220,6 +332,12 @@ public:
   void addVirtualHost(const envoy::config::route::v3::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
+  // By default, this prepends a downstream HTTP filter, but if downstream is set to
+  // false it will prepend an upstream HTTP filter.
+  void prependFilter(const std::string& filter_yaml, bool downstream = true);
+
+  // Add an HTTP filter prior to existing filters.
+  // TODO(rgs1): remove once envoy-filter-example has been updated.
   void addFilter(const std::string& filter_yaml);
 
   // Add a network filter prior to existing filters.
@@ -239,7 +357,8 @@ public:
   void configDownstreamTransportSocketWithTls(
       envoy::config::bootstrap::v3::Bootstrap& bootstrap,
       std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
-          configure_tls_context);
+          configure_tls_context,
+      bool enable_quic_early_data = true);
 
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
@@ -266,6 +385,10 @@ public:
   // Allows callers to easily modify the HttpConnectionManager configuration.
   // Modifiers will be applied just before ports are modified in finalize
   void addConfigModifier(HttpModifierFunction function);
+
+  // Allows callers to easily modify the UDP Proxy configuration.
+  // Modifiers will be applied just before ports are modified in finalize
+  void addConfigModifier(UdpProxyModifierFunction function);
 
   // Allows callers to easily modify the filter named 'name' from the first filter chain from the
   // first listener. Modifiers will be applied just before ports are modified in finalize
@@ -297,18 +420,22 @@ public:
   void applyConfigModifiers();
 
   // Configure Envoy to do TLS to upstream.
-  void configureUpstreamTls(bool use_alpn = false, bool http3 = false,
-                            bool use_alternate_protocols_cache = false);
+  void configureUpstreamTls(
+      bool use_alpn = false, bool http3 = false,
+      absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+          alternate_protocol_cache_config = {},
+      std::function<void(envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext&)>
+          configure_tls_context = nullptr);
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { skip_port_usage_validation_ = true; }
 
   // Add this key value pair to the static runtime.
-  void addRuntimeOverride(const std::string& key, const std::string& value);
+  void addRuntimeOverride(absl::string_view key, absl::string_view value);
 
-  // Enable deprecated v2 API resources via the runtime.
-  void enableDeprecatedV2Api();
+  // Add typed_filter_metadata to the first listener.
+  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,
@@ -316,7 +443,14 @@ public:
 
   // Given an HCM with the default config, set the matcher to be a connect matcher and enable
   // CONNECT requests.
-  static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect, bool allow_post);
+  static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect, bool allow_post,
+                               bool http3 = false,
+                               absl::optional<envoy::config::core::v3::ProxyProtocolConfig::Version>
+                                   proxy_protocol_version = absl::nullopt);
+  // Given an HCM with the default config, set the matcher to be a connect matcher and enable
+  // CONNECT-UDP requests.
+  static void setConnectUdpConfig(HttpConnectionManager& hcm, bool terminate_connect,
+                                  bool http3 = false);
 
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
@@ -336,22 +470,18 @@ public:
   static envoy::config::core::v3::Http3ProtocolOptions
   http2ToHttp3ProtocolOptions(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                               size_t http3_max_stream_receive_window);
-
-private:
-  static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {
-    return api_version == envoy::config::core::v3::ApiVersion::V2;
-  }
-
-  static std::string apiVersionStr(envoy::config::core::v3::ApiVersion api_version) {
-    return api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3";
-  }
-
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(HttpConnectionManager& hcm);
   // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
   void storeHttpConnectionManager(const HttpConnectionManager& hcm);
+  // Load the first UDP Proxy from the first listener into a parsed proto.
+  bool loadUdpProxyFilter(UdpProxyConfig& udp_proxy);
+  // Take the contents of the provided UDP Proxy and stuff them into the first HCM
+  // struct of the first listener.
+  void storeUdpProxyFilter(const UdpProxyConfig& udp_proxy);
 
+private:
   // Load the first FilterType struct from the first listener into a parsed proto.
   template <class FilterType> bool loadFilter(const std::string& name, FilterType& filter) {
     RELEASE_ASSERT(!finalized_, "");
@@ -372,12 +502,34 @@ private:
     filter_config_any->PackFrom(filter);
   }
 
+  // Load the first FilterType struct from the first listener filters into a parsed proto.
+  template <class FilterType> bool loadListenerFilter(const std::string& name, FilterType& filter) {
+    RELEASE_ASSERT(!finalized_, "");
+    auto* filter_config = getListenerFilterFromListener(name);
+    if (filter_config) {
+      auto* config = filter_config->mutable_typed_config();
+      filter = MessageUtil::anyConvert<FilterType>(*config);
+      return true;
+    }
+    return false;
+  }
+
+  // Take the contents of the provided FilterType proto and stuff them into the first FilterType
+  // struct of the first listener.
+  template <class FilterType>
+  void storeListenerFilter(const std::string& name, const FilterType& filter) {
+    RELEASE_ASSERT(!finalized_, "");
+    auto* filter_config_any = getListenerFilterFromListener(name)->mutable_typed_config();
+
+    filter_config_any->PackFrom(filter);
+  }
+
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::config::listener::v3::Filter* getFilterFromListener(const std::string& name);
 
-  // Configure a tap transport socket for a cluster/filter chain.
-  void setTapTransportSocket(const std::string& tap_path, const std::string& type,
-                             envoy::config::core::v3::TransportSocket& transport_socket);
+  // Finds the filter named 'name' from the first listener filter from the first listener.
+  envoy::config::listener::v3::ListenerFilter*
+  getListenerFilterFromListener(const std::string& name);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
@@ -404,7 +556,7 @@ public:
 
   // Set CDS contents on filesystem.
   void setCds(const std::vector<envoy::config::cluster::v3::Cluster>& cluster);
-  const std::string& cds_path() const { return cds_path_; }
+  const std::string& cdsPath() const { return cds_path_; }
 
 private:
   const std::string cds_path_;
@@ -422,7 +574,7 @@ public:
   void setEdsAndWait(const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>&
                          cluster_load_assignments,
                      IntegrationTestServerStats& server_stats);
-  const std::string& eds_path() const { return eds_path_; }
+  const std::string& edsPath() const { return eds_path_; }
 
 private:
   const std::string eds_path_;

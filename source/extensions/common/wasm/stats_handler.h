@@ -8,12 +8,16 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Wasm {
+
+// The custom stat namespace which prepends all the user-defined metrics.
+// Note that the prefix is removed from the final output of /stats endpoints.
+constexpr absl::string_view CustomStatNamespace = "wasmcustom";
 
 #define CREATE_WASM_STATS(COUNTER, GAUGE)                                                          \
   COUNTER(remote_load_cache_hits)                                                                  \
@@ -53,6 +57,9 @@ enum class WasmEvent : int {
   RuntimeError,
   VmCreated,
   VmShutDown,
+  VmReloadBackoff,
+  VmReloadSuccess,
+  VmReloadFailure,
 };
 
 class CreateStatsHandler : Logger::Loggable<Logger::Id::wasm> {
@@ -97,6 +104,30 @@ public:
 protected:
   LifecycleStats lifecycle_stats_;
 };
+
+// TODO(wbpcode): refactor all these stats handlers into a single one.
+#define WASM_STATS(COUNTER)                                                                        \
+  COUNTER(vm_reload)                                                                               \
+  COUNTER(vm_reload_backoff)                                                                       \
+  COUNTER(vm_reload_success)                                                                       \
+  COUNTER(vm_reload_failure)
+
+struct WasmStats {
+  WASM_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+class StatsHandler {
+public:
+  StatsHandler(Stats::Scope& parent_scope, const std::string& prefix);
+  void onEvent(WasmEvent event) const;
+  WasmStats& wasmStats() const { return wasm_stats_; }
+
+private:
+  Stats::ScopeSharedPtr scope_;
+  mutable WasmStats wasm_stats_;
+};
+
+using StatsHandlerSharedPtr = std::shared_ptr<StatsHandler>;
 
 } // namespace Wasm
 } // namespace Common

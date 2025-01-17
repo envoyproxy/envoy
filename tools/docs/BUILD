@@ -1,83 +1,61 @@
-load("@rules_python//python:defs.bzl", "py_binary")
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("@docs_pip3//:requirements.bzl", "requirement")
-load("//tools/base:envoy_python.bzl", "envoy_py_binary")
+load("@base_pip3//:requirements.bzl", "requirement")
+load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
+load("//tools/base:envoy_python.bzl", "ENVOY_PYTOOL_NAMESPACE", "envoy_pytool_binary")
+load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+envoy_py_namespace()
 
-py_binary(
+envoy_pytool_binary(
     name = "generate_extensions_security_rst",
     srcs = ["generate_extensions_security_rst.py"],
-    data = ["//source/extensions:extensions_metadata.yaml"],
+    visibility = ["//visibility:public"],
     deps = [
-        "//tools/base:utils",
+        requirement("envoy.base.utils"),
     ],
 )
 
-py_binary(
+envoy_pytool_binary(
     name = "generate_external_deps_rst",
-    srcs = [
-        "generate_external_deps_rst.py",
-    ],
-    deps = [
-        "//tools/dependency:exports",
-        "//tools/dependency:utils",
-    ],
+    srcs = ["generate_external_deps_rst.py"],
+    args = ["$(location //bazel:all_repository_locations)"],
+    data = ["//bazel:all_repository_locations"],
+    visibility = ["//visibility:public"],
 )
 
-py_binary(
+envoy_pytool_binary(
     name = "generate_api_rst",
-    srcs = [
-        "generate_api_rst.py",
-    ],
+    srcs = ["generate_api_rst.py"],
+    visibility = ["//visibility:public"],
 )
 
-envoy_py_binary(
-    name = "tools.docs.sphinx_runner",
+# The upstream lib is maintained here:
+#
+#    https://github.com/envoyproxy/toolshed/tree/main/envoy.docs.sphinx_runner
+#
+# Please submit issues/PRs to the toolshed repo:
+#
+#    https://github.com/envoyproxy/toolshed
+
+py_console_script_binary(
+    name = "sphinx_runner",
+    data = ENVOY_PYTOOL_NAMESPACE,
+    pkg = "@base_pip3//envoy_docs_sphinx_runner",
+    script = "envoy.docs.sphinx_runner",
+    visibility = ["//visibility:public"],
+)
+
+envoy_pytool_binary(
+    name = "generate_version_histories",
+    srcs = ["generate_version_histories.py"],
+    visibility = ["//visibility:public"],
     deps = [
-        "//tools/base:runner",
-        "//tools/base:utils",
-        requirement("alabaster"),
-        requirement("Babel"),
-        requirement("certifi"),
-        requirement("chardet"),
-        requirement("colorama"),
-        requirement("docutils"),
-        requirement("gitdb"),
-        requirement("GitPython"),
-        requirement("idna"),
-        requirement("imagesize"),
-        requirement("Jinja2"),
-        requirement("MarkupSafe"),
+        requirement("aio.run.runner"),
+        requirement("envoy.base.utils"),
+        requirement("frozendict"),
+        requirement("jinja2"),
         requirement("packaging"),
-        requirement("Pygments"),
-        requirement("pyparsing"),
-        requirement("pytz"),
-        requirement("requests"),
-        requirement("setuptools"),
-        requirement("six"),
-        requirement("smmap"),
-        requirement("snowballstemmer"),
-        requirement("Sphinx"),
-        requirement("sphinx-copybutton"),
-        requirement("sphinx-rtd-theme"),
-        requirement("sphinx-tabs"),
-        requirement("sphinxcontrib-applehelp"),
-        requirement("sphinxcontrib-devhelp"),
-        requirement("sphinxcontrib-htmlhelp"),
-        requirement("sphinxcontrib-httpdomain"),
-        requirement("sphinxcontrib-jsmath"),
-        requirement("sphinxcontrib-qthelp"),
-        requirement("sphinxext-rediraffe"),
-        requirement("sphinxcontrib-serializinghtml"),
-        requirement("urllib3"),
+        requirement("pyyaml"),
     ],
-)
-
-envoy_py_binary(
-    name = "tools.docs.rst_check",
-    data = ["//docs:root/version_history/current.rst"],
-    deps = ["//tools/base:checker"],
 )

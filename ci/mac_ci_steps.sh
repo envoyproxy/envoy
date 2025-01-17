@@ -1,18 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
-
-function finish {
-  echo "disk space at end of build:"
-  df -h
-}
-trap finish EXIT
-
-echo "disk space at beginning of build:"
-df -h
-
-# shellcheck source=ci/setup_cache.sh
-. "$(dirname "$0")"/setup_cache.sh
 
 read -ra BAZEL_BUILD_EXTRA_OPTIONS <<< "${BAZEL_BUILD_EXTRA_OPTIONS:-}"
 read -ra BAZEL_EXTRA_TEST_OPTIONS <<< "${BAZEL_EXTRA_TEST_OPTIONS:-}"
@@ -23,9 +11,7 @@ BUILD_CONFIG="$(dirname "$(realpath "$0")")"/osx-build-config
 # is resolved.
 BAZEL_BUILD_OPTIONS=(
     "--curses=no"
-    --show_task_finish
     --verbose_failures
-    "--test_output=all"
     "--flaky_test_attempts=integration@2"
     "--override_repository=envoy_build_config=${BUILD_CONFIG}"
     "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
@@ -60,4 +46,4 @@ fi
 bazel test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
 
 # Additionally run macOS specific test suites
-bazel test "${BAZEL_BUILD_OPTIONS[@]}" //test/common/network:apple_dns_impl_test
+bazel test "${BAZEL_BUILD_OPTIONS[@]}" //test/extensions/network/dns_resolver/apple:apple_dns_impl_test

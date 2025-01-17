@@ -1,3 +1,4 @@
+#include "source/server/admin/admin.h"
 #include "source/server/admin/admin_filter.h"
 
 #include "test/mocks/server/instance.h"
@@ -6,34 +7,29 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::ByMove;
 using testing::InSequence;
 using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Server {
 
 class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AdminFilterTest() : filter_(adminServerCallback), request_headers_{{":path", "/"}} {
+  AdminFilterTest() : filter_(admin_), request_headers_{{":path", "/"}} {
+    EXPECT_CALL(admin_, makeRequest(_)).WillOnce(Return(ByMove(adminHandlerCallback())));
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
-  NiceMock<MockInstance> server_;
+  NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
   AdminFilter filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Http::TestRequestHeaderMapImpl request_headers_;
 
-  static Http::Code adminServerCallback(absl::string_view path_and_query,
-                                        Http::ResponseHeaderMap& response_headers,
-                                        Buffer::OwnedImpl& response, AdminFilter& filter) {
-    // silence compiler warnings for unused params
-    UNREFERENCED_PARAMETER(path_and_query);
-    UNREFERENCED_PARAMETER(response_headers);
-    UNREFERENCED_PARAMETER(filter);
-
-    response.add("OK\n");
-    return Http::Code::OK;
+  static Admin::RequestPtr adminHandlerCallback() {
+    return AdminImpl::makeStaticTextRequest("OK\n", Http::Code::OK);
   }
 };
 

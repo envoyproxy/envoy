@@ -1,0 +1,61 @@
+date: Pending
+
+behavior_changes:
+# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+
+minor_behavior_changes:
+# *Changes that may cause incompatibilities for some users, but should not for most*
+- area: http2
+  change: |
+    Sets runtime guard ``envoy.reloadable_features.http2_use_oghttp2`` to true by default.
+
+bug_fixes:
+# *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: dfp
+  change:
+    Fixes a bug when loading a DNS cache entry with an empty authority/host header. This fix can be reverted by setting
+    runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` to ``false``.
+
+removed_config_or_runtime:
+# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+
+- area: dns
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.dns_details`` and legacy code paths.
+
+new_features:
+- area: oauth2
+  change: |
+    Add the option to specify SameSite cookie attribute values for oauth2 supported cookies.
+    To specify SameSite attribute, choose one of the values from ``strict``,``lax`` or ``none``. If not specified,
+    a default value of ``disabled`` will be assigned and there will be no SameSite value in the cookie attribute. See
+    :ref:`apply_on_stream_done <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.cookie_configs>`
+    for more details.
+- area: spiffe
+  change: |
+    Added :ref:`trust_bundles
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundles>`
+    to the SPIFFE certificate validator configuration. This field allows specifying a SPIFFE trust
+    bundle mapping as a DataSource. If both trust_bundles and trust_domains are specified,
+    trust_bundles takes precedence.
+- area: resource_monitors
+  change: |
+    Added support to monitor Container CPU utilization in Linux K8s environment using existing
+    extension <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>.
+- area: lua
+  change: |
+    Added :ref:`virtualClusterName() <config_http_filters_lua_stream_info_virtual_cluster_name>` API to the Stream Info
+    Object to get the name of the virtual cluster matched.
+- area: tap
+  change: |
+    Added an UDP extension for tap custom sink.
+- area: udp_proxy
+  change: |
+    Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
+- area: ext_proc
+  change: |
+    Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
+    :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
+
+deprecated:

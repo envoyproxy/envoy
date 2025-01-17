@@ -24,7 +24,11 @@ namespace Envoy {
 IntegrationStreamDecoder::IntegrationStreamDecoder(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
-void IntegrationStreamDecoder::waitForContinueHeaders() {
+IntegrationStreamDecoder::~IntegrationStreamDecoder() {
+  ENVOY_LOG_MISC(trace, "Destroying IntegrationStreamDecoder");
+}
+
+void IntegrationStreamDecoder::waitFor1xxHeaders() {
   if (!continue_headers_.get()) {
     waiting_for_continue_headers_ = true;
     dispatcher_.run(Event::Dispatcher::RunType::Block);
@@ -50,7 +54,7 @@ void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
 
 AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::milliseconds timeout) {
   bool timer_fired = false;
-  if (!saw_end_stream_) {
+  while (!saw_end_stream_) {
     Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
       timer_fired = true;
       dispatcher_.exit();
@@ -59,8 +63,7 @@ AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::millisec
     waiting_for_end_stream_ = true;
     dispatcher_.run(Event::Dispatcher::RunType::Block);
     if (!saw_end_stream_) {
-      // HTTP/1.1 may end stream by disconnecting.
-      ENVOY_LOG_MISC(warn, "No explicit end stream detected.");
+      ENVOY_LOG_MISC(warn, "non-end stream event.");
     }
     if (timer_fired) {
       return AssertionFailure() << "Timed out waiting for end stream\n";
@@ -84,7 +87,7 @@ AssertionResult IntegrationStreamDecoder::waitForReset(std::chrono::milliseconds
   return AssertionSuccess();
 }
 
-void IntegrationStreamDecoder::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
+void IntegrationStreamDecoder::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
   continue_headers_ = std::move(headers);
   if (waiting_for_continue_headers_) {
     dispatcher_.exit();

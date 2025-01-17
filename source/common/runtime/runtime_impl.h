@@ -30,6 +30,7 @@
 #include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/status/statusor.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -87,31 +88,12 @@ public:
 
   const EntryMap& values() const;
 
-  static Entry createEntry(const std::string& value);
-  static Entry createEntry(const ProtobufWkt::Value& value);
+  static Entry createEntry(const ProtobufWkt::Value& value, absl::string_view raw_string,
+                           const char*& error_message);
+  static void addEntry(Snapshot::EntryMap& values, const std::string& key,
+                       const ProtobufWkt::Value& value, absl::string_view raw_string = "");
 
 private:
-  static void resolveEntryType(Entry& entry) {
-    if (parseEntryBooleanValue(entry)) {
-      return;
-    }
-
-    if (parseEntryDoubleValue(entry) && entry.double_value_ >= 0 &&
-        entry.double_value_ <= std::numeric_limits<uint64_t>::max()) {
-      // Valid uint values will always be parseable as doubles, so we assign the value to both the
-      // uint and double fields. In cases where the value is something like "3.1", we will floor the
-      // number by casting it to a uint and assigning the uint value.
-      entry.uint_value_ = entry.double_value_;
-      return;
-    }
-
-    parseEntryFractionalPercentValue(entry);
-  }
-
-  static bool parseEntryBooleanValue(Entry& entry);
-  static bool parseEntryDoubleValue(Entry& entry);
-  static void parseEntryFractionalPercentValue(Entry& entry);
-
   const std::vector<OverrideLayerConstPtr> layers_;
   EntryMap values_;
   Random::RandomGenerator& generator_;
@@ -136,8 +118,8 @@ protected:
 
 /**
  * Extension of OverrideLayerImpl that maintains an in-memory set of values. These values can be
- * modified programmatically via mergeValues(). AdminLayer is so named because it can be accessed
- * and manipulated by Envoy's admin interface.
+ * modified programmatically via mergeValues(). AdminLayer is so named because it
+ * can be accessed and manipulated by Envoy's admin interface.
  */
 class AdminLayer : public OverrideLayerImpl {
 public:
@@ -154,7 +136,7 @@ public:
    * Merge the provided values into our entry map. An empty value indicates that a key should be
    * removed from our map.
    */
-  void mergeValues(const absl::node_hash_map<std::string, std::string>& values);
+  absl::Status mergeValues(const absl::node_hash_map<std::string, std::string>& values);
 
 private:
   RuntimeStats& stats_;
@@ -167,11 +149,12 @@ using AdminLayerPtr = std::unique_ptr<AdminLayer>;
  */
 class DiskLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  DiskLayer(absl::string_view name, const std::string& path, Api::Api& api);
+  DiskLayer(absl::string_view name, const std::string& path, Api::Api& api,
+            absl::Status& creation_status);
 
 private:
-  void walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
-                     Api::Api& api);
+  absl::Status walkDirectory(const std::string& path, const std::string& prefix, uint32_t depth,
+                             Api::Api& api);
 
   const std::string path_;
   const Filesystem::WatcherPtr watcher_;
@@ -182,10 +165,11 @@ private:
  */
 class ProtoLayer : public OverrideLayerImpl, Logger::Loggable<Logger::Id::runtime> {
 public:
-  ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto);
+  ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto,
+             absl::Status& creation_status);
 
 private:
-  void walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix);
+  absl::Status walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix);
 };
 
 class LoaderImpl;
@@ -197,24 +181,24 @@ struct RtdsSubscription : Envoy::Config::SubscriptionBase<envoy::service::runtim
                    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::SubscriptionCallbacks
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                      const std::string& version_info) override;
-  void onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string&) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                              const std::string& version_info) override;
+  absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                              const std::string&) override;
 
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
 
   void start();
-  void validateUpdateSize(uint32_t added_resources_num, uint32_t removed_resources_num);
-  void onConfigRemoved(const Protobuf::RepeatedPtrField<std::string>& removed_resources);
-  void createSubscription();
+  absl::Status validateUpdateSize(uint32_t added_resources_num, uint32_t removed_resources_num);
+  absl::Status onConfigRemoved(const Protobuf::RepeatedPtrField<std::string>& removed_resources);
+  absl::Status createSubscription();
 
   LoaderImpl& parent_;
   const envoy::config::core::v3::ConfigSource config_source_;
   Stats::Store& store_;
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   Config::SubscriptionPtr subscription_;
   std::string resource_name_;
   Init::TargetImpl init_target_;
@@ -231,28 +215,35 @@ using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;
  */
 class LoaderImpl : public Loader, Logger::Loggable<Logger::Id::runtime> {
 public:
-  LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
-             const envoy::config::bootstrap::v3::LayeredRuntime& config,
-             const LocalInfo::LocalInfo& local_info, Stats::Store& store,
-             Random::RandomGenerator& generator,
-             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  static absl::StatusOr<std::unique_ptr<LoaderImpl>>
+  create(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
+         const envoy::config::bootstrap::v3::LayeredRuntime& config,
+         const LocalInfo::LocalInfo& local_info, Stats::Store& store,
+         Random::RandomGenerator& generator, ProtobufMessage::ValidationVisitor& validation_visitor,
+         Api::Api& api);
 
   // Runtime::Loader
-  void initialize(Upstream::ClusterManager& cm) override;
+  absl::Status initialize(Upstream::ClusterManager& cm) override;
   const Snapshot& snapshot() override;
   SnapshotConstSharedPtr threadsafeSnapshot() override;
-  void mergeValues(const absl::node_hash_map<std::string, std::string>& values) override;
+  absl::Status mergeValues(const absl::node_hash_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;
   Stats::Scope& getRootScope() override;
   void countDeprecatedFeatureUse() const override;
 
 private:
   friend RtdsSubscription;
+  LoaderImpl(ThreadLocal::SlotAllocator& tls,
+             const envoy::config::bootstrap::v3::LayeredRuntime& config,
+             const LocalInfo::LocalInfo& local_info, Stats::Store& store,
+             Random::RandomGenerator& generator, Api::Api& api);
 
+  absl::Status initLayers(Event::Dispatcher& dispatcher,
+                          ProtobufMessage::ValidationVisitor& validation_visitor);
   // Create a new Snapshot
-  SnapshotImplPtr createNewSnapshot();
+  absl::StatusOr<SnapshotImplPtr> createNewSnapshot();
   // Load a new Snapshot into TLS
-  void loadNewSnapshot();
+  absl::Status loadNewSnapshot();
   RuntimeStats generateStats(Stats::Store& store);
   void onRtdsReady();
 

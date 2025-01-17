@@ -1,31 +1,25 @@
 #include "source/server/api_listener_impl.h"
 
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/http/api_listener.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/http/conn_manager_impl.h"
+#include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
-#include "source/server/drain_manager_impl.h"
-#include "source/server/listener_manager_impl.h"
 
 namespace Envoy {
 namespace Server {
 
-bool isQuic(const envoy::config::listener::v3::Listener& config) {
-  return config.has_udp_listener_config() && config.udp_listener_config().has_quic_options();
-}
-
-ApiListenerImplBase::ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,
-                                         ListenerManagerImpl& parent, const std::string& name)
-    : config_(config), parent_(parent), name_(name),
-      address_(Network::Address::resolveProtoAddress(config.address())),
-      global_scope_(parent_.server_.stats().createScope("")),
-      listener_scope_(parent_.server_.stats().createScope(fmt::format("listener.api.{}.", name_))),
-      factory_context_(parent_.server_, config_, *this, *global_scope_, *listener_scope_,
-                       isQuic(config)),
-      read_callbacks_(SyntheticReadCallbacks(*this)) {}
+ApiListenerImplBase::ApiListenerImplBase(Network::Address::InstanceConstSharedPtr&& address,
+                                         const envoy::config::listener::v3::Listener& config,
+                                         Server::Instance& server, const std::string& name)
+    : config_(config), name_(name), address_(std::move(address)),
+      factory_context_(server, *this, server.stats().createScope(""),
+                       server.stats().createScope(fmt::format("listener.api.{}.", name_)),
+                       std::make_shared<ListenerInfoImpl>(config)) {}
 
 void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConnectionEvent(
     Network::ConnectionEvent event) {
@@ -34,45 +28,68 @@ void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConn
   }
 }
 
-HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
-                                 ListenerManagerImpl& parent, const std::string& name)
-    : ApiListenerImplBase(config, parent, name) {
+HttpApiListener::ApiListenerWrapper::~ApiListenerWrapper() {
+  // The Http::ConnectionManagerImpl is a callback target for the read_callback_.connection_. By
+  // raising connection closure, Http::ConnectionManagerImpl::onEvent is fired. In that case the
+  // Http::ConnectionManagerImpl will reset any ActiveStreams it has.
+  read_callbacks_.connection_.raiseConnectionEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+Http::RequestDecoderHandlePtr
+HttpApiListener::ApiListenerWrapper::newStreamHandle(Http::ResponseEncoder& response_encoder,
+                                                     bool is_internally_created) {
+  return http_connection_manager_->newStreamHandle(response_encoder, is_internally_created);
+}
+
+absl::StatusOr<std::unique_ptr<HttpApiListener>>
+HttpApiListener::create(const envoy::config::listener::v3::Listener& config,
+                        Server::Instance& server, const std::string& name) {
+  auto address_or_error = Network::Address::resolveProtoAddress(config.address());
+  RETURN_IF_NOT_OK_REF(address_or_error.status());
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<HttpApiListener>(new HttpApiListener(
+      std::move(address_or_error.value()), config, server, name, creation_status));
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return ret;
+}
+
+HttpApiListener::HttpApiListener(Network::Address::InstanceConstSharedPtr&& address,
+                                 const envoy::config::listener::v3::Listener& config,
+                                 Server::Instance& server, const std::string& name,
+                                 absl::Status& creation_status)
+    : ApiListenerImplBase(std::move(address), config, server, name) {
   if (config.api_listener().api_listener().type_url() ==
-      absl::StrCat("type.googleapis.com/",
-                   envoy::extensions::filters::network::http_connection_manager::v3::
-                       EnvoyMobileHttpConnectionManager::descriptor()
-                           ->full_name())) {
+      absl::StrCat(
+          "type.googleapis.com/",
+          createReflectableMessage(envoy::extensions::filters::network::http_connection_manager::
+                                       v3::EnvoyMobileHttpConnectionManager::default_instance())
+              ->GetDescriptor()
+              ->full_name())) {
     auto typed_config = MessageUtil::anyConvertAndValidate<
         envoy::extensions::filters::network::http_connection_manager::v3::
             EnvoyMobileHttpConnectionManager>(config.api_listener().api_listener(),
                                               factory_context_.messageValidationVisitor());
 
-    http_connection_manager_factory_ = Envoy::Extensions::NetworkFilters::HttpConnectionManager::
+    auto factory_or_error = Envoy::Extensions::NetworkFilters::HttpConnectionManager::
         HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
-            typed_config.config(), factory_context_, read_callbacks_, false);
+            typed_config.config(), factory_context_, false);
+    SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
+    http_connection_manager_factory_ = std::move(*factory_or_error);
   } else {
     auto typed_config = MessageUtil::anyConvertAndValidate<
         envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
         config.api_listener().api_listener(), factory_context_.messageValidationVisitor());
 
-    http_connection_manager_factory_ = Envoy::Extensions::NetworkFilters::HttpConnectionManager::
-        HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
-            typed_config, factory_context_, read_callbacks_, true);
+    auto factory_or_error =
+        Envoy::Extensions::NetworkFilters::HttpConnectionManager::HttpConnectionManagerFactory::
+            createHttpConnectionManagerFactoryFromProto(typed_config, factory_context_, true);
+    SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
+    http_connection_manager_factory_ = std::move(*factory_or_error);
   }
 }
 
-Http::ApiListenerOptRef HttpApiListener::http() {
-  if (!http_connection_manager_) {
-    http_connection_manager_ = http_connection_manager_factory_();
-  }
-  return Http::ApiListenerOptRef(std::ref(*http_connection_manager_));
-}
-
-void HttpApiListener::shutdown() {
-  // The Http::ConnectionManagerImpl is a callback target for the read_callback_.connection_. By
-  // raising connection closure, Http::ConnectionManagerImpl::onEvent is fired. In that case the
-  // Http::ConnectionManagerImpl will reset any ActiveStreams it has.
-  read_callbacks_.connection_.raiseConnectionEvent(Network::ConnectionEvent::RemoteClose);
+Http::ApiListenerPtr HttpApiListener::createHttpApiListener(Event::Dispatcher& dispatcher) {
+  return std::make_unique<ApiListenerWrapper>(*this, dispatcher);
 }
 
 } // namespace Server

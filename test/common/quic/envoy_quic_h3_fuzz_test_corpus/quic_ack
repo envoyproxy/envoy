@@ -1,0 +1,12 @@
+frames {
+  qframe {
+    ack {
+      largest_acked: 1000,
+      ecn_counters: {
+        ect0: 0,
+        ect1: 0,
+        ce: 0,
+      }
+    }
+  }
+}

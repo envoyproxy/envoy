@@ -76,7 +76,7 @@ DubboHessian2SerializerImpl::deserializeRpcInvocation(Buffer::Instance& buffer,
     }
   });
 
-  return std::pair<RpcInvocationSharedPtr, bool>(invo, true);
+  return {invo, true};
 }
 
 std::pair<RpcResultSharedPtr, bool>
@@ -101,9 +101,9 @@ DubboHessian2SerializerImpl::deserializeRpcResult(Buffer::Instance& buffer,
     result->setException(true);
     break;
   case RpcResponseType::ResponseWithNullValue:
-  case RpcResponseType::ResponseNullValueWithAttachments:
     has_value = false;
     FALLTHRU;
+  case RpcResponseType::ResponseNullValueWithAttachments:
   case RpcResponseType::ResponseWithValue:
   case RpcResponseType::ResponseValueWithAttachments:
     result->setException(false);
@@ -125,7 +125,7 @@ DubboHessian2SerializerImpl::deserializeRpcResult(Buffer::Instance& buffer,
                     (context->bodySize() - total_size)));
   }
 
-  return std::pair<RpcResultSharedPtr, bool>(result, true);
+  return {result, true};
 }
 
 size_t DubboHessian2SerializerImpl::serializeRpcResult(Buffer::Instance& output_buffer,

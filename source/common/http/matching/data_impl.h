@@ -13,6 +13,9 @@ namespace Matching {
  */
 class HttpMatchingDataImpl : public HttpMatchingData {
 public:
+  explicit HttpMatchingDataImpl(const StreamInfo::StreamInfo& stream_info)
+      : stream_info_(stream_info) {}
+
   static absl::string_view name() { return "http"; }
 
   void onRequestHeaders(const RequestHeaderMap& request_headers) {
@@ -47,7 +50,14 @@ public:
     return makeOptRefFromPtr(response_trailers_);
   }
 
+  const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
+
+  const Network::ConnectionInfoProvider& connectionInfoProvider() const override {
+    return stream_info_.downstreamAddressProvider();
+  }
+
 private:
+  const StreamInfo::StreamInfo& stream_info_;
   const RequestHeaderMap* request_headers_{};
   const ResponseHeaderMap* response_headers_{};
   const RequestTrailerMap* request_trailers_{};
@@ -57,9 +67,14 @@ private:
 using HttpMatchingDataImplSharedPtr = std::shared_ptr<HttpMatchingDataImpl>;
 
 struct HttpFilterActionContext {
+  // Identify whether the filter is in downstream filter chain or upstream filter chain.
+  const bool is_downstream_ = true;
   const std::string& stat_prefix_;
-  Server::Configuration::FactoryContext& factory_context_;
+  OptRef<Server::Configuration::FactoryContext> factory_context_;
+  OptRef<Server::Configuration::UpstreamFactoryContext> upstream_factory_context_;
+  OptRef<Server::Configuration::ServerFactoryContext> server_factory_context_;
 };
+
 } // namespace Matching
 } // namespace Http
 } // namespace Envoy

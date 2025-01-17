@@ -14,8 +14,13 @@ namespace ExternalProcessing {
 class ExtProcTestUtility {
 public:
   // Compare a reference header map to a proto
-  static bool headerProtosEqualIgnoreOrder(const Http::HeaderMap& expected,
+  static bool headerProtosEqualIgnoreOrder(const ::Envoy::Http::HeaderMap& expected,
                                            const envoy::config::core::v3::HeaderMap& actual);
+
+private:
+  // These headers are present in the actual, but cannot be specified in the expected
+  // ignoredHeaders should not be used for equal comparison
+  static const absl::flat_hash_set<std::string> ignoredHeaders();
 };
 
 MATCHER_P(HeaderProtosEqual, expected, "HTTP header protos match") {
@@ -23,12 +28,16 @@ MATCHER_P(HeaderProtosEqual, expected, "HTTP header protos match") {
 }
 
 MATCHER_P(HasNoHeader, key, absl::StrFormat("Headers have no value for \"%s\"", key)) {
-  return arg.get(Http::LowerCaseString(std::string(key))).empty();
+  return arg.get(::Envoy::Http::LowerCaseString(std::string(key))).empty();
+}
+
+MATCHER_P(HasHeader, key, absl::StrFormat("There exists a header for \"%s\"", key)) {
+  return !arg.get(::Envoy::Http::LowerCaseString(std::string(key))).empty();
 }
 
 MATCHER_P2(SingleHeaderValueIs, key, value,
            absl::StrFormat("Header \"%s\" equals \"%s\"", key, value)) {
-  const auto hdr = arg.get(Http::LowerCaseString(std::string(key)));
+  const auto hdr = arg.get(::Envoy::Http::LowerCaseString(std::string(key)));
   if (hdr.size() != 1) {
     return false;
   }
@@ -45,6 +54,8 @@ MATCHER_P2(SingleProtoHeaderValueIs, key, value,
   return false;
 }
 
+envoy::config::core::v3::HeaderValue makeHeaderValue(const std::string& key,
+                                                     const std::string& value);
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

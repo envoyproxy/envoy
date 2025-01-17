@@ -5,13 +5,16 @@ import os
 import subprocess as sp
 import sys
 
+# Workaround for https://github.com/bazelbuild/rules_python/issues/1221
+sys.path += [os.path.dirname(__file__)]
+
 import tap2pcap
 
 # Validate that the tapped trace when run through tap2cap | tshark matches
 # a golden output file for the tshark dump. Since we run tap2pcap in a
 # subshell with a limited environment, the inferred time zone should be UTC.
 if __name__ == '__main__':
-    srcdir = os.path.join(os.getenv('TEST_SRCDIR'), 'envoy_api_canonical')
+    srcdir = os.path.join(os.getenv('TEST_SRCDIR'), 'envoy_api')
     tap_path = os.path.join(srcdir, 'tools/data/tap2pcap_h2_ipv4.pb_text')
     expected_path = os.path.join(srcdir, 'tools/data/tap2pcap_h2_ipv4.txt')
     pcap_path = os.path.join(os.getenv('TEST_TMPDIR'), 'generated.pcap')

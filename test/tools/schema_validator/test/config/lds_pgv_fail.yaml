@@ -1,0 +1,15 @@
+resources:
+- "@type": type.googleapis.com/envoy.config.listener.v3.Listener
+  name: ingress_https
+  filter_chains:
+  - filters:
+    - name: envoy.filters.network.http_connection_manager
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        stat_prefix: ingress_http
+        use_remote_address: true
+        route_config:
+          virtual_hosts:
+          - name: foo
+        http_filters:
+        - name: envoy.filters.http.router

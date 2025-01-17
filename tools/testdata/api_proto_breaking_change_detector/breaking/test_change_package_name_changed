@@ -1,0 +1,6 @@
+syntax = "proto3";
+package wrong.package;
+
+message ChangePackageNameMessage {
+    string passcode = 69;
+}

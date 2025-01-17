@@ -1,29 +1,23 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Run a CI build/test target, e.g. docs, asan.
 
 set -e
 
-
-build_setup_args=""
-if [[ "$1" == "format_pre" || "$1" == "fix_format" || "$1" == "check_format" || "$1" == "docs" ||  \
-          "$1" == "bazel.clang_tidy" || "$1" == "tooling" || "$1" == "deps" || "$1" == "verify_examples" || \
-          "$1" == "verify_build_examples" ]]; then
-    build_setup_args="-nofetch"
-fi
-
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
-NO_BUILD_SETUP="${NO_BUILD_SETUP:-}"
 
-if [[ -z "$NO_BUILD_SETUP" ]]; then
-    # shellcheck source=ci/setup_cache.sh
-    . "$(dirname "$0")"/setup_cache.sh
-    # shellcheck source=ci/build_setup.sh
-    . "$(dirname "$0")"/build_setup.sh $build_setup_args
-fi
+CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
+
+# shellcheck source=ci/build_setup.sh
+. "${CURRENT_SCRIPT_DIR}"/build_setup.sh
+
+echo "building using ${NUM_CPUS} CPUs"
+echo "building for ${ENVOY_BUILD_ARCH}"
+
 cd "${SRCDIR}"
+
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
   BUILD_ARCH_DIR="/linux/amd64"
@@ -34,13 +28,32 @@ else
   BUILD_ARCH_DIR="/linux/${ENVOY_BUILD_ARCH}"
 fi
 
-echo "building using ${NUM_CPUS} CPUs"
-echo "building for ${ENVOY_BUILD_ARCH}"
+setup_clang_toolchain() {
+    CONFIG_PARTS=()
+    if [[ -n "${ENVOY_RBE}" ]]; then
+        CONFIG_PARTS+=("remote")
+    fi
+    CONFIG_PARTS+=("clang")
+    ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
+        CONFIG_PARTS+=("libc++")
+    fi
+    CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
+    BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
+    BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
+    export BAZEL_BUILD_OPTION_LIST
+    echo "clang toolchain with ${ENVOY_STDLIB} configured: ${CONFIG}"
+}
 
 function collect_build_profile() {
-  declare -g build_profile_count=${build_profile_count:-1}
-  mv -f "$(bazel info output_base)/command.profile.gz" "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" || true
-  ((build_profile_count++))
+    local output_base
+    declare -g build_profile_count=${build_profile_count:-1}
+    output_base="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" output_base)"
+    mv -f \
+       "${output_base}/command.profile.gz" \
+       "${ENVOY_BUILD_PROFILE}/${build_profile_count}-$1.profile.gz" \
+        || :
+    ((build_profile_count++))
 }
 
 function bazel_with_collection() {
@@ -59,50 +72,53 @@ function bazel_with_collection() {
     exit "${BAZEL_STATUS}"
   fi
   collect_build_profile "$1"
-  run_process_test_result
 }
-
-function cp_binary_for_outside_access() {
-  DELIVERY_LOCATION="$1"
-  cp -f \
-    bazel-bin/"${ENVOY_BIN}" \
-    "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}"
-}
-
-function cp_debug_info_for_outside_access() {
-  DELIVERY_LOCATION="$1"
-  cp -f \
-    bazel-bin/"${ENVOY_BIN}".dwp \
-    "${ENVOY_DELIVERY_DIR}"/"${DELIVERY_LOCATION}".dwp
-}
-
 
 function cp_binary_for_image_build() {
+  local BINARY_TYPE="$1"
+  local COMPILE_TYPE="$2"
+  local EXE_NAME="$3"
+
   # TODO(mattklein123): Replace this with caching and a different job which creates images.
   local BASE_TARGET_DIR="${ENVOY_SRCDIR}${BUILD_ARCH_DIR}"
+  local TARGET_DIR=build_"${EXE_NAME}"_"${BINARY_TYPE}"
+  local FINAL_DELIVERY_DIR="${ENVOY_DELIVERY_DIR}"/"${EXE_NAME}"
+
   echo "Copying binary for image build..."
-  COMPILE_TYPE="$2"
-  mkdir -p "${BASE_TARGET_DIR}"/build_"$1"
-  cp -f "${ENVOY_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/build_"$1"
-  # Copy the su-exec utility binary into the image
-  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/build_"$1"
+  mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+  cp -f "${FINAL_DELIVERY_DIR}"/envoy "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
-    cp -f "${ENVOY_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/build_"$1"
+    cp -f "${FINAL_DELIVERY_DIR}"/envoy.dwp "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
   fi
-  mkdir -p "${BASE_TARGET_DIR}"/build_"$1"_stripped
-  strip "${ENVOY_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/build_"$1"_stripped/envoy
 
-  # Copy for azp which doesn't preserve permissions, creating a tar archive
-  tar czf "${ENVOY_BUILD_DIR}"/envoy_binary.tar.gz -C "${BASE_TARGET_DIR}" build_"$1" build_"$1"_stripped
+  # Tools for the tools image. Strip to save size.
+  strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
+    -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
+  strip bazel-bin/test/tools/router_check/router_check_tool \
+    -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/router_check_tool
+  strip bazel-bin/test/tools/config_load_check/config_load_check_tool \
+    -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
-  # Remove binaries to save space, only if BUILD_REASON exists (running in AZP)
-  [[ -z "${BUILD_REASON}" ]] || \
-    rm -rf "${BASE_TARGET_DIR}"/build_"$1" "${BASE_TARGET_DIR}"/build_"$1"_stripped "${ENVOY_DELIVERY_DIR}"/envoy{,.dwp} \
+  # Copy the su-exec utility binary into the image
+  cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
+
+  # Stripped binaries for the debug image.
+  mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
+  strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
+
+  # only if BUILD_REASON exists (running in AZP)
+  if [[ "${BUILD_REASON}" ]]; then
+    # Copy for azp which doesn't preserve permissions
+    tar czf "${ENVOY_BUILD_DIR}"/"${EXE_NAME}"_binary.tar.gz -C "${BASE_TARGET_DIR}" "${TARGET_DIR}" "${TARGET_DIR}"_stripped
+
+    # Remove binaries to save space
+    rm -rf "${BASE_TARGET_DIR:?}"/"${TARGET_DIR}" "${BASE_TARGET_DIR:?}"/"${TARGET_DIR}"_stripped "${FINAL_DELIVERY_DIR:?}"/envoy{,.dwp} \
       bazel-bin/"${ENVOY_BIN}"{,.dwp}
+  fi
 }
 
 function bazel_binary_build() {
-  BINARY_TYPE="$1"
+  local BINARY_TYPE="$1"
   if [[ "${BINARY_TYPE}" == "release" ]]; then
     COMPILE_TYPE="opt"
   elif [[ "${BINARY_TYPE}" == "debug" ]]; then
@@ -111,72 +127,132 @@ function bazel_binary_build() {
     # The COMPILE_TYPE variable is redundant in this case and is only here for
     # readability. It is already set in the .bazelrc config for sizeopt.
     COMPILE_TYPE="opt"
-    CONFIG_ARGS="--config=sizeopt"
+    CONFIG_ARGS=("--config=sizeopt")
   elif [[ "${BINARY_TYPE}" == "fastbuild" ]]; then
     COMPILE_TYPE="fastbuild"
   fi
 
-  echo "Building..."
-  ENVOY_BIN=$(echo "${ENVOY_BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
+  local BUILD_TARGET="$2"
+  local BUILD_DEBUG_INFORMATION="$3"
+  local EXE_NAME="$4"
+  local FINAL_DELIVERY_DIR="${ENVOY_DELIVERY_DIR}"/"${EXE_NAME}"
+  mkdir -p "${FINAL_DELIVERY_DIR}"
+
+  echo "Building (type=${BINARY_TYPE} target=${BUILD_TARGET} debug=${BUILD_DEBUG_INFORMATION} name=${EXE_NAME})..."
+  ENVOY_BIN=$(echo "${BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
+  echo "ENVOY_BIN=${ENVOY_BIN}"
 
   # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
   [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
 
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${ENVOY_BUILD_TARGET}" ${CONFIG_ARGS}
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" "${CONFIG_ARGS[@]}"
   collect_build_profile "${BINARY_TYPE}"_build
 
   # Copy the built envoy binary somewhere that we can access outside of the
   # container.
-  cp_binary_for_outside_access envoy
+  cp -f bazel-bin/"${ENVOY_BIN}" "${FINAL_DELIVERY_DIR}"/envoy
 
   if [[ "${COMPILE_TYPE}" == "dbg" || "${COMPILE_TYPE}" == "opt" ]]; then
     # Generate dwp file for debugging since we used split DWARF to reduce binary
     # size
-    bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c "${COMPILE_TYPE}" "${ENVOY_BUILD_DEBUG_INFORMATION}" ${CONFIG_ARGS}
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_DEBUG_INFORMATION}" "${CONFIG_ARGS[@]}"
     # Copy the debug information
-    cp_debug_info_for_outside_access envoy
+    cp -f bazel-bin/"${ENVOY_BIN}".dwp "${FINAL_DELIVERY_DIR}"/envoy.dwp
   fi
+
+  # Validation tools for the tools image.
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
+    //test/tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
+    //test/tools/router_check:router_check_tool "${CONFIG_ARGS[@]}"
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
+    //test/tools/config_load_check:config_load_check_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
-  bazel build external:su-exec
-  cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}"
-
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @com_github_ncopa_suexec//:su-exec
+  cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
-function run_process_test_result() {
-  if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
-      echo "running flaky test reporting script"
-      "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
-  else
-      echo "no flaky test results found"
-  fi
+function bazel_envoy_binary_build() {
+  bazel_binary_build "$1" "${ENVOY_BUILD_TARGET}" "${ENVOY_BUILD_DEBUG_INFORMATION}" envoy
 }
 
-function run_ci_verify () {
-  echo "verify examples..."
-  docker load < "$ENVOY_DOCKER_BUILD_DIR/docker/envoy-docker-images.tar.xz"
-  _images=$(docker image list --format "{{.Repository}}")
-  while read -r line; do images+=("$line"); done \
-      <<< "$_images"
-  _tags=$(docker image list --format "{{.Tag}}")
-  while read -r line; do tags+=("$line"); done \
-      <<< "$_tags"
-  for i in "${!images[@]}"; do
-      if [[ "${images[i]}" =~ "envoy" ]]; then
-          docker tag "${images[$i]}:${tags[$i]}" "${images[$i]}:latest"
-      fi
-  done
-  docker images
-  sudo apt-get update -y
-  sudo apt-get install -y -qq --no-install-recommends expect redis-tools
-  export DOCKER_NO_PULL=1
-  umask 027
-  chmod -R o-rwx examples/
-  "${ENVOY_SRCDIR}"/ci/verify_examples.sh "${@}" || exit
+function bazel_contrib_binary_build() {
+  bazel_binary_build "$1" "${ENVOY_CONTRIB_BUILD_TARGET}" "${ENVOY_CONTRIB_BUILD_DEBUG_INFORMATION}" envoy-contrib
+}
+
+function bazel_envoy_api_build() {
+    # Use libstdc++ because the API booster links to prebuilt libclang*/libLLVM* installed in /opt/llvm/lib,
+    # which is built with libstdc++. Using libstdc++ for whole of the API CI job to avoid unnecessary rebuild.
+    ENVOY_STDLIB="libstdc++"
+    setup_clang_toolchain
+    export CLANG_TOOLCHAIN_SETUP=1
+    export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
+    echo "Run protoxform test"
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+        --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \
+        --//tools/api_proto_plugin:extra_args=api_version:3.7 \
+        //tools/protoprint:protoprint_test
+    echo "Validating API structure..."
+    "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
+    echo "Testing API..."
+    bazel_with_collection \
+        test "${BAZEL_BUILD_OPTIONS[@]}" \
+        --remote_download_minimal \
+        -c fastbuild \
+        @envoy_api//test/... \
+        @envoy_api//tools/... \
+        @envoy_api//tools:tap2pcap_test
+    echo "Building API..."
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+        -c fastbuild @envoy_api//envoy/...
+}
+
+function bazel_envoy_api_go_build() {
+    if [[ -z "$CLANG_TOOLCHAIN_SETUP" ]]; then
+        setup_clang_toolchain
+    fi
+    GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
+    GO_TARGETS=(@envoy_api//...)
+    read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
+    echo "${GO_PROTOS[@]}" | grep -q envoy_api || echo "No go proto targets found"
+    bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+            --experimental_proto_descriptor_sets_include_source_info \
+            --remote_download_outputs=all \
+            "${GO_PROTOS[@]}"
+    rm -rf build_go
+    mkdir -p build_go
+    echo "Copying go protos -> build_go"
+    BAZEL_BIN="$(bazel info "${BAZEL_BUILD_OPTIONS[@]}" bazel-bin)"
+    for GO_PROTO in "${GO_PROTOS[@]}"; do
+            # strip @envoy_api//
+        RULE_DIR="$(echo "${GO_PROTO:12}" | cut -d: -f1)"
+        PROTO="$(echo "${GO_PROTO:12}" | cut -d: -f2)"
+        INPUT_DIR="${BAZEL_BIN}/external/envoy_api/${RULE_DIR}/${PROTO}_/${GO_IMPORT_BASE}/${RULE_DIR}"
+        OUTPUT_DIR="build_go/${RULE_DIR}"
+        mkdir -p "$OUTPUT_DIR"
+        if [[ ! -e "$INPUT_DIR" ]]; then
+            echo "Unable to find input ${INPUT_DIR}" >&2
+            exit 1
+        fi
+        # echo "Copying go files ${INPUT_DIR} -> ${OUTPUT_DIR}"
+        while read -r GO_FILE; do
+            cp -a "$GO_FILE" "$OUTPUT_DIR"
+            if [[ "$GO_FILE" = *.validate.go ]]; then
+                sed -i '1s;^;//go:build !disable_pgv\n;' "$OUTPUT_DIR/$(basename "$GO_FILE")"
+            fi
+        done <<< "$(find "$INPUT_DIR" -name "*.go")"
+    done
 }
 
 CI_TARGET=$1
 shift
+
+if [[ "$CI_TARGET" =~ bazel.* ]]; then
+    ORIG_CI_TARGET="$CI_TARGET"
+    CI_TARGET="$(echo "${CI_TARGET}" | cut -d. -f2-)"
+    echo "Using \`${ORIG_CI_TARGET}\` is deprecated, please use \`${CI_TARGET}\`"
+fi
 
 if [[ $# -ge 1 ]]; then
   COVERAGE_TEST_TARGETS=("$@")
@@ -184,301 +260,666 @@ if [[ $# -ge 1 ]]; then
 else
   # Coverage test will add QUICHE tests by itself.
   COVERAGE_TEST_TARGETS=("//test/...")
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_googlesource_quiche//:ci_tests")
+  if [[ "${CI_TARGET}" == "release" || "${CI_TARGET}" == "release.test_only" ]]; then
+    # We test contrib on release only.
+    COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
+  elif [[ "${CI_TARGET}" == "msan" ]]; then
+    COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
+  fi
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
 fi
 
-if [[ "$CI_TARGET" == "bazel.release" ]]; then
-  # When testing memory consumption, we want to test against exact byte-counts
-  # where possible. As these differ between platforms and compile options, we
-  # define the 'release' builds as canonical and test them only in CI, so the
-  # toolchain is kept consistent. This ifdef is checked in
-  # test/common/stats/stat_test_utility.cc when computing
-  # Stats::TestUtil::MemoryTest::mode().
-  [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]] && BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
+case $CI_TARGET in
+    api)
+        bazel_envoy_api_build
+        if [[ -n "$ENVOY_API_ONLY" ]]; then
+            exit 0
+        fi
+        bazel_envoy_api_go_build
+        ;;
 
-  setup_clang_toolchain
-  echo "Testing ${TEST_TARGETS[*]} with options: ${BAZEL_BUILD_OPTIONS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c opt "${TEST_TARGETS[@]}"
+    api.go)
+        bazel_envoy_api_go_build
+        ;;
 
-  echo "bazel release build with tests..."
-  bazel_binary_build release
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.release.server_only" ]]; then
-  setup_clang_toolchain
-  echo "bazel release build..."
-  bazel_binary_build release
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.sizeopt.server_only" ]]; then
-  setup_clang_toolchain
-  echo "bazel size optimized build..."
-  bazel_binary_build sizeopt
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.sizeopt" ]]; then
-  setup_clang_toolchain
-  echo "Testing ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=sizeopt "${TEST_TARGETS[@]}"
+    api_compat)
+        echo "Checking API for breaking changes to protobuf backwards compatibility..."
+        BASE_BRANCH_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
+        COMMIT_TITLE=$(git log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' "${BASE_BRANCH_REF}")
+        echo -e "\tUsing base commit ${COMMIT_TITLE}"
+        # BAZEL_BUILD_OPTIONS needed for setting the repository_cache param.
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/api_proto_breaking_change_detector:detector_ci \
+              "${BASE_BRANCH_REF}"
+        ;;
 
-  echo "bazel size optimized build with tests..."
-  bazel_binary_build sizeopt
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.gcc" ]]; then
-  BAZEL_BUILD_OPTIONS+=("--test_env=HEAPCHECK=")
-  setup_gcc_toolchain
+    asan)
+        setup_clang_toolchain
+        if [[ -n "$ENVOY_RBE" ]]; then
+            ASAN_CONFIG="--config=rbe-toolchain-asan"
+        else
+            ASAN_CONFIG="--config=clang-asan"
+        fi
+        BAZEL_BUILD_OPTIONS+=(
+            -c dbg
+            "${ASAN_CONFIG}"
+            "--build_tests_only"
+            "--remote_download_minimal")
+        echo "bazel ASAN/UBSAN debug build with tests"
+        echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
+        bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
+        # TODO(mattklein123): This part of the test is now flaky in CI and it's unclear why, possibly
+        # due to sandboxing issue. Debug and enable it again.
+        # if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
+        # Also validate that integration test traffic tapping (useful when debugging etc.)
+        # works. This requires that we set TAP_PATH. We do this under bazel.asan to
+        # ensure a debug build in CI.
+        # echo "Validating integration test traffic tapping..."
+        # bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" \
+            #   --run_under=@envoy//bazel/test:verify_tap_test.sh \
+            #   //test/extensions/transport_sockets/tls/integration:ssl_integration_test
+        # fi
+        ;;
 
-  echo "Testing ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild -- "${TEST_TARGETS[@]}"
+    format-api|check_and_fix_proto_format)
+        setup_clang_toolchain
+        echo "Check and fix proto format ..."
+        "${ENVOY_SRCDIR}/ci/check_and_fix_format.sh"
+        ;;
 
-  echo "bazel release build with gcc..."
-  bazel_binary_build fastbuild
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.debug" ]]; then
-  setup_clang_toolchain
-  echo "Testing ${TEST_TARGETS[*]}"
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}"
+    check_proto_format)
+        setup_clang_toolchain
+        echo "Check proto format ..."
+        "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
+        ;;
 
-  echo "bazel debug build with tests..."
-  bazel_binary_build debug
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.debug.server_only" ]]; then
-  setup_clang_toolchain
-  echo "bazel debug build..."
-  bazel_binary_build debug
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.asan" ]]; then
-  setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS+=(-c dbg "--config=clang-asan" "--build_tests_only")
-  echo "bazel ASAN/UBSAN debug build with tests"
-  echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
-  if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
-    echo "Building and testing envoy-filter-example tests..."
-    pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-    bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${ENVOY_FILTER_EXAMPLE_TESTS[@]}"
-    popd
-  fi
+    clang-tidy)
+        # clang-tidy will warn on standard library issues with libc++
+        ENVOY_STDLIB="libstdc++"
+        setup_clang_toolchain
+        export CLANG_TIDY_FIX_DIFF="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
+        export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
+        export CLANG_TIDY_APPLY_FIXES=1
+        mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
+        if [[ -n "$CLANG_TIDY_TARGETS" ]]; then
+            read -ra CLANG_TIDY_TARGETS <<< "${CLANG_TIDY_TARGETS}"
+        else
+            CLANG_TIDY_TARGETS=(
+                //contrib/...
+                //source/...
+                //test/...
+                @envoy_api//...)
+        fi
+        echo "Running clang-tidy on ${CLANG_TIDY_TARGETS[*]}"
+        bazel build \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              --config=clang-tidy \
+              "${CLANG_TIDY_TARGETS[@]}"
+        ;;
 
-  # TODO(mattklein123): This part of the test is now flaky in CI and it's unclear why, possibly
-  # due to sandboxing issue. Debug and enable it again.
-  # if [ "${CI_SKIP_INTEGRATION_TEST_TRAFFIC_TAPPING}" != "1" ] ; then
-    # Also validate that integration test traffic tapping (useful when debugging etc.)
-    # works. This requires that we set TAP_PATH. We do this under bazel.asan to
-    # ensure a debug build in CI.
-    # echo "Validating integration test traffic tapping..."
-    # bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" \
-    #   --run_under=@envoy//bazel/test:verify_tap_test.sh \
-    #   //test/extensions/transport_sockets/tls/integration:ssl_integration_test
-  # fi
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
-  setup_clang_toolchain
-  echo "bazel TSAN debug build with tests"
-  echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
-  bazel_with_collection test --config=rbe-toolchain-tsan "${BAZEL_BUILD_OPTIONS[@]}" -c dbg --build_tests_only "${TEST_TARGETS[@]}"
-  if [ "${ENVOY_BUILD_FILTER_EXAMPLE}" == "1" ]; then
-    echo "Building and testing envoy-filter-example tests..."
-    pushd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-    bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c dbg --config=clang-tsan "${ENVOY_FILTER_EXAMPLE_TESTS[@]}"
-    popd
-  fi
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.msan" ]]; then
-  ENVOY_STDLIB=libc++
-  setup_clang_toolchain
-  # rbe-toolchain-msan must comes as first to win library link order.
-  BAZEL_BUILD_OPTIONS=("--config=rbe-toolchain-msan" "${BAZEL_BUILD_OPTIONS[@]}" "-c" "dbg" "--build_tests_only")
-  echo "bazel MSAN debug build with tests"
-  echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" "${TEST_TARGETS[@]}"
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
-  setup_clang_toolchain
-  # This doesn't go into CI but is available for developer convenience.
-  echo "bazel fastbuild build with tests..."
-  echo "Building..."
-  bazel_binary_build fastbuild
+    clean|expunge)
+        setup_clang_toolchain
+        if [[ "$CI_TARGET" == "expunge" ]]; then
+            CLEAN_ARGS+=(--expunge)
+        fi
+        bazel clean "${BAZEL_GLOBAL_OPTIONS[@]}" "${CLEAN_ARGS[@]}"
+        ;;
 
-  echo "Testing ${TEST_TARGETS[*]}"
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild "${TEST_TARGETS[@]}"
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
-  # Right now, none of the available compile-time options conflict with each other. If this
-  # changes, this build type may need to be broken up.
-  COMPILE_TIME_OPTIONS=(
-    "--define" "signal_trace=disabled"
-    "--define" "hot_restart=disabled"
-    "--define" "google_grpc=disabled"
-    "--define" "boringssl=fips"
-    "--define" "log_debug_assert_in_release=enabled"
-    "--define" "path_normalization_by_default=true"
-    "--define" "deprecated_features=disabled"
-    "--define" "tcmalloc=gperftools"
-    "--define" "zlib=ng"
-    "--@envoy//bazel:http3=False"
-    "--@envoy//source/extensions/filters/http/kill_request:enabled"
-    "--test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true")
+    compile_time_options)
+        # See `compile-time-options` in `.bazelrc`
+        setup_clang_toolchain
+        # This doesn't go into CI but is available for developer convenience.
+        echo "bazel with different compiletime options build with tests..."
+        TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
+        # Building all the dependencies from scratch to link them against libc++.
+        echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
+            --define wasm=wamr \
+            -c fastbuild \
+            "${TEST_TARGETS[@]}" \
+            --test_tag_filters=-nofips \
+            --build_tests_only
+        echo "Building and testing with wasm=wasmtime: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
+            --define wasm=wasmtime \
+            --define admin_functionality=disabled \
+            -c fastbuild \
+            "${TEST_TARGETS[@]}" \
+            --test_tag_filters=-nofips \
+            --build_tests_only
+        # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
+        # these tests under "-c opt" to save time in CI.
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
+            --define wasm=wasmtime \
+            -c opt \
+            @envoy//test/common/common:assert_test \
+            @envoy//test/server:server_test
+        # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
+            --define wasm=wamtime \
+            -c opt \
+            @envoy//test/common/common:assert_test \
+            --define log_fast_debug_assert_in_release=enabled \
+            --define log_debug_assert_in_release=disabled
+        echo "Building binary with wasm=wasmtime... and logging disabled"
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=compile-time-options \
+            --define wasm=wasmtime \
+            --define enable_logging=disabled \
+            -c fastbuild \
+            @envoy//source/exe:envoy-static \
+            --build_tag_filters=-nofips
+        collect_build_profile build
+        ;;
 
-  ENVOY_STDLIB="${ENVOY_STDLIB:-libstdc++}"
-  setup_clang_toolchain
-  # This doesn't go into CI but is available for developer convenience.
-  echo "bazel with different compiletime options build with tests..."
+    coverage|fuzz_coverage)
+        setup_clang_toolchain
+        echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS[*]}"
+        if [[ "$CI_TARGET" == "fuzz_coverage" ]]; then
+            export FUZZ_COVERAGE=true
+        fi
+        export BAZEL_GRPC_LOG="${ENVOY_BUILD_DIR}/grpc.log"
+        "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
+            "${COVERAGE_TEST_TARGETS[@]}"
+        collect_build_profile coverage
+        ;;
 
-  cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
+    debug)
+        setup_clang_toolchain
+        echo "Testing ${TEST_TARGETS[*]}"
+        # Make sure that there are no regressions to building Envoy with autolink disabled.
+        EXTRA_OPTIONS=(
+            "--define" "library_autolink=disabled")
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+              "${EXTRA_OPTIONS[@]}" \
+              -c dbg \
+              "${TEST_TARGETS[@]}"
+        echo "bazel debug build with tests..."
+        bazel_envoy_binary_build debug
+        ;;
 
-  # Building all the dependencies from scratch to link them against libc++.
-  echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wamr "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+    debug.server_only)
+        setup_clang_toolchain
+        echo "bazel debug build..."
+        bazel_envoy_binary_build debug
+        ;;
 
-  echo "Building and testing with wasm=wasmtime: ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wasmtime "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+    deps)
+        setup_clang_toolchain
+        echo "dependency validate_test..."
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/dependency:validate_test
+        echo "verifying dependencies..."
+        # Validate dependency relationships between core/extensions and external deps.
+        time bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+             //tools/dependency:validate
+        # Validate repository metadata.
+        echo "check repositories..."
+        "${ENVOY_SRCDIR}/tools/check_repositories.sh"
+        echo "check dependencies..."
+        # Using todays date as an action_env expires the NIST cache daily, which is the update frequency
+        TODAY_DATE=$(date -u -I"date")
+        export TODAY_DATE
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
+              --//tools/dependency:preload_cve_data \
+              --action_env=TODAY_DATE \
+              -- -v warn \
+                 -c cves release_dates releases
+        # Run dependabot tests
+        echo "Check dependabot ..."
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/dependency:dependatool
+        # Disable this pending resolution to https://github.com/envoyproxy/envoy/issues/30286
+        # Run pip requirements tests
+        # echo "Check pip requirements ..."
+        # bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+        #       //tools/base:requirements_test
+        ;;
 
-  echo "Building and testing with wasm=wavm: ${TEST_TARGETS[*]}"
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg "${TEST_TARGETS[@]}" --test_tag_filters=-nofips --build_tests_only
+    dev)
+        setup_clang_toolchain
+        # This doesn't go into CI but is available for developer convenience.
+        echo "bazel fastbuild build with tests..."
+        echo "Building..."
+        bazel_envoy_binary_build fastbuild
+        echo "Testing ${TEST_TARGETS[*]}"
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+              -c fastbuild "${TEST_TARGETS[@]}"
+        ;;
 
-  # "--define log_debug_assert_in_release=enabled" must be tested with a release build, so run only
-  # these tests under "-c opt" to save time in CI.
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test @envoy//test/server:server_test
+    dev.contrib)
+        setup_clang_toolchain
+        # This doesn't go into CI but is available for developer convenience.
+        echo "bazel fastbuild build with contrib extensions and tests..."
+        echo "Building..."
+        bazel_contrib_binary_build fastbuild
+        echo "Testing ${TEST_TARGETS[*]}"
+        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+              -c fastbuild \
+              "${TEST_TARGETS[@]}"
+        ;;
 
-  # "--define log_fast_debug_assert_in_release=enabled" must be tested with a release build, so run only these tests under "-c opt" to save time in CI. This option will test only ASSERT()s without SLOW_ASSERT()s, so additionally disable "--define log_debug_assert_in_release" which compiles in both.
-    bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c opt @envoy//test/common/common:assert_test --define log_fast_debug_assert_in_release=enabled --define log_debug_assert_in_release=disabled
+    distribution)
+        echo "Building distro packages..."
+        setup_clang_toolchain
+        # Extract the Envoy binary from the tarball
+        mkdir -p distribution/custom
+        if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+            ENVOY_RELEASE_TARBALL="/build/release/x64/bin/release.tar.zst"
+        else
+            ENVOY_RELEASE_TARBALL="/build/release/arm64/bin/release.tar.zst"
+        fi
 
-  echo "Building binary with wasm=wavm..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --define wasm=wavm "${COMPILE_TIME_OPTIONS[@]}" -c dbg @envoy//source/exe:envoy-static --build_tag_filters=-nofips
-  collect_build_profile build
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.api" ]]; then
-  # Use libstdc++ because the API booster links to prebuilt libclang*/libLLVM* installed in /opt/llvm/lib,
-  # which is built with libstdc++. Using libstdc++ for whole of the API CI job to avoid unnecessary rebuild.
-  ENVOY_STDLIB="libstdc++"
-  setup_clang_toolchain
-  export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
-  echo "Validating API structure..."
-  "${ENVOY_SRCDIR}"/tools/api/validate_structure.py
-  echo "Testing API and API Boosting..."
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//test/... @envoy_api_canonical//tools/... \
-    @envoy_api_canonical//tools:tap2pcap_test @envoy_dev//clang_tools/api_booster/...
-  echo "Building API..."
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api_canonical//envoy/...
-  echo "Testing API boosting (golden C++ tests)..."
-  # We use custom BAZEL_BUILD_OPTIONS here; the API booster isn't capable of working with libc++ yet.
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" python3.8 "${ENVOY_SRCDIR}"/tools/api_boost/api_boost_test.py
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
-  setup_clang_toolchain
-  echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS[*]}"
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/zstd \
+              -- --stdout \
+                 -d "$ENVOY_RELEASE_TARBALL" \
+            | tar xfO - envoy > distribution/custom/envoy
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/zstd \
+              -- --stdout \
+                 -d "$ENVOY_RELEASE_TARBALL" \
+            | tar xfO - envoy-contrib > distribution/custom/envoy-contrib
+        # Build the packages
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              --remote_download_toplevel \
+              -c opt \
+              --//distribution:envoy-binary=//distribution:custom/envoy \
+              --//distribution:envoy-contrib-binary=//distribution:custom/envoy-contrib \
+              //distribution:packages.tar.gz
+        if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+            cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.x64.tar.gz"
+        else
+            cp -a bazel-bin/distribution/packages.tar.gz "${ENVOY_BUILD_DIR}/packages.arm64.tar.gz"
+        fi
+        ;;
 
-  [[ "$CI_TARGET" == "bazel.fuzz_coverage" ]] && export FUZZ_COVERAGE=true
+    docker)
+        # This is limited to linux x86/arm64 and expects `release` or `release.server_only` to have
+        # been run first.
+        if ! docker ps &> /dev/null; then
+            echo "Unable to build with Docker. If you are running with ci/run_envoy_docker.sh" \
+                 "you should set ENVOY_DOCKER_IN_DOCKER=1"
+            exit 1
+        fi
+        if [[ -z "$CI_SHA1" ]]; then
+            CI_SHA1="$(git rev-parse HEAD~1)"
+            export CI_SHA1
+        fi
+        ENVOY_ARCH_DIR="$(dirname "${ENVOY_BUILD_DIR}")"
+        ENVOY_TARBALL_DIR="${ENVOY_TARBALL_DIR:-${ENVOY_ARCH_DIR}}"
+        _PLATFORMS=()
+        PLATFORM_NAMES=(
+            x64:linux/amd64
+            arm64:linux/arm64)
+        # TODO(phlax): avoid copying bins
+        for platform_name in "${PLATFORM_NAMES[@]}"; do
+            path="$(echo "${platform_name}" | cut -d: -f1)"
+            platform="$(echo "${platform_name}" | cut -d: -f2)"
+            bin_folder="${ENVOY_TARBALL_DIR}/${path}/bin"
+            if [[ ! -e "${bin_folder}/release.tar.zst" ]]; then
+                continue
+            fi
+            _PLATFORMS+=("$platform")
+            if [[ -e "$platform" ]]; then
+                rm -rf "$platform"
+            fi
+            mkdir -p "${platform}"
+            cp -a "${bin_folder}"/* "$platform"
+        done
+        if [[ -z "${_PLATFORMS[*]}" ]]; then
+            echo "No tarballs found in ${ENVOY_TARBALL_DIR}, did you run \`release\` first?" >&2
+            exit 1
+        fi
+        PLATFORMS="$(IFS=, ; echo "${_PLATFORMS[*]}")"
+        export DOCKER_PLATFORM="$PLATFORMS"
+        if [[ -z "${DOCKERHUB_PASSWORD}" && "${#_PLATFORMS[@]}" -eq 1 && -z $ENVOY_DOCKER_SAVE_IMAGE ]]; then
+            # if you are not pushing the images and there is only one platform
+            # then load to Docker (ie local build)
+            export DOCKER_LOAD_IMAGES=1
+        fi
+        "${ENVOY_SRCDIR}/ci/docker_ci.sh"
+        ;;
 
-  # We use custom BAZEL_BUILD_OPTIONS here to cover profiler's code.
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]} --define tcmalloc=gperftools" "${ENVOY_SRCDIR}"/test/run_envoy_bazel_coverage.sh "${COVERAGE_TEST_TARGETS[@]}"
-  collect_build_profile coverage
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.clang_tidy" ]]; then
-  # clang-tidy will warn on standard library issues with libc++
-  ENVOY_STDLIB="libstdc++"
-  setup_clang_toolchain
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" NUM_CPUS=$NUM_CPUS "${ENVOY_SRCDIR}"/ci/run_clang_tidy.sh "$@"
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.coverity" ]]; then
-  # Coverity Scan version 2017.07 fails to analyze the entirely of the Envoy
-  # build when compiled with Clang 5. Revisit when Coverity Scan explicitly
-  # supports Clang 5. Until this issue is resolved, run Coverity Scan with
-  # the GCC toolchain.
-  setup_gcc_toolchain
-  echo "bazel Coverity Scan build"
-  echo "Building..."
-  /build/cov-analysis/bin/cov-build --dir "${ENVOY_BUILD_DIR}"/cov-int bazel build --action_env=LD_PRELOAD "${BAZEL_BUILD_OPTIONS[@]}" \
-    -c opt "${ENVOY_BUILD_TARGET}"
-  # tar up the coverity results
-  tar czvf "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz -C "${ENVOY_BUILD_DIR}" cov-int
-  # Copy the Coverity results somewhere that we can access outside of the container.
-  cp -f \
-     "${ENVOY_BUILD_DIR}"/envoy-coverity-output.tgz \
-     "${ENVOY_DELIVERY_DIR}"/envoy-coverity-output.tgz
-  exit 0
-elif [[ "$CI_TARGET" == "bazel.fuzz" ]]; then
-  setup_clang_toolchain
-  FUZZ_TEST_TARGETS=("$(bazel query "attr('tags','fuzzer',${TEST_TARGETS[*]})")")
-  echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS[*]}"
-  echo "Building envoy fuzzers and executing 100 fuzz iterations..."
-  bazel_with_collection test "${BAZEL_BUILD_OPTIONS[@]}" --config=asan-fuzzer "${FUZZ_TEST_TARGETS[@]}" --test_arg="-runs=10"
-  exit 0
-elif [[ "$CI_TARGET" == "format_pre" ]]; then
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/ci/format_pre.sh
-elif [[ "$CI_TARGET" == "fix_format" ]]; then
-  # proto_format.sh needs to build protobuf.
-  setup_clang_toolchain
+    dockerhub-publish)
+        setup_clang_toolchain
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //tools/distribution:update_dockerhub_repository
+        ;;
 
-  echo "fix_format..."
-  "${ENVOY_SRCDIR}"/tools/code_format/check_format.py fix
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh fix
-  exit 0
-elif [[ "$CI_TARGET" == "check_format" ]]; then
-  # proto_format.sh needs to build protobuf.
-  setup_clang_toolchain
+    dockerhub-readme)
+        setup_clang_toolchain
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              --remote_download_toplevel \
+              //distribution/dockerhub:readme
+        cat bazel-bin/distribution/dockerhub/readme.md
+        ;;
 
-  echo "check_format..."
-  "${ENVOY_SRCDIR}"/tools/code_format/check_format.py check
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/tools/proto_format/proto_format.sh check
-  exit 0
-elif [[ "$CI_TARGET" == "docs" ]]; then
-  echo "generating docs..."
-  # Build docs.
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" "${ENVOY_SRCDIR}"/docs/build.sh
-  exit 0
-elif [[ "$CI_TARGET" == "deps" ]]; then
+    docs)
+        setup_clang_toolchain
+        echo "generating docs..."
+        # Build docs.
+        [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
+        rm -rf "${DOCS_OUTPUT_DIR}"
+        mkdir -p "${DOCS_OUTPUT_DIR}"
+        if [[ -n "${CI_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
+            export SPHINX_RUNNER_ARGS="-v warn"
+            BAZEL_BUILD_OPTIONS+=("--action_env=SPHINX_RUNNER_ARGS")
+        fi
+        if [[ -n "${DOCS_BUILD_RST}" ]]; then
+            bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //docs:rst
+            cp bazel-bin/docs/rst.tar.gz "$DOCS_OUTPUT_DIR"/envoy-docs-rst.tar.gz
+        fi
+        DOCS_OUTPUT_DIR="$(realpath "$DOCS_OUTPUT_DIR")"
+        bazel "${BAZEL_STARTUP_OPTIONS[@]}" run \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              --//tools/tarball:target=//docs:html \
+              //tools/tarball:unpack \
+              "$DOCS_OUTPUT_DIR"
+        ;;
 
-  echo "verifying dependencies..."
-  # Validate dependency relationships between core/extensions and external deps.
-  "${ENVOY_SRCDIR}"/tools/dependency/validate.py
+    fix_proto_format)
+        # proto_format.sh needs to build protobuf.
+        setup_clang_toolchain
+        "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" fix
+        ;;
 
-  # Validate repository metadata.
-  echo "check repositories..."
-  "${ENVOY_SRCDIR}"/tools/check_repositories.sh
-  "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
+    format)
+        setup_clang_toolchain
+        "${ENVOY_SRCDIR}/ci/format_pre.sh"
+        ;;
 
-  # Run pip requirements tests
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check "${ENVOY_SRCDIR}"
+    fuzz)
+        setup_clang_toolchain
+        FUZZ_TEST_TARGETS=("$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "attr('tags','fuzzer',${TEST_TARGETS[*]})")")
+        echo "bazel ASAN libFuzzer build with fuzz tests ${FUZZ_TEST_TARGETS[*]}"
+        echo "Building envoy fuzzers and executing 100 fuzz iterations..."
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=asan-fuzzer \
+            "${FUZZ_TEST_TARGETS[@]}" \
+            --test_arg="-runs=10"
+        ;;
 
-  exit 0
-elif [[ "$CI_TARGET" == "cve_scan" ]]; then
-  echo "scanning for CVEs in dependencies..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan
-  exit 0
-elif [[ "$CI_TARGET" == "tooling" ]]; then
-  setup_clang_toolchain
+    gcc)
+        if [[ -n "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
+            echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
+            exit 1
+        fi
+        if [[ -n "${ENVOY_RBE}" ]]; then
+            CONFIG_PREFIX="remote-"
+        fi
+        CONFIG="${CONFIG_PREFIX}gcc"
+        BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
+        echo "gcc toolchain configured: ${CONFIG}"
+        echo "Testing ${TEST_TARGETS[*]}"
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            -c fastbuild  \
+            --remote_download_minimal \
+            -- "${TEST_TARGETS[@]}"
+        echo "bazel release build with gcc..."
+        bazel_envoy_binary_build fastbuild
+        ;;
 
-  # TODO(phlax): move this to a bazel rule
+    info)
+        setup_clang_toolchain
+        bazel info "${BAZEL_BUILD_OPTIONS[@]}"
+        ;;
 
-  echo "Run pytest tooling tests..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/testing:all_pytests -- --cov-html /source/generated/tooling "${ENVOY_SRCDIR}"
+    msan)
+        setup_clang_toolchain
+        # rbe-toolchain-msan must comes as first to win library link order.
+        BAZEL_BUILD_OPTIONS=(
+            "--config=rbe-toolchain-msan"
+            "${BAZEL_BUILD_OPTIONS[@]}"
+            "-c" "dbg"
+            "--build_tests_only"
+            "--remote_download_minimal")
+        echo "bazel MSAN debug build with tests"
+        echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            -- "${TEST_TARGETS[@]}"
+        ;;
 
-  echo "Run protoxform test"
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS[*]}" ./tools/protoxform/protoxform_test.sh
+    publish)
+        setup_clang_toolchain
+        BUILD_SHA="$(git rev-parse HEAD)"
+        ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
+        ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
+        VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
+        PUBLISH_ARGS=(
+            --publish-commitish="$ENVOY_COMMIT"
+            --publish-commit-message
+            --publish-assets=/build/release.signed/release.signed.tar.zst)
+        if [[ "$VERSION_DEV" == "dev" ]] || [[ -n "$ENVOY_PUBLISH_DRY_RUN" ]]; then
+            PUBLISH_ARGS+=(--dry-run)
+        fi
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              @envoy_repo//:publish \
+              -- --repo="$ENVOY_REPO" \
+                 "${PUBLISH_ARGS[@]}"
+        ;;
 
-  echo "Run merge active shadow test"
-  bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:merge_active_shadow_test
+    release|release.server_only|release.test_only)
+        if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
+            # When testing memory consumption, we want to test against exact byte-counts
+            # where possible. As these differ between platforms and compile options, we
+            # define the 'release' builds as canonical and test them only in CI, so the
+            # toolchain is kept consistent. This ifdef is checked in
+            # test/common/stats/stat_test_utility.cc when computing
+            # Memory::TestUtil::MemoryTest::mode().
+            if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+                BAZEL_BUILD_OPTIONS+=("--test_env=ENVOY_MEMORY_TEST_EXACT=true")
+            fi
+        fi
+        setup_clang_toolchain
+        # As the binary build package enforces compiler options, adding here to ensure the tests and distribution build
+        # reuse settings and any already compiled artefacts, the bundle itself will always be compiled
+        # `--stripopt=--strip-all -c opt`
+        BAZEL_RELEASE_OPTIONS=(
+            --stripopt=--strip-all
+            -c opt)
+        if [[ "$CI_TARGET" == "release" || "$CI_TARGET" == "release.test_only" ]]; then
+            # Run release tests
+            echo "Testing with:"
+            echo "  targets: ${TEST_TARGETS[*]}"
+            echo "  build options: ${BAZEL_BUILD_OPTIONS[*]}"
+            echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" \
+                --remote_download_minimal \
+                "${BAZEL_RELEASE_OPTIONS[@]}" \
+                "${TEST_TARGETS[@]}"
+        fi
 
-  echo "check_format_test..."
-  "${ENVOY_SRCDIR}"/tools/code_format/check_format_test_helper.sh --log=WARN
+        if [[ "$CI_TARGET" == "release.test_only" ]]; then
+            exit 0
+        fi
 
-  echo "dependency validate_test..."
-  "${ENVOY_SRCDIR}"/tools/dependency/validate_test.py
+        ENVOY_BINARY_DIR="${ENVOY_BUILD_DIR}/bin"
+        if [[ -e "${ENVOY_BINARY_DIR}" ]]; then
+            echo "Existing output directory found (${ENVOY_BINARY_DIR}), removing ..."
+            rm -rf "${ENVOY_BINARY_DIR}"
+        fi
+        mkdir -p "$ENVOY_BINARY_DIR"
 
-  # Validate the CVE scanner works. We do it here as well as in cve_scan, since this blocks
-  # presubmits, but cve_scan only runs async.
-  echo "cve_scan_test..."
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:cve_scan_test
+        # Build
+        echo "Building with:"
+        echo "  build options: ${BAZEL_BUILD_OPTIONS[*]}"
+        echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
+        echo "  binary dir:  ${ENVOY_BINARY_DIR}"
 
-  exit 0
-elif [[ "$CI_TARGET" == "verify_examples" ]]; then
-  run_ci_verify "*" "wasm-cc|win32-front-proxy"
-  exit 0
-elif [[ "$CI_TARGET" == "verify_build_examples" ]]; then
-  run_ci_verify wasm-cc
-  exit 0
-else
-  echo "Invalid do_ci.sh target, see ci/README.md for valid targets."
-  exit 1
-fi
+        # Build release binaries
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              "${BAZEL_RELEASE_OPTIONS[@]}" \
+              --remote_download_outputs=toplevel \
+              //distribution/binary:release
+        # Copy release binaries to binary export directory
+        cp -a \
+           "bazel-bin/distribution/binary/release.tar.zst" \
+           "${ENVOY_BINARY_DIR}/release.tar.zst"
+        # Grab the schema_validator_tool
+        # TODO(phlax): bundle this with the release when #26390 is resolved
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+              --remote_download_toplevel \
+              //test/tools/schema_validator:schema_validator_tool.stripped
+        # Copy schema_validator_tool to binary export directory
+        cp -a \
+           bazel-bin/test/tools/schema_validator/schema_validator_tool.stripped \
+           "${ENVOY_BINARY_DIR}/schema_validator_tool"
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+              --remote_download_toplevel \
+              //test/tools/router_check:router_check_tool.stripped
+        cp -a \
+           bazel-bin/test/tools/router_check/router_check_tool.stripped \
+           "${ENVOY_BINARY_DIR}/router_check_tool"
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+              --remote_download_toplevel \
+              //test/tools/config_load_check:config_load_check_tool.stripped
+        cp -a \
+           bazel-bin/test/tools/config_load_check/config_load_check_tool.stripped \
+           "${ENVOY_BINARY_DIR}/config_load_check_tool"
+        echo "Release files created in ${ENVOY_BINARY_DIR}"
+        ;;
+
+    release.server_only.binary)
+        setup_clang_toolchain
+        echo "bazel release build..."
+        bazel_envoy_binary_build release
+        ;;
+
+    release.signed)
+        echo "Signing binary packages..."
+        setup_clang_toolchain
+        bazel build \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              //distribution:signed
+        cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
+        ;;
+
+    sizeopt)
+        setup_clang_toolchain
+        echo "Testing ${TEST_TARGETS[*]}"
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            --config=sizeopt \
+            "${TEST_TARGETS[@]}"
+        echo "bazel size optimized build with tests..."
+        bazel_envoy_binary_build sizeopt
+        ;;
+
+    sizeopt.server_only)
+        setup_clang_toolchain
+        echo "bazel size optimized build..."
+        bazel_envoy_binary_build sizeopt
+        ;;
+
+    tsan)
+        setup_clang_toolchain
+        echo "bazel TSAN debug build with tests"
+        echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+             --config=rbe-toolchain-tsan \
+             -c dbg \
+             --build_tests_only \
+             --remote_download_minimal \
+             "${TEST_TARGETS[@]}"
+        ;;
+
+    verify_distro)
+        # this can be required if any python deps require compilation
+        setup_clang_toolchain
+        if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
+            PACKAGE_BUILD=/build/distribution/x64/packages.x64.tar.gz
+        else
+            PACKAGE_BUILD=/build/distribution/arm64/packages.arm64.tar.gz
+        fi
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              //distribution:verify_packages \
+              "$PACKAGE_BUILD"
+        ;;
+
+    verify_examples)
+        DEV_CONTAINER_ID=$(docker inspect --format='{{.Id}}' envoyproxy/envoy:dev)
+        bazel run --config=ci \
+                  --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+                  --sandbox_writable_path="${HOME}/.docker/" \
+                  --sandbox_writable_path="$HOME" \
+                  @envoy_examples//:verify_examples
+        ;;
+
+    verify.trigger)
+        setup_clang_toolchain
+        WORKFLOW="envoy-publish.yml"
+        # * Note on vars *
+        # `ENVOY_REPO`: Should always be envoyproxy/envoy unless testing
+        # `ENVOY_BRANCH`: Target branch for PRs, source branch for others
+        # `COMMIT`: This may be a merge commit in a PR
+        # `ENVOY_COMMIT`: The actual last commit of branch/PR
+        # `ENVOY_HEAD_REF`: must also be set in PRs to provide a unique key for job grouping,
+        #   cancellation, and to discriminate from other branch CI
+        COMMIT="$(git rev-parse HEAD)"
+        ENVOY_COMMIT="${ENVOY_COMMIT:-${COMMIT}}"
+        ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
+        echo "Trigger workflow (${WORKFLOW})"
+        echo "  Repo: ${ENVOY_REPO}"
+        echo "  Branch: ${ENVOY_BRANCH}"
+        echo "  Ref: ${COMMIT}"
+        echo "  Inputs:"
+        echo "    sha: ${ENVOY_COMMIT}"
+        echo "    head_ref: ${ENVOY_HEAD_REF}"
+        GITHUB_APP_KEY="$(echo "$GITHUB_TOKEN" | base64 -d -w0)"
+        export GITHUB_APP_KEY
+        INPUTS="{\"ref\":\"$COMMIT\",\"sha\":\"$ENVOY_COMMIT\",\"head_ref\":\"$ENVOY_HEAD_REF\"}"
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
+              @envoy_repo//:trigger \
+              -- --repo="$ENVOY_REPO" \
+                 --trigger-app-id="$GITHUB_APP_ID" \
+                 --trigger-installation-id="$GITHUB_INSTALL_ID" \
+                 --trigger-ref="$ENVOY_BRANCH" \
+                 --trigger-workflow="$WORKFLOW" \
+                 --trigger-inputs="$INPUTS"
+        ;;
+
+    refresh_compdb)
+        setup_clang_toolchain
+        # Override the BAZEL_STARTUP_OPTIONS to setting different output directory.
+        # So the compdb headers won't be overwritten by another bazel run.
+        for i in "${!BAZEL_STARTUP_OPTIONS[@]}"; do
+            if [[ ${BAZEL_STARTUP_OPTIONS[i]} == "--output_base"* ]]; then
+                COMPDB_OUTPUT_BASE="${BAZEL_STARTUP_OPTIONS[i]}"-envoy-compdb
+                BAZEL_STARTUP_OPTIONS[i]="${COMPDB_OUTPUT_BASE}"
+                BAZEL_STARTUP_OPTION_LIST="${BAZEL_STARTUP_OPTIONS[*]}"
+                export BAZEL_STARTUP_OPTION_LIST
+            fi
+        done
+
+        if [[ -z "${SKIP_PROTO_FORMAT}" ]]; then
+            "${CURRENT_SCRIPT_DIR}/../tools/proto_format/proto_format.sh" fix
+        fi
+
+        read -ra ENVOY_GEN_COMPDB_OPTIONS <<< "${ENVOY_GEN_COMPDB_OPTIONS:-}"
+
+        "${CURRENT_SCRIPT_DIR}/../tools/gen_compilation_database.py" \
+            "${ENVOY_GEN_COMPDB_OPTIONS[@]}"
+        # Kill clangd to reload the compilation database
+        pkill clangd || :
+        ;;
+
+    *)
+        echo "Invalid do_ci.sh target (${CI_TARGET}), see ci/README.md for valid targets."
+        exit 1
+        ;;
+esac

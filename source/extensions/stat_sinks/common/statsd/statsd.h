@@ -85,9 +85,10 @@ private:
   void flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const;
   void writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer, const std::string& data) const;
 
-  const std::string buildMessage(const Stats::Metric& metric, uint64_t value,
+  template <class StatType, typename ValueType>
+  const std::string buildMessage(const StatType& metric, ValueType value,
                                  const std::string& type) const;
-  const std::string getName(const Stats::Metric& metric) const;
+  template <class StatType> const std::string getName(const StatType& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
 
   const ThreadLocal::SlotPtr tls_;
@@ -104,19 +105,25 @@ private:
  */
 class TcpStatsdSink : public Stats::Sink {
 public:
-  TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
-                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-                Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
+  /**
+   * This is a wrapper around the constructor to return StatusOr.
+   */
+  static absl::StatusOr<std::unique_ptr<TcpStatsdSink>>
+  create(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+         ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+         Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot& snapshot) override;
-  void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override {
-    // For statsd histograms are all timers.
-    tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),
-                                                 std::chrono::milliseconds(value));
-  }
+  void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
 
   const std::string& getPrefix() { return prefix_; }
+
+protected:
+  TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+                Stats::Scope& scope, absl::Status& creation_status,
+                const std::string& prefix = getDefaultPrefix());
 
 private:
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {
@@ -129,6 +136,7 @@ private:
     void flushGauge(const std::string& name, uint64_t value);
     void endFlush(bool do_write);
     void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms);
+    void onPercentHistogramComplete(const std::string& name, float value);
     uint64_t usedBuffer() const;
     void write(Buffer::Instance& buffer);
 

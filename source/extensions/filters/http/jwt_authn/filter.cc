@@ -33,8 +33,8 @@ constexpr absl::string_view kRcDetailJwtAuthnPrefix = "jwt_authn_access_denied";
 std::string generateRcDetails(absl::string_view error_msg) {
   // Replace space with underscore since RCDetails may be written to access log.
   // Some log processors assume each log segment is separated by whitespace.
-  return absl::StrCat(kRcDetailJwtAuthnPrefix, "{",
-                      absl::StrJoin(absl::StrSplit(error_msg, ' '), "_"), "}");
+  return absl::StrCat(kRcDetailJwtAuthnPrefix, "{", StringUtil::replaceAllEmptySpace(error_msg),
+                      "}");
 }
 
 } // namespace
@@ -66,17 +66,19 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   const Verifier* verifier = nullptr;
   const auto* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteFilterConfig>(
-          "envoy.filters.http.jwt_authn", decoder_callbacks_->route());
+      Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteFilterConfig>(decoder_callbacks_);
   if (per_route_config != nullptr) {
     std::string error_msg;
     std::tie(verifier, error_msg) = config_->findPerRouteVerifier(*per_route_config);
     if (!error_msg.empty()) {
       stats_.denied_.inc();
       state_ = Responded;
-      decoder_callbacks_->sendLocalReply(Http::Code::Forbidden,
-                                         absl::StrCat("Failed JWT authentication: ", error_msg),
-                                         nullptr, absl::nullopt, generateRcDetails(error_msg));
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::Forbidden,
+          config_.get()->stripFailureResponse()
+              ? ""
+              : absl::StrCat("Failed JWT authentication: ", error_msg),
+          nullptr, absl::nullopt, generateRcDetails(error_msg));
       return Http::FilterHeadersStatus::StopIteration;
     }
   } else {
@@ -100,9 +102,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-void Filter::setPayload(const ProtobufWkt::Struct& payload) {
-  decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.jwt_authn", payload);
+void Filter::setExtractedData(const ProtobufWkt::Struct& extracted_data) {
+  decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.jwt_authn",
+                                                      extracted_data);
 }
+
+void Filter::clearRouteCache() { decoder_callbacks_->downstreamCallbacks()->clearRouteCache(); }
 
 void Filter::onComplete(const Status& status) {
   ENVOY_LOG(debug, "Jwt authentication completed with: {}",
@@ -118,6 +123,12 @@ void Filter::onComplete(const Status& status) {
     Http::Code code =
         status == Status::JwtAudienceNotAllowed ? Http::Code::Forbidden : Http::Code::Unauthorized;
     // return failure reason as message body
+    if (config_.get()->stripFailureResponse()) {
+      decoder_callbacks_->sendLocalReply(
+          code, "", nullptr, absl::nullopt,
+          generateRcDetails(::google::jwt_verify::getStatusString(status)));
+      return;
+    }
     decoder_callbacks_->sendLocalReply(
         code, ::google::jwt_verify::getStatusString(status),
         [uri = this->original_uri_, status](Http::ResponseHeaderMap& headers) {

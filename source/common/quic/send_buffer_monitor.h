@@ -1,16 +1,6 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
 #include "quiche/quic/core/quic_stream.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
 namespace Envoy {
 namespace Quic {
@@ -39,7 +29,7 @@ public:
 
 protected:
   // Update the monitor with the new buffered bytes and check watermark threshold.
-  virtual void updateBytesBuffered(size_t old_buffered_bytes, size_t new_buffered_bytes) = 0;
+  virtual void updateBytesBuffered(uint64_t old_buffered_bytes, uint64_t new_buffered_bytes) = 0;
 
   bool isDoingWatermarkAccounting() const { return is_doing_watermark_accounting_; }
 

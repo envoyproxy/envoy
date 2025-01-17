@@ -3,10 +3,10 @@
 Role Based Access Control (RBAC) Filter
 =======================================
 
-The RBAC filter is used to authorize actions (permissions) by identified downstream clients
-(principals). This is useful to explicitly manage callers to an application and protect it from
-unexpected or forbidden agents. The filter supports configuration with either a safe-list (ALLOW) or
-block-list (DENY) set of policies based off properties of the connection (IPs, ports, SSL subject)
+The RBAC filter is used to authorize actions by identified downstream clients. This is useful to
+explicitly manage callers to an application and protect it from unexpected or forbidden agents. The
+filter supports configuration with either a safe-list (ALLOW) or block-list (DENY) set of policies,
+or a matcher with different actions, based off properties of the connection (IPs, ports, SSL subject)
 as well as the incoming request's HTTP headers. This filter also supports policy in both enforcement
 and shadow mode, shadow mode won't effect real users, it is used to test that a new set of policies
 work before rolling out to production.
@@ -16,8 +16,8 @@ will include the name of the matched policy that caused the deny in the format o
 (policy_name will be ``none`` if no policy matched), this helps to distinguish the deny from Envoy RBAC
 filter and the upstream backend.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.rbac.v3.RBAC>`
-* This filter should be configured with the name *envoy.filters.http.rbac*.
 
 Per-Route Configuration
 -----------------------
@@ -29,12 +29,24 @@ the virtual host, route, or weighted cluster.
 Statistics
 ----------
 
-The RBAC filter outputs statistics in the *http.<stat_prefix>.rbac.* namespace. The :ref:`stat prefix
+The RBAC filter outputs statistics in the ``http.<stat_prefix>.rbac.`` namespace. The :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
 owning HTTP connection manager.
 
+For the rule statistics ``allowed`` and ``denied``,
+the :ref:`rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules_stat_prefix>`
+can be used to add an extra prefix to output the statistics in the ``http.<stat_prefix>.rbac.<rules_stat_prefix>.`` namespace.
+
+For the shadow rule statistics ``shadow_allowed`` and ``shadow_denied``,
+the :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules_stat_prefix>`
+
+For rules-based RBAC filters configured using :ref:`rules <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.rules>`, the filter outputs additional statistics for per-rule
+granularity in the ``http.<stat_prefix>.rbac.policy`` namespace. Similarly, :ref:`shadow_rules <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules>` are
+in the ``http.<stat_prefix>.rbac.<shadow_rules_stat_prefix>.policy`` namespace. The additional stats can be enabled with
+:ref:`track_per_rule_stats <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.track_per_rule_stats>`.
+
 For the shadow rule statistics ``shadow_allowed`` and ``shadow_denied``, the :ref:`shadow_rules_stat_prefix <envoy_v3_api_field_extensions.filters.http.rbac.v3.RBAC.shadow_rules_stat_prefix>`
-can be used to add an extra prefix to output the statistics in the *http.<stat_prefix>.rbac.<shadow_rules_stat_prefix>.* namespace.
+can be used to add an extra prefix to output the statistics in the ``http.<stat_prefix>.rbac.<shadow_rules_stat_prefix>.`` namespace.
 
 .. csv-table::
   :header: Name, Type, Description
@@ -63,4 +75,4 @@ can be used to add an extra prefix to the corresponding dynamic metadata key.
 
   shadow_effective_policy_id, string, The effective shadow policy ID matching the action (if any).
   shadow_engine_result, string, The engine result for the shadow rules (i.e. either ``allowed`` or ``denied``).
-  access_log_hint, boolean, Whether the request should be logged. This metadata is shared and set under the key namespace 'envoy.common' (See :ref:`Shared Dynamic Metadata<shared_dynamic_metadata>`).
+  access_log_hint, boolean, Whether the request should be logged. This metadata is shared and set under the key namespace ``envoy.common`` (See :ref:`Shared Dynamic Metadata<shared_dynamic_metadata>`).

@@ -6,7 +6,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 // RS256 private key
-//-----BEGIN PRIVATE KEY-----
+// -----BEGIN PRIVATE KEY-----
 //    MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC6n3u6qsX0xY49
 //    o+TBJoF64A8s6v0UpxpYZ1UQbNDh/dmrlYpVmjDH1MIHGYiY0nWqZSLXekHyi3Az
 //    +XmV9jUAUEzFVtAJRee0ui+ENqJK9injAYOMXNCJgD6lSryHoxRkGeGV5iuRTteU
@@ -33,7 +33,7 @@ namespace JwtAuthn {
 //    1ZgL8qxY/bbyA02IKF84QPFczDM5wiLjDGbGnOcIYYMvTHf1LJU4FozzYkB0GicX
 //    Y0tBQIHaaLWbPk1RZdPfR9kAp16iwk8H+V4UVjLfsTP7ocEfNCzZztmds83h8mTL
 //    DSwE5aY76Cs8XLcF/GNJRQ==
-//-----END PRIVATE KEY-----
+// -----END PRIVATE KEY-----
 
 // A good public key
 const char PublicKey[] = R"(
@@ -54,9 +54,95 @@ const char PublicKey[] = R"(
       "kid": "b3319a147514df7ee5e4bcdee51350cc890cc89e",
       "n": "up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1qmUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrkU7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaEWopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_ZdboY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw",
       "e": "AQAB"
-    }
+    },
+    {
+      "kty": "RSA",
+      "n": "u1SU1LfVLPHCozMxH2Mo4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0_IzW7yWR7QkrmBL7jTKEn5u-qKhbwKfBstIs-bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyehkd3qqGElvW_VDL5AaWTg0nLVkjRo9z-40RQzuVaE8AkAFmxZzow3x-VJYKdjykkJ0iT9wCS0DRTXu269V264Vf_3jvredZiKRkgwlL9xNAwxXFg0x_XFw005UWVRIkdgcKWTjpBP2dPwVZ4WWC-9aGVd-Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbcmw",
+      "e": "AQAB",
+      "alg": "RS256",
+      "use": "sig"
+    },
   ]
 }
+)";
+
+// Provider config with various subject constraints
+const char SubjectConfig[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    subjects:
+      suffix: "@example.com"
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  spiffe_provider:
+    issuer: https://spiffe.example.com
+    subjects:
+      prefix: spiffe://spiffe.example.com/
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  no_subj_provider:
+    issuer: https://nosub.com
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  regex_provider:
+    issuer: https://regexsub.com
+    subjects:
+      safe_regex:
+      safe_regex:
+        regex: "spiffe://.*\\.example\\.com/.*"
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+
+)";
+
+// Provider config with various subject constraints
+const char ExpirationConfig[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    max_lifetime:
+      seconds: 86400
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  spiffe_provider:
+    issuer: https://spiffe.example.com
+    require_expiration: true
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+  noexp_provider:
+    issuer: https://noexp.example.com
+    require_expiration: false
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
 )";
 
 // A good config.
@@ -70,7 +156,103 @@ providers:
     - https://example_service2/
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+      cache_duration:
+        seconds: 600
+    forward_payload_header: sec-istio-auth-userinfo
+    claim_to_headers:
+    - header_name: "x-jwt-claim-sub"
+      claim_name: "sub"
+    - header_name: "x-jwt-claim-nested"
+      claim_name: "nested.key-1"
+    - header_name: "x-jwt-claim-nested-wrong"
+      claim_name: "nested.wrong.claim"
+    - header_name: "x-jwt-unsupported-type-claim"
+      claim_name: "nested.nested-2.key-5[0]"
+    - header_name: "x-jwt-bool-claim"
+      claim_name: "nested.nested-2.key-3"
+    - header_name: "x-jwt-int-claim"
+      claim_name: "nested.nested-2.key-4"
+    - header_name: "x-jwt-claim-object-key"
+      claim_name: "nested.nested-2.key-5"
+rules:
+- match:
+    path: "/"
+  requires:
+    provider_name: "example_provider"
+bypass_cors_preflight: true
+)";
+
+// Config with claim_to_headers and clear_route_cache.
+const char ClaimToHeadersConfig[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    audiences:
+    - example_service
+    - http://example_service1
+    - https://example_service2/
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+      cache_duration:
+        seconds: 600
+    claim_to_headers:
+    - header_name: "x-jwt-claim-nested"
+      claim_name: "nested.key-1"
+    clear_route_cache: true
+rules:
+- match:
+    path: "/"
+  requires:
+    provider_name: "example_provider"
+bypass_cors_preflight: true
+)";
+
+// Config with payload_in_metadata and clear_route_cache.
+const char PayloadClearRouteCacheConfig[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    audiences:
+    - example_service
+    - http://example_service1
+    - https://example_service2/
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
+        cluster: pubkey_cluster
+        timeout:
+          seconds: 5
+      cache_duration:
+        seconds: 600
+    payload_in_metadata: test_payload
+    clear_route_cache: true
+rules:
+- match:
+    path: "/"
+  requires:
+    provider_name: "example_provider"
+bypass_cors_preflight: true
+)";
+
+const char ExampleConfigWithRegEx[] = R"(
+providers:
+  example_provider:
+    issuer: https://example.com
+    audiences:
+    - example_service
+    - http://example_service1
+    - https://example_service2/
+    remote_jwks:
+      http_uri:
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
         timeout:
           seconds: 5
@@ -78,6 +260,11 @@ providers:
         seconds: 600
     forward_payload_header: sec-istio-auth-userinfo
 rules:
+- match:
+    safe_regex:
+      regex: "/somethig/.*"
+  requires:
+    provider_name: "example_provider"
 - match:
     path: "/"
   requires:
@@ -98,6 +285,26 @@ const char GoodToken[] = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwc
                          "h6nqKXcPNaRx9lOaRWg2PkE6ySNoyju7rNfunXYtVxPuUIkl0KMq3WXWRb_cb8a_Z"
                          "EprqSZUzi_ZzzYzqBNVhIJujcNWij7JRra2sXXiSAfKjtxHQoxrX8n4V1ySWJ3_1T"
                          "H_cJcdfS_RKP7YgXRWC0L16PNF5K7iqRqmjKALNe83ZFnFIw";
+
+// Payload:
+// {
+//   "iss": "https://example.com",
+//   "sub": "test@example.com",
+//   "exp": 2001001001,
+//   "aud": "example_service",
+//   "scope": "read write",
+//   "test_string": "test_value",
+//   "test_num": 1337
+// }
+const char GoodTokenWithSpaces[] =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMS"
+    "wiYXVkIjoiZXhhbXBsZV9zZXJ2aWNlIiwic2NvcGUiOiJyZWFkIHdyaXRlIiwidGVzdF9zdHJpbmciOiJ0ZXN0X3ZhbHVl"
+    "IiwidGVzdF9udW0iOjEzMzd9.cKTwWSJgS0TZ3Ajc9QrAA50Me7j1zVv9YzDT_"
+    "2UE5jlCs5vWkdWjUb2r7MYaqximXj3affDZdDsUxMaqqR7lWT2EbxOoEceBkCMmakgSs8tjZ210w0YTU0OyhrrxsyxUpsp"
+    "PeRzPIHQTUdN7zU_KkMcUU1yDSlnJxqlYXyTL9E-DhTnLwoOdgFGiQs-md_QJfdOFgXQqU71EZ-"
+    "Ofxen8EFl10wbzHubMHGLJqVfFzK-iuVr2P0OZ0ymWvPGwQdlVMojHx3P0Yb8MRbhdW04hCJq-_"
+    "fTE1RNb6ja1JBFQbyGcQTtWVSdkHZ_C8syd8s-aK4C8_VhwNEDviOVrHPbztw";
 
 // Payload:
 // {"iss":"https://example.com","sub":"test@example.com","exp":null}
@@ -173,6 +380,32 @@ const char OtherGoodToken[] =
     "drRvLcvlT5gB4adOIOlmhm8xtXgYpvqrXfmMJCHbP9no7JATFaTEAkmA3OOxDsaOju4BFgMtRZtDM8p12QQG0rFl_FE-"
     "2FqYX9qA4q41HJ4vxTSxgObeLGA";
 
+//{
+//  "iss": "https://example.com",
+//  "sub": "test@example.com",
+//  "aud": "example_service",
+//  "exp": 2001001001,
+//  "nested": {
+//    "key-1": "value1",
+//    "nested-2": {
+//      "key-2": "value2",
+//      "key-3": true,
+//      "key-4": 9999,
+//      "key-5": ["str1", "str2"]
+//  }
+// }
+//}
+const char NestedGoodToken[] =
+    "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImF1ZCI6ImV4YW1wbGVfc2"
+    "VydmljZSIsImV4cCI6MjAwMTAwMTAwMSwibmVzdGVkIjp7ImtleS0xIjoidmFsdWUxIiwibmVzdGVkLTIiOnsia2V5LTIi"
+    "OiJ2YWx1ZTIiLCJrZXktMyI6dHJ1ZSwia2V5LTQiOjk5OTksImtleS01IjpbInN0cjEiLCJzdHIyIl19fX0."
+    "uCXNQUSualacToI0gyXz5NStad2aNBfZHiLB5mTddy-uV8Dxsa8U81NwDHGlvNksmMTodBwIeEYJ0ISkl03kKN_"
+    "VepiEpNNWJNpgOcdTqAE9-aGip-kGWZAavJS6r3fystUGIjXyI9EKNEqeUFCihpiII-"
+    "MTbcqdaSzwdbJPeGQzHyensPG6BfDjdv39b_gdO_eH1azaVwi4HnChoJcsGrBjsH6-IyJVR6Ux_"
+    "43fo3Wbs0SB82hLpiWPsucO7l4CyII5d5jPQbAM9ajcvAmh7FprIsf35acOT2bQ8dmrSD9KSjsYomkF_OAci-"
+    "osyRzYOgkGHIDGDyjj87xaPPuzIw";
+
 // Expected base64 payload value.
 const char ExpectedPayloadValue[] = "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcG"
                                     "xlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2"
@@ -190,6 +423,50 @@ const char ExpectedPayloadJSON[] = R"(
   "sub":"test@example.com",
   "exp":2001001001,
   "aud":"example_service"
+}
+)";
+
+// Base64 decoded Payload with space-delimited claims JSON
+const char ExpectedPayloadJSONWithSpaces[] = R"(
+{
+  "iss":"https://example.com",
+  "sub":"test@example.com",
+  "exp":2001001001,
+  "aud":"example_service",
+  "scope":["read","write"],
+  "test_string":["test_value"],
+  "test_num":1337
+}
+)";
+
+const char ExpectedHeaderJSON[] = R"(
+{
+  "alg": "RS256",
+  "typ": "JWT"
+}
+)";
+
+const char ExpectedPayloadAndHeaderJSON[] = R"(
+{
+  "my_payload":{
+    "iss":"https://example.com",
+    "exp":2001001001,
+    "sub":"test@example.com",
+    "aud":"example_service"
+  },
+  "my_header":{
+    "typ":"JWT",
+    "alg":"RS256"
+  }
+}
+)";
+
+const char ExpectedJWTExpiredStatusJSON[] = R"(
+{
+  "my_payload":{
+    "code": 3,
+    "message": "Jwt is expired"
+    }
 }
 )";
 
@@ -234,7 +511,7 @@ providers:
     - https://example_service2/
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
     from_params: ["jwt_a"]
     forward_payload_header: example-auth-userinfo
@@ -244,7 +521,7 @@ providers:
     - other_service
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
     from_params: ["jwt_b"]
     forward_payload_header: other-auth-userinfo
@@ -268,7 +545,7 @@ providers:
     - https://example_service2/
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
     from_headers:
     - name: a
@@ -282,7 +559,7 @@ providers:
     - other_service
     remote_jwks:
       http_uri:
-        uri: https://pubkey_server/pubkey_path
+        uri: https://www.pubkey-server.com/pubkey-path
         cluster: pubkey_cluster
     from_headers:
     - name: a

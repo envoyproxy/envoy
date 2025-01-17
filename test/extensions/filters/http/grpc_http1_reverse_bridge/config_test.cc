@@ -29,7 +29,7 @@ withhold_grpc_frames: true
   NiceMock<Server::Configuration::MockFactoryContext> context;
   Config config_factory;
   Http::FilterFactoryCb cb =
-      config_factory.createFilterFactoryFromProto(proto_config, "stats", context);
+      config_factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -48,8 +48,10 @@ TEST(ReverseBridgeFilterFactoryTest, ReverseBridgeFilterRouteSpecificConfig) {
   cfg.set_disabled(true);
 
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
-      config_factory.createRouteSpecificFilterConfig(*proto_config, factory_context,
-                                                     ProtobufMessage::getNullValidationVisitor());
+      config_factory
+          .createRouteSpecificFilterConfig(*proto_config, factory_context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
   EXPECT_TRUE(route_config.get());
 
   const auto* inflated = dynamic_cast<const FilterConfigPerRoute*>(route_config.get());

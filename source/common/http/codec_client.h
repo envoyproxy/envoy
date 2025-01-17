@@ -8,6 +8,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/upstream/upstream.h"
@@ -17,6 +18,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/codec_wrappers.h"
 #include "source/common/network/filter_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -58,8 +60,6 @@ public:
   // This is a legacy alias.
   using Type = Envoy::Http::CodecType;
 
-  ~CodecClient() override;
-
   /**
    * Add a connection callback to the underlying network connection.
    */
@@ -73,10 +73,16 @@ public:
   bool isHalfCloseEnabled() { return connection_->isHalfCloseEnabled(); }
 
   /**
+   * Initialize all of the installed read filters on the underlying connection.
+   * This effectively calls onNewConnection() on each of them.
+   */
+  void initializeReadFilters() { connection_->initializeReadFilters(); }
+
+  /**
    * Close the underlying network connection. This is immediate and will not attempt to flush any
    * pending write data.
    */
-  void close();
+  void close(Network::ConnectionCloseType type = Network::ConnectionCloseType::NoFlush);
 
   /**
    * Send a codec level go away indication to the peer.
@@ -129,7 +135,15 @@ public:
   CodecType type() const { return type_; }
 
   // Note this is the L4 stream info, not L7.
-  const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
+
+  /**
+   * Connect to the host.
+   * Needs to be called after codec_ is instantiated.
+   */
+  void connect();
+
+  bool connectCalled() const { return connect_called_; }
 
 protected:
   /**
@@ -140,12 +154,6 @@ protected:
    */
   CodecClient(CodecType type, Network::ClientConnectionPtr&& connection,
               Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher);
-
-  /**
-   * Connect to the host.
-   * Needs to be called after codec_ is instantiated.
-   */
-  void connect();
 
   // Http::ConnectionCallbacks
   void onGoAway(GoAwayErrorCode error_code) override {
@@ -158,9 +166,14 @@ protected:
       codec_callbacks_->onSettings(settings);
     }
   }
+  void onMaxStreamsChanged(uint32_t num_streams) override {
+    if (codec_callbacks_) {
+      codec_callbacks_->onMaxStreamsChanged(num_streams);
+    }
+  }
 
   void onIdleTimeout() {
-    host_->cluster().stats().upstream_cx_idle_timeout_.inc();
+    host_->cluster().trafficStats()->upstream_cx_idle_timeout_.inc();
     close();
   }
 
@@ -216,9 +229,26 @@ private:
   struct ActiveRequest : LinkedObject<ActiveRequest>,
                          public Event::DeferredDeletable,
                          public StreamCallbacks,
-                         public ResponseDecoderWrapper {
+                         public ResponseDecoderWrapper,
+                         public RequestEncoderWrapper {
     ActiveRequest(CodecClient& parent, ResponseDecoder& inner)
-        : ResponseDecoderWrapper(inner), parent_(parent) {}
+        : ResponseDecoderWrapper(inner), RequestEncoderWrapper(nullptr), parent_(parent),
+          header_validator_(
+              parent.host_->cluster().makeHeaderValidator(parent.codec_->protocol())) {
+      switch (parent.protocol()) {
+      case Protocol::Http10:
+      case Protocol::Http11:
+        // HTTP/1.1 codec does not support half-close on the response completion.
+        wait_encode_complete_ = false;
+        break;
+      case Protocol::Http2:
+      case Protocol::Http3:
+        wait_encode_complete_ = true;
+        break;
+      }
+    }
+
+    void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override;
 
     // StreamCallbacks
     void onResetStream(StreamResetReason reason, absl::string_view) override {
@@ -231,8 +261,24 @@ private:
     void onPreDecodeComplete() override { parent_.responsePreDecodeComplete(*this); }
     void onDecodeComplete() override {}
 
-    RequestEncoder* encoder_{};
+    // RequestEncoderWrapper
+    void onEncodeComplete() override { parent_.requestEncodeComplete(*this); }
+
+    // RequestEncoder
+    Status encodeHeaders(const RequestHeaderMap& headers, bool end_stream) override;
+
+    void setEncoder(RequestEncoder& encoder) {
+      inner_encoder_ = &encoder;
+      inner_encoder_->getStream().addCallbacks(*this);
+    }
+
+    void removeEncoderCallbacks() { inner_encoder_->getStream().removeCallbacks(*this); }
+
     CodecClient& parent_;
+    Http::ClientHeaderValidatorPtr header_validator_;
+    bool wait_encode_complete_{true};
+    bool encode_complete_{false};
+    bool decode_complete_{false};
   };
 
   using ActiveRequestPtr = std::unique_ptr<ActiveRequest>;
@@ -242,6 +288,8 @@ private:
    * wrapped decoder.
    */
   void responsePreDecodeComplete(ActiveRequest& request);
+  void requestEncodeComplete(ActiveRequest& request);
+  void completeRequest(ActiveRequest& request);
 
   void deleteRequest(ActiveRequest& request);
   void onReset(ActiveRequest& request, StreamResetReason reason);
@@ -276,7 +324,9 @@ class CodecClientProd : public CodecClient {
 public:
   CodecClientProd(CodecType type, Network::ClientConnectionPtr&& connection,
                   Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher,
-                  Random::RandomGenerator& random_generator);
+                  Random::RandomGenerator& random_generator,
+                  const Network::TransportSocketOptionsConstSharedPtr& options,
+                  bool should_connect_on_creation = true);
 };
 
 } // namespace Http

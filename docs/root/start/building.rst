@@ -6,8 +6,8 @@ Building
 
 The Envoy build system uses `Bazel <https://bazel.build/>`_.
 
-In order to ease initial building and for a quick start, we provide an Ubuntu 16 and a Windows based docker containers
-that have everything needed inside of it to build and *statically link* Envoy, see :repo:`ci/README.md`.
+In order to ease initial building and for a quick start, we provide a recent Ubuntu-based docker container
+that has everything needed inside of it to build and *statically link* Envoy, see :repo:`ci/README.md`.
 
 In order to build without using the Docker container, follow the instructions at :repo:`bazel/README.md`.
 
@@ -17,11 +17,11 @@ Linux/Mac Target Requirements
 -----------------------------
 
 Envoy was initially developed and deployed on Ubuntu 14.04 LTS. It should work on any reasonably
-recent Linux including Ubuntu 18.04 LTS.
+recent Linux including Ubuntu 20.04 LTS.
 
 Building Envoy has the following requirements:
 
-* GCC 7+ or Clang/LLVM 7+ (for C++14 support). Clang/LLVM 9+ preferred where Clang is used (see below).
+* Recent GCC/Clang versions - please see :repo:`bazel/README.md#supported-compiler-versions` for current requirements.
 * About 2GB of RAM per core (so 32GB of RAM for 8 cores with hyperthreading). See
   :ref:`this FAQ entry <faq_build_speed>` for more information on build performance.
 * These :repo:`Bazel native <bazel/repository_locations.bzl>` dependencies.
@@ -33,7 +33,9 @@ as the new tcmalloc code is not guaranteed to compile with lower versions of Cla
 Windows Target Requirements
 ---------------------------
 
-Envoy now suports Windows as a target platform. The requirements below only apply if you want to build the Windows
+.. include:: ../_include/windows_support_ended.rst
+
+Envoy supports Windows as a target platform. The requirements below only apply if you want to build the Windows
 native executable. If you want to build the Linux version of Envoy on Windows either with WSL or Linux containers
 please see the Linux requirements above.
 

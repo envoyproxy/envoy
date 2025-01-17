@@ -34,10 +34,16 @@ In addition, the following conventions should be followed:
   implementation. These indicate that the entity is not implemented in Envoy and the entity
   should be hidden from the Envoy documentation.
 
-* Use a `[#alpha:]` annotation in comments for messages that are considered alpha
-  and are not subject to the threat model. This is similar to the work-in-progress/alpha tagging
-  of extensions described below, but allows tagging messages that are used as part of the core API
-  as alpha without having to break it into its own file.
+* For extensions that are a work-in-progress or the config proto documentation is hidden with
+  `[#not-implemented-hide:]`, set its `status` field to `wip` in `extensions_metadata.yaml`.
+
+* Use a `(xds.annotations.v3.file_status).work_in_progress`,
+  `(xds.annotations.v3.message_status).work_in_progress`, or
+  `(xds.annotations.v3.field_status).work_in_progress` option annotation for files,
+  messages, or fields, respectively, that are considered work in progress and are not subject to the
+  threat model or the breaking change policy. This is similar to the work-in-progress/alpha tagging
+  of extensions described below, but allows tagging protos that are used as part of the core API
+  as work in progress without having to break them into their own file.
 
 * Always use plural field names for `repeated` fields, such as `filters`.
 
@@ -54,13 +60,14 @@ In addition, the following conventions should be followed:
 * Always use upper camel case names for message types and enum types without embedded
   acronyms, such as `HttpRequest`.
 
-* Prefer `oneof` selections to boolean overloads of fields, for example, prefer:
+* Prefer multiple fields with defined precedence over boolean overloads of fields or
+  `oneof`. For example, prefer:
 
   ```proto
-  oneof path_specifier {
-    string simple_path = 1;
-    string regex_path = 2;
-  }
+  // Simple path matcher. If regex_path is set, this field is not used.
+  string simple_path = 1;
+  // Regex path matcher. If set, takes precedence over simple_path.
+  string regex_path = 2;
   ```
 
   to
@@ -70,7 +77,17 @@ In addition, the following conventions should be followed:
   bool path_is_regex = 2;
   ```
 
-  This is more efficient, extendable and self-describing.
+  or
+
+  ```
+  oneof path_specifier {
+    string simple_path = 1;
+    string regex_path = 2;
+  }
+  ```
+
+  This is more efficient on the wire. It also allows new alternatives to be
+  added later in a way that allows control planes to be backward-compatible.
 
 * The API includes two types for representing [percents](envoy/type/percent.proto). `Percent` is
   effectively a double value in the range 0.0-100.0. `FractionalPercent` is an integral fraction
@@ -112,11 +129,7 @@ Extensions must currently be added as v3 APIs following the [package
 organization](#package-organization) above.
 To add an extension config to the API, the steps below should be followed:
 
-1. If this is still WiP and subject to breaking changes, use `vNalpha` instead of `vN` in steps
-   below. Refer to the [Cache filter config](envoy/extensions/filters/http/cache/v3alpha/cache.proto)
-   as an example of `v3alpha`, and the
-   [Buffer filter config](envoy/extensions/filters/http/buffer/v3/buffer.proto) as an example of `v3`.
-1. Place the v3 extension configuration `.proto` in `api/envoy/extensions`, e.g.
+1. Place the v3 extension configuration `.proto` in `api/envoy/extensions` or `api/contrib/envoy/extensions`, e.g.
    `api/envoy/extensions/filters/http/foobar/v3/foobar.proto` together with an initial BUILD file:
    ```bazel
    load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
@@ -124,20 +137,46 @@ To add an extension config to the API, the steps below should be followed:
    licenses(["notice"])  # Apache 2
 
    api_proto_package(
-       deps = ["@com_github_cncf_udpa//udpa/annotations:pkg"],
+       deps = ["@com_github_cncf_xds//udpa/annotations:pkg"],
    )
    ```
-1. Add to the v3 extension config proto `import "udpa/annotations/status.proto";`
-1. If this is still WiP and subject to breaking changes, set
-   `option (udpa.annotations.file_status).work_in_progress = true;`.
-1. Add to the v3 extension config proto a file level
-   `option (udpa.annotations.file_status).package_version_status = ACTIVE;`.
-   This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD).
-1. Add a reference to the v3 extension config in (1) in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
-1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file,
-   reformat `foobar.proto` as needed and also generate the v4alpha extension config (if needed),
-   together with shadow API protos.
-1. `git add api/ generated_api_shadow/` to add any new files to your Git index.
+1. If this is still WiP and subject to breaking changes, please tag it
+   `option (xds.annotations.v3.file_status).work_in_progress = true;` and
+   optionally hide it from the docs (`[#not-implemented-hide:]`).
+1. Make sure your proto imports the v3 extension config proto (`import "udpa/annotations/status.proto";`)
+1. Make sure your proto is tracked as ready to be used
+   (`option (udpa.annotations.file_status).package_version_status = ACTIVE;`).
+   This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
+1. Add a reference to the v3 extension config in [api/BUILD](BUILD) under `v3_protos`.
+1. Update [source/extensions/extensions_metadata.yaml](../source/extensions/extensions_metadata.yaml) or [contrib/extensions_metadata.yaml](../contrib/extensions_metadata.yaml)
+   with the category, [security posture, and status](../EXTENSION_POLICY.md#extension-stability-and-security-posture).
+   * Any extension category added to `extensions_metadata.yaml` should be annotated in precisely one proto file, associated with a field of a proto message. e.g.
+     ```proto
+     message SomeMessage {
+       // An ordered list of http filters
+       // [#extension-category: envoy.http.filters]
+       repeated core.v3.TypedExtensionConfig http_filter_extensions = 1;
+     }
+     ```
+   * Each extension added to `extensions_metadata.yaml` should have precisely one proto file annotated with the extension name. e.g.
+     ```proto
+     // [#protodoc-title: Your New Filter]
+     // [#extension: envoy.http.filters.your_new_filter]
+
+     // YourFilterConfig is the configuration for a YourFilter (write real documentation here).
+     message YourFilterConfig {
+     }
+     ```
+1. If you introduce a new extension category, you'll also need to add its name
+   under `categories` in: [tools/extensions/extensions_schema.yaml](../tools/extensions/extensions_schema.yaml).
+1. Update
+   [source/extensions/extensions_build_config.bzl](../source/extensions/extensions_build_config.bzl) or [contrib/contrib_build_config.bzl](../contrib/contrib_build_config.bzl)
+   to include the new extension.
+1. If the extension is not hidden, find or create a docs file with a toctree
+   and reference your proto to make sure users can navigate to it from the API docs
+   (and to not break the docs build), like [docs/root/api-v3/admin/admin.rst](../docs/root/api-v3/admin/admin.rst).
+1. Run `./tools/proto_format/proto_format.sh fix`. **Before running the script**, you will need to **commit your local changes**. By adding the commit, the tool will recognize the change, and will regenerate the `BUILD` file and reformat `foobar.proto` as needed. If you have not followed any of the above steps correctly `proto_format.sh` may remove some of the files that you added. If that is the case you can revert to the committed state, and try again once any issues are resolved.
+1. See the [key-value-store PR](https://github.com/envoyproxy/envoy/pull/17745/files) for an example of adding a new extension point to common.
 
 ## API annotations
 
@@ -152,11 +191,9 @@ metadata. We describe these annotations below by category.
   been disallowed by default as per the [breaking change policy](../CONTRIBUTING.md#breaking-change-policy).
 * `[(udpa.annotations.field_migrate).rename = "<new field name>"]` to denote that
   the field will be renamed to a given name in the next API major version.
-* `[(udpa.annotations.field_migrate).oneof_promotion = "<oneof name>"]` to denote that
-  the field will be promoted to a given `oneof` in the next API major version.
 * `[(udpa.annotations.sensitive) = true]` to denote sensitive fields that
   should be redacted in output such as logging or configuration dumps.
-* [PGV annotations](https://github.com/envoyproxy/protoc-gen-validate) to denote field
+* [PGV annotations](https://github.com/bufbuild/protoc-gen-validate) to denote field
   value constraints.
 
 ### Enum value level
@@ -176,7 +213,7 @@ metadata. We describe these annotations below by category.
 * `option (udpa.annotations.file_migrate).move_to_package = "<package name>";`
   to denote that in the next major version of the API, the file will be moved to
   the given package. This is consumed by `protoxform`.
-* `option (udpa.annotations.file_status).work_in_progress = true;` to denote a
+* `option (xds.annotations.v3.file_status).work_in_progress = true;` to denote a
   file that is still work-in-progress and subject to breaking changes.
 
 ## Principles
@@ -230,8 +267,7 @@ xDS APIs:
   breaking changes where there is no substantial gain in functionality,
   performance, security or implementation simplification. We will tolerate
   technical debt in the API itself, e.g. in the form of vestigial deprecated
-  fields or reduced ergonomics (such as not using `oneof` when we would prefer
-  to), in order to meet this principle.
+  fields or reduced ergonomics in order to meet this principle.
 
 * Namespaces for extensions, metadata, etc. use a reverse DNS naming scheme,
   e.g. `com.google.widget`, `com.lyft.widget`. Client built-ins may be prefixed

@@ -13,43 +13,56 @@
 #include "source/common/common/fmt.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/utility.h"
+#include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 
 namespace Envoy {
 namespace Router {
 
-// Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
-VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
-                                   Server::Configuration::ServerFactoryContext& factory_context,
-                                   const std::string& stat_prefix,
-                                   absl::optional<RouteConfigProvider*>& route_config_provider_opt,
-                                   envoy::config::core::v3::ApiVersion resource_api_version)
-    : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>(
-          resource_api_version,
-          factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
-      config_update_info_(config_update_info),
-      scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
-                                                 config_update_info_->routeConfigName() + ".")),
-      stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
-      init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
-                   [this]() { subscription_->start({config_update_info_->routeConfigName()}); }),
-      route_config_provider_opt_(route_config_provider_opt) {
-  const auto& config_source = config_update_info_->protobufConfiguration()
+absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
+    RouteConfigUpdatePtr& config_update_info,
+    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+    Rds::RouteConfigProvider* route_config_provider) {
+  const auto& config_source = config_update_info->protobufConfigurationCast()
                                   .vhds()
                                   .config_source()
                                   .api_config_source()
                                   .api_type();
   if (config_source != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-    throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
+    return absl::InvalidArgumentError("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
+
+  return std::unique_ptr<VhdsSubscription>(new VhdsSubscription(
+      config_update_info, factory_context, stat_prefix, route_config_provider));
+}
+
+// Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
+VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
+                                   Server::Configuration::ServerFactoryContext& factory_context,
+                                   const std::string& stat_prefix,
+                                   Rds::RouteConfigProvider* route_config_provider)
+    : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>(
+          factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
+      config_update_info_(config_update_info),
+      scope_(factory_context.scope().createScope(
+          stat_prefix + "vhds." + config_update_info_->protobufConfigurationCast().name() + ".")),
+      stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
+      init_target_(fmt::format("VhdsConfigSubscription {}",
+                               config_update_info_->protobufConfigurationCast().name()),
+                   [this]() {
+                     subscription_->start(
+                         {config_update_info_->protobufConfigurationCast().name()});
+                   }),
+      route_config_provider_(route_config_provider) {
   const auto resource_name = getResourceName();
   Envoy::Config::SubscriptionOptions options;
   options.use_namespace_matching_ = true;
-  subscription_ =
+  subscription_ = THROW_OR_RETURN_VALUE(
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_update_info_->protobufConfiguration().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options);
+          config_update_info_->protobufConfigurationCast().vhds().config_source(),
+          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options),
+      Envoy::Config::SubscriptionPtr);
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {
@@ -64,7 +77,7 @@ void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
   init_target_.ready();
 }
 
-void VhdsSubscription::onConfigUpdate(
+absl::Status VhdsSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
@@ -86,13 +99,15 @@ void VhdsSubscription::onConfigUpdate(
                                         version_info)) {
     stats_.config_reload_.inc();
     ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} hash={}",
-              config_update_info_->routeConfigName(), config_update_info_->configHash());
-    if (route_config_provider_opt_.has_value()) {
-      route_config_provider_opt_.value()->onConfigUpdate();
+              config_update_info_->protobufConfigurationCast().name(),
+              config_update_info_->configHash());
+    if (route_config_provider_ != nullptr) {
+      RETURN_IF_NOT_OK(route_config_provider_->onConfigUpdate());
     }
   }
 
   init_target_.ready();
+  return absl::OkStatus();
 }
 
 } // namespace Router

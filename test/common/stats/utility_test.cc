@@ -54,10 +54,11 @@ protected:
   }
 
   void init(MakeStatFn make_stat) {
-    make_stat(*store_, {pool_.add("symbolic1")});
-    make_stat(*store_, {Stats::DynamicName("dynamic1")});
+    make_stat(*store_->rootScope(), {pool_.add("symbolic1")});
+    make_stat(*store_->rootScope(), {Stats::DynamicName("dynamic1")});
     make_stat(*scope_, {pool_.add("symbolic2")});
     make_stat(*scope_, {Stats::DynamicName("dynamic2")});
+    make_stat(*scope_, {Stats::DynamicSavedName("dynamicsaved3")});
   }
 
   template <class StatType> IterateFn<StatType> iterOnce() {
@@ -111,8 +112,8 @@ protected:
   }
 
   template <class StatType> void storeOnce(const MakeStatFn make_stat) {
-    CachedReference<StatType> symbolic1_ref(*store_, "symbolic1");
-    CachedReference<StatType> dynamic1_ref(*store_, "dynamic1");
+    CachedReference<StatType> symbolic1_ref(*store_->rootScope(), "symbolic1");
+    CachedReference<StatType> dynamic1_ref(*store_->rootScope(), "dynamic1");
     EXPECT_FALSE(symbolic1_ref.get());
     EXPECT_FALSE(dynamic1_ref.get());
 
@@ -129,13 +130,13 @@ protected:
   template <class StatType> void storeAll(const MakeStatFn make_stat) {
     init(make_stat);
     EXPECT_TRUE(store_->iterate(iterAll<StatType>()));
-    EXPECT_THAT(results_,
-                UnorderedElementsAre("symbolic1", "dynamic1", "scope.symbolic2", "scope.dynamic2"));
+    EXPECT_THAT(results_, UnorderedElementsAre("symbolic1", "dynamic1", "scope.symbolic2",
+                                               "scope.dynamicsaved3", "scope.dynamic2"));
   }
 
   template <class StatType> void scopeOnce(const MakeStatFn make_stat) {
-    CachedReference<StatType> symbolic2_ref(*store_, "scope.symbolic2");
-    CachedReference<StatType> dynamic2_ref(*store_, "scope.dynamic2");
+    CachedReference<StatType> symbolic2_ref(*scope_, "scope.symbolic2");
+    CachedReference<StatType> dynamic2_ref(*scope_, "scope.dynamic2");
     EXPECT_FALSE(symbolic2_ref.get());
     EXPECT_FALSE(dynamic2_ref.get());
 
@@ -152,14 +153,15 @@ protected:
   template <class StatType> void scopeAll(const MakeStatFn make_stat) {
     init(make_stat);
     EXPECT_TRUE(scope_->iterate(iterAll<StatType>()));
-    EXPECT_THAT(results_, UnorderedElementsAre("scope.symbolic2", "scope.dynamic2"));
+    EXPECT_THAT(results_,
+                UnorderedElementsAre("scope.symbolic2", "scope.dynamic2", "scope.dynamicsaved3"));
   }
 
   SymbolTablePtr symbol_table_;
   StatNamePool pool_;
   std::unique_ptr<AllocatorImpl> alloc_;
   std::unique_ptr<Store> store_;
-  ScopePtr scope_;
+  ScopeSharedPtr scope_;
   absl::flat_hash_set<std::string> results_;
   StatNameTagVector tags_;
 };
@@ -168,7 +170,7 @@ INSTANTIATE_TEST_SUITE_P(StatsUtilityTest, StatsUtilityTest,
                          testing::ValuesIn({StoreType::ThreadLocal, StoreType::Isolated}));
 
 TEST_P(StatsUtilityTest, Counters) {
-  ScopePtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.");
   Counter& c1 = Utility::counterFromElements(*scope, {DynamicName("a"), DynamicName("b")});
   EXPECT_EQ("scope.a.b", c1.name());
   StatName token = pool_.add("token");
@@ -187,7 +189,7 @@ TEST_P(StatsUtilityTest, Counters) {
 }
 
 TEST_P(StatsUtilityTest, Gauges) {
-  ScopePtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.");
   Gauge& g1 = Utility::gaugeFromElements(*scope, {DynamicName("a"), DynamicName("b")},
                                          Gauge::ImportMode::NeverImport);
   EXPECT_EQ("scope.a.b", g1.name());
@@ -206,7 +208,7 @@ TEST_P(StatsUtilityTest, Gauges) {
 }
 
 TEST_P(StatsUtilityTest, Histograms) {
-  ScopePtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.");
   Histogram& h1 = Utility::histogramFromElements(*scope, {DynamicName("a"), DynamicName("b")},
                                                  Histogram::Unit::Milliseconds);
   EXPECT_EQ("scope.a.b", h1.name());
@@ -225,7 +227,7 @@ TEST_P(StatsUtilityTest, Histograms) {
 }
 
 TEST_P(StatsUtilityTest, TextReadouts) {
-  ScopePtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.");
   TextReadout& t1 = Utility::textReadoutFromElements(*scope, {DynamicName("a"), DynamicName("b")});
   EXPECT_EQ("scope.a.b", t1.name());
   StatName token = pool_.add("token");
@@ -270,6 +272,15 @@ TEST_P(StatsUtilityTest, StoreTextReadoutAll) { storeAll<TextReadout>(makeTextRe
 TEST_P(StatsUtilityTest, ScopeTextReadoutOnce) { scopeOnce<TextReadout>(makeTextReadout()); }
 
 TEST_P(StatsUtilityTest, ScopeTextReadoutAll) { scopeAll<TextReadout>(makeTextReadout()); }
+
+TEST_P(StatsUtilityTest, SanitizeStatsName) {
+  EXPECT_EQ("a.b.c", Utility::sanitizeStatsName("a.b.c."));
+  EXPECT_EQ("a.b.c", Utility::sanitizeStatsName(".a.b.c"));
+  EXPECT_EQ("a__b", Utility::sanitizeStatsName("a::b"));
+  EXPECT_EQ("a._", Utility::sanitizeStatsName(absl::string_view("a.\0", 3)));
+  EXPECT_EQ("a_b", Utility::sanitizeStatsName("a://b"));
+  EXPECT_EQ("a_b", Utility::sanitizeStatsName("a:/b"));
+}
 
 } // namespace
 } // namespace Stats

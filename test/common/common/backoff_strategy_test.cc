@@ -23,11 +23,12 @@ TEST(ExponentialBackOffStrategyTest, JitteredBackOffBasicReset) {
   ON_CALL(random, random()).WillByDefault(Return(27));
 
   JitteredExponentialBackOffStrategy jittered_back_off(25, 30, random);
-  EXPECT_EQ(2, jittered_back_off.nextBackOffMs());
+  EXPECT_EQ(2, jittered_back_off.nextBackOffMs()); // 25 % 27
   EXPECT_EQ(27, jittered_back_off.nextBackOffMs());
 
   jittered_back_off.reset();
   EXPECT_EQ(2, jittered_back_off.nextBackOffMs()); // Should start from start
+  EXPECT_EQ(27, jittered_back_off.nextBackOffMs());
 }
 
 TEST(ExponentialBackOffStrategyTest, JitteredBackOffDoesntOverflow) {
@@ -102,6 +103,31 @@ TEST(FixedBackOffStrategyTest, FixedBackOffBasicReset) {
 
   fixed_back_off.reset();
   EXPECT_EQ(30, fixed_back_off.nextBackOffMs());
+}
+
+TEST(BackOffStrategyUtilsTest, InvalidConfig) {
+  {
+    // Valid config.
+    envoy::config::core::v3::BackoffStrategy backoff_strategy;
+    backoff_strategy.mutable_base_interval()->set_seconds(2);
+    backoff_strategy.mutable_max_interval()->set_seconds(3);
+    EXPECT_TRUE(BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 1, 10).ok());
+  }
+
+  {
+    // Max interval is lower than base interval.
+    envoy::config::core::v3::BackoffStrategy backoff_strategy;
+    backoff_strategy.mutable_base_interval()->set_seconds(3);
+    backoff_strategy.mutable_max_interval()->set_seconds(2);
+    EXPECT_TRUE(!BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 1, 10).ok());
+  }
+
+  {
+    // Max interval is lower than base interval.
+    envoy::config::core::v3::BackoffStrategy backoff_strategy;
+    backoff_strategy.mutable_max_interval()->set_nanos(2000000);
+    EXPECT_TRUE(!BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 3, 10).ok());
+  }
 }
 
 } // namespace Envoy

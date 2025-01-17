@@ -6,22 +6,58 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/win32_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Network {
 
+namespace {
+[[maybe_unused]] bool hasIoUringWorkerFactory(Io::IoUringWorkerFactory* io_uring_worker_factory) {
+  return io_uring_worker_factory != nullptr && io_uring_worker_factory->currentThreadRegistered() &&
+         io_uring_worker_factory->getIoUringWorker() != absl::nullopt;
+}
+} // namespace
+
+IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
+    int socket_fd, bool socket_v6only, absl::optional<int> domain,
+    const SocketCreationOptions& options,
+    [[maybe_unused]] Io::IoUringWorkerFactory* io_uring_worker_factory) {
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+    return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
+  }
+  // Only create IoUringSocketHandleImpl when the IoUringWorkerFactory has been created and it has
+  // been registered in the TLS, initialized. There are cases that test may create threads before
+  // IoUringWorkerFactory has been added to the TLS and got initialized.
+  if (hasIoUringWorkerFactory(io_uring_worker_factory)) {
+    return io_uring_worker_factory->createIoUringSocketHandle(socket_fd, socket_v6only, domain);
+  }
+  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain,
+                                              options.max_addresses_cache_size_);
+}
+
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
-                                            absl::optional<int> domain) const {
-  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+                                            absl::optional<int> domain,
+                                            const SocketCreationOptions& options) const {
+  return makePlatformSpecificSocket(socket_fd, socket_v6only, domain, options);
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
-                                        Address::IpVersion version, bool socket_v6only) const {
+                                        Address::IpVersion version, bool socket_v6only,
+                                        const SocketCreationOptions& options) const {
+  int protocol = 0;
 #if defined(__APPLE__) || defined(WIN32)
+  ASSERT(!options.mptcp_enabled_, "MPTCP is only supported on Linux");
   int flags = 0;
 #else
   int flags = SOCK_NONBLOCK;
+
+  if (options.mptcp_enabled_) {
+    ASSERT(socket_type == Socket::Type::Stream);
+    ASSERT(addr_type == Address::Type::Ip);
+    protocol = IPPROTO_MPTCP;
+  }
 #endif
 
   if (socket_type == Socket::Type::Stream) {
@@ -32,7 +68,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 
   int domain;
   if (addr_type == Address::Type::Ip) {
-    if (version == Address::IpVersion::v6) {
+    if (version == Address::IpVersion::v6 || Address::forceV6()) {
       domain = AF_INET6;
     } else {
       ASSERT(version == Address::IpVersion::v4);
@@ -42,26 +78,34 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
     domain = AF_UNIX;
   } else {
     ASSERT(addr_type == Address::Type::EnvoyInternal);
+    PANIC("not implemented");
     // TODO(lambdai): Add InternalIoSocketHandleImpl to support internal address.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
 
-  const Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().socket(domain, flags, 0);
-  RELEASE_ASSERT(SOCKET_VALID(result.return_value_),
-                 fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
-  IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain);
+  const Api::SysCallSocketResult result =
+      Api::OsSysCallsSingleton::get().socket(domain, flags, protocol);
+  if (!SOCKET_VALID(result.return_value_)) {
+    IS_ENVOY_BUG(fmt::format("socket(2) failed, got error: {}", errorDetails(result.errno_)));
+    return nullptr;
+  }
+  IoHandlePtr io_handle = makeSocket(result.return_value_, socket_v6only, domain, options);
 
 #if defined(__APPLE__) || defined(WIN32)
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
   const int rc = io_handle->setBlocking(false).return_value_;
-  RELEASE_ASSERT(!SOCKET_FAILURE(rc), "");
+  if (SOCKET_FAILURE(result.return_value_)) {
+    IS_ENVOY_BUG(fmt::format("Unable to set socket non-blocking: got error: {}", rc));
+    return nullptr;
+  }
 #endif
 
   return io_handle;
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
-                                        const Address::InstanceConstSharedPtr addr) const {
+                                        const Address::InstanceConstSharedPtr addr,
+                                        const SocketCreationOptions& options) const {
   Address::IpVersion ip_version = addr->ip() ? addr->ip()->version() : Address::IpVersion::v4;
   int v6only = 0;
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
@@ -69,12 +113,14 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
   }
 
   IoHandlePtr io_handle =
-      SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only);
-  if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
+      SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only, options);
+  if (io_handle && addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6 &&
+      !Address::forceV6()) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
     const Api::SysCallIntResult result = io_handle->setOption(
         IPPROTO_IPV6, IPV6_V6ONLY, reinterpret_cast<const char*>(&v6only), sizeof(v6only));
-    RELEASE_ASSERT(!SOCKET_FAILURE(result.return_value_), "");
+    ENVOY_BUG(!SOCKET_FAILURE(result.return_value_),
+              fmt::format("Unable to set socket v6-only: got error: {}", result.return_value_));
   }
   return io_handle;
 }

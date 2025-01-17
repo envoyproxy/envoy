@@ -7,27 +7,44 @@ Extensions
   :glob:
   :maxdepth: 2
 
-  filter/filter
+  accesslog/filters
+  formatter/formatter
   accesslog/accesslog
-  rbac/rbac
-  health_checker/health_checker
-  transport_socket/transport_socket
-  resource_monitor/resource_monitor
+  cluster/cluster
   common/common
   compression/compression
-  cluster/cluster
+  config_validators/config_validators
+  contrib/contrib
+  dns_resolver/dns_resolver
+  endpoint/endpoint
+  filter/filter
   grpc_credential/grpc_credential
-  retry/retry
+  health_check_event_sinks/health_check_event_sinks
+  health_checker/health_checker
+  http/early_header_mutation
+  http/custom_response
+  http/header_formatters
+  http/header_validators
+  http/original_ip_detection
+  http/stateful_session
+  injected_credentials/injected_credentials
+  geoip_provider/geoip_provider
   trace/trace
   internal_redirect/internal_redirect
-  endpoint/endpoint
+  path/match/path_matcher
+  path/rewrite/path_rewriter
+  quic/quic_extensions
+  descriptors/descriptors
+  rbac/rbac
+  rbac/matchers
+  request_id/request_id
+  resource_monitor/resource_monitor
+  retry/retry
+  stat_sinks/stat_sinks
+  string_matcher/string_matcher
+  transport_socket/transport_socket
   upstream/upstream
   wasm/wasm
   watchdog/watchdog
-  descriptors/descriptors
-  request_id/request_id
-  http/header_formatters
-  http/original_ip_detection
-  stat_sinks/stat_sinks
-  quic/quic_extensions
-  formatter/formatter
+  load_balancing_policies/load_balancing_policies
+  cluster_specifier/cluster_specifier

@@ -44,7 +44,8 @@ public:
 
   // AccessLog::AccessLogManager
   void reopen() override;
-  AccessLogFileSharedPtr createAccessLog(const Filesystem::FilePathAndType& file_info) override;
+  absl::StatusOr<AccessLogFileSharedPtr>
+  createAccessLog(const Filesystem::FilePathAndType& file_info) override;
 
 private:
   const std::chrono::milliseconds file_flush_interval_msec_;
@@ -84,11 +85,7 @@ public:
 private:
   void doWrite(Buffer::Instance& buffer);
   void flushThreadFunc();
-  Api::IoCallBoolResult open();
   void createFlushStructures();
-
-  // return default flags set which used by open
-  static Filesystem::FlagSet defaultFlags();
 
   // Minimum size before the flush thread will be told to flush.
   static const uint64_t MIN_FLUSH_SIZE = 1024 * 64;
@@ -114,8 +111,8 @@ private:
                    // high performance. It is always local to the process.
   Thread::ThreadPtr flush_thread_;
   Thread::CondVar flush_event_;
-  std::atomic<bool> flush_thread_exit_{};
-  std::atomic<bool> reopen_file_{};
+  bool flush_thread_exit_ ABSL_GUARDED_BY(write_lock_){false};
+  bool reopen_file_ ABSL_GUARDED_BY(write_lock_){false};
   Buffer::OwnedImpl
       flush_buffer_ ABSL_GUARDED_BY(write_lock_); // This buffer is used by multiple threads. It
                                                   // gets filled and then flushed either when max

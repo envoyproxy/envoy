@@ -12,6 +12,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.config.filter.http.grpc_stats.v2alpha";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/filter/http/grpc_stats/v2alpha";
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.grpc_stats.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
@@ -45,9 +46,7 @@ message FilterConfig {
     //
     // .. attention::
     //   If neither `individual_method_stats_allowlist` nor `stats_for_all_methods` is set, the
-    //   behavior will default to `stats_for_all_methods=false`. This default value is changed due
-    //   to the previous value being deprecated. This behavior can be changed with runtime override
-    //   `envoy.deprecated_features.grpc_stats_filter_enable_stats_for_all_methods_by_default`.
+    //   behavior will default to `stats_for_all_methods=false`.
     google.protobuf.BoolValue stats_for_all_methods = 3;
   }
 }

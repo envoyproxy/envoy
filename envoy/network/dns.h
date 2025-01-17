@@ -7,7 +7,11 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/network/address.h"
+
+#include "absl/types/optional.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Network {
@@ -28,25 +32,72 @@ public:
     Timeout
   };
 
+  /** Store the trace information. */
+  struct Trace {
+    /**
+     * An identifier to store the trace information. The trace is `uint8_t` because the value can
+     * vary depending on the DNS resolver implementation.
+     */
+    uint8_t trace_;
+    /** Store the current time of this trace. */
+    MonotonicTime time_;
+  };
+
   /**
    * Cancel an outstanding DNS request.
    * @param reason supplies the cancel reason.
    */
   virtual void cancel(CancelReason reason) PURE;
+
+  /**
+   * Add a trace for the DNS query. The trace lifetime is tied to the lifetime of `ActiveQuery` and
+   * `ActiveQuery` will be destroyed upon query completion or cancellation.
+   */
+  virtual void addTrace(uint8_t trace) PURE;
+
+  /** Return the DNS query traces. */
+  virtual std::string getTraces() PURE;
 };
 
 /**
- * DNS response.
+ * DNS A/AAAA record response.
  */
-struct DnsResponse {
-  DnsResponse(const Address::InstanceConstSharedPtr& address, const std::chrono::seconds ttl)
-      : address_(address), ttl_(ttl) {}
-
+struct AddrInfoResponse {
   const Address::InstanceConstSharedPtr address_;
   const std::chrono::seconds ttl_;
 };
 
-enum class DnsLookupFamily { V4Only, V6Only, Auto };
+/**
+ * DNS SRV record response.
+ */
+struct SrvResponse {
+  const std::string host_;
+  const uint16_t port_;
+  const uint16_t priority_;
+  const uint16_t weight_;
+};
+
+enum class RecordType { A, AAAA, SRV };
+
+enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred, All };
+
+class DnsResponse {
+public:
+  DnsResponse(const Address::InstanceConstSharedPtr& address, const std::chrono::seconds ttl)
+      : response_(AddrInfoResponse{
+            address,
+            std::chrono::seconds(std::min(std::chrono::seconds::rep(INT_MAX),
+                                          std::max(ttl.count(), std::chrono::seconds::rep(0))))}) {}
+  DnsResponse(const std::string& host, uint16_t port, uint16_t priority, uint16_t weight)
+      : response_(SrvResponse{host, port, priority, weight}) {}
+
+  const AddrInfoResponse& addrInfo() const { return absl::get<AddrInfoResponse>(response_); }
+
+  const SrvResponse& srv() const { return absl::get<SrvResponse>(response_); }
+
+private:
+  absl::variant<AddrInfoResponse, SrvResponse> response_;
+};
 
 /**
  * An asynchronous DNS resolver.
@@ -57,15 +108,20 @@ public:
 
   /**
    * Final status for a DNS resolution.
+   * DNS resolution can return result statuses like NODATA、SERVFAIL and NONAME,
+   * which indicate successful completion of the query but
+   * no results, and `Completed` is a more accurate way of reflecting that.
    */
-  enum class ResolutionStatus { Success, Failure };
+  enum class ResolutionStatus { Completed, Failure };
 
   /**
    * Called when a resolution attempt is complete.
    * @param status supplies the final status of the resolution.
+   * @param details supplies the details for the current address' resolution.
    * @param response supplies the list of resolved IP addresses and TTLs.
    */
-  using ResolveCb = std::function<void(ResolutionStatus status, std::list<DnsResponse>&& response)>;
+  using ResolveCb = std::function<void(ResolutionStatus status, absl::string_view details,
+                                       std::list<DnsResponse>&& response)>;
 
   /**
    * Initiate an async DNS resolution.
@@ -77,6 +133,13 @@ public:
    */
   virtual ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                                   ResolveCb callback) PURE;
+
+  /**
+   * Tell the resolver to reset networking, typically in response to a network switch (e.g., from
+   * WiFi to cellular). What the resolver does is resolver dependent but might involve creating
+   * new resolver connections, re-reading resolver targets, etc.
+   */
+  virtual void resetNetworking() PURE;
 };
 
 using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;

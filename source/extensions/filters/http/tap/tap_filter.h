@@ -44,6 +44,11 @@ public:
   virtual HttpTapConfigSharedPtr currentConfig() PURE;
 
   /**
+   * @return the http tap config.
+   */
+  virtual const envoy::extensions::filters::http::tap::v3::Tap& getTapConfig() const PURE;
+
+  /**
    * @return the filter stats.
    */
   virtual FilterStats& stats() PURE;
@@ -59,15 +64,20 @@ public:
   FilterConfigImpl(const envoy::extensions::filters::http::tap::v3::Tap& proto_config,
                    const std::string& stats_prefix,
                    Extensions::Common::Tap::TapConfigFactoryPtr&& config_factory,
-                   Stats::Scope& scope, Server::Admin& admin, Singleton::Manager& singleton_manager,
-                   ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_thread_dispatcher);
+                   Stats::Scope& scope, OptRef<Server::Admin> admin,
+                   Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+                   Event::Dispatcher& main_thread_dispatcher);
 
   // FilterConfig
   HttpTapConfigSharedPtr currentConfig() override;
   FilterStats& stats() override { return stats_; }
+  const envoy::extensions::filters::http::tap::v3::Tap& getTapConfig() const override {
+    return tap_config_;
+  }
 
 private:
   FilterStats stats_;
+  const envoy::extensions::filters::http::tap::v3::Tap tap_config_;
 };
 
 /**
@@ -89,12 +99,18 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     HttpTapConfigSharedPtr config = config_->currentConfig();
-    tapper_ = config ? config->createPerRequestTapper(callbacks.streamId()) : nullptr;
+    if (config != nullptr) {
+      auto streamId = callbacks.streamId();
+      auto connection = callbacks.connection();
+      tapper_ = config->createPerRequestTapper(config_->getTapConfig(), streamId, connection);
+    } else {
+      tapper_ = nullptr;
+    }
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
-    return Http::FilterHeadersStatus::Continue;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
@@ -106,10 +122,7 @@ public:
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override {}
 
   // AccessLog::Instance
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
-           const StreamInfo::StreamInfo& stream_info) override;
+  void log(const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo&) override;
 
 private:
   FilterConfigSharedPtr config_;

@@ -14,11 +14,21 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "cache_filter_lib",
-    srcs = ["cache_filter.cc"],
-    hdrs = ["cache_filter.h"],
+    srcs = [
+        "cache_filter.cc",
+        "upstream_request.cc",
+    ],
+    hdrs = [
+        "cache_filter.h",
+        "filter_state.h",
+        "upstream_request.h",
+    ],
     deps = [
         ":cache_custom_headers",
+        ":cache_entry_utils_lib",
+        ":cache_filter_logging_info_lib",
         ":cache_headers_utils_lib",
+        ":cache_insert_queue_lib",
         ":cacheability_utils_lib",
         ":http_cache_lib",
         "//source/common/common:enum_to_int",
@@ -28,7 +38,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
 
@@ -41,6 +51,27 @@ envoy_cc_library(
         ":cache_headers_utils_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "cache_entry_utils_lib",
+    srcs = ["cache_entry_utils.cc"],
+    hdrs = ["cache_entry_utils.h"],
+    deps = [
+        ":cache_headers_utils_lib",
+        "//envoy/common:time_interface",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "cache_insert_queue_lib",
+    srcs = ["cache_insert_queue.cc"],
+    hdrs = ["cache_insert_queue.h"],
+    deps = [
+        ":http_cache_lib",
+        "//source/common/buffer:buffer_lib",
     ],
 )
 
@@ -66,8 +97,10 @@ envoy_cc_library(
     hdrs = ["http_cache.h"],
     deps = [
         ":cache_custom_headers",
+        ":cache_entry_utils_lib",
         ":cache_headers_utils_lib",
         ":key_cc_proto",
+        ":range_utils_lib",
         "//envoy/buffer:buffer_interface",
         "//envoy/common:time_interface",
         "//envoy/config:typed_config_interface",
@@ -76,8 +109,25 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+        "//source/common/protobuf:deterministic_hash_lib",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "range_utils_lib",
+    srcs = ["range_utils.cc"],
+    hdrs = ["range_utils.h"],
+    deps = [
+        ":cache_headers_utils_lib",
+        ":key_cc_proto",
+        "//envoy/http:header_map_interface",
+        "//envoy/protobuf:message_validator_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/http:headers_lib",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
 
@@ -85,7 +135,6 @@ envoy_cc_library(
     name = "cache_headers_utils_lib",
     srcs = ["cache_headers_utils.cc"],
     hdrs = ["cache_headers_utils.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":cache_custom_headers",
         "//envoy/common:time_interface",
@@ -95,7 +144,9 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+        "@com_google_absl//absl/container:btree",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
 
@@ -108,6 +159,15 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "cache_filter_logging_info_lib",
+    srcs = ["cache_filter_logging_info.cc"],
+    hdrs = ["cache_filter_logging_info.h"],
+    deps = [
+        "//source/common/stream_info:filter_state_lib",
+    ],
+)
+
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
@@ -115,6 +175,6 @@ envoy_cc_extension(
     deps = [
         ":cache_filter_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )

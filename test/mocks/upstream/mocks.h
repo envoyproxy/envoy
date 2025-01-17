@@ -14,7 +14,7 @@
 
 #include "source/common/common/callback_impl.h"
 #include "source/common/upstream/health_discovery_service.h"
-#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "test/mocks/config/mocks.h"
@@ -27,6 +27,7 @@
 #include "test/mocks/upstream/basic_resource_limit.h"
 #include "test/mocks/upstream/cds_api.h"
 #include "test/mocks/upstream/cluster.h"
+#include "test/mocks/upstream/cluster_discovery_callback_handle.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/cluster_info_factory.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -40,6 +41,8 @@
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/load_balancer.h"
 #include "test/mocks/upstream/load_balancer_context.h"
+#include "test/mocks/upstream/od_cds_api.h"
+#include "test/mocks/upstream/od_cds_api_handle.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/retry_host_predicate.h"
 #include "test/mocks/upstream/retry_priority.h"

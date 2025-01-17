@@ -15,37 +15,25 @@ using Envoy::Extensions::Common::Wasm::PluginSharedPtr;
 
 class WasmAccessLog : public AccessLog::Instance {
 public:
-  WasmAccessLog(const PluginSharedPtr& plugin,
-                ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal>&& tls_slot,
+  WasmAccessLog(Extensions::Common::Wasm::PluginConfigPtr plugin_config,
                 AccessLog::FilterPtr filter)
-      : plugin_(plugin), tls_slot_(std::move(tls_slot)), filter_(std::move(filter)) {}
+      : plugin_config_(std::move(plugin_config)), filter_(std::move(filter)) {}
 
-  void log(const Http::RequestHeaderMap* request_headers,
-           const Http::ResponseHeaderMap* response_headers,
-           const Http::ResponseTrailerMap* response_trailers,
+  void log(const Formatter::HttpFormatterContext& log_context,
            const StreamInfo::StreamInfo& stream_info) override {
-    if (filter_ && request_headers && response_headers && response_trailers) {
-      if (!filter_->evaluate(stream_info, *request_headers, *response_headers,
-                             *response_trailers)) {
+    if (filter_) {
+      if (!filter_->evaluate(log_context, stream_info)) {
         return;
       }
     }
 
-    auto handle = tls_slot_->get()->handle();
-    if (handle->wasmHandle()) {
-      handle->wasmHandle()->wasm()->log(plugin_, request_headers, response_headers,
-                                        response_trailers, stream_info);
+    if (Common::Wasm::Wasm* wasm = plugin_config_->wasm(); wasm != nullptr) {
+      wasm->log(plugin_config_->plugin(), log_context, stream_info);
     }
   }
 
-  void setTlsSlot(ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal>&& tls_slot) {
-    ASSERT(tls_slot_ == nullptr);
-    tls_slot_ = std::move(tls_slot);
-  }
-
 private:
-  PluginSharedPtr plugin_;
-  ThreadLocal::TypedSlotPtr<PluginHandleSharedPtrThreadLocal> tls_slot_;
+  Common::Wasm::PluginConfigPtr plugin_config_;
   AccessLog::FilterPtr filter_;
 };
 

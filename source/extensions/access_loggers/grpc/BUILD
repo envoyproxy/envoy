@@ -36,6 +36,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/extensions/access_loggers/common:grpc_access_logger",
+        "//source/extensions/access_loggers/common:grpc_access_logger_clients_lib",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/accesslog/v3:pkg_cc_proto",
@@ -51,6 +52,8 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:utility_lib",
+        "//source/common/tracing:custom_tag_lib",
+        "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
     ],
@@ -97,14 +100,9 @@ envoy_cc_extension(
     name = "http_config",
     srcs = ["http_config.cc"],
     hdrs = ["http_config.h"],
-    # TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/common/access_log:__subpackages__",
-        "//test/integration:__subpackages__",
-    ],
     deps = [
         ":config_utils",
-        "//envoy/server:access_log_config_interface",
+        "//envoy/access_log:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",
@@ -118,14 +116,9 @@ envoy_cc_extension(
     name = "tcp_config",
     srcs = ["tcp_config.cc"],
     hdrs = ["tcp_config.h"],
-    # TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/common/access_log:__subpackages__",
-        "//test/integration:__subpackages__",
-    ],
     deps = [
         ":config_utils",
-        "//envoy/server:access_log_config_interface",
+        "//envoy/access_log:access_log_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/protobuf",

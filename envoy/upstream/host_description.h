@@ -13,11 +13,15 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/outlier_detection.h"
+#include "envoy/upstream/resource_manager.h"
 
 #include "absl/strings/string_view.h"
+#include "xds/data/orca/v3/orca_load_report.pb.h"
 
 namespace Envoy {
 namespace Upstream {
+
+using OrcaLoadReport = xds::data::orca::v3::OrcaLoadReport;
 
 using MetadataConstSharedPtr = std::shared_ptr<const envoy::config::core::v3::Metadata>;
 
@@ -45,15 +49,67 @@ struct HostStats {
   ALL_HOST_STATS(GENERATE_PRIMITIVE_COUNTER_STRUCT, GENERATE_PRIMITIVE_GAUGE_STRUCT);
 
   // Provide access to name,counter pairs.
-  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters() const {
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters() {
     return {ALL_HOST_STATS(PRIMITIVE_COUNTER_NAME_AND_REFERENCE, IGNORE_PRIMITIVE_GAUGE)};
   }
 
   // Provide access to name,gauge pairs.
-  std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges() const {
+  std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges() {
     return {ALL_HOST_STATS(IGNORE_PRIMITIVE_COUNTER, PRIMITIVE_GAUGE_NAME_AND_REFERENCE)};
   }
 };
+
+/**
+ * Weakly-named load metrics to be reported as EndpointLoadMetricStats. Individual stats are
+ * accumulated by calling add(), which combines stats with the same name. The aggregated stats are
+ * retrieved by calling latch(), which also clears the current load metrics.
+ */
+class LoadMetricStats {
+public:
+  virtual ~LoadMetricStats() = default;
+
+  struct Stat {
+    uint64_t num_requests_with_metric = 0;
+    double total_metric_value = 0.0;
+  };
+
+  using StatMap = absl::flat_hash_map<std::string, Stat>;
+  using StatMapPtr = std::unique_ptr<StatMap>;
+
+  // Adds the given stat to the map. If the stat already exists in the map, then the stat is
+  // combined with the existing map entry by incrementing num_requests_with_metric and summing the
+  // total_metric_value fields. Otherwise, the stat is added with the provided value to the map,
+  // which retains all entries until the next call to latch(). This allows metrics to be added
+  // whose keys may not necessarily be known at startup time.
+  virtual void add(const absl::string_view key, double value) PURE;
+
+  // Returns an owning pointer to the current load metrics and clears the map.
+  virtual StatMapPtr latch() PURE;
+};
+
+/**
+ * Base interface for attaching LbPolicy-specific data to individual hosts.
+ * This allows LbPolicy implementations to store per-host data that is used
+ * to make load balancing decisions.
+ */
+class HostLbPolicyData {
+public:
+  virtual ~HostLbPolicyData() = default;
+
+  /**
+   * Invoked when a new orca report is received for this upstream host to
+   * update the host lb policy data.
+   * NOTE: this method may be called concurrently from multiple threads.
+   * Please ensure that the implementation is thread-safe.
+   *
+   * @param report supplies the ORCA load report of this upstream host.
+   */
+  virtual absl::Status onOrcaLoadReport(const OrcaLoadReport& /*report*/) {
+    return absl::OkStatus();
+  }
+};
+
+using HostLbPolicyDataPtr = std::unique_ptr<HostLbPolicyData>;
 
 class ClusterInfo;
 
@@ -62,6 +118,9 @@ class ClusterInfo;
  */
 class HostDescription {
 public:
+  using AddressVector = std::vector<Network::Address::InstanceConstSharedPtr>;
+  using SharedConstAddressVector = std::shared_ptr<const AddressVector>;
+
   virtual ~HostDescription() = default;
 
   /**
@@ -90,14 +149,35 @@ public:
   virtual const ClusterInfo& cluster() const PURE;
 
   /**
+   * @return true if the cluster can create a connection for this priority, false otherwise.
+   * @param priority the priority the connection would have.
+   */
+  virtual bool canCreateConnection(Upstream::ResourcePriority priority) const PURE;
+
+  /**
    * @return the host's outlier detection monitor.
    */
   virtual Outlier::DetectorHostMonitor& outlierDetector() const PURE;
 
   /**
+   * Set the host's outlier detector monitor. Outlier detector monitors are assumed to be thread
+   * safe, however a new outlier detector monitor must be installed before the host is used across
+   * threads. Thus, this routine should only be called on the main thread before the host is used
+   * across threads.
+   */
+  virtual void setOutlierDetector(Outlier::DetectorHostMonitorPtr&& outlier_detector) PURE;
+
+  /**
    * @return the host's health checker monitor.
    */
   virtual HealthCheckHostMonitor& healthChecker() const PURE;
+
+  /**
+   * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
+   * a new monitor must be installed before the host is used across threads. Thus,
+   * this routine should only be called on the main thread before the host is used across threads.
+   */
+  virtual void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) PURE;
 
   /**
    * @return The hostname used as the host header for health checking.
@@ -113,7 +193,7 @@ public:
   /**
    * @return the transport socket factory responsible for this host.
    */
-  virtual Network::TransportSocketFactory& transportSocketFactory() const PURE;
+  virtual Network::UpstreamTransportSocketFactory& transportSocketFactory() const PURE;
 
   /**
    * @return the address used to connect to the host.
@@ -121,10 +201,19 @@ public:
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
-   * @return a optional list of additional addresses which the host resolved to. These addresses
-   *         may be used to create upstream connections if the primary address is unreachable.
+   * @return nullptr, or a optional list of additional addresses which the host
+   *         resolved to. These addresses may be used to create upstream
+   *         connections if the primary address is unreachable.
+   *
+   * The address-list is returned as a shared_ptr<const vector<...>> because in
+   * some implements of HostDescription, the address-list can be mutated
+   * asynchronously. Those implementations must use a lock to ensure this is
+   * safe. However this is not sufficient when returning the addressList by
+   * reference.
+   *
+   * Caller must check return-value for nullptr before accessing the vector.
    */
-  virtual const std::vector<Network::Address::InstanceConstSharedPtr>& addressList() const PURE;
+  virtual SharedConstAddressVector addressListOrNull() const PURE;
 
   /**
    * @return host specific stats.
@@ -132,10 +221,20 @@ public:
   virtual HostStats& stats() const PURE;
 
   /**
+   * @return custom stats for multi-dimensional load balancing.
+   */
+  virtual LoadMetricStats& loadMetricStats() const PURE;
+
+  /**
    * @return the locality of the host (deployment specific). This will be the default instance if
    *         unknown.
    */
   virtual const envoy::config::core::v3::Locality& locality() const PURE;
+
+  /**
+   * @return the metadata associated with the locality endpoints the host belongs to.
+   */
+  virtual const MetadataConstSharedPtr localityMetadata() const PURE;
 
   /**
    * @return the human readable name of the host's locality zone as a StatName.
@@ -158,12 +257,48 @@ public:
   virtual void priority(uint32_t) PURE;
 
   /**
-   * @return timestamp in milliseconds of when host was created.
+   * @return timestamp of when host has transitioned from unhealthy to
+   *         healthy state via an active healthchecking.
    */
-  virtual MonotonicTime creationTime() const PURE;
+  virtual absl::optional<MonotonicTime> lastHcPassTime() const PURE;
+
+  /**
+   * Set the timestamp of when the host has transitioned from unhealthy to healthy state via an
+   * active health checking.
+   */
+  virtual void setLastHcPassTime(MonotonicTime last_hc_pass_time) PURE;
+
+  virtual Network::UpstreamTransportSocketFactory&
+  resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
+                                const envoy::config::core::v3::Metadata* metadata) const PURE;
+
+  /**
+   * Set load balancing policy related data to the host.
+   * NOTE: this method should only be called at main thread before the host is used
+   * across worker threads.
+   */
+  virtual void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
+
+  /**
+   * Get the load balancing policy related data of the host.
+   * @return the optional reference to the load balancing policy related data of the host.
+   * Non-const reference is returned to allow the caller to modify the data if needed.
+   * NOTE: the update to the data may be done at multiple threads concurrently and the caller
+   * should ensure the thread safety of the data.
+   */
+  virtual OptRef<HostLbPolicyData> lbPolicyData() const PURE;
+
+  /**
+   * Get the typed load balancing policy related data of the host.
+   * @return the optional reference to the typed load balancing policy related data of the host.
+   */
+  template <class HostLbPolicyDataType> OptRef<HostLbPolicyDataType> typedLbPolicyData() const {
+    return makeOptRefFromPtr(dynamic_cast<HostLbPolicyDataType*>(lbPolicyData().ptr()));
+  }
 };
 
 using HostDescriptionConstSharedPtr = std::shared_ptr<const HostDescription>;
+using HostDescriptionOptConstRef = OptRef<const Upstream::HostDescription>;
 
 #define ALL_TRANSPORT_SOCKET_MATCH_STATS(COUNTER) COUNTER(total_match_count)
 
@@ -180,10 +315,10 @@ struct TransportSocketMatchStats {
 class TransportSocketMatcher {
 public:
   struct MatchData {
-    MatchData(Network::TransportSocketFactory& factory, TransportSocketMatchStats& stats,
+    MatchData(Network::UpstreamTransportSocketFactory& factory, TransportSocketMatchStats& stats,
               std::string name)
         : factory_(factory), stats_(stats), name_(std::move(name)) {}
-    Network::TransportSocketFactory& factory_;
+    Network::UpstreamTransportSocketFactory& factory_;
     TransportSocketMatchStats& stats_;
     std::string name_;
   };
@@ -191,10 +326,17 @@ public:
 
   /**
    * Resolve the transport socket configuration for a particular host.
-   * @param metadata the metadata of the given host.
+   * @param endpoint_metadata the metadata of the given host.
+   * @param locality_metadata the metadata of the host's locality.
    * @return the match information of the transport socket selected.
    */
-  virtual MatchData resolve(const envoy::config::core::v3::Metadata* metadata) const PURE;
+  virtual MatchData resolve(const envoy::config::core::v3::Metadata* endpoint_metadata,
+                            const envoy::config::core::v3::Metadata* locality_metadata) const PURE;
+
+  /*
+   * return true if all matches support ALPN, false otherwise.
+   */
+  virtual bool allMatchesSupportAlpn() const PURE;
 };
 
 using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;

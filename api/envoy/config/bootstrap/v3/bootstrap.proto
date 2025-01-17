@@ -32,6 +32,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.bootstrap.v3";
 option java_outer_classname = "BootstrapProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3;bootstrapv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Bootstrap]
@@ -40,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 33]
+// [#next-free-field: 42]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -98,6 +99,48 @@ message Bootstrap {
     // the :ref:`ads <envoy_v3_api_field_config.core.v3.ConfigSource.ads>` field set will be
     // streamed on the ADS channel.
     core.v3.ApiConfigSource ads_config = 3;
+  }
+
+  message ApplicationLogConfig {
+    message LogFormat {
+      oneof log_format {
+        option (validate.required) = true;
+
+        // Flush application logs in JSON format. The configured JSON struct can
+        // support all the format flags specified in the :option:`--log-format`
+        // command line options section, except for the ``%v`` and ``%_`` flags.
+        google.protobuf.Struct json_format = 1;
+
+        // Flush application log in a format defined by a string. The text format
+        // can support all the format flags specified in the :option:`--log-format`
+        // command line option section.
+        string text_format = 2;
+      }
+    }
+
+    // Optional field to set the application logs format. If this field is set, it will override
+    // the default log format. Setting both this field and :option:`--log-format` command line
+    // option is not allowed, and will cause a bootstrap error.
+    LogFormat log_format = 1;
+  }
+
+  message DeferredStatOptions {
+    // When the flag is enabled, Envoy will lazily initialize a subset of the stats (see below).
+    // This will save memory and CPU cycles when creating the objects that own these stats, if those
+    // stats are never referenced throughout the lifetime of the process. However, it will incur additional
+    // memory overhead for these objects, and a small increase of CPU usage when a at least one of the stats
+    // is updated for the first time.
+    // Groups of stats that will be lazily initialized:
+    // - Cluster traffic stats: a subgroup of the :ref:`cluster statistics <config_cluster_manager_cluster_stats>`
+    // that are used when requests are routed to the cluster.
+    bool enable_deferred_creation_stats = 1;
+  }
+
+  message GrpcAsyncClientManagerConfig {
+    // Optional field to set the expiration time for the cached gRPC client object.
+    // The minimal value is 5s and the default is 50s.
+    google.protobuf.Duration max_cached_entry_idle_duration = 1
+        [(validate.rules).duration = {gte {seconds: 5}}];
   }
 
   reserved 10, 11;
@@ -162,13 +205,16 @@ message Bootstrap {
   // Optional set of stats sinks.
   repeated metrics.v3.StatsSink stats_sinks = 6;
 
+  // Options to control behaviors of deferred creation compatible stats.
+  DeferredStatOptions deferred_stat_options = 39;
+
   // Configuration for internal processing of stats.
   metrics.v3.StatsConfig stats_config = 13;
 
   // Optional duration between flushes to configured stats sinks. For
   // performance reasons Envoy latches counters and only flushes counters and
   // gauges at a periodic interval. If not specified the default is 5000ms (5
-  // seconds). Only one of `stats_flush_interval` or `stats_flush_on_admin`
+  // seconds). Only one of ``stats_flush_interval`` or ``stats_flush_on_admin``
   // can be set.
   // Duration must be at least 1ms and at most 5 min.
   google.protobuf.Duration stats_flush_interval = 7 [
@@ -181,14 +227,14 @@ message Bootstrap {
 
   oneof stats_flush {
     // Flush stats to sinks only when queried for on the admin interface. If set,
-    // a flush timer is not created. Only one of `stats_flush_on_admin` or
-    // `stats_flush_interval` can be set.
+    // a flush timer is not created. Only one of ``stats_flush_on_admin`` or
+    // ``stats_flush_interval`` can be set.
     bool stats_flush_on_admin = 29 [(validate.rules).bool = {const: true}];
   }
 
   // Optional watchdog configuration.
   // This is for a single watchdog configuration for the entire system.
-  // Deprecated in favor of *watchdogs* which has finer granularity.
+  // Deprecated in favor of ``watchdogs`` which has finer granularity.
   Watchdog watchdog = 8
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -248,10 +294,7 @@ message Bootstrap {
   // when :ref:`dns_resolvers <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolvers>` and
   // :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
   // specified.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple' API only uses UDP for DNS resolution.
-  // This field is deprecated in favor of *dns_resolution_config*
+  // This field is deprecated in favor of ``dns_resolution_config``
   // which aggregates all of the DNS resolver configuration in a single message.
   bool use_tcp_for_dns_lookups = 20
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
@@ -260,23 +303,22 @@ message Bootstrap {
   // This may be overridden on a per-cluster basis in cds_config, when
   // :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
   // is specified.
-  // *dns_resolution_config* will be deprecated once
-  // :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>'
-  // is fully supported.
-  core.v3.DnsResolutionConfig dns_resolution_config = 30;
+  // This field is deprecated in favor of
+  // :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>`.
+  core.v3.DnsResolutionConfig dns_resolution_config = 30
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
   // or any other DNS resolver types and the related parameters.
-  // For example, an object of :ref:`DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`
-  // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
-  // :ref:'dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>'
-  // configuration eventually.
-  // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
-  // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
-  // this configuration is optional.
-  // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
-  // When *typed_dns_resolver_config* is missing, the default behavior is in place.
-  // [#not-implemented-hide:]
+  // For example, an object of
+  // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
+  // can be packed into this ``typed_dns_resolver_config``. This configuration replaces the
+  // :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>`
+  // configuration.
+  // During the transition period when both ``dns_resolution_config`` and ``typed_dns_resolver_config`` exists,
+  // when ``typed_dns_resolver_config`` is in place, Envoy will use it and ignore ``dns_resolution_config``.
+  // When ``typed_dns_resolver_config`` is missing, the default behavior is in place.
+  // [#extension-category: envoy.network.dns_resolver]
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 31;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.
@@ -292,18 +334,18 @@ message Bootstrap {
   // xdstp:// URL authority resolution. The algorithm is as
   // follows:
   // 1. The authority field is taken from the xdstp:// URL, call
-  //    this *resource_authority*.
-  // 2. *resource_authority* is compared against the authorities in any peer
-  //    *ConfigSource*. The peer *ConfigSource* is the configuration source
+  //    this ``resource_authority``.
+  // 2. ``resource_authority`` is compared against the authorities in any peer
+  //    ``ConfigSource``. The peer ``ConfigSource`` is the configuration source
   //    message which would have been used unconditionally for resolution
   //    with opaque resource names. If there is a match with an authority, the
-  //    peer *ConfigSource* message is used.
-  // 3. *resource_authority* is compared sequentially with the authorities in
-  //    each configuration source in *config_sources*. The first *ConfigSource*
+  //    peer ``ConfigSource`` message is used.
+  // 3. ``resource_authority`` is compared sequentially with the authorities in
+  //    each configuration source in ``config_sources``. The first ``ConfigSource``
   //    to match wins.
   // 4. As a fallback, if no configuration source matches, then
-  //    *default_config_source* is used.
-  // 5. If *default_config_source* is not specified, resolution fails.
+  //    ``default_config_source`` is used.
+  // 5. If ``default_config_source`` is not specified, resolution fails.
   // [#not-implemented-hide:]
   repeated core.v3.ConfigSource config_sources = 22;
 
@@ -329,11 +371,55 @@ message Bootstrap {
   //
   // Note that the 'set-cookie' header cannot be registered as inline header.
   repeated CustomInlineHeader inline_headers = 32;
+
+  // Optional path to a file with performance tracing data created by "Perfetto" SDK in binary
+  // ProtoBuf format. The default value is "envoy.pftrace".
+  string perf_tracing_file_path = 33;
+
+  // Optional overriding of default regex engine.
+  // If the value is not specified, Google RE2 will be used by default.
+  // [#extension-category: envoy.regex_engines]
+  core.v3.TypedExtensionConfig default_regex_engine = 34;
+
+  // Optional XdsResourcesDelegate configuration, which allows plugging custom logic into both
+  // fetch and load events during xDS processing.
+  // If a value is not specified, no XdsResourcesDelegate will be used.
+  // TODO(abeyad): Add public-facing documentation.
+  // [#not-implemented-hide:]
+  core.v3.TypedExtensionConfig xds_delegate_extension = 35;
+
+  // Optional XdsConfigTracker configuration, which allows tracking xDS responses in external components,
+  // e.g., external tracer or monitor. It provides the process point when receive, ingest, or fail to
+  // process xDS resources and messages. If a value is not specified, no XdsConfigTracker will be used.
+  //
+  // .. note::
+  //
+  //    There are no in-repo extensions currently, and the :repo:`XdsConfigTracker <envoy/config/xds_config_tracker.h>`
+  //    interface should be implemented before using.
+  //    See :repo:`xds_config_tracker_integration_test <test/integration/xds_config_tracker_integration_test.cc>`
+  //    for an example usage of the interface.
+  core.v3.TypedExtensionConfig xds_config_tracker_extension = 36;
+
+  // [#not-implemented-hide:]
+  // This controls the type of listener manager configured for Envoy. Currently
+  // Envoy only supports ListenerManager for this field and Envoy Mobile
+  // supports ApiListenerManager.
+  core.v3.TypedExtensionConfig listener_manager = 37;
+
+  // Optional application log configuration.
+  ApplicationLogConfig application_log_config = 38;
+
+  // Optional gRPC async manager config.
+  GrpcAsyncClientManagerConfig grpc_async_client_manager_config = 40;
+
+  // Optional configuration for memory allocation manager.
+  // Memory releasing is only supported for `tcmalloc allocator <https://github.com/google/tcmalloc>`_.
+  MemoryAllocatorManager memory_allocator_manager = 41;
 }
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Admin";
 
@@ -344,7 +430,7 @@ message Admin {
   // The path to write the access log for the administration server. If no
   // access log is desired specify ‘/dev/null’. This is only required if
   // :ref:`address <envoy_v3_api_field_config.bootstrap.v3.Admin.address>` is set.
-  // Deprecated in favor of *access_log* which offers more options.
+  // Deprecated in favor of ``access_log`` which offers more options.
   string access_log_path = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
@@ -359,9 +445,14 @@ message Admin {
   // Additional socket options that may not be present in Envoy source code or
   // precompiled binaries.
   repeated core.v3.SocketOption socket_options = 4;
+
+  // Indicates whether :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`
+  // should apply to the admin interface or not.
+  bool ignore_global_conn_limit = 6;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
+// [#next-free-field: 6]
 message ClusterManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.ClusterManager";
@@ -382,7 +473,7 @@ message ClusterManager {
   // Name of the local cluster (i.e., the cluster that owns the Envoy running
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
-  // If *local_cluster_name* is defined then :ref:`clusters
+  // If ``local_cluster_name`` is defined then :ref:`clusters
   // <envoy_v3_api_msg_config.cluster.v3.Cluster>` must be defined in the :ref:`Bootstrap
   // static cluster resources
   // <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.StaticResources.clusters>`. This is unrelated to
@@ -398,10 +489,15 @@ message ClusterManager {
   core.v3.BindConfig upstream_bind_config = 3;
 
   // A management server endpoint to stream load stats to via
-  // *StreamLoadStats*. This must have :ref:`api_type
+  // ``StreamLoadStats``. This must have :ref:`api_type
   // <envoy_v3_api_field_config.core.v3.ApiConfigSource.api_type>` :ref:`GRPC
   // <envoy_v3_api_enum_value_config.core.v3.ApiConfigSource.ApiType.GRPC>`.
   core.v3.ApiConfigSource load_stats_config = 4;
+
+  // Whether the ClusterManager will create clusters on the worker threads
+  // inline during requests. This will save memory and CPU cycles in cases where
+  // there are lots of inactive clusters and > 1 worker thread.
+  bool enable_deferred_cluster_creation = 5;
 }
 
 // Allows you to specify different watchdog configs for different subsystems.
@@ -444,15 +540,15 @@ message Watchdog {
   }
 
   // Register actions that will fire on given WatchDog events.
-  // See *WatchDogAction* for priority of events.
+  // See ``WatchDogAction`` for priority of events.
   repeated WatchdogAction actions = 7;
 
   // The duration after which Envoy counts a nonresponsive thread in the
-  // *watchdog_miss* statistic. If not specified the default is 200ms.
+  // ``watchdog_miss`` statistic. If not specified the default is 200ms.
   google.protobuf.Duration miss_timeout = 1;
 
   // The duration after which Envoy counts a nonresponsive thread in the
-  // *watchdog_mega_miss* statistic. If not specified the default is
+  // ``watchdog_mega_miss`` statistic. If not specified the default is
   // 1000ms.
   google.protobuf.Duration megamiss_timeout = 2;
 
@@ -461,20 +557,20 @@ message Watchdog {
   // kill behavior. If not specified the default is 0 (disabled).
   google.protobuf.Duration kill_timeout = 3;
 
-  // Defines the maximum jitter used to adjust the *kill_timeout* if *kill_timeout* is
+  // Defines the maximum jitter used to adjust the ``kill_timeout`` if ``kill_timeout`` is
   // enabled. Enabling this feature would help to reduce risk of synchronized
   // watchdog kill events across proxies due to external triggers. Set to 0 to
   // disable. If not specified the default is 0 (disabled).
   google.protobuf.Duration max_kill_timeout_jitter = 6 [(validate.rules).duration = {gte {}}];
 
-  // If max(2, ceil(registered_threads * Fraction(*multikill_threshold*)))
+  // If ``max(2, ceil(registered_threads * Fraction(*multikill_threshold*)))``
   // threads have been nonresponsive for at least this duration kill the entire
   // Envoy process. Set to 0 to disable this behavior. If not specified the
   // default is 0 (disabled).
   google.protobuf.Duration multikill_timeout = 4;
 
-  // Sets the threshold for *multikill_timeout* in terms of the percentage of
-  // nonresponsive threads required for the *multikill_timeout*.
+  // Sets the threshold for ``multikill_timeout`` in terms of the percentage of
+  // nonresponsive threads required for the ``multikill_timeout``.
   // If not specified the default is 0.
   type.v3.Percent multikill_threshold = 5;
 }
@@ -485,7 +581,7 @@ message Watchdog {
 // have an out of band system to terminate the process.
 //
 // The interface for the extension is ``Envoy::Server::Configuration::FatalAction``.
-// *FatalAction* extensions live in the ``envoy.extensions.fatal_actions`` API
+// ``FatalAction`` extensions live in the ``envoy.extensions.fatal_actions`` API
 // namespace.
 message FatalAction {
   // Extension specific configuration for the action. It's expected to conform
@@ -565,7 +661,7 @@ message RuntimeLayer {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.RuntimeLayer.RtdsLayer";
 
-    // Resource to subscribe to at *rtds_config* for the RTDS layer.
+    // Resource to subscribe to at ``rtds_config`` for the RTDS layer.
     string name = 1;
 
     // RTDS configuration source.
@@ -641,4 +737,15 @@ message CustomInlineHeader {
 
   // The type of the header that is expected to be set as the inline header.
   InlineHeaderType inline_header_type = 2 [(validate.rules).enum = {defined_only: true}];
+}
+
+message MemoryAllocatorManager {
+  // Configures tcmalloc to perform background release of free memory in amount of bytes per ``memory_release_interval`` interval.
+  // If equals to ``0``, no memory release will occur. Defaults to ``0``.
+  uint64 bytes_to_release = 1;
+
+  // Interval in milliseconds for memory releasing. If specified, during every
+  // interval Envoy will try to release ``bytes_to_release`` of free memory back to operating system for reuse.
+  // Defaults to 1000 milliseconds.
+  google.protobuf.Duration memory_release_interval = 2;
 }

@@ -1,11 +1,10 @@
-#!/usr/bin/python
 """Parses a file containing the API version (X.Y.Z format), and outputs (to
 stdout) a C++ header file with the ApiVersion value.
 """
 import string
 import sys
 
-import utils
+from tools.api_versioning import utils
 
 FILE_TEMPLATE = string.Template(
     """#pragma once
@@ -24,7 +23,7 @@ def generate_header_file(input_path):
     correct value.
 
     Args:
-        input_path: the file containing the API version (API_VERSION).
+        input_path: the file containing the API version (API_VERSION.txt).
 
     Returns:
         the header file contents.

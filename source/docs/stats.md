@@ -77,6 +77,10 @@ followed.
    accumulates in to *interval* histograms.
  * Finally the main *interval* histogram is merged to *cumulative* histogram.
 
+Pictorially this looks like:
+
+![Histogram Stat Flush](histogram.png)
+
 `ParentHistogram`s are held weakly a set in ThreadLocalStore. Like other stats,
 they keep an embedded reference count and are removed from the set and destroyed
 when the last strong reference disappears. Consequently, we must hold a lock for
@@ -204,9 +208,7 @@ occurring during via an admin endpoint that shows 20 recent lookups by name, at
 
 Class | Superclass | Description
 -----| ---------- | ---------
-SymbolTable | | Abstract class providing an interface for symbol tables
-SymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName share symbols held in a table
-SymbolTableImpl::Encoding | | Helper class for incrementally encoding strings into symbols
+SymbolTable | | Holds a table of dot-separated names with shared tokens
 StatName | | Provides an API and a view into a StatName (dynamic or symbolized). Like absl::string_view, the backing store must be separately maintained.
 StatNameStorageBase | | Holds storage (an array of bytes) for a dynamic or symbolized StatName
 StatNameStorage  | StatNameStorageBase | Holds storage for a symbolized StatName. Must be explicitly freed (not just destructed).
@@ -274,7 +276,7 @@ Developers trying to can iterate through changes in these tests locally with:
 If you are visiting this section because you saw a message like:
 
 ```bash
-[...][16][critical][assert] [source/common/stats/symbol_table_impl.cc:251] assert failure:
+[...][16][critical][assert] [source/common/stats/symbol_table.cc:341] assert failure:
 decode_search != decode_map_.end(). Details: Please see
 https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#debugging-symbol-table-assertions
 ```
@@ -297,3 +299,11 @@ from the same symbol table. To facilitate this, a test-only global singleton can
 be instantiated, via either `Stats::TestUtil::TestSymbolTable` or
 `Stats::TestUtil::TestStore`. All such structures use a singleton symbol-table
 whose lifetime is a single test method. This should resolve the assertion.
+
+
+Deferred Initialization of Stats
+================================
+
+When :ref:`enable_deferred_creation_stats <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.deferred_stat_options>`
+is enabled in Bootstrap, for stats that are deferred creation compatible, the actual stats struct creation
+is deferred to first access of any member of that stats, i.e. instantiation only happens when an invocation on operator "*" or "->" happens.

@@ -27,11 +27,11 @@ namespace Filesystem {
 
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::file> {
 public:
-  WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api);
+  WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& file_system);
   ~WatcherImpl();
 
   // Filesystem::Watcher
-  void addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
+  absl::Status addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
 
 private:
   static void issueFirstRead(ULONG_PTR param);
@@ -59,7 +59,7 @@ private:
 
   typedef std::unique_ptr<DirectoryWatch> DirectoryWatchPtr;
 
-  Api::Api& api_;
+  Filesystem::Instance& file_system_;
   absl::node_hash_map<std::string, DirectoryWatchPtr> callback_map_;
   Network::IoHandlePtr read_handle_;
   Network::IoHandlePtr write_handle_;

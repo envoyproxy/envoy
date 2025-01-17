@@ -15,19 +15,24 @@ InjectedResourceMonitor::InjectedResourceMonitor(
     const envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig&
         config,
     Server::Configuration::ResourceMonitorFactoryContext& context)
-    : filename_(config.filename()), file_changed_(true),
-      watcher_(context.dispatcher().createFilesystemWatcher()), api_(context.api()) {
-  watcher_->addWatch(filename_, Filesystem::Watcher::Events::MovedTo,
-                     [this](uint32_t) { onFileChanged(); });
+    : filename_(config.filename()),
+      watcher_(context.mainThreadDispatcher().createFilesystemWatcher()), api_(context.api()) {
+  THROW_IF_NOT_OK(
+      watcher_->addWatch(filename_, Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
+        onFileChanged();
+        return absl::OkStatus();
+      }));
 }
 
 void InjectedResourceMonitor::onFileChanged() { file_changed_ = true; }
 
-void InjectedResourceMonitor::updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) {
+void InjectedResourceMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   if (file_changed_) {
     file_changed_ = false;
     TRY_ASSERT_MAIN_THREAD {
-      const std::string contents = api_.fileSystem().fileReadToEnd(filename_);
+      auto file_or_error = api_.fileSystem().fileReadToEnd(filename_);
+      THROW_IF_NOT_OK_REF(file_or_error.status());
+      const std::string contents = file_or_error.value();
       double pressure;
       if (absl::SimpleAtod(contents, &pressure)) {
         if (pressure < 0 || pressure > 1) {

@@ -9,7 +9,6 @@ import "envoy/config/core/v3/health_check.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -17,6 +16,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.endpoint.v3";
 option java_outer_classname = "EndpointComponentsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3;endpointv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Endpoints]
@@ -44,6 +44,22 @@ message Endpoint {
     // to a non-empty value allows overriding the cluster level configuration for a specific
     // endpoint.
     string hostname = 2;
+
+    // Optional alternative health check host address.
+    //
+    // .. attention::
+    //
+    //   The form of the health check host address is expected to be a direct IP address.
+    core.v3.Address address = 3;
+
+    // Optional flag to control if perform active health check for this endpoint.
+    // Active health check is enabled by default if there is a health checker.
+    bool disable_active_health_check = 4;
+  }
+
+  message AdditionalAddress {
+    // Additional address that is associated with the endpoint.
+    core.v3.Address address = 1;
   }
 
   // The upstream host address.
@@ -71,6 +87,13 @@ message Endpoint {
   // that require a hostname, like
   // :ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`.
   string hostname = 3;
+
+  // An ordered list of addresses that together with ``address`` comprise the
+  // list of addresses for an endpoint. The address given in the ``address`` is
+  // prepended to this list. It is assumed that the list must already be
+  // sorted by preference order of the addresses. This will only be supported
+  // for STATIC and EDS clusters.
+  repeated AdditionalAddress additional_addresses = 4;
 }
 
 // An Endpoint that Envoy can route traffic to.
@@ -91,8 +114,8 @@ message LbEndpoint {
 
   // The endpoint metadata specifies values that may be used by the load
   // balancer to select endpoints in a cluster for a given request. The filter
-  // name should be specified as *envoy.lb*. An example boolean key-value pair
-  // is *canary*, providing the optional canary status of the upstream host.
+  // name should be specified as ``envoy.lb``. An example boolean key-value pair
+  // is ``canary``, providing the optional canary status of the upstream host.
   // This may be matched against in a route's
   // :ref:`RouteAction <envoy_v3_api_msg_config.route.v3.RouteAction>` metadata_match field
   // to subset the endpoints considered in cluster load balancing.
@@ -104,9 +127,9 @@ message LbEndpoint {
   // of the weights of all endpoints in the endpoint's locality to produce a
   // percentage of traffic for the endpoint. This percentage is then further
   // weighted by the endpoint's locality's load balancing weight from
-  // LocalityLbEndpoints. If unspecified, each host is presumed to have equal
-  // weight in a locality. The sum of the weights of all endpoints in the
-  // endpoint's locality must not exceed uint32_t maximal value (4294967295).
+  // LocalityLbEndpoints. If unspecified, will be treated as 1. The sum
+  // of the weights of all endpoints in the endpoint's locality must not
+  // exceed uint32_t maximal value (4294967295).
   google.protobuf.UInt32Value load_balancing_weight = 4 [(validate.rules).uint32 = {gte: 1}];
 }
 
@@ -122,10 +145,9 @@ message LedsClusterLocalityConfig {
 }
 
 // A group of endpoints belonging to a Locality.
-// One can have multiple LocalityLbEndpoints for a locality, but this is
-// generally only done if the different groups need to have different load
-// balancing weights or different priorities.
-// [#next-free-field: 9]
+// One can have multiple LocalityLbEndpoints for a locality, but only if
+// they have different priorities.
+// [#next-free-field: 10]
 message LocalityLbEndpoints {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.endpoint.LocalityLbEndpoints";
@@ -139,17 +161,20 @@ message LocalityLbEndpoints {
   // Identifies location of where the upstream hosts run.
   core.v3.Locality locality = 1;
 
+  // Metadata to provide additional information about the locality endpoints in aggregate.
+  core.v3.Metadata metadata = 9;
+
   // The group of endpoints belonging to the locality specified.
   // [#comment:TODO(adisuissa): Once LEDS is implemented this field needs to be
-  // deprecated and replaced by *lb_endpoints_list*.]
+  // deprecated and replaced by ``load_balancer_endpoints``.]
   repeated LbEndpoint lb_endpoints = 2;
 
   // [#not-implemented-hide:]
   oneof lb_config {
     // The group of endpoints belonging to the locality.
-    // [#comment:TODO(adisuissa): Once LEDS is implemented the *lb_endpoints* field
+    // [#comment:TODO(adisuissa): Once LEDS is implemented the ``lb_endpoints`` field
     // needs to be deprecated.]
-    LbEndpointList lb_endpoints_list = 7;
+    LbEndpointList load_balancer_endpoints = 7;
 
     // LEDS Configuration for the current locality.
     LedsClusterLocalityConfig leds_cluster_locality_config = 8;
@@ -172,9 +197,9 @@ message LocalityLbEndpoints {
   // default to the highest priority (0).
   //
   // Under usual circumstances, Envoy will only select endpoints for the highest
-  // priority (0). In the event all endpoints for a particular priority are
+  // priority (0). In the event that enough endpoints for a particular priority are
   // unavailable/unhealthy, Envoy will fail over to selecting endpoints for the
-  // next highest priority group.
+  // next highest priority group. Read more at :ref:`priority levels <arch_overview_load_balancing_priority_levels>`.
   //
   // Priorities should range from 0 (highest) to N (lowest) without skipping.
   uint32 priority = 5 [(validate.rules).uint32 = {lte: 128}];

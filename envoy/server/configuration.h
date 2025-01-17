@@ -84,6 +84,11 @@ public:
    * @return bool indicator to flush stats on-demand via the admin interface instead of on a timer.
    */
   virtual bool flushOnAdmin() const PURE;
+
+  /**
+   * @return true if deferred creation of stats is enabled.
+   */
+  virtual bool enableDeferredCreationStats() const PURE;
 };
 
 /**
@@ -98,6 +103,12 @@ public:
    *         This will be nullptr if the cluster manager has not initialized yet.
    */
   virtual Upstream::ClusterManager* clusterManager() PURE;
+
+  /**
+   * @return const Upstream::ClusterManager* singleton for use by the entire server.
+   *         This will be nullptr if the cluster manager has not initialized yet.
+   */
+  virtual const Upstream::ClusterManager* clusterManager() const PURE;
 
   /**
    * @return const StatsConfig& the configuration of server stats.
@@ -125,7 +136,7 @@ public:
   /**
    * @return std::list<AccessLog::InstanceSharedPtr> the list of access loggers.
    */
-  virtual std::list<AccessLog::InstanceSharedPtr> accessLogs() const PURE;
+  virtual AccessLog::InstanceSharedPtrVector accessLogs() const PURE;
 
   /**
    * @return const std::string& profiler output path.
@@ -141,6 +152,12 @@ public:
    * @return Network::Address::OptionsSharedPtr the list of listener socket options.
    */
   virtual Network::Socket::OptionsSharedPtr socketOptions() PURE;
+
+  /**
+   * @return bool whether the listener should avoid blocking connections based on the globally set
+   * limit.
+   */
+  virtual bool ignoreGlobalConnLimit() const PURE;
 };
 
 /**

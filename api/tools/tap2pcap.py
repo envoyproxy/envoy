@@ -8,7 +8,7 @@ tap files; it is not a literal wire tap.
 
 Usage:
 
-bazel run @envoy_api_canonical//tools:tap2pcap <tap .pb/.pb_text> <pcap path>
+bazel run @envoy_api//tools:tap2pcap <tap .pb/.pb_text> <pcap path>
 
 Known issues:
 - IPv6 PCAP generation has malformed TCP packets. This appears to be a text2pcap
@@ -49,7 +49,7 @@ def tap2pcap(tap_path, pcap_path):
         with open(tap_path, 'r') as f:
             text_format.Merge(f.read(), wrapper)
     else:
-        with open(tap_path, 'r') as f:
+        with open(tap_path, 'rb') as f:
             wrapper.ParseFromString(f.read())
 
     trace = wrapper.socket_buffered_trace

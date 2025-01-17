@@ -1,24 +1,37 @@
-load("@pylint_pip3//:requirements.bzl", "requirement")
-load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_py_binary")
+load("@base_pip3//:requirements.bzl", "requirement")
+load("@envoy_repo//:path.bzl", "PATH")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
 licenses(["notice"])  # Apache 2
 
-envoy_package()
+py_library(
+    name = "envoy_build_fixer",
+    srcs = ["envoy_build_fixer.py"],
+)
 
-exports_files([
-    "check_format.py",
-    "header_order.py",
-    "envoy_build_fixer.py",
-])
+py_library(
+    name = "header_order",
+    srcs = ["header_order.py"],
+)
 
-envoy_py_binary(
-    name = "tools.code_format.python_check",
+py_binary(
+    name = "check_format",
+    srcs = ["check_format.py"],
+    args = [
+        "--path=%s" % PATH,
+        "--clang_format_path=$(location //tools/clang-format)",
+        "--buildifier_path=$(location @com_github_bazelbuild_buildtools//buildifier)",
+        "--buildozer_path=$(location @com_github_bazelbuild_buildtools//buildozer)",
+    ],
+    data = [
+        ":config.yaml",
+        "//tools/clang-format",
+        "@com_github_bazelbuild_buildtools//buildifier",
+        "@com_github_bazelbuild_buildtools//buildozer",
+    ],
     deps = [
-        "//tools/base:checker",
-        "//tools/base:utils",
-        requirement("flake8"),
-        requirement("pep8-naming"),
-        requirement("yapf"),
+        requirement("pyyaml"),
+        ":envoy_build_fixer",
+        ":header_order",
     ],
 )

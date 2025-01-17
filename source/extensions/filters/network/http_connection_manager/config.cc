@@ -8,19 +8,20 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/extensions/http/original_ip_detection/xff/v3/xff.pb.h"
 #include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/filesystem/filesystem.h"
+#include "envoy/http/header_validator_factory.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/common/filter/http/filter_config_discovery_impl.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/default_server_string.h"
@@ -31,17 +32,12 @@
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/router/rds_impl.h"
-#include "source/common/router/scoped_rds.h"
+#include "source/common/quic/server_connection_factory.h"
+#include "source/common/router/route_provider_manager.h"
 #include "source/common/runtime/runtime_impl.h"
-#include "source/common/tracing/http_tracer_manager_impl.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
-
-#ifdef ENVOY_ENABLE_QUIC
-#include "source/common/quic/codec_impl.h"
-#endif
-
-#include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/tracing/tracer_manager_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -49,7 +45,6 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 namespace {
 
-using FilterFactoriesList = std::list<Http::FilterFactoryCb>;
 using FilterFactoryMap = std::map<std::string, HttpConnectionManagerConfig::FilterConfig>;
 
 HttpConnectionManagerConfig::UpgradeMap::const_iterator
@@ -75,29 +70,30 @@ FilterFactoryMap::const_iterator findUpgradeCaseInsensitive(const FilterFactoryM
 
 std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-        config) {
+        config,
+    absl::Status& creation_status) {
   if (config.has_internal_address_config()) {
-    return std::make_unique<InternalAddressConfig>(config.internal_address_config());
+    return std::make_unique<InternalAddressConfig>(config.internal_address_config(),
+                                                   creation_status);
+  }
+
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.explicit_internal_address_config")) {
+    ENVOY_LOG_ONCE_MISC(warn,
+                        "internal_address_config is not configured. The prior default behaviour "
+                        "trusted RFC1918 IP addresses, but this was changed in the 1.32 release. "
+                        "Please explictily config internal address config if you need it before "
+                        "envoy.reloadable_features.explicit_internal_address_config is removed.");
   }
 
   return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
 
-class MissingConfigFilter : public Http::PassThroughDecoderFilter {
-public:
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-    decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound);
-    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, EMPTY_STRING, nullptr,
-                                       absl::nullopt, EMPTY_STRING);
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-};
-
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
     PathWithEscapedSlashesAction
     getPathWithEscapedSlashesActionRuntimeOverride(Server::Configuration::FactoryContext& context) {
   // The default behavior is to leave escaped slashes unchanged.
-  uint64_t runtime_override = context.runtime().snapshot().getInteger(
+  uint64_t runtime_override = context.serverFactoryContext().runtime().snapshot().getInteger(
       "http_connection_manager.path_with_escaped_slashes_action", 0);
   switch (runtime_override) {
   default:
@@ -124,7 +120,7 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
   envoy::type::v3::FractionalPercent default_fraction;
   default_fraction.set_numerator(100);
   default_fraction.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
-  if (context.runtime().snapshot().featureEnabled(
+  if (context.serverFactoryContext().runtime().snapshot().featureEnabled(
           "http_connection_manager.path_with_escaped_slashes_action_enabled", default_fraction)) {
     return config.path_with_escaped_slashes_action() ==
                    envoy::extensions::filters::network::http_connection_manager::v3::
@@ -138,67 +134,148 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
       KEEP_UNCHANGED;
 }
 
+Http::HeaderValidatorFactoryPtr
+createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::network::
+                                 http_connection_manager::v3::HttpConnectionManager& config,
+                             [[maybe_unused]] Server::Configuration::FactoryContext& context,
+                             absl::Status& creation_status) {
+
+  Http::HeaderValidatorFactoryPtr header_validator_factory;
+#ifdef ENVOY_ENABLE_UHV
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_universal_header_validator")) {
+    // This will cause codecs to use legacy header validation and path normalization
+    return nullptr;
+  }
+  ::envoy::config::core::v3::TypedExtensionConfig legacy_header_validator_config;
+  if (!config.has_typed_header_validation_config()) {
+    // If header validator is not configured ensure that the defaults match Envoy's original
+    // behavior.
+    ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+        uhv_config;
+    // By default legacy config had path normalization and merge slashes disabled.
+    uhv_config.mutable_uri_path_normalization_options()->set_skip_path_normalization(
+        !config.has_normalize_path() || !config.normalize_path().value());
+    uhv_config.mutable_uri_path_normalization_options()->set_skip_merging_slashes(
+        !config.merge_slashes());
+    uhv_config.mutable_uri_path_normalization_options()->set_path_with_escaped_slashes_action(
+        static_cast<
+            ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig::
+                UriPathNormalizationOptions::PathWithEscapedSlashesAction>(
+            getPathWithEscapedSlashesAction(config, context)));
+    uhv_config.mutable_http1_protocol_options()->set_allow_chunked_length(
+        config.http_protocol_options().allow_chunked_length());
+    uhv_config.set_headers_with_underscores_action(
+        static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
+                        HeaderValidatorConfig::HeadersWithUnderscoresAction>(
+            config.common_http_protocol_options().headers_with_underscores_action()));
+    uhv_config.set_strip_fragment_from_path(!Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.http_reject_path_with_fragment"));
+    legacy_header_validator_config.set_name("default_envoy_uhv_from_legacy_settings");
+    legacy_header_validator_config.mutable_typed_config()->PackFrom(uhv_config);
+  }
+
+  const ::envoy::config::core::v3::TypedExtensionConfig& header_validator_config =
+      config.has_typed_header_validation_config() ? config.typed_header_validation_config()
+                                                  : legacy_header_validator_config;
+
+  auto* factory = Envoy::Config::Utility::getFactory<Http::HeaderValidatorFactoryConfig>(
+      header_validator_config);
+  if (!factory) {
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("Header validator extension not found: '{}'", header_validator_config.name()));
+    return nullptr;
+  }
+
+  header_validator_factory = factory->createFromProto(header_validator_config.typed_config(),
+                                                      context.serverFactoryContext());
+  if (!header_validator_factory) {
+    creation_status = absl::InvalidArgumentError(fmt::format(
+        "Header validator extension could not be created: '{}'", header_validator_config.name()));
+    return nullptr;
+  }
+#else
+  if (config.has_typed_header_validation_config()) {
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("This Envoy binary does not support header validator extensions.: '{}'",
+                    config.typed_header_validation_config().name()));
+    return nullptr;
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_universal_header_validator")) {
+    creation_status = absl::InvalidArgumentError(
+        "Header validator can not be enabled since this Envoy binary does not support it.");
+    return nullptr;
+  }
+#endif
+  return header_validator_factory;
+}
+
 } // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
-SINGLETON_MANAGER_REGISTRATION(http_tracer_manager);
-SINGLETON_MANAGER_REGISTRATION(filter_config_provider_manager);
+static const std::string srds_factory_name = "envoy.srds_factory.default";
 
 Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
+  auto& server_context = context.serverFactoryContext();
+
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
-      context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
-          SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
-            return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
-                                                                      context.threadLocal());
+      server_context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
+          SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&server_context] {
+            return std::make_shared<Http::TlsCachingDateProviderImpl>(
+                server_context.mainThreadDispatcher(), server_context.threadLocal());
           });
 
   Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager =
-      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&context] {
-            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
+      server_context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(route_config_provider_manager), [&server_context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(server_context.admin());
           });
-
-  Router::ScopedRoutesConfigProviderManagerSharedPtr scoped_routes_config_provider_manager =
-      context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
+  std::shared_ptr<Envoy::Config::ConfigProviderManager> scoped_routes_config_provider_manager =
+      server_context.singletonManager().getTyped<Envoy::Config::ConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(scoped_routes_config_provider_manager),
-          [&context, route_config_provider_manager] {
-            return std::make_shared<Router::ScopedRoutesConfigProviderManager>(
-                context.admin(), *route_config_provider_manager);
+          [&server_context, route_config_provider_manager]()
+              -> std::shared_ptr<Envoy::Config::ConfigProviderManager> {
+            auto srds_factory =
+                Envoy::Config::Utility::getFactoryByName<Router::SrdsFactory>(srds_factory_name);
+            if (srds_factory) {
+              return srds_factory->createScopedRoutesConfigProviderManager(
+                  server_context, *route_config_provider_manager);
+            }
+            return nullptr;
           });
+  auto tracer_manager = Tracing::TracerManagerImpl::singleton(context);
 
-  auto http_tracer_manager = context.singletonManager().getTyped<Tracing::HttpTracerManagerImpl>(
-      SINGLETON_MANAGER_REGISTERED_NAME(http_tracer_manager), [&context] {
-        return std::make_shared<Tracing::HttpTracerManagerImpl>(
-            std::make_unique<Tracing::TracerFactoryContextImpl>(
-                context.getServerFactoryContext(), context.messageValidationVisitor()));
-      });
-
-  std::shared_ptr<Filter::Http::FilterConfigProviderManager> filter_config_provider_manager =
-      context.singletonManager().getTyped<Filter::Http::FilterConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(filter_config_provider_manager),
-          [] { return std::make_shared<Filter::Http::FilterConfigProviderManagerImpl>(); });
+  std::shared_ptr<Http::DownstreamFilterConfigProviderManager> filter_config_provider_manager =
+      Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
+          server_context);
 
   return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
-          http_tracer_manager, filter_config_provider_manager};
+          tracer_manager, filter_config_provider_manager};
 }
 
-std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
+absl::StatusOr<std::shared_ptr<HttpConnectionManagerConfig>> Utility::createConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
-    Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-    Tracing::HttpTracerManager& http_tracer_manager,
-    Filter::Http::FilterConfigProviderManager& filter_config_provider_manager) {
-  return std::make_shared<HttpConnectionManagerConfig>(
+    Config::ConfigProviderManager* scoped_routes_config_provider_manager,
+    Tracing::TracerManager& tracer_manager,
+    FilterConfigProviderManager& filter_config_provider_manager) {
+  absl::Status creation_status = absl::OkStatus();
+  auto config = std::make_shared<HttpConnectionManagerConfig>(
       proto_config, context, date_provider, route_config_provider_manager,
-      scoped_routes_config_provider_manager, http_tracer_manager, filter_config_provider_manager);
+      scoped_routes_config_provider_manager, tracer_manager, filter_config_provider_manager,
+      creation_status);
+  RETURN_IF_NOT_OK(creation_status);
+  return config;
 }
 
-Network::FilterFactoryCb
+absl::StatusOr<Network::FilterFactoryCb>
 HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
@@ -206,17 +283,19 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   return createFilterFactoryFromProtoAndHopByHop(proto_config, context, true);
 }
 
-Network::FilterFactoryCb
+absl::StatusOr<Network::FilterFactoryCb>
 HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHop(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
     Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers) {
   Utility::Singletons singletons = Utility::createSingletons(context);
 
-  auto filter_config = Utility::createConfig(
+  auto config_or_error = Utility::createConfig(
       proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
-      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_,
+      singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_);
+  RETURN_IF_NOT_OK_REF(config_or_error.status());
+  auto filter_config = std::move(*config_or_error);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
@@ -224,10 +303,16 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   // as these captured objects are also global singletons.
   return [singletons, filter_config, &context,
           clear_hop_by_hop_headers](Network::FilterManager& filter_manager) -> void {
+    auto& server_context = context.serverFactoryContext();
+    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+                                                    ? server_context.nullOverloadManager()
+                                                    : server_context.overloadManager();
+
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
-        *filter_config, context.drainDecision(), context.api().randomGenerator(),
-        context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.dispatcher().timeSource());
+        filter_config, context.drainDecision(), server_context.api().randomGenerator(),
+        server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
+        server_context.clusterManager(), overload_manager,
+        server_context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
@@ -235,7 +320,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
   };
 }
 
-Network::FilterFactoryCb
+absl::StatusOr<Network::FilterFactoryCb>
 MobileHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::http_connection_manager::v3::
         EnvoyMobileHttpConnectionManager& mobile_config,
@@ -247,53 +332,57 @@ MobileHttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoType
 /**
  * Static registration for the HTTP connection manager filter.
  */
-REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
-                 Server::Configuration::NamedNetworkFilterConfigFactory){
-    "envoy.http_connection_manager"};
+LEGACY_REGISTER_FACTORY(HttpConnectionManagerFilterConfigFactory,
+                        Server::Configuration::NamedNetworkFilterConfigFactory,
+                        "envoy.http_connection_manager");
 
 InternalAddressConfig::InternalAddressConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-        InternalAddressConfig& config)
-    : unix_sockets_(config.unix_sockets()) {}
+        InternalAddressConfig& config,
+    absl::Status& creation_status)
+    : unix_sockets_(config.unix_sockets()) {
+  auto list_or_error = Network::Address::IpList::create(config.cidr_ranges());
+  SET_AND_RETURN_IF_NOT_OK(list_or_error.status(), creation_status);
+  cidr_ranges_ = std::move(list_or_error.value());
+}
 
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         config,
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
-    Config::ConfigProviderManager& scoped_routes_config_provider_manager,
-    Tracing::HttpTracerManager& http_tracer_manager,
-    Filter::Http::FilterConfigProviderManager& filter_config_provider_manager)
+    Config::ConfigProviderManager* scoped_routes_config_provider_manager,
+    Tracing::TracerManager& tracer_manager,
+    FilterConfigProviderManager& filter_config_provider_manager, absl::Status& creation_status)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
-      internal_address_config_(createInternalAddressConfig(config)),
+      internal_address_config_(createInternalAddressConfig(config, creation_status)),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
-      route_config_provider_manager_(route_config_provider_manager),
       scoped_routes_config_provider_manager_(scoped_routes_config_provider_manager),
       filter_config_provider_manager_(filter_config_provider_manager),
       http3_options_(Http3::Utility::initializeAndValidateOptions(
           config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
-          config.stream_error_on_invalid_http_message())),
-      http2_options_(Http2::Utility::initializeAndValidateOptions(
-          config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Http1::parseHttp1Settings(
           config.http_protocol_options(), context.messageValidationVisitor(),
           config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config, max_request_headers_kb, Http::DEFAULT_MAX_REQUEST_HEADERS_KB)),
+          config, max_request_headers_kb,
+          context.serverFactoryContext().runtime().snapshot().getInteger(
+              Http::MaxRequestHeadersSizeOverrideKey, Http::DEFAULT_MAX_REQUEST_HEADERS_KB))),
       max_request_headers_count_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.common_http_protocol_options(), max_headers_count,
-          context.runtime().snapshot().getInteger(Http::MaxRequestHeadersCountOverrideKey,
-                                                  Http::DEFAULT_MAX_HEADERS_COUNT))),
+          context.serverFactoryContext().runtime().snapshot().getInteger(
+              Http::MaxRequestHeadersCountOverrideKey, Http::DEFAULT_MAX_HEADERS_COUNT))),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), idle_timeout)),
       max_connection_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_connection_duration)),
+      http1_safe_max_connection_duration_(config.http1_safe_max_connection_duration()),
       max_stream_duration_(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
       stream_idle_timeout_(
@@ -316,14 +405,14 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
           // TODO(htuch): we should have a boolean variant of featureEnabled() here.
-          context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
-                                                      100))),
+          context.serverFactoryContext().runtime().snapshot().featureEnabled(
+              "http_connection_manager.normalize_path", 100))),
 #else
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
           // TODO(htuch): we should have a boolean variant of featureEnabled() here.
-          context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
-                                                      0))),
+          context.serverFactoryContext().runtime().snapshot().featureEnabled(
+              "http_connection_manager.normalize_path", 0))),
 #endif
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
@@ -332,16 +421,41 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
       strip_trailing_host_dot_(config.strip_trailing_host_dot()),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          config.common_http_protocol_options(), max_requests_per_connection, 0)) {
+          config.common_http_protocol_options(), max_requests_per_connection, 0)),
+      proxy_status_config_(config.has_proxy_status_config()
+                               ? std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>(
+                                     config.proxy_status_config())
+                               : nullptr),
+      header_validator_factory_(createHeaderValidatorFactory(config, context, creation_status)),
+      append_local_overload_(config.append_local_overload()),
+      append_x_forwarded_port_(config.append_x_forwarded_port()),
+      add_proxy_protocol_connection_state_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, add_proxy_protocol_connection_state, true)) {
+  if (!creation_status.ok()) {
+    return;
+  }
+
+  auto options_or_error = Http2::Utility::initializeAndValidateOptions(
+      config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
+      config.stream_error_on_invalid_http_message());
+  SET_AND_RETURN_IF_NOT_OK(options_or_error.status(), creation_status);
+  http2_options_ = options_or_error.value();
   if (!idle_timeout_) {
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
     idle_timeout_ = absl::nullopt;
   }
 
+  if (config.common_http_protocol_options().has_max_response_headers_kb()) {
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("Error: max_response_headers_kb cannot be set on http_connection_manager."));
+    return;
+  }
+
   if (config.strip_any_host_port() && config.strip_matching_host_port()) {
-    throw EnvoyException(fmt::format(
+    creation_status = absl::InvalidArgumentError(fmt::format(
         "Error: Only one of `strip_matching_host_port` or `strip_any_host_port` can be set."));
+    return;
   }
 
   if (config.strip_any_host_port()) {
@@ -362,7 +476,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     final_rid_config.mutable_typed_config()->PackFrom(
         envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
   }
-  request_id_extension_ = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
+  auto extension_or_error = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context_);
+  SET_AND_RETURN_IF_NOT_OK(extension_or_error.status(), creation_status);
+  request_id_extension_ = extension_or_error.value();
 
   // Check if IP detection extensions were configured, otherwise fall back to XFF.
   auto ip_detection_extensions = config.original_ip_detection_extensions();
@@ -375,13 +491,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     extension->mutable_typed_config()->PackFrom(xff_config);
   } else {
     if (use_remote_address_) {
-      throw EnvoyException(
+      creation_status = absl::InvalidArgumentError(
           "Original IP detection extensions and use_remote_address may not be mixed");
+      return;
     }
 
     if (xff_num_trusted_hops_ > 0) {
-      throw EnvoyException(
+      creation_status = absl::InvalidArgumentError(
           "Original IP detection extensions and xff_num_trusted_hops may not be mixed");
+      return;
     }
   }
 
@@ -390,40 +508,77 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     auto* factory =
         Envoy::Config::Utility::getFactory<Http::OriginalIPDetectionFactory>(extension_config);
     if (!factory) {
-      throw EnvoyException(
+      creation_status = absl::InvalidArgumentError(
           fmt::format("Original IP detection extension not found: '{}'", extension_config.name()));
+      return;
+    }
+
+    auto extension = factory->createExtension(extension_config.typed_config(), context_);
+    SET_AND_RETURN_IF_NOT_OK(extension.status(), creation_status);
+    if (!*extension) {
+      creation_status = absl::InvalidArgumentError(fmt::format(
+          "Original IP detection extension could not be created: '{}'", extension_config.name()));
+      return;
+    }
+    original_ip_detection_extensions_.push_back(*extension);
+  }
+
+  const auto& header_mutation_extensions = config.early_header_mutation_extensions();
+  early_header_mutation_extensions_.reserve(header_mutation_extensions.size());
+  for (const auto& extension_config : header_mutation_extensions) {
+    auto* factory =
+        Envoy::Config::Utility::getFactory<Http::EarlyHeaderMutationFactory>(extension_config);
+    if (!factory) {
+      creation_status = absl::InvalidArgumentError(
+          fmt::format("Early header mutation extension not found: '{}'", extension_config.name()));
+      return;
     }
 
     auto extension = factory->createExtension(extension_config.typed_config(), context_);
     if (!extension) {
-      throw EnvoyException(fmt::format("Original IP detection extension could not be created: '{}'",
-                                       extension_config.name()));
+      creation_status = absl::InvalidArgumentError(fmt::format(
+          "Early header mutation extension could not be created: '{}'", extension_config.name()));
+      return;
     }
-    original_ip_detection_extensions_.push_back(extension);
+    early_header_mutation_extensions_.push_back(std::move(extension));
   }
 
-  // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will
-  // be managed by the scoped routing logic instead.
+  auto srds_factory =
+      Envoy::Config::Utility::getFactoryByName<Router::SrdsFactory>(srds_factory_name);
+  // If scoped RDS is enabled, avoid creating a route config provider. Route config providers
+  // will be managed by the scoped routing logic instead.
   switch (config.route_specifier_case()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRds:
+    route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
+        // At the creation of a RDS route config provider, the factory_context's initManager is
+        // always valid, though the init manager may go away later when the listener goes away.
+        config.rds(), context_.serverFactoryContext(), stats_prefix_, context_.initManager());
+    break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRouteConfig:
-    route_config_provider_ = Router::RouteConfigProviderUtil::create(
-        config, context_.getServerFactoryContext(), context_.messageValidationVisitor(),
-        context_.initManager(), stats_prefix_, route_config_provider_manager_);
+    route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
+        config.route_config(), context_.serverFactoryContext(),
+        context_.messageValidationVisitor());
     break;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kScopedRoutes:
-    scoped_routes_config_provider_ = Router::ScopedRoutesConfigProviderUtil::create(
-        config, context_.getServerFactoryContext(), context_.initManager(), stats_prefix_,
-        scoped_routes_config_provider_manager_);
+    if (!srds_factory || !scoped_routes_config_provider_manager_) {
+      creation_status = absl::InvalidArgumentError("SRDS configured but not compiled in");
+      return;
+    }
+    scoped_routes_config_provider_ =
+        srds_factory->createConfigProvider(config, context_.serverFactoryContext(), stats_prefix_,
+                                           *scoped_routes_config_provider_manager_);
+    scope_key_builder_ = srds_factory->createScopeKeyBuilder(config);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      RouteSpecifierCase::ROUTE_SPECIFIER_NOT_SET:
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   switch (config.forward_client_cert_details()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       SANITIZE:
     forward_client_cert_ = Http::ForwardClientCertType::Sanitize;
@@ -444,8 +599,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       ALWAYS_FORWARD_ONLY:
     forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const auto& set_current_client_cert_details = config.set_current_client_cert_details();
@@ -466,61 +619,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   if (config.has_add_user_agent() && config.add_user_agent().value()) {
-    user_agent_ = context_.localInfo().clusterName();
+    user_agent_ = context_.serverFactoryContext().localInfo().clusterName();
   }
 
   if (config.has_tracing()) {
-    http_tracer_ = http_tracer_manager.getOrCreateHttpTracer(getPerFilterTracerConfig(config));
-
-    const auto& tracing_config = config.tracing();
-
-    Tracing::OperationName tracing_operation_name;
-
-    // Listener level traffic direction overrides the operation name
-    switch (context.direction()) {
-    case envoy::config::core::v3::UNSPECIFIED: {
-      // Continuing legacy behavior; if unspecified, we treat this as ingress.
-      tracing_operation_name = Tracing::OperationName::Ingress;
-      break;
-    }
-    case envoy::config::core::v3::INBOUND:
-      tracing_operation_name = Tracing::OperationName::Ingress;
-      break;
-    case envoy::config::core::v3::OUTBOUND:
-      tracing_operation_name = Tracing::OperationName::Egress;
-      break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-
-    Tracing::CustomTagMap custom_tags;
-    for (const auto& tag : tracing_config.custom_tags()) {
-      custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
-    }
-
-    envoy::type::v3::FractionalPercent client_sampling;
-    client_sampling.set_numerator(
-        tracing_config.has_client_sampling() ? tracing_config.client_sampling().value() : 100);
-    envoy::type::v3::FractionalPercent random_sampling;
-    // TODO: Random sampling historically was an integer and default to out of 10,000. We should
-    // deprecate that and move to a straight fractional percent config.
-    uint64_t random_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-        tracing_config, random_sampling, 10000, 10000)};
-    random_sampling.set_numerator(random_sampling_numerator);
-    random_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-    envoy::type::v3::FractionalPercent overall_sampling;
-    uint64_t overall_sampling_numerator{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-        tracing_config, overall_sampling, 10000, 10000)};
-    overall_sampling.set_numerator(overall_sampling_numerator);
-    overall_sampling.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-
-    const uint32_t max_path_tag_length = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-        tracing_config, max_path_tag_length, Tracing::DefaultMaxPathTagLength);
-
-    tracing_config_ =
-        std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
-            tracing_operation_name, custom_tags, client_sampling, random_sampling, overall_sampling,
-            tracing_config.verbose(), max_path_tag_length});
+    tracer_ = tracer_manager.getOrCreateTracer(getPerFilterTracerConfig(config));
+    tracing_config_ = std::make_unique<Http::TracingConnectionManagerConfig>(
+        context.listenerInfo().direction(), config.tracing());
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -529,10 +634,48 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     access_logs_.push_back(current_access_log);
   }
 
+  if (config.has_access_log_options()) {
+    if (config.flush_access_log_on_new_request() /* deprecated */) {
+      creation_status = absl::InvalidArgumentError(
+          "Only one of flush_access_log_on_new_request or access_log_options can be specified.");
+      return;
+    }
+
+    if (config.has_access_log_flush_interval()) {
+      creation_status = absl::InvalidArgumentError(
+          "Only one of access_log_flush_interval or access_log_options can be specified.");
+      return;
+    }
+
+    flush_access_log_on_new_request_ =
+        config.access_log_options().flush_access_log_on_new_request();
+    flush_log_on_tunnel_successfully_established_ =
+        config.access_log_options().flush_log_on_tunnel_successfully_established();
+
+    if (config.access_log_options().has_access_log_flush_interval()) {
+      access_log_flush_interval_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+          config.access_log_options().access_log_flush_interval()));
+    }
+  } else {
+    flush_access_log_on_new_request_ = config.flush_access_log_on_new_request();
+
+    if (config.has_access_log_flush_interval()) {
+      access_log_flush_interval_ = std::chrono::milliseconds(
+          DurationUtil::durationToMilliseconds(config.access_log_flush_interval()));
+    }
+  }
+
   server_transformation_ = config.server_header_transformation();
 
   if (!config.scheme_header_transformation().scheme_to_overwrite().empty()) {
     scheme_to_set_ = config.scheme_header_transformation().scheme_to_overwrite();
+
+    if (config.scheme_header_transformation().match_upstream()) {
+      ENVOY_LOG(warn, "match_upstream and scheme_to_overwrite both set, using scheme_to_overwrite");
+    }
+    should_scheme_match_upstream_ = false;
+  } else {
+    should_scheme_match_upstream_ = config.scheme_header_transformation().match_upstream();
   }
 
   if (!config.server_name().empty()) {
@@ -542,6 +685,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 
   switch (config.codec_type()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       AUTO:
     codec_type_ = CodecType::AUTO;
@@ -558,53 +702,47 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     codec_type_ = CodecType::HTTP3;
-    if (!context_.isQuicListener()) {
-      throw EnvoyException("HTTP/3 codec configured on non-QUIC listener.");
+    if (!context_.listenerInfo().isQuic()) {
+      creation_status = absl::InvalidArgumentError("HTTP/3 codec configured on non-QUIC listener.");
+      return;
     }
 #else
-    throw EnvoyException("HTTP3 configured but not enabled in the build.");
+    creation_status = absl::InvalidArgumentError("HTTP3 configured but not enabled in the build.");
+    return;
 #endif
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
-  if (codec_type_ != CodecType::HTTP3 && context_.isQuicListener()) {
-    throw EnvoyException("Non-HTTP/3 codec configured on QUIC listener.");
+  if (codec_type_ != CodecType::HTTP3 && context_.listenerInfo().isQuic()) {
+    creation_status = absl::InvalidArgumentError("Non-HTTP/3 codec configured on QUIC listener.");
+    return;
   }
 
-  const auto& filters = config.http_filters();
-  DependencyManager dependency_manager;
-  for (int32_t i = 0; i < filters.size(); i++) {
-    processFilter(filters[i], i, "http", "http", i == filters.size() - 1, filter_factories_,
-                  dependency_manager);
-  }
-  // TODO(auni53): Validate encode dependencies too.
-  auto status = dependency_manager.validDecodeDependencies();
-  if (!status.ok()) {
-    throw EnvoyException(std::string(status.message()));
-  }
+  Http::FilterChainHelper<Server::Configuration::FactoryContext,
+                          Server::Configuration::NamedHttpFilterConfigFactory>
+      helper(filter_config_provider_manager_, context_.serverFactoryContext(),
+             context_.serverFactoryContext().clusterManager(), context_, stats_prefix_);
+  SET_AND_RETURN_IF_NOT_OK(
+      helper.processFilters(config.http_filters(), "http", "http", filter_factories_),
+      creation_status);
 
   for (const auto& upgrade_config : config.upgrade_configs()) {
     const std::string& name = upgrade_config.upgrade_type();
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
     if (findUpgradeCaseInsensitive(upgrade_filter_factories_, name) !=
         upgrade_filter_factories_.end()) {
-      throw EnvoyException(
+      creation_status = absl::InvalidArgumentError(
           fmt::format("Error: multiple upgrade configs with the same name: '{}'", name));
+      return;
     }
     if (!upgrade_config.filters().empty()) {
       std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
-      DependencyManager upgrade_dependency_manager;
-      for (int32_t j = 0; j < upgrade_config.filters().size(); j++) {
-        processFilter(upgrade_config.filters(j), j, name, "http upgrade",
-                      j == upgrade_config.filters().size() - 1, *factories,
-                      upgrade_dependency_manager);
-      }
+      Http::DependencyManager upgrade_dependency_manager;
+      SET_AND_RETURN_IF_NOT_OK(
+          helper.processFilters(upgrade_config.filters(), name, "http upgrade", *factories),
+          creation_status);
       // TODO(auni53): Validate encode dependencies too.
       auto status = upgrade_dependency_manager.validDecodeDependencies();
-      if (!status.ok()) {
-        throw EnvoyException(std::string(status.message()));
-      }
+      SET_AND_RETURN_IF_NOT_OK(status, creation_status);
 
       upgrade_filter_factories_.emplace(
           std::make_pair(name, FilterConfig{std::move(factories), enabled}));
@@ -616,141 +754,50 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
 }
 
-void HttpConnectionManagerConfig::processFilter(
-    const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
-        proto_config,
-    int i, const std::string& prefix, const std::string& filter_chain_type,
-    bool last_filter_in_current_config, FilterFactoriesList& filter_factories,
-    DependencyManager& dependency_manager) {
-  ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
-  if (proto_config.config_type_case() ==
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter::ConfigTypeCase::
-          kConfigDiscovery) {
-    processDynamicFilterConfig(proto_config.name(), proto_config.config_discovery(),
-                               filter_factories, filter_chain_type, last_filter_in_current_config);
-    return;
-  }
-
-  // Now see if there is a factory that will accept the config.
-  auto* factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          proto_config, proto_config.is_optional());
-  // null pointer returned only when the filter is optional, then skip all the processes.
-  if (factory == nullptr) {
-    ENVOY_LOG(warn, "Didn't find a registered factory for the optional http filter {}",
-              proto_config.name());
-    return;
-  }
-  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      proto_config, context_.messageValidationVisitor(), *factory);
-  Http::FilterFactoryCb callback =
-      factory->createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  dependency_manager.registerFilter(factory->name(), *factory->dependencies());
-  bool is_terminal = factory->isTerminalFilterByProto(*message, context_);
-  Config::Utility::validateTerminalFilters(proto_config.name(), factory->name(), filter_chain_type,
-                                           is_terminal, last_filter_in_current_config);
-  auto filter_config_provider = filter_config_provider_manager_.createStaticFilterConfigProvider(
-      callback, proto_config.name());
-  ENVOY_LOG(debug, "      name: {}", filter_config_provider->name());
-  ENVOY_LOG(debug, "    config: {}",
-            MessageUtil::getJsonStringFromMessageOrError(
-                static_cast<const Protobuf::Message&>(proto_config.typed_config()), true));
-  filter_factories.push_back(std::move(filter_config_provider));
-}
-
-void HttpConnectionManagerConfig::processDynamicFilterConfig(
-    const std::string& name, const envoy::config::core::v3::ExtensionConfigSource& config_discovery,
-    FilterFactoriesList& filter_factories, const std::string& filter_chain_type,
-    bool last_filter_in_current_config) {
-  ENVOY_LOG(debug, "      dynamic filter name: {}", name);
-  if (config_discovery.apply_default_config_without_warming() &&
-      !config_discovery.has_default_config()) {
-    throw EnvoyException(fmt::format(
-        "Error: filter config {} applied without warming but has no default config.", name));
-  }
-  for (const auto& type_url : config_discovery.type_urls()) {
-    auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
-    auto* factory = Registry::FactoryRegistry<
-        Server::Configuration::NamedHttpFilterConfigFactory>::getFactoryByType(factory_type_url);
-    if (factory == nullptr) {
-      throw EnvoyException(
-          fmt::format("Error: no factory found for a required type URL {}.", factory_type_url));
-    }
-  }
-
-  auto filter_config_provider = filter_config_provider_manager_.createDynamicFilterConfigProvider(
-      config_discovery, name, context_, stats_prefix_, last_filter_in_current_config,
-      filter_chain_type);
-  filter_factories.push_back(std::move(filter_config_provider));
-}
-
-Http::ServerConnectionPtr
-HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
-                                         const Buffer::Instance& data,
-                                         Http::ServerConnectionCallbacks& callbacks) {
+Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
+    Network::Connection& connection, const Buffer::Instance& data,
+    Http::ServerConnectionCallbacks& callbacks, Server::OverloadManager& overload_manager) {
   switch (codec_type_) {
-  case CodecType::HTTP1: {
+  case CodecType::HTTP1:
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction());
-  }
-  case CodecType::HTTP2: {
+        headersWithUnderscoresAction(), overload_manager);
+  case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
-        context_.api().randomGenerator(), http2_options_, maxRequestHeadersKb(),
-        maxRequestHeadersCount(), headersWithUnderscoresAction());
-  }
+        context_.serverFactoryContext().api().randomGenerator(), http2_options_,
+        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
+        overload_manager);
   case CodecType::HTTP3:
-#ifdef ENVOY_ENABLE_QUIC
-    return std::make_unique<Quic::QuicHttpServerConnectionImpl>(
-        dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks,
-        Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()), http3_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
-#else
-    // Should be blocked by configuration checking at an earlier point.
-    NOT_REACHED_GCOVR_EXCL_LINE;
-#endif
+    return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
+               "quic.http_server_connection.default")
+        .createQuicHttpServerConnectionImpl(
+            connection, callbacks,
+            Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()),
+            http3_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
+            headersWithUnderscoresAction());
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
-        connection, data, callbacks, context_.scope(), context_.api().randomGenerator(),
-        http1_codec_stats_, http2_codec_stats_, http1_settings_, http2_options_,
-        maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction());
+        connection, data, callbacks, context_.scope(),
+        context_.serverFactoryContext().api().randomGenerator(), http1_codec_stats_,
+        http2_codec_stats_, http1_settings_, http2_options_, maxRequestHeadersKb(),
+        maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager);
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-void HttpConnectionManagerConfig::createFilterChainForFactories(
-    Http::FilterChainFactoryCallbacks& callbacks, const FilterFactoriesList& filter_factories) {
-  bool added_missing_config_filter = false;
-  for (const auto& filter_config_provider : filter_factories) {
-    auto config = filter_config_provider->config();
-    if (config.has_value()) {
-      config.value()(callbacks);
-      continue;
-    }
-
-    // If a filter config is missing after warming, inject a local reply with status 500.
-    if (!added_missing_config_filter) {
-      ENVOY_LOG(trace, "Missing filter config for a provider {}", filter_config_provider->name());
-      callbacks.addStreamDecoderFilter(
-          Http::StreamDecoderFilterSharedPtr{std::make_shared<MissingConfigFilter>()});
-      added_missing_config_filter = true;
-    } else {
-      ENVOY_LOG(trace, "Provider {} missing a filter config", filter_config_provider->name());
-    }
-  }
-}
-
-void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
-  createFilterChainForFactories(callbacks, filter_factories_);
+bool HttpConnectionManagerConfig::createFilterChain(Http::FilterChainManager& manager,
+                                                    const Http::FilterChainOptions& options) const {
+  Http::FilterChainUtility::createFilterChainForFactories(manager, options, filter_factories_);
+  return true;
 }
 
 bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     absl::string_view upgrade_type,
     const Http::FilterChainFactory::UpgradeMap* per_route_upgrade_map,
-    Http::FilterChainFactoryCallbacks& callbacks) {
+    Http::FilterChainManager& callbacks, const Http::FilterChainOptions& options) const {
   bool route_enabled = false;
   if (per_route_upgrade_map) {
     auto route_it = findUpgradeBoolCaseInsensitive(*per_route_upgrade_map, upgrade_type);
@@ -770,17 +817,17 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
     // or neither is configured for this upgrade.
     return false;
   }
-  FilterFactoriesList* filters_to_use = &filter_factories_;
+  const FilterFactoriesList* filters_to_use = &filter_factories_;
   if (it != upgrade_filter_factories_.end() && it->second.filter_factories != nullptr) {
     filters_to_use = it->second.filter_factories.get();
   }
 
-  createFilterChainForFactories(callbacks, *filters_to_use);
+  Http::FilterChainUtility::createFilterChainForFactories(callbacks, options, *filters_to_use);
   return true;
 }
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
-  return *context_.localInfo().address();
+  return *context_.serverFactoryContext().localInfo().address();
 }
 
 /**
@@ -797,36 +844,58 @@ const envoy::config::trace::v3::Tracing_Http* HttpConnectionManagerConfig::getPe
   }
   // Otherwise, for the sake of backwards compatibility, fall back to using tracing provider
   // configuration defined in the bootstrap config.
-  if (context_.httpContext().defaultTracingConfig().has_http()) {
-    return &context_.httpContext().defaultTracingConfig().http();
+  if (context_.serverFactoryContext().httpContext().defaultTracingConfig().has_http()) {
+    return &context_.serverFactoryContext().httpContext().defaultTracingConfig().http();
   }
   return nullptr;
 }
 
-std::function<Http::ApiListenerPtr()>
+#ifdef ENVOY_ENABLE_UHV
+::Envoy::Http::HeaderValidatorStats&
+HttpConnectionManagerConfig::getHeaderValidatorStats([[maybe_unused]] Http::Protocol protocol) {
+  switch (protocol) {
+  case Http::Protocol::Http10:
+  case Http::Protocol::Http11:
+    return Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope());
+  case Http::Protocol::Http2:
+    return Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope());
+  case Http::Protocol::Http3:
+    return Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope());
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+#endif
+
+absl::StatusOr<std::function<Http::ApiListenerPtr(Network::ReadFilterCallbacks&)>>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
         proto_config,
-    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks,
-    bool clear_hop_by_hop_headers) {
-
+    Server::Configuration::FactoryContext& context, bool clear_hop_by_hop_headers) {
   Utility::Singletons singletons = Utility::createSingletons(context);
 
-  auto filter_config = Utility::createConfig(
+  auto config_or_error = Utility::createConfig(
       proto_config, context, *singletons.date_provider_, *singletons.route_config_provider_manager_,
-      *singletons.scoped_routes_config_provider_manager_, *singletons.http_tracer_manager_,
+      singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_);
+  RETURN_IF_NOT_OK_REF(config_or_error.status());
+  auto filter_config = std::move(*config_or_error);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [singletons, filter_config, &context, &read_callbacks,
-          clear_hop_by_hop_headers]() -> Http::ApiListenerPtr {
+  return [singletons, filter_config, &context, clear_hop_by_hop_headers](
+             Network::ReadFilterCallbacks& read_callbacks) -> Http::ApiListenerPtr {
+    auto& server_context = context.serverFactoryContext();
+    Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
+                                                    ? server_context.nullOverloadManager()
+                                                    : server_context.overloadManager();
+
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
-        *filter_config, context.drainDecision(), context.api().randomGenerator(),
-        context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.dispatcher().timeSource());
+        filter_config, context.drainDecision(), server_context.api().randomGenerator(),
+        server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
+        server_context.clusterManager(), overload_manager,
+        server_context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);
     }

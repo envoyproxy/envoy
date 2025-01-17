@@ -7,8 +7,8 @@
 namespace Envoy {
 namespace Filesystem {
 
-WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api)
-    : api_(api), os_sys_calls_(Api::OsSysCallsSingleton::get()) {
+WatcherImpl::WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& file_system)
+    : file_system_(file_system), os_sys_calls_(Api::OsSysCallsSingleton::get()) {
   os_fd_t socks[2];
   Api::SysCallIntResult result = os_sys_calls_.socketpair(AF_INET, SOCK_STREAM, IPPROTO_TCP, socks);
   ASSERT(result.return_value_ == 0);
@@ -50,12 +50,14 @@ WatcherImpl::~WatcherImpl() {
   ::CloseHandle(thread_exit_event_);
 }
 
-void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) {
+absl::Status WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) {
   if (path == Platform::null_device_path) {
-    return;
+    return absl::OkStatus();
   }
 
-  const PathSplitResult result = api_.fileSystem().splitPathFromFilename(path);
+  const absl::StatusOr<PathSplitResult> result_or_error = file_system_.splitPathFromFilename(path);
+  RETURN_IF_NOT_OK_REF(result_or_error.status());
+  const PathSplitResult& result = result_or_error.value();
   // ReadDirectoryChangesW only has a Unicode version, so we need
   // to use wide strings here
   const std::wstring directory = wstring_converter_.from_bytes(std::string(result.directory_));
@@ -65,7 +67,7 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
       directory.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
       nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, NULL);
   if (dir_handle == INVALID_HANDLE_VALUE) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("unable to open directory {}: {}", result.directory_, GetLastError()));
   }
   std::string fii_key(sizeof(FILE_ID_INFO), '\0');
@@ -106,6 +108,7 @@ void WatcherImpl::addWatch(absl::string_view path, uint32_t events, OnChangedCb 
 
   callback_map_[fii_key]->watches_.push_back({file, events, cb});
   ENVOY_LOG(debug, "added watch for file '{}' in directory '{}'", result.file_, result.directory_);
+  return absl::OkStatus();
 }
 
 void WatcherImpl::onDirectoryEvent() {
@@ -117,7 +120,8 @@ void WatcherImpl::onDirectoryEvent() {
       return;
     }
 
-    RELEASE_ASSERT(result.err_ == nullptr, fmt::format("recv errored: {}", result.err_));
+    RELEASE_ASSERT(result.err_ == nullptr,
+                   fmt::format("recv errored: {}", result.err_->getErrorDetails()));
     if (data == 0) {
       // no callbacks to run; this is just a notification that a DirectoryWatch exited
       return;

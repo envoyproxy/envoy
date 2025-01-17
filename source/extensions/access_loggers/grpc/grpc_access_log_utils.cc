@@ -2,9 +2,13 @@
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/stream_info/utility.h"
+#include "source/common/tracing/custom_tag_impl.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,119 +41,128 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x2000000,
+  static_assert(StreamInfo::CoreResponseFlag::LastFlag == 28,
                 "A flag has been added. Fix this code.");
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck)) {
     common_access_log.mutable_response_flags()->set_failed_local_healthcheck(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoHealthyUpstream)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream)) {
     common_access_log.mutable_response_flags()->set_no_healthy_upstream(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout)) {
     common_access_log.mutable_response_flags()->set_upstream_request_timeout(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::LocalReset)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::LocalReset)) {
     common_access_log.mutable_response_flags()->set_local_reset(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRemoteReset)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset)) {
     common_access_log.mutable_response_flags()->set_upstream_remote_reset(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure)) {
     common_access_log.mutable_response_flags()->set_upstream_connection_failure(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionTermination)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionTermination)) {
     common_access_log.mutable_response_flags()->set_upstream_connection_termination(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow)) {
     common_access_log.mutable_response_flags()->set_upstream_overflow(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoRouteFound)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound)) {
     common_access_log.mutable_response_flags()->set_no_route_found(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DelayInjected)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected)) {
     common_access_log.mutable_response_flags()->set_delay_injected(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FaultInjected)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected)) {
     common_access_log.mutable_response_flags()->set_fault_injected(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::RateLimited)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::RateLimited)) {
     common_access_log.mutable_response_flags()->set_rate_limited(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService)) {
     common_access_log.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
         envoy::data::accesslog::v3::ResponseFlags::Unauthorized::EXTERNAL_SERVICE);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::RateLimitServiceError)) {
     common_access_log.mutable_response_flags()->set_rate_limit_service_error(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamConnectionTermination)) {
     common_access_log.mutable_response_flags()->set_downstream_connection_termination(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded)) {
     common_access_log.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::StreamIdleTimeout)) {
     common_access_log.mutable_response_flags()->set_stream_idle_timeout(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::InvalidEnvoyRequestHeaders)) {
     common_access_log.mutable_response_flags()->set_invalid_envoy_request_headers(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
     common_access_log.mutable_response_flags()->set_downstream_protocol_error(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamMaxStreamDurationReached)) {
     common_access_log.mutable_response_flags()->set_upstream_max_stream_duration_reached(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::ResponseFromCacheFilter)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::ResponseFromCacheFilter)) {
     common_access_log.mutable_response_flags()->set_response_from_cache_filter(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoFilterConfigFound)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::NoFilterConfigFound)) {
     common_access_log.mutable_response_flags()->set_no_filter_config_found(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DurationTimeout)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DurationTimeout)) {
     common_access_log.mutable_response_flags()->set_duration_timeout(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamProtocolError)) {
     common_access_log.mutable_response_flags()->set_upstream_protocol_error(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::NoClusterFound)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::NoClusterFound)) {
     common_access_log.mutable_response_flags()->set_no_cluster_found(true);
   }
 
-  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::OverloadManager)) {
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::OverloadManager)) {
     common_access_log.mutable_response_flags()->set_overload_manager(true);
+  }
+
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DnsResolutionFailed)) {
+    common_access_log.mutable_response_flags()->set_dns_resolution_failure(true);
+  }
+
+  if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamRemoteReset)) {
+    common_access_log.mutable_response_flags()->set_downstream_remote_reset(true);
   }
 }
 
 void Utility::extractCommonAccessLogProperties(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
-    const StreamInfo::StreamInfo& stream_info,
-    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
+    const Http::RequestHeaderMap& request_header, const StreamInfo::StreamInfo& stream_info,
+    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+    AccessLog::AccessLogType access_log_type) {
   // TODO(mattklein123): Populate sample_rate field.
   if (stream_info.downstreamAddressProvider().remoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
@@ -166,29 +179,40 @@ void Utility::extractCommonAccessLogProperties(
         *stream_info.downstreamAddressProvider().localAddress(),
         *common_access_log.mutable_downstream_local_address());
   }
+  if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
+    common_access_log.mutable_tls_properties()->set_tls_sni_hostname(
+        MessageUtil::sanitizeUtf8String(
+            stream_info.downstreamAddressProvider().requestedServerName()));
+  }
+  if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
+    common_access_log.mutable_tls_properties()->set_ja3_fingerprint(
+        std::string(stream_info.downstreamAddressProvider().ja3Hash()));
+  }
   if (stream_info.downstreamAddressProvider().sslConnection() != nullptr) {
     auto* tls_properties = common_access_log.mutable_tls_properties();
     const Ssl::ConnectionInfoConstSharedPtr downstream_ssl_connection =
         stream_info.downstreamAddressProvider().sslConnection();
 
-    tls_properties->set_tls_sni_hostname(
-        std::string(stream_info.downstreamAddressProvider().requestedServerName()));
-
     auto* local_properties = tls_properties->mutable_local_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanLocalCertificate()) {
       auto* local_san = local_properties->add_subject_alt_name();
-      local_san->set_uri(uri_san);
+      local_san->set_uri(MessageUtil::sanitizeUtf8String(uri_san));
     }
-    local_properties->set_subject(downstream_ssl_connection->subjectLocalCertificate());
+    local_properties->set_subject(
+        MessageUtil::sanitizeUtf8String(downstream_ssl_connection->subjectLocalCertificate()));
 
     auto* peer_properties = tls_properties->mutable_peer_certificate_properties();
     for (const auto& uri_san : downstream_ssl_connection->uriSanPeerCertificate()) {
       auto* peer_san = peer_properties->add_subject_alt_name();
-      peer_san->set_uri(uri_san);
+      peer_san->set_uri(MessageUtil::sanitizeUtf8String(uri_san));
     }
 
     peer_properties->set_subject(downstream_ssl_connection->subjectPeerCertificate());
-    tls_properties->set_tls_session_id(downstream_ssl_connection->sessionId());
+    peer_properties->set_issuer(
+        MessageUtil::sanitizeUtf8String(downstream_ssl_connection->issuerPeerCertificate()));
+
+    tls_properties->set_tls_session_id(
+        MessageUtil::sanitizeUtf8String(downstream_ssl_connection->sessionId()));
     tls_properties->set_tls_version(
         tlsVersionStringToEnum(downstream_ssl_connection->tlsVersion()));
 
@@ -201,88 +225,148 @@ void Utility::extractCommonAccessLogProperties(
               stream_info.startTime().time_since_epoch())
               .count()));
 
-  absl::optional<std::chrono::nanoseconds> dur = stream_info.lastDownstreamRxByteReceived();
+  absl::optional<std::chrono::nanoseconds> dur = stream_info.requestComplete();
+  if (dur) {
+    common_access_log.mutable_duration()->MergeFrom(
+        Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
+  }
+
+  StreamInfo::TimingUtility timing(stream_info);
+  dur = timing.lastDownstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_last_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.firstUpstreamTxByteSent();
+  dur = timing.firstUpstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_first_upstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.lastUpstreamTxByteSent();
+  dur = timing.lastUpstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_last_upstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.firstUpstreamRxByteReceived();
+  dur = timing.firstUpstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_first_upstream_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.lastUpstreamRxByteReceived();
+  dur = timing.lastUpstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_last_upstream_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.firstDownstreamTxByteSent();
+  dur = timing.firstDownstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_first_downstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.lastDownstreamTxByteSent();
+  dur = timing.lastDownstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_last_downstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  if (stream_info.upstreamHost() != nullptr) {
-    Network::Utility::addressToProtobufAddress(
-        *stream_info.upstreamHost()->address(),
-        *common_access_log.mutable_upstream_remote_address());
-    common_access_log.set_upstream_cluster(stream_info.upstreamHost()->cluster().name());
+  if (stream_info.upstreamInfo().has_value()) {
+    const auto& upstream_info = stream_info.upstreamInfo().value().get();
+    if (upstream_info.upstreamHost() != nullptr) {
+      Network::Utility::addressToProtobufAddress(
+          *upstream_info.upstreamHost()->address(),
+          *common_access_log.mutable_upstream_remote_address());
+      common_access_log.set_upstream_cluster(upstream_info.upstreamHost()->cluster().name());
+    }
+    if (upstream_info.upstreamLocalAddress() != nullptr) {
+      Network::Utility::addressToProtobufAddress(
+          *upstream_info.upstreamLocalAddress(),
+          *common_access_log.mutable_upstream_local_address());
+    }
+    if (!upstream_info.upstreamTransportFailureReason().empty()) {
+      common_access_log.set_upstream_transport_failure_reason(
+          upstream_info.upstreamTransportFailureReason());
+    }
   }
-
   if (!stream_info.getRouteName().empty()) {
     common_access_log.set_route_name(stream_info.getRouteName());
   }
+  if (stream_info.attemptCount().has_value()) {
+    common_access_log.set_upstream_request_attempt_count(stream_info.attemptCount().value());
+  }
+  if (stream_info.connectionTerminationDetails().has_value()) {
+    common_access_log.set_connection_termination_details(
+        stream_info.connectionTerminationDetails().value());
+  }
 
-  if (stream_info.upstreamLocalAddress() != nullptr) {
-    Network::Utility::addressToProtobufAddress(*stream_info.upstreamLocalAddress(),
-                                               *common_access_log.mutable_upstream_local_address());
-  }
   responseFlagsToAccessLogResponseFlags(common_access_log, stream_info);
-  if (!stream_info.upstreamTransportFailureReason().empty()) {
-    common_access_log.set_upstream_transport_failure_reason(
-        stream_info.upstreamTransportFailureReason());
-  }
   if (stream_info.dynamicMetadata().filter_metadata_size() > 0) {
     common_access_log.mutable_metadata()->MergeFrom(stream_info.dynamicMetadata());
   }
 
   for (const auto& key : config.filter_state_objects_to_log()) {
-    if (stream_info.filterState().hasDataWithName(key)) {
-      const auto& obj =
-          stream_info.filterState().getDataReadOnly<StreamInfo::FilterState::Object>(key);
-      ProtobufTypes::MessagePtr serialized_proto = obj.serializeAsProto();
-      if (serialized_proto != nullptr) {
-        auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
-        ProtobufWkt::Any& any = filter_state_objects[key];
-        if (dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()) != nullptr) {
-          any.Swap(dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()));
-        } else {
-          any.PackFrom(*serialized_proto);
-        }
+    if (!(extractFilterStateData(stream_info.filterState(), key, common_access_log))) {
+      if (stream_info.upstreamInfo().has_value() &&
+          stream_info.upstreamInfo()->upstreamFilterState() != nullptr) {
+        extractFilterStateData(*(stream_info.upstreamInfo()->upstreamFilterState()), key,
+                               common_access_log);
       }
     }
   }
+
+  Tracing::ReadOnlyHttpTraceContext trace_context(request_header);
+  Tracing::CustomTagContext ctx{trace_context, stream_info};
+  for (const auto& custom_tag : config.custom_tags()) {
+    const auto tag_applier = Tracing::CustomTagUtility::createCustomTag(custom_tag);
+    tag_applier->applyLog(common_access_log, ctx);
+  }
+
+  // If the stream is not complete, then this log entry is intermediate log entry.
+  if (!stream_info.requestComplete().has_value()) {
+    common_access_log.set_intermediate_log_entry(true); // Deprecated field
+  }
+
+  // Set stream unique id from the stream info.
+  if (auto provider = stream_info.getStreamIdProvider(); provider.has_value()) {
+    common_access_log.set_stream_id(std::string(provider->toStringView().value_or("")));
+  }
+
+  if (const auto& reason = stream_info.downstreamTransportFailureReason(); !reason.empty()) {
+    common_access_log.set_downstream_transport_failure_reason(reason);
+  }
+
+  if (const auto& bytes_meter = stream_info.getDownstreamBytesMeter(); bytes_meter != nullptr) {
+    common_access_log.set_downstream_wire_bytes_sent(bytes_meter->wireBytesSent());
+    common_access_log.set_downstream_wire_bytes_received(bytes_meter->wireBytesReceived());
+  }
+  if (const auto& bytes_meter = stream_info.getUpstreamBytesMeter(); bytes_meter != nullptr) {
+    common_access_log.set_upstream_wire_bytes_sent(bytes_meter->wireBytesSent());
+    common_access_log.set_upstream_wire_bytes_received(bytes_meter->wireBytesReceived());
+  }
+
+  common_access_log.set_access_log_type(access_log_type);
+}
+
+bool extractFilterStateData(const StreamInfo::FilterState& filter_state, const std::string& key,
+                            envoy::data::accesslog::v3::AccessLogCommon& common_access_log) {
+  if (auto state = filter_state.getDataReadOnlyGeneric(key); state != nullptr) {
+    ProtobufTypes::MessagePtr serialized_proto = state->serializeAsProto();
+    if (serialized_proto != nullptr) {
+      auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
+      ProtobufWkt::Any& any = filter_state_objects[key];
+      if (dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()) != nullptr) {
+        any.Swap(dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()));
+      } else {
+        any.PackFrom(*serialized_proto);
+      }
+    }
+    return true;
+  }
+  return false;
 }
 
 } // namespace GrpcCommon

@@ -13,11 +13,11 @@ envoy_cc_library(
     name = "compressor_lib",
     srcs = ["brotli_compressor_impl.cc"],
     hdrs = ["brotli_compressor_impl.h"],
-    external_deps = ["brotlienc"],
     deps = [
         "//envoy/compression/compressor:compressor_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/compression/brotli/common:brotli_base_lib",
+        "@org_brotli//:brotlienc",
     ],
 )
 

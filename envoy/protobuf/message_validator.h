@@ -1,7 +1,9 @@
 #pragma once
 
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
+#include "envoy/runtime/runtime.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -9,24 +11,6 @@
 
 namespace Envoy {
 namespace ProtobufMessage {
-
-/**
- * Exception class for reporting validation errors due to the presence of unknown
- * fields in a protobuf.
- */
-class UnknownProtoFieldException : public EnvoyException {
-public:
-  UnknownProtoFieldException(const std::string& message) : EnvoyException(message) {}
-};
-
-/**
- * Exception class for reporting validation errors due to the presence of deprecated
- * fields in a protobuf.
- */
-class DeprecatedProtoFieldException : public EnvoyException {
-public:
-  DeprecatedProtoFieldException(const std::string& message) : EnvoyException(message) {}
-};
 
 /**
  * Visitor interface for a Protobuf::Message. The methods of ValidationVisitor are invoked to
@@ -40,8 +24,9 @@ public:
   /**
    * Invoked when an unknown field is encountered.
    * @param description human readable description of the field.
+   * @return a status indicating if an unknown field was found.
    */
-  virtual void onUnknownField(absl::string_view description) PURE;
+  virtual absl::Status onUnknownField(absl::string_view description) PURE;
 
   /**
    * If true, skip this validation visitor in the interest of speed when
@@ -53,9 +38,20 @@ public:
    * Invoked when deprecated field is encountered.
    * @param description human readable description of the field.
    * @param soft_deprecation is set to true, visitor would log a warning message, otherwise would
-   * throw an exception.
+   * return an error
    */
-  virtual void onDeprecatedField(absl::string_view description, bool soft_deprecation) PURE;
+  virtual absl::Status onDeprecatedField(absl::string_view description, bool soft_deprecation) PURE;
+
+  /**
+   * Called when a message or field is marked as work in progress or a message is contained in a
+   * proto file marked as work in progress.
+   */
+  virtual void onWorkInProgress(absl::string_view description) PURE;
+
+  /**
+   * Called to update runtime stats on deprecated fields.
+   */
+  virtual OptRef<Runtime::Loader> runtime() PURE;
 };
 
 class ValidationContext {

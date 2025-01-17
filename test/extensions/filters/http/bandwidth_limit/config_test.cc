@@ -11,8 +11,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BandwidthLimitFilter {
 
-using EnableMode =
-    envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit_EnableMode;
+using EnableMode = envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit_EnableMode;
 
 TEST(Factory, GlobalEmptyConfig) {
   const std::string yaml = R"(
@@ -25,8 +24,8 @@ TEST(Factory, GlobalEmptyConfig) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
-  auto callback = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_CALL(context.server_factory_context_.dispatcher_, createTimer_(_)).Times(0);
+  auto callback = factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   callback(filter_callback);
@@ -38,6 +37,8 @@ TEST(Factory, RouteSpecificFilterConfig) {
   enable_mode: REQUEST_AND_RESPONSE
   limit_kbps: 10
   fill_interval: 0.1s
+  enable_response_trailers: true
+  response_trailer_prefix: test
   )";
 
   BandwidthLimitFilterConfig factory;
@@ -47,13 +48,21 @@ TEST(Factory, RouteSpecificFilterConfig) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
-  const auto route_config = factory.createRouteSpecificFilterConfig(
-      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  const auto route_config =
+      factory
+          .createRouteSpecificFilterConfig(*proto_config, context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
   EXPECT_EQ(config->limit(), 10);
   EXPECT_EQ(config->fillInterval().count(), 100);
   EXPECT_EQ(config->enableMode(), EnableMode::BandwidthLimit_EnableMode_REQUEST_AND_RESPONSE);
   EXPECT_FALSE(config->tokenBucket() == nullptr);
+  EXPECT_EQ(config->enableResponseTrailers(), true);
+  EXPECT_EQ(const_cast<FilterConfig*>(config)->requestDelayTrailer(),
+            Http::LowerCaseString("test-bandwidth-request-delay-ms"));
+  EXPECT_EQ(const_cast<FilterConfig*>(config)->responseDelayTrailer(),
+            Http::LowerCaseString("test-bandwidth-response-delay-ms"));
 }
 
 TEST(Factory, RouteSpecificFilterConfigDisabledByDefault) {
@@ -70,15 +79,18 @@ TEST(Factory, RouteSpecificFilterConfigDisabledByDefault) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
-  const auto route_config = factory.createRouteSpecificFilterConfig(
-      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  const auto route_config =
+      factory
+          .createRouteSpecificFilterConfig(*proto_config, context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
   EXPECT_EQ(config->enableMode(), EnableMode::BandwidthLimit_EnableMode_DISABLED);
   EXPECT_EQ(config->limit(), 10);
   EXPECT_EQ(config->fillInterval().count(), 100);
 }
 
-TEST(Factory, RouteSpecificFilterConfigDefaultFillInterval) {
+TEST(Factory, RouteSpecificFilterConfigDefault) {
   const std::string config_yaml = R"(
   stat_prefix: test
   enable_mode: REQUEST_AND_RESPONSE
@@ -92,11 +104,20 @@ TEST(Factory, RouteSpecificFilterConfigDefaultFillInterval) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_CALL(context.dispatcher_, createTimer_(_)).Times(0);
-  const auto route_config = factory.createRouteSpecificFilterConfig(
-      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  const auto route_config =
+      factory
+          .createRouteSpecificFilterConfig(*proto_config, context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
   EXPECT_EQ(config->limit(), 10);
   EXPECT_EQ(config->fillInterval().count(), 50);
+  // default trailers
+  EXPECT_EQ(config->enableResponseTrailers(), false);
+  EXPECT_EQ(const_cast<FilterConfig*>(config)->requestDelayTrailer(),
+            Http::LowerCaseString("bandwidth-request-delay-ms"));
+  EXPECT_EQ(const_cast<FilterConfig*>(config)->responseDelayTrailer(),
+            Http::LowerCaseString("bandwidth-response-delay-ms"));
 }
 
 TEST(Factory, PerRouteConfigNoLimits) {
@@ -109,9 +130,9 @@ TEST(Factory, PerRouteConfigNoLimits) {
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_THROW(factory.createRouteSpecificFilterConfig(*proto_config, context,
-                                                       ProtobufMessage::getNullValidationVisitor()),
-               EnvoyException);
+  const auto result = factory.createRouteSpecificFilterConfig(
+      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_EQ(result.status().message(), "limit must be set for per route filter config");
 }
 } // namespace BandwidthLimitFilter
 } // namespace HttpFilters

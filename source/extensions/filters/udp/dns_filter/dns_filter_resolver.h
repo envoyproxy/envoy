@@ -3,6 +3,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
 namespace Envoy {
@@ -18,13 +19,15 @@ enum class DnsFilterResolverStatus { Pending, Complete, TimedOut };
  */
 class DnsFilterResolver : Logger::Loggable<Logger::Id::filter> {
 public:
-  DnsFilterResolver(DnsFilterResolverCallback& callback, AddressConstPtrVec resolvers,
-                    std::chrono::milliseconds timeout, Event::Dispatcher& dispatcher,
-                    uint64_t max_pending_lookups,
-                    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options)
-      : timeout_(timeout), dispatcher_(dispatcher),
-        resolver_(dispatcher.createDnsResolver(resolvers, dns_resolver_options)),
-        callback_(callback), max_pending_lookups_(max_pending_lookups) {}
+  DnsFilterResolver(DnsFilterResolverCallback& callback, std::chrono::milliseconds timeout,
+                    Event::Dispatcher& dispatcher, uint64_t max_pending_lookups,
+                    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+                    const Network::DnsResolverFactory& dns_resolver_factory, Api::Api& api)
+      : timeout_(timeout), dispatcher_(dispatcher), callback_(callback),
+        max_pending_lookups_(max_pending_lookups),
+        resolver_(THROW_OR_RETURN_VALUE(
+            dns_resolver_factory.createDnsResolver(dispatcher, api, typed_dns_resolver_config),
+            Network::DnsResolverSharedPtr)) {}
   /**
    * @brief entry point to resolve the name in a DnsQueryRecord
    *
@@ -64,10 +67,15 @@ private:
 
   std::chrono::milliseconds timeout_;
   Event::Dispatcher& dispatcher_;
-  const Network::DnsResolverSharedPtr resolver_;
   DnsFilterResolverCallback& callback_;
   absl::flat_hash_map<const DnsQueryRecord*, LookupContext> lookups_;
   uint64_t max_pending_lookups_;
+
+  // The order of members is important. If the lookups_'s destructor is called before the
+  // resolver_'s destructor and some c-ares queries were in progress, then the DnsFilterResolver's
+  // callback function may try to write to the lookups_ hash map, which could cause issues. To avoid
+  // this problem, the resolver_ should be destroyed before the lookups_.
+  const Network::DnsResolverSharedPtr resolver_;
 };
 
 using DnsFilterResolverPtr = std::unique_ptr<DnsFilterResolver>;

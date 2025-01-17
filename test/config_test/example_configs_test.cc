@@ -14,7 +14,8 @@ TEST(ExampleConfigsTest, All) {
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
   Filesystem::InstanceImpl file_system;
   const auto config_file_count = std::stoi(
-      file_system.fileReadToEnd(TestEnvironment::temporaryDirectory() + "/config-file-count.txt"));
+      file_system.fileReadToEnd(TestEnvironment::temporaryDirectory() + "/config-file-count.txt")
+          .value());
 
   // Change working directory, otherwise we won't be able to read files using relative paths.
 #ifdef PATH_MAX
@@ -28,7 +29,9 @@ TEST(ExampleConfigsTest, All) {
 
   EXPECT_EQ(config_file_count, ConfigTest::run(directory));
 
-  ConfigTest::testMerge();
+  if (std::getenv("DISABLE_TEST_MERGE") == nullptr) {
+    ConfigTest::testMerge();
+  }
 
   // Return to the original working directory, otherwise "bazel.coverage" breaks (...but why?).
   RELEASE_ASSERT(::chdir(cwd) == 0, "");

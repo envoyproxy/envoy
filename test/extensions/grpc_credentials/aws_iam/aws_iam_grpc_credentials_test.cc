@@ -4,12 +4,15 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/grpc/google_async_client_impl.h"
+#include "source/extensions/common/aws/signer.h"
+#include "source/extensions/grpc_credentials/aws_iam/config.h"
 
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 #include "test/integration/fake_upstream.h"
 #include "test/test_common/environment.h"
 
 #include "absl/strings/match.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -145,7 +148,7 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_NoRegion) {
   region_name_ = "test_region_env";
   region_location_ = RegionLocation::NotProvided;
   credentials_factory_name_ = "envoy.grpc_credentials.aws_iam";
-  EXPECT_THROW_WITH_REGEX(initialize();, EnvoyException, "AWS region");
+  EXPECT_THROW_WITH_REGEX(initialize();, EnvoyException, "Region string");
 }
 
 TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_UnexpectedCallCredentials) {
@@ -156,6 +159,55 @@ TEST_P(GrpcAwsIamClientIntegrationTest, AwsIamGrpcAuth_UnexpectedCallCredentials
   auto request = createRequest(empty_metadata_);
   request->sendReply();
   dispatcher_helper_.runDispatcher();
+}
+
+class MockSigner : public Envoy::Extensions::Common::Aws::Signer {
+public:
+  ~MockSigner() override = default;
+  absl::Status sign(Http::RequestMessage&, bool, absl::string_view) override {
+    return absl::NotFoundError("test");
+  };
+  absl::Status signEmptyPayload(Http::RequestHeaderMap&, const absl::string_view = "") override {
+    return absl::OkStatus();
+  };
+  absl::Status signUnsignedPayload(Http::RequestHeaderMap&, const absl::string_view = "") override {
+    return absl::OkStatus();
+  };
+  absl::Status sign(Http::RequestHeaderMap&, const std::string&,
+                    const absl::string_view = "") override {
+    return absl::OkStatus();
+  };
+};
+
+class MockAuthContext : public ::grpc::AuthContext {
+public:
+  ~MockAuthContext() override = default;
+  MOCK_METHOD(bool, IsPeerAuthenticated, (), (const, override));
+  MOCK_METHOD(std::vector<grpc::string_ref>, GetPeerIdentity, (), (const, override));
+  MOCK_METHOD(std::string, GetPeerIdentityPropertyName, (), (const, override));
+  MOCK_METHOD(std::vector<grpc::string_ref>, FindPropertyValues, (const std::string& name),
+              (const, override));
+  MOCK_METHOD(::grpc::AuthPropertyIterator, begin, (), (const, override));
+  MOCK_METHOD(::grpc::AuthPropertyIterator, end, (), (const, override));
+  MOCK_METHOD(void, AddProperty, (const std::string& key, const grpc::string_ref& value),
+              (override));
+  MOCK_METHOD(bool, SetPeerIdentityPropertyName, (const std::string& name), (override));
+};
+
+TEST(GrpcAwsIamClientTest, AwsIamGrpcAuth_SignerError) {
+
+  auto testAwsIamHeaderAuthenticator =
+      Extensions::GrpcCredentials::AwsIam::AwsIamHeaderAuthenticator(
+          std::make_unique<MockSigner>());
+
+  std::string url = "https://a.example.org/test";
+  grpc::string_ref urlGs(url.data(), url.size());
+  std::string method = "POST";
+  grpc::string_ref methodGs(method.data(), method.size());
+  MockAuthContext context;
+  std::multimap<grpc::string, grpc::string> metadata;
+  auto status = testAwsIamHeaderAuthenticator.GetMetadata(urlGs, methodGs, context, &metadata);
+  EXPECT_EQ(status.error_code(), grpc::StatusCode::INTERNAL);
 }
 
 } // namespace

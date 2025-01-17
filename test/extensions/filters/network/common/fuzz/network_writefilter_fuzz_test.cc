@@ -5,6 +5,7 @@
 #include "test/config/utility.h"
 #include "test/extensions/filters/network/common/fuzz/network_writefilter_fuzz.pb.validate.h"
 #include "test/extensions/filters/network/common/fuzz/uber_writefilter.h"
+#include "test/extensions/filters/network/common/fuzz/validated_input_generator_any_map_extensions.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {
@@ -27,13 +28,20 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::network::FilterFuzzTestCase
         if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
             std::end(filter_names)) {
           absl::string_view filter_name = filter_names[seed % filter_names.size()];
-          input->mutable_config()->set_name(std::string(filter_name));
+          if (filter_name != input->config().name()) {
+            // Clear old config, or unpacking non-suitable value may crash.
+            input->mutable_config()->clear_typed_config();
+            input->mutable_config()->set_name(std::string(filter_name));
+          }
         }
         // Set the corresponding type_url for Any.
         auto& factory = factories.at(input->config().name());
         input->mutable_config()->mutable_typed_config()->set_type_url(
             absl::StrCat("type.googleapis.com/",
                          factory->createEmptyConfigProto()->GetDescriptor()->full_name()));
+        ProtobufMessage::ValidatedInputGenerator generator(
+            seed, ProtobufMessage::composeFiltersAnyMap(), 20);
+        ProtobufMessage::traverseMessage(generator, *input, true);
       }};
   try {
     TestUtility::validate(input);

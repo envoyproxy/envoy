@@ -12,7 +12,7 @@ Envoy also has support for transmitting and receiving generic ``TCP`` traffic wi
 
 Envoy also offers a number of other ``HTTP``-based protocols for authentication and authorization
 such as :ref:`JWT <arch_overview_jwt_authn>`, :ref:`RBAC <arch_overview_rbac>`
-and :ref:`OAuth <envoy_v3_api_file_envoy/extensions/filters/http/oauth2/v3alpha/oauth.proto>`.
+and :ref:`OAuth <envoy_v3_api_file_envoy/extensions/filters/http/oauth2/v3/oauth.proto>`.
 
 .. warning::
 
@@ -46,8 +46,8 @@ You will also need to provide valid certificates.
 .. literalinclude:: _include/envoy-demo-tls.yaml
    :language: yaml
    :linenos:
-   :lines: 1-37
-   :emphasize-lines: 28-37
+   :lines: 1-40
+   :emphasize-lines: 30-39
    :caption: :download:`envoy-demo-tls.yaml <_include/envoy-demo-tls.yaml>`
 
 Connecting to an "upstream" ``TLS`` service is conversely done by adding an
@@ -58,9 +58,9 @@ to the :ref:`transport_socket <extension_envoy.transport_sockets.tls>` of a
 .. literalinclude:: _include/envoy-demo-tls.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 39
-   :lines: 39-56
-   :emphasize-lines: 15-18
+   :lineno-start: 40
+   :lines: 40-58
+   :emphasize-lines: 15-19
    :caption: :download:`envoy-demo-tls.yaml <_include/envoy-demo-tls.yaml>`
 
 .. _start_quick_start_securing_validation:
@@ -81,26 +81,33 @@ Firstly, you can ensure that the certificates are from a mutually trusted certif
    :linenos:
    :lineno-start: 42
    :lines: 42-52
-   :emphasize-lines: 6-9
+   :emphasize-lines: 8-11
    :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
 
-You can also ensure that the "Subject Alternative Names" for the cerficate match.
+You should also ensure that the Subject Alternative Names (SANs) for the certificate match.
 
 This is commonly used by web certificates (X.509) to identify the domain or domains that a
 certificate is valid for.
 
+For the most common case where the certificate should have a SAN matching the :ref:`SNI <start_quick_start_securing_sni_client>`
+which was sent, you can enable :ref:`auto_sni_san_validation <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.auto_sni_san_validation>`
+and omit :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`
+in the validation context.
+
+To validate that a certificate has a SAN matching the downstream request ``host`` or ``:authority`` header, you can enable
+:ref:`auto_san_validation <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_san_validation>`.
+
+When multiple validation options are configured, ``auto_san_validation`` has the highest priority, followed by ``auto_sni_san_validation``,
+followed by ``match_typed_subject_alt_names``.
+
 .. literalinclude:: _include/envoy-demo-tls-validation.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 42
-   :lines: 42-52
+   :lineno-start: 44
+   :lines: 44-54
    :emphasize-lines: 6-7, 10-11
    :caption: :download:`envoy-demo-tls-validation.yaml <_include/envoy-demo-tls-validation.yaml>`
 
-.. note::
-
-   If the "Subject Alternative Names" for a certificate are for a wildcard domain, eg ``*.example.com``,
-   this is what you should use when matching with ``match_subject_alt_names``.
 
 .. note::
 
@@ -121,22 +128,22 @@ and specify a mutually trusted certificate authority:
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 27
-   :lines: 27-39
+   :lineno-start: 29
+   :lines: 29-43
    :emphasize-lines: 6, 8-10
    :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
 
 You can further restrict the authentication of connecting clients by specifying the allowed
 "Subject Alternative Names" in
-:ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`,
+:ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`,
 similar to validating upstream certificates :ref:`described above <start_quick_start_securing_validation>`.
 
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 27
-   :lines: 27-39
-   :emphasize-lines: 7, 11-12
+   :lineno-start: 29
+   :lines: 29-43
+   :emphasize-lines: 7, 11-14
    :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
 
 .. note::
@@ -154,9 +161,9 @@ When connecting to an upstream with client certificates you can set them as foll
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 44
-   :lines: 44-68
-   :emphasize-lines: 20-25
+   :lineno-start: 46
+   :lines: 46-70
+   :emphasize-lines: 22-25
    :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
 
 .. _start_quick_start_securing_sni:
@@ -174,8 +181,8 @@ To secure specific domains on a listening connection with ``SNI``, you should se
 .. literalinclude:: _include/envoy-demo-tls-sni.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 27
-   :lines: 27-35
+   :lineno-start: 29
+   :lines: 29-37
    :emphasize-lines: 2-4
    :caption: :download:`envoy-demo-tls-sni.yaml <_include/envoy-demo-tls-sni.yaml>`
 
@@ -195,8 +202,8 @@ This will usually be the DNS name of the service you are connecting to.
 .. literalinclude:: _include/envoy-demo-tls-sni.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 55
-   :lines: 55-60
+   :lineno-start: 57
+   :lines: 57-62
    :emphasize-lines: 6
    :caption: :download:`envoy-demo-tls-sni.yaml <_include/envoy-demo-tls-sni.yaml>`
 
@@ -204,3 +211,16 @@ When connecting to an Envoy endpoint that is protected by ``SNI``, this must mat
 :ref:`server_names <envoy_v3_api_field_config.listener.v3.FilterChainMatch.server_names>` set in the endpoint's
 :ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChainMatch>`, as
 :ref:`described above <start_quick_start_securing_sni>`.
+
+To derive SNI from a downstream HTTP header ``host`` or ``:authority``, turn on
+:ref:`auto_sni <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.auto_sni>` to override the fixed SNI in
+:ref:`UpstreamTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.UpstreamTlsContext>`. A custom header other than
+the ``host`` or ``:authority`` can also be supplied using the optional
+:ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>` field.
+
+To derive SNI from the host Envoy is connecting to, turn on :ref:`auto_host_sni
+<envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.auto_host_sni>`, which will use the hostname
+of the upstream endpoint.
+
+When multiple options are configured, ``auto_sni`` has the highest priority, followed by ``auto_host_sni``, followed by
+the fixed ``sni``.

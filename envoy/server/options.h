@@ -8,6 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
@@ -84,6 +85,18 @@ public:
   virtual bool useDynamicBaseId() const PURE;
 
   /**
+   * @return bool don't get hot restart information from the parent if the communication channel
+   *         to the parent instance fails to connect.
+   */
+  virtual bool skipHotRestartOnNoParent() const PURE;
+
+  /**
+   * @return bool don't get stats from the parent. If there are a lot of stats, getting them
+   *         from the parent instance can be slow and require a lot of memory.
+   */
+  virtual bool skipHotRestartParentStats() const PURE;
+
+  /**
    * @return const std::string& the dynamic base id output file.
    */
   virtual const std::string& baseIdPath() const PURE;
@@ -127,11 +140,6 @@ public:
   virtual const envoy::config::bootstrap::v3::Bootstrap& configProto() const PURE;
 
   /**
-   * @return const absl::optional<uint32_t>& the bootstrap version to use, if specified.
-   */
-  virtual const absl::optional<uint32_t>& bootstrapVersion() const PURE;
-
-  /**
    * @return bool allow unknown fields in the static configuration?
    */
   virtual bool allowUnknownStaticFields() const PURE;
@@ -145,6 +153,11 @@ public:
    * @return bool ignore unknown fields in the dynamic configuration?
    **/
   virtual bool ignoreUnknownDynamicFields() const PURE;
+
+  /**
+   * @return bool skip deprecated warning log messages?
+   **/
+  virtual bool skipDeprecatedLogs() const PURE;
 
   /**
    * @return const std::string& the admin address output file.
@@ -174,12 +187,17 @@ public:
   virtual const std::string& logFormat() const PURE;
 
   /**
+   * @return whether or not a log format was set by CLI option.
+   */
+  virtual bool logFormatSet() const PURE;
+
+  /**
    * @return const bool indicating whether to escape c-style escape sequences in logs.
    */
   virtual bool logFormatEscaped() const PURE;
 
   /**
-   * @return const bool logger mode: whether to use Fancy Logger.
+   * @return const bool logger mode: whether to use Fine-Grain Logger.
    */
   virtual bool enableFineGrainLogging() const PURE;
 
@@ -264,6 +282,12 @@ public:
    * @return the mode of socket file.
    */
   virtual mode_t socketMode() const PURE;
+
+  /**
+   * @return the stats tags provided by the cli. Tags may contain duplicates. It is the
+   * responsibility of the caller to handle the duplicates.
+   */
+  virtual const Stats::TagVector& statsTags() const PURE;
 };
 
 } // namespace Server

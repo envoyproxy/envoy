@@ -18,6 +18,7 @@
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/options.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/ssl/context.h"
@@ -32,7 +33,7 @@ namespace Envoy {
 namespace Upstream {
 
 /**
- * Context passed to cluster factory to access envoy resources. Cluster factory should only access
+ * Context passed to cluster factory to access Envoy resources. Cluster factory should only access
  * the rest of the server through this context object.
  */
 class ClusterFactoryContext {
@@ -40,30 +41,29 @@ public:
   virtual ~ClusterFactoryContext() = default;
 
   /**
-   * @return bool flag indicating whether the cluster is added via api.
+   * @return Server::Configuration::ServerFactoryContext& the server factory context. All the
+   *         server-wide resources should be accessed through this context.
    */
-  virtual bool addedViaApi() PURE;
-
-  /**
-   * @return Server::Admin& the server's admin interface.
-   */
-  virtual Server::Admin& admin() PURE;
-
-  /**
-   * @return Api::Api& a reference to the api object.
-   */
-  virtual Api::Api& api() PURE;
+  virtual Server::Configuration::ServerFactoryContext& serverFactoryContext() PURE;
 
   /**
    * @return Upstream::ClusterManager& singleton for use by the entire server.
+   * TODO(wbpcode): clusterManager() of ServerFactoryContext still be invalid when loading
+   * static cluster. So we need to provide an cluster manager reference here.
+   * This could be removed after https://github.com/envoyproxy/envoy/issues/26653 is resolved.
    */
-  virtual ClusterManager& clusterManager() PURE;
+  virtual Upstream::ClusterManager& clusterManager() PURE;
 
   /**
-   * @return Event::Dispatcher& the main thread's dispatcher. This dispatcher should be used
-   *         for all singleton processing.
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for cluster configuration
+   * messages.
    */
-  virtual Event::Dispatcher& dispatcher() PURE;
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
+   * @return bool flag indicating whether the cluster is added via api.
+   */
+  virtual bool addedViaApi() PURE;
 
   /**
    * @return Network::DnsResolverSharedPtr the dns resolver for the server.
@@ -71,55 +71,14 @@ public:
   virtual Network::DnsResolverSharedPtr dnsResolver() PURE;
 
   /**
-   * @return information about the local environment the server is running in.
-   */
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
-
-  /**
-   * @return Server::Options& the command-line options that Envoy was started with.
-   */
-  virtual const Server::Options& options() PURE;
-
-  /**
-   * @return AccessLogManager for use by the entire server.
-   */
-  virtual AccessLog::AccessLogManager& logManager() PURE;
-
-  /**
-   * @return Runtime::Loader& the singleton runtime loader for the server.
-   */
-  virtual Runtime::Loader& runtime() PURE;
-
-  /**
-   * @return Singleton::Manager& the server-wide singleton manager.
-   */
-  virtual Singleton::Manager& singletonManager() PURE;
-
-  /**
    * @return Ssl::ContextManager& the SSL context manager.
    */
   virtual Ssl::ContextManager& sslContextManager() PURE;
 
   /**
-   * @return the server-wide stats store.
-   */
-  virtual Stats::Store& stats() PURE;
-
-  /**
-   * @return the server's TLS slot allocator.
-   */
-  virtual ThreadLocal::SlotAllocator& tls() PURE;
-
-  /**
    * @return Outlier::EventLoggerSharedPtr sink for outlier detection event logs.
    */
   virtual Outlier::EventLoggerSharedPtr outlierEventLogger() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration
-   *         messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
 /**
@@ -135,10 +94,10 @@ public:
    * with the provided parameters, it should throw an EnvoyException in the case of general error.
    * @param cluster supplies the general protobuf configuration for the cluster.
    * @param context supplies the cluster's context.
-   * @return a pair containing the cluster instance as well as an option thread aware load
-   *         balancer if this cluster has an integrated load balancer.
+   * @return a pair containing the cluster instance as well as an option thread aware load balancer
+   * if this cluster has an integrated load balancer or an absl::Satus error on failure.
    */
-  virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
+  virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   create(const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.clusters"; }

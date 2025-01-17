@@ -9,6 +9,7 @@ envoy_package()
 
 exports_files([
     "server.yaml",
+    "server_multiple_addresses.yaml",
     "server_unix_listener.yaml",
 ])
 
@@ -35,7 +36,9 @@ filegroup(
 filegroup(
     name = "server_config_files",
     srcs = [
+        "empty.yaml",
         "server.yaml",
+        "server_multiple_addresses.yaml",
         "server_unix_listener.yaml",
     ],
 )

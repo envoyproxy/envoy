@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <memory>
+#include <vector>
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -13,13 +15,14 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/common/version/version.h"
+#include "source/server/instance_impl.h"
 #include "source/server/process_context_impl.h"
-#include "source/server/server.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
+#include "test/mocks/common.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
@@ -31,6 +34,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -55,6 +59,7 @@ namespace {
 TEST(ServerInstanceUtil, flushHelper) {
   InSequence s;
 
+  NiceMock<Upstream::MockClusterManager> cm;
   Stats::TestUtil::TestStore store;
   Event::SimulatedTimeSystem time_system;
   Stats::Counter& c = store.counter("hello");
@@ -64,7 +69,7 @@ TEST(ServerInstanceUtil, flushHelper) {
   store.textReadout("text").set("is important");
 
   std::list<Stats::SinkPtr> sinks;
-  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
   // Make sure that counters have been latched even if there are no sinks.
   EXPECT_EQ(1UL, c.value());
   EXPECT_EQ(0, c.latch());
@@ -85,20 +90,74 @@ TEST(ServerInstanceUtil, flushHelper) {
     EXPECT_EQ(snapshot.textReadouts()[0].get().value(), "is important");
   }));
   c.inc();
-  InstanceUtil::flushMetricsToSinks(sinks, store, time_system);
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 
   // Histograms don't currently work with the isolated store so test those with a mock store.
   NiceMock<Stats::MockStore> mock_store;
   Stats::ParentHistogramSharedPtr parent_histogram(new Stats::MockParentHistogram());
   std::vector<Stats::ParentHistogramSharedPtr> parent_histograms = {parent_histogram};
-  ON_CALL(mock_store, histograms).WillByDefault(Return(parent_histograms));
+  ON_CALL(mock_store, forEachSinkedHistogram)
+      .WillByDefault([&](std::function<void(std::size_t)> f_size,
+                         std::function<void(Stats::ParentHistogram&)> f_stat) {
+        if (f_size != nullptr) {
+          f_size(parent_histograms.size());
+        }
+        for (auto& histogram : parent_histograms) {
+          f_stat(*histogram);
+        }
+      });
   EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
     EXPECT_TRUE(snapshot.counters().empty());
     EXPECT_TRUE(snapshot.gauges().empty());
     EXPECT_EQ(snapshot.histograms().size(), 1);
     EXPECT_TRUE(snapshot.textReadouts().empty());
   }));
-  InstanceUtil::flushMetricsToSinks(sinks, mock_store, time_system);
+  InstanceUtil::flushMetricsToSinks(sinks, mock_store, cm, time_system);
+}
+
+TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
+  InSequence s;
+
+  NiceMock<Upstream::MockClusterManager> cm;
+  Stats::TestUtil::TestStore store;
+  Event::SimulatedTimeSystem time_system;
+  Stats::Counter& c = store.counter("hello");
+  c.inc();
+  store.gauge("world", Stats::Gauge::ImportMode::Accumulate).set(5);
+  store.gauge("again", Stats::Gauge::ImportMode::Uninitialized).set(10);
+
+  std::list<Stats::SinkPtr> sinks;
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
+  // Make sure that counters have been latched even if there are no sinks.
+  EXPECT_EQ(1UL, c.value());
+  EXPECT_EQ(0, c.latch());
+
+  Stats::MockSink* sink = new StrictMock<Stats::MockSink>();
+  sinks.emplace_back(sink);
+  EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
+    ASSERT_EQ(snapshot.counters().size(), 1);
+    EXPECT_EQ(snapshot.counters()[0].counter_.get().name(), "hello");
+    EXPECT_EQ(snapshot.counters()[0].delta_, 1);
+
+    ASSERT_EQ(snapshot.gauges().size(), 2);
+    auto world_it = std::find_if(snapshot.gauges().begin(), snapshot.gauges().end(),
+                                 [](const std::reference_wrapper<const Stats::Gauge>& gauge) {
+                                   return gauge.get().name().compare("world") == 0;
+                                 });
+    ASSERT_TRUE(world_it != snapshot.gauges().end());
+    EXPECT_EQ(world_it->get().value(), 5);
+
+    auto again_it = std::find_if(snapshot.gauges().begin(), snapshot.gauges().end(),
+                                 [](const std::reference_wrapper<const Stats::Gauge>& gauge) {
+                                   return gauge.get().name().compare("again") == 0;
+                                 });
+    ASSERT_TRUE(again_it != snapshot.gauges().end());
+    EXPECT_EQ(again_it->get().value(), 10);
+
+    ASSERT_EQ(snapshot.textReadouts().size(), 0);
+  }));
+  c.inc();
+  InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 }
 
 class RunHelperTest : public testing::Test {
@@ -117,7 +176,7 @@ public:
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
     helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
-                                          init_manager_, overload_manager_,
+                                          init_manager_, overload_manager_, null_overload_manager_,
                                           [this] { start_workers_.ready(); });
   }
 
@@ -127,6 +186,7 @@ public:
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
+  NiceMock<MockOverloadManager> null_overload_manager_;
   Init::ManagerImpl init_manager_{""};
   ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;
@@ -199,12 +259,12 @@ protected:
                                              : std::make_unique<Init::ManagerImpl>("Server");
 
     server_ = std::make_unique<InstanceImpl>(
-        *init_manager_, options_, time_system_,
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart_,
-        stats_store_, fakelock_, component_factory_,
+        *init_manager_, options_, time_system_, hooks, restart_, stats_store_, fakelock_,
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(),
         std::move(process_context_));
+    server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                        component_factory_);
     EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
   }
 
@@ -218,11 +278,11 @@ protected:
     thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
     init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
     server_ = std::make_unique<InstanceImpl>(
-        *init_manager_, options_, time_system_,
-        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks_, restart_,
-        stats_store_, fakelock_, component_factory_,
+        *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
         std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
         Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+    server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                        component_factory_);
 
     EXPECT_TRUE(server_->api().fileSystem().fileExists(std::string(Platform::null_device_path)));
   }
@@ -305,8 +365,9 @@ private:
 class CustomStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
-                                 Server::Configuration::ServerFactoryContext& server) override {
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message&,
+                  Server::Configuration::ServerFactoryContext& server) override {
     return std::make_unique<CustomStatsSink>(server.scope());
   }
 
@@ -436,7 +497,7 @@ TEST_P(ServerInstanceImplTest, StatsFlushWhenServerIsStillInitializing) {
       startTestServer("test/server/test_data/server/stats_sink_bootstrap.yaml", true);
 
   // Wait till stats are flushed to custom sink and validate that the actual flush happens.
-  TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_);
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_store_, "stats.flushed", 1, time_system_));
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.state")->value());
   EXPECT_EQ(Init::Manager::State::Initializing, server_->initManager().state());
 
@@ -532,16 +593,18 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
       post_init = true;
       post_init_fired.Notify();
     });
-    auto handle3 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
-      shutdown = true;
-      shutdown_begin.Notify();
-    });
+    ServerLifecycleNotifier::HandlePtr handle3 =
+        server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [&] {
+          shutdown = true;
+          shutdown_begin.Notify();
+          handle3 = nullptr;
+        });
     auto handle4 = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                                              [&](Event::PostCb completion_cb) {
                                                // Block till we're told to complete
                                                completion_block.WaitForNotification();
                                                shutdown_with_completion = true;
-                                               server_->dispatcher().post(completion_cb);
+                                               server_->dispatcher().post(std::move(completion_cb));
                                                completion_done.Notify();
                                              });
     auto handle5 =
@@ -553,7 +616,7 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
     server_->run();
     handle1 = nullptr;
     handle2 = nullptr;
-    handle3 = nullptr;
+    // handle3 is nulled out in the callback itself, to test that works as well
     handle4 = nullptr;
     server_ = nullptr;
     thread_local_ = nullptr;
@@ -583,35 +646,78 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   server_thread->join();
 }
 
-TEST_P(ServerInstanceImplTest, DrainParentListenerAfterWorkersStarted) {
-  bool workers_started = false;
-  absl::Notification workers_started_fired, workers_started_block;
-  // Expect drainParentListeners not to be called before workers start.
-  EXPECT_CALL(restart_, drainParentListeners).Times(0);
+class ServerInstanceImplWorkersTest : public ServerInstanceImplTest {
+protected:
+  ServerInstanceImplWorkersTest() {
+    bool workers_started = false;
 
-  // Run the server in a separate thread so we can test different lifecycle stages.
-  auto server_thread = Thread::threadFactoryForTest().createThread([&] {
-    auto hooks = CustomListenerHooks([&]() {
-      workers_started = true;
-      workers_started_fired.Notify();
-      workers_started_block.WaitForNotification();
+    // Expect drainParentListeners not to be called before workers start.
+    EXPECT_CALL(restart_, drainParentListeners).Times(0);
+
+    // Run the server in a separate thread so we can test different lifecycle stages.
+    server_thread_ = Thread::threadFactoryForTest().createThread([&] {
+      auto hooks = CustomListenerHooks([&]() {
+        workers_started = true;
+        workers_started_fired_.Notify();
+        workers_started_block_.WaitForNotification();
+      });
+      initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
+      server_->run();
+      server_ = nullptr;
+      thread_local_ = nullptr;
     });
-    initialize("test/server/test_data/server/node_bootstrap.yaml", false, hooks);
-    server_->run();
-    server_ = nullptr;
-    thread_local_ = nullptr;
-  });
 
-  workers_started_fired.WaitForNotification();
-  EXPECT_TRUE(workers_started);
+    workers_started_fired_.WaitForNotification();
+    EXPECT_TRUE(workers_started);
+    EXPECT_CALL(restart_, drainParentListeners);
+  }
+
+  ~ServerInstanceImplWorkersTest() override {
+    server_->dispatcher().post([&] { server_->shutdown(); });
+    server_thread_->join();
+  }
+
+  absl::Notification workers_started_fired_;
+  absl::Notification workers_started_block_;
+  Thread::ThreadPtr server_thread_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplWorkersTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(ServerInstanceImplWorkersTest, DrainParentListenerAfterWorkersStarted) {
   EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
   EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
+  workers_started_block_.Notify();
+}
 
-  EXPECT_CALL(restart_, drainParentListeners);
-  workers_started_block.Notify();
+TEST_P(ServerInstanceImplWorkersTest, DrainCloseAfterWorkersStarted) {
+  absl::Notification drain_closes_started, drain_complete;
+  workers_started_block_.Notify();
 
-  server_->dispatcher().post([&] { server_->shutdown(); });
-  server_thread->join();
+  DrainManager& drain_manager = server_->drainManager();
+
+  // To reproduce the race condition from
+  // https://github.com/envoyproxy/envoy/issues/31457 we make sure that the
+  // infinite drainClose spin-loop (mimicing high traffic) is running before we
+  // initiate the drain sequence.
+  auto drain_thread = Thread::threadFactoryForTest().createThread([&] {
+    bool closed = drain_manager.drainClose();
+    drain_closes_started.Notify();
+    while (!closed) {
+      closed = drain_manager.drainClose();
+    }
+  });
+  drain_closes_started.WaitForNotification();
+
+  // Now that we are starting to try to call drainClose, we'll start the drain sequence, then
+  // wait for that to complete.
+  server_->dispatcher().post(
+      [&] { drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); }); });
+
+  drain_complete.WaitForNotification();
+  drain_thread->join();
 }
 
 // A test target which never signals that it is ready.
@@ -677,17 +783,6 @@ TEST_P(ServerInstanceImplTest, ShutdownBeforeWorkersStarted) {
   });
 
   server_thread->join();
-}
-
-TEST_P(ServerInstanceImplTest, V2ConfigOnly) {
-  options_.service_cluster_name_ = "some_cluster_name";
-  options_.service_node_name_ = "some_node_name";
-  try {
-    initialize("test/server/test_data/server/unparseable_bootstrap.yaml");
-    FAIL();
-  } catch (const EnvoyException& e) {
-    EXPECT_THAT(e.what(), HasSubstr("Unable to parse JSON as proto"));
-  }
 }
 
 TEST_P(ServerInstanceImplTest, Stats) {
@@ -789,7 +884,6 @@ TEST_P(ServerStatsTest, FlushStats) {
 TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
-  options_.bootstrap_version_ = 3;
   auto server_thread =
       startTestServer("test/server/test_data/server/stats_sink_manual_flush_bootstrap.yaml", true);
   EXPECT_TRUE(server_->statsConfig().flushOnAdmin());
@@ -803,7 +897,7 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   // Flush via admin.
   Http::TestResponseHeaderMapImpl response_headers;
   std::string body;
-  EXPECT_EQ(Http::Code::OK, server_->admin().request("/stats", "GET", response_headers, body));
+  EXPECT_EQ(Http::Code::OK, server_->admin()->request("/stats", "GET", response_headers, body));
   EXPECT_EQ(1L, counter->value());
 
   time_system_.advanceTimeWait(std::chrono::seconds(6));
@@ -816,7 +910,6 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
 TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
-  options_.bootstrap_version_ = 3;
 
   bool workers_started = false;
   absl::Notification workers_started_fired;
@@ -869,12 +962,12 @@ TEST_P(ServerInstanceImplTest, ValidationDefault) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
-      EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").message(),
+      "Protobuf message (foo) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -884,11 +977,11 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStatic) {
   options_.service_node_name_ = "some_node_name";
   options_.allow_unknown_static_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -899,13 +992,15 @@ TEST_P(ServerInstanceImplTest, ValidationRejectDynamic) {
   options_.reject_unknown_dynamic_fields_ = true;
   options_.ignore_unknown_dynamic_fields_ = true; // reject takes precedence over ignore
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"),
-      EnvoyException, "Protobuf message (foo) has unknown fields");
+  EXPECT_EQ(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").message(),
+      "Protobuf message (foo) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
-      EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(server_->messageValidationContext()
+                .dynamicValidationVisitor()
+                .onUnknownField("bar")
+                .message(),
+            "Protobuf message (bar) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
 }
 
@@ -916,28 +1011,15 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
   options_.allow_unknown_static_fields_ = true;
   options_.reject_unknown_dynamic_fields_ = true;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
-  EXPECT_NO_THROW(
-      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo"));
+  EXPECT_TRUE(
+      server_->messageValidationContext().staticValidationVisitor().onUnknownField("foo").ok());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_, "server.static_unknown_fields")->value());
-  EXPECT_THAT_THROWS_MESSAGE(
-      server_->messageValidationContext().dynamicValidationVisitor().onUnknownField("bar"),
-      EnvoyException, "Protobuf message (bar) has unknown fields");
+  EXPECT_EQ(server_->messageValidationContext()
+                .dynamicValidationVisitor()
+                .onUnknownField("bar")
+                .message(),
+            "Protobuf message (bar) has unknown fields");
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "server.dynamic_unknown_fields")->value());
-}
-
-// Validate server localInfo() from bootstrap Node.
-// Deprecated testing of the envoy.api.v2.core.Node.build_version field
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(BootstrapNodeDeprecated)) {
-  initialize("test/server/test_data/server/node_bootstrap.yaml");
-  EXPECT_EQ("bootstrap_zone", server_->localInfo().zoneName());
-  EXPECT_EQ("bootstrap_cluster", server_->localInfo().clusterName());
-  EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
-  EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
-  EXPECT_EQ(VersionInfo::version(),
-            server_->localInfo().node().hidden_envoy_deprecated_build_version());
-  EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
-  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
-  expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
 // Validate server localInfo() from bootstrap Node.
@@ -977,126 +1059,6 @@ TEST_P(ServerInstanceImplTest, UserAgentOverrideFromNode) {
   EXPECT_EQ(7, server_->localInfo().node().user_agent_build_version().version().patch());
 }
 
-// Validate deprecated user agent version field from bootstrap Node.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(UserAgentBuildDeprecatedOverrideFromNode)) {
-  initialize("test/server/test_data/server/node_bootstrap_agent_deprecated_override.yaml");
-  EXPECT_EQ("test-ci-user-agent", server_->localInfo().node().user_agent_name());
-  EXPECT_EQ("test", server_->localInfo().node().hidden_envoy_deprecated_build_version());
-}
-
-// Validate that bootstrap with v2 dynamic transport is rejected when --bootstrap-version is not
-// set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(FailToLoadV2TransportWithoutExplicitVersion)) {
-  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/dynamic_v2.yaml"),
-                          DeprecatedMajorVersionException,
-                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
-}
-
-// Validate that bootstrap with v2 ADS transport is rejected when --bootstrap-version is not
-// set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(FailToLoadV2AdsTransportWithoutExplicitVersion)) {
-  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/ads_v2.yaml"),
-                          DeprecatedMajorVersionException,
-                          "V2 .and AUTO. xDS transport protocol versions are deprecated in.*");
-}
-
-// Validate that bootstrap with v2 HDS transport is rejected when --bootstrap-version is not
-// set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(FailToLoadV2HdsTransportWithoutExplicitVersion)) {
-  // HDS cluster initialization happens through callbacks after runtime initialization. Exceptions
-  // are caught and will result in server shutdown.
-  EXPECT_LOG_CONTAINS("warn",
-                      "Skipping initialization of HDS cluster: V2 (and AUTO) xDS transport "
-                      "protocol versions are deprecated",
-                      initialize("test/server/test_data/server/hds_v2.yaml"));
-}
-
-// Validate that bootstrap v2 is rejected when --bootstrap-version is not set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapWithoutExplicitVersion)) {
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      DeprecatedMajorVersionException,
-      "Support for v2 will be removed from Envoy at the start of Q1 2021.");
-}
-
-// Validate that bootstrap v2 pb_text with deprecated fields loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2BootstrapWithExplicitVersionFromPbText)) {
-  options_.bootstrap_version_ = 2;
-  initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text");
-  EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
-}
-
-// Validate that bootstrap v2 pb_text with deprecated fields fails to load when
-// --bootstrap-version is not set.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2BootstrapFromPbText)) {
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      EnvoyException, "The v2 xDS major version is deprecated and disabled by default.");
-}
-
-// Validate that bootstrap v2 YAML with deprecated fields loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2BootstrapWithExplicitVersionFromYaml)) {
-  options_.bootstrap_version_ = 2;
-  EXPECT_LOG_CONTAINS(
-      "trace", "Configuration does not parse cleanly as v3",
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"));
-  EXPECT_FALSE(server_->localInfo().node().hidden_envoy_deprecated_build_version().empty());
-}
-
-// Validate that bootstrap v2 YAML with deprecated fields fails to load when
-// --bootstrap-version is not set.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailsToLoadV2BootstrapFromYaml)) {
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"),
-      EnvoyException, "The v2 xDS major version is deprecated and disabled by default.");
-}
-
-// Validate that bootstrap v3 pb_text with new fields loads fails if V2 config is specified.
-TEST_P(ServerInstanceImplTest, DISABLED_FailToLoadV3ConfigWhenV2SelectedFromPbText) {
-  options_.bootstrap_version_ = 2;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"),
-      EnvoyException, "Unable to parse file");
-}
-
-// Validate that bootstrap v3 YAML with new fields loads fails if V2 config is specified.
-TEST_P(ServerInstanceImplTest, DISABLED_FailToLoadV3ConfigWhenV2SelectedFromYaml) {
-  options_.bootstrap_version_ = 2;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.yaml"),
-      EnvoyException, "has unknown fields");
-}
-
-// Validate that we correctly parse a V2 pb_text file when configured to do so.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2ConfigWhenV2SelectedFromPbText)) {
-  options_.bootstrap_version_ = 2;
-
-  EXPECT_LOG_CONTAINS(
-      "trace", "Configuration does not parse cleanly as v3",
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"));
-  EXPECT_EQ(server_->localInfo().node().id(), "bootstrap_id");
-}
-
-// Validate that we correctly parse a V2 YAML file when configured to do so.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2ConfigWhenV2SelectedFromYaml)) {
-  options_.bootstrap_version_ = 2;
-
-  EXPECT_LOG_CONTAINS(
-      "trace", "Configuration does not parse cleanly as v3",
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"));
-  EXPECT_EQ(server_->localInfo().node().id(), "bootstrap_id");
-}
-
 // Validate that we correctly parse a V3 pb_text file without explicit version configuration.
 TEST_P(ServerInstanceImplTest, LoadsV3ConfigFromPbText) {
   EXPECT_LOG_NOT_CONTAINS(
@@ -1113,8 +1075,6 @@ TEST_P(ServerInstanceImplTest, LoadsV3ConfigFromYaml) {
 
 // Validate that we correctly parse a V3 pb_text file when configured to do so.
 TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV3SelectedFromPbText) {
-  options_.bootstrap_version_ = 3;
-
   EXPECT_LOG_NOT_CONTAINS(
       "trace", "Configuration does not parse cleanly as v3",
       initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.pb_text"));
@@ -1122,50 +1082,9 @@ TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV3SelectedFromPbText) {
 
 // Validate that we correctly parse a V3 YAML file when configured to do so.
 TEST_P(ServerInstanceImplTest, LoadsV3ConfigWhenV3SelectedFromYaml) {
-  options_.bootstrap_version_ = 3;
-
   EXPECT_LOG_NOT_CONTAINS(
       "trace", "Configuration does not parse cleanly as v3",
       initialize("test/server/test_data/server/valid_v3_but_invalid_v2_bootstrap.yaml"));
-}
-
-// Validate that bootstrap v2 pb_text with deprecated fields loads fails if V3 config is specified.
-TEST_P(ServerInstanceImplTest, FailToLoadV2ConfigWhenV3SelectedFromPbText) {
-  options_.bootstrap_version_ = 3;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      EnvoyException, "Unable to parse file");
-}
-
-// Validate that bootstrap v2 YAML with deprecated fields loads fails if V3 config is specified.
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(FailToLoadV2ConfigWhenV3SelectedFromYaml)) {
-  options_.bootstrap_version_ = 3;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.yaml"),
-      EnvoyException, "has unknown fields");
-}
-
-// Validate that bootstrap with v2 dynamic transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2TransportWithoutExplicitVersion)) {
-  options_.bootstrap_version_ = 2;
-  initialize("test/server/test_data/server/dynamic_v2.yaml");
-}
-
-// Validate that bootstrap with v2 ADS transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2AdsTransportWithoutExplicitVersion)) {
-  options_.bootstrap_version_ = 2;
-  initialize("test/server/test_data/server/ads_v2.yaml");
-}
-
-// Validate that bootstrap with v2 HDS transport loads when --bootstrap-version is set.
-TEST_P(ServerInstanceImplTest,
-       DEPRECATED_FEATURE_TEST(DISABLED_LoadsV2HdsTransportWithoutExplicitVersion)) {
-  options_.bootstrap_version_ = 2;
-  initialize("test/server/test_data/server/hds_v2.yaml");
 }
 
 // Validate that bootstrap pb_text loads.
@@ -1173,15 +1092,6 @@ TEST_P(ServerInstanceImplTest, LoadsBootstrapFromPbText) {
   EXPECT_LOG_NOT_CONTAINS("trace", "Configuration does not parse cleanly as v3",
                           initialize("test/server/test_data/server/node_bootstrap.pb_text"));
   EXPECT_EQ("bootstrap_id", server_->localInfo().node().id());
-}
-
-// Validate that we blow up on invalid version number.
-TEST_P(ServerInstanceImplTest, InvalidBootstrapVersion) {
-  options_.bootstrap_version_ = 1;
-
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/valid_v2_but_invalid_v3_bootstrap.pb_text"),
-      EnvoyException, "Unknown bootstrap version 1.");
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
@@ -1220,7 +1130,6 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
 TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   options_.service_cluster_name_ = "some_service";
   initialize("test/server/test_data/server/runtime_bootstrap.yaml");
-  EXPECT_FALSE(server_->enableReusePortDefault());
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo").value().get());
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz").value().get());
@@ -1234,11 +1143,11 @@ TEST_P(ServerInstanceImplTest, RuntimeNoAdminLayer) {
   Http::TestResponseHeaderMapImpl response_headers;
   std::string response_body;
   EXPECT_EQ(Http::Code::OK,
-            server_->admin().request("/runtime", "GET", response_headers, response_body));
+            server_->admin()->request("/runtime", "GET", response_headers, response_body));
   EXPECT_THAT(response_body, HasSubstr("fozz"));
-  EXPECT_EQ(
-      Http::Code::ServiceUnavailable,
-      server_->admin().request("/runtime_modify?foo=bar", "POST", response_headers, response_body));
+  EXPECT_EQ(Http::Code::ServiceUnavailable,
+            server_->admin()->request("/runtime_modify?foo=bar", "POST", response_headers,
+                                      response_body));
   EXPECT_EQ("No admin layer specified", response_body);
 }
 
@@ -1256,13 +1165,6 @@ TEST_P(ServerInstanceImplTest, BootstrapRtdsThroughAdsViaEdsFails) {
   options_.service_node_name_ = "some_node_name";
   EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/runtime_bootstrap_ads_eds.yaml"),
                           EnvoyException, "Unknown gRPC client cluster");
-}
-
-TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(DISABLED_InvalidLegacyBootstrapRuntime)) {
-  options_.bootstrap_version_ = 2;
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/invalid_legacy_runtime_bootstrap.yaml"),
-      EnvoyException, "Invalid runtime entry value for foo");
 }
 
 // Validate invalid runtime in bootstrap is rejected.
@@ -1298,14 +1200,6 @@ TEST_P(ServerInstanceImplTest, InvalidLayeredBootstrapNoLayerSpecifier) {
 TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/test_data/server/cluster_dupe_bootstrap.yaml"),
                             EnvoyException, "cluster manager: duplicate cluster 'service_google'");
-}
-
-// Regression tests for SdsApi throwing exceptions in initialize().
-TEST_P(ServerInstanceImplTest, BadSdsConfigSource) {
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/bad_sds_config_source.yaml"), EnvoyException,
-      "envoy.config.core.v3.ApiConfigSource must have a statically defined non-EDS cluster: "
-      "'sds-grpc' does not exist, was added via api, or is an EDS cluster");
 }
 
 // Test for protoc-gen-validate constraint on invalid timeout entry of a health check config entry.
@@ -1346,7 +1240,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
   // Admin::addListenerToHandler() calls one of handler's methods after checking that the Admin
   // has a listener. So, the fact that passing a nullptr doesn't cause a segfault establishes
   // that there is no listener.
-  server_->admin().addListenerToHandler(/*handler=*/nullptr);
+  server_->admin()->addListenerToHandler(/*handler=*/nullptr);
 }
 
 namespace {
@@ -1368,7 +1262,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // Start Envoy instance with admin port with SO_REUSEPORT option.
   ASSERT_NO_THROW(
       initialize("test/server/test_data/server/node_bootstrap_with_admin_socket_options.yaml"));
-  const auto address = server_->admin().socket().addressProvider().localAddress();
+  const auto address = server_->admin()->socket().connectionInfoProvider().localAddress();
 
   // First attempt to bind and listen socket should fail due to the lack of SO_REUSEPORT socket
   // options.
@@ -1424,13 +1318,13 @@ TEST_P(ServerInstanceImplTest, LogToFile) {
   GET_MISC_LOGGER().set_level(spdlog::level::info);
   ENVOY_LOG_MISC(warn, "LogToFile test string");
   Logger::Registry::getSink()->flush();
-  std::string log = server_->api().fileSystem().fileReadToEnd(path);
+  std::string log = server_->api().fileSystem().fileReadToEnd(path).value();
   EXPECT_GT(log.size(), 0);
   EXPECT_TRUE(log.find("LogToFile test string") != std::string::npos);
 
   // Test that critical messages get immediately flushed
   ENVOY_LOG_MISC(critical, "LogToFile second test string");
-  log = server_->api().fileSystem().fileReadToEnd(path);
+  log = server_->api().fileSystem().fileReadToEnd(path).value();
   EXPECT_TRUE(log.find("LogToFile second test string") != std::string::npos);
 }
 
@@ -1451,13 +1345,13 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
   init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+  server_ = std::make_unique<InstanceImpl>(
+      *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
   EXPECT_THROW_WITH_MESSAGE(
-      server_.reset(new InstanceImpl(*init_manager_, options_, time_system_,
-                                     std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
-                                     hooks_, restart_, stats_store_, fakelock_, component_factory_,
-                                     std::make_unique<NiceMock<Random::MockRandomGenerator>>(),
-                                     *thread_local_, Thread::threadFactoryForTest(),
-                                     Filesystem::fileSystemForTest(), nullptr)),
+      server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                          component_factory_),
       EnvoyException,
       "At least one of --config-path or --config-yaml or Options::configProto() should be "
       "non-empty");
@@ -1517,7 +1411,6 @@ TEST_P(ServerInstanceImplTest, NoHttpTracing) {
 TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(DISABLED_ZipkinHttpTracingEnabled)) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
-  options_.bootstrap_version_ = 2;
   EXPECT_NO_THROW(initialize("test/server/test_data/server/zipkin_tracing_deprecated_config.yaml"));
   EXPECT_EQ("zipkin", server_->httpContext().defaultTracingConfig().http().name());
 }
@@ -1593,9 +1486,10 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsThrowingError) {
 }
 
 TEST_P(ServerInstanceImplTest, WithUnknownBootstrapExtensions) {
-  EXPECT_THROW_WITH_REGEX(
-      initialize("test/server/test_data/server/bootstrap_extensions.yaml"), EnvoyException,
-      "Didn't find a registered implementation for name: 'envoy_test.bootstrap.foo'");
+  EXPECT_THROW_WITH_REGEX(initialize("test/server/test_data/server/bootstrap_extensions.yaml"),
+                          EnvoyException,
+                          "Didn't find a registered implementation for 'envoy_test.bootstrap.foo' "
+                          "with type URL: 'test.common.config.DummyConfig'");
 }
 
 // Insufficient support on Windows.
@@ -1632,7 +1526,7 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
   // Inject Unsafe Factory
   NiceMock<Configuration::MockFatalActionFactory> mock_unsafe_factory;
   EXPECT_CALL(mock_unsafe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
-    return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
+    return std::make_unique<ProtobufWkt::Struct>();
   }));
   EXPECT_CALL(mock_unsafe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.unsafe"));
 
@@ -1738,7 +1632,7 @@ public:
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
   // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster&) override {}
+  void onClusterAddOrUpdate(absl::string_view, Upstream::ThreadLocalClusterCommand&) override {}
   void onClusterRemoval(const std::string&) override {}
 
 private:
@@ -1749,8 +1643,9 @@ private:
 class CallbacksStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
-                                 Server::Configuration::ServerFactoryContext& server) override {
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message&,
+                  Server::Configuration::ServerFactoryContext& server) override {
     return std::make_unique<CallbacksStatsSink>(server);
   }
 
@@ -1778,7 +1673,7 @@ TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
 
 // Validate that disabled extension is reflected in the list of Node extensions.
 TEST_P(ServerInstanceImplTest, DisabledExtension) {
-  OptionsImpl::disableExtensions({"envoy.filters.http/envoy.filters.http.buffer"});
+  OptionsImplBase::disableExtensions({"envoy.filters.http/envoy.filters.http.buffer"});
   initialize("test/server/test_data/server/node_bootstrap.yaml");
   bool disabled_filter_found = false;
   for (const auto& extension : server_->localInfo().node().extensions()) {
@@ -1808,6 +1703,54 @@ TEST_P(ServerInstanceImplTest, AdminAccessLogFilter) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
   EXPECT_NO_THROW(initialize("test/server/test_data/server/access_log_filter_bootstrap.yaml"));
+}
+
+TEST_P(ServerInstanceImplTest, BootstrapApplicationLogsAndCLIThrows) {
+  EXPECT_CALL(options_, logFormatSet()).WillRepeatedly(Return(true));
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log.yaml"), EnvoyException,
+      "Only one of ApplicationLogConfig.log_format or CLI option --log-format can be specified.");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/json_application_log.yaml"));
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
+    EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagv) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log_forbidden_flagv.yaml"),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %v is unavailable for JSON log formats");
+}
+
+TEST_P(ServerInstanceImplTest, JsonApplicationLogFailWithForbiddenFlagUnderscore) {
+  EXPECT_THROW_WITH_MESSAGE(
+      initialize("test/server/test_data/server/json_application_log_forbidden_flag_.yaml"),
+      EnvoyException,
+      "setJsonLogFormat error: INVALID_ARGUMENT: Usage of %_ is unavailable for JSON log formats");
+}
+
+TEST_P(ServerInstanceImplTest, TextApplicationLog) {
+  EXPECT_NO_THROW(initialize("test/server/test_data/server/text_application_log.yaml"));
+
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+
+  ENVOY_LOG_MISC(info, "hello");
 }
 
 } // namespace

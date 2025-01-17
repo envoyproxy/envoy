@@ -5,6 +5,7 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 
@@ -20,6 +21,11 @@ bool SocketOptionImpl::setOption(Socket& socket,
       return false;
     }
 
+    if (socket_type_.has_value() && *socket_type_ != socket.socketType()) {
+      ENVOY_LOG(info, "Skipping inapplicable socket option {}", optname_.name());
+      return true;
+    }
+
     const Api::SysCallIntResult result =
         SocketOptionImpl::setSocketOption(socket, optname_, value_.data(), value_.size());
     if (result.return_value_ != 0) {
@@ -30,6 +36,14 @@ bool SocketOptionImpl::setOption(Socket& socket,
   }
 
   return true;
+}
+
+void SocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const {
+  if (optname_.hasValue()) {
+    pushScalarToByteVector(optname_.level(), hash_key);
+    pushScalarToByteVector(optname_.option(), hash_key);
+    hash_key.insert(hash_key.end(), value_.begin(), value_.end());
+  }
 }
 
 absl::optional<Socket::Option::Details>
@@ -46,6 +60,8 @@ SocketOptionImpl::getOptionDetails(const Socket&,
 }
 
 bool SocketOptionImpl::isSupported() const { return optname_.hasValue(); }
+
+absl::optional<Socket::Type> SocketOptionImpl::socketType() const { return socket_type_; }
 
 Api::SysCallIntResult SocketOptionImpl::setSocketOption(Socket& socket,
                                                         const Network::SocketOptionName& optname,

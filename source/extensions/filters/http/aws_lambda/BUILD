@@ -9,7 +9,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP AWS Lambda filter
-# Public docs: docs/root/configuration/http_filters/aws_lambda_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/aws_lambda_filter
 
 envoy_extension_package()
 
@@ -27,7 +27,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//source/common/common:base64_lib",
         "//source/extensions/common/aws:credentials_provider_impl_lib",
-        "//source/extensions/common/aws:signer_impl_lib",
+        "//source/extensions/common/aws:sigv4_signer_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )

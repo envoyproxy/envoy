@@ -12,8 +12,9 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.api.v2.cluster";
 option java_outer_classname = "OutlierDetectionProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/api/v2/cluster";
 option csharp_namespace = "Envoy.Api.V2.ClusterNS";
-option ruby_package = "Envoy.Api.V2.ClusterNS";
+option ruby_package = "Envoy::Api::V2::ClusterNS";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
@@ -23,9 +24,9 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // more information on outlier detection.
 // [#next-free-field: 21]
 message OutlierDetection {
-  // The number of consecutive 5xx responses or local origin errors that are mapped
-  // to 5xx error codes before a consecutive 5xx ejection
-  // occurs. Defaults to 5.
+  // The number of consecutive server-side error responses (for HTTP traffic,
+  // 5xx responses; for TCP traffic, connection failures; for Redis, failure to
+  // respond PONG; etc.) before a consecutive 5xx ejection occurs. Defaults to 5.
   google.protobuf.UInt32Value consecutive_5xx = 1;
 
   // The time interval between ejection analysis sweeps. This can result in

@@ -17,6 +17,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "GrpcServiceProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/api/v2/core";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
@@ -99,7 +100,7 @@ message GrpcService {
       message StsService {
         // URI of the token exchange service that handles token exchange requests.
         // [#comment:TODO(asraa): Add URI validation when implemented. Tracked by
-        // https://github.com/envoyproxy/protoc-gen-validate/issues/303]
+        // https://github.com/bufbuild/protoc-gen-validate/issues/303]
         string token_exchange_service_uri = 1;
 
         // Location of the target service or resource where the client

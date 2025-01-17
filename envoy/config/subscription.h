@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/stats_macros.h"
@@ -59,6 +60,11 @@ public:
    * @return bool does the xDS discovery response have a set resource payload?
    */
   virtual bool hasResource() const PURE;
+
+  /**
+   * @return optional ref<envoy::config::core::v3::Metadata> of a resource.
+   */
+  virtual const OptRef<const envoy::config::core::v3::Metadata> metadata() const PURE;
 };
 
 using DecodedResourcePtr = std::unique_ptr<DecodedResource>;
@@ -83,6 +89,8 @@ public:
   virtual std::string resourceName(const Protobuf::Message& resource) PURE;
 };
 
+using OpaqueResourceDecoderSharedPtr = std::shared_ptr<OpaqueResourceDecoder>;
+
 /**
  * Subscription to DecodedResources.
  */
@@ -95,28 +103,30 @@ public:
    * everything other than delta gRPC - filesystem, HTTP, non-delta gRPC).
    * @param resources vector of fetched resources corresponding to the configuration update.
    * @param version_info supplies the version information as supplied by the xDS discovery response.
-   * @throw EnvoyException with reason if the configuration is rejected. Otherwise the configuration
-   *        is accepted. Accepted configurations have their version_info reflected in subsequent
-   *        requests.
+   * @return an absl status indicating if a non-exception-throwing error was encountered.
+   * @throw EnvoyException with reason if the configuration is rejected for legacy reasons,
+   *        Accepted configurations have their version_info reflected in subsequent requests.
    */
-  virtual void onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
-                              const std::string& version_info) PURE;
+  virtual absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
+                                      const std::string& version_info) PURE;
 
   /**
    * Called when a delta configuration update is received.
    * @param added_resources resources newly added since the previous fetch.
    * @param removed_resources names of resources that this fetch instructed to be removed.
    * @param system_version_info aggregate response data "version", for debugging.
-   * @throw EnvoyException with reason if the config changes are rejected. Otherwise the changes
-   *        are accepted. Accepted changes have their version_info reflected in subsequent requests.
+   * @return an absl status indicating if a non-exception-throwing error was encountered.
+   * @throw EnvoyException with reason if the configuration is rejected for legacy reasons,
+   *        Accepted configurations have their version_info reflected in subsequent requests.
    */
-  virtual void onConfigUpdate(const std::vector<DecodedResourceRef>& added_resources,
-                              const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                              const std::string& system_version_info) PURE;
+  virtual absl::Status
+  onConfigUpdate(const std::vector<DecodedResourceRef>& added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& system_version_info) PURE;
 
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate
-   * invokes an exception.
+   * returns a failure or invokes an exception.
    * @param reason supplies the update failure reason.
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
@@ -146,6 +156,7 @@ class UntypedConfigUpdateCallbacks {
 public:
   virtual ~UntypedConfigUpdateCallbacks() = default;
 
+  // TODO (dmitri-d) remove this method when legacy sotw mux has been removed.
   /**
    * Called when a state-of-the-world configuration update is received. (State-of-the-world is
    * everything other than delta gRPC - filesystem, HTTP, non-delta gRPC).
@@ -159,6 +170,17 @@ public:
                               const std::string& version_info) PURE;
 
   /**
+   * Called when a non-delta gRPC configuration update is received.
+   * @param resources vector of fetched resources corresponding to the configuration update.
+   * @param version_info supplies the version information as supplied by the xDS discovery response.
+   * @throw EnvoyException with reason if the configuration is rejected. Otherwise the configuration
+   *        is accepted. Accepted configurations have their version_info reflected in subsequent
+   *        requests.
+   */
+  virtual void onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
+                              const std::string& version_info) PURE;
+
+  /**
    * Called when a delta configuration update is received.
    * @param added_resources resources newly added since the previous fetch.
    * @param removed_resources names of resources that this fetch instructed to be removed.
@@ -169,10 +191,10 @@ public:
    * being updated. Accepted changes have their version_info reflected in subsequent
    * requests.
    */
-  virtual void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info) PURE;
+  virtual void
+  onConfigUpdate(absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& system_version_info) PURE;
 
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate

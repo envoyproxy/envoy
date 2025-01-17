@@ -25,8 +25,8 @@ envoy_cc_extension(
 envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
-    external_deps = ["abseil_optional"],
     deps = [
+        "//envoy/rds:rds_interface",
         "//envoy/router:router_interface",
         "//envoy/tcp:conn_pool_interface",
         "//source/common/buffer:buffer_lib",
@@ -36,6 +36,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_options_config_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -77,7 +78,7 @@ envoy_cc_library(
         "//envoy/upstream:load_balancer_interface",
         "//envoy/upstream:thread_local_cluster_interface",
         "//source/common/common:linked_object",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
@@ -103,7 +104,7 @@ envoy_cc_library(
         "//envoy/upstream:thread_local_cluster_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
@@ -125,5 +126,29 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_interface",
+    hdrs = ["rds.h"],
+    deps = [
+        ":router_interface",
+        "//envoy/rds:rds_interface",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "rds_lib",
+    hdrs = [
+        "rds_impl.h",
+    ],
+    deps = [
+        ":config",
+        ":rds_interface",
+        "//envoy/rds:rds_interface",
+        "//source/common/rds:rds_lib",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )

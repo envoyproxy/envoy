@@ -37,6 +37,12 @@ TEST(MessageMetadataTest, Fields) {
   EXPECT_TRUE(metadata.hasMessageType());
   EXPECT_EQ(MessageType::Call, metadata.messageType());
 
+  EXPECT_FALSE(metadata.hasHeaderFlags());
+  EXPECT_THROW(metadata.headerFlags(), absl::bad_optional_access);
+  metadata.setHeaderFlags(11);
+  EXPECT_TRUE(metadata.hasHeaderFlags());
+  EXPECT_EQ(11, metadata.headerFlags());
+
   EXPECT_FALSE(metadata.hasSequenceId());
   EXPECT_THROW(metadata.sequenceId(), absl::bad_optional_access);
   metadata.setSequenceId(101);
@@ -53,11 +59,21 @@ TEST(MessageMetadataTest, Fields) {
 }
 
 TEST(MessageMetadataTest, Headers) {
-  MessageMetadata metadata;
+  {
+    MessageMetadata metadata;
 
-  EXPECT_EQ(metadata.headers().size(), 0);
-  metadata.headers().addCopy(Http::LowerCaseString("k"), "v");
-  EXPECT_EQ(metadata.headers().size(), 1);
+    EXPECT_EQ(metadata.requestHeaders().size(), 0);
+    metadata.requestHeaders().addCopy(Http::LowerCaseString("k"), "v");
+    EXPECT_EQ(metadata.requestHeaders().size(), 1);
+  }
+
+  {
+    MessageMetadata metadata(false);
+
+    EXPECT_EQ(metadata.responseHeaders().size(), 0);
+    metadata.responseHeaders().addCopy(Http::LowerCaseString("k"), "v");
+    EXPECT_EQ(metadata.responseHeaders().size(), 1);
+  }
 }
 
 } // namespace ThriftProxy

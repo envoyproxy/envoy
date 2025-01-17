@@ -13,18 +13,20 @@ namespace Envoy {
 namespace Server {
 namespace Utility {
 
-envoy::admin::v3::ServerInfo::State serverState(Init::Manager::State state,
-                                                bool health_check_failed);
+// HistogramBucketsMode determines how histogram statistics get reported. Not
+// all modes are supported for all formats, with the "Unset" variant allowing
+// different formats to have different default behavior.
+enum class HistogramBucketsMode { Unset, Summary, Cumulative, Disjoint, Detailed };
 
 void populateFallbackResponseHeaders(Http::Code code, Http::ResponseHeaderMap& header_map);
 
-bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
-                 absl::optional<std::regex>& regex);
+absl::Status histogramBucketsParam(const Http::Utility::QueryParamsMulti& params,
+                                   HistogramBucketsMode& histogram_buckets_mode);
 
-absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params);
+absl::optional<std::string> formatParam(const Http::Utility::QueryParamsMulti& params);
 
-absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,
-                                       const std::string& key);
+absl::optional<std::string> nonEmptyQueryParam(const Http::Utility::QueryParamsMulti& params,
+                                               const std::string& key);
 
 } // namespace Utility
 } // namespace Server

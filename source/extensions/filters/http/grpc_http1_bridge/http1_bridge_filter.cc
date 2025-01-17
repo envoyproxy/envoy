@@ -8,6 +8,7 @@
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/utility.h"
+#include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/headers.h"
@@ -18,31 +19,58 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-void Http1BridgeFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
-  context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_stat_names_,
-                      headers.GrpcStatus());
+// Some client requests' URLs may contain query params. gRPC upstream servers can not
+// handle these requests, and may return error such as "unknown method". So we remove
+// query params here.
+void Http1BridgeFilter::ignoreQueryParams(Http::RequestHeaderMap& headers) {
+  absl::string_view path = headers.getPathValue();
+  size_t pos = path.find('?');
+  if (pos != absl::string_view::npos) {
+    absl::string_view new_path = path.substr(0, pos);
+    headers.setPath(new_path);
+  }
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const bool grpc_request = Grpc::Common::isGrpcRequestHeaders(headers);
-  if (grpc_request) {
-    setupStatTracking(headers);
+  const bool protobuf_request = Grpc::Common::isProtobufRequestHeaders(headers);
+  if (upgrade_protobuf_ && protobuf_request) {
+    do_framing_ = true;
+    headers.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
+    headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
+    headers.removeContentLength(); // message length part of the gRPC frame
+    decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
   }
 
+  const bool grpc_request = Grpc::Common::isGrpcRequestHeaders(headers);
   const absl::optional<Http::Protocol>& protocol = decoder_callbacks_->streamInfo().protocol();
   ASSERT(protocol);
   if (protocol.value() < Http::Protocol::Http2 && grpc_request) {
     do_bridging_ = true;
   }
 
+  if (do_bridging_ && ignore_query_parameters_) {
+    ignoreQueryParams(headers);
+  }
   return Http::FilterHeadersStatus::Continue;
+}
+
+Http::FilterDataStatus Http1BridgeFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  if (!do_bridging_ || !do_framing_) {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  decoder_callbacks_->addDecodedData(data, true);
+  if (end_stream && do_framing_) {
+    decoder_callbacks_->modifyDecodingBuffer(
+        [](Buffer::Instance& buf) { Grpc::Common::prependGrpcFrameHeader(buf); });
+    return Http::FilterDataStatus::Continue;
+  }
+
+  return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                            bool end_stream) {
-  if (doStatTracking()) {
-    chargeStat(headers);
-  }
 
   if (!do_bridging_ || end_stream) {
     return Http::FilterHeadersStatus::Continue;
@@ -52,19 +80,23 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
   }
 }
 
-Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!do_bridging_ || end_stream) {
     return Http::FilterDataStatus::Continue;
-  } else {
-    // Buffer until the complete request has been processed.
-    return Http::FilterDataStatus::StopIterationAndBuffer;
   }
+
+  // If a Protobuf request has been upgraded to a gRPC request, then we need to do the reverse
+  // for the response and remove the gRPC frame header from the first chunk.
+  if (do_framing_) {
+    data.drain(Grpc::GRPC_FRAME_HEADER_SIZE);
+    do_framing_ = false;
+  }
+
+  // Buffer until the complete request has been processed.
+  return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
 Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  if (doStatTracking()) {
-    chargeStat(trailers);
-  }
 
   if (do_bridging_) {
     // Here we check for grpc-status. If it's not zero, we change the response code. We assume
@@ -94,14 +126,6 @@ Http::FilterTrailersStatus Http1BridgeFilter::encodeTrailers(Http::ResponseTrail
   // NOTE: We will still write the trailers, but the HTTP/1.1 codec will just eat them and end
   //       the chunk encoded response which is what we want.
   return Http::FilterTrailersStatus::Continue;
-}
-
-void Http1BridgeFilter::setupStatTracking(const Http::RequestHeaderMap& headers) {
-  cluster_ = decoder_callbacks_->clusterInfo();
-  if (!cluster_) {
-    return;
-  }
-  request_stat_names_ = context_.resolveDynamicServiceAndMethod(headers.Path());
 }
 
 } // namespace GrpcHttp1Bridge

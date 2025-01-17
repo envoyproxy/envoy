@@ -16,6 +16,7 @@
 
 #include "test/common/network/udp_listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/network/mock_parent_drained_callback_registrar.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -52,12 +53,15 @@ public:
 class UdpListenerImplTest : public UdpListenerImplTestBase {
 public:
   void setup(bool prefer_gro = false) {
+    UdpListenerImplTestBase::setup();
     ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(false));
     // Return the real version by default.
     ON_CALL(override_syscall_, supportsMmsg())
         .WillByDefault(Return(os_calls.latched().supportsMmsg()));
     ON_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop())
         .WillByDefault(Return(MAX_NUM_PACKETS_PER_EVENT_LOOP));
+    ON_CALL(listener_callbacks_, udpSaveCmsgConfig())
+        .WillByDefault(ReturnRef(udp_save_cmsg_config_));
 
     // Set listening socket options.
     server_socket_->addOptions(SocketOptionFactory::buildIpPacketInfoOptions());
@@ -97,6 +101,7 @@ public:
   NiceMock<OverrideOsSysCallsImpl> override_syscall_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&override_syscall_};
   bool recvbuf_large_enough_{true};
+  const IoHandle::UdpSaveCmsgConfig udp_save_cmsg_config_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpListenerImplTest,
@@ -167,9 +172,6 @@ TEST_P(UdpListenerImplTest, LargeDatagramRecvmmsg) {
 
 TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
   setup();
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")) {
-    return;
-  }
   const uint64_t num_packets_per_read =
       Api::OsSysCallsSingleton::get().supportsMmsg() ? NUM_DATAGRAMS_PER_RECEIVE : 1u;
 
@@ -238,6 +240,10 @@ TEST_P(UdpListenerImplTest, LimitNumberOfReadsPerLoop) {
 
 #ifdef UDP_GRO
 TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsg) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
+    return;
+  }
   setup(true);
 
   ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(true));
@@ -345,7 +351,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
 TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
   setup();
 
-  auto const* server_ip = server_socket_->addressProvider().localAddress()->ip();
+  auto const* server_ip = server_socket_->connectionInfoProvider().localAddress()->ip();
   ASSERT_NE(server_ip, nullptr);
 
   // We first disable the listener and then send two packets.
@@ -388,13 +394,113 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+class HotRestartedUdpListenerImplTest : public UdpListenerImplTest {
+public:
+  void SetUp() override {
+#ifdef WIN32
+    GTEST_SKIP() << "Hot restart is not supported on Windows.";
+#endif
+  }
+  void setup() {
+    io_handle_ = &useHotRestartSocket(registrar_);
+    // File event should be created listening to no events (i.e. disabled).
+    EXPECT_CALL(*io_handle_, createFileEvent_(_, _, _, 0));
+    // Parent drained callback should be registered when the listener is created.
+    // We capture the callback so we can simulate "drain complete".
+    EXPECT_CALL(registrar_, registerParentDrainedCallback(_, _))
+        .WillOnce(
+            [this](const Address::InstanceConstSharedPtr&, absl::AnyInvocable<void()> callback) {
+              parent_drained_callback_ = std::move(callback);
+            });
+    UdpListenerImplTest::setup();
+    testing::Mock::VerifyAndClearExpectations(&registrar_);
+  }
+
+protected:
+  MockParentDrainedCallbackRegistrar registrar_;
+  MockIoHandle* io_handle_;
+  absl::AnyInvocable<void()> parent_drained_callback_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, HotRestartedUdpListenerImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+/**
+ * During hot restart, while the parent instance is draining, a quic udp
+ * listener (created with a parent_drained_callback_registrar) should not
+ * be reading packets, regardless of enable/disable calls.
+ * It should begin reading packets after drain completes.
+ */
+TEST_P(HotRestartedUdpListenerImplTest, EnableAndDisableDuringParentDrainShouldDoNothing) {
+  setup();
+  // Enabling and disabling listener should *not* trigger any
+  // event actions on the io_handle, because of listener being paused
+  // while draining.
+  EXPECT_CALL(*io_handle_, enableFileEvents(_)).Times(0);
+  listener_->disable();
+  listener_->enable();
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  // Ending parent drain should cause io_handle to go into reading mode.
+  EXPECT_CALL(*io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  EXPECT_CALL(*io_handle_, activateFileEvents(Event::FileReadyType::Read));
+  std::move(parent_drained_callback_)();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  // Enabling and disabling once unpaused should update io_handle.
+  EXPECT_CALL(*io_handle_, enableFileEvents(0));
+  listener_->disable();
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  EXPECT_CALL(*io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  listener_->enable();
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+}
+
+/**
+ * Mostly the same as EnableAndDisableDuringParentDrainShouldDoNothing, but in disabled state when
+ * drain ends.
+ */
+TEST_P(HotRestartedUdpListenerImplTest, EndingParentDrainedWhileDisabledShouldNotStartReading) {
+  setup();
+  // Enabling and disabling listener should *not* trigger any
+  // event actions on the io_handle, because of listener being paused
+  // while draining.
+  EXPECT_CALL(*io_handle_, enableFileEvents(_)).Times(0);
+  listener_->enable();
+  listener_->disable();
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  // Ending drain should not trigger any event changes because the last state
+  // of the listener was disabled.
+  std::move(parent_drained_callback_)();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+  // Enabling after unpaused should set io_handle to reading/writing.
+  EXPECT_CALL(*io_handle_,
+              enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  listener_->enable();
+  testing::Mock::VerifyAndClearExpectations(io_handle_);
+}
+
+TEST_P(HotRestartedUdpListenerImplTest,
+       ParentDrainedCallbackAfterListenerDestroyedShouldDoNothing) {
+  setup();
+  EXPECT_CALL(*io_handle_, enableFileEvents(_)).Times(0);
+  listener_ = nullptr;
+  // Signaling end-of-drain after the listener was destroyed should do nothing.
+  std::move(parent_drained_callback_)();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // At this point io_handle should be an invalid reference.
+}
+
 /**
  * Tests UDP listener's error callback.
  */
 TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   setup();
 
-  auto const* server_ip = server_socket_->addressProvider().localAddress()->ip();
+  auto const* server_ip = server_socket_->connectionInfoProvider().localAddress()->ip();
   ASSERT_NE(server_ip, nullptr);
 
   // When the `receive` system call returns an error, we expect the `onReceiveError`
@@ -417,11 +523,7 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
   // Inject mocked OsSysCalls implementation to mock a read failure.
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, supportsMmsg())
-      .Times(
-          (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_per_event_loop_read_limit")
-               ? 2u
-               : 1u));
+  EXPECT_CALL(os_sys_calls, supportsMmsg()).Times((1u));
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_NOT_SUP}));
 
@@ -473,8 +575,8 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   Buffer::InstancePtr buffer(new Buffer::OwnedImpl());
   buffer->add(payload);
   // send data to itself
-  UdpSendData send_data{send_to_addr_->ip(), *server_socket_->addressProvider().localAddress(),
-                        *buffer};
+  UdpSendData send_data{send_to_addr_->ip(),
+                        *server_socket_->connectionInfoProvider().localAddress(), *buffer};
 
   // Inject mocked OsSysCalls implementation to mock a write failure.
   Api::MockOsSysCalls os_sys_calls;
@@ -502,10 +604,13 @@ TEST_P(UdpListenerImplTest, SendDataError) {
   // Failed write shouldn't drain the data.
   EXPECT_EQ(payload.length(), buffer->length());
 
-  ON_CALL(os_sys_calls, sendmsg(_, _, _))
-      .WillByDefault(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL}));
-  // EINVAL should cause RELEASE_ASSERT.
-  EXPECT_DEATH(listener_->send(send_data), "Invalid argument passed in");
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_INVAL}));
+  send_result = listener_->send(send_data);
+  EXPECT_FALSE(send_result.ok());
+  EXPECT_EQ(send_result.err_->getErrorCode(), Api::IoError::IoErrorCode::InvalidArgument);
+  // Failed write shouldn't drain the data.
+  EXPECT_EQ(payload.length(), buffer->length());
 }
 
 /**
@@ -562,6 +667,10 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
         // Set msg_iovec
         EXPECT_EQ(msg->msg_iovlen, 1);
         memcpy(msg->msg_iov[0].iov_base, stacked_message.data(), stacked_message.length());
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
+          EXPECT_EQ(msg->msg_iov[0].iov_len, 64 * 1024);
+        }
         msg->msg_iov[0].iov_len = stacked_message.length();
 
         // Set control headers
@@ -611,14 +720,9 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
       }))
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, EAGAIN}));
 
-  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onReadReady()).WillOnce(Invoke([&]() { dispatcher_->exit(); }));
   EXPECT_CALL(listener_callbacks_, onData(_))
-      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
-        validateRecvCallbackParams(data, client_data.size());
-
-        const std::string data_str = data.buffer_->toString();
-        EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
-      }))
+      .Times(4u)
       .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data, client_data.size());
 
@@ -628,11 +732,166 @@ TEST_P(UdpListenerImplTest, UdpGroBasic) {
 
   EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
     EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
-    dispatcher_->exit();
   }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
+
+TEST_P(UdpListenerImplTest, GroLargeDatagramRecvmsgNoDrop) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
+    return;
+  }
+  setup(true);
+
+  ON_CALL(override_syscall_, supportsUdpGro()).WillByDefault(Return(true));
+  const std::string first = std::string(32 * 1024, 'a');
+  client_.write(first, *send_to_addr_);
+  const std::string second("second");
+  client_.write(second, *send_to_addr_);
+
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onDatagramsDropped(_)).Times(0);
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        validateRecvCallbackParams(data, 1);
+        EXPECT_EQ(data.buffer_->toString(), first);
+      }))
+      .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
+        validateRecvCallbackParams(data, 1);
+        EXPECT_EQ(data.buffer_->toString(), second);
+        dispatcher_->exit();
+      }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(0, listener_->packetsDropped());
+}
+
+// Tests that with GRO, listener are able to read 64kB worth of data if they are carried in packets
+// of same size, regardless of MAX_NUM_PACKETS_PER_EVENT_LOOP or listener_callbacks_ provided limit.
+// But once MAX_NUM_PACKETS_PER_EVENT_LOOP of packets are processed, read will stop.
+TEST_P(UdpListenerImplTest, UdpGroReadLimit) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
+    return;
+  }
+  setup(true);
+
+  EXPECT_CALL(listener_callbacks_, numPacketsExpectedPerEventLoop()).WillRepeatedly(Return(32));
+  // We send 128 packets of 1024kB. Verify the concatenated packet is transformed back into
+  // individual packets and only 32 packets (64kB) are read in one batch.
+  std::vector<std::string> client_data;
+  std::string stacked_message;
+  for (size_t i = 0; i < 128; i++) {
+    // Interleave packets with 1024 bytes of 'a' and 1024 bytes of 'b'.
+    std::string payload(1024, (i % 2 == 0 ? 'a' : 'b'));
+    client_data.push_back(payload);
+    // The concatenated payload received from kernel supporting udp_gro
+    stacked_message = absl::StrCat(stacked_message, payload);
+    // Actually send the packets to trigger I/O events on the listener.
+    client_.write(payload, *send_to_addr_);
+  }
+
+  // Mock OsSysCalls to mimic kernel behavior for packet concatenation
+  // based on udp_gro. supportsUdpGro should return true and recvmsg should
+  // return the concatenated payload with the gso_size set appropriately.
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, supportsUdpGro).WillRepeatedly(Return(true));
+  EXPECT_CALL(os_sys_calls, supportsMmsg).Times(0);
+
+  EXPECT_CALL(os_sys_calls, recvmsg(_, _, _)).WillOnce(Invoke([&](os_fd_t, msghdr* msg, int) {
+    // Set msg_name and msg_namelen
+    if (client_.localAddress()->ip()->version() == Address::IpVersion::v4) {
+      sockaddr_storage ss;
+      auto ipv4_addr = reinterpret_cast<sockaddr_in*>(&ss);
+      memset(ipv4_addr, 0, sizeof(sockaddr_in));
+      ipv4_addr->sin_family = AF_INET;
+      ipv4_addr->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+      ipv4_addr->sin_port = client_.localAddress()->ip()->port();
+      msg->msg_namelen = sizeof(sockaddr_in);
+      *reinterpret_cast<sockaddr_in*>(msg->msg_name) = *ipv4_addr;
+    } else if (client_.localAddress()->ip()->version() == Address::IpVersion::v6) {
+      sockaddr_storage ss;
+      auto ipv6_addr = reinterpret_cast<sockaddr_in6*>(&ss);
+      memset(ipv6_addr, 0, sizeof(sockaddr_in6));
+      ipv6_addr->sin6_family = AF_INET6;
+      ipv6_addr->sin6_addr = in6addr_loopback;
+      ipv6_addr->sin6_port = client_.localAddress()->ip()->port();
+      *reinterpret_cast<sockaddr_in6*>(msg->msg_name) = *ipv6_addr;
+      msg->msg_namelen = sizeof(sockaddr_in6);
+    }
+
+    // Set msg_iovec
+    EXPECT_EQ(msg->msg_iovlen, 1);
+    EXPECT_EQ(msg->msg_iov[0].iov_len, 64 * 1024);
+    memcpy(msg->msg_iov[0].iov_base, stacked_message.data(), 64 * 1024);
+    msg->msg_iov[0].iov_len = 64 * 1024;
+
+    // Set control headers
+    memset(msg->msg_control, 0, msg->msg_controllen);
+    cmsghdr* cmsg = CMSG_FIRSTHDR(msg);
+    if (send_to_addr_->ip()->version() == Address::IpVersion::v4) {
+      cmsg->cmsg_level = IPPROTO_IP;
+#ifndef IP_RECVDSTADDR
+      cmsg->cmsg_type = IP_PKTINFO;
+      cmsg->cmsg_len = CMSG_LEN(sizeof(in_pktinfo));
+      reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg))->ipi_addr.s_addr =
+          send_to_addr_->ip()->ipv4()->address();
+#else
+      cmsg.cmsg_type = IP_RECVDSTADDR;
+      cmsg->cmsg_len = CMSG_LEN(sizeof(in_addr));
+      *reinterpret_cast<in_addr*>(CMSG_DATA(cmsg)) = send_to_addr_->ip()->ipv4()->address();
+#endif
+    } else if (send_to_addr_->ip()->version() == Address::IpVersion::v6) {
+      cmsg->cmsg_len = CMSG_LEN(sizeof(in6_pktinfo));
+      cmsg->cmsg_level = IPPROTO_IPV6;
+      cmsg->cmsg_type = IPV6_PKTINFO;
+      auto pktinfo = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
+      pktinfo->ipi6_ifindex = 0;
+      *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) =
+          send_to_addr_->ip()->ipv6()->address();
+    }
+
+    // Set gso_size
+    cmsg = CMSG_NXTHDR(msg, cmsg);
+    cmsg->cmsg_level = SOL_UDP;
+    cmsg->cmsg_type = UDP_GRO;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(uint16_t));
+    const uint16_t gso_size = 1024;
+    *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg)) = gso_size;
+
+#ifdef SO_RXQ_OVFL
+    // Set SO_RXQ_OVFL
+    cmsg = CMSG_NXTHDR(msg, cmsg);
+    EXPECT_NE(cmsg, nullptr);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SO_RXQ_OVFL;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(uint32_t));
+    const uint32_t overflow = 0;
+    *reinterpret_cast<uint32_t*>(CMSG_DATA(cmsg)) = overflow;
+#endif
+    return Api::SysCallSizeResult{static_cast<long>(64 * 1024), 0};
+  }));
+
+  EXPECT_CALL(listener_callbacks_, onReadReady()).WillOnce(Invoke([&]() { dispatcher_->exit(); }));
+  // Only 64 packets should be read, via one recvmsg call.
+  EXPECT_CALL(listener_callbacks_, onData(_))
+      .Times(64u)
+      .WillRepeatedly(Invoke([&](const UdpRecvData& data) -> void {
+        validateRecvCallbackParams(data, client_data.size());
+
+        const std::string data_str = data.buffer_->toString();
+        EXPECT_EQ(data_str, client_data[num_packets_received_by_listener_ - 1]);
+      }));
+
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
+    EXPECT_EQ(&socket.ioHandle(), &server_socket_->ioHandle());
+  }));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 #endif
 
 } // namespace

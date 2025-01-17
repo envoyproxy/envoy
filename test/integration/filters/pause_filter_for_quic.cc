@@ -32,7 +32,7 @@ public:
           decoder_callbacks_->connection()->aboveHighWatermark()) {
         auto quic_connection = const_cast<Quic::QuicFilterManagerConnectionImpl*>(
             dynamic_cast<const Quic::QuicFilterManagerConnectionImpl*>(
-                decoder_callbacks_->connection()));
+                decoder_callbacks_->connection().ptr()));
         quic_connection->write_buffer_watermark_simulation_.checkLowWatermark(
             quic_connection->write_buffer_watermark_simulation_.lowWatermark() - 1u);
       }
@@ -50,7 +50,7 @@ public:
           !decoder_callbacks_->connection()->aboveHighWatermark()) {
         auto quic_connection = const_cast<Quic::QuicFilterManagerConnectionImpl*>(
             dynamic_cast<const Quic::QuicFilterManagerConnectionImpl*>(
-                decoder_callbacks_->connection()));
+                decoder_callbacks_->connection().ptr()));
         quic_connection->write_buffer_watermark_simulation_.checkHighWatermark(
             quic_connection->write_buffer_watermark_simulation_.highWatermark() + 1u);
       }
@@ -67,8 +67,8 @@ class TestPauseFilterConfigForQuic : public Extensions::HttpFilters::Common::Emp
 public:
   TestPauseFilterConfigForQuic() : EmptyHttpFilterConfig("pause-filter-for-quic") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       // ABSL_GUARDED_BY insists the lock be held when the guarded variables are passed by
       // reference.

@@ -16,6 +16,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.filter.http.ext_authz.v2";
 option java_outer_classname = "ExtAuthzProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/filter/http/ext_authz/v2;ext_authzv2";
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.ext_authz.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
@@ -193,7 +194,7 @@ message AuthorizationResponse {
   // Note that coexistent headers will be overridden.
   type.matcher.ListStringMatcher allowed_upstream_headers = 1;
 
-  // When this :ref:`list <envoy_api_msg_type.matcher.ListStringMatcher>`. is set, authorization
+  // When this :ref:`list <envoy_api_msg_type.matcher.ListStringMatcher>` is set, authorization
   // response headers that have a correspondent match will be added to the client's response. Note
   // that when this list is *not* set, all the authorization response headers, except *Authority
   // (Host)* will be in the response to the client. When a header is included in this list, *Path*,

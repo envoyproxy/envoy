@@ -57,10 +57,10 @@ using Params = std::tuple<std::string, uint32_t>;
 const std::vector<Params> params = {
     {"listener.127.0.0.1_3012.http.http_prefix.downstream_rq_5xx", 3},
     {"cluster.ratelimit.upstream_rq_timeout", 1},
-    {"listener.[__1]_0.ssl.cipher.AES256-SHA", 2},
+    {"listener.[__1]_0.ssl.ciphers.AES256-SHA", 2},
     {"cluster.ratelimit.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256", 2},
-    {"listener.[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543.ssl.cipher.AES256-SHA", 2},
-    {"listener.127.0.0.1_0.ssl.cipher.AES256-SHA", 2},
+    {"listener.[2001_0db8_85a3_0000_0000_8a2e_0370_7334]_3543.ssl.ciphers.AES256-SHA", 2},
+    {"listener.127.0.0.1_0.ssl.ciphers.AES256-SHA", 2},
     {"mongo.mongo_filter.op_reply", 1},
     {"mongo.mongo_filter.cmd.foo_cmd.reply_size", 2},
     {"mongo.mongo_filter.collection.bar_collection.query.multi_get", 2},
@@ -90,7 +90,9 @@ const std::vector<Params> params = {
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 void BM_ExtractTags(benchmark::State& state) {
-  TagProducerImpl tag_extractors{envoy::config::metrics::v3::StatsConfig()};
+  const Stats::TagVector tags;
+  auto tag_extractors =
+      TagProducerImpl::createTagProducer(envoy::config::metrics::v3::StatsConfig(), tags).value();
   const auto idx = state.range(0);
   const auto& p = params[idx];
   absl::string_view str = std::get<0>(p);
@@ -99,7 +101,7 @@ void BM_ExtractTags(benchmark::State& state) {
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     TagVector tags;
-    tag_extractors.produceTags(str, tags);
+    tag_extractors->produceTags(str, tags);
     RELEASE_ASSERT(tags.size() == tags_size,
                    absl::StrCat("tags.size()=", tags.size(), " tags_size==", tags_size));
   }

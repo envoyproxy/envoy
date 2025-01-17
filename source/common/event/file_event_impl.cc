@@ -55,6 +55,7 @@ void FileEventImpl::activate(uint32_t events) {
 void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
   ASSERT(dispatcher_.isThreadSafe());
   ASSERT(base != nullptr);
+
   enabled_events_ = events;
   event_assign(
       &raw_event_, base, fd_,
@@ -120,7 +121,6 @@ void FileEventImpl::unregisterEventIfEmulatedEdge(uint32_t event) {
   ASSERT(dispatcher_.isThreadSafe());
   // This constexpr if allows the compiler to optimize away the function on POSIX
   if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
-    ASSERT((event & (FileReadyType::Read | FileReadyType::Write)) == event);
     if (trigger_ == FileTriggerType::EmulatedEdge) {
       auto new_event_mask = enabled_events_ & ~event;
       updateEvents(new_event_mask);
@@ -135,10 +135,6 @@ void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
     ASSERT((event & (FileReadyType::Read | FileReadyType::Write)) == event);
     if (trigger_ == FileTriggerType::EmulatedEdge) {
       auto new_event_mask = enabled_events_ | event;
-      if (event & FileReadyType::Read && (enabled_events_ & FileReadyType::Closed)) {
-        // We never ask for both early close and read at the same time.
-        new_event_mask = new_event_mask & ~FileReadyType::Read;
-      }
       updateEvents(new_event_mask);
     }
   }
@@ -147,16 +143,6 @@ void FileEventImpl::registerEventIfEmulatedEdge(uint32_t event) {
 void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
   ASSERT(dispatcher_.isThreadSafe());
   if (injected_activation_events_ != 0) {
-    // TODO(antoniovicente) remove this adjustment to activation events once ConnectionImpl can
-    // handle Read and Close events delivered together.
-    if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
-      if (events & FileReadyType::Closed && injected_activation_events_ & FileReadyType::Read) {
-        // We never ask for both early close and read at the same time. If close is requested
-        // keep that instead.
-        injected_activation_events_ = injected_activation_events_ & ~FileReadyType::Read;
-      }
-    }
-
     events |= injected_activation_events_;
     injected_activation_events_ = 0;
     activation_cb_->cancel();
@@ -172,7 +158,7 @@ void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
     }
   }
 
-  cb_(events);
+  THROW_IF_NOT_OK(cb_(events));
 }
 
 } // namespace Event

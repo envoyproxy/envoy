@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
+#include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/tcp/upstream.h"
 
@@ -18,14 +19,19 @@ public:
   std::string name() const override { return "envoy.filters.connection_pools.tcp.generic"; }
   std::string category() const override { return "envoy.upstreams"; }
   TcpProxy::GenericConnPoolPtr createGenericConnPool(
-      Upstream::ThreadLocalCluster& thread_local_cluster,
-      const absl::optional<TunnelingConfig>& config, Upstream::LoadBalancerContext* context,
-      Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const override;
+      Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
+      TcpProxy::TunnelingConfigHelperOptConstRef config, Upstream::LoadBalancerContext* context,
+      Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
+      Http::StreamDecoderFilterCallbacks& stream_decoder_callbacks,
+      StreamInfo::StreamInfo& downstream_info) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
         envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto>();
   }
+
+private:
+  bool disableTunnelingByFilterState(StreamInfo::StreamInfo& downstream_info) const;
 };
 
 DECLARE_FACTORY(GenericConnPoolFactory);

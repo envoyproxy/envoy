@@ -5,6 +5,7 @@ load(
     "envoy_cc_posix_library",
     "envoy_cc_win32_library",
     "envoy_package",
+    "envoy_select_signal_trace",
 )
 
 licenses(["notice"])  # Apache 2
@@ -34,23 +35,20 @@ envoy_cc_library(
         ":dispatcher_includes",
         ":libevent_scheduler_lib",
         ":real_time_system_lib",
-        ":signal_lib",
         ":scaled_range_timer_manager_lib",
+        ":signal_lib",
         "//envoy/common:scope_tracker_interface",
         "//envoy/common:time_interface",
         "//envoy/event:signal_interface",
-        "//envoy/network:listen_socket_interface",
-        "//envoy/network:listener_interface",
+        "//envoy/network:client_connection_factory",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
+        "//source/common/config:utility_lib",
         "//source/common/filesystem:watcher_lib",
-        "//source/common/network:dns_lib",
-        "//source/common/network:connection_lib",
-        "//source/common/network:listener_lib",
-    ] + select({
-        "//bazel:apple": ["//source/common/network:apple_dns_lib"],
-        "//conditions:default": [],
-    }),
+        "//source/common/network:address_lib",
+        "//source/common/network:default_client_connection_factory",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -90,8 +88,8 @@ envoy_cc_library(
     name = "event_impl_base_lib",
     srcs = ["event_impl_base.cc"],
     hdrs = ["event_impl_base.h"],
-    external_deps = [
-        "event",
+    deps = [
+        "//bazel/foreign_cc:event",
     ],
 )
 
@@ -116,9 +114,6 @@ envoy_cc_library(
         "file_event_impl.h",
         "schedulable_cb_impl.h",
     ],
-    external_deps = [
-        "abseil_inlined_vector",
-    ],
     deps = [
         ":libevent_lib",
         ":libevent_scheduler_lib",
@@ -130,22 +125,16 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/signal:fatal_error_handler_lib",
-    ] + select({
-        "//bazel:disable_signal_trace": [],
-        "//conditions:default": [
-            "//source/common/signal:sigaction_lib",
-        ],
-    }),
+        "@com_google_absl//absl/container:inlined_vector",
+    ] + envoy_select_signal_trace(["//source/common/signal:sigaction_lib"]),
 )
 
 envoy_cc_library(
     name = "libevent_lib",
     srcs = ["libevent.cc"],
     hdrs = ["libevent.h"],
-    external_deps = [
-        "event",
-    ],
     deps = [
+        "//bazel/foreign_cc:event",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
     ],
@@ -155,11 +144,11 @@ envoy_cc_library(
     name = "libevent_scheduler_lib",
     srcs = ["libevent_scheduler.cc"],
     hdrs = ["libevent_scheduler.h"],
-    external_deps = ["event"],
     deps = [
         ":libevent_lib",
         ":schedulable_cb_lib",
         ":timer_lib",
+        "//bazel/foreign_cc:event",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//source/common/common:assert_lib",
@@ -170,10 +159,10 @@ envoy_cc_library(
     name = "schedulable_cb_lib",
     srcs = ["schedulable_cb_impl.cc"],
     hdrs = ["schedulable_cb_impl.h"],
-    external_deps = ["event"],
     deps = [
         ":event_impl_base_lib",
         ":libevent_lib",
+        "//bazel/foreign_cc:event",
         "//envoy/event:schedulable_cb_interface",
     ],
 )
@@ -182,10 +171,10 @@ envoy_cc_library(
     name = "timer_lib",
     srcs = ["timer_impl.cc"],
     hdrs = ["timer_impl.h"],
-    external_deps = ["event"],
     deps = [
         ":event_impl_base_lib",
         ":libevent_lib",
+        "//bazel/foreign_cc:event",
         "//envoy/event:timer_interface",
         "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",

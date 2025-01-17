@@ -1,5 +1,4 @@
 admin {
-  access_log_path: "@"
   address {
     pipe {
       path: "@"
@@ -7,5 +6,6 @@ admin {
   }
 }
 hds_config {
+  api_type: REST
   cluster_names: "+"
 }

@@ -44,6 +44,8 @@ public:
                     - not_id:
                         any: true
        -  name: envoy.filters.network.echo
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo
 )EOF");
   }
 
@@ -131,6 +133,36 @@ typed_config:
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_denied")->value());
 }
 
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DelayDenied) {
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  rules:
+    policies:
+      "deny_all":
+        permissions:
+          - any: true
+        principals:
+          - not_id:
+              any: true
+  delay_deny: 5s
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello", false, false));
+  ASSERT_TRUE(tcp_client->connected());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  ASSERT_TRUE(tcp_client->connected());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(6));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
+}
+
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DeniedWithDenyAction) {
   useListenerAccessLog("%CONNECTION_TERMINATION_DETAILS%");
   initializeFilter(R"EOF(
@@ -146,6 +178,100 @@ typed_config:
           - any: true
         principals:
           - any: true
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello", false, false));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
+  // Note the whitespace in the policy id is replaced by '_'.
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr("rbac_access_denied_matched_policy[deny_all]"));
+}
+
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, MatcherAllowed) {
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow_all
+          action: ALLOW
+  shadow_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: deny_all
+          action: DENY
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(tcp_client->connected());
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("tcp.rbac.allowed", 1);
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.denied")->value());
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_allowed")->value());
+  test_server_->waitForCounterGe("tcp.rbac.shadow_denied", 1);
+}
+
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, MatcherDenied) {
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: deny_all
+          action: DENY
+  shadow_matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow_all
+          action: ALLOW
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello", false, false));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.shadow_allowed")->value());
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_denied")->value());
+}
+
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, MatcherDeniedWithDenyAction) {
+  useListenerAccessLog("%CONNECTION_TERMINATION_DETAILS%");
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  matcher:
+    on_no_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: "deny all"
+          action: DENY
 )EOF");
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write("hello", false, false));

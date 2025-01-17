@@ -8,13 +8,12 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/filters/http/grpc_web/grpc_web_filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/global.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -58,28 +57,28 @@ public:
 
   ~GrpcWebFilterTest() override { filter_.onDestroy(); }
 
-  const std::string& request_content_type() const { return std::get<0>(GetParam()); }
+  const std::string& requestContentType() const { return std::get<0>(GetParam()); }
 
-  const std::string& request_accept() const { return std::get<1>(GetParam()); }
+  const std::string& requestAccept() const { return std::get<1>(GetParam()); }
 
   bool isTextRequest() const {
-    return request_content_type() == Http::Headers::get().ContentTypeValues.GrpcWebText ||
-           request_content_type() == Http::Headers::get().ContentTypeValues.GrpcWebTextProto;
+    return requestContentType() == Http::Headers::get().ContentTypeValues.GrpcWebText ||
+           requestContentType() == Http::Headers::get().ContentTypeValues.GrpcWebTextProto;
   }
 
   bool isBinaryRequest() const {
-    return request_content_type() == Http::Headers::get().ContentTypeValues.GrpcWeb ||
-           request_content_type() == Http::Headers::get().ContentTypeValues.GrpcWebProto;
+    return requestContentType() == Http::Headers::get().ContentTypeValues.GrpcWeb ||
+           requestContentType() == Http::Headers::get().ContentTypeValues.GrpcWebProto;
   }
 
-  bool accept_text_response() const {
-    return request_accept() == Http::Headers::get().ContentTypeValues.GrpcWebText ||
-           request_accept() == Http::Headers::get().ContentTypeValues.GrpcWebTextProto;
+  bool acceptTextResponse() const {
+    return requestAccept() == Http::Headers::get().ContentTypeValues.GrpcWebText ||
+           requestAccept() == Http::Headers::get().ContentTypeValues.GrpcWebTextProto;
   }
 
-  bool accept_binary_response() const {
-    return request_accept() == Http::Headers::get().ContentTypeValues.GrpcWeb ||
-           request_accept() == Http::Headers::get().ContentTypeValues.GrpcWebProto;
+  bool acceptBinaryResponse() const {
+    return requestAccept() == Http::Headers::get().ContentTypeValues.GrpcWeb ||
+           requestAccept() == Http::Headers::get().ContentTypeValues.GrpcWebProto;
   }
 
   bool doStatTracking() const { return filter_.doStatTracking(); }
@@ -419,28 +418,9 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithTrailers) {
   EXPECT_EQ("hellohello", response_headers.get_(Http::Headers::get().GrpcMessage));
 }
 
-TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextSkipTransformation) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling", "false"}});
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {"content-type", Http::Headers::get().ContentTypeValues.GrpcWebText},
-      {"accept", Http::Headers::get().ContentTypeValues.GrpcWebText},
-      {":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
-
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "400"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
-  Buffer::OwnedImpl data("hello");
-  // Since the client expects grpc-web-text and the upstream response does not contain gRPC frames,
-  // the iteration is paused.
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_.encodeData(data, false));
-}
-
 TEST_P(GrpcWebFilterTest, StatsNoCluster) {
   Http::TestRequestHeaderMapImpl request_headers{
-      {"content-type", request_content_type()},
+      {"content-type", requestContentType()},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
   EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillOnce(Return(nullptr));
 
@@ -450,13 +430,12 @@ TEST_P(GrpcWebFilterTest, StatsNoCluster) {
 
 TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
   Http::TestRequestHeaderMapImpl request_headers{
-      {"content-type", request_content_type()},
+      {"content-type", requestContentType()},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
 
   Http::TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-            filter_.encode100ContinueHeaders(continue_headers));
+  EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_.encode1xxHeaders(continue_headers));
 
   Http::MetadataMap metadata_map{{"metadata", "metadata"}};
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.encodeMetadata(metadata_map));
@@ -481,7 +460,7 @@ TEST_P(GrpcWebFilterTest, StatsNormalResponse) {
 
 TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
   Http::TestRequestHeaderMapImpl request_headers{
-      {"content-type", request_content_type()},
+      {"content-type", requestContentType()},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   Http::TestResponseHeaderMapImpl response_headers{
@@ -504,14 +483,14 @@ TEST_P(GrpcWebFilterTest, StatsErrorResponse) {
 
 TEST_P(GrpcWebFilterTest, ExternallyProvidedEncodingHeader) {
   Http::TestRequestHeaderMapImpl request_headers{
-      {"grpc-accept-encoding", "foo"}, {":path", "/"}, {"content-type", request_accept()}};
+      {"grpc-accept-encoding", "foo"}, {":path", "/"}, {"content-type", requestAccept()}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
   EXPECT_EQ("foo", request_headers.get_(Http::CustomHeaders::get().GrpcAcceptEncoding));
 }
 
 TEST_P(GrpcWebFilterTest, MediaTypeWithParameter) {
-  Http::TestRequestHeaderMapImpl request_headers{{"content-type", request_content_type()},
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", requestContentType()},
                                                  {":path", "/test.MediaTypes/GetParameter"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
   Http::TestResponseHeaderMapImpl response_headers{
@@ -525,8 +504,8 @@ TEST_P(GrpcWebFilterTest, MediaTypeWithParameter) {
 
 TEST_P(GrpcWebFilterTest, Unary) {
   // Tests request headers.
-  request_headers_.addCopy(Http::Headers::get().ContentType, request_content_type());
-  request_headers_.addCopy(Http::CustomHeaders::get().Accept, request_accept());
+  request_headers_.addCopy(Http::Headers::get().ContentType, requestContentType());
+  request_headers_.addCopy(Http::CustomHeaders::get().Accept, requestAccept());
   request_headers_.addCopy(Http::Headers::get().ContentLength, uint64_t(8));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, false));
@@ -562,7 +541,7 @@ TEST_P(GrpcWebFilterTest, Unary) {
     }
     EXPECT_EQ(std::string(TEXT_MESSAGE, TEXT_MESSAGE_SIZE), decoded_buffer.toString());
   } else {
-    FAIL() << "Unsupported gRPC-Web request content-type: " << request_content_type();
+    FAIL() << "Unsupported gRPC-Web request content-type: " << requestContentType();
   }
 
   // Tests request trailers, they are passed through.
@@ -580,18 +559,18 @@ TEST_P(GrpcWebFilterTest, Unary) {
                            Http::Headers::get().ContentTypeValues.GrpcWebProto);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("200", response_headers.get_(Http::Headers::get().Status.get()));
-  if (accept_binary_response()) {
+  if (acceptBinaryResponse()) {
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.GrpcWebProto,
               response_headers.getContentTypeValue());
-  } else if (accept_text_response()) {
+  } else if (acceptTextResponse()) {
     EXPECT_EQ(Http::Headers::get().ContentTypeValues.GrpcWebTextProto,
               response_headers.getContentTypeValue());
   } else {
-    FAIL() << "Unsupported gRPC-Web request accept: " << request_accept();
+    FAIL() << "Unsupported gRPC-Web request accept: " << requestAccept();
   }
 
   // Tests response data.
-  if (accept_binary_response()) {
+  if (acceptBinaryResponse()) {
     Buffer::OwnedImpl response_buffer;
     Buffer::OwnedImpl encoded_buffer;
     for (size_t i = 0; i < MESSAGE_SIZE; i++) {
@@ -600,7 +579,7 @@ TEST_P(GrpcWebFilterTest, Unary) {
       encoded_buffer.move(response_buffer);
     }
     EXPECT_EQ(std::string(MESSAGE, MESSAGE_SIZE), encoded_buffer.toString());
-  } else if (accept_text_response()) {
+  } else if (acceptTextResponse()) {
     Buffer::OwnedImpl response_buffer;
     Buffer::OwnedImpl encoded_buffer;
     for (size_t i = 0; i < TEXT_MESSAGE_SIZE; i++) {
@@ -627,9 +606,9 @@ TEST_P(GrpcWebFilterTest, Unary) {
   response_trailers.addCopy(Http::Headers::get().GrpcStatus, "0");
   response_trailers.addCopy(Http::Headers::get().GrpcMessage, "ok");
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers));
-  if (accept_binary_response()) {
+  if (acceptBinaryResponse()) {
     EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), trailers_buffer.toString());
-  } else if (accept_text_response()) {
+  } else if (acceptTextResponse()) {
     EXPECT_EQ(std::string(TRAILERS, TRAILERS_SIZE), Base64::decode(trailers_buffer.toString()));
   } else {
     FAIL() << "Unsupported gRPC-Web response content-type: "

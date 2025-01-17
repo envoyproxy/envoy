@@ -4,7 +4,7 @@ static_resources:
       socket_address:
         address: "{{ ip_loopback_address }}"
         port_value: 0
-    enable_reuse_port: {{ enable_reuse_port }}
+    enable_reuse_port: "{{ enable_reuse_port }}"
     filter_chains:
     - filters:
       - name: http
@@ -151,7 +151,6 @@ stats_sinks:
   typed_config:
     "@type": type.googleapis.com/envoy.config.metrics.v3.StatsdSink
     tcp_cluster_name: statsd
-watchdog: {}
 layered_runtime:
   layers:
   - name: root

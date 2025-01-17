@@ -18,7 +18,6 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/mocks/upstream/priority_set.h"
-#include "test/test_common/test_runtime.h"
 
 using testing::_;
 using testing::DoAll;
@@ -79,7 +78,7 @@ public:
         "@type": type.googleapis.com/envoy.extensions.health_checkers.redis.v3.Redis
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
@@ -131,7 +130,7 @@ public:
     interval: 1s
     no_traffic_interval: 5s
     interval_jitter: 1s
-    unhealthy_threshold: 1
+    unhealthy_threshold: 2
     healthy_threshold: 1
     custom_health_check:
       name: redis
@@ -164,7 +163,7 @@ public:
         key: foo
     )EOF";
 
-    const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
+    const auto& health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
@@ -212,9 +211,9 @@ public:
 
   Extensions::NetworkFilters::Common::Redis::Client::ClientPtr
   create(Upstream::HostConstSharedPtr, Event::Dispatcher&,
-         const Extensions::NetworkFilters::Common::Redis::Client::Config&,
+         const Extensions::NetworkFilters::Common::Redis::Client::ConfigSharedPtr&,
          const Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr&,
-         Stats::Scope&, const std::string& username, const std::string& password) override {
+         Stats::Scope&, const std::string& username, const std::string& password, bool) override {
     EXPECT_EQ(auth_username_, username);
     EXPECT_EQ(auth_password_, password);
     return Extensions::NetworkFilters::Common::Redis::Client::ClientPtr{create_()};
@@ -251,15 +250,15 @@ public:
     RedisHealthChecker::RedisActiveHealthCheckSessionPtr session =
         std::make_unique<RedisHealthChecker::RedisActiveHealthCheckSession>(*health_checker_, host);
 
-    EXPECT_TRUE(session->disableOutlierEvents());
-    EXPECT_EQ(session->opTimeout(),
+    EXPECT_TRUE(session->redis_config_->disableOutlierEvents());
+    EXPECT_EQ(session->redis_config_->opTimeout(),
               std::chrono::milliseconds(2000)); // Timeout is 1s is test configurations.
-    EXPECT_FALSE(session->enableHashtagging());
-    EXPECT_TRUE(session->enableRedirection());
-    EXPECT_EQ(session->maxBufferSizeBeforeFlush(), 0);
-    EXPECT_EQ(session->bufferFlushTimeoutInMs(), std::chrono::milliseconds(1));
-    EXPECT_EQ(session->maxUpstreamUnknownConnections(), 0);
-    EXPECT_FALSE(session->enableCommandStats());
+    EXPECT_FALSE(session->redis_config_->enableHashtagging());
+    EXPECT_TRUE(session->redis_config_->enableRedirection());
+    EXPECT_EQ(session->redis_config_->maxBufferSizeBeforeFlush(), 0);
+    EXPECT_EQ(session->redis_config_->bufferFlushTimeoutInMs(), std::chrono::milliseconds(1));
+    EXPECT_EQ(session->redis_config_->maxUpstreamUnknownConnections(), 0);
+    EXPECT_FALSE(session->redis_config_->enableCommandStats());
     session->onDeferredDeleteBase(); // This must be called to pass assertions in the destructor.
   }
 
@@ -602,6 +601,8 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
   EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
   EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(2UL,
+            cluster_->info_->stats_store_.counter("health_check.redis.exists_failure").value());
 }
 
 TEST_F(RedisHealthCheckerTest, ExistsRedirected) {

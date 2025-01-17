@@ -24,7 +24,19 @@
     {
       "label": "Refresh Compilation Database",
       "type": "shell",
-      "command": "tools/vscode/refresh_compdb.sh",
+      "command": "ENVOY_GEN_COMPDB_OPTIONS=\"--vscode\" ./ci/do_ci.sh refresh_compdb",
+      "problemMatcher": []
+    },
+    {
+      "label": "Refresh Compilation Database Exclude Contrib",
+      "type": "shell",
+      "command": "ENVOY_GEN_COMPDB_OPTIONS=\"--vscode --exclude_contrib\" ./ci/do_ci.sh refresh_compdb",
+      "problemMatcher": []
+    },
+    {
+      "label": "Local Fix Format",
+      "type": "shell",
+      "command": "tools/local_fix_format.sh -all",
       "problemMatcher": []
     }
   ]

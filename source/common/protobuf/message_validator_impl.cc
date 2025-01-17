@@ -16,27 +16,48 @@ const char deprecation_error[] = " If continued use of this field is absolutely 
                                  "see " ENVOY_DOC_URL_RUNTIME_OVERRIDE_DEPRECATED " for "
                                  "how to apply a temporary and highly discouraged override.";
 
-void onDeprecatedFieldCommon(absl::string_view description, bool soft_deprecation) {
+absl::Status onDeprecatedFieldCommon(absl::string_view description, bool soft_deprecation,
+                                     bool skip_deprecated_logs) {
   if (soft_deprecation) {
-    ENVOY_LOG_MISC(warn, "Deprecated field: {}", absl::StrCat(description, deprecation_error));
+    if (!skip_deprecated_logs) {
+      ENVOY_LOG_MISC(warn, "Deprecated field: {}", absl::StrCat(description, deprecation_error));
+    }
   } else {
-    throw DeprecatedProtoFieldException(absl::StrCat(description, deprecation_error));
+    return absl::InvalidArgumentError(absl::StrCat(description, deprecation_error));
   }
+  return absl::OkStatus();
 }
 } // namespace
 
-void WarningValidationVisitorImpl::setUnknownCounter(Stats::Counter& counter) {
-  ASSERT(unknown_counter_ == nullptr);
-  unknown_counter_ = &counter;
-  counter.add(prestats_unknown_count_);
+void WipCounterBase::setWipCounter(Stats::Counter& wip_counter) {
+  ASSERT(wip_counter_ == nullptr);
+  wip_counter_ = &wip_counter;
+  wip_counter.add(prestats_wip_count_);
 }
 
-void WarningValidationVisitorImpl::onUnknownField(absl::string_view description) {
+void WipCounterBase::onWorkInProgressCommon(absl::string_view description) {
+  ENVOY_LOG_MISC(warn, "{}", description);
+  if (wip_counter_ != nullptr) {
+    wip_counter_->inc();
+  } else {
+    prestats_wip_count_++;
+  }
+}
+
+void WarningValidationVisitorImpl::setCounters(Stats::Counter& unknown_counter,
+                                               Stats::Counter& wip_counter) {
+  setWipCounter(wip_counter);
+  ASSERT(unknown_counter_ == nullptr);
+  unknown_counter_ = &unknown_counter;
+  unknown_counter.add(prestats_unknown_count_);
+}
+
+absl::Status WarningValidationVisitorImpl::onUnknownField(absl::string_view description) {
   const uint64_t hash = HashUtil::xxHash64(description);
   auto it = descriptions_.insert(hash);
   // If we've seen this before, skip.
   if (!it.second) {
-    return;
+    return absl::OkStatus();
   }
 
   // It's a new field, log and bump stat.
@@ -46,21 +67,30 @@ void WarningValidationVisitorImpl::onUnknownField(absl::string_view description)
   } else {
     unknown_counter_->inc();
   }
+  return absl::OkStatus();
 }
 
-void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description,
-                                                     bool soft_deprecation) {
-  onDeprecatedFieldCommon(description, soft_deprecation);
+absl::Status WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description,
+                                                             bool soft_deprecation) {
+  return onDeprecatedFieldCommon(description, soft_deprecation, isSkipDeprecatedLogs());
 }
 
-void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
-  throw UnknownProtoFieldException(
+void WarningValidationVisitorImpl::onWorkInProgress(absl::string_view description) {
+  onWorkInProgressCommon(description);
+}
+
+absl::Status StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
+  return absl::InvalidArgumentError(
       absl::StrCat("Protobuf message (", description, ") has unknown fields"));
 }
 
-void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description,
-                                                    bool soft_deprecation) {
-  onDeprecatedFieldCommon(description, soft_deprecation);
+absl::Status StrictValidationVisitorImpl::onDeprecatedField(absl::string_view description,
+                                                            bool soft_deprecation) {
+  return onDeprecatedFieldCommon(description, soft_deprecation, isSkipDeprecatedLogs());
+}
+
+void StrictValidationVisitorImpl::onWorkInProgress(absl::string_view description) {
+  onWorkInProgressCommon(description);
 }
 
 ValidationVisitor& getNullValidationVisitor() {

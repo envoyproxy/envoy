@@ -2,21 +2,19 @@
 
 namespace Envoy {
 
-FakeResourceMonitor::~FakeResourceMonitor() { factory_.onMonitorDestroyed(this); }
+FakeResourceMonitor::~FakeResourceMonitor() { factory_.onMonitorDestroyed(); }
 
-void FakeResourceMonitor::updateResourceUsage(Callbacks& callbacks) {
+void FakeResourceMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   Server::ResourceUsage usage;
   usage.resource_pressure_ = pressure_;
   callbacks.onSuccess(usage);
 }
 
-void FakeResourceMonitorFactory::onMonitorDestroyed(FakeResourceMonitor* monitor) {
-  ASSERT(monitor_ == monitor);
-  monitor_ = nullptr;
-}
+void FakeResourceMonitorFactory::onMonitorDestroyed() { monitor_ = nullptr; }
+
 Server::ResourceMonitorPtr FakeResourceMonitorFactory::createResourceMonitor(
     const Protobuf::Message&, Server::Configuration::ResourceMonitorFactoryContext& context) {
-  auto monitor = std::make_unique<FakeResourceMonitor>(context.dispatcher(), *this);
+  auto monitor = std::make_unique<FakeResourceMonitor>(context.mainThreadDispatcher(), *this);
   monitor_ = monitor.get();
   return monitor;
 }

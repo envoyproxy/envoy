@@ -23,11 +23,14 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/server/overload/thread_local_overload_state.h"
 #include "envoy/server/watchdog.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/thread/thread.h"
+
+#include "absl/functional/any_invocable.h"
 
 namespace Envoy {
 namespace Event {
@@ -51,7 +54,7 @@ using DispatcherStatsPtr = std::unique_ptr<DispatcherStats>;
 /**
  * Callback invoked when a dispatcher post() runs.
  */
-using PostCb = std::function<void()>;
+using PostCb = absl::AnyInvocable<void()>;
 
 using PostCbSharedPtr = std::shared_ptr<PostCb>;
 
@@ -210,53 +213,21 @@ public:
    * @param transport_socket supplies a transport socket to be used by the connection.
    * @param options the socket options to be set on the underlying socket before anything is sent
    *        on the socket.
+   * @param transport socket options used to create the transport socket.
    * @return Network::ClientConnectionPtr a client connection that is owned by the caller.
    */
-  virtual Network::ClientConnectionPtr
-  createClientConnection(Network::Address::InstanceConstSharedPtr address,
-                         Network::Address::InstanceConstSharedPtr source_address,
-                         Network::TransportSocketPtr&& transport_socket,
-                         const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
-
-  /**
-   * Creates an async DNS resolver. The resolver should only be used on the thread that runs this
-   * dispatcher.
-   * @param resolvers supplies the addresses of DNS resolvers that this resolver should use. If left
-   * empty, it will not use any specific resolvers, but use defaults (/etc/resolv.conf)
-   * @param dns_resolver_options supplies the aggregated area options flags needed for dns resolver
-   * init.
-   * @return Network::DnsResolverSharedPtr that is owned by the caller.
-   */
-  virtual Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) PURE;
+  virtual Network::ClientConnectionPtr createClientConnection(
+      Network::Address::InstanceConstSharedPtr address,
+      Network::Address::InstanceConstSharedPtr source_address,
+      Network::TransportSocketPtr&& transport_socket,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.
    */
   virtual Filesystem::WatcherPtr createFilesystemWatcher() PURE;
 
-  /**
-   * Creates a listener on a specific port.
-   * @param socket supplies the socket to listen on.
-   * @param cb supplies the callbacks to invoke for listener events.
-   * @param bind_to_port controls whether the listener binds to a transport port or not.
-   * @return Network::ListenerPtr a new listener that is owned by the caller.
-   */
-  virtual Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                              Network::TcpListenerCallbacks& cb,
-                                              bool bind_to_port) PURE;
-
-  /**
-   * Creates a logical udp listener on a specific port.
-   * @param socket supplies the socket to listen on.
-   * @param cb supplies the udp listener callbacks to invoke for listener events.
-   * @param config provides the UDP socket configuration.
-   * @return Network::ListenerPtr a new listener that is owned by the caller.
-   */
-  virtual Network::UdpListenerPtr
-  createUdpListener(Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
-                    const envoy::config::core::v3::UdpSocketConfig& config) PURE;
   /**
    * Submits an item for deferred delete. @see DeferredDeletable.
    */

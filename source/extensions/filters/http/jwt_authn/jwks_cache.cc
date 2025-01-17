@@ -5,11 +5,17 @@
 
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 #include "source/common/config/datasource.h"
+#include "source/common/http/utility.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/strings/string_view.h"
+#include "absl/time/time.h"
+#include "absl/types/optional.h"
 #include "jwt_verify_lib/check_audience.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
@@ -27,14 +33,49 @@ class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger:
 public:
   JwksDataImpl(const JwtProvider& jwt_provider, Server::Configuration::FactoryContext& context,
                CreateJwksFetcherCb fetcher_cb, JwtAuthnFilterStats& stats)
-      : jwt_provider_(jwt_provider), time_source_(context.timeSource()),
-        tls_(context.threadLocal()) {
+      : jwt_provider_(jwt_provider), time_source_(context.serverFactoryContext().timeSource()),
+        tls_(context.serverFactoryContext().threadLocal()) {
+
+    if (jwt_provider_.has_remote_jwks()) {
+      // remote_jwks.retry_policy has an invalid case that could not be validated by the
+      // proto validation annotation. It has to be validated by the code.
+      if (jwt_provider_.remote_jwks().has_retry_policy()) {
+        THROW_IF_NOT_OK(
+            Http::Utility::validateCoreRetryPolicy(jwt_provider_.remote_jwks().retry_policy()));
+      }
+      if (jwt_provider_.remote_jwks().has_cache_duration()) {
+        // Use `durationToMilliseconds` as it has stricter max boundary to the `seconds` value to
+        // avoid overflow.
+        ProtobufWkt::Duration duration_copy(jwt_provider_.remote_jwks().cache_duration());
+        (void)DurationUtil::durationToMilliseconds(duration_copy);
+
+        // remote_jwks.duration is used as: now + remote_jwks.duration.
+        // need to verify twice of its `seconds` value.
+        duration_copy.set_seconds(2 * duration_copy.seconds());
+        (void)DurationUtil::durationToMilliseconds(duration_copy);
+      }
+    }
 
     std::vector<std::string> audiences;
     for (const auto& aud : jwt_provider_.audiences()) {
       audiences.push_back(aud);
     }
     audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
+
+    if (jwt_provider_.has_subjects()) {
+      sub_matcher_.emplace(jwt_provider_.subjects(), context.serverFactoryContext());
+    }
+
+    if (jwt_provider_.require_expiration()) {
+      max_exp_ = absl::InfiniteDuration();
+    }
+
+    if (jwt_provider_.has_max_lifetime()) {
+      // Intentionally overwrite previous max_exp_. max_lifetime takes precedence.
+      max_exp_ = absl::Seconds(jwt_provider_.max_lifetime().seconds()) +
+                 absl::Nanoseconds(jwt_provider_.max_lifetime().nanos());
+    }
+
     bool enable_jwt_cache = jwt_provider_.has_jwt_cache_config();
     const auto& config = jwt_provider_.jwt_cache_config();
     tls_.set([enable_jwt_cache, config](Envoy::Event::Dispatcher& dispatcher) {
@@ -42,7 +83,9 @@ public:
     });
 
     const auto inline_jwks =
-        Config::DataSource::read(jwt_provider_.local_jwks(), true, context.api());
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(jwt_provider_.local_jwks(), true,
+                                                       context.serverFactoryContext().api()),
+                              std::string);
     if (!inline_jwks.empty()) {
       auto jwks =
           ::google::jwt_verify::Jwks::createFrom(inline_jwks, ::google::jwt_verify::Jwks::JWKS);
@@ -66,6 +109,35 @@ public:
 
   bool areAudiencesAllowed(const std::vector<std::string>& jwt_audiences) const override {
     return audiences_->areAudiencesAllowed(jwt_audiences);
+  }
+
+  bool isSubjectAllowed(const absl::string_view jwt_subject) const override {
+    if (!sub_matcher_.has_value()) {
+      return true;
+    }
+
+    return sub_matcher_->match(jwt_subject);
+  }
+
+  bool isLifetimeAllowed(const absl::Time& now, const absl::Time* exp) const override {
+    // This function takes the current time and calculates the remaining lifetime of the JWT.
+    // Then it compares that with the max lifetime in the config. Using issue time or not before
+    // claims would be better, but optional according to the spec.
+
+    // Without a max lifetime, any exp is allowed.
+    if (!max_exp_.has_value()) {
+      return true;
+    }
+
+    // If there's no exp field and we have a max set, then this isn't allowed.
+    if (exp == nullptr) {
+      return false;
+    }
+
+    // Take the remaining credential lifetime and return if it's less
+    // than the max.
+    absl::Duration lifetime = *exp - now;
+    return lifetime < *max_exp_;
   }
 
   const Jwks* getJwksObj() const override { return tls_->jwks_.get(); }
@@ -117,6 +189,8 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCache> tls_;
   // async fetcher
   JwksAsyncFetcherPtr async_fetcher_;
+  absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>> sub_matcher_;
+  absl::optional<absl::Duration> max_exp_;
 };
 
 using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;
@@ -127,14 +201,20 @@ public:
   JwksCacheImpl(const JwtAuthentication& config, Server::Configuration::FactoryContext& context,
                 CreateJwksFetcherCb fetcher_fn, JwtAuthnFilterStats& stats)
       : stats_(stats) {
-    for (const auto& it : config.providers()) {
-      const auto& provider = it.second;
+    for (const auto& [name, provider] : config.providers()) {
       auto jwks_data = std::make_unique<JwksDataImpl>(provider, context, fetcher_fn, stats);
       if (issuer_ptr_map_.find(provider.issuer()) == issuer_ptr_map_.end()) {
         issuer_ptr_map_.emplace(provider.issuer(), jwks_data.get());
       }
-      jwks_data_map_.emplace(it.first, std::move(jwks_data));
+      jwks_data_map_.emplace(name, std::move(jwks_data));
     }
+  }
+
+  JwksData* getSingleProvider() override {
+    if (jwks_data_map_.size() == 1) {
+      return jwks_data_map_.begin()->second.get();
+    }
+    return nullptr;
   }
 
   JwksData* findByIssuer(const std::string& issuer) override {
@@ -152,7 +232,7 @@ public:
       return it->second.get();
     }
     // Verifier::innerCreate function makes sure that all provider names are defined.
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
   }
 
   JwtAuthnFilterStats& stats() override { return stats_; }

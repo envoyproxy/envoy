@@ -19,9 +19,7 @@ public:
 
 private:
   // Common::ImplBase
-  void emitLog(const Http::RequestHeaderMap& request_headers,
-               const Http::ResponseHeaderMap& response_headers,
-               const Http::ResponseTrailerMap& response_trailers,
+  void emitLog(const Formatter::HttpFormatterContext& context,
                const StreamInfo::StreamInfo& stream_info) override;
 
   AccessLog::AccessLogFileSharedPtr log_file_;

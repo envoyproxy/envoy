@@ -8,12 +8,13 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/stats_matcher_impl.h"
-#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -27,7 +28,8 @@ public:
   ThreadLocalStorePerf()
       : heap_alloc_(symbol_table_), store_(heap_alloc_),
         api_(Api::createApiForTest(store_, time_system_)) {
-    store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
+    const Stats::TagVector tags;
+    store_.setTagProducer(Stats::TagProducerImpl::createTagProducer(stats_config_, tags).value());
 
     Stats::TestUtil::forEachSampleStat(1000, true, [this](absl::string_view name) {
       stat_names_.push_back(std::make_unique<Stats::StatNameManagedStorage>(name, symbol_table_));
@@ -48,8 +50,9 @@ public:
   }
 
   void accessCounters() {
+    Stats::Scope& scope = *store_.rootScope();
     for (auto& stat_name_storage : stat_names_) {
-      store_.counterFromStatName(stat_name_storage->statName());
+      scope.counterFromStatName(stat_name_storage->statName());
     }
   }
 
@@ -66,10 +69,12 @@ public:
   void initPrefixRejections(const std::string& prefix) {
     stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
         prefix);
-    store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_));
+    store_.setStatsMatcher(
+        std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_, context_));
   }
 
 private:
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Stats::SymbolTableImpl symbol_table_;
   Event::SimulatedTimeSystem time_system_;
   Stats::AllocatorImpl heap_alloc_;

@@ -1,9 +1,11 @@
 #pragma once
 
+#include "envoy/common/execution_context.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 
@@ -31,8 +33,14 @@ public:
   void* operator new(std::size_t) = delete;
 
 private:
+  friend class ScopeTrackerScopeStateTest;
+
   const ScopeTrackedObject* registered_object_;
   Event::ScopeTracker& tracker_;
+
+#ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
+  ScopedExecutionContext scoped_execution_context_{registered_object_};
+#endif
 };
 
 } // namespace Envoy

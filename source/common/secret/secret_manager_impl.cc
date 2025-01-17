@@ -8,7 +8,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/secret/secret_provider_impl.h"
@@ -18,12 +17,16 @@
 namespace Envoy {
 namespace Secret {
 
-SecretManagerImpl::SecretManagerImpl(Server::ConfigTracker& config_tracker)
-    : config_tracker_entry_(
-          config_tracker.add("secrets", [this](const Matchers::StringMatcher& name_matcher) {
-            return dumpSecretConfigs(name_matcher);
-          })) {}
-void SecretManagerImpl::addStaticSecret(
+SecretManagerImpl::SecretManagerImpl(OptRef<Server::ConfigTracker> config_tracker) {
+  if (config_tracker.has_value()) {
+    config_tracker_entry_ =
+        config_tracker->add("secrets", [this](const Matchers::StringMatcher& name_matcher) {
+          return dumpSecretConfigs(name_matcher);
+        });
+  }
+}
+
+absl::Status SecretManagerImpl::addStaticSecret(
     const envoy::extensions::transport_sockets::tls::v3::Secret& secret) {
   switch (secret.type_case()) {
   case envoy::extensions::transport_sockets::tls::v3::Secret::TypeCase::kTlsCertificate: {
@@ -31,7 +34,7 @@ void SecretManagerImpl::addStaticSecret(
         std::make_shared<TlsCertificateConfigProviderImpl>(secret.tls_certificate());
     if (!static_tls_certificate_providers_.insert(std::make_pair(secret.name(), secret_provider))
              .second) {
-      throw EnvoyException(
+      return absl::InvalidArgumentError(
           absl::StrCat("Duplicate static TlsCertificate secret name ", secret.name()));
     }
     break;
@@ -42,7 +45,7 @@ void SecretManagerImpl::addStaticSecret(
     if (!static_certificate_validation_context_providers_
              .insert(std::make_pair(secret.name(), secret_provider))
              .second) {
-      throw EnvoyException(absl::StrCat(
+      return absl::InvalidArgumentError(absl::StrCat(
           "Duplicate static CertificateValidationContext secret name ", secret.name()));
     }
     break;
@@ -53,7 +56,7 @@ void SecretManagerImpl::addStaticSecret(
     if (!static_session_ticket_keys_providers_
              .insert(std::make_pair(secret.name(), secret_provider))
              .second) {
-      throw EnvoyException(
+      return absl::InvalidArgumentError(
           absl::StrCat("Duplicate static TlsSessionTicketKeys secret name ", secret.name()));
     }
     break;
@@ -63,14 +66,15 @@ void SecretManagerImpl::addStaticSecret(
         std::make_shared<GenericSecretConfigProviderImpl>(secret.generic_secret());
     if (!static_generic_secret_providers_.insert(std::make_pair(secret.name(), secret_provider))
              .second) {
-      throw EnvoyException(
+      return absl::InvalidArgumentError(
           absl::StrCat("Duplicate static GenericSecret secret name ", secret.name()));
     }
     break;
   }
   default:
-    throw EnvoyException("Secret type not implemented");
+    return absl::InvalidArgumentError("Secret type not implemented");
   }
+  return absl::OkStatus();
 }
 
 TlsCertificateConfigProviderSharedPtr
@@ -125,41 +129,40 @@ GenericSecretConfigProviderSharedPtr SecretManagerImpl::createInlineGenericSecre
 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
     const envoy::config::core::v3::ConfigSource& sds_config_source, const std::string& config_name,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+    Init::Manager& init_manager) {
   return certificate_providers_.findOrCreate(sds_config_source, config_name,
-                                             secret_provider_context);
+                                             secret_provider_context, init_manager);
 }
 
 CertificateValidationContextConfigProviderSharedPtr
 SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
     const envoy::config::core::v3::ConfigSource& sds_config_source, const std::string& config_name,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+    Init::Manager& init_manager) {
   return validation_context_providers_.findOrCreate(sds_config_source, config_name,
-                                                    secret_provider_context);
+                                                    secret_provider_context, init_manager);
 }
 
 TlsSessionTicketKeysConfigProviderSharedPtr
 SecretManagerImpl::findOrCreateTlsSessionTicketKeysContextProvider(
     const envoy::config::core::v3::ConfigSource& sds_config_source, const std::string& config_name,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+    Init::Manager& init_manager) {
   return session_ticket_keys_providers_.findOrCreate(sds_config_source, config_name,
-                                                     secret_provider_context);
+                                                     secret_provider_context, init_manager);
 }
 
 GenericSecretConfigProviderSharedPtr SecretManagerImpl::findOrCreateGenericSecretProvider(
     const envoy::config::core::v3::ConfigSource& sds_config_source, const std::string& config_name,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+    Init::Manager& init_manager) {
   return generic_secret_providers_.findOrCreate(sds_config_source, config_name,
-                                                secret_provider_context);
+                                                secret_provider_context, init_manager);
 }
 
 ProtobufTypes::MessagePtr
 SecretManagerImpl::dumpSecretConfigs(const Matchers::StringMatcher& name_matcher) {
-  // TODO(htuch): unlike other config providers, we're recreating the original
-  // Secrets below. This makes it hard to support API_RECOVER_ORIGINAL()-style
-  // recovery of the original config message. As a result, for now we're
-  // providing v3 config dumps. For Secrets, the main deprecation of interest
-  // are the use of v2 Struct config() and verify_subject_alt_name.
   auto config_dump = std::make_unique<envoy::admin::v3::SecretsConfigDump>();
   // Handle static tls key/cert providers.
   for (const auto& cert_iter : static_tls_certificate_providers_) {

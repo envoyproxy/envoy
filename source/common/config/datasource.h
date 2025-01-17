@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/init/manager.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/backoff_strategy.h"
@@ -19,16 +20,37 @@ namespace Envoy {
 namespace Config {
 namespace DataSource {
 
+class DataSourceProvider;
+
+using ProtoDataSource = envoy::config::core::v3::DataSource;
+using ProtoWatchedDirectory = envoy::config::core::v3::WatchedDirectory;
+using DataSourceProviderPtr = std::unique_ptr<DataSourceProvider>;
+
+/**
+ * Read contents of the file.
+ * @param path file path.
+ * @param api reference to the Api.
+ * @param allow_empty return an empty string if the file is empty.
+ * @param max_size max size limit of file to read, default 0 means no limit, and if the file data
+ * would exceed the limit, it will return an error status.
+ * @return std::string with file contents. or an error status if the file does not exist or
+ * cannot be read.
+ */
+absl::StatusOr<std::string> readFile(const std::string& path, Api::Api& api, bool allow_empty,
+                                     uint64_t max_size = 0);
+
 /**
  * Read contents of the DataSource.
  * @param source data source.
  * @param allow_empty return an empty string if no DataSource case is specified.
- * @param api reference to the Api object
- * @return std::string with DataSource contents.
- * @throw EnvoyException if no DataSource case is specified and !allow_empty.
+ * @param api reference to the Api.
+ * @param max_size max size limit of file to read, default 0 means no limit, and if the file data
+ * would exceed the limit, it will return an error status.
+ * @return std::string with DataSource contents. or an error status if no DataSource case is
+ * specified and !allow_empty.
  */
-std::string read(const envoy::config::core::v3::DataSource& source, bool allow_empty,
-                 Api::Api& api);
+absl::StatusOr<std::string> read(const envoy::config::core::v3::DataSource& source,
+                                 bool allow_empty, Api::Api& api, uint64_t max_size = 0);
 
 /**
  * @param source data source.
@@ -36,84 +58,61 @@ std::string read(const envoy::config::core::v3::DataSource& source, bool allow_e
  */
 absl::optional<std::string> getPath(const envoy::config::core::v3::DataSource& source);
 
+class DynamicData {
+public:
+  struct ThreadLocalData : public ThreadLocal::ThreadLocalObject {
+    ThreadLocalData(std::shared_ptr<std::string> data) : data_(std::move(data)) {}
+    std::shared_ptr<std::string> data_;
+  };
+
+  DynamicData(DynamicData&&) = default;
+  DynamicData(Event::Dispatcher& main_dispatcher, ThreadLocal::TypedSlotPtr<ThreadLocalData> slot,
+              Filesystem::WatcherPtr watcher);
+  ~DynamicData();
+
+  const std::string& data() const;
+
+private:
+  Event::Dispatcher& dispatcher_;
+  ThreadLocal::TypedSlotPtr<ThreadLocalData> slot_;
+  Filesystem::WatcherPtr watcher_;
+};
+
 /**
- * Callback for async data source.
+ * DataSourceProvider provides a way to get the DataSource contents and watch the possible
+ * content changes. The watch only works for filename-based DataSource and watched directory
+ * is provided explicitly.
+ *
+ * NOTE: This should only be used when the envoy.config.core.v3.DataSource is necessary and
+ * file watch is required.
  */
-using AsyncDataSourceCb = std::function<void(const std::string&)>;
-
-class LocalAsyncDataProvider {
+class DataSourceProvider {
 public:
-  LocalAsyncDataProvider(Init::Manager& manager, const envoy::config::core::v3::DataSource& source,
-                         bool allow_empty, Api::Api& api, AsyncDataSourceCb&& callback)
-      : init_target_("LocalAsyncDataProvider", [this, &source, allow_empty, &api, callback]() {
-          callback(DataSource::read(source, allow_empty, api));
-          init_target_.ready();
-        }) {
-    manager.add(init_target_);
-  }
+  /**
+   * Create a DataSourceProvider from a DataSource.
+   * @param source data source.
+   * @param main_dispatcher reference to the main dispatcher.
+   * @param tls reference to the thread local slot allocator.
+   * @param api reference to the Api.
+   * @param allow_empty return an empty string if no DataSource case is specified.
+   * @param max_size max size limit of file to read, default 0 means no limit.
+   * @return absl::StatusOr<DataSourceProvider> with DataSource contents. or an error
+   * status if any error occurs.
+   * NOTE: If file watch is enabled and the new file content does not meet the
+   * requirements (allow_empty, max_size), the provider will keep the old content.
+   */
+  static absl::StatusOr<DataSourceProviderPtr>
+  create(const ProtoDataSource& source, Event::Dispatcher& main_dispatcher,
+         ThreadLocal::SlotAllocator& tls, Api::Api& api, bool allow_empty, uint64_t max_size = 0);
 
-  ~LocalAsyncDataProvider() { init_target_.ready(); }
+  const std::string& data() const;
 
 private:
-  Init::TargetImpl init_target_;
+  DataSourceProvider(std::string&& data) : data_(std::move(data)) {}
+  DataSourceProvider(DynamicData&& data) : data_(std::move(data)) {}
+
+  absl::variant<std::string, DynamicData> data_;
 };
-
-using LocalAsyncDataProviderPtr = std::unique_ptr<LocalAsyncDataProvider>;
-
-class RemoteAsyncDataProvider : public Event::DeferredDeletable,
-                                public Config::DataFetcher::RemoteDataFetcherCallback,
-                                public Logger::Loggable<Logger::Id::config> {
-public:
-  RemoteAsyncDataProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
-                          const envoy::config::core::v3::RemoteDataSource& source,
-                          Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
-                          bool allow_empty, AsyncDataSourceCb&& callback);
-
-  ~RemoteAsyncDataProvider() override {
-    init_target_.ready();
-    if (retry_timer_) {
-      retry_timer_->disableTimer();
-    }
-  }
-
-  // Config::DataFetcher::RemoteDataFetcherCallback
-  void onSuccess(const std::string& data) override {
-    callback_(data);
-    init_target_.ready();
-  }
-
-  // Config::DataFetcher::RemoteDataFetcherCallback
-  void onFailure(Config::DataFetcher::FailureReason failure) override {
-    ENVOY_LOG(debug, "Failed to fetch remote data, failure reason: {}", enumToInt(failure));
-    if (retries_remaining_-- == 0) {
-      ENVOY_LOG(warn, "Retry limit exceeded for fetching data from remote data source.");
-      if (allow_empty_) {
-        callback_(EMPTY_STRING);
-      }
-      // We need to allow server startup to continue.
-      init_target_.ready();
-      return;
-    }
-
-    const auto retry_ms = std::chrono::milliseconds(backoff_strategy_->nextBackOffMs());
-    ENVOY_LOG(debug, "Remote data provider will retry in {} ms.", retry_ms.count());
-    retry_timer_->enableTimer(retry_ms);
-  }
-
-private:
-  void start() { fetcher_->fetch(); }
-
-  bool allow_empty_;
-  AsyncDataSourceCb callback_;
-  const Config::DataFetcher::RemoteDataFetcherPtr fetcher_;
-  Init::TargetImpl init_target_;
-
-  Event::TimerPtr retry_timer_;
-  BackOffStrategyPtr backoff_strategy_;
-  uint32_t retries_remaining_;
-};
-
-using RemoteAsyncDataProviderPtr = std::unique_ptr<RemoteAsyncDataProvider>;
 
 } // namespace DataSource
 } // namespace Config

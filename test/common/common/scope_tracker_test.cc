@@ -11,7 +11,6 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-namespace {
 
 using testing::_;
 
@@ -33,5 +32,4 @@ TEST(ScopeTrackerScopeStateTest, ShouldManageTrackedObjectOnDispatcherStack) {
   static_cast<Event::DispatcherImpl*>(dispatcher.get())->onFatalError(std::cerr);
 }
 
-} // namespace
 } // namespace Envoy

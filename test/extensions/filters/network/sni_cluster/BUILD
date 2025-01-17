@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "sni_cluster_test",
     srcs = ["sni_cluster_test.cc"],
     extension_names = ["envoy.filters.network.sni_cluster"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/sni_cluster",
         "//source/extensions/filters/network/sni_cluster:config",

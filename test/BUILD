@@ -21,16 +21,17 @@ envoy_cc_test_library(
         "main.cc",
         "test_listener.cc",
         "test_runner.cc",
+    ],
+    hdrs = [
+        "test_listener.h",
         "test_runner.h",
     ],
-    hdrs = ["test_listener.h"],
     deps = [
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
         "//source/exe:process_wide_lib",
         "//source/server:backtrace_lib",
-        "//test/common/runtime:utility_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:global_lib",
@@ -38,13 +39,23 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "test_listener_lib",
+    srcs = [
+        "test_listener.cc",
+    ],
+    hdrs = ["test_listener.h"],
+    deps = [
+        "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//test/test_common:global_lib",
+    ],
+)
+
 envoy_pch_library(
     name = "test_pch",
     testonly = True,
-    external_deps = [
-        "googletest",
-        "spdlog",
-    ],
     includes = [
         "envoy/config/bootstrap/v3/bootstrap.pb.h",
         "envoy/config/cluster/v3/cluster.pb.h",
@@ -78,6 +89,8 @@ envoy_pch_library(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/mocks/stats:stats_mocks",
+        "@com_github_gabime_spdlog//:spdlog",
+        "@com_google_googletest//:gtest",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

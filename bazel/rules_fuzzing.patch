@@ -1,0 +1,28 @@
+diff --git a/fuzzing/private/oss_fuzz/package.bzl b/fuzzing/private/oss_fuzz/package.bzl
+index 4f4e636..a1add46 100644
+--- a/fuzzing/private/oss_fuzz/package.bzl
++++ b/fuzzing/private/oss_fuzz/package.bzl
+@@ -79,7 +79,7 @@ def _oss_fuzz_package_impl(ctx):
+             if [[ -n "{options_path}" ]]; then
+                 ln -s "$(pwd)/{options_path}" "$STAGING_DIR/{base_name}.options"
+             fi
+-            tar -chf "{output}" -C "$STAGING_DIR" .
++            tar -czhf "{output}" -C "$STAGING_DIR" .
+         """.format(
+             base_name = ctx.attr.base_name,
+             binary_path = binary_info.binary_file.path,
+diff --git a/fuzzing/tools/validate_dict.py b/fuzzing/tools/validate_dict.py
+index 52cbcb8..dac313a 100644
+--- a/fuzzing/tools/validate_dict.py
++++ b/fuzzing/tools/validate_dict.py
+@@ -22,6 +22,10 @@ from absl import flags
+ from fuzzing.tools.dict_validation import validate_line
+ from sys import stderr
+ 
++import os
++import sys
++sys.path += [os.path.dirname(__file__)]
++
+ FLAGS = flags.FLAGS
+ 
+ flags.DEFINE_list("dict_list", [],

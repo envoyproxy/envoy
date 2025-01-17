@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.generic_proxy.action.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.generic_proxy.action.v3";
+option java_outer_classname = "ActionProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/generic_proxy/action/v3;actionv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Generic Proxy Route Action Configuration]
+
+// Configuration for the route match action.
+// [#next-free-field: 8]
+message RouteAction {
+  // The name of the route action. This should be unique across all route actions.
+  string name = 5;
+
+  oneof cluster_specifier {
+    option (validate.required) = true;
+
+    // Indicates the upstream cluster to which the request should be routed.
+    string cluster = 1;
+
+    // [#not-implemented-hide:]
+    // Multiple upstream clusters can be specified for a given route. The request is routed to one
+    // of the upstream clusters based on weights assigned to each cluster.
+    // Currently ClusterWeight only supports the name and weight fields.
+    config.route.v3.WeightedCluster weighted_clusters = 2;
+  }
+
+  // Route metadata.
+  config.core.v3.Metadata metadata = 3;
+
+  // Route level config for L7 generic filters. The key should be the related :ref:`extension name
+  // <envoy_v3_api_field_config.core.v3.TypedExtensionConfig.name>` in the :ref:`generic filters
+  // <envoy_v3_api_field_extensions.filters.network.generic_proxy.v3.GenericProxy.filters>`.
+  map<string, google.protobuf.Any> per_filter_config = 4;
+
+  // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
+  // spans between the point at which the entire downstream request (i.e. end-of-stream) has been
+  // processed and when the upstream response has been completely processed. A value of 0 will
+  // disable the route's timeout.
+  google.protobuf.Duration timeout = 6;
+
+  // Specifies the retry policy for the route. If not specified, then no retries will be performed.
+  //
+  // .. note::
+  //   Only simplest retry policy is supported and only ``num_retries`` field is used for generic
+  //   proxy. The default value for ``num_retries`` is 1 means that the request will be tried once
+  //   and no additional retries will be performed.
+  config.core.v3.RetryPolicy retry_policy = 7;
+}

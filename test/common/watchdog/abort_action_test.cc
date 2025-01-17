@@ -6,7 +6,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
-#include "envoy/watchdog/v3alpha/abort_action.pb.h"
+#include "envoy/watchdog/v3/abort_action.pb.h"
 
 #include "source/common/watchdog/abort_action.h"
 #include "source/common/watchdog/abort_action_config.h"
@@ -21,13 +21,13 @@ namespace Envoy {
 namespace Watchdog {
 namespace {
 
-using AbortActionConfig = envoy::watchdog::v3alpha::AbortActionConfig;
+using AbortActionConfig = envoy::watchdog::v3::AbortActionConfig;
 
 class AbortActionTest : public testing::Test {
 protected:
   AbortActionTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
-        context_({*api_, *dispatcher_, stats_, "test"}) {}
+        context_({*api_, *dispatcher_, *stats_.rootScope(), "test"}) {}
 
   Stats::TestUtil::TestStore stats_;
   Api::ApiPtr api_;

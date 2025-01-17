@@ -17,6 +17,7 @@ public:
 
   Api::IoError::IoErrorCode getErrorCode() const override;
   std::string getErrorDetails() const override;
+  int getSystemErrorCode() const override { return errno_; }
 
 private:
   const int errno_;
@@ -32,13 +33,13 @@ template <typename T> Api::IoCallResult<T> resultFailure(T result, int sys_errno
 }
 
 template <typename T> Api::IoCallResult<T> resultSuccess(T result) {
-  return {result, IoFileErrorPtr(nullptr, [](Api::IoError*) { NOT_REACHED_GCOVR_EXCL_LINE; })};
+  return {result, IoFileErrorPtr(nullptr, [](Api::IoError*) { PANIC("unimplemented"); })};
 }
 
 class FileSharedImpl : public File {
 public:
   FileSharedImpl(const FilePathAndType& filepath_and_type)
-      : fd_(INVALID_HANDLE), filepath_and_type_(filepath_and_type) {}
+      : filepath_and_type_(filepath_and_type) {}
 
   ~FileSharedImpl() override = default;
 
@@ -47,8 +48,9 @@ public:
   DestinationType destinationType() const override;
 
 protected:
-  filesystem_os_id_t fd_;
+  filesystem_os_id_t fd_{INVALID_HANDLE};
   const FilePathAndType filepath_and_type_;
+  static std::string generateTmpFilePath(absl::string_view path);
 };
 
 } // namespace Filesystem

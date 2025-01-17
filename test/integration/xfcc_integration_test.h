@@ -25,20 +25,22 @@ class XfccIntegrationTest : public testing::TestWithParam<Network::Address::IpVe
                             public HttpIntegrationTest {
 public:
   const std::string previous_xfcc_ =
-      "By=spiffe://lyft.com/frontend;Hash=123456;URI=spiffe://lyft.com/testclient";
+      "By=spiffe://lyft.com/frontend;By=http://frontend.lyft.com;Hash=123456;URI=spiffe://lyft.com/"
+      "testclient";
   const std::string current_xfcc_by_hash_ =
-      "By=spiffe://lyft.com/"
-      "backend-team;Hash=" +
+      "By=spiffe://lyft.com/backend-team;"
+      "By=http://backend.lyft.com;Hash=" +
       absl::AsciiStrToLower(absl::StrReplaceAll(TEST_CLIENT_CERT_HASH, {{":", ""}}));
   const std::string client_subject_ =
       "Subject=\""
       "emailAddress=frontend-team@lyft.com,CN=Test Frontend Team,"
       "OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US\"";
-  const std::string client_uri_san_ = "URI=spiffe://lyft.com/frontend-team";
+  const std::string client_uri_san_ =
+      "URI=spiffe://lyft.com/frontend-team;URI=http://frontend.lyft.com";
   const std::string client_dns_san_ = "DNS=lyft.com;DNS=www.lyft.com";
 
   XfccIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
-    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   }
 
   void initialize() override;
@@ -46,8 +48,8 @@ public:
 
   void TearDown() override;
 
-  Network::TransportSocketFactoryPtr createUpstreamSslContext();
-  Network::TransportSocketFactoryPtr createClientSslContext(bool mtls);
+  Network::DownstreamTransportSocketFactoryPtr createUpstreamSslContext();
+  Network::UpstreamTransportSocketFactoryPtr createClientSslContext(bool mtls);
   Network::ClientConnectionPtr makeTcpClientConnection();
   Network::ClientConnectionPtr makeTlsClientConnection();
   Network::ClientConnectionPtr makeMtlsClientConnection();
@@ -60,9 +62,9 @@ public:
 
 private:
   std::unique_ptr<Ssl::ContextManager> context_manager_;
-  Network::TransportSocketFactoryPtr client_tls_ssl_ctx_;
-  Network::TransportSocketFactoryPtr client_mtls_ssl_ctx_;
-  Network::TransportSocketFactoryPtr upstream_ssl_ctx_;
+  Network::UpstreamTransportSocketFactoryPtr client_tls_ssl_ctx_;
+  Network::UpstreamTransportSocketFactoryPtr client_mtls_ssl_ctx_;
+  Network::UpstreamTransportSocketFactoryPtr upstream_ssl_ctx_;
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 } // namespace Xfcc

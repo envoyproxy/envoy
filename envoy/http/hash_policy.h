@@ -9,11 +9,22 @@
 namespace Envoy {
 namespace Http {
 
-class Hashable {
+/**
+ * CookieAttribute that stores the name and value of a cookie.
+ */
+class CookieAttribute {
 public:
-  virtual absl::optional<uint64_t> hash() const PURE;
-  virtual ~Hashable() = default;
+  CookieAttribute(const std::string& name, const std::string& value) : name_(name), value_(value) {}
+
+  std::string name() const { return name_; }
+  std::string value() const { return value_; }
+
+private:
+  std::string name_;
+  std::string value_;
 };
+
+using CookieAttributeRefVector = std::vector<std::reference_wrapper<const CookieAttribute>>;
 
 /**
  * Request hash policy. I.e., if using a hashing load balancer, how a request should be hashed onto
@@ -31,7 +42,8 @@ public:
    * @return std::string the opaque value of the cookie that will be set
    */
   using AddCookieCallback = std::function<std::string(
-      const std::string& key, const std::string& path, std::chrono::seconds ttl)>;
+      const std::string& key, const std::string& path, std::chrono::seconds ttl,
+      const CookieAttributeRefVector attributes)>;
 
   /**
    * @param downstream_address is the address of the connected client host, or nullptr if the

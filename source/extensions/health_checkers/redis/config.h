@@ -29,6 +29,8 @@ public:
   }
 };
 
+DECLARE_FACTORY(RedisHealthCheckerFactory);
+
 } // namespace RedisHealthChecker
 } // namespace HealthCheckers
 } // namespace Extensions

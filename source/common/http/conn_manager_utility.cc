@@ -7,6 +7,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/common/empty_string.h"
+#include "source/common/common/enum_to_int.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/header_utility.h"
@@ -17,6 +18,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stream_info/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "absl/strings/str_cat.h"
@@ -27,7 +29,7 @@ namespace Http {
 namespace {
 
 absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
-  if (HeaderUtility::schemeIsValid(forwarded_proto)) {
+  if (Utility::schemeIsValid(forwarded_proto)) {
     return forwarded_proto;
   }
   return is_ssl ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http;
@@ -36,8 +38,9 @@ absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
 } // namespace
 std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection& connection,
                                                             const Buffer::Instance& data) {
-  if (!connection.nextProtocol().empty()) {
-    return connection.nextProtocol();
+  const std::string next_protocol = connection.nextProtocol();
+  if (!next_protocol.empty()) {
+    return next_protocol;
   }
 
   // See if the data we have so far shows the HTTP/2 prefix. We ignore the case where someone sends
@@ -58,40 +61,49 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
     const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
     uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action) {
+        headers_with_underscores_action,
+    Server::OverloadManager& overload_manager) {
   if (determineNextProtocol(connection, data) == Utility::AlpnNames::get().Http2) {
     Http2::CodecStats& stats = Http2::CodecStats::atomicGet(http2_codec_stats, scope);
     return std::make_unique<Http2::ServerConnectionImpl>(
         connection, callbacks, stats, random, http2_options, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager);
   } else {
     Http1::CodecStats& stats = Http1::CodecStats::atomicGet(http1_codec_stats, scope);
     return std::make_unique<Http1::ServerConnectionImpl>(
         connection, stats, callbacks, http1_settings, max_request_headers_kb,
-        max_request_headers_count, headers_with_underscores_action);
+        max_request_headers_count, headers_with_underscores_action, overload_manager);
+  }
+}
+
+void ConnectionManagerUtility::appendXff(RequestHeaderMap& request_headers,
+                                         Network::Connection& connection,
+                                         ConnectionManagerConfig& config) {
+  if (Network::Utility::isLoopbackAddress(*connection.connectionInfoProvider().remoteAddress())) {
+    Utility::appendXff(request_headers, config.localAddress());
+  } else {
+    Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());
   }
 }
 
 ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::mutateRequestHeaders(
     RequestHeaderMap& request_headers, Network::Connection& connection,
     ConnectionManagerConfig& config, const Router::Config& route_config,
-    const LocalInfo::LocalInfo& local_info) {
+    const LocalInfo::LocalInfo& local_info, const StreamInfo::StreamInfo& stream_info) {
+
+  for (const auto& extension : config.earlyHeaderMutationExtensions()) {
+    if (!extension->mutate(request_headers, stream_info)) {
+      break;
+    }
+  }
+
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
-  if (Utility::isUpgrade(request_headers)) {
-    // The current WebSocket implementation re-uses the HTTP1 codec to send upgrade headers to
-    // the upstream host. This adds the "transfer-encoding: chunked" request header if the stream
-    // has not ended and content-length does not exist. In HTTP1.1, if transfer-encoding and
-    // content-length both do not exist this means there is no request body. After transfer-encoding
-    // is stripped here, the upstream request becomes invalid. We can fix it by explicitly adding a
-    // "content-length: 0" request header here.
-    const bool no_body = (!request_headers.TransferEncoding() && !request_headers.ContentLength());
-    if (no_body) {
-      request_headers.setContentLength(uint64_t(0));
-    }
-  } else {
+  if (!Utility::isUpgrade(request_headers)) {
     request_headers.removeConnection();
     request_headers.removeUpgrade();
+
+    sanitizeTEHeader(request_headers);
   }
 
   // Clean proxy headers.
@@ -99,6 +111,15 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
   request_headers.removeTransferEncoding();
+
+  // Sanitize referer field if exists.
+  auto result = request_headers.get(Http::CustomHeaders::get().Referer);
+  if (!result.empty()) {
+    if (result.size() > 1 || !Utility::isValidRefererValue(result[0]->value().getStringView())) {
+      // A request header shouldn't have multiple referer field.
+      request_headers.remove(Http::CustomHeaders::get().Referer);
+    }
+  }
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate
   // peer. Cases where we don't "use remote address" include trusted double proxy where we expect
@@ -120,20 +141,25 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // are but they didn't populate XFF properly, the trusted client address is the
     // source address of the immediate downstream's connection to us.
     if (final_remote_address == nullptr) {
-      final_remote_address = connection.addressProvider().remoteAddress();
+      final_remote_address = connection.connectionInfoProvider().remoteAddress();
     }
     if (!config.skipXffAppend()) {
-      if (Network::Utility::isLoopbackAddress(*connection.addressProvider().remoteAddress())) {
-        Utility::appendXff(request_headers, config.localAddress());
-      } else {
-        Utility::appendXff(request_headers, *connection.addressProvider().remoteAddress());
-      }
+      appendXff(request_headers, connection, config);
     }
-    // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
-    // untrusted. Alternately if no x-forwarded-proto header exists, add one.
+    // If the prior hop is not a trusted proxy, overwrite any
+    // x-forwarded-proto/x-forwarded-port value it set as untrusted. Alternately if no
+    // x-forwarded-proto/x-forwarded-port header exists, add one if configured.
     if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
       request_headers.setReferenceForwardedProto(
           connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
+    }
+    if (config.appendXForwardedPort() &&
+        (xff_num_trusted_hops == 0 || request_headers.ForwardedPort() == nullptr)) {
+      const Envoy::Network::Address::Ip* ip =
+          connection.streamInfo().downstreamAddressProvider().localAddress()->ip();
+      if (ip) {
+        request_headers.setForwardedPort(ip->port());
+      }
     }
   } else {
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF
@@ -143,12 +169,15 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
     OriginalIPDetectionParams params = {request_headers,
-                                        connection.addressProvider().remoteAddress()};
+                                        connection.connectionInfoProvider().remoteAddress()};
     for (const auto& detection_extension : config.originalIpDetectionExtensions()) {
       const auto result = detection_extension->detect(params);
 
       if (result.reject_options.has_value()) {
         return {nullptr, result.reject_options};
+      }
+      if (!result.skip_xff_append) {
+        appendXff(request_headers, connection, config);
       }
 
       if (result.detected_remote_address) {
@@ -166,6 +195,16 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
                                                                 : Headers::get().SchemeValues.Http);
   }
 
+  // Usually, the x-forwarded-port header comes with x-forwarded-proto header. If the
+  // x-forwarded-proto header is not set, set it here if append-x-forwarded-port is configured.
+  if (config.appendXForwardedPort() && !request_headers.ForwardedPort()) {
+    const Envoy::Network::Address::Ip* ip =
+        connection.streamInfo().downstreamAddressProvider().localAddress()->ip();
+    if (ip) {
+      request_headers.setForwardedPort(ip->port());
+    }
+  }
+
   if (config.schemeToSet().has_value()) {
     request_headers.setScheme(config.schemeToSet().value());
     request_headers.setForwardedProto(config.schemeToSet().value());
@@ -174,11 +213,11 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
   // else encryption level.
   // X-Forwarded-Proto and :scheme may still differ if different values are sent from downstream.
-  if (!request_headers.Scheme() &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
+  if (!request_headers.Scheme()) {
     request_headers.setScheme(
         getScheme(request_headers.getForwardedProtoValue(), connection.ssl() != nullptr));
   }
+  request_headers.setScheme(absl::AsciiStrToLower(request_headers.getSchemeValue()));
 
   // At this point we can determine whether this is an internal or external request. The
   // determination of internal status uses the following:
@@ -196,7 +235,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // After determining internal request status, if there is no final remote address, due to no XFF,
   // busted XFF, etc., use the direct connection remote address for logging.
   if (final_remote_address == nullptr) {
-    final_remote_address = connection.addressProvider().remoteAddress();
+    final_remote_address = connection.connectionInfoProvider().remoteAddress();
   }
 
   // Edge request is the request from external clients to front Envoy.
@@ -239,27 +278,59 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
 
   // Generate x-request-id for all edge requests, or if there is none.
   if (config.generateRequestId()) {
-    auto rid_extension = config.requestIDExtension();
-    // Unconditionally set a request ID if we are allowed to override it from
-    // the edge. Otherwise just ensure it is set.
-    const bool force_set = !config.preserveExternalRequestId() && edge_request;
-    rid_extension->set(request_headers, force_set);
+    config.requestIDExtension()->set(request_headers, edge_request,
+                                     config.preserveExternalRequestId());
   }
 
+  if (connection.connecting() && request_headers.get(Headers::get().EarlyData).empty()) {
+    // Add an Early-Data header to indicate that this is a 0-RTT request according to
+    // https://datatracker.ietf.org/doc/html/rfc8470#section-5.1.
+    HeaderString value;
+    value.setCopy("1");
+    request_headers.addViaMove(HeaderString(Headers::get().EarlyData), std::move(value));
+  }
   mutateXfccRequestHeader(request_headers, connection, config);
 
   return {final_remote_address, absl::nullopt};
 }
 
+void ConnectionManagerUtility::sanitizeTEHeader(RequestHeaderMap& request_headers) {
+  absl::string_view te_header = request_headers.getTEValue();
+  if (te_header.empty()) {
+    return;
+  }
+
+  // If the TE header contains the "trailers" value, set the TE header to "trailers" only.
+  std::vector<absl::string_view> te_values = absl::StrSplit(te_header, ',');
+  for (const absl::string_view& te_value : te_values) {
+    bool is_trailers =
+        absl::StripAsciiWhitespace(te_value) == Http::Headers::get().TEValues.Trailers;
+
+    if (is_trailers) {
+      request_headers.setTE(Http::Headers::get().TEValues.Trailers);
+      return;
+    }
+  }
+
+  // If the TE header does not contain the "trailers" value, remove the TE header.
+  request_headers.removeTE();
+}
+
 void ConnectionManagerUtility::cleanInternalHeaders(
     RequestHeaderMap& request_headers, bool edge_request,
-    const std::list<Http::LowerCaseString>& internal_only_headers) {
+    const std::vector<Http::LowerCaseString>& internal_only_headers) {
   if (edge_request) {
+    // Headers to be stripped from edge requests, i.e. to sanitize so
+    // clients can't inject values.
     request_headers.removeEnvoyDecoratorOperation();
     request_headers.removeEnvoyDownstreamServiceCluster();
     request_headers.removeEnvoyDownstreamServiceNode();
+    request_headers.removeEnvoyOriginalPath();
   }
 
+  // Headers to be stripped from edge *and* intermediate-hop external requests.
+  // TODO: some of these should only be stripped at edge, i.e. moved into
+  // the block above.
   request_headers.removeEnvoyRetriableStatusCodes();
   request_headers.removeEnvoyRetriableHeaderNames();
   request_headers.removeEnvoyRetryOn();
@@ -292,7 +363,7 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
   if (!rid_extension->useRequestIdForTraceSampling()) {
     return Tracing::Reason::Sampling;
   }
-  const auto rid_to_integer = rid_extension->toInteger(request_headers);
+  const auto rid_to_integer = rid_extension->getInteger(request_headers);
   // Skip if request-id is corrupted, or non-existent
   if (!rid_to_integer.has_value()) {
     return final_reason;
@@ -367,7 +438,9 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
       config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     const auto uri_sans_local_cert = connection.ssl()->uriSanLocalCertificate();
     if (!uri_sans_local_cert.empty()) {
-      client_cert_details.push_back(absl::StrCat("By=", uri_sans_local_cert[0]));
+      for (const std::string& uri : uri_sans_local_cert) {
+        client_cert_details.push_back(absl::StrCat("By=", uri));
+      }
     }
     const std::string cert_digest = connection.ssl()->sha256PeerCertificateDigest();
     if (!cert_digest.empty()) {
@@ -397,8 +470,13 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
       case ClientCertDetailsType::URI: {
         // The "URI" key still exists even if the URI is empty.
         const auto sans = connection.ssl()->uriSanPeerCertificate();
-        const auto& uri_san = sans.empty() ? "" : sans[0];
-        client_cert_details.push_back(absl::StrCat("URI=", uri_san));
+        if (!sans.empty()) {
+          for (const std::string& uri : sans) {
+            client_cert_details.push_back(absl::StrCat("URI=", uri));
+          }
+        } else {
+          client_cert_details.push_back("URI=");
+        }
         break;
       }
       case ClientCertDetailsType::DNS: {
@@ -415,12 +493,14 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
+
+  ENVOY_BUG(config.forwardClientCert() == ForwardClientCertType::AppendForward ||
+                config.forwardClientCert() == ForwardClientCertType::SanitizeSet,
+            "error in client cert logic");
   if (config.forwardClientCert() == ForwardClientCertType::AppendForward) {
     request_headers.appendForwardedClientCert(client_cert_details_str, ",");
   } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     request_headers.setForwardedClientCert(client_cert_details_str);
-  } else {
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -428,6 +508,8 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
                                                      const RequestHeaderMap* request_headers,
                                                      ConnectionManagerConfig& config,
                                                      const std::string& via,
+                                                     const StreamInfo::StreamInfo& stream_info,
+                                                     absl::string_view proxy_name,
                                                      bool clear_hop_by_hop) {
   if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
       Utility::isUpgrade(response_headers)) {
@@ -465,6 +547,35 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   if (!via.empty()) {
     Utility::appendVia(response_headers, via);
   }
+
+  setProxyStatusHeader(response_headers, config, stream_info, proxy_name);
+}
+
+void ConnectionManagerUtility::setProxyStatusHeader(ResponseHeaderMap& response_headers,
+                                                    const ConnectionManagerConfig& config,
+                                                    const StreamInfo::StreamInfo& stream_info,
+                                                    absl::string_view proxy_name) {
+  if (auto* proxy_status_config = config.proxyStatusConfig(); proxy_status_config != nullptr) {
+    // Writing the Proxy-Status header is gated on the existence of
+    // |proxy_status_config|. The |details| field and other internals are generated in
+    // fromStreamInfo().
+    if (absl::optional<StreamInfo::ProxyStatusError> proxy_status =
+            StreamInfo::ProxyStatusUtils::fromStreamInfo(stream_info);
+        proxy_status.has_value()) {
+      response_headers.appendProxyStatus(
+          StreamInfo::ProxyStatusUtils::makeProxyStatusHeader(stream_info, *proxy_status,
+                                                              proxy_name, *proxy_status_config),
+          ", ");
+      // Apply the recommended response code, if configured and applicable.
+      if (proxy_status_config->set_recommended_response_code()) {
+        if (absl::optional<Http::Code> response_code =
+                StreamInfo::ProxyStatusUtils::recommendedHttpStatusCode(*proxy_status);
+            response_code.has_value()) {
+          response_headers.setStatus(std::to_string(enumToInt(*response_code)));
+        }
+      }
+    }
+  }
 }
 
 ConnectionManagerUtility::NormalizePathAction
@@ -472,6 +583,16 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
                                              const ConnectionManagerConfig& config) {
   if (!request_headers.Path()) {
     return NormalizePathAction::Continue; // It's as valid as it is going to get.
+  }
+
+  auto fragment_pos = request_headers.getPathValue().find('#');
+  if (fragment_pos != absl::string_view::npos) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http_reject_path_with_fragment")) {
+      return NormalizePathAction::Reject;
+    }
+    // Check runtime override and throw away fragment from URI path
+    request_headers.setPath(request_headers.getPathValue().substr(0, fragment_pos));
   }
 
   NormalizePathAction final_action = NormalizePathAction::Continue;

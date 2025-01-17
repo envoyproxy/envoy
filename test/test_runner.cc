@@ -10,7 +10,6 @@
 #include "source/exe/process_wide.h"
 #include "source/server/backtrace.h"
 
-#include "test/common/runtime/utility.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_listener.h"
@@ -46,37 +45,42 @@ public:
       : runtime_override_(runtime_override), disable_(disable) {}
 
   // On each test start, edit RuntimeFeaturesDefaults with our custom runtime defaults.
+  // The defaults will be restored by TestListener::OnTestEnd.
   void OnTestStart(const ::testing::TestInfo&) override {
     if (!runtime_override_.empty()) {
-      bool reset = disable_ ? Runtime::RuntimeFeaturesPeer::disableFeature(runtime_override_)
-                            : Runtime::RuntimeFeaturesPeer::enableFeature(runtime_override_);
-      if (!reset) {
-        // If the entry was already in the hash map, don't remove it OnTestEnd.
+      bool old_value = Runtime::runtimeFeatureEnabled(runtime_override_);
+      if (disable_ != old_value) {
+        // If the entry was already in the hash map, don't invert it OnTestEnd.
         runtime_override_.clear();
+      } else {
+        Runtime::maybeSetRuntimeGuard(runtime_override_, !disable_);
       }
     }
   }
 
-  // As each test ends, clean up the RuntimeFeaturesDefaults state.
-  void OnTestEnd(const ::testing::TestInfo&) override {
-    if (!runtime_override_.empty()) {
-      disable_ ? Runtime::RuntimeFeaturesPeer::enableFeature(runtime_override_)
-               : Runtime::RuntimeFeaturesPeer::disableFeature(runtime_override_);
-    }
-  }
   std::string runtime_override_;
   // This marks whether the runtime feature was enabled by default and needs to be overridden to
   // false.
   bool disable_;
 };
 
+bool isDeathTestChild(int argc, char** argv) {
+  for (int i = 0; i < argc; ++i) {
+    if (absl::StartsWith(argv[i], "--gtest_internal_run_death_test")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 } // namespace
 
-int TestRunner::RunTests(int argc, char** argv) {
+int TestRunner::runTests(int argc, char** argv) {
+  const bool is_death_test_child = isDeathTestChild(argc, argv);
   ::testing::InitGoogleMock(&argc, argv);
   // We hold on to process_wide to provide RAII cleanup of process-wide
   // state.
-  ProcessWide process_wide;
+  ProcessWide process_wide(false);
   // Add a test-listener so we can call a hook where we can do a quiescence
   // check after each method. See
   // https://github.com/google/googletest/blob/master/googletest/docs/advanced.md
@@ -146,8 +150,10 @@ int TestRunner::RunTests(int argc, char** argv) {
   std::unique_ptr<Logger::FileSinkDelegate> file_logger;
 
   // Redirect all logs to fake file when --log-path arg is specified in command line.
-  if (!TestEnvironment::getOptions().logPath().empty()) {
-    file_logger = std::make_unique<Logger::FileSinkDelegate>(
+  // However do not redirect to file from death test children as the parent typically
+  // looks for specific output in stderr
+  if (!TestEnvironment::getOptions().logPath().empty() && !is_death_test_child) {
+    file_logger = *Logger::FileSinkDelegate::create(
         TestEnvironment::getOptions().logPath(), access_log_manager, Logger::Registry::getSink());
   }
 

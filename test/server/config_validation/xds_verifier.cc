@@ -1,18 +1,18 @@
 #include "test/server/config_validation/xds_verifier.h"
 
+#include "envoy/common/exception.h"
+
 #include "source/common/common/logger.h"
 
 namespace Envoy {
 
-XdsVerifier::XdsVerifier(test::server::config_validation::Config::SotwOrDelta sotw_or_delta)
-    : num_warming_(0), num_active_(0), num_draining_(0), num_added_(0), num_modified_(0),
-      num_removed_(0) {
+XdsVerifier::XdsVerifier(test::server::config_validation::Config::SotwOrDelta sotw_or_delta) {
   if (sotw_or_delta == test::server::config_validation::Config::SOTW) {
     sotw_or_delta_ = SOTW;
   } else {
     sotw_or_delta_ = DELTA;
   }
-  ENVOY_LOG_MISC(debug, "sotw_or_delta_ = {}", sotw_or_delta_);
+  ENVOY_LOG_MISC(debug, "sotw_or_delta_ = {}", static_cast<int>(sotw_or_delta_));
 }
 
 /**
@@ -53,7 +53,7 @@ void XdsVerifier::dumpState() {
   ENVOY_LOG_MISC(debug, "Listener Dump:");
   for (const auto& rep : listeners_) {
     ENVOY_LOG_MISC(debug, "Name: {}, Route {}, State: {}", rep.listener.name(),
-                   getRoute(rep.listener), rep.state);
+                   getRoute(rep.listener), static_cast<int>(rep.state));
   }
 }
 

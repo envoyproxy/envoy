@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # In order to get core dumps that can be debugged, uncomment the following line and then run
 # the test using --spawn_strategy=local. (There may be a better way of doing this but this worked
@@ -75,6 +75,19 @@ sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/envoy"/test/config/integration/s
   cat > "${HOT_RESTART_JSON_REUSE_PORT}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
+# Test reuse_port listener with multiple addresses.
+HOT_RESTART_JSON_REUSE_PORT_MULTI_ADDRESSES="${TEST_TMPDIR}"/hot_restart_v4_multiple_addresses.yaml
+echo "building ${HOT_RESTART_JSON_V4} ..."
+sed -e "s#{{ upstream_. }}#0#g" "${TEST_SRCDIR}/envoy"/test/config/integration/server_multiple_addresses.yaml | \
+  sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
+  sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
+  sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
+  sed -e "s#{{ enable_reuse_port }}#true#" | \
+  sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
+  sed -e "s#{{ null_device_path }}#/dev/null#" | \
+  cat > "${HOT_RESTART_JSON_REUSE_PORT_MULTI_ADDRESSES}"
+JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT_MULTI_ADDRESSES}")
+
 # Shared memory size varies by architecture
 SHARED_MEMORY_SIZE="104"
 [[ "$(uname -m)" == "aarch64" ]] && SHARED_MEMORY_SIZE="120"
@@ -84,7 +97,7 @@ echo "Hot restart test using dynamic base id"
 TEST_INDEX=0
 function run_testsuite() {
   local BASE_ID BASE_ID_PATH HOT_RESTART_JSON="$1"
-  local SOCKET_PATH=@envoy_domain_socket
+  local SOCKET_PATH=@envoy_domain_socket_$$
   local SOCKET_MODE=0
   if [ -n "$2" ] &&  [ -n "$3" ]
   then
@@ -124,7 +137,7 @@ function run_testsuite() {
   sleep 3
 
   UPDATED_HOT_RESTART_JSON="${TEST_TMPDIR}"/hot_restart_updated."${TEST_INDEX}".yaml
-  "${TEST_SRCDIR}/envoy"/tools/socket_passing "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}" \
+  "${TEST_SRCDIR}/envoy"/tools/socket_passing/socket_passing "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}" \
     "-u" "${UPDATED_HOT_RESTART_JSON}"
 
   # Send SIGUSR1 signal to the first server, this should not kill it. Also send SIGHUP which should
@@ -192,7 +205,7 @@ function run_testsuite() {
 
   start_test "Checking that listener addresses have not changed"
   HOT_RESTART_JSON_1="${TEST_TMPDIR}"/hot_restart.1."${TEST_INDEX}".yaml
-  "${TEST_SRCDIR}/envoy"/tools/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" \
+  "${TEST_SRCDIR}/envoy"/tools/socket_passing/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" \
     "-u" "${HOT_RESTART_JSON_1}"
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
   [[ -z "${CONFIG_DIFF}" ]]
@@ -251,7 +264,7 @@ function run_testsuite() {
 
   start_test "Checking that listener addresses have not changed"
   HOT_RESTART_JSON_2="${TEST_TMPDIR}"/hot_restart.2."${TEST_INDEX}".yaml
-  "${TEST_SRCDIR}/envoy"/tools/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
+  "${TEST_SRCDIR}/envoy"/tools/socket_passing/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
     "-u" "${HOT_RESTART_JSON_2}"
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_2}")
   [[ -z "${CONFIG_DIFF}" ]]

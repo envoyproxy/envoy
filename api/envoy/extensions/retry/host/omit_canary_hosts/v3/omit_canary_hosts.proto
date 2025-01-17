@@ -8,6 +8,7 @@ import "udpa/annotations/versioning.proto";
 option java_package = "io.envoyproxy.envoy.extensions.retry.host.omit_canary_hosts.v3";
 option java_outer_classname = "OmitCanaryHostsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/retry/host/omit_canary_hosts/v3;omit_canary_hostsv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Omit Canary Hosts Predicate]

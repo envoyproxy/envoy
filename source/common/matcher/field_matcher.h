@@ -1,7 +1,8 @@
-
 #pragma once
 
 #include "envoy/matcher/matcher.h"
+
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Matcher {
@@ -143,30 +144,45 @@ private:
 template <class DataType>
 class SingleFieldMatcher : public FieldMatcher<DataType>, Logger::Loggable<Logger::Id::matcher> {
 public:
-  SingleFieldMatcher(DataInputPtr<DataType>&& data_input, InputMatcherPtr&& input_matcher)
-      : data_input_(std::move(data_input)), input_matcher_(std::move(input_matcher)) {}
+  static absl::StatusOr<std::unique_ptr<SingleFieldMatcher<DataType>>>
+  create(DataInputPtr<DataType>&& data_input, InputMatcherPtr&& input_matcher) {
+    auto supported_input_types = input_matcher->supportedDataInputTypes();
+    if (supported_input_types.find(data_input->dataInputType()) == supported_input_types.end()) {
+      std::string supported_types =
+          absl::StrJoin(supported_input_types.begin(), supported_input_types.end(), ", ");
+      return absl::InvalidArgumentError(
+          absl::StrCat("Unsupported data input type: ", data_input->dataInputType(),
+                       ". The matcher supports input type: ", supported_types));
+    }
+
+    return std::unique_ptr<SingleFieldMatcher<DataType>>{
+        new SingleFieldMatcher<DataType>(std::move(data_input), std::move(input_matcher))};
+  }
 
   FieldMatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
 
-    ENVOY_LOG(debug, "Attempting to match {}", input);
+    ENVOY_LOG(trace, "Attempting to match {}", input);
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
-    const auto current_match = input_matcher_->match(input.data_);
+    bool current_match = input_matcher_->match(input.data_);
     if (!current_match && input.data_availability_ ==
                               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
-      ENVOY_LOG(debug, "No match yet; delaying result as more data might be available.");
+      ENVOY_LOG(trace, "No match yet; delaying result as more data might be available.");
       return {MatchState::UnableToMatch, absl::nullopt};
     }
 
-    ENVOY_LOG(debug, "Match result: {}", current_match);
+    ENVOY_LOG(trace, "Match result: {}", current_match);
 
     return {MatchState::MatchComplete, current_match};
   }
 
 private:
+  SingleFieldMatcher(DataInputPtr<DataType>&& data_input, InputMatcherPtr&& input_matcher)
+      : data_input_(std::move(data_input)), input_matcher_(std::move(input_matcher)) {}
+
   const DataInputPtr<DataType> data_input_;
   const InputMatcherPtr input_matcher_;
 };

@@ -18,18 +18,19 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace HttpGrpc {
 
-AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
-    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::CommonFactoryContext& context) {
+AccessLog::InstanceSharedPtr
+HttpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
+                                                  AccessLog::FilterPtr&& filter,
+                                                  Server::Configuration::FactoryContext& context) {
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  return std::make_shared<HttpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
-                                             GrpcCommon::getGrpcAccessLoggerCacheSingleton(context),
-                                             context.scope());
+  return std::make_shared<HttpGrpcAccessLog>(
+      std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),
+      GrpcCommon::getGrpcAccessLoggerCacheSingleton(context.serverFactoryContext()));
 }
 
 ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {
@@ -41,8 +42,8 @@ std::string HttpGrpcAccessLogFactory::name() const { return "envoy.access_logger
 /**
  * Static registration for the HTTP gRPC access log. @see RegisterFactory.
  */
-REGISTER_FACTORY(HttpGrpcAccessLogFactory,
-                 Server::Configuration::AccessLogInstanceFactory){"envoy.http_grpc_access_log"};
+LEGACY_REGISTER_FACTORY(HttpGrpcAccessLogFactory, AccessLog::AccessLogInstanceFactory,
+                        "envoy.http_grpc_access_log");
 
 } // namespace HttpGrpc
 } // namespace AccessLoggers

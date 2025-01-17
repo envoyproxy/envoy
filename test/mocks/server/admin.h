@@ -23,21 +23,24 @@ public:
   // Server::Admin
   MOCK_METHOD(bool, addHandler,
               (const std::string& prefix, const std::string& help_text, HandlerCb callback,
-               bool removable, bool mutates_server_state));
+               bool removable, bool mutates_server_state, const ParamDescriptorVec& params));
+  MOCK_METHOD(bool, addStreamingHandler,
+              (const std::string& prefix, const std::string& help_text, GenRequestFn callback,
+               bool removable, bool mutates_server_state, const ParamDescriptorVec& params));
   MOCK_METHOD(bool, removeHandler, (const std::string& prefix));
   MOCK_METHOD(Network::Socket&, socket, ());
   MOCK_METHOD(ConfigTracker&, getConfigTracker, ());
   MOCK_METHOD(void, startHttpListener,
-              (const std::list<AccessLog::InstanceSharedPtr>& access_logs,
-               const std::string& address_out_path,
+              (AccessLog::InstanceSharedPtrVector access_logs,
                Network::Address::InstanceConstSharedPtr address,
-               const Network::Socket::OptionsSharedPtr& socket_options,
-               Stats::ScopePtr&& listener_scope));
+               Network::Socket::OptionsSharedPtr socket_options));
   MOCK_METHOD(Http::Code, request,
               (absl::string_view path_and_query, absl::string_view method,
                Http::ResponseHeaderMap& response_headers, std::string& body));
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
+  MOCK_METHOD(void, closeSocket, ());
+  MOCK_METHOD(RequestPtr, makeRequest, (AdminStream & admin_stream), (const));
 
   NiceMock<MockConfigTracker> config_tracker_;
   NiceMock<Network::MockSocket> socket_;
