@@ -103,7 +103,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
             }
           }
         }
-        if (rq_success + rq_error + rq_active != 0) {
+        if (rq_issued != 0) {
           auto* locality_stats = cluster_stats->add_upstream_locality_stats();
           locality_stats->mutable_locality()->MergeFrom(hosts[0]->locality());
           locality_stats->set_priority(host_set->priority());
