@@ -452,6 +452,18 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "io_socket_handle_impl_benchmark",
+    srcs = ["io_socket_handle_impl_benchmark_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/network:address_lib",
+        "//test/test_common:network_utility_lib",
+        "@com_github_google_benchmark//:benchmark",
+    ],
+)
+
 envoy_cc_test(
     name = "io_uring_socket_handle_impl_test",
     srcs = select({
@@ -460,6 +472,7 @@ envoy_cc_test(
     }),
     rbe_pool = "6gig",
     deps = [
+        "//source/common/network:io_uring_socket_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/io:io_mocks",

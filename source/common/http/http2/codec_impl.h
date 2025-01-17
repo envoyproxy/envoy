@@ -404,6 +404,11 @@ protected:
         codec_callbacks_->onCodecEncodeComplete();
       }
     }
+    void onResetEncoded(uint32_t error_code) {
+      if (codec_callbacks_ && error_code != 0) {
+        codec_callbacks_->onCodecLowLevelReset();
+      }
+    }
 
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
@@ -489,26 +494,6 @@ protected:
     // Marks data consumed by the stream, granting the peer additional stream
     // window.
     void grantPeerAdditionalStreamWindow();
-  };
-
-  // Encapsulates the logic for sending DATA frames on a given stream.
-  // Deprecated. Remove when removing
-  // `envoy_reloadable_features_http2_use_visitor_for_data`.
-  class StreamDataFrameSource : public http2::adapter::DataFrameSource {
-  public:
-    explicit StreamDataFrameSource(StreamImpl& stream) : stream_(stream) {}
-
-    // Returns a pair of the next payload length, and whether that payload is the end of the data
-    // for this stream.
-    std::pair<int64_t, bool> SelectPayloadLength(size_t max_length) override;
-    // Queues the frame header and a DATA frame payload of the specified length for writing.
-    bool Send(absl::string_view frame_header, size_t payload_length) override;
-    // Whether the codec should send the END_STREAM flag on the final DATA frame.
-    bool send_fin() const override { return send_fin_; }
-
-  private:
-    StreamImpl& stream_;
-    bool send_fin_ = false;
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;

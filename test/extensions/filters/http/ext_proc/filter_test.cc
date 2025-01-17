@@ -2017,6 +2017,9 @@ TEST_F(HttpFilterTest, PostStreamingBodiesDifferentOrder) {
     got_response_body.move(resp_chunk);
   }
 
+  EXPECT_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(_, true))
+      .WillRepeatedly(Invoke(
+          [&got_response_body](Buffer::Instance& data, Unused) { got_response_body.move(data); }));
   Buffer::OwnedImpl last_resp_chunk;
   EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(last_resp_chunk, true));
 
@@ -2827,145 +2830,6 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnlyWithoutCallingDecodeHead
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
-TEST_F(HttpFilterTest, GrpcServiceHttpServiceBothSet) {
-  std::string yaml = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  http_service:
-    http_service:
-      http_uri:
-        uri: "ext_proc_server_0:9000"
-        cluster: "ext_proc_server_0"
-        timeout:
-          seconds: 500
-  processing_mode:
-    response_body_mode: "BUFFERED"
-  )EOF";
-
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
-  TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto config = std::make_shared<FilterConfig>(
-            proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
-            std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-                Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-            factory_context_);
-      },
-      EnvoyException, "One and only one of grpc_service or http_service must be configured");
-}
-
-TEST_F(HttpFilterTest, HttpServiceBodyProcessingModeNotNone) {
-  std::string yaml = R"EOF(
-  http_service:
-    http_service:
-      http_uri:
-        uri: "ext_proc_server_0:9000"
-        cluster: "ext_proc_server_0"
-        timeout:
-          seconds: 500
-  processing_mode:
-    response_header_mode: "SEND"
-    request_body_mode: "BUFFERED"
-  )EOF";
-
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
-  TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto config = std::make_shared<FilterConfig>(
-            proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
-            std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-                Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-            factory_context_);
-      },
-      EnvoyException,
-      "If the ext_proc filter is configured with http_service instead of gRPC service, "
-      "then the processing modes of this filter can not be configured to send body or trailer.");
-}
-
-TEST_F(HttpFilterTest, HttpServiceTrailerProcessingModeNotSKIP) {
-  std::string yaml = R"EOF(
-  http_service:
-    http_service:
-      http_uri:
-        uri: "ext_proc_server_0:9000"
-        cluster: "ext_proc_server_0"
-        timeout:
-          seconds: 500
-  processing_mode:
-    request_body_mode: "NONE"
-    response_body_mode: "NONE"
-    request_trailer_mode: "SKIP"
-    response_trailer_mode: "SEND"
-  )EOF";
-
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
-  TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto config = std::make_shared<FilterConfig>(
-            proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
-            std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-                Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-            factory_context_);
-      },
-      EnvoyException,
-      "If the ext_proc filter is configured with http_service instead of gRPC service, "
-      "then the processing modes of this filter can not be configured to send body or trailer.");
-}
-
-TEST_F(HttpFilterTest, RequestBodyModeStreamedTrailerModeSKIP) {
-  std::string yaml = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  processing_mode:
-    request_body_mode: "FULL_DUPLEX_STREAMED"
-    request_trailer_mode: "SKIP"
-  )EOF";
-
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
-  TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto config = std::make_shared<FilterConfig>(
-            proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
-            std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-                Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-            factory_context_);
-      },
-      EnvoyException,
-      "If the ext_proc filter has the request_body_mode set to FULL_DUPLEX_STREAMED, "
-      "then the request_trailer_mode has to be set to SEND");
-}
-
-TEST_F(HttpFilterTest, ResponseBodyModeStreamedTrailerModeSKIP) {
-  std::string yaml = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  processing_mode:
-    response_body_mode: "FULL_DUPLEX_STREAMED"
-    response_trailer_mode: "SKIP"
-  )EOF";
-
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
-  TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto config = std::make_shared<FilterConfig>(
-            proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
-            std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-                Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-            factory_context_);
-      },
-      EnvoyException,
-      "If the ext_proc filter has the response_body_mode set to FULL_DUPLEX_STREAMED, "
-      "then the response_trailer_mode has to be set to SEND");
-}
-
 // Using the default configuration, verify that the "clear_route_cache" flag makes the appropriate
 // callback on the filter for inbound traffic when header modifications are also present.
 // Also verify it does not make the callback for outbound traffic.
@@ -3139,34 +3003,6 @@ TEST_F(HttpFilterTest, ClearRouteCacheUnchangedNoClearFlag) {
   EXPECT_EQ(config_->stats().clear_route_cache_ignored_.value(), 0);
   EXPECT_EQ(config_->stats().clear_route_cache_disabled_.value(), 0);
   EXPECT_EQ(config_->stats().clear_route_cache_upstream_ignored_.value(), 0);
-}
-
-// Verify that the "disable_route_cache_clearing" and "route_cache_action"  setting
-// can not be set at the same time.
-TEST_F(HttpFilterTest, ClearRouteCacheDisableRouteCacheActionBothSet) {
-  std::string yaml = R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  processing_mode:
-    response_body_mode: "BUFFERED"
-  disable_clear_route_cache: true
-  route_cache_action: CLEAR
-  )EOF";
-
-  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
-  TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto config = std::make_shared<FilterConfig>(
-            proto_config, 200ms, 10000, *stats_store_.rootScope(), "", false,
-            std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-                Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-            factory_context_);
-      },
-      EnvoyException,
-      "disable_clear_route_cache and route_cache_action can not be set to none-default at the same "
-      "time.");
 }
 
 // Verify that with header mutation in response, setting route_cache_action to CLEAR
@@ -5344,11 +5180,62 @@ TEST_F(HttpFilterTest, GrpcServiceMetadataOverride) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
   processRequestHeaders(false, absl::nullopt);
 
-  const auto& meta = filter_->grpc_service_config().initial_metadata();
+  const auto& meta = filter_->grpcServiceConfig().initial_metadata();
   EXPECT_EQ(meta[0].value(), "a"); // a = a inherited
   EXPECT_EQ(meta[1].value(), "c"); // b = c overridden
   EXPECT_EQ(meta[2].value(), "c"); // c = c added
 
+  filter_->onDestroy();
+}
+
+// Test header mutation errors during response processing
+TEST_F(HttpFilterTest, ResponseHeaderMutationErrors) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_header_mode: "SEND"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, absl::nullopt);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  // Process response with invalid header mutation
+  processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    auto* header_mut =
+        resp.mutable_response_headers()->mutable_response()->mutable_header_mutation();
+    auto* header = header_mut->add_set_headers();
+    header->mutable_header()->set_key(":scheme");
+    header->mutable_header()->set_raw_value("invalid");
+  });
+
+  filter_->onDestroy();
+}
+
+// Test invalid content length handling during response processing
+TEST_F(HttpFilterTest, InvalidResponseContentLength) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    response_header_mode: "SEND"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  processRequestHeaders(false, absl::nullopt);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-length"), "not_a_number");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  processResponseHeaders(false, absl::nullopt);
   filter_->onDestroy();
 }
 

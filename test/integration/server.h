@@ -17,6 +17,9 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/null_counter.h"
+#include "source/common/stats/null_gauge.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/options_impl_base.h"
@@ -52,8 +55,8 @@ OptionsImplBase createTestOptionsImpl(
 class TestComponentFactory : public ComponentFactory {
 public:
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    return Server::DrainManagerPtr{new Server::DrainManagerImpl(
-        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher())};
+    return Server::DrainManagerPtr{
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY)};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
@@ -534,8 +537,8 @@ public:
 
   // Server::ComponentFactory
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    drain_manager_ = new Server::DrainManagerImpl(
-        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher());
+    drain_manager_ =
+        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
     return Server::DrainManagerPtr{drain_manager_};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,

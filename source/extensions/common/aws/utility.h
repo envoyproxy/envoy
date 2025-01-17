@@ -92,7 +92,7 @@ public:
   static std::string getSTSEndpoint(absl::string_view region);
 
   /**
-   * Fetch AWS instance or task metadata.
+   * Fetch AWS instance or task metadata with curl.
    *
    * @param message An HTTP request.
    * @return Metadata document or nullopt in case if unable to fetch it.
@@ -102,7 +102,7 @@ public:
    * @note This is not main loop safe method as it is blocking. It is intended to be used from the
    * gRPC auth plugins that are able to schedule blocking plugins on a different thread.
    */
-  static absl::optional<std::string> fetchMetadata(Http::RequestMessage& message);
+  static absl::optional<std::string> fetchMetadataWithCurl(Http::RequestMessage& message);
 
   /**
    * @brief Creates the prototype for a static cluster towards a credentials provider
@@ -140,9 +140,18 @@ public:
    * @return true if profile file could be read and searched.
    * @return false if profile file could not be read.
    */
-  static bool resolveProfileElements(const std::string& profile_file,
-                                     const std::string& profile_name,
-                                     absl::flat_hash_map<std::string, std::string>& elements);
+
+  static bool
+  resolveProfileElementsFromString(const std::string& string_data, const std::string& profile_name,
+                                   absl::flat_hash_map<std::string, std::string>& elements);
+
+  static bool
+  resolveProfileElementsFromFile(const std::string& profile_file, const std::string& profile_name,
+                                 absl::flat_hash_map<std::string, std::string>& elements);
+
+  static bool
+  resolveProfileElementsFromStream(std::istream& stream, const std::string& profile_name,
+                                   absl::flat_hash_map<std::string, std::string>& elements);
 
   /**
    * @brief Return the path of AWS credential file, following environment variable expansions

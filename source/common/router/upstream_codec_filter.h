@@ -30,8 +30,7 @@ class UpstreamCodecFilter : public Http::StreamDecoderFilter,
                             public Http::DownstreamWatermarkCallbacks,
                             public Http::UpstreamCallbacks {
 public:
-  UpstreamCodecFilter()
-      : bridge_(*this), calling_encode_headers_(false), deferred_reset_status_(absl::OkStatus()) {}
+  UpstreamCodecFilter() : bridge_(*this), deferred_reset_status_(absl::OkStatus()) {}
 
   // Http::DownstreamWatermarkCallbacks
   void onBelowWriteBufferLowWatermark() override;
@@ -87,10 +86,10 @@ public:
   Http::StreamDecoderFilterCallbacks* callbacks_;
   CodecBridge bridge_;
   OptRef<Http::RequestHeaderMap> latched_headers_;
-  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  bool calling_encode_headers_ : 1;
   absl::Status deferred_reset_status_;
   absl::optional<bool> latched_end_stream_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  bool calling_encode_headers_ = false;
 
 private:
   StreamInfo::UpstreamTiming& upstreamTiming() {
@@ -121,6 +120,8 @@ public:
 };
 
 DECLARE_FACTORY(UpstreamCodecFilterFactory);
+
+const Http::FilterChainFactory& defaultUpstreamHttpFilterChainFactory();
 
 } // namespace Router
 } // namespace Envoy

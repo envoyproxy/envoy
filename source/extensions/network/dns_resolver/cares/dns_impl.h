@@ -201,6 +201,7 @@ private:
   const uint32_t udp_max_queries_;
   const uint64_t query_timeout_seconds_;
   const uint32_t query_tries_;
+  const bool rotate_nameservers_;
   const absl::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
   Stats::ScopeSharedPtr scope_;

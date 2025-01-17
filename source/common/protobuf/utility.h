@@ -478,7 +478,6 @@ public:
     const Protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
     const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
     return reflection->GetString(*reflectable_message, name_field);
-    return name_field->name();
   }
 
 #ifdef ENVOY_ENABLE_YAML
@@ -587,17 +586,6 @@ public:
   static void redact(Protobuf::Message& message);
 
   /**
-   * Reinterpret a Protobuf message as another Protobuf message by converting to wire format and
-   * back. This only works for messages that can be effectively duck typed this way, e.g. with a
-   * subtype relationship modulo field name.
-   *
-   * @param src source message.
-   * @param dst destination message.
-   * @throw EnvoyException if a conversion error occurs.
-   */
-  static void wireCast(const Protobuf::Message& src, Protobuf::Message& dst);
-
-  /**
    * Sanitizes a string to contain only valid UTF-8. Invalid UTF-8 characters will be replaced. If
    * the input string is valid UTF-8, it will be returned unmodified.
    */
@@ -636,11 +624,11 @@ public:
   static const ProtobufWkt::Value& nullValue();
 
   /**
-   * Wrap std::string into ProtobufWkt::Value string value.
+   * Wrap absl::string_view into ProtobufWkt::Value string value.
    * @param str string to be wrapped.
    * @return wrapped string.
    */
-  static ProtobufWkt::Value stringValue(const std::string& str);
+  static ProtobufWkt::Value stringValue(absl::string_view str);
 
   /**
    * Wrap optional std::string into ProtobufWkt::Value string value.

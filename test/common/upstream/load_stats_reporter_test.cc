@@ -369,8 +369,24 @@ TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();
+  EXPECT_EQ(load_stats_reporter_->getStats().errors_.value(), 1);
+  EXPECT_EQ(load_stats_reporter_->getStats().retries_.value(), 1);
 }
 
+// Validate that errors stat is not incremented for a graceful stream termination.
+TEST_F(LoadStatsReporterTest, RemoteStreamGracefulClose) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+  EXPECT_CALL(*response_timer_, disableTimer());
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _));
+  load_stats_reporter_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Ok, "");
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  retry_timer_cb_();
+  EXPECT_EQ(load_stats_reporter_->getStats().errors_.value(), 0);
+  EXPECT_EQ(load_stats_reporter_->getStats().retries_.value(), 1);
+}
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

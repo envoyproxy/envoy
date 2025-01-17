@@ -248,26 +248,28 @@ private:
 
 class MetadataMatcher : public Matcher {
 public:
-  MetadataMatcher(const Envoy::Matchers::MetadataMatcher& matcher) : matcher_(matcher) {}
+  MetadataMatcher(const Envoy::Matchers::MetadataMatcher& matcher,
+                  const envoy::config::rbac::v3::MetadataSource& metadata_source)
+      : matcher_(matcher), metadata_source_(metadata_source) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info) const override;
 
 private:
   const Envoy::Matchers::MetadataMatcher matcher_;
+  const envoy::config::rbac::v3::MetadataSource metadata_source_;
 };
 
 class FilterStateMatcher : public Matcher {
 public:
   FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
-                     Server::Configuration::CommonFactoryContext& context)
-      : matcher_(matcher, context) {}
+                     Server::Configuration::CommonFactoryContext& context);
 
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                const StreamInfo::StreamInfo& info) const override;
 
 private:
-  const Envoy::Matchers::FilterStateMatcher matcher_;
+  const Envoy::Matchers::FilterStateMatcherPtr matcher_;
 };
 
 /**

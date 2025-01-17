@@ -146,6 +146,10 @@ class FormatChecker:
         return not self.args.skip_envoy_build_rule_check
 
     @property
+    def run_code_validation(self):
+        return not self.args.skip_code_validation
+
+    @property
     def excluded_prefixes(self):
         return (
             self.config.paths["excluded"] + tuple(self.args.add_excluded_prefixes)
@@ -154,6 +158,10 @@ class FormatChecker:
     @cached_property
     def error_messages(self):
         return []
+
+    @property
+    def run_build_fixer(self):
+        return not self.args.skip_build_fixer
 
     @property
     def operation_type(self):
@@ -196,6 +204,8 @@ class FormatChecker:
             action="store_true",
             help="skip checking for '@envoy//' prefix in build rules.")
         parser.add_argument(
+            "--skip_code_validation", action="store_true", help="skip custom code validation steps")
+        parser.add_argument(
             "--namespace_check",
             type=str,
             nargs="?",
@@ -207,6 +217,8 @@ class FormatChecker:
             nargs="+",
             default=[],
             help="exclude paths from the namespace_check.")
+        parser.add_argument(
+            "--skip_build_fixer", action="store_true", help="skip running build fixer script")
         parser.add_argument(
             "--build_fixer_check_excluded_paths",
             type=str,
@@ -299,7 +311,7 @@ class FormatChecker:
     def read_lines(self, path):
         with open(path) as f:
             for l in f:
-                yield l[:-1]
+                yield l.rstrip('\r\n')
         yield ""
 
     # Read a UTF-8 encoded file as a str.
@@ -885,7 +897,9 @@ class FormatChecker:
         return error_messages
 
     def check_source_path(self, file_path):
-        error_messages = self.check_file_contents(file_path, self.check_source_line)
+        error_messages = []
+        if self.run_code_validation:
+            error_messages = self.check_file_contents(file_path, self.check_source_line)
         if not file_path.endswith(self.config.suffixes["proto"]):
             error_messages += self.check_namespace(file_path)
             command = (
@@ -1108,8 +1122,9 @@ class FormatChecker:
 
     def _run_build_fixer(self, filepath: str) -> bool:
         return (
-            not self.is_build_fixer_excluded_file(filepath) and not self.is_api_file(filepath)
-            and not self.is_starlark_file(filepath) and not self.is_workspace_file(filepath))
+            self.run_build_fixer and not self.is_build_fixer_excluded_file(filepath)
+            and not self.is_api_file(filepath) and not self.is_starlark_file(filepath)
+            and not self.is_workspace_file(filepath))
 
 
 def main(*args):

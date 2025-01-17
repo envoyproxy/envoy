@@ -10,6 +10,7 @@
 #include "envoy/extensions/filters/http/alternate_protocols_cache/v3/alternate_protocols_cache.pb.h"
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 
 #if defined(__APPLE__)
@@ -334,8 +335,11 @@ EngineBuilder& EngineBuilder::addRestartRuntimeGuard(std::string guard, bool val
 }
 
 #if defined(__APPLE__)
-EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value) {
+EngineBuilder& EngineBuilder::respectSystemProxySettings(bool value, int refresh_interval_secs) {
   respect_system_proxy_settings_ = value;
+  if (refresh_interval_secs > 0) {
+    proxy_settings_refresh_interval_secs_ = refresh_interval_secs;
+  }
   return *this;
 }
 
@@ -848,19 +852,19 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
   ProtobufWkt::Struct& reloadable_features =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
+  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(true);
   for (auto& guard_and_value : runtime_guards_) {
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  (*reloadable_features.mutable_fields())["prefer_quic_client_udp_gro"].set_bool_value(true);
   ProtobufWkt::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
+  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
+  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   for (auto& guard_and_value : restart_runtime_guards_) {
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
-  (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
   ProtobufWkt::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
   (*overload_values.mutable_fields())["global_downstream_max_connections"].set_string_value(
@@ -905,7 +909,7 @@ EngineSharedPtr EngineBuilder::build() {
 
 #if defined(__APPLE__)
   if (respect_system_proxy_settings_) {
-    registerAppleProxyResolver();
+    registerAppleProxyResolver(proxy_settings_refresh_interval_secs_);
   }
 #endif
 

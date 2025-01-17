@@ -61,10 +61,11 @@ public:
       bool stream, const Grpc::RawAsyncClientSharedPtr& client,
       const Protobuf::MethodDescriptor& service_method,
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
-    if (stream)
+    if (stream) {
       return std::make_unique<
           Common::StreamingGrpcAccessLogClient<ProtobufWkt::Struct, ProtobufWkt::Struct>>(
           client, service_method, GrpcCommon::optionalRetryPolicy(config));
+    }
     return std::make_unique<
         Common::UnaryGrpcAccessLogClient<ProtobufWkt::Struct, ProtobufWkt::Struct>>(
         client, service_method, GrpcCommon::optionalRetryPolicy(config),
@@ -504,9 +505,11 @@ private:
   MockGrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
                Event::Dispatcher& dispatcher) override {
-    auto client = async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
-                      .value()
-                      ->createUncachedRawAsyncClient();
+    auto client = THROW_OR_RETURN_VALUE(
+        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
+            .value()
+            ->createUncachedRawAsyncClient(),
+        Grpc::RawAsyncClientPtr);
     return std::make_shared<MockGrpcAccessLoggerImpl>(std::move(client), config, dispatcher, scope_,
                                                       "mock_access_log_prefix.",
                                                       mockMethodDescriptor(), true);

@@ -161,7 +161,7 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
       (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
 
   THROW_IF_NOT_OK(validation_visitor.onDeprecatedField(
-      "type " + message.GetTypeName() + " " + with_overridden, warn_only));
+      absl::StrCat("type ", message.GetTypeName(), " ", with_overridden), warn_only));
 }
 
 } // namespace
@@ -706,14 +706,6 @@ void MessageUtil::redact(Protobuf::Message& message) {
   ::Envoy::redact(&message, /* ancestor_is_sensitive = */ false);
 }
 
-void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst) {
-  // This should should generally succeed, but if there are malformed UTF-8 strings in a message,
-  // this can fail.
-  if (!dst.ParseFromString(src.SerializeAsString())) {
-    throwEnvoyExceptionOrPanic("Unable to deserialize during wireCast()");
-  }
-}
-
 std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
   std::string text_format;
@@ -797,7 +789,7 @@ const ProtobufWkt::Value& ValueUtil::nullValue() {
   return *v;
 }
 
-ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
+ProtobufWkt::Value ValueUtil::stringValue(absl::string_view str) {
   ProtobufWkt::Value val;
   val.set_string_value(str);
   return val;
@@ -936,8 +928,9 @@ absl::Status MessageUtil::loadFromFile(const std::string& path, Protobuf::Messag
       return absl::OkStatus();
     }
 #endif
-    return absl::InvalidArgumentError("Unable to parse file \"" + path +
-                                      "\" as a text protobuf (type " + message.GetTypeName() + ")");
+    return absl::InvalidArgumentError(absl::StrCat("Unable to parse file \"", path,
+                                                   "\" as a text protobuf (type ",
+                                                   message.GetTypeName(), ")"));
   }
 #ifdef ENVOY_ENABLE_YAML
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
@@ -950,8 +943,8 @@ absl::Status MessageUtil::loadFromFile(const std::string& path, Protobuf::Messag
     loadFromJson(contents, message, validation_visitor);
   }
 #else
-  return absl::InvalidArgumentError("Unable to parse file \"" + path + "\" (type " +
-                                    message.GetTypeName() + ")");
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unable to parse file \"", path, "\" (type ", message.GetTypeName(), ")"));
 #endif
   return absl::OkStatus();
 }

@@ -25,6 +25,7 @@ envoy_cc_library(
         "//source/common/config:xds_resource_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/upstream:od_cds_api_lib",
         "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/extensions/filters/http/on_demand/v3:pkg_cc_proto",
     ],

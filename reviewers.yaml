@@ -7,7 +7,8 @@ alyssawilk:
   opsgenie: Alyssa
   slack: U78RP48V9
 botengyao:
-  first-pass: true
+  maintainer: true
+  opsgenie: Boteng
   slack: U037YUAK147
 daixiang0:
   first-pass: true
@@ -58,10 +59,6 @@ RyanTheOptimist:
 silverstar194:
   first-pass: true
   slack: U03LNPC8JN9
-soulxu:
-  maintainer: true
-  opsgenie: Hejie
-  slack: U01GNQ3B8AY
 tyxia:
   maintainer: true
   opsgenie: Tianyu

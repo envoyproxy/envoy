@@ -85,6 +85,8 @@ public:
   MOCK_METHOD(OptRef<IoUringWorker>, getIoUringWorker, ());
   MOCK_METHOD(void, onWorkerThreadInitialized, ());
   MOCK_METHOD(bool, currentThreadRegistered, ());
+  MOCK_METHOD(Network::IoHandlePtr, createIoUringSocketHandle,
+              (int socket_fd, bool socket_v6only, absl::optional<int> domain));
 };
 
 } // namespace Io

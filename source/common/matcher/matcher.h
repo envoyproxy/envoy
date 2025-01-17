@@ -31,7 +31,7 @@ public:
   absl::string_view typeUrl() const override { return staticTypeUrl(); }
 
   static absl::string_view staticTypeUrl() {
-    const static std::string typeUrl = ProtoType().GetTypeName();
+    const static std::string typeUrl(ProtoType().GetTypeName());
 
     return typeUrl;
   }

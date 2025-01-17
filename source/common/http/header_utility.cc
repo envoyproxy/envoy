@@ -94,7 +94,8 @@ HeaderUtility::createHeaderData(const envoy::config::route::v3::HeaderMatcher& c
     return std::make_unique<HeaderDataExactMatch>(config);
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
-    return std::make_unique<HeaderDataRegexMatch>(config, factory_context);
+    return THROW_OR_RETURN_VALUE(HeaderDataRegexMatch::create(config, factory_context),
+                                 std::unique_ptr<HeaderDataRegexMatch>);
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
     return std::make_unique<HeaderDataRangeMatch>(config);
@@ -167,7 +168,7 @@ namespace {
 // HTTP/2 valid characters (similar to oghttp2's implementation) and the "@" character.
 // Once UHV is used, this function should be removed, and the HTTP/1 and HTTP/2
 // authority validations should be different.
-bool check_authority_h1_h2(const absl::string_view header_value) {
+bool checkAuthorityH1H2(const absl::string_view header_value) {
   static constexpr char ValidAuthorityChars[] = {
       0 /* NUL  */, 0 /* SOH  */, 0 /* STX  */, 0 /* ETX  */,
       0 /* EOT  */, 0 /* ENQ  */, 0 /* ACK  */, 0 /* BEL  */,
@@ -247,7 +248,7 @@ bool check_authority_h1_h2(const absl::string_view header_value) {
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.internal_authority_header_validator")) {
-    return check_authority_h1_h2(header_value);
+    return checkAuthorityH1H2(header_value);
   }
   return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
 }
@@ -413,6 +414,14 @@ absl::optional<uint32_t> HeaderUtility::stripPortFromHost(RequestHeaderMap& head
   const absl::string_view host = original_host.substr(0, port_start);
   headers.setHost(host);
   return port;
+}
+
+void HeaderUtility::stripPortFromHost(std::string& host) {
+  const absl::string_view::size_type port_start = getPortStart(host);
+  if (port_start == absl::string_view::npos) {
+    return;
+  }
+  host = host.substr(0, port_start);
 }
 
 absl::string_view::size_type HeaderUtility::getPortStart(absl::string_view host) {

@@ -22,6 +22,8 @@ public:
               (envoy::service::ext_proc::v3::ProcessingRequest&&, bool, const uint64_t,
                RequestCallbacks*, StreamBase*));
   MOCK_METHOD(void, cancel, ());
+
+  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, (), (const));
 };
 
 class MockStream : public ExternalProcessorStream {

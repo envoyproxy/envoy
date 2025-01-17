@@ -18,6 +18,8 @@ public:
   static void SetUpTestSuite() {
     Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker);
   }
+
+  void SetUp() override { Context::changeAllLogLevels(spdlog::level::info); }
 };
 
 std::unique_ptr<EnvoyEventTracker> LambdaDelegateTest::event_tracker =

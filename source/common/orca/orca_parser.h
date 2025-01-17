@@ -23,6 +23,7 @@ static constexpr absl::string_view kMemUtilizationField = "mem_utilization";
 static constexpr absl::string_view kEpsField = "eps";
 static constexpr absl::string_view kRpsFractionalField = "rps_fractional";
 static constexpr absl::string_view kNamedMetricsFieldPrefix = "named_metrics.";
+static constexpr absl::string_view kUtilizationPrefix = "utilization.";
 
 // Parses ORCA load metrics from a header map into an OrcaLoadReport proto.
 // Supports native HTTP, JSON and serialized binary formats.

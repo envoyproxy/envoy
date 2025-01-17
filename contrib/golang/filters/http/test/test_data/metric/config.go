@@ -1,4 +1,4 @@
-package main
+package metric
 
 import (
 	"google.golang.org/protobuf/types/known/anypb"
@@ -46,7 +46,4 @@ func filterFactory(c interface{}, callbacks api.FilterCallbackHandler) api.Strea
 		callbacks: callbacks,
 		config:    conf,
 	}
-}
-
-func main() {
 }

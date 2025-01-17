@@ -1,4 +1,4 @@
-package main
+package add_data
 
 import (
 	"net/url"

@@ -102,7 +102,7 @@ void ExternalProcessorStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
     return;
   }
 
-  callbacks_->logGrpcStreamInfo();
+  callbacks_->logStreamInfo();
   if (status == Grpc::Status::Ok) {
     callbacks_->onGrpcClose();
   } else {

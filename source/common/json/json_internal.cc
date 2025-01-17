@@ -193,8 +193,13 @@ public:
   }
   bool number_unsigned(uint64_t value) override {
     if (value > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
-      IS_ENVOY_BUG("JSON value from line {} is larger than int64_t (not supported)");
-      value = std::numeric_limits<int64_t>::max();
+      // Envoy's code is discouraging the use of exceptions. The following sets
+      // the error details as if an exception occurs, and returns false to stop
+      // parsing.
+      error_ = fmt::format("JSON value from line {} is larger than int64_t (not supported)",
+                           line_number_);
+      error_position_ = absl::StrCat("line: ", line_number_);
+      return false;
     }
     return handleValueEvent(Field::createValue(static_cast<int64_t>(value)));
   }

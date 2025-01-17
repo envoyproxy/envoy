@@ -191,8 +191,8 @@ Cluster::createSubClusterConfig(const std::string& cluster_name, const std::stri
   return std::make_pair(true, absl::make_optional(config));
 }
 
-Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
-                                                 Upstream::LoadBalancerContext* context) const {
+Upstream::HostSelectionResponse Cluster::chooseHost(absl::string_view host,
+                                                    Upstream::LoadBalancerContext* context) const {
   uint16_t default_port = 80;
   if (info_->transportSocketMatcher()
           .resolve(nullptr, nullptr)
@@ -211,7 +211,7 @@ Upstream::HostConstSharedPtr Cluster::chooseHost(absl::string_view host,
   auto cluster = cm_.getThreadLocalCluster(cluster_name);
   if (cluster == nullptr) {
     ENVOY_LOG(debug, "cluster='{}' get thread local failed, too short ttl?", cluster_name);
-    return nullptr;
+    return {nullptr};
   }
 
   return cluster->loadBalancer().chooseHost(context);
@@ -350,16 +350,16 @@ void Cluster::onDnsHostRemove(const std::string& host) {
   updatePriorityState({}, hosts_removed);
 }
 
-Upstream::HostConstSharedPtr
+Upstream::HostSelectionResponse
 Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (!context) {
-    return nullptr;
+    return {nullptr};
   }
 
   const Router::StringAccessor* dynamic_host_filter_state = nullptr;
   if (context->requestStreamInfo()) {
     dynamic_host_filter_state =
-        context->requestStreamInfo()->filterState().getDataReadOnly<Router::StringAccessor>(
+        context->requestStreamInfo()->filterState()->getDataReadOnly<Router::StringAccessor>(
             DynamicHostFilterStateKey);
   }
 
@@ -384,7 +384,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   uint32_t port = is_secure ? 443 : 80;
   if (context->requestStreamInfo()) {
     const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
-        context->requestStreamInfo()->filterState().getDataReadOnly<StreamInfo::UInt32Accessor>(
+        context->requestStreamInfo()->filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
             DynamicPortFilterStateKey);
     if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
         dynamic_port_filter_state->value() <= 65535) {
@@ -394,7 +394,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
   if (raw_host.empty()) {
     ENVOY_LOG(debug, "host empty");
-    return nullptr;
+    return {nullptr};
   }
   std::string host = Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 

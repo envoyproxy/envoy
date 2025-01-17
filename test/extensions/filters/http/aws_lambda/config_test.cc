@@ -96,8 +96,11 @@ TEST(AwsLambdaFilterConfigTest, ValidPerRouteConfigCreatesFilter) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
-  auto route_specific_config_ptr = factory.createRouteSpecificFilterConfig(
-      proto_config, context, ProtobufMessage::getStrictValidationVisitor());
+  auto route_specific_config_ptr =
+      factory
+          .createRouteSpecificFilterConfig(proto_config, context,
+                                           ProtobufMessage::getStrictValidationVisitor())
+          .value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   ASSERT_NE(route_specific_config_ptr, nullptr);
   auto filter_settings_ptr =
@@ -135,8 +138,10 @@ TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithInvalidARNThrows) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
-  EXPECT_THROW(factory.createRouteSpecificFilterConfig(
-                   proto_config, context, ProtobufMessage::getStrictValidationVisitor()),
+  EXPECT_THROW(factory
+                   .createRouteSpecificFilterConfig(proto_config, context,
+                                                    ProtobufMessage::getStrictValidationVisitor())
+                   .value(),
                EnvoyException);
 }
 
@@ -154,8 +159,11 @@ TEST(AwsLambdaFilterConfigTest, AsynchrnousPerRouteConfig) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
-  auto route_specific_config_ptr = factory.createRouteSpecificFilterConfig(
-      proto_config, context, ProtobufMessage::getStrictValidationVisitor());
+  auto route_specific_config_ptr =
+      factory
+          .createRouteSpecificFilterConfig(proto_config, context,
+                                           ProtobufMessage::getStrictValidationVisitor())
+          .value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   ASSERT_NE(route_specific_config_ptr, nullptr);
   auto filter_settings_ptr =

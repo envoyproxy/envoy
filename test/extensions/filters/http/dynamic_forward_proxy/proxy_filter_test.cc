@@ -169,6 +169,31 @@ TEST_F(ProxyFilterTest, HttpsDefaultPort) {
   filter_->onDestroy();
 }
 
+TEST_F(ProxyFilterTest, EmptyHostHeader) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(circuit_breakers_));
+  EXPECT_CALL(callbacks_, streamInfo()).Times(AnyNumber());
+
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(_, _, _, _)).Times(0);
+  Http::TestRequestHeaderMapImpl request_headers{{":authority", ""}};
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::BadRequest, Eq("Empty host header"), _, _,
+                                         Eq("empty_host_header")));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+
+  filter_->onDestroy();
+}
+
 // Cache overflow.
 TEST_F(ProxyFilterTest, CacheOverflow) {
   Upstream::ResourceAutoIncDec* circuit_breakers_(

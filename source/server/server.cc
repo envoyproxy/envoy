@@ -86,7 +86,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
     : init_manager_(init_manager), live_(false), options_(options),
       validation_context_(options_.allowUnknownStaticFields(),
                           !options.rejectUnknownDynamicFields(),
-                          options.ignoreUnknownDynamicFields()),
+                          options.ignoreUnknownDynamicFields(), options.skipDeprecatedLogs()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),
@@ -125,6 +125,7 @@ InstanceBase::~InstanceBase() {
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
   dispatcher_->shutdown();
+  ENVOY_LOG(debug, "shut down dispatcher");
 
 #ifdef ENVOY_PERFETTO
   if (tracing_session_ != nullptr) {
@@ -386,8 +387,10 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
                               ComponentFactory& component_factory) {
   std::function set_up_logger = [&] {
     TRY_ASSERT_MAIN_THREAD {
-      file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
-          options_.logPath(), access_log_manager_, Logger::Registry::getSink());
+      file_logger_ = THROW_OR_RETURN_VALUE(
+          Logger::FileSinkDelegate::create(options_.logPath(), access_log_manager_,
+                                           Logger::Registry::getSink()),
+          std::unique_ptr<Logger::FileSinkDelegate>);
     }
     END_TRY
     CATCH(const EnvoyException& e, {
@@ -837,16 +840,18 @@ void InstanceBase::onRuntimeReady() {
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
           *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
       THROW_IF_NOT_OK_REF(factory_or_error.status());
-      hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
+      hds_delegate_ = maybeCreateHdsDelegate(
           serverFactoryContext(), *stats_store_.rootScope(),
-          factory_or_error.value()->createUncachedRawAsyncClient(), stats_store_,
-          *ssl_context_manager_, info_factory_);
+          THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),
+                                Grpc::RawAsyncClientPtr),
+          stats_store_, *ssl_context_manager_);
     }
     END_TRY
-    CATCH(const EnvoyException& e, {
-      ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
+    CATCH(const EnvoyException& e,
+          { ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what()); });
+    if (!hds_delegate_) {
       shutdown();
-    });
+    }
   }
 
   // TODO (nezdolik): Fully deprecate this runtime key in the next release.
@@ -888,7 +893,7 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
       server.messageValidationContext().dynamicValidationVisitor(), server.api());
-  THROW_IF_NOT_OK(loader.status());
+  THROW_IF_NOT_OK_REF(loader.status());
   return std::move(loader.value());
 }
 

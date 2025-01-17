@@ -496,11 +496,15 @@ HttpServerPropertiesCache::Http3StatusTracker& ConnectivityGrid::getHttp3StatusT
   return alternate_protocols_->getOrCreateHttp3StatusTracker(origin_);
 }
 
-bool ConnectivityGrid::isHttp3Broken() const { return getHttp3StatusTracker().isHttp3Broken(); }
+bool ConnectivityGrid::isHttp3Broken() const {
+  ENVOY_BUG(host_->address()->type() == Network::Address::Type::Ip, "Address is not an IP address");
+  return alternate_protocols_->isHttp3Broken(origin_);
+}
 
 void ConnectivityGrid::markHttp3Broken() {
   host_->cluster().trafficStats()->upstream_http3_broken_.inc();
-  getHttp3StatusTracker().markHttp3Broken();
+  ENVOY_BUG(host_->address()->type() == Network::Address::Type::Ip, "Address is not an IP address");
+  alternate_protocols_->markHttp3Broken(origin_);
 }
 
 void ConnectivityGrid::markHttp3Confirmed() { getHttp3StatusTracker().markHttp3Confirmed(); }

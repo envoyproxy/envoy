@@ -13,6 +13,7 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
+#include "source/common/common/filter_state_object_matchers.h"
 #include "source/common/common/regex.h"
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/protobuf.h"
@@ -100,7 +101,9 @@ public:
       if (matcher.ignore_case()) {
         ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
       }
-      regex_ = Regex::Utility::parseRegex(matcher_.safe_regex(), context.regexEngine());
+      regex_ = THROW_OR_RETURN_VALUE(
+          Regex::Utility::parseRegex(matcher_.safe_regex(), context.regexEngine()),
+          Regex::CompiledMatcherPtr);
     } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kContains) {
       if (matcher_.ignore_case()) {
         // Cache the lowercase conversion of the Contains matcher for future use
@@ -237,8 +240,7 @@ private:
 
 class FilterStateMatcher {
 public:
-  FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
-                     Server::Configuration::CommonFactoryContext& context);
+  FilterStateMatcher(std::string key, FilterStateObjectMatcherPtr&& object_matcher);
 
   /**
    * Check whether the filter state object is matched to the matcher.
@@ -247,10 +249,16 @@ public:
    */
   bool match(const StreamInfo::FilterState& filter_state) const;
 
+  static absl::StatusOr<std::unique_ptr<FilterStateMatcher>>
+  create(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
+         Server::Configuration::CommonFactoryContext& context);
+
 private:
   const std::string key_;
-  const StringMatcherPtr value_matcher_;
+  const FilterStateObjectMatcherPtr object_matcher_;
 };
+
+using FilterStateMatcherPtr = std::unique_ptr<FilterStateMatcher>;
 
 class PathMatcher : public StringMatcher {
 public:
@@ -267,9 +275,6 @@ public:
   static PathMatcherConstSharedPtr
   createPrefix(const std::string& prefix, bool ignore_case,
                Server::Configuration::CommonFactoryContext& context);
-  static PathMatcherConstSharedPtr
-  createPattern(const std::string& pattern, bool ignore_case,
-                Server::Configuration::CommonFactoryContext& context);
   static PathMatcherConstSharedPtr
   createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher,
                   Server::Configuration::CommonFactoryContext& context);

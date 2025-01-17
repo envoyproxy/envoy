@@ -279,7 +279,7 @@ void InternalEngine::onDefaultNetworkAvailable() {
   ENVOY_LOG_MISC(trace, "Calling the default network available callback");
 }
 
-void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
+void InternalEngine::onDefaultNetworkChanged(int network) {
   ENVOY_LOG_MISC(trace, "Calling the default network changed callback");
   dispatcher_->post([&, network]() -> void {
     envoy_netconf_t configuration = Network::ConnectivityManagerImpl::setPreferredNetwork(network);
@@ -293,6 +293,11 @@ void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
       } else {
         connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
       }
+    }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.drain_pools_on_network_change")) {
+      ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
+      connectivity_manager_->clusterManager().drainConnections(
+          [](const Upstream::Host&) { return true; });
     }
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.reset_brokenness_on_nework_change")) {

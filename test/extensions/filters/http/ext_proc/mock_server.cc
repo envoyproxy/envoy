@@ -13,8 +13,10 @@ MockClient::MockClient() {
       .WillRepeatedly(
           Invoke([](envoy::service::ext_proc::v3::ProcessingRequest&& request, bool end_stream,
                     const uint64_t, RequestCallbacks*, StreamBase* stream) {
-            ExternalProcessorStream* grpc_stream = dynamic_cast<ExternalProcessorStream*>(stream);
-            grpc_stream->send(std::move(request), end_stream);
+            if (stream != nullptr) {
+              ExternalProcessorStream* grpc_stream = dynamic_cast<ExternalProcessorStream*>(stream);
+              grpc_stream->send(std::move(request), end_stream);
+            }
           }));
 }
 MockClient::~MockClient() = default;

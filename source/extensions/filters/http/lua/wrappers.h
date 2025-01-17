@@ -269,11 +269,14 @@ public:
   static ExportedFunctions exportedFunctions() {
     return {{"protocol", static_luaProtocol},
             {"dynamicMetadata", static_luaDynamicMetadata},
+            {"downstreamDirectLocalAddress", static_luaDownstreamDirectLocalAddress},
             {"downstreamLocalAddress", static_luaDownstreamLocalAddress},
             {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
             {"downstreamRemoteAddress", static_luaDownstreamRemoteAddress},
             {"downstreamSslConnection", static_luaDownstreamSslConnection},
-            {"requestedServerName", static_luaRequestedServerName}};
+            {"requestedServerName", static_luaRequestedServerName},
+            {"routeName", static_luaRouteName},
+            {"virtualClusterName", static_luaVirtualClusterName}};
   }
 
 private:
@@ -302,6 +305,13 @@ private:
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamLocalAddress);
 
   /**
+   * Get current direct downstream local address
+   * @return string representation of downstream directly connected local address.
+   * This is equivalent to the local address of the physical connection.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDownstreamDirectLocalAddress);
+
+  /**
    * Get current direct downstream remote address
    * @return string representation of downstream directly connected address.
    * This is equivalent to the address of the physical connection.
@@ -319,6 +329,18 @@ private:
    * @return requested server name (e.g. SNI in TLS), if any.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRequestedServerName);
+
+  /**
+   * Get the name of the route matched by the filter chain
+   * @return matched route name or an empty string if no route was matched
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRouteName);
+
+  /**
+   * Get the name of the virtual cluster that gets matched (if any)
+   * @return matched virtual cluster or an empty string if no virtual cluster was matched
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaVirtualClusterName);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {

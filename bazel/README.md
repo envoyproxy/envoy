@@ -278,6 +278,7 @@ for how to update or override dependencies.
    in your shell for buildozer to work. If GOPATH is not set, it is $HOME/go by default.
 1. `bazel build envoy` from the Envoy source directory. Add `-c opt` for an optimized release build or
    `-c dbg` for an unoptimized, fully instrumented debugging build.
+1. For debug builds on macOS, pass additionally: `--spawn_strategy=local --features=oso_prefix_is_pwd`
 
 ## Building Envoy with the CI Docker image
 
@@ -923,10 +924,15 @@ This requires Python 3.8.0+, download from [here](https://www.python.org/downloa
 
 Use the following command to prepare a compilation database:
 
-```
+```console
 TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 ```
 
+On macOS:
+
+```console
+tools/gen_compilation_database.py --exclude_contrib
+```
 
 # Running format linting without docker
 

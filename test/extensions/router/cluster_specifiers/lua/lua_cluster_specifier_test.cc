@@ -270,6 +270,70 @@ TEST_F(LuaClusterSpecifierPluginTest, ClusterMethods) {
   config_->perLuaCodeSetup()->runtimeGC();
 }
 
+TEST_F(LuaClusterSpecifierPluginTest, ClusterRef) {
+  const std::string config = R"EOF(
+  source_code:
+    inline_string: |
+      function envoy_on_route(route_handle)
+        local c1 = route_handle:getCluster("cluster1")
+        local c2 = route_handle:getCluster("cluster2")
+        local c3 = route_handle:getCluster("cluster3")
+        local c4 = route_handle:getCluster("cluster3")
+        local val1 = c1:numRequests()
+        local val2 = c2:numRequests()
+        local val3 = c3:numRequests()
+        local val4 = c4:numRequests()
+        if val1 == 2 and val2 == 2 and val3 == 2 and val4 == 2 then
+          return "pass"
+        end
+        return "fail"
+      end
+  default_cluster: default_service
+  )EOF";
+  setUpTest(config);
+
+  NiceMock<Upstream::MockThreadLocalCluster> cluster;
+  EXPECT_CALL(server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .Times(4)
+      .WillRepeatedly(Return(&cluster));
+  cluster.cluster_.info_->resource_manager_->requests().inc();
+
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
+  auto route = plugin_->route(mock_route, headers);
+  EXPECT_EQ("pass", route->routeEntry()->clusterName());
+
+  // Force the runtime to gc and destroy all the userdata.
+  config_->perLuaCodeSetup()->runtimeGC();
+}
+
+TEST_F(LuaClusterSpecifierPluginTest, Logging) {
+  const std::string config = R"EOF(
+  source_code:
+    inline_string: |
+      function envoy_on_route(route_handle)
+        route_handle:logTrace("log test")
+        route_handle:logDebug("log test")
+        route_handle:logInfo("log test")
+        route_handle:logWarn("log test")
+        route_handle:logErr("log test")
+        route_handle:logCritical("log test")
+      end
+  default_cluster: default_service
+  )EOF";
+  setUpTest(config);
+
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"trace", "log test"},
+                                                         {"debug", "log test"},
+                                                         {"info", "log test"},
+                                                         {"warn", "log test"},
+                                                         {"error", "log test"},
+                                                         {"critical", "log test"}}),
+                             { plugin_->route(mock_route, headers); });
+}
+
 } // namespace Lua
 } // namespace Router
 } // namespace Extensions

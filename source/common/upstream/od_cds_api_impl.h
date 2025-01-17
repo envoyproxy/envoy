@@ -28,31 +28,6 @@ enum class StartStatus {
 };
 
 /**
- * An interface for on-demand CDS. Defined to allow mocking.
- */
-class OdCdsApi {
-public:
-  virtual ~OdCdsApi() = default;
-
-  // Subscribe to a cluster with a given name. It's meant to eventually send a discovery request
-  // with the cluster name to the management server.
-  virtual void updateOnDemand(std::string cluster_name) PURE;
-};
-
-using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
-
-/**
- * An interface used by OdCdsApiImpl for sending notifications about the missing cluster that was
- * requested.
- */
-class MissingClusterNotifier {
-public:
-  virtual ~MissingClusterNotifier() = default;
-
-  virtual void notifyMissingCluster(absl::string_view name) PURE;
-};
-
-/**
  * ODCDS API implementation that fetches via Subscription.
  */
 class OdCdsApiImpl : public OdCdsApi,

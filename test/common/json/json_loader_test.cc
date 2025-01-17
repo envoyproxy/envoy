@@ -318,8 +318,11 @@ TEST_F(JsonLoaderTest, Integer) {
     EXPECT_EQ(std::numeric_limits<int64_t>::min(), *json->getInteger("min"));
   }
   {
-    EXPECT_ENVOY_BUG(
-        EXPECT_TRUE(Factory::loadFromString("{\"val\":9223372036854775808}").status().ok()), "");
+    const absl::StatusOr<ObjectSharedPtr> res =
+        Factory::loadFromString("{\"val\":9223372036854775808}");
+    expectError(res, absl::StatusCode::kInternal,
+                "JSON supplied is not valid. Error(line: 1): JSON value from line 1 is larger than "
+                "int64_t (not supported)\n");
     ObjectSharedPtr json = *Factory::loadFromString("{\"val\":-9223372036854775809}");
     EXPECT_FALSE(json->getInteger("val").status().ok());
   }

@@ -89,6 +89,7 @@ envoy_cc_test(
     srcs = ["cluster_manager_impl_test.cc"],
     rbe_pool = "4core",
     deps = [
+        ":metadata_writer_lb_proto_cc_proto",
         ":test_cluster_manager",
         "//envoy/config:config_validator_interface",
         "//source/common/router:context_lib",
@@ -459,6 +460,8 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
+        "//source/extensions/clusters/eds:eds_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
@@ -681,4 +684,9 @@ envoy_cc_test_library(
         "//envoy/upstream:upstream_interface",
         "@com_google_absl//absl/types:optional",
     ],
+)
+
+envoy_proto_library(
+    name = "metadata_writer_lb_proto",
+    srcs = ["metadata_writer_lb.proto"],
 )

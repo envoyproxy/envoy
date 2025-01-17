@@ -255,10 +255,13 @@ public:
         .WillRepeatedly(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
           encoder.getStream().addCallbacks(server_stream_callbacks_);
+          encoder.getStream().registerCodecEventCallbacks(&server_codec_event_callbacks_);
           encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
           request_decoder_.setResponseEncoder(response_encoder_);
           return request_decoder_;
         }));
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecEncodeComplete())
+        .Times(::testing::AnyNumber());
 
     ON_CALL(server_connection_.dispatcher_, trackedObjectStackIsEmpty())
         .WillByDefault(Return(true));
@@ -436,6 +439,7 @@ public:
   MockRequestDecoderShimWithUhv request_decoder_;
   ResponseEncoder* response_encoder_{};
   MockStreamCallbacks server_stream_callbacks_;
+  MockCodecEventCallbacks server_codec_event_callbacks_;
   // Corrupt a metadata frame payload.
   bool corrupt_metadata_frame_ = false;
   bool expect_buffered_data_on_teardown_ = false;
@@ -602,51 +606,6 @@ TEST_P(Http2CodecImplTest, ClientUnexpectedHeaders) {
   Http::Status status = Http2CodecImplTestFixture::onConnBeginHeaders(client_.get(), 3);
   EXPECT_FALSE(status.ok());
   EXPECT_THAT(status.message(), testing::HasSubstr("stream 3 is already gone"));
-}
-
-TEST_P(Http2CodecImplTest, SimpleRequestResponseOldApi) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.http2_use_visitor_for_data", "false"}});
-  initialize();
-
-  InSequence s;
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  request_headers.setMethod("POST");
-
-  // Encode request headers.
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
-
-  // Queue request body.
-  Buffer::OwnedImpl request_body(std::string(1024, 'a'));
-  request_encoder_->encodeData(request_body, true);
-
-  // Flush request body.
-  EXPECT_CALL(request_decoder_, decodeData(_, true)).Times(AtLeast(1));
-  driveToCompletion();
-
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-
-  // Encode response headers.
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
-  response_encoder_->encodeHeaders(response_headers, false);
-
-  // Queue response body.
-  Buffer::OwnedImpl response_body(std::string(1024, 'b'));
-  response_encoder_->encodeData(response_body, true);
-
-  // Flush response body.
-  EXPECT_CALL(response_decoder_, decodeData(_, true)).Times(AtLeast(1));
-  driveToCompletion();
-
-  EXPECT_TRUE(client_wrapper_->status_.ok());
-  EXPECT_TRUE(server_wrapper_->status_.ok());
-
-  if (http2_implementation_ == Http2Impl::Nghttp2) {
-    // Regression test for issue #19761.
-    EXPECT_EQ(0, getClientDataSourcesSize());
-    EXPECT_EQ(0, getServerDataSourcesSize());
-  }
 }
 
 TEST_P(Http2CodecImplTest, ShutdownNotice) {
@@ -1016,6 +975,11 @@ TEST_P(Http2CodecImplTest, RefusedStreamReset) {
   EXPECT_CALL(server_stream_callbacks_,
               onResetStream(StreamResetReason::LocalRefusedStreamReset, _));
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::RemoteRefusedStreamReset, _));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events")) {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
+  } else {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  }
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
   driveToCompletion();
 }
@@ -1766,6 +1730,7 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBefor
     EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
     response_encoder_->encodeData(body, true);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
     EXPECT_CALL(*flush_timer, disableTimer());
     response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
   }));
@@ -1805,6 +1770,7 @@ TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndSt
     EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
     response_encoder_->encodeData(body, true);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
     EXPECT_CALL(*flush_timer, disableTimer());
     response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
   }));
@@ -1841,6 +1807,7 @@ TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetServerIfResetBeforeLocalE
     EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
     response_encoder_->encodeData(body, false);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
     response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
   }));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
@@ -2048,6 +2015,11 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
         server_->onUnderlyingConnectionAboveWriteBufferHighWatermark();
         server_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
       }));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events")) {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
+  } else {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  }
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
   driveToCompletion();
 
@@ -2242,6 +2214,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBodyFlushTimeout
   // Invoke a stream flush timeout. Make sure we don't get a reset locally for higher layers but
   // we do get a reset on the client.
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   flush_timer->invokeCallback();
   driveToCompletion();
@@ -2282,6 +2255,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeout) {
   // Invoke a stream flush timeout. Make sure we don't get a reset locally for higher layers but
   // we do get a reset on the client.
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   flush_timer->invokeCallback();
   driveToCompletion();
@@ -2450,6 +2424,7 @@ TEST_P(Http2CodecImplFlowControlTest, RstStreamOnPendingFlushTimeoutFlood) {
 
   EXPECT_FALSE(violation_callback->enabled_);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
 
   // Pending flush timeout causes RST_STREAM to be sent and overflow the outbound frame queue.
   flush_timer->invokeCallback();
@@ -2796,6 +2771,11 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersInvokeResetStream) {
   std::string long_string = std::string(63 * 1024, 'q');
   request_headers.addCopy("big", long_string);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events")) {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  } else {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(0);
+  }
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
 }
@@ -2843,6 +2823,11 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejected) {
   request_headers.addCopy("bad_header", "something");
 
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events")) {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  } else {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(0);
+  }
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
   EXPECT_EQ(
@@ -2897,6 +2882,11 @@ TEST_P(Http2CodecImplTest, ManyRequestHeadersInvokeResetStream) {
     request_headers.addCopy(std::to_string(i), "");
   }
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events")) {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  } else {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(0);
+  }
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   driveToCompletion();
 }
@@ -3713,6 +3703,7 @@ TEST_P(Http2CodecImplTest, ResetStreamCausesOutboundFlood) {
 
   EXPECT_FALSE(violation_callback->enabled_);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
 
   server_->getStream(1)->resetStream(StreamResetReason::RemoteReset);
 
@@ -3749,6 +3740,11 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
 
   EXPECT_CALL(callbacks, onResetStream(StreamResetReason::ConnectError, _));
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ConnectError, _));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events")) {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
+  } else {
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  }
   response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
   driveToCompletion();
 }
@@ -4452,18 +4448,29 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
   scoped_runtime_.mergeValues({{"envoy.reloadable_features.validate_upstream_headers", "false"}});
   stream_error_on_invalid_http_messaging_ = true;
   initialize();
+
+#ifdef ENVOY_ENABLE_UHV
+  // UHV does not appear to reject some header value chars.
   if (http2_implementation_ == Http2Impl::Oghttp2) {
-    // oghttp2 fails this test for now.
-    return;
+    GTEST_SKIP();
   }
+#endif
 
   // Change one character in the header value and verify that codec correctly
   // accepts or rejects based on the table above.
   std::string header_value{"aaaaaaaa"};
   for (int i = 0; i <= 0xff; ++i) {
+    if (i == 0 && http2_implementation_ == Http2Impl::Oghttp2) {
+      // oghttp2 fails this specific case for now.
+      continue;
+    }
+
     TestRequestHeaderMapImpl request_headers;
     HttpTestUtility::addDefaultHeaders(request_headers);
     header_value[2] = static_cast<char>(i);
+
+    SCOPED_TRACE(absl::StrCat("header value: [", absl::CEscape(header_value), "]"));
+
     HeaderString header_string("a");
     setHeaderStringUnvalidated(header_string, header_value);
     request_headers.addViaMove(HeaderString(absl::string_view("foo")), std::move(header_string));

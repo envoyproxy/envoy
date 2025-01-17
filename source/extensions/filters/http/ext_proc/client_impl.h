@@ -36,6 +36,7 @@ public:
                    const uint64_t stream_id, RequestCallbacks* callbacks,
                    StreamBase* stream) override;
   void cancel() override {}
+  const Envoy::StreamInfo::StreamInfo* getStreamInfo() const override { return nullptr; }
 
 private:
   Grpc::AsyncClientManager& client_manager_;
