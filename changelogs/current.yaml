@@ -31,6 +31,13 @@ new_features:
     a default value of ``disabled`` will be assigned and there will be no SameSite value in the cookie attribute. See
     :ref:`apply_on_stream_done <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.cookie_configs>`
     for more details.
+- area: spiffe
+  change: |
+    Added :ref:`trust_bundles
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundles>`
+    to the SPIFFE certificate validator configuration. This field allows specifying a SPIFFE trust
+    bundle mapping as a DataSource. If both trust_bundles and trust_domains are specified,
+    trust_bundles takes precedence.
 - area: resource_monitors
   change: |
     Added support to monitor Container CPU utilization in Linux K8s environment using existing
