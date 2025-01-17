@@ -24,6 +24,13 @@ removed_config_or_runtime:
     Removed runtime flag ``envoy.reloadable_features.dns_details`` and legacy code paths.
 
 new_features:
+- area: spiffe
+  change: |
+    Added :ref:`trust_bundles
+    <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundles>`
+    to the SPIFFE certificate validator configuration. This field allows specifying a SPIFFE trust
+    bundle mapping as a DataSource. If both trust_bundles and trust_domains are specified,
+    trust_bundles takes precedence.
 - area: resource_monitors
   change: |
     Added support to monitor Container CPU utilization in Linux K8s environment using existing
