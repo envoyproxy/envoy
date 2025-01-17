@@ -48,7 +48,13 @@ public:
           }
           // Add a dummy trace for test coverage.
           query->addTrace(100);
-          pending_queries_.push_back(PendingQueryInfo{std::move(query), absl::nullopt});
+          if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_num_retries") &&
+              config_.has_num_retries()) {
+            pending_queries_.push_back(
+                PendingQueryInfo{std::move(query), config_.num_retries().value() + 1});
+          } else {
+            pending_queries_.push_back(PendingQueryInfo{std::move(query), absl::nullopt});
+          }
         });
     return raw_new_query;
   }

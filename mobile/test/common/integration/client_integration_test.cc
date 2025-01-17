@@ -672,8 +672,6 @@ TEST_P(ClientIntegrationTest, InvalidDomainFakeResolver) {
 
 TEST_P(ClientIntegrationTest, InvalidDomainReresolveWithNoAddresses) {
   builder_.addRuntimeGuard("reresolve_null_addresses", true);
-  builder_.setLogLevel(Logger::Logger::debug);
-  builder_.setDnsNumRetries(3);
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
   Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
