@@ -7079,6 +7079,70 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolsIdleDeleted) {
   }
 }
 
+TEST_P(ClusterManagerLifecycleTest, ConnPoolsCorrectDeleted) {
+  TestScopedRuntime scoped_runtime;
+
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.25s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+  )EOF";
+
+  ReadyWatcher initialized;
+  EXPECT_CALL(initialized, ready());
+  create(parseBootstrapFromV3Yaml(yaml));
+
+  // Set up for an initialize callback.
+  cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
+
+  std::unique_ptr<MockClusterUpdateCallbacks> callbacks(new NiceMock<MockClusterUpdateCallbacks>());
+  ClusterUpdateCallbacksHandlePtr cb =
+      cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
+
+  Cluster& cluster = cluster_manager_->activeClusters().begin()->second;
+
+  // Set up the HostSet.
+  HostSharedPtr host1 = makeTestHost(cluster.info(), "tcp://127.0.0.1:80", time_system_);
+
+  HostVector hosts{host1};
+  auto hosts_ptr = std::make_shared<HostVector>(hosts);
+
+  // Sending non-mergeable updates.
+  cluster.prioritySet().updateHosts(
+      0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
+      123, absl::nullopt, 100);
+  {
+    auto* tcp1 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
+    EXPECT_CALL(factory_, allocateTcpConnPool_).WillOnce(Return(tcp1));
+    std::function<void()> idle_callback;
+    EXPECT_CALL(*tcp1, addIdleCallback(_)).WillOnce(SaveArg<0>(&idle_callback));
+    EXPECT_EQ(tcp1,
+              TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                           ->tcpConnPool(ResourcePriority::Default, nullptr)));
+    // Request the same pool again and verify that it produces the same output
+    EXPECT_EQ(tcp1,
+              TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                           ->tcpConnPool(ResourcePriority::Default, nullptr)));
+
+    // Trigger the idle callback so we remove the connection pool
+    idle_callback();
+
+    auto* tcp2 = new NiceMock<Tcp::ConnectionPool::MockInstance>();
+    EXPECT_CALL(factory_, allocateTcpConnPool_).WillOnce(Return(tcp2));
+
+    // Trigger the callback on first connection pool again
+    idle_callback();
+
+    // Check that the callback for tcp1 did not destroy tcp2 instead
+    EXPECT_EQ(tcp2,
+              TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
+                                           ->tcpConnPool(ResourcePriority::Default, nullptr)));
+  }
+}
+
 TEST_F(ClusterManagerImplTest, InvalidPriorityLocalClusterNameStatic) {
   std::string yaml = R"EOF(
 static_resources:
