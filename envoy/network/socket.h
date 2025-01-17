@@ -558,6 +558,11 @@ public:
       return true;
     }
     for (const auto& option : *options) {
+      auto details = option->getOptionDetails(socket, state);
+      if (details.has_value() && (details->name_.name() == "IPPROTO_IPV6/IPV6_UNICAST_HOPS" ||
+                                  details->name_.name() == "IPPROTO_IP/IP_TTL")) {
+        continue;
+      }
       if (!option->setOption(socket, state)) {
         return false;
       }
