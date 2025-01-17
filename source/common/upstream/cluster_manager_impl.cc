@@ -2294,6 +2294,12 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 
     auto erase_iter = container.pools_.find(hash_key);
     if (erase_iter != container.pools_.end()) {
+      // ConnPoolImplBase::checkForIdleAndNotify can be invoked once or twice.
+      // In a situation where an idle TCP connection pool is added to the deferred delete
+      // list, but a new pool with the same hash key is created before the deferred delete
+      // list is cleaned up, the idle callbacks of the new pool will get executed. This will
+      // result in the new pool being destroyed, even if it is still active. Therefore the check
+      // here makes sure only the correct, idle conn pool is destroyed.
       if (erase_iter->second.get() == pool_to_erase) {
         ENVOY_LOG(trace, "Idle pool, erasing pool for host {}", *host);
         thread_local_dispatcher_.deferredDelete(std::move(erase_iter->second));
