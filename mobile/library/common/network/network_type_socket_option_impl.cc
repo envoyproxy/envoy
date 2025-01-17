@@ -24,10 +24,6 @@ void NetworkTypeSocketOptionImpl::hashKey(std::vector<uint8_t>& hash_key) const 
 
 absl::optional<Socket::Option::Details> NetworkTypeSocketOptionImpl::getOptionDetails(
     const Socket&, envoy::config::core::v3::SocketOption::SocketState /*state*/) const {
-  if (!isSupported()) {
-    return absl::nullopt;
-  }
-
   Socket::Option::Details details;
   details.name_ = optname_;
   std::vector<uint8_t> data;
@@ -36,7 +32,7 @@ absl::optional<Socket::Option::Details> NetworkTypeSocketOptionImpl::getOptionDe
   return absl::make_optional(std::move(details));
 }
 
-bool NetworkTypeSocketOptionImpl::isSupported() const { return optname_.hasValue(); }
+bool NetworkTypeSocketOptionImpl::isSupported() const { return true; }
 
 } // namespace Network
 } // namespace Envoy
