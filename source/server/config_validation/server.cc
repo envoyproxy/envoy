@@ -52,9 +52,10 @@ ValidationInstance::ValidationInstance(
     Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
     Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
     const ProcessContextOptRef& process_context)
-    : options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields(),
-                                             !options.ignoreUnknownDynamicFields()),
+    : options_(options),
+      validation_context_(options_.allowUnknownStaticFields(),
+                          !options.rejectUnknownDynamicFields(),
+                          !options.ignoreUnknownDynamicFields(), options.skipDeprecatedLogs()),
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
                                    random_generator_, bootstrap_, process_context)),

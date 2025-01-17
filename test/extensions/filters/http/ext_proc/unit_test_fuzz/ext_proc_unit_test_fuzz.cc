@@ -118,7 +118,7 @@ DEFINE_PROTO_FUZZER(
             }));
         EXPECT_CALL(*stream, streamInfo())
             .WillRepeatedly(ReturnRef(mocks.async_client_stream_info_));
-        EXPECT_CALL(*stream, closeLocalStream()).WillRepeatedly(Return(false));
+        EXPECT_CALL(*stream, close()).WillRepeatedly(Return(false));
         return stream;
       }));
 

@@ -152,7 +152,7 @@ private:
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
   int dns_query_timeout_seconds_ = 5;
-  absl::optional<uint32_t> dns_num_retries_ = absl::nullopt;
+  absl::optional<uint32_t> dns_num_retries_ = 3;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
   std::string app_version_ = "unspecified";
@@ -211,7 +211,7 @@ private:
   // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.cc;l=21-22;drc=6849bf6b37e96bd1c38a5f77f7deaa28b53779c4;bpv=1;bpt=1
   const uint32_t initial_stream_window_size_ = 6 * 1024 * 1024;      // 6MB
   const uint32_t initial_connection_window_size_ = 15 * 1024 * 1024; // 15MB
-  int quic_connection_idle_timeout_seconds_ = 30;
+  int quic_connection_idle_timeout_seconds_ = 60;
 
   int keepalive_initial_interval_ms_ = 0;
 };

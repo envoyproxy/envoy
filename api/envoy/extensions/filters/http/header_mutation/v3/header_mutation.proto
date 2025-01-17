@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.header_mutation.v3;
 
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
+import "envoy/config/core/v3/base.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -18,6 +19,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Mutations {
   // The request mutations are applied before the request is forwarded to the upstream cluster.
   repeated config.common.mutation_rules.v3.HeaderMutation request_mutations = 1;
+
+  // The ``path`` header query parameter mutations are applied after ``request_mutations`` and before the request
+  // is forwarded to the next filter in the filter chain.
+  repeated config.core.v3.KeyValueMutation query_parameter_mutations = 3;
 
   // The response mutations are applied before the response is sent to the downstream client.
   repeated config.common.mutation_rules.v3.HeaderMutation response_mutations = 2;

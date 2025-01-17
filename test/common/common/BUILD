@@ -558,6 +558,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:scope_tracked_object_stack",
         "//source/common/common:utility_lib",
+        "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
 

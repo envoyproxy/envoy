@@ -451,19 +451,38 @@ std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable
   return (value != nullptr) && (value[0] != '\0') ? value : default_value;
 }
 
-bool Utility::resolveProfileElements(const std::string& profile_file,
-                                     const std::string& profile_name,
-                                     absl::flat_hash_map<std::string, std::string>& elements) {
+bool Utility::resolveProfileElementsFromString(
+    const std::string& string_data, const std::string& profile_name,
+    absl::flat_hash_map<std::string, std::string>& elements) {
+  std::unique_ptr<std::istream> stream;
+
+  stream = std::make_unique<std::istringstream>(std::istringstream{string_data});
+  return resolveProfileElementsFromStream(*stream, profile_name, elements);
+}
+
+bool Utility::resolveProfileElementsFromFile(
+    const std::string& profile_file, const std::string& profile_name,
+    absl::flat_hash_map<std::string, std::string>& elements) {
   std::ifstream file(profile_file);
   if (!file.is_open()) {
     ENVOY_LOG_MISC(debug, "Error opening credentials file {}", profile_file);
     return false;
   }
+  std::unique_ptr<std::istream> stream;
+  stream = std::make_unique<std::ifstream>(std::move(file));
+  return resolveProfileElementsFromStream(*stream, profile_name, elements);
+}
+
+bool Utility::resolveProfileElementsFromStream(
+    std::istream& stream, const std::string& profile_name,
+    absl::flat_hash_map<std::string, std::string>& elements) {
+
   const auto profile_start = absl::StrFormat("[%s]", profile_name);
 
   bool found_profile = false;
   std::string line;
-  while (std::getline(file, line)) {
+
+  while (std::getline(stream, line)) {
     line = std::string(StringUtil::trim(line));
     if (line.empty()) {
       continue;

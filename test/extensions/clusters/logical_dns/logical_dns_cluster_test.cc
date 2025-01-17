@@ -13,6 +13,8 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/extensions/clusters/common/dns_cluster_backcompat.h"
+#include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/server/transport_socket_config_impl.h"
 
@@ -58,10 +60,27 @@ protected:
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    absl::Status creation_status = absl::OkStatus();
-    cluster_ = std::shared_ptr<LogicalDnsCluster>(
-        new LogicalDnsCluster(cluster_config, factory_context, dns_resolver_, creation_status));
-    THROW_IF_NOT_OK(creation_status);
+    absl::StatusOr<std::unique_ptr<LogicalDnsCluster>> status_or_cluster;
+
+    envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
+    if (cluster_config.has_cluster_type()) {
+      ProtobufTypes::MessagePtr dns_cluster_msg =
+          std::make_unique<envoy::extensions::clusters::dns::v3::DnsCluster>();
+      ASSERT_TRUE(Config::Utility::translateOpaqueConfig(
+                      cluster_config.cluster_type().typed_config(),
+                      factory_context.messageValidationVisitor(), *dns_cluster_msg)
+                      .ok());
+      dns_cluster =
+          MessageUtil::downcastAndValidate<const envoy::extensions::clusters::dns::v3::DnsCluster&>(
+              *dns_cluster_msg, factory_context.messageValidationVisitor());
+    } else {
+      createDnsClusterFromLegacyFields(cluster_config, dns_cluster);
+    }
+
+    status_or_cluster =
+        LogicalDnsCluster::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
+    THROW_IF_NOT_OK_REF(status_or_cluster.status());
+    cluster_ = std::move(*status_or_cluster);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) {
           membership_updated_.ready();
@@ -75,15 +94,31 @@ protected:
 
   absl::Status factorySetupFromV3Yaml(const std::string& yaml) {
     ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_));
+    resolve_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
     ClusterFactoryContextImpl::LazyCreateDnsResolver resolver_fn = [&]() { return dns_resolver_; };
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, resolver_fn, ssl_context_manager_,
-        nullptr, false);
-
-    LogicalDnsClusterFactory factory;
-    return factory.createClusterImpl(cluster_config, factory_context).status();
+    auto status_or_cluster = ClusterFactoryImplBase::create(
+        cluster_config, server_context_, server_context_.cluster_manager_, resolver_fn,
+        ssl_context_manager_, nullptr, false);
+    if (status_or_cluster.ok()) {
+      cluster_ = std::dynamic_pointer_cast<LogicalDnsCluster>(status_or_cluster->first);
+      priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
+          [&](uint32_t, const HostVector&, const HostVector&) {
+            membership_updated_.ready();
+            return absl::OkStatus();
+          });
+      cluster_->initialize([&]() {
+        initialized_.ready();
+        return absl::OkStatus();
+      });
+    } else {
+      // the Event::MockTimer constructor creates EXPECT_CALL for the dispatcher.
+      // If we want cluster creation to fail, there won't be a cluster to create the timer,
+      // so we need to clear the expectation manually.
+      server_context_.dispatcher_.createTimer([]() -> void {});
+    }
+    return status_or_cluster.status();
   }
 
   void expectResolve(Network::DnsLookupFamily dns_lookup_family,
@@ -437,13 +472,17 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
       factorySetupFromV3Yaml(multiple_hosts_yaml).message(),
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
-  const std::string multiple_lb_endpoints_yaml = R"EOF(
+  const std::string multiple_hosts_cluster_type_yaml = R"EOF(
   name: name
-  type: LOGICAL_DNS
-  dns_refresh_rate: 4s
+  cluster_type:
+    name: envoy.cluster.strict_dns # (this is right, name shouldnt matter)
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+      dns_refresh_rate: 4s
+      all_addresses_in_single_endpoint: true
+      dns_lookup_family: V4_ONLY
   connect_timeout: 0.25s
   lb_policy: ROUND_ROBIN
-  dns_lookup_family: V4_ONLY
   load_assignment:
     cluster_name: name
     endpoints:
@@ -463,67 +502,269 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
             health_check_config:
               port_value: 8000
   )EOF";
+
+  EXPECT_EQ(
+      factorySetupFromV3Yaml(multiple_hosts_cluster_type_yaml).message(),
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+
+  const std::string multiple_lb_endpoints_yaml = R"EOF(
+    name: name
+    type: LOGICAL_DNS
+    dns_refresh_rate: 4s
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: foo.bar.com
+                  port_value: 443
+              health_check_config:
+                port_value: 8000
+          - endpoint:
+              address:
+                socket_address:
+                  address: hello.world.com
+                  port_value: 443
+              health_check_config:
+                port_value: 8000
+    )EOF";
 
   EXPECT_EQ(
       factorySetupFromV3Yaml(multiple_lb_endpoints_yaml).message(),
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
-  const std::string multiple_endpoints_yaml = R"EOF(
-  name: name
-  type: LOGICAL_DNS
-  dns_refresh_rate: 4s
-  connect_timeout: 0.25s
-  lb_policy: ROUND_ROBIN
-  dns_lookup_family: V4_ONLY
-  load_assignment:
-    cluster_name: name
-    endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: foo.bar.com
-                port_value: 443
-            health_check_config:
-              port_value: 8000
+  const std::string multiple_lb_endpoints_cluster_type_yaml = R"EOF(
+    name: name
+    cluster_type:
+      name: envoy.cluster.logical_dns
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        dns_refresh_rate: 4s
+        all_addresses_in_single_endpoint: true
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: foo.bar.com
+                  port_value: 443
+              health_check_config:
+                port_value: 8000
+          - endpoint:
+              address:
+                socket_address:
+                  address: hello.world.com
+                  port_value: 443
+              health_check_config:
+                port_value: 8000
+    )EOF";
 
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: hello.world.com
-                port_value: 443
-            health_check_config:
-              port_value: 8000
-  )EOF";
+  EXPECT_EQ(
+      factorySetupFromV3Yaml(multiple_lb_endpoints_cluster_type_yaml).message(),
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+
+  const std::string multiple_endpoints_yaml = R"EOF(
+    name: name
+    type: LOGICAL_DNS
+    dns_refresh_rate: 4s
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: foo.bar.com
+                  port_value: 443
+              health_check_config:
+                port_value: 8000
+
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: hello.world.com
+                  port_value: 443
+              health_check_config:
+                port_value: 8000
+    )EOF";
 
   EXPECT_EQ(
       factorySetupFromV3Yaml(multiple_endpoints_yaml).message(),
       "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
+  const std::string multiple_endpoints_cluster_type_yaml = R"EOF(
+    name: name
+    cluster_type:
+      name: abc
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        dns_lookup_family: V4_ONLY
+        dns_refresh_rate: 4s
+        all_addresses_in_single_endpoint: true
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: foo.bar.com
+                  port_value: 443
+              health_check_config:
+                port_value: 8000
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: hello.world.com
+                  port_value: 443
+              health_check_config:
+                port_value: 8000
+    )EOF";
+
+  EXPECT_EQ(
+      factorySetupFromV3Yaml(multiple_endpoints_cluster_type_yaml).message(),
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+
   const std::string custom_resolver_yaml = R"EOF(
-  name: name
-  type: LOGICAL_DNS
-  dns_refresh_rate: 4s
-  connect_timeout: 0.25s
-  lb_policy: ROUND_ROBIN
-  dns_lookup_family: V4_ONLY
-  load_assignment:
-    cluster_name: name
-    endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: hello.world.com
-                port_value: 443
-                resolver_name: customresolver
-            health_check_config:
-              port_value: 8000
-  )EOF";
+    name: name
+    type: LOGICAL_DNS
+    dns_refresh_rate: 4s
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: hello.world.com
+                  port_value: 443
+                  resolver_name: customresolver
+              health_check_config:
+                port_value: 8000
+    )EOF";
 
   EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_yaml).message(),
             "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+
+  const std::string custom_resolver_cluster_type_yaml = R"EOF(
+    name: name
+    cluster_type:
+      name: abc
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        dns_lookup_family: V4_ONLY
+        dns_refresh_rate: 4s
+        all_addresses_in_single_endpoint: true
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: name
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: hello.world.com
+                  port_value: 443
+                  resolver_name: customresolver
+              health_check_config:
+                port_value: 8000
+    )EOF";
+
+  EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_cluster_type_yaml).message(),
+            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+}
+
+// Test using both types of names in the cluster type.
+TEST_F(LogicalDnsClusterTest, UseDnsExtension) {
+  const std::string config = R"EOF(
+  name: name
+  cluster_type:
+    name: arglegarble
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+      dns_refresh_rate: 4s
+      dns_lookup_family: V4_ONLY
+      all_addresses_in_single_endpoint: true
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  wait_for_warm_on_init: false
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  ASSERT_TRUE(factorySetupFromV3Yaml(config).ok());
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
+
+  dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
+}
+
+TEST_F(LogicalDnsClusterTest, TypedConfigBackcompat) {
+  const std::string config = R"EOF(
+  name: name
+  cluster_type:
+    name: envoy.cluster.logical_dns
+  dns_refresh_rate: 4s
+  dns_lookup_family: V4_ONLY
+  connect_timeout: 0.25s
+  lb_policy: ROUND_ROBIN
+  # Since the following expectResolve() requires Network::DnsLookupFamily::V4Only we need to set
+  # dns_lookup_family to V4_ONLY explicitly for v2 .yaml config.
+  wait_for_warm_on_init: false
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  ASSERT_TRUE(factorySetupFromV3Yaml(config).ok());
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
+
+  dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
 }
 
 TEST_F(LogicalDnsClusterTest, Basic) {
