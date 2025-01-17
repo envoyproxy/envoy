@@ -4968,10 +4968,10 @@ TEST_P(RouterShadowingTest, ShadowRequestCarriesMatchingRoute) {
   expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
 
   EXPECT_CALL(
-     runtime_.snapshot_,
-     featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
-                    43))
-     .WillOnce(Return(true));
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   NiceMock<Http::MockAsyncClient> foo_client;
