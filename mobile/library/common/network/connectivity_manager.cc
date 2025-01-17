@@ -13,6 +13,7 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 #include "fmt/ostream.h"
+#include "library/common/network/network_type_socket_option_impl.h"
 #include "library/common/network/src_addr_socket_option_impl.h"
 
 // Used on Linux (requires root/CAP_NET_RAW)
@@ -34,22 +35,6 @@
 #else
 #define ENVOY_SOCKET_IPV6_BOUND_IF Network::SocketOptionName()
 #endif
-
-// Dummy/test option
-#ifdef IP_TTL
-#define ENVOY_SOCKET_IP_TTL ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_TTL)
-#else
-#define ENVOY_SOCKET_IP_TTL Network::SocketOptionName()
-#endif
-
-#ifdef IPV6_UNICAST_HOPS
-#define ENVOY_SOCKET_IPV6_UNICAST_HOPS                                                             \
-  ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IPV6, IPV6_UNICAST_HOPS)
-#else
-#define ENVOY_SOCKET_IPV6_UNICAST_HOPS Network::SocketOptionName()
-#endif
-
-#define DEFAULT_IP_TTL 64
 
 // Prefixes used to prefer well-known interface names.
 #if defined(__APPLE__)
@@ -308,11 +293,15 @@ Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(int n
   // Envoy uses the hash signature of overridden socket options to choose a connection pool.
   // Setting a dummy socket option is a hack that allows us to select a different
   // connection pool without materially changing the socket configuration.
-  int ttl_value = DEFAULT_IP_TTL + static_cast<int>(network);
   auto options = std::make_shared<Socket::Options>();
-  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
-      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_TTL,
-      ENVOY_SOCKET_IPV6_UNICAST_HOPS, ttl_value));
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_network_type_socket_option")) {
+    options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
+        envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_TTL,
+        ENVOY_SOCKET_IPV6_UNICAST_HOPS, DEFAULT_IP_TTL + static_cast<int>(network)));
+  } else {
+    options->push_back(std::make_shared<NetworkTypeSocketOptionImpl>(network));
+  }
+
   return options;
 }
 
