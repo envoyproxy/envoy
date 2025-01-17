@@ -17,6 +17,11 @@ def api_dependencies():
         name = "bazel_skylib",
     )
     external_http_archive(
+        name = "rules_java",
+        patch_args = ["-p1"],
+        patches = ["@envoy_api//bazel:rules_java.patch"],
+    )
+    external_http_archive(
         name = "rules_jvm_external",
     )
     external_http_archive(

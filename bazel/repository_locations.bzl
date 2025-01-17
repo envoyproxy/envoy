@@ -1068,18 +1068,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/bazelbuild/rules_foreign_cc/blob/{version}/LICENSE",
     ),
-    rules_java = dict(
-        project_name = "Java rules for Bazel",
-        project_desc = "Bazel rules for the Java language",
-        project_url = "https://github.com/bazelbuild/rules_java/",
-        version = "7.12.3",
-        sha256 = "c0ee60f8757f140c157fc2c7af703d819514de6e025ebf70386d38bdd85fce83",
-        release_date = "2024-12-03",
-        urls = ["https://github.com/bazelbuild/rules_java/releases/download/{version}/rules_java-{version}.tar.gz"],
-        use_category = ["build"],
-        license = "Apache-2.0",
-        license_url = "https://github.com/bazelbuild/rules_java/blob/{version}/LICENSE",
-    ),
     rules_python = dict(
         project_name = "Python rules for Bazel",
         project_desc = "Bazel rules for the Python language",
