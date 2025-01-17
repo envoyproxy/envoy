@@ -113,8 +113,8 @@ CompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : DirectionConfig(proto_config.request_direction_config().common_config(),
                       stats_prefix + "request.", scope, runtime),
-      is_set_{proto_config.has_request_direction_config(),
-      enable_on_x_header_(proto_config.request_direction_config().enable_on_x_header())} {}
+      enable_on_x_header_(proto_config.request_direction_config().enable_on_x_header()),
+      is_set_{proto_config.has_request_direction_config()} {}
 
 CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const envoy::extensions::filters::http::compressor::v3::Compressor& proto_config,
