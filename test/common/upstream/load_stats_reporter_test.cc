@@ -253,6 +253,7 @@ HostSharedPtr makeTestHost(const std::string& hostname,
 
 void addStats(const HostSharedPtr& host, double a, double b = 0, double c = 0, double d = 0) {
   host->stats().rq_success_.inc();
+  host->stats().rq_total_.inc();
   host->loadMetricStats().add("metric_a", a);
   if (b != 0) {
     host->loadMetricStats().add("metric_b", b);
@@ -313,6 +314,7 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
     auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality0_stats->mutable_locality()->set_region("mars");
     expected_locality0_stats->set_total_successful_requests(3);
+    expected_locality0_stats->set_total_issued_requests(3);
     addStatExpectation(expected_locality0_stats, "metric_a", 3, 0.88888);
     addStatExpectation(expected_locality0_stats, "metric_b", 2, 1.12345);
     addStatExpectation(expected_locality0_stats, "metric_c", 1, 3.14159);
@@ -320,6 +322,7 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
     auto expected_locality1_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality1_stats->mutable_locality()->set_region("jupiter");
     expected_locality1_stats->set_total_successful_requests(1);
+    expected_locality1_stats->set_total_issued_requests(1);
     addStatExpectation(expected_locality1_stats, "metric_a", 1, 10.01);
     addStatExpectation(expected_locality1_stats, "metric_c", 1, 20.02);
     addStatExpectation(expected_locality1_stats, "metric_d", 1, 30.03);
@@ -331,6 +334,7 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
 
   // Traffic between previous request and next response. Previous latched metrics are cleared.
   host1->stats().rq_success_.inc();
+  host1->stats().rq_total_.inc();
   host1->loadMetricStats().add("metric_a", 1.41421);
   host1->loadMetricStats().add("metric_e", 2.71828);
 
@@ -348,6 +352,7 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
     auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality0_stats->mutable_locality()->set_region("mars");
     expected_locality0_stats->set_total_successful_requests(1);
+    expected_locality0_stats->set_total_issued_requests(1);
     addStatExpectation(expected_locality0_stats, "metric_a", 1, 1.41421);
     addStatExpectation(expected_locality0_stats, "metric_e", 1, 2.71828);
 
