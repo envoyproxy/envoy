@@ -291,7 +291,6 @@ void LocalRateLimiterImpl::onFillTimer() {
   for (const auto& descriptor : descriptors_) {
     descriptor.second->onFillTimer(refill_counter_, share_factor);
   }
-  dynamic_descriptors_.onFillTimer(refill_counter_, share_factor);
 
   fill_timer_->enableTimer(default_token_bucket_->fillInterval());
 }
@@ -426,12 +425,6 @@ DynamicDescriptorMap::getBucket(const RateLimit::Descriptor request_descriptor) 
   return nullptr;
 }
 
-void DynamicDescriptorMap::onFillTimer(uint64_t refill_counter, double factor) {
-  for (const auto& pair : user_descriptors_) {
-    pair.second->onFillTimer(refill_counter, factor);
-  }
-}
-
 DynamicDescriptor::DynamicDescriptor(RateLimitTokenBucketSharedPtr token_bucket, uint32_t lru_size,
                                      TimeSource& time_source)
     : parent_token_bucket_(token_bucket), lru_size_(lru_size), time_source_(time_source) {}
@@ -473,13 +466,6 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descr
   }
   ASSERT(lru_list_.size() == dynamic_descriptors_.size());
   return result.first->second.first;
-}
-
-void DynamicDescriptor::onFillTimer(uint64_t refill_counter, double factor) {
-  absl::WriterMutexLock lock(&dyn_desc_lock_);
-  for (auto& pair : dynamic_descriptors_) {
-    pair.second.first->onFillTimer(refill_counter, factor);
-  }
 }
 
 } // namespace LocalRateLimit

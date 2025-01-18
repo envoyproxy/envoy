@@ -31,7 +31,6 @@ public:
   ~DynamicDescriptor() = default;
   // add a new user configured descriptor to the set.
   RateLimitTokenBucketSharedPtr addOrGetDescriptor(const RateLimit::Descriptor& request_descriptor);
-  void onFillTimer(uint64_t refill_counter, double factor);
 
 private:
   RateLimitTokenBucketSharedPtr parent_token_bucket_;
@@ -57,7 +56,6 @@ public:
                      DynamicDescriptorSharedPtr dynamic_descriptor);
   // pass request_descriptors to the dynamic descriptor set to get the token bucket.
   RateLimitTokenBucketSharedPtr getBucket(const RateLimit::Descriptor);
-  void onFillTimer(uint64_t refill_counter, double factor);
 
 private:
   bool compareDescriptorEntries(const std::vector<RateLimit::DescriptorEntry>& request_entries,
