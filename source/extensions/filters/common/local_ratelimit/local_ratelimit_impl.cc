@@ -213,6 +213,11 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
           throw EnvoyException("local_rate_limiting_with_dynamic_buckets is disabled. Local rate "
                                "descriptor value cannot be empty");
         }
+        if (!no_timer_based_rate_limit_token_bucket_) {
+          throw EnvoyException("local rate limit descriptor value cannot be empty without "
+                               "no_timer_based_rate_limit_token_bucket");
+        }
+
         if (per_connection) {
           throw EnvoyException(
               "local rate descriptor value cannot be empty in per connection rate limit mode");
@@ -253,7 +258,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     }
     if (wildcard_found) {
       DynamicDescriptorSharedPtr dynamic_descriptor = std::make_shared<DynamicDescriptor>(
-          per_descriptor_token_bucket, lru_size, dispatcher.timeSource(), *this);
+          per_descriptor_token_bucket, lru_size, dispatcher.timeSource());
       dynamic_descriptors_.addDescriptor(std::move(new_descriptor), std::move(dynamic_descriptor));
       continue;
     }
@@ -428,11 +433,8 @@ void DynamicDescriptorMap::onFillTimer(uint64_t refill_counter, double factor) {
 }
 
 DynamicDescriptor::DynamicDescriptor(RateLimitTokenBucketSharedPtr token_bucket, uint32_t lru_size,
-                                     TimeSource& time_source, LocalRateLimiterImpl& parent)
-    : parent_token_bucket_(token_bucket), lru_size_(lru_size), time_source_(time_source),
-      no_timer_based_rate_limit_token_bucket_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.no_timer_based_rate_limit_token_bucket")),
-      parent_(parent) {}
+                                     TimeSource& time_source)
+    : parent_token_bucket_(token_bucket), lru_size_(lru_size), time_source_(time_source) {}
 
 RateLimitTokenBucketSharedPtr
 DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descriptor) {
@@ -446,23 +448,15 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descr
   }
   // add a new descriptor to the set along with its token bucket
   RateLimitTokenBucketSharedPtr per_descriptor_token_bucket;
-  if (no_timer_based_rate_limit_token_bucket_) {
-    ENVOY_LOG(trace, "creating atomic token bucket for dynamic descriptor");
-    ENVOY_LOG(trace, "max_tokens: {}, fill_rate: {}, fill_interval: {}",
-              parent_token_bucket_->maxTokens(), parent_token_bucket_->fillRate(),
-              std::chrono::duration<double>(parent_token_bucket_->fillInterval()).count());
-    per_descriptor_token_bucket = std::make_shared<AtomicTokenBucket>(
-        parent_token_bucket_->maxTokens(),
-        uint32_t(parent_token_bucket_->fillRate() *
-                 std::chrono::duration<double>(parent_token_bucket_->fillInterval()).count()),
-        parent_token_bucket_->fillInterval(), time_source_);
-  } else {
-    per_descriptor_token_bucket = std::make_shared<TimerTokenBucket>(
-        parent_token_bucket_->maxTokens(),
-        uint32_t(parent_token_bucket_->fillRate() *
-                 std::chrono::duration<double>(parent_token_bucket_->fillInterval()).count()),
-        parent_token_bucket_->fillInterval(), parent_token_bucket_->multiplier(), parent_);
-  }
+  ENVOY_LOG(trace, "creating atomic token bucket for dynamic descriptor");
+  ENVOY_LOG(trace, "max_tokens: {}, fill_rate: {}, fill_interval: {}",
+            parent_token_bucket_->maxTokens(), parent_token_bucket_->fillRate(),
+            std::chrono::duration<double>(parent_token_bucket_->fillInterval()).count());
+  per_descriptor_token_bucket = std::make_shared<AtomicTokenBucket>(
+      parent_token_bucket_->maxTokens(),
+      uint32_t(parent_token_bucket_->fillRate() *
+               std::chrono::duration<double>(parent_token_bucket_->fillInterval()).count()),
+      parent_token_bucket_->fillInterval(), time_source_);
 
   ENVOY_LOG(trace, "DynamicDescriptor::addorGetDescriptor: adding dynamic descriptor: {}",
             request_descriptor.toString());

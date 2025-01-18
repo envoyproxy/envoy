@@ -27,8 +27,7 @@ using ProtoLocalClusterRateLimit = envoy::extensions::common::ratelimit::v3::Loc
 
 class DynamicDescriptor : public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
-  DynamicDescriptor(RateLimitTokenBucketSharedPtr token_bucket, uint32_t lru_size, TimeSource&,
-                    LocalRateLimiterImpl& parent);
+  DynamicDescriptor(RateLimitTokenBucketSharedPtr token_bucket, uint32_t lru_size, TimeSource&);
   ~DynamicDescriptor() = default;
   // add a new user configured descriptor to the set.
   RateLimitTokenBucketSharedPtr addOrGetDescriptor(const RateLimit::Descriptor& request_descriptor);
@@ -45,8 +44,6 @@ private:
   LruList lru_list_;
   uint32_t lru_size_;
   TimeSource& time_source_;
-  const bool no_timer_based_rate_limit_token_bucket_{};
-  LocalRateLimiterImpl& parent_;
 };
 
 using DynamicDescriptorSharedPtr = std::shared_ptr<DynamicDescriptor>;
