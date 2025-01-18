@@ -668,7 +668,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn get_request_body_size(&self) -> usize {
-    unsafe { abi::envoy_dynamic_module_callback_http_get_request_body_data_size(self.raw_ptr) }
+    unsafe { abi::envoy_dynamic_module_callback_http_get_request_body_size(self.raw_ptr) }
   }
 
   fn get_request_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a> {
@@ -677,7 +677,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
 
   fn drain_request_body(&mut self, size: usize) {
     unsafe {
-      abi::envoy_dynamic_module_callback_http_drain_request_body_data(self.raw_ptr, size);
+      abi::envoy_dynamic_module_callback_http_drain_request_body(self.raw_ptr, size);
     }
   }
 
@@ -686,7 +686,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn get_response_body_size(&self) -> usize {
-    unsafe { abi::envoy_dynamic_module_callback_http_get_response_body_data_size(self.raw_ptr) }
+    unsafe { abi::envoy_dynamic_module_callback_http_get_response_body_size(self.raw_ptr) }
   }
 
   fn get_response_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a> {
@@ -695,7 +695,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
 
   fn drain_response_body(&mut self, _size: usize) {
     unsafe {
-      abi::envoy_dynamic_module_callback_http_drain_response_body_data(self.raw_ptr, _size);
+      abi::envoy_dynamic_module_callback_http_drain_response_body(self.raw_ptr, _size);
     }
   }
 

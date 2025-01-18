@@ -62,7 +62,7 @@ pub struct RequestBodyReader<'a> {
 impl std::io::Read for RequestBodyReader<'_> {
   fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
     let size = unsafe {
-      envoy_dynamic_module_callback_http_read_request_body_data(
+      envoy_dynamic_module_callback_http_read_request_body(
         self.raw_ptr,
         self.offset,
         _buf.as_ptr() as _,
@@ -102,7 +102,7 @@ impl RequestBodyWriter<'_> {
 impl std::io::Write for RequestBodyWriter<'_> {
   fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
     unsafe {
-      envoy_dynamic_module_callback_http_write_request_body_data(
+      envoy_dynamic_module_callback_http_write_request_body(
         self.raw_ptr,
         buf.as_ptr() as _,
         buf.len(),
@@ -126,7 +126,7 @@ pub struct ResponseBodyReader<'a> {
 impl std::io::Read for ResponseBodyReader<'_> {
   fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
     let size = unsafe {
-      envoy_dynamic_module_callback_http_read_response_body_data(
+      envoy_dynamic_module_callback_http_read_response_body(
         self.raw_ptr,
         self.offset,
         _buf.as_ptr() as _,
@@ -166,7 +166,7 @@ impl ResponseBodyWriter<'_> {
 impl std::io::Write for ResponseBodyWriter<'_> {
   fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
     unsafe {
-      envoy_dynamic_module_callback_http_write_response_body_data(
+      envoy_dynamic_module_callback_http_write_response_body(
         self.raw_ptr,
         buf.as_ptr() as _,
         buf.len(),

@@ -369,7 +369,7 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
   return true;
 }
 
-size_t envoy_dynamic_module_callback_http_read_request_body_data(
+size_t envoy_dynamic_module_callback_http_read_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t offset,
     envoy_dynamic_module_type_buffer_module_ptr module_buffer_ptr, size_t module_buffer_length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
@@ -386,7 +386,7 @@ size_t envoy_dynamic_module_callback_http_read_request_body_data(
   return ret;
 }
 
-void envoy_dynamic_module_callback_http_write_request_body_data(
+void envoy_dynamic_module_callback_http_write_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
@@ -395,21 +395,21 @@ void envoy_dynamic_module_callback_http_write_request_body_data(
   });
 }
 
-size_t envoy_dynamic_module_callback_http_get_request_body_data_size(
+size_t envoy_dynamic_module_callback_http_get_request_body_size(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->decoder_callbacks_->decodingBuffer();
   return buffer ? buffer->length() : 0;
 }
 
-void envoy_dynamic_module_callback_http_drain_request_body_data(
+void envoy_dynamic_module_callback_http_drain_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   filter->decoder_callbacks_->modifyDecodingBuffer(
       [length](Buffer::Instance& buffer) { buffer.drain(length); });
 }
 
-size_t envoy_dynamic_module_callback_http_read_response_body_data(
+size_t envoy_dynamic_module_callback_http_read_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t offset,
     envoy_dynamic_module_type_buffer_module_ptr module_buffer_ptr, size_t module_buffer_length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
@@ -426,7 +426,7 @@ size_t envoy_dynamic_module_callback_http_read_response_body_data(
   return ret;
 }
 
-void envoy_dynamic_module_callback_http_write_response_body_data(
+void envoy_dynamic_module_callback_http_write_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
@@ -435,14 +435,14 @@ void envoy_dynamic_module_callback_http_write_response_body_data(
   });
 }
 
-size_t envoy_dynamic_module_callback_http_get_response_body_data_size(
+size_t envoy_dynamic_module_callback_http_get_response_body_size(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->encoder_callbacks_->encodingBuffer();
   return buffer ? buffer->length() : 0;
 }
 
-void envoy_dynamic_module_callback_http_drain_response_body_data(
+void envoy_dynamic_module_callback_http_drain_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   filter->encoder_callbacks_->modifyEncodingBuffer(
