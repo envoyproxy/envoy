@@ -213,8 +213,8 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
 
   const auto& request_config = config_->requestDirectionConfig();
 
-  if (!end_stream && requestCompressionEnabled(request_config, headers) && !Http::Utility::isUpgrade(headers) &&
-      request_config.isMinimumContentLength(headers) &&
+  if (!end_stream && requestCompressionEnabled(request_config, headers) &&
+      !Http::Utility::isUpgrade(headers) && request_config.isMinimumContentLength(headers) &&
       request_config.isContentTypeAllowed(headers) &&
       !headers.getInline(request_content_encoding_handle.handle()) &&
       isTransferEncodingAllowed(headers)) {
@@ -651,23 +651,23 @@ bool CompressorFilter::compressionEnabled(
 
 // True if request compression is enabled.
 bool CompressorFilter::requestCompressionEnabled(
-     const CompressorFilterConfig::RequestDirectionConfig& config,
-     const Http::RequestHeaderMap& headers) const {
-   if (config.compressionEnabled()) {
-     return config.compressionEnabled();
-   } else if (config.enableOnXHeader()) {
-     Envoy::Http::HeaderMap::GetResult header_result =
-         headers.get(Envoy::Http::LowerCaseString("X-Request-Compression"));
-     if (header_result.size() > 0) { // Check if the header exists
-       std::string compressionRequired =
-           std::string(header_result.operator[](0)->value().getStringView());
-       ENVOY_LOG(debug, "X-Request-Compression {}", compressionRequired);
-       if (absl::EqualsIgnoreCase(compressionRequired, "true")) {
-         return true;
-       }
-     }
-   }
-   return false;
+    const CompressorFilterConfig::RequestDirectionConfig& config,
+    const Http::RequestHeaderMap& headers) const {
+  if (config.compressionEnabled()) {
+    return config.compressionEnabled();
+  } else if (config.enableOnXHeader()) {
+    Envoy::Http::HeaderMap::GetResult header_result =
+        headers.get(Envoy::Http::LowerCaseString("X-Request-Compression"));
+    if (header_result.size() > 0) { // Check if the header exists
+      std::string compressionRequired =
+          std::string(header_result.operator[](0)->value().getStringView());
+      ENVOY_LOG(debug, "X-Request-Compression {}", compressionRequired);
+      if (absl::EqualsIgnoreCase(compressionRequired, "true")) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 bool CompressorFilter::removeAcceptEncodingHeader(

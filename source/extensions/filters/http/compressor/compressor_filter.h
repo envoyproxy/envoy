@@ -204,7 +204,7 @@ private:
   bool compressionEnabled(const CompressorFilterConfig::ResponseDirectionConfig& config,
                           const CompressorPerRouteFilterConfig* per_route_config) const;
   bool requestCompressionEnabled(const CompressorFilterConfig::RequestDirectionConfig& config,
-                          const Http::RequestHeaderMap& headers) const;
+                                 const Http::RequestHeaderMap& headers) const;
   bool removeAcceptEncodingHeader(const CompressorFilterConfig::ResponseDirectionConfig& config,
                                   const CompressorPerRouteFilterConfig* per_route_config) const;
   bool hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const;
