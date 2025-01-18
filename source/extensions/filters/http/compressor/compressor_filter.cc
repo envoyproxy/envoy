@@ -661,7 +661,6 @@ bool CompressorFilter::requestCompressionEnabled(
     if (header_result.size() > 0) { // Check if the header exists
       std::string compressionRequired =
           std::string(header_result.operator[](0)->value().getStringView());
-      ENVOY_LOG(debug, "X-Request-Compression {}", compressionRequired);
       if (absl::EqualsIgnoreCase(compressionRequired, "true")) {
         return true;
       }
