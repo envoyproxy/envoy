@@ -65,7 +65,7 @@ impl std::io::Read for RequestBodyReader<'_> {
       envoy_dynamic_module_callback_http_read_request_body_data(
         self.raw_ptr,
         self.offset,
-        _buf.as_ptr() as *mut i8,
+        _buf.as_ptr() as _,
         _buf.len(),
       )
     };
@@ -104,7 +104,7 @@ impl std::io::Write for RequestBodyWriter<'_> {
     unsafe {
       envoy_dynamic_module_callback_http_write_request_body_data(
         self.raw_ptr,
-        buf.as_ptr() as *mut i8,
+        buf.as_ptr() as _,
         buf.len(),
       )
     };
@@ -129,7 +129,7 @@ impl std::io::Read for ResponseBodyReader<'_> {
       envoy_dynamic_module_callback_http_read_response_body_data(
         self.raw_ptr,
         self.offset,
-        _buf.as_ptr() as *mut i8,
+        _buf.as_ptr() as _,
         _buf.len(),
       )
     };
@@ -168,7 +168,7 @@ impl std::io::Write for ResponseBodyWriter<'_> {
     unsafe {
       envoy_dynamic_module_callback_http_write_response_body_data(
         self.raw_ptr,
-        buf.as_ptr() as *mut i8,
+        buf.as_ptr() as _,
         buf.len(),
       )
     };
