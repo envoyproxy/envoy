@@ -360,6 +360,9 @@ pub trait EnvoyHttpFilter {
     key: &str,
   ) -> Option<EnvoyBuffer<'a>>;
 
+  // TODO(mathetake): find a clean way to avoid dyn Write and dyn Read. It seems a bit tricky
+  // because of the mock + lifetime, but there should be a way to do it.
+
   /// Set the string-typed dynamic metadata value with the given key.
   /// If the namespace is not found, this will create a new namespace.
   ///
@@ -367,27 +370,32 @@ pub trait EnvoyHttpFilter {
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
 
   /// Get the currently buffered request body size.
-  fn get_request_body_size(&self) -> usize;
+  fn get_request_body_size(&self) -> Option<usize>;
 
   /// Get the currently buffered request body reader.
+  ///
+  /// The returned reader will read the data from the beginning of the currently buffered request,
+  /// and return error when the buffer is not available on read.
   fn get_request_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a>;
 
   /// Discard the given number of bytes from the beginning of the currently buffered request body.
   fn drain_request_body(&mut self, size: usize);
 
-  // TODO(mathetake): find a clean way to avoid dyn Write and dyn Read. It seems a bit tricky
-  // because of the mock + lifetime, but there should be a way to do it.
-
   /// Get the currently buffered request body reader.
   ///
-  /// The returned reader will append the data to the existing request body buffer.
+  /// The returned writer will append the data to the existing request body buffer.
   /// To read from the beginning, use [`EnvoyHttpFilter::drain_request_body`] first.
+  ///
+  /// The returned writer will return error when the buffer is not available on write.
   fn get_request_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a>;
 
   /// Get the currently buffered response body size.
-  fn get_response_body_size(&self) -> usize;
+  fn get_response_body_size(&self) -> Option<usize>;
 
   /// Get the currently buffered response body reader.
+  ///
+  /// The returned reader will read the data from the beginning of the currently buffered response,
+  /// and return error when the buffer is not available on read.
   fn get_response_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a>;
 
   /// Discard the given number of bytes from the beginning of the currently buffered request body.
@@ -397,6 +405,8 @@ pub trait EnvoyHttpFilter {
   ///
   /// The returned writer will append the data to the existing response body buffer.
   /// To write from the beginning, use [`EnvoyHttpFilter::drain_response_body`] first.
+  ///
+  /// The returned writer will return error when the buffer is not available on write.
   fn get_response_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a>;
 }
 
@@ -667,8 +677,16 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_request_body_size(&self) -> usize {
-    unsafe { abi::envoy_dynamic_module_callback_http_get_request_body_size(self.raw_ptr) }
+  fn get_request_body_size(&self) -> Option<usize> {
+    let mut size: usize = 0;
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_request_body_size(self.raw_ptr, &mut size)
+    };
+    if ok {
+      Some(size)
+    } else {
+      None
+    }
   }
 
   fn get_request_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a> {
@@ -685,8 +703,16 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     Box::new(buffer::RequestBodyWriter::<'a>::new(self.raw_ptr))
   }
 
-  fn get_response_body_size(&self) -> usize {
-    unsafe { abi::envoy_dynamic_module_callback_http_get_response_body_size(self.raw_ptr) }
+  fn get_response_body_size(&self) -> Option<usize> {
+    let mut size: usize = 0;
+    let ok = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_response_body_size(self.raw_ptr, &mut size)
+    };
+    if ok {
+      Some(size)
+    } else {
+      None
+    }
   }
 
   fn get_response_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a> {

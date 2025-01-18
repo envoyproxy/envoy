@@ -437,9 +437,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
     // Test reading response body.
     let mut reader = envoy_filter.get_response_body_reader();
-    let mut buf = vec![0; 1024];
-    let n = reader.read(&mut buf).unwrap();
-    self.response_body.extend_from_slice(&buf[.. n]);
+    let mut buffer = Vec::new();
+    let n = reader.read_to_end(&mut buffer).unwrap();
+    self.response_body.extend_from_slice(&buffer);
     // Drop the reader and try writing to the writer.
     drop(reader);
     envoy_filter.drain_response_body(n); // Discard the read bytes.

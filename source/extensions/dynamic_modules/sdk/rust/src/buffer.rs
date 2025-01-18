@@ -60,15 +60,23 @@ pub struct RequestBodyReader<'a> {
 }
 
 impl std::io::Read for RequestBodyReader<'_> {
-  fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
-    let size = unsafe {
+  fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    let mut size: usize = 0;
+    let ok = unsafe {
       envoy_dynamic_module_callback_http_read_request_body(
         self.raw_ptr,
         self.offset,
-        _buf.as_ptr() as _,
-        _buf.len(),
+        buf.as_ptr() as _,
+        buf.len(),
+        &mut size,
       )
     };
+    if !ok {
+      return Result::Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "Request body not available",
+      ));
+    }
     self.offset += size;
     Result::Ok(size)
   }
@@ -101,14 +109,22 @@ impl RequestBodyWriter<'_> {
 
 impl std::io::Write for RequestBodyWriter<'_> {
   fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-    unsafe {
+    let mut size: usize = 0;
+    let ok = unsafe {
       envoy_dynamic_module_callback_http_write_request_body(
         self.raw_ptr,
         buf.as_ptr() as _,
         buf.len(),
+        &mut size,
       )
     };
-    Result::Ok(buf.len())
+    if !ok {
+      return Result::Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "Request body not available",
+      ));
+    }
+    Result::Ok(size)
   }
 
   fn flush(&mut self) -> std::io::Result<()> {
@@ -124,15 +140,23 @@ pub struct ResponseBodyReader<'a> {
 }
 
 impl std::io::Read for ResponseBodyReader<'_> {
-  fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
-    let size = unsafe {
+  fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+    let mut size: usize = 0;
+    let ok = unsafe {
       envoy_dynamic_module_callback_http_read_response_body(
         self.raw_ptr,
         self.offset,
-        _buf.as_ptr() as _,
-        _buf.len(),
+        buf.as_ptr() as _,
+        buf.len(),
+        &mut size,
       )
     };
+    if !ok {
+      return Result::Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "Response body not available",
+      ));
+    }
     self.offset += size;
     Result::Ok(size)
   }
@@ -165,13 +189,21 @@ impl ResponseBodyWriter<'_> {
 
 impl std::io::Write for ResponseBodyWriter<'_> {
   fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-    unsafe {
+    let mut size: usize = 0;
+    let ok = unsafe {
       envoy_dynamic_module_callback_http_write_response_body(
         self.raw_ptr,
         buf.as_ptr() as _,
         buf.len(),
+        &mut size,
       )
     };
+    if !ok {
+      return Result::Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "Response body not available",
+      ));
+    }
     Result::Ok(buf.len())
   }
 

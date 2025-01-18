@@ -650,11 +650,14 @@ void envoy_dynamic_module_callback_http_send_response(
  * @param offset is the offset in the body where the read will start.
  * @param module_buffer_ptr is the pointer to the buffer where the body will be stored.
  * @param module_buffer_length is the length of the buffer.
- * @return the number of bytes read. Returns 0 if the body is not available.
+ * @param read_length is the pointer to the variable where the length of the read data will be
+ * stored.
+ * @return false if the buffer is not available, true otherwise.
  */
-size_t envoy_dynamic_module_callback_http_read_request_body(
+bool envoy_dynamic_module_callback_http_read_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t offset,
-    envoy_dynamic_module_type_buffer_module_ptr module_buffer_ptr, size_t module_buffer_length);
+    envoy_dynamic_module_type_buffer_module_ptr module_buffer_ptr, size_t module_buffer_length,
+    size_t* read_length);
 
 /**
  * envoy_dynamic_module_callback_http_write_request_body is called by the module to write
@@ -664,11 +667,14 @@ size_t envoy_dynamic_module_callback_http_read_request_body(
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param data is the pointer to the buffer of the data to be written.
- * @param data_length is the length of the data.
+ * @param data_length is the length of the data, returning -1 if the buffer is not available.
+ * @param written_length is the pointer to the variable where the length of the written data will be
+ * stored.
+ * @return false if the buffer is not available, true otherwise.
  */
-void envoy_dynamic_module_callback_http_write_request_body(
+bool envoy_dynamic_module_callback_http_write_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length);
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length, size_t* written_length);
 
 /**
  * envoy_dynamic_module_callback_http_get_request_body_size is called by the module to get
@@ -676,20 +682,23 @@ void envoy_dynamic_module_callback_http_write_request_body(
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
- * @return the size of the buffered request body data.
+ * @param size is the pointer to the variable where the size of the buffered data will be stored.
+ * @return false if the buffer is not available, true otherwise.
  */
-size_t envoy_dynamic_module_callback_http_get_request_body_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+bool envoy_dynamic_module_callback_http_get_request_body_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size);
 
 /**
  * envoy_dynamic_module_callback_http_drain_request_body_size is called by the module to drain
  * the given size of the buffered request body data from the beginning of the buffer.
+ * If the size is greater than the size of the buffered data, all the data will be drained.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param length is the length of the data to be drained.
+ * @return false if the buffer is not available, true otherwise.
  */
-void envoy_dynamic_module_callback_http_drain_request_body(
+bool envoy_dynamic_module_callback_http_drain_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t length);
 
 /**
@@ -698,18 +707,19 @@ void envoy_dynamic_module_callback_http_drain_request_body(
  * See the comments on envoy_dynamic_module_callback_http_read_request_body for more
  * details.
  */
-size_t envoy_dynamic_module_callback_http_read_response_body(
+bool envoy_dynamic_module_callback_http_read_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t offset,
-    envoy_dynamic_module_type_buffer_module_ptr module_buffer_ptr, size_t module_buffer_length);
+    envoy_dynamic_module_type_buffer_module_ptr module_buffer_ptr, size_t module_buffer_length,
+    size_t* read_length);
 
 /**
  * envoy_dynamic_module_callback_http_write_response_body is the same as
  * envoy_dynamic_module_callback_http_write_request_body, but for the response body.
  * See the comments on envoy_dynamic_module_callback_http_write_request_body for more details.
  */
-void envoy_dynamic_module_callback_http_write_response_body(
+bool envoy_dynamic_module_callback_http_write_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length);
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length, size_t* written_length);
 
 /**
  * envoy_dynamic_module_callback_http_get_response_body_size is the same as
@@ -717,15 +727,15 @@ void envoy_dynamic_module_callback_http_write_response_body(
  * See the comments on envoy_dynamic_module_callback_http_get_request_body_size for more
  * details.
  */
-size_t envoy_dynamic_module_callback_http_get_response_body_size(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+bool envoy_dynamic_module_callback_http_get_response_body_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size);
 
 /**
  * envoy_dynamic_module_callback_http_drain_response_body is the same as
  * envoy_dynamic_module_callback_http_drain_request_body, but for the response body.
  * See the comments on envoy_dynamic_module_callback_http_drain_request_body for more details.
  */
-void envoy_dynamic_module_callback_http_drain_response_body(
+bool envoy_dynamic_module_callback_http_drain_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t length);
 
 // ------------------------ Dynamic Metadata Callbacks -------------------------
