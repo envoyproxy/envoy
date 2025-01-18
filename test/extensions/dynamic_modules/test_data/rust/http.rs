@@ -23,6 +23,7 @@ fn new_http_filter_config_fn<EHF: EnvoyHttpFilter>(
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
     "passthrough" => Some(Box::new(PassthroughHttpFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
+    "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
     // TODO: add various configs for body, etc.
     _ => panic!("Unknown filter name: {}", name),
   }
@@ -362,6 +363,91 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     // Try getting a string as number.
     let ns_res_body = envoy_filter.get_dynamic_metadata_number("ns_res_body", "key");
     assert!(ns_res_body.is_none());
+    abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
+  }
+}
+
+/// A HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`]
+/// to test the body related callbacks.
+struct BodyCallbacksFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BodyCallbacksFilterConfig {
+  fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(BodyCallbacksFilter::default())
+  }
+}
+
+/// A HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`].
+///
+/// This filter tests the body related callbacks.
+struct BodyCallbacksFilter {
+  request_body: Vec<u8>,
+  response_body: Vec<u8>,
+}
+
+impl Drop for BodyCallbacksFilter {
+  fn drop(&mut self) {
+    assert_eq!(
+      std::str::from_utf8(&self.request_body).unwrap(),
+      "nicenicenice"
+    );
+    assert_eq!(
+      std::str::from_utf8(&self.response_body).unwrap(),
+      "coolcoolcool"
+    );
+  }
+}
+
+impl Default for BodyCallbacksFilter {
+  fn default() -> Self {
+    Self {
+      request_body: vec![],
+      response_body: vec![],
+    }
+  }
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
+  fn on_request_body(
+    &mut self,
+    mut envoy_filter: EHF,
+    end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
+    // Test reading request body.
+    let mut reader = envoy_filter.get_request_body_reader();
+    let mut buf = vec![0; 1024];
+    let n = reader.read(&mut buf).unwrap();
+    self.request_body.extend_from_slice(&buf[.. n]);
+    // Drop the reader and try writing to the writer.
+    drop(reader);
+    envoy_filter.drain_request_body(n); // Discard the read bytes.
+    let mut writer = envoy_filter.get_request_body_writer();
+    writer.write(b"foo").unwrap();
+    if end_of_stream {
+      writer.write(b"end").unwrap();
+    }
+    abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+  }
+
+  fn on_response_body(
+    &mut self,
+    mut envoy_filter: EHF,
+    end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
+    // Test reading response body.
+    let mut reader = envoy_filter.get_response_body_reader();
+    let mut buf = vec![0; 1024];
+    let n = reader.read(&mut buf).unwrap();
+    self.response_body.extend_from_slice(&buf[.. n]);
+    // Drop the reader and try writing to the writer.
+    drop(reader);
+    envoy_filter.drain_response_body(n); // Discard the read bytes.
+    let mut writer = envoy_filter.get_response_body_writer();
+    writer.write(b"bar").unwrap();
+    if end_of_stream {
+      writer.write(b"end").unwrap();
+    }
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }
 }

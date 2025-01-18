@@ -87,3 +87,53 @@ fn test_header_callbacks_on_request_headers_local_resp() {
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   );
 }
+
+#[test]
+fn test_body_callbacks_filter_on_request_body() {
+  let mut f = BodyCallbacksFilter::default();
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+  envoy_filter
+    .expect_get_request_body_reader()
+    .returning(move || {
+      let reader: Box<dyn std::io::Read> = Box::new(std::io::Cursor::new(
+        String::from("nicenicenice").into_bytes(),
+      ));
+      reader
+    })
+    .once();
+  envoy_filter
+    .expect_drain_request_body()
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_get_request_body_writer()
+    .returning(move || {
+      let writer: Box<dyn std::io::Write> = Box::new(std::io::sink());
+      writer
+    })
+    .once();
+  f.on_request_body(envoy_filter, true);
+
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+  envoy_filter
+    .expect_get_response_body_reader()
+    .returning(move || {
+      let reader: Box<dyn std::io::Read> = Box::new(std::io::Cursor::new(
+        String::from("coolcoolcool").into_bytes(),
+      ));
+      reader
+    })
+    .once();
+  envoy_filter
+    .expect_drain_response_body()
+    .return_const(())
+    .once();
+  envoy_filter
+    .expect_get_response_body_writer()
+    .returning(move || {
+      let writer: Box<dyn std::io::Write> = Box::new(std::io::sink());
+      writer
+    })
+    .once();
+  f.on_response_body(envoy_filter, true);
+}

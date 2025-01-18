@@ -639,6 +639,95 @@ void envoy_dynamic_module_callback_http_send_response(
     envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
     envoy_dynamic_module_type_buffer_module_ptr body, size_t body_length);
 
+// ------------------- HTTP Request/Response body callbacks --------------------
+
+/**
+ * envoy_dynamic_module_callback_http_read_request_body_buffer is called by the module to read
+ * currently buffered request body data from the given offset until the end of the buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param offset is the offset in the body where the read will start.
+ * @param module_buffer_ptr is the pointer to the buffer where the body will be stored.
+ * @param module_buffer_length is the length of the buffer.
+ * @return the number of bytes read. Returns 0 if the body is not available.
+ */
+size_t envoy_dynamic_module_callback_http_read_request_body_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t offset,
+    envoy_dynamic_module_type_buffer_module_ptr module_buffer_ptr, size_t module_buffer_length);
+
+/**
+ * envoy_dynamic_module_callback_http_write_request_body_data is called by the module to write
+ * the given data to the current buffer of the request body. The data will be copied and appended to
+ * the end of the buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param data is the pointer to the buffer of the data to be written.
+ * @param data_length is the length of the data.
+ */
+void envoy_dynamic_module_callback_http_write_request_body_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length);
+
+/**
+ * envoy_dynamic_module_callback_http_get_request_body_data_size is called by the module to get
+ * the size of the buffered request body data.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return the size of the buffered request body data.
+ */
+size_t envoy_dynamic_module_callback_http_get_request_body_data_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_drain_request_body_data_size is called by the module to drain
+ * the given size of the buffered request body data from the beginning of the buffer.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param length is the length of the data to be drained.
+ */
+void envoy_dynamic_module_callback_http_drain_request_body_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_http_read_response_body_data is the same as
+ * envoy_dynamic_module_callback_http_read_request_body_buffer, but for the response body.
+ * See the comments on envoy_dynamic_module_callback_http_read_request_body_buffer for more
+ * details.
+ */
+size_t envoy_dynamic_module_callback_http_read_response_body_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t offset,
+    envoy_dynamic_module_type_buffer_module_ptr module_buffer_ptr, size_t module_buffer_length);
+
+/**
+ * envoy_dynamic_module_callback_http_write_response_body_data is the same as
+ * envoy_dynamic_module_callback_http_write_request_body_data, but for the response body.
+ * See the comments on envoy_dynamic_module_callback_http_write_request_body_data for more details.
+ */
+void envoy_dynamic_module_callback_http_write_response_body_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t data_length);
+
+/**
+ * envoy_dynamic_module_callback_http_get_response_body_data_size is the same as
+ * envoy_dynamic_module_callback_http_get_request_body_data_size, but for the response body.
+ * See the comments on envoy_dynamic_module_callback_http_get_request_body_data_size for more
+ * details.
+ */
+size_t envoy_dynamic_module_callback_http_get_response_body_data_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_drain_response_body_data is the same as
+ * envoy_dynamic_module_callback_http_drain_request_body_data, but for the response body.
+ * See the comments on envoy_dynamic_module_callback_http_drain_request_body_data for more details.
+ */
+void envoy_dynamic_module_callback_http_drain_response_body_data(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t length);
+
 // ------------------------ Dynamic Metadata Callbacks -------------------------
 
 /**

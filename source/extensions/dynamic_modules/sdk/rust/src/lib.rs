@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 
 pub mod buffer;
-pub use buffer::EnvoyBuffer;
+pub use buffer::*;
 use mockall::predicate::*;
 use mockall::*;
 
@@ -365,6 +365,39 @@ pub trait EnvoyHttpFilter {
   ///
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
+
+  /// Get the currently buffered request body size.
+  fn get_request_body_size(&self) -> usize;
+
+  /// Get the currently buffered request body reader.
+  fn get_request_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a>;
+
+  /// Discard the given number of bytes from the beginning of the currently buffered request body.
+  fn drain_request_body(&mut self, size: usize);
+
+  // TODO(mathetake): find a clean way to avoid dyn Write and dyn Read. It seems a bit tricky
+  // because of the mock + lifetime, but there should be a way to do it.
+
+  /// Get the currently buffered request body reader.
+  ///
+  /// The returned reader will append the data to the existing request body buffer.
+  /// To read from the beginning, use [`EnvoyHttpFilter::drain_request_body`] first.
+  fn get_request_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a>;
+
+  /// Get the currently buffered response body size.
+  fn get_response_body_size(&self) -> usize;
+
+  /// Get the currently buffered response body reader.
+  fn get_response_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a>;
+
+  /// Discard the given number of bytes from the beginning of the currently buffered request body.
+  fn drain_response_body(&mut self, size: usize);
+
+  /// Get the currently buffered response body writer.
+  ///
+  /// The returned writer will append the data to the existing response body buffer.
+  /// To write from the beginning, use [`EnvoyHttpFilter::drain_response_body`] first.
+  fn get_response_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a>;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -632,6 +665,42 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         value_size,
       )
     }
+  }
+
+  fn get_request_body_size(&self) -> usize {
+    unsafe { abi::envoy_dynamic_module_callback_http_get_request_body_data_size(self.raw_ptr) }
+  }
+
+  fn get_request_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a> {
+    Box::new(buffer::RequestBodyReader::<'a>::new(self.raw_ptr))
+  }
+
+  fn drain_request_body(&mut self, size: usize) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_drain_request_body_data(self.raw_ptr, size);
+    }
+  }
+
+  fn get_request_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a> {
+    Box::new(buffer::RequestBodyWriter::<'a>::new(self.raw_ptr))
+  }
+
+  fn get_response_body_size(&self) -> usize {
+    unsafe { abi::envoy_dynamic_module_callback_http_get_response_body_data_size(self.raw_ptr) }
+  }
+
+  fn get_response_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a> {
+    Box::new(buffer::ResponseBodyReader::<'a>::new(self.raw_ptr))
+  }
+
+  fn drain_response_body(&mut self, _size: usize) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_drain_response_body_data(self.raw_ptr, _size);
+    }
+  }
+
+  fn get_response_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a> {
+    Box::new(buffer::ResponseBodyWriter::<'a>::new(self.raw_ptr))
   }
 }
 
