@@ -48,9 +48,9 @@ TEST_F(DrainManagerImplTest, Default) {
 
   // Verify basic drain close.
   EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(false));
-  EXPECT_FALSE(drain_manager.drainClose());
+  EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
   EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(true));
-  EXPECT_TRUE(drain_manager.drainClose());
+  EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
 
   // Test drain sequence.
   Event::MockTimer* drain_timer = new Event::MockTimer(&server_.dispatcher_);
@@ -68,7 +68,7 @@ TEST_F(DrainManagerImplTest, ModifyOnly) {
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::MODIFY_ONLY);
 
   EXPECT_CALL(server_, healthCheckFailed()).Times(0); // Listener check will short-circuit
-  EXPECT_FALSE(drain_manager.drainClose());
+  EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
 }
 
 TEST_P(DrainManagerImplTest, DrainDeadline) {
@@ -90,28 +90,28 @@ TEST_P(DrainManagerImplTest, DrainDeadline) {
   if (drain_gradually) {
     // random() should be called when elapsed time < drain timeout
     EXPECT_CALL(server_.api_.random_, random()).Times(2);
-    EXPECT_FALSE(drain_manager.drainClose());
+    EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(DrainTimeSeconds - 1));
-    EXPECT_FALSE(drain_manager.drainClose());
+    EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
 
     // Test that this still works if remaining time is negative
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(500));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
   } else {
     EXPECT_CALL(server_.api_.random_, random()).Times(0);
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(DrainTimeSeconds - 1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(500));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
   }
 }
 
@@ -126,9 +126,9 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   DrainManagerImpl drain_manager(server_, envoy::config::listener::v3::Listener::DEFAULT);
 
   EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(true));
-  EXPECT_TRUE(drain_manager.drainClose());
+  EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
-  EXPECT_FALSE(drain_manager.drainClose());
+  EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
   EXPECT_FALSE(drain_manager.draining());
 
   drain_manager.startDrainSequence(Network::DrainDirection::All, [] {});
@@ -139,18 +139,18 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
     EXPECT_CALL(server_.api_.random_, random()).Times(2);
     // Current elapsed time is 0
     // drainClose() will return true when elapsed time > (4 % 3 == 1).
-    EXPECT_FALSE(drain_manager.drainClose());
+    EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(2));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
   } else {
     EXPECT_CALL(server_.api_.random_, random()).Times(0);
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(2));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
   }
 }
 

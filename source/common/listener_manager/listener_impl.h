@@ -144,19 +144,10 @@ public:
   Network::DrainDecision& drainDecision() override;
 
   // DrainDecision
-  bool drainClose() const override {
-    return drain_manager_->drainClose() || server_.drainManager().drainClose();
+  bool drainClose(Network::DrainDirection scope) const override {
+    return drain_manager_->drainClose(scope) || server_.drainManager().drainClose(scope);
   }
 
-  Network::DrainDirection drainDirection() const override {
-    // Note: drain_manager knows how to implement the drain direction logic,
-    // so we can trust it.
-    auto direction = drain_manager_->drainDirection();
-    if (direction == Network::DrainDirection::None) {
-      direction = server_.drainManager().drainDirection();
-    }
-    return direction;
-  }
   Server::DrainManager& drainManager();
   friend class ListenerImpl;
 

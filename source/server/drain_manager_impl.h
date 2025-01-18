@@ -1,6 +1,8 @@
 #pragma once
 
 #include <functional>
+#include <shared_mutex>
+#include <vector>
 
 #include "envoy/common/time.h"
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -24,8 +26,7 @@ public:
   DrainManagerImpl(Instance& server, envoy::config::listener::v3::Listener::DrainType drain_type);
 
   // Network::DrainDecision
-  bool drainClose() const override;
-  Network::DrainDirection drainDirection() const override;
+  bool drainClose(Network::DrainDirection scope) const override;
 
   // Server::DrainManager
   void startDrainSequence(Network::DrainDirection direction,
@@ -41,8 +42,12 @@ private:
     Network::DrainDirection second;
   };
   std::atomic<DrainPair> draining_{DrainPair{false, Network::DrainDirection::None}};
-  Event::TimerPtr drain_tick_timer_;
-  MonotonicTime drain_deadline_;
+  // A map of timers keyed by the direction that triggered the drain
+  std::vector<Event::TimerPtr> drain_tick_timers_;
+  std::map<Network::DrainDirection, MonotonicTime> drain_deadlines_ = {
+      {Network::DrainDirection::InboundOnly, MonotonicTime()},
+      {Network::DrainDirection::All, MonotonicTime()}
+  };
 
   Event::TimerPtr parent_shutdown_timer_;
 };

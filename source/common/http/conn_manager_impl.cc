@@ -1799,17 +1799,19 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
   }
 
+  // If we're an inbound listener, then we should drain even if the drain direction is inbound only.
+  // If not, then we only drain if the drain direction is all.
+  Network::DrainDirection drain_scope =
+      connection_manager_.direction_ == envoy::config::core::v3::TrafficDirection::INBOUND
+          ? Network::DrainDirection::InboundOnly
+          : Network::DrainDirection::All;
+
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
-  // header block.
-  auto drain_is_inbound_only =
-      connection_manager_.drain_close_.drainDirection() == Network::DrainDirection::InboundOnly;
-  // Only drain if the drain direction is not inbound only or the connection is inbound.
-  auto should_drain_direction =
-      !drain_is_inbound_only ||
-      connection_manager_.direction_ == envoy::config::core::v3::TrafficDirection::INBOUND;
-  auto should_drain = connection_manager_.drain_close_.drainClose() && should_drain_direction;
+  // header block. Only drain if the drain direction is not inbound only or the connection is
+  // inbound.
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      (should_drain || drain_connection_due_to_overload)) {
+      (connection_manager_.drain_close_.drainClose(drain_scope) ||
+       drain_connection_due_to_overload)) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
     // of time to race with incoming requests. For HTTP/2 connections, send a GOAWAY frame to

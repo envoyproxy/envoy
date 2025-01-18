@@ -2684,9 +2684,9 @@ filter_chains:
 
   worker_->callAddCompletion();
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All)).WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose(Network::DrainDirection::All)).WillOnce(Return(false));
+  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
@@ -2946,9 +2946,9 @@ filter_chains:
   worker_->callAddCompletion();
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All)).WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose(Network::DrainDirection::All)).WillOnce(Return(false));
+  EXPECT_FALSE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
@@ -2956,16 +2956,16 @@ filter_chains:
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
 
   // NOTE: || short circuit here prevents the server drain manager from getting called.
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(true));
-  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
+  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*worker_, removeListener(_, _));
   listener_foo->drain_manager_->drain_sequence_completion_();
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
 
-  EXPECT_CALL(*listener_foo->drain_manager_, drainClose()).WillOnce(Return(false));
-  EXPECT_CALL(server_.drain_manager_, drainClose()).WillOnce(Return(true));
-  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose());
+  EXPECT_CALL(*listener_foo->drain_manager_, drainClose(Network::DrainDirection::All)).WillOnce(Return(false));
+  EXPECT_CALL(server_.drain_manager_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
+  EXPECT_TRUE(listener_foo->context_->drainDecision().drainClose(Network::DrainDirection::All));
 
   EXPECT_CALL(*listener_foo, onDestroy());
   worker_->callRemovalCompletion();

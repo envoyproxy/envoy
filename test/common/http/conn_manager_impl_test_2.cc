@@ -3094,9 +3094,7 @@ traffic_direction: INBOUND
   EXPECT_CALL(factory_context_, listenerInfo()).WillOnce(ReturnRef(listener_info));
   setup();
 
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
-  EXPECT_CALL(drain_close_, drainDirection())
-      .WillOnce(Return(Network::DrainDirection::InboundOnly));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::InboundOnly)).WillOnce(Return(true));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -3144,9 +3142,7 @@ traffic_direction: OUTBOUND
   EXPECT_CALL(factory_context_, listenerInfo()).WillOnce(ReturnRef(listener_info));
   setup();
 
-  EXPECT_CALL(drain_close_, drainDirection())
-      .WillOnce(Return(Network::DrainDirection::InboundOnly));
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::InboundOnly)).WillOnce(Return(true));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -3185,7 +3181,7 @@ traffic_direction: OUTBOUND
 TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenDraining) {
   setup();
 
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))

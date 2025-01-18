@@ -17,8 +17,7 @@ public:
   ~MockDrainManager() override;
 
   // Server::DrainManager
-  MOCK_METHOD(bool, drainClose, (), (const));
-  MOCK_METHOD(Network::DrainDirection, drainDirection, (), (const));
+  MOCK_METHOD(bool, drainClose, (Network::DrainDirection direction), (const));
   MOCK_METHOD(bool, draining, (), (const));
   MOCK_METHOD(void, startDrainSequence,
               (Network::DrainDirection direction, std::function<void()> completion));
