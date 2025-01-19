@@ -57,8 +57,9 @@ public:
         .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
     HttpTestUtility::addDefaultHeaders(headers_);
-    ON_CALL(cm_.thread_local_cluster_, chooseHost(_))
-        .WillByDefault(Return(cm_.thread_local_cluster_.lb_.host_));
+    ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
+      return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+    }));
   }
 
   virtual void expectSuccess(AsyncClient::Request* sent_request, uint64_t code) {
@@ -2353,6 +2354,24 @@ retry_back_off:
 
   EXPECT_EQ(route_entry.retryPolicy().baseInterval(), std::chrono::milliseconds(10));
   EXPECT_EQ(route_entry.retryPolicy().maxInterval(), std::chrono::seconds(30));
+}
+
+TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithInvalidRetryPolicy) {
+  // Set an invalid retry back off.
+  const std::string yaml = R"EOF(
+per_try_timeout: 30s
+num_retries: 10
+retry_on: 5xx,gateway-error,connect-failure,reset
+retry_back_off:
+  base_interval: 10s
+  max_interval: 3s
+)EOF";
+  envoy::config::route::v3::RetryPolicy retry_policy;
+  TestUtility::loadFromYaml(yaml, retry_policy);
+
+  absl::StatusOr<std::unique_ptr<AsyncStreamImpl>> stream_or_error = Http::AsyncStreamImpl::create(
+      client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy));
+  EXPECT_FALSE(stream_or_error.ok());
 }
 
 TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithRetryPolicy) {

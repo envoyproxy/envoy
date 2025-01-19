@@ -33,17 +33,18 @@ RUNTIME_GUARD(envoy_reloadable_features_allow_alt_svc_for_ips);
 RUNTIME_GUARD(envoy_reloadable_features_avoid_dfp_cluster_removal_on_cds_update);
 RUNTIME_GUARD(envoy_reloadable_features_boolean_to_string_fix);
 RUNTIME_GUARD(envoy_reloadable_features_check_switch_protocol_websocket_handshake);
-RUNTIME_GUARD(envoy_reloadable_features_conn_pool_delete_when_idle);
 RUNTIME_GUARD(envoy_reloadable_features_consistent_header_validation);
+RUNTIME_GUARD(envoy_reloadable_features_dfp_fail_on_empty_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
-RUNTIME_GUARD(envoy_reloadable_features_dns_details);
 RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
+RUNTIME_GUARD(envoy_reloadable_features_enable_udp_proxy_outlier_detection);
 RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_timeout_error);
 RUNTIME_GUARD(envoy_reloadable_features_extend_h3_accept_untrusted);
 RUNTIME_GUARD(envoy_reloadable_features_filter_access_loggers_first);
+RUNTIME_GUARD(envoy_reloadable_features_filter_chain_aborted_can_not_continue);
 RUNTIME_GUARD(envoy_reloadable_features_gcp_authn_use_fixed_url);
 RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_num_retries);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
@@ -53,9 +54,10 @@ RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_ex
 RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_no_protocol_error_upon_clean_close);
+RUNTIME_GUARD(envoy_reloadable_features_http2_propagate_reset_events);
+RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
 RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_trailers);
-RUNTIME_GUARD(envoy_reloadable_features_http_filter_avoid_reentrant_local_reply);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_internal_authority_header_validator);
@@ -87,6 +89,7 @@ RUNTIME_GUARD(envoy_reloadable_features_reject_invalid_yaml);
 RUNTIME_GUARD(envoy_reloadable_features_report_stream_reset_error_code);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_http2_headers_without_nghttp2);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_sni_in_access_log);
+RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_trace_sampling);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
 RUNTIME_GUARD(envoy_reloadable_features_strict_duration_validation);
@@ -102,10 +105,10 @@ RUNTIME_GUARD(envoy_reloadable_features_use_route_host_mutation_for_auto_sni_san
 RUNTIME_GUARD(envoy_reloadable_features_use_typed_metadata_in_proxy_protocol_listener);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
+RUNTIME_GUARD(envoy_reloadable_features_wait_for_first_byte_before_balsa_msg_done);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_prevent_resource_copy);
 RUNTIME_GUARD(envoy_reloadable_features_xdstp_path_avoid_colon_encoding);
-RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
 RUNTIME_GUARD(envoy_restart_features_fix_dispatcher_approximate_now);
 RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
@@ -116,8 +119,6 @@ RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 // TODO(adisuissa) reset to true to enable unified mux by default
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_unified_mux);
-// TODO(birenroy) flip after the security issue is addressed.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
 // Used to track if runtime is initialized.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_runtime_initialized);
 // TODO(alyssawilk, renjietang) figure out what to do with this for optimal defaults
@@ -135,7 +136,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
 // For more information about Universal Header Validation, please see
 // https://github.com/envoyproxy/envoy/issues/10646
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
-// TODO(pksohn): enable after canarying fix for https://github.com/envoyproxy/envoy/issues/29930
+// TODO(pksohn): enable after canarying the feature internally without problems.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 // TODO(alyssar) evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_null_addresses);
@@ -164,6 +165,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 // Controls whether a stream stays open when HTTP/2 or HTTP/3 upstream half closes
 // before downstream.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_close);
+
+// TODO(renjietang): Flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_network_type_socket_option);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

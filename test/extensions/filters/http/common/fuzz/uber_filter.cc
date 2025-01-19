@@ -14,10 +14,13 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 
+using ::testing::Return;
+using ::testing::ReturnRef;
+
 UberFilterFuzzer::UberFilterFuzzer()
     : async_request_{&cluster_manager_.thread_local_cluster_.async_client_},
       thread_factory_(Thread::threadFactoryForTest()) {
-  ON_CALL(api_, threadFactory()).WillByDefault(testing::ReturnRef(thread_factory_));
+  ON_CALL(api_, threadFactory()).WillByDefault(ReturnRef(thread_factory_));
   worker_thread_dispatcher_ =
       std::make_unique<Event::DispatcherImpl>("filter_fuzz_test", api_, api_.time_system_);
   // This is a decoder filter.
@@ -61,8 +64,7 @@ UberFilterFuzzer::UberFilterFuzzer()
             enabled_ = false;
             decoder_callbacks_.sendLocalReply_(code, body, modify_headers, grpc_status, details);
           }));
-  ON_CALL(encoder_callbacks_, addEncodedTrailers())
-      .WillByDefault(testing::ReturnRef(encoded_trailers_));
+  ON_CALL(encoder_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(encoded_trailers_));
   // Set expectations for particular filters that may get fuzzed.
   perFilterSetup();
 }
@@ -91,6 +93,11 @@ void UberFilterFuzzer::fuzz(
 
   // Data path should not throw exceptions.
   if (decoder_filter_ != nullptr) {
+    Http::TestRequestHeaderMapImpl headers;
+    for (const auto& header : downstream_data.headers().headers()) {
+      headers.addCopy(header.key(), header.value());
+    }
+    ON_CALL(decoder_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(headers)));
     HttpFilterFuzzer::runData(decoder_filter_.get(), downstream_data);
   } else {
     decoding_finished_ = true;

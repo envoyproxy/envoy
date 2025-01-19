@@ -131,7 +131,7 @@ ProcessorState::getCallbackStateAfterHeaderResp(const CommonResponse& common_res
     if (bodyReceived()) {
       return ProcessorState::CallbackState::StreamedBodyCallback;
     }
-    if (trailers_available_) {
+    if (trailers_ != nullptr) {
       return ProcessorState::CallbackState::TrailersCallback;
     }
   }
@@ -196,7 +196,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
             // flag of decodeData() can be determined by whether the trailers are received.
             // Also, bufferedData() is not nullptr means decodeData() is called, even though
             // the data can be an empty chunk.
-            auto req = filter_.setupBodyChunk(*this, *bufferedData(), !trailers_available_);
+            auto req = filter_.setupBodyChunk(*this, *bufferedData(), trailers_ == nullptr);
             filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
             clearWatermark();
             return absl::OkStatus();
@@ -206,7 +206,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
           // Check whether there is buffered data. If there is, send them.
           // Do not continue filter chain here so the pending body response have chance to be
           // served.
-          sendBufferedDataInStreamedMode(!trailers_available_);
+          sendBufferedDataInStreamedMode(trailers_ == nullptr);
           return absl::OkStatus();
         }
       } else if (body_mode_ == ProcessingMode::BUFFERED) {
@@ -252,7 +252,7 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
         }
         return absl::OkStatus();
       }
-      if (send_trailers_ && trailers_available_) {
+      if (send_trailers_ && trailers_ != nullptr) {
         // Trailers came in while we were waiting for this response, and the server
         // is not interested in the body, so send them now.
         filter_.sendTrailers(*this, *trailers_);
@@ -442,9 +442,9 @@ void ProcessorState::applyBufferedBodyMutation(const CommonResponse& common_resp
 
 void ProcessorState::finalizeBodyResponse(bool should_continue) {
   headers_ = nullptr;
-  if (send_trailers_ && trailers_available_ && chunk_queue_.empty()) {
+  if (send_trailers_ && trailers_ != nullptr && chunk_queue_.empty()) {
     filter_.sendTrailers(*this, *trailers_);
-  } else if (should_continue || (trailers_available_ && chunk_queue_.empty())) {
+  } else if (should_continue || (trailers_ != nullptr && chunk_queue_.empty())) {
     continueIfNecessary();
   }
 }
@@ -456,7 +456,7 @@ absl::Status ProcessorState::handleTrailersResponse(const TrailersResponse& resp
       bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) {
     ENVOY_LOG(debug, "Applying response to buffered trailers, body_mode_ {}",
               ProcessingMode::BodySendMode_Name(body_mode_));
-    if (response.has_header_mutation()) {
+    if (response.has_header_mutation() && trailers_ != nullptr) {
       auto mut_status = MutationUtils::applyHeaderMutations(
           response.header_mutation(), *trailers_, false, filter_.config().mutationChecker(),
           filter_.stats().rejected_header_mutations_);
@@ -513,10 +513,8 @@ bool ProcessorState::handleStreamedBodyResponse(const CommonResponse& common_res
     MutationUtils::applyBodyMutations(common_response.body_mutation(), chunk_data);
   }
   bool should_continue = chunk->end_stream;
-  if (chunk_data.length() > 0) {
-    ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
-    injectDataToFilterChain(chunk_data, chunk->end_stream);
-  }
+  ENVOY_LOG(trace, "Injecting {} bytes of data to filter stream", chunk_data.length());
+  injectDataToFilterChain(chunk_data, chunk->end_stream);
 
   if (queueBelowLowLimit()) {
     clearWatermark();
@@ -536,15 +534,13 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
   const std::string& body = streamed_response.body();
   const bool end_of_stream = streamed_response.end_of_stream();
 
-  if (!body.empty()) {
-    Buffer::OwnedImpl buffer;
-    buffer.add(body);
-    ENVOY_LOG(trace,
-              "Injecting {} bytes of data to filter stream in FULL_DUPLEX_STREAMED mode. "
-              "end_of_stream is {}",
-              buffer.length(), end_of_stream);
-    injectDataToFilterChain(buffer, end_of_stream);
-  }
+  Buffer::OwnedImpl buffer;
+  buffer.add(body);
+  ENVOY_LOG(trace,
+            "Injecting {} bytes of data to filter stream in FULL_DUPLEX_STREAMED mode. "
+            "end_of_stream is {}",
+            buffer.length(), end_of_stream);
+  injectDataToFilterChain(buffer, end_of_stream);
 
   if (end_of_stream) {
     onFinishProcessorCall(Grpc::Status::Ok);

@@ -41,47 +41,7 @@ updates:
     time: "06:00"
 
 - package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/access_log"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/action"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/add_data"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/basic"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/buffer"
+  directory: "/contrib/golang/filters/http/test/test_data"
   groups:
     contrib-golang:
       patterns:
@@ -92,66 +52,6 @@ updates:
 
 - package-ecosystem: "gomod"
   directory: "/contrib/golang/filters/http/test/test_data/dummy"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/echo"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/metric"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/passthrough"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/property"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/routeconfig"
-  groups:
-    contrib-golang:
-      patterns:
-      - "*"
-  schedule:
-    interval: daily
-    time: "06:00"
-
-- package-ecosystem: "gomod"
-  directory: "/contrib/golang/filters/http/test/test_data/websocket"
   groups:
     contrib-golang:
       patterns:

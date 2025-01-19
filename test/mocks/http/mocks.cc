@@ -38,6 +38,9 @@ MockFilterManagerCallbacks::~MockFilterManagerCallbacks() = default;
 MockStreamCallbacks::MockStreamCallbacks() = default;
 MockStreamCallbacks::~MockStreamCallbacks() = default;
 
+MockCodecEventCallbacks::MockCodecEventCallbacks() = default;
+MockCodecEventCallbacks::~MockCodecEventCallbacks() = default;
+
 MockServerConnection::MockServerConnection() {
   ON_CALL(*this, protocol()).WillByDefault(Invoke([this]() { return protocol_; }));
 }

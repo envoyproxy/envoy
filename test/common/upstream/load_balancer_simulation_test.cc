@@ -116,7 +116,7 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
       *time_source};
 
   for (uint64_t i = 0; i < num_requests; i++) {
-    host_hits[lb_.chooseHost(nullptr)]++;
+    host_hits[lb_.chooseHost(nullptr).host]++;
   }
 
   std::vector<double> observed_pcts;
@@ -268,7 +268,7 @@ public:
                             per_zone_local_shared),
           {}, empty_vector_, empty_vector_, random_.random(), absl::nullopt);
 
-      HostConstSharedPtr selected = lb.chooseHost(nullptr);
+      HostConstSharedPtr selected = lb.chooseHost(nullptr).host;
       hits[selected->address()->asString()]++;
     }
 

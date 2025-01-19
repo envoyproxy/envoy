@@ -279,6 +279,7 @@ public:
 
   // Router::VirtualHost
   const CorsPolicy* corsPolicy() const override { return cors_policy_.get(); }
+  const std::string& name() const override { return name_; }
   Stats::StatName statName() const override { return stat_name_storage_.statName(); }
   const RateLimitPolicy& rateLimitPolicy() const override {
     if (rate_limit_policy_ != nullptr) {
@@ -359,6 +360,7 @@ private:
                              scope.scopeFromStatName(stat_names.other_), stat_names) {}
   };
 
+  const std::string name_;
   const Stats::StatNameManagedStorage stat_name_storage_;
   Stats::ScopeSharedPtr vcluster_scope_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
@@ -507,7 +509,7 @@ public:
   const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
-  bool traceSampled() const override { return trace_sampled_; }
+  absl::optional<bool> traceSampled() const override { return trace_sampled_; }
   bool disableShadowHostSuffixAppend() const override { return disable_shadow_host_suffix_append_; }
 
 private:
@@ -517,7 +519,7 @@ private:
   const Http::LowerCaseString cluster_header_;
   std::string runtime_key_;
   envoy::type::v3::FractionalPercent default_value_;
-  bool trace_sampled_;
+  absl::optional<bool> trace_sampled_;
   const bool disable_shadow_host_suffix_append_;
 };
 

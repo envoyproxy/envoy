@@ -75,7 +75,7 @@ ShareProviderManagerSharedPtr ShareProviderManager::singleton(Event::Dispatcher&
       });
 }
 
-TimerTokenBucket::TimerTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill,
+TimerTokenBucket::TimerTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                                    std::chrono::milliseconds fill_interval, uint64_t multiplier,
                                    LocalRateLimiterImpl& parent)
     : multiplier_(multiplier), parent_(parent), max_tokens_(max_tokens),
@@ -104,24 +104,24 @@ absl::optional<int64_t> TimerTokenBucket::remainingFillInterval() const {
                               absl::Seconds((time_after_last_fill) / 1s));
 }
 
-bool TimerTokenBucket::consume(double) {
+bool TimerTokenBucket::consume(double, uint64_t to_consume) {
   // Relaxed consistency is used for all operations because we don't care about ordering, just the
   // final atomic correctness.
-  uint32_t expected_tokens = tokens_.load(std::memory_order_relaxed);
+  uint64_t expected_tokens = tokens_.load(std::memory_order_relaxed);
   do {
     // expected_tokens is either initialized above or reloaded during the CAS failure below.
-    if (expected_tokens == 0) {
+    if (expected_tokens < to_consume) {
       return false;
     }
 
     // Testing hook.
     parent_.synchronizer_.syncPoint("allowed_pre_cas");
 
-    // Loop while the weak CAS fails trying to subtract 1 from expected.
-  } while (!tokens_.compare_exchange_weak(expected_tokens, expected_tokens - 1,
+    // Loop while the weak CAS fails trying to subtract tokens from expected.
+  } while (!tokens_.compare_exchange_weak(expected_tokens, expected_tokens - to_consume,
                                           std::memory_order_relaxed));
 
-  // We successfully decremented the counter by 1.
+  // We successfully decremented the counter by tokens.
   return true;
 }
 
@@ -135,12 +135,12 @@ void TimerTokenBucket::onFillTimer(uint64_t refill_counter, double factor) {
     return;
   }
 
-  const uint32_t tokens_per_fill = std::ceil(tokens_per_fill_ * factor);
+  const uint64_t tokens_per_fill = std::ceil(tokens_per_fill_ * factor);
 
   // Relaxed consistency is used for all operations because we don't care about ordering, just the
   // final atomic correctness.
-  uint32_t expected_tokens = tokens_.load(std::memory_order_relaxed);
-  uint32_t new_tokens_value{};
+  uint64_t expected_tokens = tokens_.load(std::memory_order_relaxed);
+  uint64_t new_tokens_value{};
   do {
     // expected_tokens is either initialized above or reloaded during the CAS failure below.
     new_tokens_value = std::min(max_tokens_, expected_tokens + tokens_per_fill);
@@ -156,22 +156,22 @@ void TimerTokenBucket::onFillTimer(uint64_t refill_counter, double factor) {
   fill_time_ = parent_.time_source_.monotonicTime();
 }
 
-AtomicTokenBucket::AtomicTokenBucket(uint32_t max_tokens, uint32_t tokens_per_fill,
+AtomicTokenBucket::AtomicTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                                      std::chrono::milliseconds fill_interval,
                                      TimeSource& time_source)
     : token_bucket_(max_tokens, time_source,
                     // Calculate the fill rate in tokens per second.
                     tokens_per_fill / std::chrono::duration<double>(fill_interval).count()) {}
 
-bool AtomicTokenBucket::consume(double factor) {
+bool AtomicTokenBucket::consume(double factor, uint64_t to_consume) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
-  auto cb = [tokens = 1.0 / factor](double total) { return total < tokens ? 0.0 : tokens; };
+  auto cb = [tokens = to_consume / factor](double total) { return total < tokens ? 0.0 : tokens; };
   return token_bucket_.consume(cb) != 0.0;
 }
 
 LocalRateLimiterImpl::LocalRateLimiterImpl(
-    const std::chrono::milliseconds fill_interval, const uint32_t max_tokens,
-    const uint32_t tokens_per_fill, Event::Dispatcher& dispatcher,
+    const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
+    const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
     const Protobuf::RepeatedPtrField<
         envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
     bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider)
@@ -269,44 +269,49 @@ void LocalRateLimiterImpl::onFillTimer() {
   fill_timer_->enableTimer(default_token_bucket_->fillInterval());
 }
 
+struct MatchResult {
+  std::reference_wrapper<RateLimitTokenBucket> token_bucket;
+  std::reference_wrapper<const RateLimit::Descriptor> request_descriptor;
+};
+
 LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
-    absl::Span<const RateLimit::LocalDescriptor> request_descriptors) const {
+    absl::Span<const RateLimit::Descriptor> request_descriptors) const {
 
   // In most cases the request descriptors has only few elements. We use a inlined vector to
   // avoid heap allocation.
-  absl::InlinedVector<RateLimitTokenBucket*, 8> matched_descriptors;
+  absl::InlinedVector<MatchResult, 8> matched_results;
 
   // Find all matched descriptors.
   for (const auto& request_descriptor : request_descriptors) {
     auto iter = descriptors_.find(request_descriptor);
     if (iter != descriptors_.end()) {
-      matched_descriptors.push_back(iter->second.get());
+      matched_results.push_back(MatchResult{*iter->second, request_descriptor});
     }
   }
 
-  if (matched_descriptors.size() > 1) {
+  if (matched_results.size() > 1) {
     // Sort the matched descriptors by token bucket fill rate to ensure the descriptor with the
     // smallest fill rate is consumed first.
-    std::sort(matched_descriptors.begin(), matched_descriptors.end(),
-              [](const RateLimitTokenBucket* lhs, const RateLimitTokenBucket* rhs) {
-                return lhs->fillRate() < rhs->fillRate();
-              });
+    std::sort(matched_results.begin(), matched_results.end(), [](const auto& lhs, const auto& rhs) {
+      return lhs.token_bucket.get().fillRate() < rhs.token_bucket.get().fillRate();
+    });
   }
 
   const double share_factor =
       share_provider_ != nullptr ? share_provider_->getTokensShareFactor() : 1.0;
 
   // See if the request is forbidden by any of the matched descriptors.
-  for (auto descriptor : matched_descriptors) {
-    if (!descriptor->consume(share_factor)) {
+  for (auto match_result : matched_results) {
+    if (!match_result.token_bucket.get().consume(
+            share_factor, match_result.request_descriptor.get().hits_addend_.value_or(1))) {
       // If the request is forbidden by a descriptor, return the result and the descriptor
       // token bucket.
-      return {false, makeOptRefFromPtr<TokenBucketContext>(descriptor)};
+      return {false, makeOptRef<TokenBucketContext>(match_result.token_bucket.get())};
     }
   }
 
   // See if the request is forbidden by the default token bucket.
-  if (matched_descriptors.empty() || always_consume_default_token_bucket_) {
+  if (matched_results.empty() || always_consume_default_token_bucket_) {
     if (const bool result = default_token_bucket_->consume(share_factor); !result) {
       // If the request is forbidden by the default token bucket, return the result and the
       // default token bucket.
@@ -315,13 +320,13 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
 
     // If the request is allowed then return the result the token bucket. The descriptor
     // token bucket will be selected as priority if it exists.
-    return {true, makeOptRefFromPtr<TokenBucketContext>(matched_descriptors.empty()
-                                                            ? default_token_bucket_.get()
-                                                            : matched_descriptors[0])};
+    return {true, makeOptRef<TokenBucketContext>(matched_results.empty()
+                                                     ? *default_token_bucket_
+                                                     : matched_results[0].token_bucket.get())};
   };
 
-  ASSERT(!matched_descriptors.empty());
-  return {true, makeOptRefFromPtr<TokenBucketContext>(matched_descriptors[0])};
+  ASSERT(!matched_results.empty());
+  return {true, makeOptRef<TokenBucketContext>(matched_results[0].token_bucket.get())};
 }
 
 } // namespace LocalRateLimit

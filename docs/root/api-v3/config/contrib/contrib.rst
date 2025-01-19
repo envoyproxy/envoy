@@ -15,3 +15,4 @@ Contrib extensions
   dlb/dlb
   qat/qat
   http_tcp_bridge/golang
+  tap_sinks/tap_sinks
