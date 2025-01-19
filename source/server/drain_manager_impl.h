@@ -1,7 +1,6 @@
 #pragma once
 
 #include <functional>
-#include <shared_mutex>
 #include <vector>
 
 #include "envoy/common/time.h"
