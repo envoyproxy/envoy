@@ -218,6 +218,10 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
                                "no_timer_based_rate_limit_token_bucket");
         }
 
+        if (lru_size == 0) {
+          throw EnvoyException("minimum allowed value for max_dynamic_descriptors is 1");
+        }
+
         if (per_connection) {
           throw EnvoyException(
               "local rate descriptor value cannot be empty in per connection rate limit mode");
@@ -367,7 +371,7 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
 
 // Compare the request descriptor entries with the user descriptor entries. If all non-empty user
 // descriptor values match the request descriptor values, return true
-bool DynamicDescriptorMap::compareDescriptorEntries(
+bool DynamicDescriptorMap::matchDescriptorEntries(
     const std::vector<RateLimit::DescriptorEntry>& request_entries,
     const std::vector<RateLimit::DescriptorEntry>& user_entries) {
   // Check for equality of sizes
@@ -411,11 +415,8 @@ DynamicDescriptorMap::getBucket(const RateLimit::Descriptor request_descriptor) 
     if (user_descriptor.entries_.size() != request_descriptor.entries_.size()) {
       continue;
     }
-    bool wildcard_found = false;
-    wildcard_found =
-        compareDescriptorEntries(request_descriptor.entries_, user_descriptor.entries_);
 
-    if (!wildcard_found) {
+    if (!matchDescriptorEntries(request_descriptor.entries_, user_descriptor.entries_)) {
       continue;
     }
 
@@ -456,7 +457,8 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descr
   lru_list_.emplace_front(request_descriptor);
   auto result = dynamic_descriptors_.emplace(
       request_descriptor, std::pair(per_descriptor_token_bucket, lru_list_.begin()));
-  if (lru_list_.size() >= lru_size_) {
+  auto token_bucket = result.first->second.first;
+  if (lru_list_.size() > lru_size_) {
     ENVOY_LOG(trace,
               "DynamicDescriptor::addorGetDescriptor: lru_size({}) overflow. Removing dynamic "
               "descriptor: {}",
@@ -465,7 +467,7 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descr
     lru_list_.pop_back();
   }
   ASSERT(lru_list_.size() == dynamic_descriptors_.size());
-  return result.first->second.first;
+  return token_bucket;
 }
 
 } // namespace LocalRateLimit

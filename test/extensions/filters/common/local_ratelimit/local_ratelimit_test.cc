@@ -391,6 +391,15 @@ public:
     fill_interval: {}
   )";
 
+  static constexpr absl::string_view wildcard_descriptor_config_yaml = R"(
+  entries:
+  - key: foo
+  token_bucket:
+    max_tokens: {}
+    tokens_per_fill: {}
+    fill_interval: {}
+  )";
+
   static constexpr absl::string_view multiple_descriptor_config_yaml = R"(
   entries:
   - key: hello
@@ -407,6 +416,54 @@ public:
   std::vector<RateLimit::Descriptor> descriptor_{{{{"foo2", "bar2"}}}};
   std::vector<RateLimit::Descriptor> descriptor2_{{{{"hello", "world"}, {"foo", "bar"}}}};
 };
+
+// Make sure blank values are not allowed if the dynamic bucket feature is disabled.
+TEST_F(LocalRateLimiterImplTest, DynamicTokenBucketNotEnabled) {
+  TestUtility::loadFromYaml(
+      fmt::format(LocalRateLimiterDescriptorImplTest::wildcard_descriptor_config_yaml, 2, 1, "60s"),
+      *descriptors_.Add());
+
+  EXPECT_THROW_WITH_MESSAGE(
+      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_),
+      EnvoyException,
+      "local_rate_limiting_with_dynamic_buckets is disabled. Local rate descriptor value cannot be "
+      "empty");
+}
+
+// Make sure no_timer_based_rate_limit_token_bucket is enabled if the dynamic bucket feature is
+// enabled.
+TEST_F(LocalRateLimiterImplTest, DynamicTokenBucketEnabledbutNoTimerBasedTokenBucketDisabled) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.no_timer_based_rate_limit_token_bucket", "false"},
+       {"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
+  TestUtility::loadFromYaml(
+      fmt::format(LocalRateLimiterDescriptorImplTest::wildcard_descriptor_config_yaml, 2, 1, "60s"),
+      *descriptors_.Add());
+
+  EXPECT_THROW_WITH_MESSAGE(
+      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_),
+      EnvoyException,
+      "local rate limit descriptor value cannot be empty without "
+      "no_timer_based_rate_limit_token_bucket");
+}
+
+// Make sure valid max_dynamic_descriptors is required if the dynamic bucket feature is enabled.
+TEST_F(LocalRateLimiterImplTest, DynamicTokenBucketEnabledbutInvalidMaxDynamicDescriptors) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.no_timer_based_rate_limit_token_bucket", "true"},
+       {"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
+  TestUtility::loadFromYaml(
+      fmt::format(LocalRateLimiterDescriptorImplTest::wildcard_descriptor_config_yaml, 2, 1, "60s"),
+      *descriptors_.Add());
+
+  EXPECT_THROW_WITH_MESSAGE(LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1,
+                                                 dispatcher_, descriptors_, true, nullptr, 0),
+
+                            EnvoyException,
+                            "minimum allowed value for max_dynamic_descriptors is 1");
+}
 
 // Verify descriptor rate limit time interval is multiple of token bucket fill interval.
 TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitDivisibleByTokenFillInterval) {

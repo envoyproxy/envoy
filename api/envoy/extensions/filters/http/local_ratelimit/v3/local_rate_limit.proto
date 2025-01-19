@@ -174,6 +174,6 @@ message LocalRateLimit {
   // with blank value entries, then max dynamic descriptors stored in the LRU cache will be 2 * max_dynamic_descriptors.
   // Actual number of dynamic descriptors will depend on the cardinality of unique values received from the http request for the omitted
   // values.
-  // Default is 20.
+  // Minimum is 1. Default is 20.
   google.protobuf.UInt32Value max_dynamic_descriptors = 18;
 }
