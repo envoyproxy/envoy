@@ -105,7 +105,8 @@ Network::FilterStatus StickySessionUdpProxyFilter::onDataInternal(Network::UdpRe
       ClusterInfo* cluster = active_session->cluster();
       ASSERT(cluster);
 
-      auto host = cluster->chooseHost(data.addresses_.peer_, nullptr);
+      auto host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+          cluster->chooseHost(data.addresses_.peer_, nullptr));
       if (host != nullptr && host->coarseHealth() != Upstream::Host::Health::Unhealthy &&
           host.get() != &active_session->host().value().get()) {
         ENVOY_LOG(debug, "upstream session unhealthy, recreating the session");
@@ -130,7 +131,8 @@ PerPacketLoadBalancingUdpProxyFilter::onDataInternal(Network::UdpRecvData& data)
     return Network::FilterStatus::StopIteration;
   }
 
-  auto host = cluster->chooseHost(data.addresses_.peer_, nullptr);
+  auto host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      cluster->chooseHost(data.addresses_.peer_, nullptr));
   if (host == nullptr) {
     ENVOY_LOG(debug, "cannot find any valid host.");
     cluster->cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
@@ -266,7 +268,8 @@ UdpProxyFilter::createSession(Network::UdpRecvData::LocalPeerAddresses&& address
     return nullptr;
   }
 
-  auto host = cluster->chooseHost(addresses.peer_, nullptr);
+  auto host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      cluster->chooseHost(addresses.peer_, nullptr));
   if (host == nullptr) {
     ENVOY_LOG(debug, "cannot find any valid host.");
     cluster->cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
@@ -303,11 +306,12 @@ UdpProxyFilter::createSessionWithOptionalHost(Network::UdpRecvData::LocalPeerAdd
   return nullptr;
 }
 
-Upstream::HostConstSharedPtr UdpProxyFilter::ClusterInfo::chooseHost(
+Upstream::HostSelectionResponse UdpProxyFilter::ClusterInfo::chooseHost(
     const Network::Address::InstanceConstSharedPtr& peer_address,
     StreamInfo::StreamInfo* stream_info) const {
   UdpLoadBalancerContext context(filter_.config_->hashPolicy(), peer_address, stream_info);
-  Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
+  Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      cluster_.loadBalancer().chooseHost(&context));
   return host;
 }
 
@@ -588,7 +592,8 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
   }
 
   if (!host_) {
-    host_ = cluster_->chooseHost(addresses_.peer_, &udp_session_info_);
+    host_ = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+        cluster_->chooseHost(addresses_.peer_, &udp_session_info_));
     if (host_ == nullptr) {
       ENVOY_LOG(debug, "cannot find any valid host.");
       cluster_->cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
@@ -902,7 +907,8 @@ TunnelingConnectionPoolImpl::TunnelingConnectionPoolImpl(
       downstream_info_(downstream_info) {
   // TODO(ohadvano): support upstream HTTP/3.
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
-  auto host = thread_local_cluster.loadBalancer().chooseHost(context);
+  auto host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      thread_local_cluster.loadBalancer().chooseHost(context));
   conn_pool_data_ = thread_local_cluster.httpConnPool(host, Upstream::ResourcePriority::Default,
                                                       protocol, context);
 }
