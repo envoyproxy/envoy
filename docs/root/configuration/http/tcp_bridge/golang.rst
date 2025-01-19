@@ -69,9 +69,9 @@ A prebuilt Golang Http Tcp Bridge  ``my_plugin.so`` might be configured as follo
 .. literalinclude:: /_configs/go/golang-http-tcp-bridge.yaml
    :language: yaml
    :linenos:
-   :lines: 38-44
-   :lineno-start: 39
-   :emphasize-lines: 2-7
+   :lines: 34-44
+   :lineno-start: 35
+   :emphasize-lines: 4-7
    :caption: :download:`golang-http-tcp-bridge.yaml </_configs/go/golang-http-tcp-bridge.yaml>`
 
 Extensible plugin configuration
@@ -84,9 +84,9 @@ Below is a very simple example of how such a plugin might be configured in Envoy
 .. literalinclude:: /_configs/go/golang-http-tcp-bridge-with-config.yaml
    :language: yaml
    :linenos:
-   :lines: 38-50
-   :lineno-start: 39
-   :emphasize-lines: 8-13
+   :lines: 34-48
+   :lineno-start: 35
+   :emphasize-lines: 4-11
    :caption: :download:`golang-http-tcp-bridge-with-config.yaml </_configs/go/golang-http-tcp-bridge-with-config.yaml>`
 
 See the :repo:`HttpTcpBridge API <contrib/golang/common/go/api/filter.go>`
