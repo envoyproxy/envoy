@@ -381,7 +381,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DynamicDesciptorsBasicTest) {
   TestScopedRuntime runtime;
   runtime.mergeValues(
       {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
-  for (int i = 1; i < 2; ++i) {
+  for (int i = 1; i < 3; ++i) {
     auto max_dynamic_descriptors = i;
     initializeFilter(
         fmt::format(filter_config_with_blank_value_descriptor_, max_dynamic_descriptors, "false"));
