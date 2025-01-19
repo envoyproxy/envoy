@@ -5,7 +5,7 @@ Golang Http Tcp Bridge
 
 This bridge enables an Http client to connect to a Tcp server via a Golang plugin, facilitating **Protocol Convert** from Http to any RPC protocol in Envoy.
 
-Notice: the bridge is designed for sync-data-flow between go and c, so when you create new goroutines, **DO NOT** touch the request in these goroutines, they could be background goroutines.
+Note that the bridge is designed for sync-data-flow between go and c, so when you create new goroutines, **DO NOT** touch the request in these goroutines, they could be background goroutines.
 
 The Bridge allows `Golang <https://go.dev/>`_ to be run during both the request
 and response flows of upstream.
@@ -22,9 +22,9 @@ Developing a Go plugin
 Envoy's Golang HTTP-TCP Bridge plugin must implement the :repo:`TcpUpstreamFilter API <contrib/golang/common/go/api/filter.go>`.
 
 Here is the introduction about the TcpUpstreamFilter API:
-* EncodeHeaders: get http request headers and decide whether to directly send rpc frame to tcp server.
-* EncodeData: get http request body and convert it to rpc frame, then send that to tcp server. and you can control whether to half-close upstream conn by Envoy.
-* OnUpstreamData: aggregate and verify multi rpc frame from tcp server, then convert complete rpc frame to http body, finally construct http response with headers to http client.
+- EncodeHeaders: get http request headers and decide whether to directly send rpc frame to tcp server.
+- EncodeData: get http request body and convert it to rpc frame, then send that to tcp server. and you can control whether to half-close upstream conn by Envoy.
+- OnUpstreamData: aggregate and verify multi rpc frame from tcp server, then convert complete rpc frame to http body, finally construct http response with headers to http client.
 
 .. attention::
   The Go plugin API is not yet stable, you are **strongly** recommended to use the same version of Go plugin SDK and Envoy.
@@ -71,7 +71,7 @@ A prebuilt Golang Http Tcp Bridge  ``my_plugin.so`` might be configured as follo
    :linenos:
    :lines: 34-44
    :lineno-start: 35
-   :emphasize-lines: 4-7
+   :emphasize-lines: 4-8
    :caption: :download:`golang-http-tcp-bridge.yaml </_configs/go/golang-http-tcp-bridge.yaml>`
 
 Extensible plugin configuration
@@ -86,7 +86,7 @@ Below is a very simple example of how such a plugin might be configured in Envoy
    :linenos:
    :lines: 34-48
    :lineno-start: 35
-   :emphasize-lines: 4-11
+   :emphasize-lines: 4-12
    :caption: :download:`golang-http-tcp-bridge-with-config.yaml </_configs/go/golang-http-tcp-bridge-with-config.yaml>`
 
 See the :repo:`HttpTcpBridge API <contrib/golang/common/go/api/filter.go>`
