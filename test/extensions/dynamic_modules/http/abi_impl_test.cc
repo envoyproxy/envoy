@@ -468,10 +468,13 @@ TEST(ABIImpl, RequestBody) {
 
   size_t length = 0;
 
-  // Non existing buffer should return 0.
-  EXPECT_CALL(callbacks, decodingBuffer()).WillOnce(testing::ReturnNull());
+  // Non existing buffer should return false.
+  EXPECT_CALL(callbacks, decodingBuffer()).WillRepeatedly(testing::ReturnNull());
   EXPECT_FALSE(
       envoy_dynamic_module_callback_http_read_request_body(&filter, 0, nullptr, 0, &length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_write_request_body(&filter, nullptr, 0, &length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_request_body_size(&filter, &length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_request_body(&filter, 12345));
 
   // Empty buffer should return 0.
   Buffer::OwnedImpl body;
@@ -529,6 +532,10 @@ TEST(ABIImpl, RequestBody) {
       envoy_dynamic_module_callback_http_read_request_body(&filter, 8, buffer4, 4, &length));
   EXPECT_EQ(length, 1);
   EXPECT_EQ(std::string(buffer4, 1), "2");
+  // Over the offset should return 0.
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_read_request_body(&filter, 9, buffer4, 4, &length));
+  EXPECT_EQ(length, 0);
 }
 
 TEST(ABIImpl, ResponseBody) {
@@ -540,10 +547,14 @@ TEST(ABIImpl, ResponseBody) {
 
   size_t length = 0;
 
-  // Non existing buffer should return 0.
-  EXPECT_CALL(callbacks, encodingBuffer()).WillOnce(testing::ReturnNull());
+  // Non existing buffer should false.
+  EXPECT_CALL(callbacks, encodingBuffer()).WillRepeatedly(testing::ReturnNull());
   EXPECT_FALSE(
       envoy_dynamic_module_callback_http_read_response_body(&filter, 0, nullptr, 0, &length));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_write_response_body(&filter, nullptr, 0, &length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_response_body_size(&filter, &length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_response_body(&filter, 12345));
 
   // Empty buffer should return 0.
   Buffer::OwnedImpl body;
@@ -601,6 +612,10 @@ TEST(ABIImpl, ResponseBody) {
       envoy_dynamic_module_callback_http_read_response_body(&filter, 8, buffer4, 4, &length));
   EXPECT_EQ(length, 1);
   EXPECT_EQ(std::string(buffer4, 1), "2");
+  // Over the offset should return 0.
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_http_read_response_body(&filter, 9, buffer4, 4, &length));
+  EXPECT_EQ(length, 0);
 }
 
 } // namespace HttpFilters
