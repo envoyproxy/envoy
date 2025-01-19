@@ -82,7 +82,7 @@ impl Drop for NopHttpFilter {
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NopHttpFilter {
   fn on_request_headers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     self.on_request_headers_called = true;
@@ -91,7 +91,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NopHttpFilter {
 
   fn on_request_body(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
     self.on_request_body_called = true;
@@ -100,7 +100,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NopHttpFilter {
 
   fn on_request_trailers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
     self.on_request_trailers_called = true;
     abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
@@ -108,7 +108,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NopHttpFilter {
 
   fn on_response_headers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     self.on_response_headers_called = true;
@@ -117,7 +117,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NopHttpFilter {
 
   fn on_response_body(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
     self.on_response_body_called = true;
@@ -126,7 +126,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NopHttpFilter {
 
   fn on_response_trailers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
     self.on_response_trailers_called = true;
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue

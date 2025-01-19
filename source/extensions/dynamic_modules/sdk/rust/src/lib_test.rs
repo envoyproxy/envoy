@@ -134,7 +134,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
   impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for TestHttpFilter {
     fn on_request_headers(
       &mut self,
-      _envoy_filter: EHF,
+      _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
       ON_REQUEST_HEADERS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -143,7 +143,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
 
     fn on_request_body(
       &mut self,
-      _envoy_filter: EHF,
+      _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
       ON_REQUEST_BODY_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -152,7 +152,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
 
     fn on_request_trailers(
       &mut self,
-      _envoy_filter: EHF,
+      _envoy_filter: &mut EHF,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
       ON_REQUEST_TRAILERS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
       abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
@@ -160,7 +160,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
 
     fn on_response_headers(
       &mut self,
-      _envoy_filter: EHF,
+      _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
       ON_RESPONSE_HEADERS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -169,7 +169,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
 
     fn on_response_body(
       &mut self,
-      _envoy_filter: EHF,
+      _envoy_filter: &mut EHF,
       _end_of_stream: bool,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
       ON_RESPONSE_BODY_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -178,7 +178,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
 
     fn on_response_trailers(
       &mut self,
-      _envoy_filter: EHF,
+      _envoy_filter: &mut EHF,
     ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
       ON_RESPONSE_TRAILERS_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
       abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue

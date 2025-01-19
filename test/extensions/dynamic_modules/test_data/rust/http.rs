@@ -47,7 +47,7 @@ struct HeaderCallbacksFilter {}
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
   fn on_request_headers(
     &mut self,
-    mut envoy_filter: EHF,
+    envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // Test single getter API.
@@ -90,7 +90,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
 
   fn on_request_body(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
     abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
@@ -98,7 +98,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
 
   fn on_request_trailers(
     &mut self,
-    mut envoy_filter: EHF,
+    envoy_filter: &mut EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
     // Test single getter API.
     let single_value = envoy_filter
@@ -140,7 +140,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
 
   fn on_response_headers(
     &mut self,
-    mut envoy_filter: EHF,
+    envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     // Test single getter API.
@@ -183,7 +183,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
 
   fn on_response_body(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
@@ -191,7 +191,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
 
   fn on_response_trailers(
     &mut self,
-    mut envoy_filter: EHF,
+    envoy_filter: &mut EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
     // Test single getter API.
     let single_value = envoy_filter
@@ -252,7 +252,7 @@ struct SendResponseFilter {}
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
   fn on_request_headers(
     &mut self,
-    mut envoy_filter: EHF,
+    envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.send_response(
@@ -302,7 +302,7 @@ struct DynamicMetadataCallbacksFilter {}
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
   fn on_request_headers(
     &mut self,
-    mut envoy_filter: EHF,
+    envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // No namespace.
@@ -320,7 +320,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
 
   fn on_request_body(
     &mut self,
-    mut envoy_filter: EHF,
+    envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
     // No namespace.
@@ -339,7 +339,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
 
   fn on_response_headers(
     &mut self,
-    mut envoy_filter: EHF,
+    envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     // No namespace.
@@ -357,7 +357,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
 
   fn on_response_body(
     &mut self,
-    mut envoy_filter: EHF,
+    envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
     // No namespace.

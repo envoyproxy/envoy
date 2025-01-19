@@ -129,7 +129,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the request headers processing.
   fn on_request_headers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
@@ -143,7 +143,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the request body processing.
   fn on_request_body(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
     abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
@@ -156,7 +156,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the request trailers processing.
   fn on_request_trailers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
     abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
   }
@@ -169,7 +169,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the response headers processing.
   fn on_response_headers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
@@ -183,7 +183,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the response body processing.
   fn on_response_body(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
@@ -197,7 +197,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the response trailers processing.
   fn on_response_trailers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
@@ -885,7 +885,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_headers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_request_headers(EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
+  filter.on_request_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
 #[no_mangle]
@@ -896,7 +896,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_body(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_request_body(EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
+  filter.on_request_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
 #[no_mangle]
@@ -906,7 +906,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_trailers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_request_trailers(EnvoyHttpFilterImpl::new(envoy_ptr))
+  filter.on_request_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
 }
 
 #[no_mangle]
@@ -917,7 +917,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_headers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_response_headers(EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
+  filter.on_response_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
 #[no_mangle]
@@ -928,7 +928,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_body(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_response_body(EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
+  filter.on_response_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
 #[no_mangle]
@@ -938,5 +938,5 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_response_trailers(EnvoyHttpFilterImpl::new(envoy_ptr))
+  filter.on_response_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
 }
