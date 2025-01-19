@@ -381,36 +381,67 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DynamicDesciptorsBasicTest) {
   TestScopedRuntime runtime;
   runtime.mergeValues(
       {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
-  for (int i = 1; i < 2; ++i) {
-    auto max_dynamic_descriptors = i;
-    initializeFilter(
-        fmt::format(filter_config_with_blank_value_descriptor_, max_dynamic_descriptors, "false"));
-    // filter is adding dynamic descriptors based on the request header
-    // 'x-envoy-downstream-service-cluster' and the token bucket is set to 1 token per fill interval
-    // of 1000s which means only one request is allowed per 1000s for each unique value of
-    // 'x-envoy-downstream-service-cluster' header.
+  initializeFilter(fmt::format(filter_config_with_blank_value_descriptor_, 20, "false"));
+  // filter is adding dynamic descriptors based on the request header
+  // 'x-envoy-downstream-service-cluster' and the token bucket is set to 1 token per fill interval
+  // of 1000s which means only one request is allowed per 1000s for each unique value of
+  // 'x-envoy-downstream-service-cluster' header.
 
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    sendAndVerifyRequest("foo", "200", 0);
-    cleanupUpstreamAndDownstream();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("foo", "200", 0);
+  cleanupUpstreamAndDownstream();
 
-    // 1 token is exhausted for 'foo' cluster, so the next request with the same cluster should be
-    // rate limited.
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    sendRateLimitedRequest("foo");
-    cleanupUpstreamAndDownstream();
+  // 1 token is exhausted for 'foo' cluster, so the next request with the same cluster should be
+  // rate limited.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendRateLimitedRequest("foo");
+  cleanupUpstreamAndDownstream();
 
-    // The next request with a different cluster, 'bar', should be allowed.
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    sendAndVerifyRequest("bar", "200", 0);
-    cleanupUpstreamAndDownstream();
+  // The next request with a different cluster, 'bar', should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("bar", "200", 0);
+  cleanupUpstreamAndDownstream();
 
-    // 1 token is exhausted for 'bar' cluster as well, so the next request with the same cluster
-    // should be rate limited.
-    codec_client_ = makeHttpConnection(lookupPort("http"));
-    sendRateLimitedRequest("bar");
-    cleanupUpstreamAndDownstream();
-  }
+  // 1 token is exhausted for 'bar' cluster as well, so the next request with the same cluster
+  // should be rate limited.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendRateLimitedRequest("bar");
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(LocalRateLimitFilterIntegrationTest, DesciptorsBasicTestWithMinimumMaxDynamicDescriptors) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
+
+  auto max_dynamic_descriptors = 1;
+  initializeFilter(
+      fmt::format(filter_config_with_blank_value_descriptor_, max_dynamic_descriptors, "false"));
+  // filter is adding dynamic descriptors based on the request header
+  // 'x-envoy-downstream-service-cluster' and the token bucket is set to 1 token per fill interval
+  // of 1000s which means only one request is allowed per 1000s for each unique value of
+  // 'x-envoy-downstream-service-cluster' header.
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("foo", "200", 0);
+  cleanupUpstreamAndDownstream();
+
+  // 1 token is exhausted for 'foo' cluster, so the next request with the same cluster should be
+  // rate limited.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendRateLimitedRequest("foo");
+  cleanupUpstreamAndDownstream();
+
+  // The next request with a different cluster, 'bar', should be allowed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendAndVerifyRequest("bar", "200", 0);
+  cleanupUpstreamAndDownstream();
+
+  // 1 token is exhausted for 'bar' cluster as well, so the next request with the same cluster
+  // should be rate limited.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  sendRateLimitedRequest("bar");
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestPerProcess) {
