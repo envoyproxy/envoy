@@ -87,7 +87,8 @@ void DrainManagerImpl::startDrainSequence(Network::DrainDirection direction,
   // drainClose. Note that drain_deadline_ is default-constructed which guarantees
   // to set the time-since epoch to a count of 0
   // (https://en.cppreference.com/w/cpp/chrono/time_point/time_point).
-  ASSERT(drain_deadlines_[direction].time_since_epoch().count() == 0, "drain_deadline_ cannot be set twice for the same direction.");
+  ASSERT(drain_deadlines_[direction].time_since_epoch().count() == 0,
+         "drain_deadline_ cannot be set twice for the same direction.");
   // Since draining_ is atomic, it is safe to set drain_deadline_ without a mutex
   // as drain_close() only reads from drain_deadline_ if draining_ is true, and
   // C++ will not re-order an assign to an atomic. See

@@ -510,13 +510,12 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
       lookupPort("admin"), "POST", "/drain_listeners?inboundonly&graceful", "",
       downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("304", response->headers().getStatusValue());
+  EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
-  EXPECT_EQ("already draining\n", response->body());
+  EXPECT_EQ("OK\n", response->body());
 
   BufferingStreamDecoderPtr response3 = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "POST", "/drain_listeners?graceful", "",
-      downstreamProtocol(), version_);
+      lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
@@ -533,7 +532,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
 
 // Validates that the inbound only query param only drains inbound listeners when graceful is set.
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulConnectionCloseForInbound) {
-    if (downstreamProtocol() != Http::CodecType::HTTP1) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1) {
     // Connection: close is HTTP1 only
     return;
   }

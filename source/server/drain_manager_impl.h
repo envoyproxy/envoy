@@ -46,8 +46,7 @@ private:
   std::vector<Event::TimerPtr> drain_tick_timers_;
   std::map<Network::DrainDirection, MonotonicTime> drain_deadlines_ = {
       {Network::DrainDirection::InboundOnly, MonotonicTime()},
-      {Network::DrainDirection::All, MonotonicTime()}
-  };
+      {Network::DrainDirection::All, MonotonicTime()}};
 
   Event::TimerPtr parent_shutdown_timer_;
 };

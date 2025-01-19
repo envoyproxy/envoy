@@ -51,9 +51,6 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
               server_.listenerManager().stopListeners(stop_listeners_type, {});
             }
           });
-    } else {
-      response.add("already draining\n");
-      return Http::Code::NotModified;
     }
   } else {
     server_.listenerManager().stopListeners(stop_listeners_type, {});
