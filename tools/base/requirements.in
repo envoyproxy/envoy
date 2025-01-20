@@ -30,7 +30,7 @@ icalendar>=6.1.1
 jinja2
 kafka-python-ng
 multidict>=6.0.2
-orjson
+orjson>=3.10.15
 pep8-naming
 ply
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved
