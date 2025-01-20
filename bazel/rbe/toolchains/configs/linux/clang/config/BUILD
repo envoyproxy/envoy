@@ -19,6 +19,8 @@ licenses(["notice"])  # Apache 2
 
 package(default_visibility = ["//visibility:public"])
 
+CACHE_SILO_KEY = "llvm-18"
+
 toolchain(
     name = "cc-toolchain",
     exec_compatible_with = [
@@ -42,6 +44,7 @@ platform(
         "@bazel_tools//tools/cpp:clang",
     ],
     exec_properties = {
+        "cache-silo-key": CACHE_SILO_KEY,
         "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:e33b02c95f0e39d80a247b065ac61d962c3330611ee55549becc8b19539e69b4",
         "OSFamily": "Linux",
     },
