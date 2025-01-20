@@ -558,7 +558,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBuckets) {
 }
 
 // Verify dynamic token bucket functionality with multiple entries descriptor.
-TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketsWilcardWithMultipleEntries) {
+TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketswildcardWithMultipleEntries) {
   TestScopedRuntime runtime;
   runtime.mergeValues(
       {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
@@ -571,7 +571,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketsWilcardWithMultipl
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
   // Descriptor from 2 -> 2 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
-  // Descriptor from 2 -> 2 tokens this is conformatory test to check if the tokens are not consumed
+  // Descriptor from 2 -> 2 tokens. This is to check if the tokens are not consumed
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
 
   // same size entries but non-matching key for wildcard descriptor. Should not be rate-limited.
@@ -580,19 +580,19 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketsWilcardWithMultipl
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
   // Descriptor from 2 -> 2 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
-  // Descriptor from 2 -> 2 tokens this is conformatory test to check if the tokens are not consumed
+  // Descriptor from 2 -> 2 tokens. This is to check if the tokens are not consumed
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
 
-  // same size entries but non-wildcard key's values does notmatch. Should not be rate-limited.
+  // same size entries but non-wildcard key's values does not match. Should not be rate-limited.
   std::vector<RateLimit::Descriptor> descriptors3{{{{"user", "A"}, {"org", "not-test"}}}};
   // Descriptor from 2 -> 2 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors3).allowed);
   // Descriptor from 2 -> 2 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors3).allowed);
-  // Descriptor from 2 -> 2 tokens this is conformatory test to check if the tokens are not consumed
+  // Descriptor from 2 -> 2 tokens. This is to check if the tokens are not consumed
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors3).allowed);
 
-  // this must be rate-limited because non-wildcard key-value matches and wilcard key matches
+  // this must be rate-limited because non-wildcard key-value matches and wildcard key matches
   std::vector<RateLimit::Descriptor> descriptors4{{{{"user", "A"}, {"org", "test"}}}};
   // Descriptor from 2 -> 1 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors4).allowed);
