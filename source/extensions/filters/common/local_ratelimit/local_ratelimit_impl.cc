@@ -412,10 +412,6 @@ RateLimitTokenBucketSharedPtr
 DynamicDescriptorMap::getBucket(const RateLimit::Descriptor request_descriptor) {
   for (const auto& pair : user_descriptors_) {
     auto user_descriptor = pair.first;
-    if (user_descriptor.entries_.size() != request_descriptor.entries_.size()) {
-      continue;
-    }
-
     if (!matchDescriptorEntries(request_descriptor.entries_, user_descriptor.entries_)) {
       continue;
     }

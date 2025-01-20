@@ -402,6 +402,17 @@ public:
     fill_interval: {}
   )";
 
+  static constexpr absl::string_view multiple_wildcard_descriptor_config_yaml = R"(
+  entries:
+  - key: user
+  - key: org
+    value: test
+  token_bucket:
+    max_tokens: {}
+    tokens_per_fill: {}
+    fill_interval: {}
+  )";
+
   static constexpr absl::string_view multiple_descriptor_config_yaml = R"(
   entries:
   - key: hello
@@ -505,14 +516,14 @@ TEST_F(LocalRateLimiterImplTest, DuplicatedDynamicTokenBucketDescriptor) {
                             "duplicate descriptor in the local rate descriptor: user=");
 }
 
-// Verify dynamic token bucket lru cache functionality
+// Verify dynamic token bucket functionality with a single entry descriptor.
 TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBuckets) {
   TestScopedRuntime runtime;
   runtime.mergeValues(
       {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
   TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 2, 2, "1s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 4, 2, 1);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 20, 2, 1);
 
   std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
 
@@ -530,15 +541,74 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBuckets) {
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
   // Descriptor from 0 -> 0 tokens
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors2).allowed);
+
+  // this must not be rate-limited because it will be handled by default bucket which uses
+  // max_tokens i.e 20
+  std::vector<RateLimit::Descriptor> extra_entries_descriptor{{{{"user", "C"}, {"key", "value"}}}};
+  EXPECT_TRUE(rate_limiter_->requestAllowed(extra_entries_descriptor).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(extra_entries_descriptor).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(extra_entries_descriptor).allowed);
+
+  // this must not be rate-limited because it will be handled by default bucket which uses
+  // max_tokens i.e 20
+  std::vector<RateLimit::Descriptor> different_key_descriptor{{{{"notuser", "A"}}}};
+  EXPECT_TRUE(rate_limiter_->requestAllowed(different_key_descriptor).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(different_key_descriptor).allowed);
+  EXPECT_TRUE(rate_limiter_->requestAllowed(different_key_descriptor).allowed);
+}
+
+// Verify dynamic token bucket functionality with multiple entries descriptor.
+TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketsWilcardWithMultipleEntries) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
+  TestUtility::loadFromYaml(fmt::format(multiple_wildcard_descriptor_config_yaml, 2, 2, "1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 20, 2, 1);
+
+  std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 2 -> 2 tokens this is conformatory test to check if the tokens are not consumed
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+
+  // same size entries but non-matching key for wildcard descriptor. Should not be rate-limited.
+  std::vector<RateLimit::Descriptor> descriptors2{{{{"user", "A"}, {"key", "value"}}}};
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 2 -> 2 tokens this is conformatory test to check if the tokens are not consumed
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+
+  // same size entries but non-wildcard key's values does notmatch. Should not be rate-limited.
+  std::vector<RateLimit::Descriptor> descriptors3{{{{"user", "A"}, {"org", "not-test"}}}};
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors3).allowed);
+  // Descriptor from 2 -> 2 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors3).allowed);
+  // Descriptor from 2 -> 2 tokens this is conformatory test to check if the tokens are not consumed
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors3).allowed);
+
+  // this must be rate-limited because non-wildcard key-value matches and wilcard key matches
+  std::vector<RateLimit::Descriptor> descriptors4{{{{"user", "A"}, {"org", "test"}}}};
+  // Descriptor from 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors4).allowed);
+  // Descriptor from 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors4).allowed);
+  // Descriptor from 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors4).allowed);
 }
 
 TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketsMixedRequestOrder) {
   TestScopedRuntime runtime;
   runtime.mergeValues(
       {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
-  TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 2, 2, "100s"),
+  TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 2, 2, "1s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(100000), 4, 2, 2);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 4, 2, 2);
 
   std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
   std::vector<RateLimit::Descriptor> descriptors2{{{{"user", "B"}}}};
