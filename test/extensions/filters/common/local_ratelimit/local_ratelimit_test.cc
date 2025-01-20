@@ -376,9 +376,11 @@ public:
 
   void initializeWithAtomicTokenBucketDescriptor(const std::chrono::milliseconds fill_interval,
                                                  const uint32_t max_tokens,
-                                                 const uint32_t tokens_per_fill) {
-    rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
-        fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_);
+                                                 const uint32_t tokens_per_fill,
+                                                 uint32_t lru_size = 20) {
+    rate_limiter_ =
+        std::make_shared<LocalRateLimiterImpl>(fill_interval, max_tokens, tokens_per_fill,
+                                               dispatcher_, descriptors_, true, nullptr, lru_size);
   }
 
   static constexpr absl::string_view single_descriptor_config_yaml = R"(
@@ -393,7 +395,7 @@ public:
 
   static constexpr absl::string_view wildcard_descriptor_config_yaml = R"(
   entries:
-  - key: foo
+  - key: user
   token_bucket:
     max_tokens: {}
     tokens_per_fill: {}
@@ -463,6 +465,96 @@ TEST_F(LocalRateLimiterImplTest, DynamicTokenBucketEnabledbutInvalidMaxDynamicDe
 
                             EnvoyException,
                             "minimum allowed value for max_dynamic_descriptors is 1");
+}
+
+// Make sure error raised in case values are omitted with per connection rate limiting.
+TEST_F(LocalRateLimiterImplTest, DynamicTokenBucketEnabledPerConnectionRateLimiting) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.no_timer_based_rate_limit_token_bucket", "true"},
+       {"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
+  TestUtility::loadFromYaml(
+      fmt::format(LocalRateLimiterDescriptorImplTest::wildcard_descriptor_config_yaml, 2, 1, "60s"),
+      *descriptors_.Add());
+
+  EXPECT_THROW_WITH_MESSAGE(
+      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_, true,
+                           nullptr, 1, true),
+
+      EnvoyException,
+      "local rate descriptor value cannot be empty in per connection rate limit mode");
+}
+
+// Make sure error raised in case duplicate/replicated descriptors are found.
+TEST_F(LocalRateLimiterImplTest, DuplicatedDynamicTokenBucketDescriptor) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.no_timer_based_rate_limit_token_bucket", "true"},
+       {"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
+  TestUtility::loadFromYaml(
+      fmt::format(LocalRateLimiterDescriptorImplTest::wildcard_descriptor_config_yaml, 2, 1, "60s"),
+      *descriptors_.Add());
+  TestUtility::loadFromYaml(
+      fmt::format(LocalRateLimiterDescriptorImplTest::wildcard_descriptor_config_yaml, 2, 1, "60s"),
+      *descriptors_.Add());
+
+  EXPECT_THROW_WITH_MESSAGE(LocalRateLimiterImpl(std::chrono::milliseconds(60000), 2, 1,
+                                                 dispatcher_, descriptors_, true, nullptr, 1),
+
+                            EnvoyException,
+                            "duplicate descriptor in the local rate descriptor: user=");
+}
+
+// Verify dynamic token bucket lru cache functionality
+TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBuckets) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
+  TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 2, 2, "1s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 4, 2, 1);
+
+  std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
+
+  // Descriptor from 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+
+  std::vector<RateLimit::Descriptor> descriptors2{{{{"user", "B"}}}};
+  // Descriptor from 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors2).allowed);
+}
+
+TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketsMixedRequestOrder) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
+  TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 2, 2, "100s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(100000), 4, 2, 2);
+
+  std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
+  std::vector<RateLimit::Descriptor> descriptors2{{{{"user", "B"}}}};
+
+  // Descriptor from 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 2 -> 1 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 1 -> 0 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(descriptors2).allowed);
+  // Descriptor from 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors).allowed);
+  // Descriptor from 0 -> 0 tokens
+  EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors2).allowed);
 }
 
 // Verify descriptor rate limit time interval is multiple of token bucket fill interval.
