@@ -3074,27 +3074,6 @@ TEST_F(LuaHttpFilterTest, DestructFilterConfigPerRoute) {
   per_route_config_.reset();
 }
 
-TEST_F(LuaHttpFilterTest, DestructFilterConfigPerRouteAndDisableRuntime) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.restart_features.allow_slot_destroy_on_worker_threads", "false"}});
-
-  envoy::extensions::filters::http::lua::v3::Lua proto_config;
-  envoy::extensions::filters::http::lua::v3::LuaPerRoute per_route_proto_config;
-  per_route_proto_config.mutable_source_code()->set_inline_string(HEADER_ONLY_SCRIPT);
-  setupConfig(proto_config, per_route_proto_config);
-  setupFilter();
-
-  InSequence s;
-  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(false));
-  EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
-  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(true));
-  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
-
-  per_route_config_ =
-      std::make_shared<FilterConfigPerRoute>(per_route_proto_config, server_factory_context_);
-  per_route_config_.reset();
-}
-
 TEST_F(LuaHttpFilterTest, Stats) {
   InSequence s;
   setup(REQUEST_RESPONSE_RUNTIME_ERROR_SCRIPT);
