@@ -60,5 +60,9 @@ new_features:
   change: |
     Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
     :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
+- area: formatter
+  change: |
+    Added ``QUERY_PARAM`` support for substitution formatter. See :ref:`access log formatter <config_access_log_format>`
+    for more details.
 
 deprecated:
