@@ -36,9 +36,9 @@ static_resources:
       name: envoy.upstreams.http.tcp.golang
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.tcp.golang.v3alpha.Config
-        library_id: my-configurable-bridge-id
-        library_path: "lib/my_configurable_bridge.so"
-        plugin_name: my_configurable_bridge
+        library_id: my-bridge-id
+        library_path: "lib/my_bridge.so"
+        plugin_name: my_bridge
     load_assignment:
       cluster_name: local_service
       endpoints:
