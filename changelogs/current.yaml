@@ -176,5 +176,10 @@ new_features:
   change: |
     Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
     work as an upstream filter.
+- area: tcp_proxy
+  change: |
+    Added :ref:`proxy_protocol_tlvs
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlvs>` to the TCP proxy filter.
+    This field allows specifying the list of Proxy Protocol TLVs to be sent in the Proxy Protocol header.
 
 deprecated:

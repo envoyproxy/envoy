@@ -243,6 +243,9 @@ public:
       }
     }
     const BackOffStrategyPtr& backoffStrategy() const { return backoff_strategy_; };
+    const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
+      return proxy_protocol_tlvs_;
+    }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -259,6 +262,7 @@ public:
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
     BackOffStrategyPtr backoff_strategy_;
+    Network::ProxyProtocolTLVVector proxy_protocol_tlvs_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -314,6 +318,9 @@ public:
   bool flushAccessLogOnConnected() const { return shared_config_->flushAccessLogOnConnected(); }
   Regex::Engine& regexEngine() const { return regex_engine_; }
   const BackOffStrategyPtr& backoffStrategy() const { return shared_config_->backoffStrategy(); };
+  Network::ProxyProtocolTLVVector proxyProtocolTLVs() const {
+    return shared_config_->proxyProtocolTLVs();
+  }
 
 private:
   struct SimpleRouteImpl : public Route {

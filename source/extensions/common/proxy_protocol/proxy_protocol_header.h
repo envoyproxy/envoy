@@ -73,6 +73,10 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
                       bool pass_all_tlvs, const absl::flat_hash_set<uint8_t>& pass_through_tlvs,
                       const std::vector<Envoy::Network::ProxyProtocolTLV>& custom_tlvs);
 
+// Parses proxy protocol TLVs from the given configuration.
+Network::ProxyProtocolTLVVector
+parseTLVs(absl::Span<const envoy::config::core::v3::ProxyProtocolTLV* const> tlvs);
+
 } // namespace ProxyProtocol
 } // namespace Common
 } // namespace Extensions
