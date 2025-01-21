@@ -16,6 +16,31 @@ namespace Cache {
 
 using CancelWrapper::cancelWrapped;
 
+class UpstreamRequestWithCacheabilityReset : public HttpSource {
+public:
+  UpstreamRequestWithCacheabilityReset(std::unique_ptr<HttpSource> original_source,
+                                       std::shared_ptr<ActiveCacheEntry> entry)
+      : original_source_(std::move(original_source)), entry_(std::move(entry)) {}
+  void getHeaders(GetHeadersCallback&& cb) override {
+    original_source_->getHeaders(
+        [entry = std::move(entry_), cb = std::move(cb)](Http::ResponseHeaderMapPtr headers,
+                                                        EndStream end_stream) mutable {
+          entry->maybeBecomeCacheable(*headers);
+          cb(std::move(headers), end_stream);
+        });
+  }
+  void getBody(AdjustedByteRange range, GetBodyCallback&& cb) override {
+    original_source_->getBody(std::move(range), std::move(cb));
+  }
+  void getTrailers(GetTrailersCallback&& cb) override {
+    original_source_->getTrailers(std::move(cb));
+  }
+
+private:
+  std::unique_ptr<HttpSource> original_source_;
+  std::shared_ptr<ActiveCacheEntry> entry_;
+};
+
 class UpstreamRequestWithHeadersPrepopulated : public HttpSource {
 public:
   UpstreamRequestWithHeadersPrepopulated(std::unique_ptr<HttpSource> original_source,
@@ -25,13 +50,10 @@ public:
   void getHeaders(GetHeadersCallback&& cb) override {
     cb(std::move(headers_), end_stream_after_headers_);
   }
-  // Calls the provided callback with a buffer that is the beginning of the
-  // requested range, up to but not necessarily including the entire requested
-  // range, or no buffer if there is no more data or an error occurred.
   void getBody(AdjustedByteRange range, GetBodyCallback&& cb) override {
     original_source_->getBody(std::move(range), std::move(cb));
   }
-  virtual void getTrailers(GetTrailersCallback&& cb) override {
+  void getTrailers(GetTrailersCallback&& cb) override {
     original_source_->getTrailers(std::move(cb));
   }
 
@@ -51,10 +73,16 @@ requestHeadersWithRangeRemoved(const Http::RequestHeaderMap& original_headers) {
 
 static ActiveLookupResultPtr
 upstreamPassThrough(ActiveLookupRequestPtr lookup,
-                    CacheEntryStatus status = CacheEntryStatus::Uncacheable) {
+                    CacheEntryStatus status = CacheEntryStatus::Uncacheable,
+                    std::shared_ptr<ActiveCacheEntry> entry = nullptr) {
   auto result = std::make_unique<ActiveLookupResult>();
   auto upstream = lookup->upstreamRequestFactory().create(lookup->requestHeaders());
-  result->http_source_ = std::move(upstream);
+  if (entry) {
+    result->http_source_ =
+        std::make_unique<UpstreamRequestWithCacheabilityReset>(std::move(upstream), entry);
+  } else {
+    result->http_source_ = std::move(upstream);
+  }
   result->status_ = status;
   return result;
 }
@@ -120,6 +148,19 @@ std::shared_ptr<ActiveCache> ActiveCache::create(TimeSource& time_source,
 
 ActiveCacheEntry::ActiveCacheEntry(std::weak_ptr<ActiveCacheImpl> cache, const Key& key)
     : cache_(std::move(cache)), key_(key) {}
+
+void ActiveCacheEntry::maybeBecomeCacheable(Http::ResponseHeaderMap& response_headers) {
+  absl::MutexLock lock(&mu_);
+  if (state_ != State::NotCacheable) {
+    return;
+  }
+  ASSERT(!response_headers.empty());
+  // TODO: check cacheability, only change state if response is cacheable.
+  // Without this, an upstream error will prevent caching on subsequent success.
+  if (false) {
+    state_ = State::New;
+  }
+}
 
 void ActiveCacheEntry::wantHeaders(Event::Dispatcher&, SystemTime lookup_timestamp,
                                    GetHeadersCallback&& cb) {
@@ -447,8 +488,10 @@ void ActiveCacheEntry::getLookupResult(ActiveCacheImpl& cache, ActiveLookupReque
     IS_ENVOY_BUG("not implemented yet");
   case State::NotCacheable: {
     Event::Dispatcher& dispatcher = lookup->dispatcher();
-    dispatcher.post([cb = std::move(cb), lookup = std::move(lookup)]() mutable {
-      cb(upstreamPassThrough(std::move(lookup)));
+    auto upstream =
+        upstreamPassThrough(std::move(lookup), CacheEntryStatus::Uncacheable, shared_from_this());
+    dispatcher.post([cb = std::move(cb), upstream = std::move(upstream)]() mutable {
+      cb(std::move(upstream));
     });
     return;
   }
@@ -671,7 +714,8 @@ void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, End
         result->http_source_ = std::make_unique<UpstreamRequestWithHeadersPrepopulated>(
             std::move(upstream_request_), std::move(headers), end_stream);
       } else {
-        result = upstreamPassThrough(sub.context_->movedLookup());
+        result = upstreamPassThrough(sub.context_->movedLookup(), CacheEntryStatus::Uncacheable,
+                                     shared_from_this());
       }
       sub.dispatcher().post([result = std::move(result), cb = std::move(sub.callback_)]() mutable {
         cb(std::move(result));

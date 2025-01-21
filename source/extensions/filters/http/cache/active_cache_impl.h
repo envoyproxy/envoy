@@ -64,6 +64,7 @@ public:
       ABSL_LOCKS_EXCLUDED(mu_);
   void wantTrailers(Event::Dispatcher& dispatcher, GetTrailersCallback&& cb)
       ABSL_LOCKS_EXCLUDED(mu_);
+  void maybeBecomeCacheable(Http::ResponseHeaderMap& response_headers) ABSL_LOCKS_EXCLUDED(mu_);
 
   ~ActiveCacheEntry();
 
