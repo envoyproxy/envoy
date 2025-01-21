@@ -19,9 +19,9 @@ for more details on the filter's implementation.
 Developing a Go plugin
 ----------------------
 
-Envoy's Golang HTTP-TCP Bridge plugin must implement the :repo:`TcpUpstreamFilter API <contrib/golang/common/go/api/filter.go>`.
+Envoy's Golang HTTP-TCP Bridge plugin must implement the :repo:`HttpTcpBridge API <contrib/golang/common/go/api/filter.go>`.
 
-Here is the introduction about the TcpUpstreamFilter API:
+Here is the introduction about the HttpTcpBridge API:
 
 - EncodeHeaders: get http request headers and decide whether to directly send rpc frame to tcp server.
 - EncodeData: get http request body and convert it to rpc frame, then send that to tcp server. and you can control whether to half-close upstream conn by Envoy.
