@@ -263,7 +263,8 @@ std::string encrypt(const std::string& plaintext, const std::string& secret,
   std::unique_ptr<uint64_t[]> data = mem_block.release();
   const unsigned char* raw_data = reinterpret_cast<const unsigned char*>(data.get());
 
-  std::vector<unsigned char> iv(16); // AES uses 16-byte IV
+  // AES uses 16-byte IV
+  std::vector<unsigned char> iv(16);
   iv.assign(raw_data, raw_data + 16);
 
   EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
@@ -292,7 +293,8 @@ std::string encrypt(const std::string& plaintext, const std::string& secret,
 
   EVP_CIPHER_CTX_free(ctx);
 
-  ciphertext.resize(ciphertext_len); // Resize to actual length
+  // AES uses 16-byte IV
+  ciphertext.resize(ciphertext_len);
 
   // Prepend the IV to the ciphertext
   std::vector<unsigned char> combined(iv.size() + ciphertext.size());
@@ -327,7 +329,7 @@ DecryptResult decrypt(const std::string& encrypted, const std::string& secret) {
   std::vector<unsigned char> ciphertext(combined.begin() + 16, combined.end());
 
   // Generate the key from the secret using SHA-256
-  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH); // 256-bit key
+  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH);
   SHA256(reinterpret_cast<const unsigned char*>(secret.c_str()), secret.size(), key.data());
 
   EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
@@ -352,7 +354,8 @@ DecryptResult decrypt(const std::string& encrypted, const std::string& secret) {
 
   EVP_CIPHER_CTX_free(ctx);
 
-  plaintext.resize(plaintext_len); // Resize to actual plaintext length
+  // Resize to actual plaintext length
+  plaintext.resize(plaintext_len);
 
   return {std::string(plaintext.begin(), plaintext.end()), std::nullopt};
 }
