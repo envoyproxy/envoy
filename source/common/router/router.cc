@@ -672,7 +672,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   ENVOY_STREAM_LOG(debug, "Doing asynchronous host selection\n", *callbacks_);
-  // Latch the cancelable and call it in Filter::onDestroy to avoid any use-after-frees for cases
+  // Latch the cancel handle and call it in Filter::onDestroy to avoid any use-after-frees for cases
   // like stream timeout.
   host_selection_cancelable_ = std::move(host_selection_response.cancelable);
   // Configure a callback to be called on asynchronous host selection.
@@ -680,7 +680,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                         modify_headers](Upstream::HostConstSharedPtr&& host) -> void {
     // It should always be safe to call continueDecodeHeaders. In the case the
     // stream had a local reply before host selection completed,
-    // host_selection_cancelable_ should have been called.
+    // the lookup should be canceled.
     bool should_continue_decoding = false;
     continueDecodeHeaders(cluster, *downstream_headers_, end_stream, modify_headers,
                           &should_continue_decoding, std::move(host));
@@ -2121,7 +2121,7 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
   }
 
   ENVOY_STREAM_LOG(debug, "Handling asynchronous host selection for retry\n", *callbacks_);
-  // Again latch the cancelable, and set up the callback to be called when host
+  // Again latch the cancel handle, and set up the callback to be called when host
   // selection is complete.
   host_selection_cancelable_ = std::move(host_selection_response.cancelable);
   on_host_selected_ = ([this, can_send_early_data, can_use_http3, is_timeout_retry,
