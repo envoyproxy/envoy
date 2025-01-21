@@ -38,7 +38,7 @@ public:
     for (std::shared_ptr<AsyncInfo::Detachable>& handle : handles_) {
       if (handle->parent_) {
         handle->parent_->context_->onAsyncHostSelection(
-            std::move(handle->parent_->preselected_host_));
+            std::move(handle->parent_->preselected_host_), "");
       }
     }
     handles_.clear();
