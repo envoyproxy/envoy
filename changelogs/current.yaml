@@ -217,5 +217,10 @@ new_features:
     added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
     downstream connection before TCP proxy has opened the upstream connection, by setting a filter state object for the key
     ``envoy.tcp_proxy.receive_before_connect``.
+- area: tcp_proxy
+  change: |
+    Added :ref:`proxy_protocol_tlvs
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlvs>` to the TCP proxy filter.
+    This field allows specifying the list of Proxy Protocol TLVs to be sent in the Proxy Protocol header.
 
 deprecated:

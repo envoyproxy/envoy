@@ -37,6 +37,7 @@
 #include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -179,6 +180,11 @@ Config::SharedConfig::SharedConfig(
 
     backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
         base_interval_ms, max_interval_ms, context.serverFactoryContext().api().randomGenerator());
+  }
+
+  if (!config.proxy_protocol_tlvs().empty()) {
+    proxy_protocol_tlvs_ =
+        Extensions::Common::ProxyProtocol::parseTLVs(config.proxy_protocol_tlvs());
   }
 }
 
@@ -539,7 +545,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
         Network::ProxyProtocolFilterState::key(),
         std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             downstream_connection.connectionInfoProvider().remoteAddress(),
-            downstream_connection.connectionInfoProvider().localAddress()}),
+            downstream_connection.connectionInfoProvider().localAddress(),
+            config_->proxyProtocolTLVs()}),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
