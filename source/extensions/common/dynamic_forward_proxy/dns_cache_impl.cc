@@ -70,8 +70,6 @@ DnsCacheImpl::DnsCacheImpl(
   }
   enable_dfp_dns_trace_ = context.serverFactoryContext().runtime().snapshot().getBoolean(
       "envoy.enable_dfp_dns_trace", false);
-  enable_dfp_resolve_timeout_ = context.serverFactoryContext().runtime().snapshot().getBoolean(
-      "envoy.enable_dfp_resolve_timeout", true);
 }
 
 DnsCacheImpl::~DnsCacheImpl() {
@@ -244,11 +242,7 @@ DnsCacheImpl::PrimaryHostInfo* DnsCacheImpl::createHost(const std::string& host,
                          *this, std::string(host_attributes.host_),
                          host_attributes.port_.value_or(default_port),
                          host_attributes.is_ip_address_, [this, host]() { onReResolveAlarm(host); },
-                         [this, host]() {
-                           if (enable_dfp_resolve_timeout_) {
-                             onResolveTimeout(host);
-                           }
-                         }))
+                         [this, host]() { onResolveTimeout(host); }))
         .first->second.get();
   }
 }
@@ -332,10 +326,16 @@ void DnsCacheImpl::forceRefreshHosts() {
       primary_host.second->active_query_->cancel(
           Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
       primary_host.second->active_query_ = nullptr;
-      primary_host.second->timeout_timer_->disableTimer();
+      if (Runtime::isRuntimeFeature("envoy.reloadable_features.dfp_disable_dns_query_timeout") &&
+          timeout_interval_.count() > 0) {
+        primary_host.second->timeout_timer_->disableTimer();
+      }
     }
 
-    ASSERT(!primary_host.second->timeout_timer_->enabled());
+    if (Runtime::isRuntimeFeature("envoy.reloadable_features.dfp_disable_dns_query_timeout") &&
+        timeout_interval_.count() > 0) {
+      ASSERT(!primary_host.second->timeout_timer_->enabled());
+    }
     primary_host.second->refresh_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
     ENVOY_LOG_EVENT(debug, "force_refresh_host", "force refreshing host='{}'", primary_host.first);
   }
@@ -360,8 +360,11 @@ void DnsCacheImpl::stop() {
       primary_host.second->active_query_ = nullptr;
     }
 
-    primary_host.second->timeout_timer_->disableTimer();
-    ASSERT(!primary_host.second->timeout_timer_->enabled());
+    if (Runtime::isRuntimeFeature("envoy.reloadable_features.dfp_disable_dns_query_timeout") &&
+        timeout_interval_.count() > 0) {
+      primary_host.second->timeout_timer_->disableTimer();
+      ASSERT(!primary_host.second->timeout_timer_->enabled());
+    }
     primary_host.second->refresh_timer_->disableTimer();
     ENVOY_LOG_EVENT(debug, "stop_host", "stop host='{}'", primary_host.first);
   }
@@ -373,8 +376,10 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   ASSERT(host_info.active_query_ == nullptr);
 
   stats_.dns_query_attempt_.inc();
-
-  host_info.timeout_timer_->enableTimer(timeout_interval_, nullptr);
+  if (Runtime::isRuntimeFeature("envoy.reloadable_features.dfp_disable_dns_query_timeout") &&
+      timeout_interval_.count() > 0) {
+    host_info.timeout_timer_->enableTimer(timeout_interval_, nullptr);
+  }
   host_info.active_query_ = resolver_->resolve(
       host_info.host_info_->resolvedHost(), dns_lookup_family_,
       [this, host](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
@@ -442,7 +447,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   if (!from_cache) {
     first_resolve = !primary_host_info->host_info_->firstResolveComplete();
-    primary_host_info->timeout_timer_->disableTimer();
+    if (Runtime::isRuntimeFeature("envoy.reloadable_features.dfp_disable_dns_query_timeout") &&
+        timeout_interval_.count() > 0) {
+      primary_host_info->timeout_timer_->disableTimer();
+    }
     primary_host_info->active_query_ = nullptr;
 
     if (status == Network::DnsResolver::ResolutionStatus::Failure) {

@@ -8,6 +8,12 @@ minor_behavior_changes:
 - area: http2
   change: |
     Sets runtime guard ``envoy.reloadable_features.http2_use_oghttp2`` to true by default.
+- area: dfp
+  change: |
+    Setting :ref:`dns_query_timeout
+    <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>`
+    to 0 will disable the DNS query timeout. This behavior can be disabled by setting
+    ``envoy.reloadable_features.dfp_disable_dns_query_timeout`` flag to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -53,10 +59,6 @@ new_features:
   change: |
     Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
-- area: dfp
-  change: |
-    Added a knob for disabling the DFP resolve timeout by setting ``envoy.enable_dfp_resolve_timeout`` flag to ``false``.
-    By default, the flag is set to ``true``.
 - area: ext_proc
   change: |
     Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
