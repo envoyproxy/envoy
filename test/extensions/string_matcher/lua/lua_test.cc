@@ -91,9 +91,9 @@ TEST(LuaStringMatcher, NoCode) {
 
   LuaStringMatcherFactory factory;
   ::envoy::extensions::string_matcher::lua::v3::Lua empty_config;
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       factory.createStringMatcher(empty_config, context), EnvoyException,
-      "Proto constraint validation failed (LuaValidationError.SourceCode: value is required): ");
+      "Proto constraint validation failed.*LuaValidationError.SourceCode: value is required");
 
   empty_config.mutable_source_code()->set_inline_string("");
   EXPECT_THROW_WITH_MESSAGE(factory.createStringMatcher(empty_config, context), EnvoyException,
