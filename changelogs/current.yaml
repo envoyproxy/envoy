@@ -65,6 +65,10 @@ new_features:
   change: |
     Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
+- area: http
+  change: |
+    Alpha support for asynchronous load balancing.  See <arch_overview_load_balancing_policies> for details. Support can
+    be temporarily reverted by setting runtime guard ``envoy.reloadable_features.async_host_selection`` to ``false``.
 - area: ext_proc
   change: |
     Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
