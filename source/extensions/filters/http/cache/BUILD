@@ -34,6 +34,7 @@ envoy_cc_library(
         ":http_source_interface",
         ":range_utils_lib",
         "//source/common/buffer:watermark_buffer_lib",
+        "//source/common/common:cancel_wrapper_lib",
         "//source/common/common:logger_lib",
         "@com_google_absl//absl/types:variant",
     ],

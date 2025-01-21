@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/cancel_wrapper.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/http_source.h"
 #include "source/extensions/filters/http/cache/range_utils.h"
@@ -73,6 +74,7 @@ private:
   uint64_t stream_pos_ = 0;
   bool end_stream_after_body_{false};
   Http::ResponseTrailerMapPtr trailers_;
+  CancelWrapper::CancelFunction cancel_ = []() {};
 };
 
 class UpstreamRequestImplFactory : public UpstreamRequestFactory {

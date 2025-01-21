@@ -138,6 +138,7 @@ void UpstreamRequestImpl::maybeDeliverTrailers() {
 UpstreamRequestImpl::~UpstreamRequestImpl() {
   // Cancel in-flight callbacks on destroy.
   callback_ = absl::monostate{};
+  cancel_();
   if (stream_) {
     // Resets the stream and calls onReset, guaranteeing no further callbacks.
     stream_->reset();
@@ -149,20 +150,23 @@ void UpstreamRequestImpl::postHeaders(Event::Dispatcher& dispatcher,
   // UpstreamRequest must take a copy of the headers as the upstream request may
   // still use the reference provided to it after the original reference has moved.
   request_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers);
-  dispatcher.post([this]() {
-    // If this request had a body or trailers, CacheFilter::decodeHeaders
-    // would have bypassed cache lookup and insertion, so this class wouldn't
-    // be instantiated. So end_stream will always be true.
-    stream_->sendHeaders(*request_headers_, /*end_stream=*/true);
-    absl::optional<absl::string_view> range_header = RangeUtils::getRangeHeader(*request_headers_);
-    if (range_header) {
-      absl::optional<std::vector<RawByteRange>> ranges =
-          RangeUtils::parseRangeHeader(range_header.value(), 1);
-      if (ranges) {
-        stream_pos_ = ranges.value().front().firstBytePos();
-      }
-    }
-  });
+  dispatcher.post(CancelWrapper::cancelWrapped(
+      [this]() {
+        // If this request had a body or trailers, CacheFilter::decodeHeaders
+        // would have bypassed cache lookup and insertion, so this class wouldn't
+        // be instantiated. So end_stream will always be true.
+        stream_->sendHeaders(*request_headers_, /*end_stream=*/true);
+        absl::optional<absl::string_view> range_header =
+            RangeUtils::getRangeHeader(*request_headers_);
+        if (range_header) {
+          absl::optional<std::vector<RawByteRange>> ranges =
+              RangeUtils::parseRangeHeader(range_header.value(), 1);
+          if (ranges) {
+            stream_pos_ = ranges.value().front().firstBytePos();
+          }
+        }
+      },
+      &cancel_));
 }
 
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
