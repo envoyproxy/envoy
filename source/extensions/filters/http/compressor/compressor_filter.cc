@@ -113,7 +113,6 @@ CompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : DirectionConfig(proto_config.request_direction_config().common_config(),
                       stats_prefix + "request.", scope, runtime),
-      enable_on_x_header_(proto_config.request_direction_config().enable_on_x_header()),
       is_set_{proto_config.has_request_direction_config()} {}
 
 CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
@@ -655,7 +654,7 @@ bool CompressorFilter::requestCompressionEnabled(
     const Http::RequestHeaderMap& headers) const {
   if (config.compressionEnabled()) {
     return config.compressionEnabled();
-  } else if (config.enableOnXHeader()) {
+  } else {
     Envoy::Http::HeaderMap::GetResult header_result =
         headers.get(Envoy::Http::LowerCaseString("X-Request-Compression"));
     if (header_result.size() > 0) { // Check if the header exists

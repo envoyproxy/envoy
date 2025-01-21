@@ -49,12 +49,6 @@ message Compressor {
   // Configuration for filter behavior on the request direction.
   message RequestDirectionConfig {
     CommonDirectionConfig common_config = 1;
-
-    // Allow request body compression enabled by request header flag
-    // https://github.com/envoyproxy/envoy/issues/38097
-    // If true, it checks the "X-Request-Compression" header to see whether the request needs to do compression or not
-    // This flag only available when common/enabled is false. Checking this flag is faster than checking header directly.
-    bool enable_on_x_header = 2;
   }
 
   // Configuration for filter behavior on the response direction.
