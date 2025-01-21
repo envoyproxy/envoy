@@ -13,7 +13,7 @@ absl::StatusOr<std::unique_ptr<RdsRouteConfigSubscription>> RdsRouteConfigSubscr
     const std::string& route_config_name, const uint64_t manager_identifier,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     const std::string& rds_type, RouteConfigProviderManager& route_config_provider_manager) {
-  absl::Status creation_status;
+  absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<RdsRouteConfigSubscription>(new RdsRouteConfigSubscription(
       std::move(config_update), std::move(resource_decoder), config_source, route_config_name,
       manager_identifier, factory_context, stat_prefix, rds_type, route_config_provider_manager,
