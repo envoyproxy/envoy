@@ -447,8 +447,6 @@ public:
     absl::optional<bool> sampled_{true};
     // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
     Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
-    // MetadataMatchCriteria to be associated to the new stream
-    const Envoy::Router::MetadataMatchCriteria* metadata_match;
     // Matching route to be associated with new stream
     Envoy::Router::RouteConstSharedPtr matching_route;
   };
