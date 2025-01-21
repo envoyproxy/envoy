@@ -72,8 +72,7 @@ ActiveQuicListener::ActiveQuicListener(
   auto alarm_factory =
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
   // Set the socket to report incoming ECN.
-  if (udp_listener_->localAddress() == nullptr ||
-      udp_listener_->localAddress()->ip() == nullptr) {
+  if (udp_listener_->localAddress() == nullptr || udp_listener_->localAddress()->ip() == nullptr) {
     IS_ENVOY_BUG("UDP Listener does not have local IP address");
   } else {
     int optval = 1;
@@ -433,8 +432,8 @@ ActiveQuicListenerFactory::createActiveQuicListener(
   return std::make_unique<ActiveQuicListener>(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
-      packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
-      proof_source_factory, std::move(cid_generator), worker_selector_,
+      packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
+      std::move(cid_generator), worker_selector_,
       makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_);
 }
 
