@@ -28,6 +28,12 @@ envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
+    copts = select({
+        "//bazel:darwin_arm64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [
+            "-DSET_MAX_CONTINUATION",
+        ],
+    }),
     deps = [
         ":codec_stats_lib",
         ":metadata_decoder_lib",

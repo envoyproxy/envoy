@@ -109,10 +109,12 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
     options.options_.flags |= ARES_FLAG_NOSEARCH;
   }
 
+#ifdef UDP_MAX_QUERIES
   if (udp_max_queries_ > 0) {
     options.optmask_ |= ARES_OPT_UDP_MAX_QUERIES;
     options.options_.udp_max_queries = udp_max_queries_;
   }
+#endif
 
   options.optmask_ |= ARES_OPT_TIMEOUT;
   options.options_.timeout = query_timeout_seconds_;

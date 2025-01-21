@@ -12,6 +12,12 @@ envoy_cc_extension(
     name = "config",
     srcs = ["dns_impl.cc"],
     hdrs = ["dns_impl.h"],
+    copts = select({
+        "//bazel:darwin_arm64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [
+            "-DUDP_MAX_QUERIES",
+        ],
+    }),
     visibility = ["//visibility:public"],
     deps = [
         "//bazel/foreign_cc:ares",

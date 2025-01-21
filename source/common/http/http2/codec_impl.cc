@@ -1965,10 +1965,12 @@ ConnectionImpl::Http2Options::Http2Options(
   // behavior.
   nghttp2_option_set_max_outbound_ack(options_, 10000);
 
+#ifdef SET_MAX_CONTINUATION
   // nghttp2 REQUIRES setting max number of CONTINUATION frames.
   // 512 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb
   // in both headers and trailers
   nghttp2_option_set_max_continuations(options_, 512);
+#endif
 #endif
 }
 
@@ -1993,10 +1995,12 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
   nghttp2_option_set_peer_max_concurrent_streams(
       options_, ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
 
+#ifdef SET_MAX_CONTINUATION
   // nghttp2 REQUIRES setting max number of CONTINUATION frames.
   // 1024 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb
   // in both headers and trailers
   nghttp2_option_set_max_continuations(options_, 1024);
+#endif
 #endif
 }
 
