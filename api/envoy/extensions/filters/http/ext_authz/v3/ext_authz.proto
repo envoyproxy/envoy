@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 35]
+// [#next-free-field: 36]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -325,6 +325,8 @@ message ExtAuthz {
   double response_cache_eviction_candidate_ratio = 33;
 
   double response_cache_eviction_threshold_ratio = 34;
+
+  bool response_cache_remember_body_headers = 35;
 }
 
 // Configuration for buffering the request data.

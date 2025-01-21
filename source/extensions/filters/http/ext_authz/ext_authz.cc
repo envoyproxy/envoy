@@ -130,6 +130,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
           config.response_cache_eviction_threshold_ratio() != 0
               ? config.response_cache_eviction_threshold_ratio()
               : 0.5),
+      response_cache_remember_body_headers_(config.response_cache_remember_body_headers()),
       response_cache_(response_cache_max_size_, response_cache_ttl_,
                       response_cache_eviction_candidate_ratio_,
                       response_cache_eviction_threshold_ratio_,
@@ -529,11 +530,20 @@ CheckResult Filter::validateAndCheckDecoderHeaderMutation(
   return config_->checkDecoderHeaderMutation(operation, Http::LowerCaseString(key), value);
 }
 
-void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
-  state_ = State::Complete;
-  using Filters::Common::ExtAuthz::CheckStatus;
-  Stats::StatName empty_stat_name;
+std::string formatHeaders(const Filters::Common::ExtAuthz::UnsafeHeaderVector& headers) {
+  std::string formatted_headers;
+  for (const auto& header : headers) {
+    formatted_headers += fmt::format("{}: {}, ", header.first, header.second);
+  }
+  // Remove the trailing comma and space
+  if (!formatted_headers.empty()) {
+    formatted_headers.pop_back();
+    formatted_headers.pop_back();
+  }
+  return formatted_headers;
+}
 
+void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   // Extract the actual HTTP status code
   const int http_status_code =
       static_cast<uint16_t>(response->status_code); // Assuming this static cast is safe because
@@ -546,9 +556,33 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     ENVOY_LOG(info, "Caching response: {} with HTTP status: {}", auth_header_str, http_status_code);
     config_->responseCache().Insert(auth_header_str.c_str(),
                                     http_status_code); // Store the HTTP status code
+    // If response_cache_remember_body_headers_ is set, remember the whole response
+    if (config_->responseCacheRememberBodyHeaders()) {
+      config_->responseCache().RememberBody(auth_header_str.c_str(), response->body);
+    }
   }
 
+  // Use std::move to cast the response to an rvalue reference, transferring ownership to
+  // onCompleteSub. This is necessary because onCompleteSub expects an rvalue reference
+  // (ResponsePtr&&).
+  onCompleteSub(std::move(response));
+}
+
+// This code, which handles response headers and metadata, were originally part of onComplete()
+// function. It was moved into a separate method so that it can be invoked from onComplete() and
+// onDecodeHeaders() in case of cache hit.
+void Filter::onCompleteSub(Filters::Common::ExtAuthz::ResponsePtr&& response) {
+  state_ = State::Complete;
+  using Filters::Common::ExtAuthz::CheckStatus;
+  Stats::StatName empty_stat_name;
+
   updateLoggingInfo();
+  // ENVOY_STREAM_LOG(info, "ext_authz server response: status_code={}, headers_to_append={},
+  // headers_to_set={}, headers_to_add={}, response_headers_to_add={}, response_headers_to_set={},
+  // body={}", *decoder_callbacks_, static_cast<int>(response->status_code),
+  // formatHeaders(response->headers_to_append), formatHeaders(response->headers_to_set),
+  // formatHeaders(response->headers_to_add), formatHeaders(response->response_headers_to_add),
+  // formatHeaders(response->response_headers_to_set), response->body);
 
   if (!response->dynamic_metadata.fields().empty()) {
     if (!config_->enableDynamicMetadataIngestion()) {

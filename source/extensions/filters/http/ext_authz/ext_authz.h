@@ -287,6 +287,7 @@ private:
   // Response cache
   double response_cache_eviction_candidate_ratio_;
   double response_cache_eviction_threshold_ratio_;
+  bool response_cache_remember_body_headers_;
   RespCache response_cache_;
 
 public:
@@ -401,6 +402,7 @@ private:
   void continueDecoding();
   bool isBufferFull(uint64_t num_bytes_processing) const;
   void updateLoggingInfo();
+  void onCompleteSub(Filters::Common::ExtAuthz::ResponsePtr&&);
 
   // This holds a set of flags defined in per-route configuration.
   struct PerRouteFlags {
