@@ -273,6 +273,7 @@ private:
   absl::optional<Network::Address::IpVersion>
       ip_version_to_remove_ ABSL_GUARDED_BY(ip_version_to_remove_lock_) = absl::nullopt;
   bool enable_dfp_dns_trace_;
+  bool allow_disabling_dns_query_timeout_;
 };
 
 } // namespace DynamicForwardProxy
