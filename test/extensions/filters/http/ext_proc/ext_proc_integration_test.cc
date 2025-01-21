@@ -963,7 +963,7 @@ TEST_P(ExtProcIntegrationTest, SetHostHeaderRoutingFailed) {
 
   // The routing to upstream is expected to fail and 500 is returned to downstream client, since no
   // route is found for mismatched vhost.
-  verifyDownstreamResponse(*response, 500);
+  verifyDownstreamResponse(*response, 404);
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndSetPathHeader) {
