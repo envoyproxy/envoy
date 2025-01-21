@@ -1,11 +1,12 @@
 .. _config_http_tcp_bridge_golang:
 
-Golang Http Tcp Bridge
+Golang HTTP TCP Bridge
 ======================
 
-This bridge enables an Http client to connect to a Tcp server via a Golang plugin, facilitating **Protocol Convert** from Http to any RPC protocol in Envoy.
+This bridge enables an HTTP client to connect to a TCP server via a Golang plugin, facilitating **Protocol Convert** from HTTP to any RPC protocol in Envoy.
 
-Note that the bridge is designed for sync-data-flow between go and c, so when you create new goroutines, **DO NOT** touch the request in these goroutines, they could be background goroutines.
+.. note::
+  The bridge is designed for sync-data-flow between go and c, so when you create new goroutines, **DO NOT** touch the request in these goroutines, they could be background goroutines.
 
 The Bridge allows `Golang <https://go.dev/>`_ to be run during both the request
 and response flows of upstream.
@@ -23,9 +24,9 @@ Envoy's Golang HTTP-TCP Bridge plugin must implement the :repo:`HttpTcpBridge AP
 
 Here is the introduction about the HttpTcpBridge API:
 
-- EncodeHeaders: get http request headers and decide whether to directly send rpc frame to tcp server.
-- EncodeData: get http request body and convert it to rpc frame, then send that to tcp server. and you can control whether to half-close upstream conn by Envoy.
-- OnUpstreamData: aggregate and verify multi rpc frame from tcp server, then convert complete rpc frame to http body, finally construct http response with headers to http client.
+- ``EncodeHeaders``: get HTTP request headers and decide whether to directly send RPC frame to TCP server.
+- ``EncodeData``: get HTTP request body and convert it to RPC frame, then send that to TCP server. and you can control whether to half-close the upstream connection by Envoy.
+- ``OnUpstreamData``: aggregate and verify multiple RPC frames from the TCP server, then convert the complete RPC frame to the HTTP body, finally construct the HTTP response with headers for the HTTP client.
 
 .. attention::
   The Go plugin API is not yet stable, you are **strongly** recommended to use the same version of Go plugin SDK and Envoy.
@@ -34,8 +35,8 @@ When you are using a release version of Envoy, i.e. 1.26.x,
 you should use ``github.com/envoyproxy/envoy v1.26.x`` in the go.mod file.
 
 When you are not using a release, i.e. the latest main branch of Envoy,
-you could use ``go get -u github.com/envoyproxy/envoy@SHA`` to get the same version of Go plugin SDK,
-the SHA is the latest commit sha.
+you could use ``go get -u github.com/envoyproxy/envoy@SHA`` to get the same version of the Go plugin SDK,
+the SHA is the latest commit SHA.
 
 Building a Go plugin
 --------------------
@@ -65,7 +66,7 @@ Configuration
    This filter should be configured with the type URL
    :ref:`type.googleapis.com/envoy.extensions.upstreams.http.tcp.golang.v3alpha.Config <envoy_v3_api_msg_extensions.upstreams.http.tcp.golang.v3alpha.Config>`.
 
-A prebuilt Golang Http Tcp Bridge  ``my_bridge.so`` might be configured as follows:
+A prebuilt Golang HTTP TCP Bridge  ``my_bridge.so`` might be configured as follows:
 
 .. literalinclude:: /_configs/go/golang-http-tcp-bridge.yaml
    :language: yaml

@@ -1,4 +1,4 @@
-Golang Http Tcp Bridge
+Golang HTTP TCP Bridge
 ======================
 
 .. toctree::
