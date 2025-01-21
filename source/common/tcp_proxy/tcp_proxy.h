@@ -248,6 +248,9 @@ public:
         return {};
       }
     }
+    const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
+      return proxy_protocol_tlvs_;
+    }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -263,6 +266,7 @@ public:
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
+    Network::ProxyProtocolTLVVector proxy_protocol_tlvs_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -317,6 +321,9 @@ public:
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
   bool flushAccessLogOnConnected() const { return shared_config_->flushAccessLogOnConnected(); }
   Regex::Engine& regexEngine() const { return regex_engine_; }
+  Network::ProxyProtocolTLVVector proxyProtocolTLVs() const {
+    return shared_config_->proxyProtocolTLVs();
+  }
 
 private:
   struct SimpleRouteImpl : public Route {
