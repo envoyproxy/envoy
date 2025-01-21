@@ -53,6 +53,9 @@ public:
       }
     }
 
+    ON_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+            getBoolean("envoy.allow_disabling_dns_query_timeout", true))
+        .WillByDefault(Return(allow_disabling_dns_query_timeout_));
     EXPECT_CALL(context_.server_factory_context_.dispatcher_, isThreadSafe)
         .WillRepeatedly(Return(true));
 
@@ -98,6 +101,7 @@ public:
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
   std::chrono::milliseconds configured_ttl_ = std::chrono::milliseconds(60000);
   std::chrono::milliseconds dns_ttl_ = std::chrono::milliseconds(6000);
+  bool allow_disabling_dns_query_timeout_{true};
 };
 
 MATCHER_P3(DnsHostInfoEquals, address, resolved_host, is_ip_address, "") {

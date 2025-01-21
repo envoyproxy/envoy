@@ -861,6 +861,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
+  (*runtime_values.mutable_fields())["allow_disabling_dns_query_timeout"].set_bool_value(true);
   for (auto& guard_and_value : restart_runtime_guards_) {
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
