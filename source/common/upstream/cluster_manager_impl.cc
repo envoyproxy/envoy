@@ -2238,6 +2238,9 @@ HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cluster
     if (host_selection.host || host_selection.cancelable) {
       return host_selection;
     }
+    cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
+    ENVOY_LOG(debug, "no healthy host");
+    return host_selection;
   }
 
   cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
