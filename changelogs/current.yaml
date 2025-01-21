@@ -70,10 +70,18 @@ new_features:
   change: |
     Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
+- area: http
+  change: |
+    Alpha support for asynchronous load balancing.  See <arch_overview_load_balancing_policies> for details. Support can
+    be temporarily reverted by setting runtime guard ``envoy.reloadable_features.async_host_selection`` to ``false``.
 - area: ext_proc
   change: |
     Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
     :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
+- area: http
+  change: |
+    Added :ref:`max_metadata_size <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_metadata_size>` to make
+    HTTP/2 metadata limits configurable.
 - area: tcp_proxy
   change: |
     Added support for :ref:`backoff_options <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.backoff_options>`
