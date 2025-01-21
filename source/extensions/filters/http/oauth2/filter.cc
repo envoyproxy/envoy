@@ -267,33 +267,27 @@ std::string encrypt(const std::string& plaintext, const std::string& secret,
   iv.assign(raw_data, raw_data + 16);
 
   EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-  if (!ctx) {
-    throw EnvoyException("Failed to create context");
-  }
+  RELEASE_ASSERT(ctx, "Failed to create context");
 
   std::vector<unsigned char> ciphertext(plaintext.size() + EVP_MAX_BLOCK_LENGTH);
   int len = 0, ciphertext_len = 0;
 
   // Initialize encryption operation
-  if (EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data()) != 1) {
-    EVP_CIPHER_CTX_free(ctx);
-    throw EnvoyException("Encryption initialization failed");
-  }
+  int result = EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data());
+  RELEASE_ASSERT(result == 1, "Encryption initialization failed");
 
   // Encrypt the plaintext
-  if (EVP_EncryptUpdate(ctx, ciphertext.data(), &len,
-                        reinterpret_cast<const unsigned char*>(plaintext.c_str()),
-                        plaintext.size()) != 1) {
-    EVP_CIPHER_CTX_free(ctx);
-    throw EnvoyException("Encryption update failed");
-  }
+  result = EVP_EncryptUpdate(ctx, ciphertext.data(), &len,
+                             reinterpret_cast<const unsigned char*>(plaintext.c_str()),
+                             plaintext.size());
+  RELEASE_ASSERT(result == 1, "Encryption update failed");
+
   ciphertext_len += len;
 
   // Finalize encryption
-  if (EVP_EncryptFinal_ex(ctx, ciphertext.data() + len, &len) != 1) {
-    EVP_CIPHER_CTX_free(ctx);
-    throw EnvoyException("Encryption finalization failed");
-  }
+  result = EVP_EncryptFinal_ex(ctx, ciphertext.data() + len, &len);
+  RELEASE_ASSERT(result == 1, "Encryption finalization failed");
+
   ciphertext_len += len;
 
   EVP_CIPHER_CTX_free(ctx);
@@ -309,16 +303,21 @@ std::string encrypt(const std::string& plaintext, const std::string& secret,
   return Base64Url::encode(reinterpret_cast<const char*>(combined.data()), combined.size());
 }
 
+struct DecryptResult {
+  std::string plaintext;
+  std::optional<std::string> error;
+};
+
 /**
  * Decrypt an AES-256-CBC encrypted string.
  */
-std::string decrypt(const std::string& encrypted, const std::string& secret) {
+DecryptResult decrypt(const std::string& encrypted, const std::string& secret) {
   // Decode the Base64Url-encoded input
   std::string decoded = Base64Url::decode(encrypted);
   std::vector<unsigned char> combined(decoded.begin(), decoded.end());
 
   if (combined.size() <= 16) {
-    throw EnvoyException("Invalid encrypted data");
+    return {"", "Invalid encrypted data"};
   }
 
   // Extract the IV (first 16 bytes)
@@ -332,38 +331,30 @@ std::string decrypt(const std::string& encrypted, const std::string& secret) {
   SHA256(reinterpret_cast<const unsigned char*>(secret.c_str()), secret.size(), key.data());
 
   EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-  if (!ctx) {
-    throw EnvoyException("Failed to create context");
-  }
+  RELEASE_ASSERT(ctx, "Failed to create context");
 
   std::vector<unsigned char> plaintext(ciphertext.size() + EVP_MAX_BLOCK_LENGTH);
   int len = 0, plaintext_len = 0;
 
   // Initialize decryption operation
-  if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data()) != 1) {
-    EVP_CIPHER_CTX_free(ctx);
-    throw EnvoyException("Decryption initialization failed");
-  }
+  int result = EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data());
+  RELEASE_ASSERT(result == 1, "Decryption initialization failed");
 
   // Decrypt the ciphertext
-  if (EVP_DecryptUpdate(ctx, plaintext.data(), &len, ciphertext.data(), ciphertext.size()) != 1) {
-    EVP_CIPHER_CTX_free(ctx);
-    throw EnvoyException("Decryption update failed");
-  }
+  result = EVP_DecryptUpdate(ctx, plaintext.data(), &len, ciphertext.data(), ciphertext.size());
+  RELEASE_ASSERT(result == 1, "Decryption update failed");
   plaintext_len += len;
 
   // Finalize decryption
-  if (EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len) != 1) {
-    EVP_CIPHER_CTX_free(ctx);
-    throw EnvoyException("Decryption finalization failed");
-  }
+  result = EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len);
+  RELEASE_ASSERT(result == 1, "Decryption finalization failed");
   plaintext_len += len;
 
   EVP_CIPHER_CTX_free(ctx);
 
   plaintext.resize(plaintext_len); // Resize to actual plaintext length
 
-  return std::string(plaintext.begin(), plaintext.end());
+  return {std::string(plaintext.begin(), plaintext.end()), std::nullopt};
 }
 
 } // namespace
@@ -621,7 +612,15 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
-  std::string code_verifier = decrypt(encrypted_code_verifier, config_->hmacSecret());
+
+  DecryptResult decrypt_result = decrypt(encrypted_code_verifier, config_->hmacSecret());
+  if (decrypt_result.error.has_value()) {
+    ENVOY_LOG(error, "decryption failed: {}", decrypt_result.error.value());
+    sendUnauthorizedResponse();
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  std::string code_verifier = decrypt_result.plaintext;
 
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
                                      redirect_uri, code_verifier, config_->authType());
