@@ -540,6 +540,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
     if (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
         !Config::SubscriptionFactory::isPathBasedConfigSource(
             cluster.eds_cluster_config().eds_config().config_source_specifier_case())) {
+      ASSERT(!isBlockingAdsCluster(bootstrap, cluster.name()));
       // Passing "false" for required_for_ads because an ADS cluster cannot be
       // defined using EDS (or non-primary cluster).
       auto status_or_cluster =
