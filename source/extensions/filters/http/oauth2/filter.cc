@@ -792,7 +792,8 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   // Expire the code verifier cookie in 10 minutes.
   // This should be enough time for the user to complete the OAuth flow.
   std::string expire_in = std::to_string(10 * 60);
-  std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in);
+  std::string same_site = getSameSiteString(config_->codeVerifierCookieSettings().same_site_);
+  std::string cookie_tail_http_only = fmt::format(CookieTailHttpOnlyFormatString, expire_in,same_site);
   if (!config_->cookieDomain().empty()) {
     cookie_tail_http_only = absl::StrCat(
         fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
