@@ -228,26 +228,28 @@ message TcpProxy {
   google.protobuf.Duration max_downstream_connection_duration = 13
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
-  // .. attention::
-  // This field is deprecated in favor of
-  // :ref:`access_log_flush_interval
-  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`.
   // Note that if both this field and :ref:`access_log_flush_interval
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`
   // are specified, the former (deprecated field) is ignored.
+  //
+  // .. attention::
+  //   This field is deprecated in favor of
+  //   :ref:`access_log_flush_interval
+  //   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`.
   google.protobuf.Duration access_log_flush_interval = 15 [
     deprecated = true,
     (validate.rules).duration = {gte {nanos: 1000000}},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
-  // .. attention::
-  // This field is deprecated in favor of
-  // :ref:`flush_access_log_on_connected
-  // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.
   // Note that if both this field and :ref:`flush_access_log_on_connected
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`
   // are specified, the former (deprecated field) is ignored.
+  //
+  // .. attention::
+  //   This field is deprecated in favor of
+  //   :ref:`flush_access_log_on_connected
+  //   <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.flush_access_log_on_connected>`.
   bool flush_access_log_on_connected = 16
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 

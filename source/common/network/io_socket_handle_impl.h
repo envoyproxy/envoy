@@ -30,7 +30,6 @@ public:
                               absl::optional<int> domain = absl::nullopt,
                               size_t address_cache_max_capacity = 0)
       : IoSocketHandleBaseImpl(fd, socket_v6only, domain),
-        receive_ecn_(Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")),
         address_cache_max_capacity_(address_cache_max_capacity) {
     if (address_cache_max_capacity > 0) {
       recent_received_addresses_ = std::vector<QuicEnvoyAddressPair>();
@@ -105,9 +104,6 @@ protected:
   // and IPV6 addresses.
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
                            CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t))};
-
-  // Latches a copy of the runtime feature "envoy.reloadable_features.quic_receive_ecn".
-  const bool receive_ecn_;
 
   size_t addressCacheMaxSize() const { return address_cache_max_capacity_; }
 

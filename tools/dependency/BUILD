@@ -1,6 +1,7 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@envoy_repo//:path.bzl", "PATH")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_pytool_binary")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")

@@ -412,11 +412,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
         }
       }
 #endif
-      if (receive_ecn_) {
-        absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
-        if (maybe_tos) {
-          output.msg_[0].tos_ = *maybe_tos;
-        }
+      absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
+      if (maybe_tos) {
+        output.msg_[0].tos_ = *maybe_tos;
       }
     }
   }
@@ -502,12 +500,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
           output.msg_[0].saved_cmsg_ = cmsg_slice;
         }
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
-        if (receive_ecn_) {
-          absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
-          if (maybe_tos) {
-            output.msg_[0].tos_ = *maybe_tos;
-            continue;
-          }
+        absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
+        if (maybe_tos) {
+          output.msg_[0].tos_ = *maybe_tos;
+          continue;
         }
         if (addr != nullptr) {
           // This is a IP packet info message.

@@ -432,32 +432,11 @@ public:
   FilterConfigPerRoute(const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
                        Server::Configuration::ServerFactoryContext& context);
 
-  ~FilterConfigPerRoute() override {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.restart_features.allow_slot_destroy_on_worker_threads")) {
-      return;
-    }
-
-    // The design of the TLS system does not allow TLS state to be modified in worker threads.
-    // However, when the route configuration is dynamically updated via RDS, the old
-    // FilterConfigPerRoute object may be destructed in a random worker thread. Therefore, to
-    // ensure thread safety, ownership of per_lua_code_setup_ptr_ must be transferred to the main
-    // thread and destroyed when the FilterConfigPerRoute object is not destructed in the main
-    // thread.
-    if (per_lua_code_setup_ptr_ && !main_thread_dispatcher_.isThreadSafe()) {
-      auto shared_ptr_wrapper =
-          std::make_shared<PerLuaCodeSetupPtr>(std::move(per_lua_code_setup_ptr_));
-      main_thread_dispatcher_.post([shared_ptr_wrapper] { shared_ptr_wrapper->reset(); });
-    }
-  }
-
   bool disabled() const { return disabled_; }
   const std::string& name() const { return name_; }
   PerLuaCodeSetup* perLuaCodeSetup() const { return per_lua_code_setup_ptr_.get(); }
 
 private:
-  Event::Dispatcher& main_thread_dispatcher_;
-
   const bool disabled_;
   const std::string name_;
   PerLuaCodeSetupPtr per_lua_code_setup_ptr_;
