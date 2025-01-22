@@ -27,6 +27,10 @@ static const std::string TEST_STATE_CSRF_TOKEN_1 =
 static const std::string TEST_ENCODED_STATE_1 =
     "eyJ1cmwiOiJodHRwOi8vdHJhZmZpYy5leGFtcGxlLmNvbS9ub3QvX29hdXRoIiwiY3NyZl90b2tlbiI6IjhjMThiOGZjZj"
     "U3NWI1OTMuWnBrWE1ETkZpaW5rTDg3QW9TRE9OS3VsQnJ1T3BhSWlTQWQ3Q05rZ09Fbz0ifQ";
+static const std::string TEST_ENCRYPTED_CODE_VERIFIER =
+    "Fc1bBwAAAAAVzVsHAAAAACcWO_WnprqLTdaCdFE7rj83_Jej1OihEIfOcQJFRCQZirutZ-XL7LK2G2KgRnVCCA";
+static const std::string TEST_ENCRYPTED_CODE_VERIFIER_1 =
+    "Fc1bBwAAAAAVzVsHAAAAANRgXgBre6UErcWdPGZOl-o0px-SribGBqMNhaB6Smp-pjDSB20RXanapU6gVN4E1A";
 class OauthIntegrationTest : public HttpIntegrationTest,
                              public Grpc::GrpcClientIntegrationParamTest {
 public:
@@ -333,7 +337,8 @@ typed_config:
   }
 
   void doAuthenticationFlow(absl::string_view token_secret, absl::string_view hmac_secret,
-                            absl::string_view csrf_token, absl::string_view state) {
+                            absl::string_view csrf_token, absl::string_view state,
+                            absl::string_view code_verifier) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     Http::TestRequestHeaderMapImpl headers{
@@ -343,7 +348,8 @@ typed_config:
         {"x-forwarded-proto", "http"},
         {":authority", "authority"},
         {"authority", "Bearer token"},
-        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", csrf_token)}};
+        {"cookie", absl::StrCat(default_cookie_names_.oauth_nonce_, "=", csrf_token)},
+        {"cookie", absl::StrCat(default_cookie_names_.code_verifier_, "=", code_verifier)}};
 
     auto encoder_decoder = codec_client_->startRequest(headers);
     request_encoder_ = &encoder_decoder.first;
@@ -436,8 +442,8 @@ typed_config:
     cleanup();
   }
 
-  const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC",    "OauthExpires",
-                                          "IdToken",     "RefreshToken", "OauthNonce"};
+  const CookieNames default_cookie_names_{"BearerToken",  "OauthHMAC",  "OauthExpires", "IdToken",
+                                          "RefreshToken", "OauthNonce", "CodeVerifier"};
   envoy::config::listener::v3::Listener listener_config_;
   std::string listener_name_{"http"};
   FakeHttpConnectionPtr lds_connection_;
@@ -485,7 +491,8 @@ TEST_P(OauthIntegrationTest, AuthenticationFlow) {
   initialize();
 
   // 1. Do one authentication flow.
-  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE);
+  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
+                       TEST_ENCRYPTED_CODE_VERIFIER);
 
   // 2. Reload secrets.
   EXPECT_EQ(test_server_->counter("sds.token.update_success")->value(), 1);
@@ -498,7 +505,7 @@ TEST_P(OauthIntegrationTest, AuthenticationFlow) {
   test_server_->waitForCounterEq("sds.hmac.update_success", 2, std::chrono::milliseconds(5000));
   // 3. Do another one authentication flow.
   doAuthenticationFlow("token_secret_1", "hmac_secret_1", TEST_STATE_CSRF_TOKEN_1,
-                       TEST_ENCODED_STATE_1);
+                       TEST_ENCODED_STATE_1, TEST_ENCRYPTED_CODE_VERIFIER_1);
 }
 
 TEST_P(OauthIntegrationTest, RefreshTokenFlow) {
@@ -596,7 +603,8 @@ TEST_P(OauthIntegrationTest, LoadListenerAfterServerIsInitialized) {
   test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
   test_server_->waitForGaugeEq("listener_manager.total_listeners_warming", 0);
 
-  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE);
+  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
+                       TEST_ENCRYPTED_CODE_VERIFIER);
   if (lds_connection_ != nullptr) {
     AssertionResult result = lds_connection_->close();
     RELEASE_ASSERT(result, result.message());
@@ -672,7 +680,8 @@ TEST_P(OauthIntegrationTestWithBasicAuth, AuthenticationFlow) {
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
   };
   initialize();
-  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE);
+  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
+                       TEST_ENCRYPTED_CODE_VERIFIER);
 }
 
 class OauthUseRefreshTokenDisabled : public OauthIntegrationTest {
@@ -736,7 +745,8 @@ TEST_P(OauthUseRefreshTokenDisabled, FailRefreshTokenFlow) {
   initialize();
 
   // 1. Do one authentication flow.
-  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE);
+  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
+                       TEST_ENCRYPTED_CODE_VERIFIER);
 
   // 2. Reload secrets.
   EXPECT_EQ(test_server_->counter("sds.token.update_success")->value(), 1);

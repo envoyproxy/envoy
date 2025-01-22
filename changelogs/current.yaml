@@ -8,6 +8,9 @@ minor_behavior_changes:
 - area: http2
   change: |
     Sets runtime guard ``envoy.reloadable_features.http2_use_oghttp2`` to true by default.
+- area: oauth2
+  change: |
+    Introduced PKCE(Proof Key for Code Exchange) support for OAuth2 authorization code flow.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
