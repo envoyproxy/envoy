@@ -1,17 +1,15 @@
 syntax = "proto3";
 
-package envoy_api_envoy_extensions_filters_http_api_filter_v3;
+package envoy_api_envoy_extensions_filters_http_proto_api_scrubber_v3;
 
 import "envoy/config/core/v3/base.proto";
-
+import "udpa/annotations/status.proto";
 import "xds/annotations/v3/status.proto";
 
-import "udpa/annotations/status.proto";
-
-option java_package = "io.envoyproxy.envoy_api_envoy_extensions_filters_http_api_filter_v3";
+option java_package = "io.envoyproxy.envoy_api_envoy_extensions_filters_http_proto_api_scrubber_v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy_api_envoy_extensions_filters_http_api_filter_v3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy_api_envoy_extensions_filters_http_proto_api_scrubber_v3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
