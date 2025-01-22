@@ -131,9 +131,10 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   if (!creation_status.ok()) {
     return;
   }
-  const auto metadata_matching_criteria = options.matching_route && options.matching_route->routeEntry() 
-    ? options.matching_route->routeEntry()->metadataMatchCriteria() 
-    : nullptr;
+  const auto metadata_matching_criteria = 
+      options.matching_route && options.matching_route->routeEntry() 
+          ? options.matching_route->routeEntry()->metadataMatchCriteria() 
+          : nullptr;
   auto route_or_error = NullRouteImpl::create(
       parent_.cluster_->name(),
       retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
