@@ -209,6 +209,7 @@ proto_library(
         "//envoy/extensions/filters/http/oauth2/v3:pkg",
         "//envoy/extensions/filters/http/on_demand/v3:pkg",
         "//envoy/extensions/filters/http/original_src/v3:pkg",
+        "//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg",
         "//envoy/extensions/filters/http/proto_message_extraction/v3:pkg",
         "//envoy/extensions/filters/http/rate_limit_quota/v3:pkg",
         "//envoy/extensions/filters/http/ratelimit/v3:pkg",
