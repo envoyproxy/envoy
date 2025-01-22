@@ -67,22 +67,12 @@ message ProxyProtocolConfig {
   // Host-level TLVs are specified in the ``metadata.typed_filter_metadata`` field under the
   // ``envoy.transport_sockets.proxy_protocol`` namespace.
   //
-  // .. code-block:: yaml
-  //
-  //  clusters:
-  //  - name: cluster_0
-  //    load_assignment:
-  //      endpoints:
-  //      - lbEndpoints:
-  //        - metadata:
-  //            typed_filter_metadata:
-  //              envoy.transport_sockets.proxy_protocol:
-  //                "@type": type.googleapis.com/envoy.config.core.v3.ProxyProtocolConfig
-  //                added_tlvs:
-  //                - type: 0xD7
-  //                  value: b3Zy
-  //                - type: 0xD8
-  //                  value: bmV3
+  // .. literalinclude:: /_configs/repo/proxy_protocol.yaml
+  //    :language: yaml
+  //    :lines: 49-57
+  //    :linenos:
+  //    :lineno-start: 49
+  //    :caption: :download:`proxy_protocol.yaml </_configs/repo/proxy_protocol.yaml>`
   //
   // **Precedence behavior**:
   //
