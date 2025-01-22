@@ -15,7 +15,7 @@ Go plugins used by this bridge can be recompiled independently of Envoy.
 
 See the `Envoy's Golang HTTP-TCP Bridge proposal
 <https://github.com/envoyproxy/envoy/issues/35749>`_
-for more details on the filter's implementation.
+for more details on the bridge's implementation.
 
 Developing a Go plugin
 ----------------------

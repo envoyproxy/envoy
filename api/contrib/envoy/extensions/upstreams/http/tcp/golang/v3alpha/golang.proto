@@ -16,12 +16,12 @@ option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extens
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: Golang HTTP TCP Bridge]
+// [#protodoc-title: Golang]
+// [#extension: envoy.upstreams.http.tcp.golang]
 //
 // This bridge enables an Http client to connect to a TCP server via a Golang plugin, facilitating Protocol Convert from HTTP to any RPC protocol in Envoy.
 //
 // For an overview of the Golang HTTP TCP bridge please see the :ref:`configuration reference documentation <config_http_tcp_bridge_golang>`.
-// [#extension: envoy.upstreams.http.tcp.golang]
 message Config {
   // Globally unique ID for a dynamic library file.
   string library_id = 1 [(validate.rules).string = {min_len: 1}];
