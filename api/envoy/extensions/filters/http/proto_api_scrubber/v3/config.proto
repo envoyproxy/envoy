@@ -18,76 +18,94 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.filters.http.proto_api_scrubber]
 // Overview
 // --------
-// ProtoApiScrubber filter supports filtering the request and response payloads based on configured restrictions and request entitlements. Restrictions are simple strings which can be applied to any proto elements (eg, API, method, message, field, etc.) and are provided as part of the filter configuration. Entitlements are also simple strings which are fetched from the request. The filter matches the request entitlements with the restrictions configured to produce the filtered output.
-// 
-// This filter currently supports only field level restrictions. Support for other proto elements are planned to be implemented in future.
-// 
-// The source of entitlements for a request can be configured in the filter config. As of now, it supports `REQUEST_HEADER` and `FILTER_STATE` as sources.
-// 
+// ProtoApiScrubber filter supports filtering the request and response payloads
+// based on configured restrictions and request entitlements. Restrictions are
+// simple strings which can be applied to any proto elements (eg, API, method,
+// message, field, etc.) and are provided as part of the filter configuration.
+// Entitlements are also simple strings which are fetched from the request. The
+// filter matches the request entitlements with the restrictions configured to
+// produce the filtered output.
+//
+// This filter currently supports only field level restrictions. Support for
+// other proto elements are planned to be implemented in future.
+//
+// The source of entitlements for a request can be configured in the filter
+// config. As of now, it supports `REQUEST_HEADER` and `FILTER_STATE` as
+// sources.
+//
 // Assumptions
 // -----------
-// 
-// This filter assumes the request and response payloads are backed by proto descriptors which are provided as part of the filter config.
-// 
-// 
+//
+// This filter assumes the request and response payloads are backed by proto
+// descriptors which are provided as part of the filter config.
+//
+//
 // Process Flow
 // ------------
 // (I) Request Path
-// 
-// 1. Fetch the request `entitlements` from the configured sources. Note that these entitlements would be stored and used for the corresponding response as well. 
+//
+// 1. Fetch the request `entitlements` from the configured sources. Note that
+// these entitlements would be stored and used for the corresponding response as
+// well.
 // 2. Buffer the incoming data to build the complete request body.
-// 3. Filter the request body as per the configured restrictions using the request entitlements.
-// 
+// 3. Filter the request body as per the configured restrictions using the
+// request entitlements.
+//
 // (II) Response Path
 // 1. Buffer the incoming data to build the complete response body.
-// 2. Filter the response body as per the configured restrictions using request entitlements stored in the request flow.
-// 
+// 2. Filter the response body as per the configured restrictions using request
+// entitlements stored in the request flow.
+//
 // Example
 // -------
-// 
+//
 // API Proto Definition
 // --------------------
-// 
+//
 // .. code-block:: proto
-// 
+//
 // package library;
-// 
+//
 // service BookService {
 //   rpc GetBook(GetBookRequest) returns GetBookResponse;
 // }
-// 
+//
 // message GetBookRequest {
 //   // The id of the book.
 //   string book_id = 1;
 // }
-// 
+//
 // message GetBookResponse {
 //   Book book = 1;
-// 
-//   // A field containing debugging information which is expected to be visibile only for the development team (ie, USER_TYPE = DEV) and would be filtered out for other users.
-//   string debug_info = 2; 
+//
+//   // A field containing debugging information which is expected to be
+//   // visible only for the development team (ie, USER_TYPE = DEV) and would
+//   // be filtered out for other users.
+//   string debug_info = 2;
 // }
-// 
+//
 // message Book {
 //   // The title of the book.
 //   string title = 1;
-// 
+//
 //   // The author of the book.
 //   string author = 2;
-// 
+//
 //   // The publisher of the book.
 //   string publisher = 3;
-// 
-//   // Debugging information about a book which is expected to be visible only for the development team (ie, USER_TYPE = DEV) and would be filtered out for other users.
+//
+//   // Debugging information about a book which is expected to be visible only
+//   // for the development team (ie, USER_TYPE = DEV) and would be filtered out
+//   // for other users.
 //   string debug_info = 4;
 // }
-// 
-// 
+//
+//
 // Filter Config (in JSON)
 // -----------------------
-// 
+//
 // .. code-block:: json
-// 
+//
 // {
 //   "data_source": {...},
 //   "request_entitlement_sources": {
@@ -124,34 +142,35 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //     }
 //   }
 // }
-// 
+//
 // Request and Response
 // --------------------
-// 
+//
 // Consider the following request sent by client to BookService.GetBook method:
-// 
+//
 // Request Headers
-// 
+//
 // .. code-block:: json
-// 
+//
 // {
 //   "header1": "value1",
 //   "header2": "value2",
 //   "X-USER-TYPE": "PROD"
 // }
-// 
+//
 // Request Body
-// 
+//
 // .. code-block:: json
-// 
+//
 // {
 //   "book_id": ABC1234
 // }
-// 
-// And consider the following response body sent by the API backend for the above request:
-// 
+//
+// And consider the following response body sent by the API backend for the
+// above request:
+//
 // .. code-block:: json
-// 
+//
 // {
 //   "book": {
 //     "title": "Book Title",
@@ -161,11 +180,11 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   },
 //   "debug_info": "Served from server with IP: 172.164.1.2"
 // }
-// 
+//
 // The filtered response sent to the client will be following:
-// 
+//
 // .. code-block:: json
-// 
+//
 // {
 //   "book": {
 //     "title": "Book Title",
@@ -173,8 +192,10 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //     "publisher": "Book Publisher"
 //   }
 // }
-// 
-// Note that the fields `debug_info` and `book.debug_info` are filtered out from the response since the request entitlement of type "USER_TYPE" is PROD while the restrictions on the fields `debug_info` and `book.debug_info` is DEV.
+//
+// Note that the fields `debug_info` and `book.debug_info` are filtered out from
+// the response since the request entitlement of type "USER_TYPE" is PROD while
+// the restrictions on the fields `debug_info` and `book.debug_info` is DEV.
 
 message ProtoApiScrubberConfig {
   // The proto descriptor set for the proto services.
