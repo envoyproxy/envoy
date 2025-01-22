@@ -6,8 +6,18 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
+class ReleaseAsserter {
+public:
+  virtual void releaseAssertInAFunction() PURE;
+  virtual ~ReleaseAsserter() = default;
+};
 
-static void __attribute__((noinline)) releaseAssertInAFunction() { RELEASE_ASSERT(0, ""); }
+class ReleaseAsserterImpl : public ReleaseAsserter {
+public:
+  void releaseAssertInAFunction() override { RELEASE_ASSERT(0, "") }
+};
+} // namespace
 
 TEST(ReleaseAssertDeathTest, VariousLogs) {
   EXPECT_DEATH({ RELEASE_ASSERT(0, ""); }, ".*assert failure: 0.*");
@@ -16,7 +26,14 @@ TEST(ReleaseAssertDeathTest, VariousLogs) {
   EXPECT_DEATH({ RELEASE_ASSERT(0 == EAGAIN, fmt::format("using {}", "fmt")); },
                ".*assert failure: 0 == EAGAIN. Details: using fmt.*");
   // ensure a stack trace is included.
-  EXPECT_DEATH({ releaseAssertInAFunction(); }, "releaseAssertInAFunction");
+  // To avoid the call being inlined such that it doesn't make it to the
+  // stack trace in opt builds, we make it through a messy virtual function.
+  EXPECT_DEATH(
+      {
+        std::unique_ptr<ReleaseAsserter> asserter = std::make_unique<ReleaseAsserterImpl>();
+        asserter->releaseAssertInAFunction();
+      },
+      "releaseAssertInAFunction");
 }
 
 TEST(AssertDeathTest, VariousLogs) {
