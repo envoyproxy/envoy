@@ -63,7 +63,7 @@ Configuration
 -------------
 
 .. tip::
-   This filter should be configured with the type URL
+   This bridge should be configured with the type URL
    :ref:`type.googleapis.com/envoy.extensions.upstreams.http.tcp.golang.v3alpha.Config <envoy_v3_api_msg_extensions.upstreams.http.tcp.golang.v3alpha.Config>`.
 
 A prebuilt Golang HTTP TCP Bridge  ``my_bridge.so`` might be configured as follows:
