@@ -710,13 +710,13 @@ TEST_F(DnsCacheImplTest, InlineResolve) {
 }
 
 // Resolve timeout.
-TEST_F(DnsCacheImplTest, ResolveTimeout) {
+TEST_F(DnsCacheImplTest, EnableResolveTimeout) {
   initialize();
   InSequence s;
 
   MockLoadDnsCacheEntryCallbacks callbacks;
   Network::DnsResolver::ResolveCb resolve_cb;
-  Event::MockTimer* resolve_timer =
+  Event::MockTimer* refresh_timer =
       new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
   Event::MockTimer* timeout_timer =
       new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
@@ -737,13 +737,38 @@ TEST_F(DnsCacheImplTest, ResolveTimeout) {
   EXPECT_CALL(update_callbacks_,
               onDnsResolutionComplete("foo.com:80", DnsHostInfoAddressIsNull(),
                                       Network::DnsResolver::ResolutionStatus::Failure));
-  // The resolve timeout will be the default TTL as there was no specific TTL
-  // overriding.
-  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(configured_ttl_), _));
+  // The refresh timeout will be the default TTL as there was no specific TTL overriding.
+  EXPECT_CALL(*refresh_timer, enableTimer(std::chrono::milliseconds(configured_ttl_), _));
   timeout_timer->invokeCallback();
   checkStats(1 /* attempt */, 0 /* success */, 1 /* failure */, 0 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
   EXPECT_EQ(1,
+            TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_query_timeout")->value());
+}
+
+TEST_F(DnsCacheImplTest, DisableResolveTimeout) {
+  // Setting the DNS query timeout to 0 will disable the resolve timeout.
+  *config_.mutable_dns_query_timeout() = Protobuf::util::TimeUtil::SecondsToDuration(0);
+  initialize();
+  InSequence s;
+
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+  Event::MockTimer* refresh_timer =
+      new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
+  (void)refresh_timer; // Silent unused warning.
+  Event::MockTimer* timeout_timer =
+      new Event::MockTimer(&context_.server_factory_context_.dispatcher_);
+  (void)timeout_timer; // Silent unused warning.
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, false, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
+  EXPECT_EQ(absl::nullopt, result.host_info_);
+  checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+  EXPECT_EQ(0,
             TestUtility::findCounter(context_.store_, "dns_cache.foo.dns_query_timeout")->value());
 }
 
