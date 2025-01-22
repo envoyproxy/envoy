@@ -30,6 +30,9 @@ bug_fixes:
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2`` and legacy code paths.
 - area: access_log
   change: |
     Removed runtime guard ``envoy.reloadable_features.upstream_remote_address_use_connection`` and legacy code paths.
@@ -86,5 +89,8 @@ new_features:
   change: |
     Added support for :ref:`backoff_options <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.backoff_options>`
     to configure the backoff strategy for TCP proxy retries.
+- area: redis
+  change: |
+    Added support for multi-key commands on transactions.
 
 deprecated:
