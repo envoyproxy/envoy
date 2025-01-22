@@ -4993,7 +4993,15 @@ TEST_P(RouterShadowingTest, ShadowRequestCarriesMatchingRoute) {
         }));
   }
 
-  router_->decodeHeaders(headers, !streaming_shadow_);
+  const auto should_end_stream = !streaming_shadow_;
+  router_->decodeHeaders(headers, should_end_stream);
+
+  if (streaming_shadow_)
+  {
+    EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+    EXPECT_CALL(foo_request, cancel());
+  }
+
   router_->onDestroy();
 }
 
