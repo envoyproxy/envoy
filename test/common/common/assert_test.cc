@@ -15,7 +15,7 @@ public:
 
 class ReleaseAsserterImpl : public ReleaseAsserter {
 public:
-  void releaseAssertInAFunction() override { RELEASE_ASSERT(0, "") }
+  void releaseAssertInAFunction() override { RELEASE_ASSERT(0, ""); }
 };
 } // namespace
 
