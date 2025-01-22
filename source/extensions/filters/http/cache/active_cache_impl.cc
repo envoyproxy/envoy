@@ -582,8 +582,8 @@ void ActiveCacheEntry::performUpstreamRequest() {
       !lookup_subscribers_.empty(),
       "upstream request should only be possible if someone requested a lookup and it was a miss");
   ASSERT(!upstream_request_, "should only be one upstream request in flight");
-  LookupSubscriber& last_sub = lookup_subscribers_.back();
-  const ActiveLookupRequest& lookup = last_sub.context_->lookup();
+  LookupSubscriber& first_sub = lookup_subscribers_.front();
+  const ActiveLookupRequest& lookup = first_sub.context_->lookup();
   Http::RequestHeaderMapPtr request_headers;
   bool was_ranged_request = lookup.isRangeRequest();
   if (was_ranged_request) {
@@ -592,9 +592,9 @@ void ActiveCacheEntry::performUpstreamRequest() {
     request_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(lookup.requestHeaders());
   }
   upstream_request_ = lookup.upstreamRequestFactory().create();
-  last_sub.dispatcher().post([upstream_request = upstream_request_.get(),
-                              request_headers = std::move(request_headers), this,
-                              p = shared_from_this(), was_ranged_request]() mutable {
+  first_sub.dispatcher().post([upstream_request = upstream_request_.get(),
+                               request_headers = std::move(request_headers), this,
+                               p = shared_from_this(), was_ranged_request]() mutable {
     upstream_request->sendHeaders(std::move(request_headers));
     upstream_request->getHeaders([this, p = std::move(p), was_ranged_request](
                                      Http::ResponseHeaderMapPtr headers, EndStream end_stream) {
@@ -768,13 +768,13 @@ void ActiveCacheEntry::performValidation() {
   ENVOY_LOG(debug, "validating");
   state_ = State::Validating;
   ASSERT(!lookup_subscribers_.empty());
-  LookupSubscriber& last_sub = lookup_subscribers_.front();
-  const ActiveLookupRequest& lookup = last_sub.context_->lookup();
+  LookupSubscriber& first_sub = lookup_subscribers_.front();
+  const ActiveLookupRequest& lookup = first_sub.context_->lookup();
   Http::RequestHeaderMapPtr req = requestHeadersWithRangeRemoved(lookup.requestHeaders());
   CacheHeadersUtils::injectValidationHeaders(*req, *entry_.response_headers_);
   upstream_request_ = lookup.upstreamRequestFactory().create();
-  last_sub.dispatcher().post([upstream_request = upstream_request_.get(), req = std::move(req),
-                              this, p = shared_from_this()]() mutable {
+  first_sub.dispatcher().post([upstream_request = upstream_request_.get(), req = std::move(req),
+                               this, p = shared_from_this()]() mutable {
     upstream_request->sendHeaders(std::move(req));
     upstream_request->getHeaders(
         [this, p = std::move(p)](Http::ResponseHeaderMapPtr headers, EndStream end_stream) {
