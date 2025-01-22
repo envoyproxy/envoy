@@ -44,14 +44,11 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
     }
     // This means either we aren't draining or we still have to do some work
     // (e.g. we were draining inbound only but now we're being asked to drain all)
-    if (!server_.drainManager().draining()) {
-      server_.drainManager().startDrainSequence(
-          direction, [this, stop_listeners_type, skip_exit]() {
-            if (!skip_exit) {
-              server_.listenerManager().stopListeners(stop_listeners_type, {});
-            }
-          });
-    }
+    server_.drainManager().startDrainSequence(direction, [this, stop_listeners_type, skip_exit]() {
+      if (!skip_exit) {
+        server_.listenerManager().stopListeners(stop_listeners_type, {});
+      }
+    });
   } else {
     server_.listenerManager().stopListeners(stop_listeners_type, {});
   }

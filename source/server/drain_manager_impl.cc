@@ -40,8 +40,6 @@ bool DrainManagerImpl::drainClose(Network::DrainDirection direction) const {
     return false;
   }
 
-  ASSERT(draining_.load().first);
-
   if (server_.options().drainStrategy() == Server::DrainStrategy::Immediate) {
     return true;
   }

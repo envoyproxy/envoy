@@ -16,6 +16,7 @@ class DrainManager : public Network::DrainDecision {
 public:
   /**
    * Invoked to begin the drain procedure. (Making drain close operations more likely).
+   * @param direction is the direction of the drain.
    * @param drain_complete_cb will be invoked once the drain sequence is finished. The parameter is
    * optional and can be an unassigned function.
    */

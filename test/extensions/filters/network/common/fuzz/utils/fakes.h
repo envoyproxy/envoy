@@ -28,8 +28,8 @@ public:
 private:
   Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
   envoy::config::core::v3::TrafficDirection direction_ = envoy::config::core::v3::UNSPECIFIED;
-  bool is_quic_ = false;
-  bool bypass_overload_manager_ = false;
+  const bool is_quic_ = false;
+  const bool bypass_overload_manager_ = false;
 };
 
 class FakeFactoryContext : public MockFactoryContext {

@@ -1029,14 +1029,21 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
       // Close the socket once all workers stopped accepting its connections.
       // This allows clients to fast fail instead of waiting in the accept queue.
       const uint64_t listener_tag = listener.listenerTag();
-      stopListener(listener, options, [this, listener_tag]() {
-        stats_.listener_stopped_.inc();
-        for (auto& listener : active_listeners_) {
-          if (listener->listenerTag() == listener_tag) {
-            maybeCloseSocketsForListener(*listener);
+      // Only stop the listener if we don't have a record of its tag.
+      // This prevents us from double incrementing if listeners are stopped twice.
+      // This can happen if the admin endpoint is triggered for inbound_only and then
+      // all.
+      if (stopped_listener_tags_.find(listener_tag) == stopped_listener_tags_.end()) {
+        stopListener(listener, options, [this, listener_tag]() {
+          stats_.listener_stopped_.inc();
+          stopped_listener_tags_.insert(listener_tag);
+          for (auto& listener : active_listeners_) {
+            if (listener->listenerTag() == listener_tag) {
+              maybeCloseSocketsForListener(*listener);
+            }
           }
-        }
-      });
+        });
+      }
     }
   }
 }

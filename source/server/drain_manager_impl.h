@@ -41,7 +41,7 @@ private:
     Network::DrainDirection second;
   };
   std::atomic<DrainPair> draining_{DrainPair{false, Network::DrainDirection::None}};
-  // A map of timers keyed by the direction that triggered the drain
+  // A vector of timers keyed by the direction that triggered the drain
   std::vector<Event::TimerPtr> drain_tick_timers_;
   std::map<Network::DrainDirection, MonotonicTime> drain_deadlines_ = {
       {Network::DrainDirection::InboundOnly, MonotonicTime()},
