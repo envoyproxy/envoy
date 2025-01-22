@@ -75,8 +75,8 @@ new_features:
     :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
 - area: xds
   change: |
-    Reporting a locality_stats to LRS server when rq_issued > 0. Guarded by runtime flag
-    'envoy.reloadable_features.report_load_with_rq_issued'.
+    Reporting a locality_stats to LRS server when rq_issued > 0, disable by setting runtime guard
+    ``envoy.reloadable_features.report_load_with_rq_issued`` to ``false``.
 - area: http
   change: |
     Added :ref:`max_metadata_size <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_metadata_size>` to make
