@@ -145,6 +145,9 @@ public:
               CookieConfig_SameSite_DISABLED,
       ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite nonce_samesite =
           ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+              CookieConfig_SameSite_DISABLED,
+      ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite code_verifier_samesite =
+          ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
               CookieConfig_SameSite_DISABLED) {
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
@@ -218,6 +221,10 @@ public:
     // Set value to disabled by default.
     auto* oauth_nonce_config = cookie_configs->mutable_oauth_nonce_cookie_config();
     oauth_nonce_config->set_same_site(nonce_samesite);
+
+    // Set value to disabled by default.
+    auto* code_verifier_config = cookie_configs->mutable_code_verifier_cookie_config();
+    code_verifier_config->set_same_site(code_verifier_samesite);
 
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
@@ -2775,7 +2782,7 @@ TEST_F(OAuth2Test, AllCookiesStrictSameSite) {
                  0, false, false, false, false, false, SameSite::CookieConfig_SameSite_STRICT,
                  SameSite::CookieConfig_SameSite_STRICT, SameSite::CookieConfig_SameSite_STRICT,
                  SameSite::CookieConfig_SameSite_STRICT, SameSite::CookieConfig_SameSite_STRICT,
-                 SameSite::CookieConfig_SameSite_STRICT));
+                 SameSite::CookieConfig_SameSite_STRICT, SameSite::CookieConfig_SameSite_STRICT));
   oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
   TestScopedRuntime scoped_runtime;
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
@@ -2857,7 +2864,7 @@ TEST_F(OAuth2Test, AllCookiesLaxSameSite) {
                  0, false, false, false, false, false, SameSite::CookieConfig_SameSite_LAX,
                  SameSite::CookieConfig_SameSite_LAX, SameSite::CookieConfig_SameSite_LAX,
                  SameSite::CookieConfig_SameSite_LAX, SameSite::CookieConfig_SameSite_LAX,
-                 SameSite::CookieConfig_SameSite_LAX));
+                 SameSite::CookieConfig_SameSite_LAX, SameSite::CookieConfig_SameSite_LAX));
   oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
   TestScopedRuntime scoped_runtime;
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
@@ -2898,7 +2905,7 @@ TEST_F(OAuth2Test, MixedCookieSameSiteWithDisabled) {
                  0, false, false, false, false, false, SameSite::CookieConfig_SameSite_STRICT,
                  SameSite::CookieConfig_SameSite_LAX, SameSite::CookieConfig_SameSite_DISABLED,
                  SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_STRICT,
-                 SameSite::CookieConfig_SameSite_DISABLED));
+                 SameSite::CookieConfig_SameSite_DISABLED, SameSite::CookieConfig_SameSite_LAX));
   oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
   TestScopedRuntime scoped_runtime;
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
@@ -2939,7 +2946,7 @@ TEST_F(OAuth2Test, MixedCookieSameSiteWithoutDisabled) {
                  0, false, false, false, false, false, SameSite::CookieConfig_SameSite_STRICT,
                  SameSite::CookieConfig_SameSite_LAX, SameSite::CookieConfig_SameSite_NONE,
                  SameSite::CookieConfig_SameSite_STRICT, SameSite::CookieConfig_SameSite_LAX,
-                 SameSite::CookieConfig_SameSite_NONE));
+                 SameSite::CookieConfig_SameSite_NONE, SameSite::CookieConfig_SameSite_LAX));
   oauthHMAC = "4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ=;";
   TestScopedRuntime scoped_runtime;
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
@@ -2979,7 +2986,7 @@ TEST_F(OAuth2Test, CSRFSameSiteWithCookieDomain) {
                  0, false, false, true, false, false, SameSite::CookieConfig_SameSite_DISABLED,
                  SameSite::CookieConfig_SameSite_DISABLED, SameSite::CookieConfig_SameSite_DISABLED,
                  SameSite::CookieConfig_SameSite_DISABLED, SameSite::CookieConfig_SameSite_DISABLED,
-                 SameSite::CookieConfig_SameSite_STRICT));
+                 SameSite::CookieConfig_SameSite_STRICT, SameSite::CookieConfig_SameSite_LAX));
   // First construct the initial request to the oauth filter with URI parameters.
   Http::TestRequestHeaderMapImpl first_request_headers{
       {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
@@ -2994,10 +3001,14 @@ TEST_F(OAuth2Test, CSRFSameSiteWithCookieDomain) {
       {Http::Headers::get().SetCookie.get(),
        "OauthNonce=" + TEST_STATE_CSRF_TOKEN +
            ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly;SameSite=Strict"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";domain=example.com;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
-           TEST_CLIENT_ID +
+           TEST_CLIENT_ID + "&code_challenge=" + TEST_CODE_CHALLENGE +
+           "&code_challenge_method=S256" +
            "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
            "&response_type=code"
            "&scope=" +

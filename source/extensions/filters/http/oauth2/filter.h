@@ -193,7 +193,9 @@ public:
     return refresh_token_cookie_settings_;
   }
   const CookieSettings& nonceCookieSettings() const { return nonce_cookie_settings_; }
-  const CookieSettings& codeVerifierCookieSettings() const { return code_verifier_cookie_settings_; }
+  const CookieSettings& codeVerifierCookieSettings() const {
+    return code_verifier_cookie_settings_;
+  }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);

@@ -58,6 +58,9 @@ message CookieConfigs {
 
   // Configuration for the OAuth nonce cookie.
   CookieConfig oauth_nonce_cookie_config = 6;
+
+  // Configuration for the code verifier cookie.
+  CookieConfig code_verifier_cookie_config = 7;
 }
 
 // [#next-free-field: 6]
