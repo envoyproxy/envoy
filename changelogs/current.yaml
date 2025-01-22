@@ -15,13 +15,22 @@ bug_fixes:
   change:
     Fixes a bug when loading a DNS cache entry with an empty authority/host header. This fix can be reverted by setting
     runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` to ``false``.
+- area: router
+  change: |
+    Fixed query parameter matcher to properly implement
+    :ref:`present_match <envoy_v3_api_field_config.route.v3.QueryParameterMatcher.present_match>`. Previously, the
+    matcher would incorrectly handle ``present_match`` configurations by treating them as default present checks. This
+    behavior can be temporarily reverted by setting runtime feature
+    ``envoy_reloadable_features_enable_new_query_param_present_match_behavior`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: access_log
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.upstream_remote_address_use_connection`` and legacy code paths.
 - area: thread_local
   change: |
     Removed runtime guard  ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads`` and legacy code paths.
-
 - area: dns
   change: |
     Removed runtime flag ``envoy.reloadable_features.dns_details`` and legacy code paths.
@@ -56,9 +65,17 @@ new_features:
   change: |
     Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
+- area: http
+  change: |
+    Alpha support for asynchronous load balancing.  See <arch_overview_load_balancing_policies> for details. Support can
+    be temporarily reverted by setting runtime guard ``envoy.reloadable_features.async_host_selection`` to ``false``.
 - area: ext_proc
   change: |
     Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
     :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
+- area: http
+  change: |
+    Added :ref:`max_metadata_size <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_metadata_size>` to make
+    HTTP/2 metadata limits configurable.
 
 deprecated:

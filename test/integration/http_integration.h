@@ -379,6 +379,7 @@ protected:
   // Set this to true when sending malformed requests to avoid test client codec rejecting it.
   // This flag is only valid when UHV build flag is enabled.
   bool disable_client_header_validation_{false};
+
 #ifdef ENVOY_ENABLE_QUIC
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
