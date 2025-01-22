@@ -58,7 +58,7 @@ fn test_header_callbacks_filter_on_request_headers() {
     .once();
 
   assert_eq!(
-    f.on_request_headers(envoy_filter, false),
+    f.on_request_headers(&mut envoy_filter, false),
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   );
 }
@@ -83,7 +83,7 @@ fn test_header_callbacks_on_request_headers_local_resp() {
     .return_const(());
 
   assert_eq!(
-    f.on_request_headers(envoy_filter, false),
+    f.on_request_headers(&mut envoy_filter, false),
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   );
 }

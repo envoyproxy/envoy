@@ -217,9 +217,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")) {
-    connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
-  }
+  connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
   if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
   }
