@@ -720,6 +720,7 @@ protected:
   const uint32_t max_headers_count_;
   uint32_t per_stream_buffer_limit_;
   bool allow_metadata_;
+  uint64_t max_metadata_size_;
   const bool stream_error_on_invalid_http_messaging_;
 
   // Status for any errors encountered by the nghttp2 callbacks.

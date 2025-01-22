@@ -193,8 +193,9 @@ public:
    * @return a HostSelectionResponse either containing a host, or AsyncHostSelectionHandle handle.
    *
    * Please note that asynchronous host selection is not yet fully supported in
-   * Envoy. All endpoints will treat asynchronous resolution as host resolution
-   * failure. TODO(alyssawilk) land #38007
+   * Envoy. It works for HTTP load balancing (with the notable exclusion of the
+   * subset load balancer) but not for TCP proxy or other load balancers.
+   * Updates to functionality should be reflected in load_balancing_policies.rst
    */
   virtual HostSelectionResponse chooseHost(LoadBalancerContext* context) PURE;
 

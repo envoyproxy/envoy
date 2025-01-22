@@ -85,8 +85,7 @@ int RouteHandleWrapper::luaGetCluster(lua_State* state) {
 LuaClusterSpecifierConfig::LuaClusterSpecifierConfig(
     const LuaClusterSpecifierConfigProto& config,
     Server::Configuration::CommonFactoryContext& context)
-    : main_thread_dispatcher_(context.mainThreadDispatcher()), cm_(context.clusterManager()),
-      default_cluster_(config.default_cluster()) {
+    : cm_(context.clusterManager()), default_cluster_(config.default_cluster()) {
   const std::string code_str = THROW_OR_RETURN_VALUE(
       Config::DataSource::read(config.source_code(), true, context.api()), std::string);
   per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());

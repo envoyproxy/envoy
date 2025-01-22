@@ -30,6 +30,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_allow_alt_svc_for_ips);
+RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_avoid_dfp_cluster_removal_on_cds_update);
 RUNTIME_GUARD(envoy_reloadable_features_boolean_to_string_fix);
 RUNTIME_GUARD(envoy_reloadable_features_check_switch_protocol_websocket_handshake);
@@ -39,6 +40,7 @@ RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
+RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_enable_udp_proxy_outlier_detection);
 RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_timeout_error);
@@ -98,7 +100,6 @@ RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_udp_socket_apply_aggregated_read_limit);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
-RUNTIME_GUARD(envoy_reloadable_features_upstream_remote_address_use_connection);
 RUNTIME_GUARD(envoy_reloadable_features_use_config_in_happy_eyeballs);
 RUNTIME_GUARD(envoy_reloadable_features_use_filter_manager_state_for_downstream_end_stream);
 RUNTIME_GUARD(envoy_reloadable_features_use_route_host_mutation_for_auto_sni_san);
@@ -109,7 +110,6 @@ RUNTIME_GUARD(envoy_reloadable_features_wait_for_first_byte_before_balsa_msg_don
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_xds_prevent_resource_copy);
 RUNTIME_GUARD(envoy_reloadable_features_xdstp_path_avoid_colon_encoding);
-RUNTIME_GUARD(envoy_restart_features_allow_slot_destroy_on_worker_threads);
 RUNTIME_GUARD(envoy_restart_features_fix_dispatcher_approximate_now);
 RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
@@ -166,6 +166,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 // Controls whether a stream stays open when HTTP/2 or HTTP/3 upstream half closes
 // before downstream.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_close);
+
+// TODO(renjietang): Flip to true after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_network_type_socket_option);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
