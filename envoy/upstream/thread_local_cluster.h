@@ -179,6 +179,12 @@ public:
   virtual const std::string& dropCategory() const PURE;
 
   /**
+   * @return the thread local cluster drop_overload_no_healthy_endpoint configuration.
+   * This flag will be true if drop_overload is 100% and endpoints().size() is empty.
+   */
+  virtual bool dropOverloadNoHealthyEndpoint() const PURE;
+
+  /**
    * Set up the drop_overload value for the thread local cluster.
    */
   virtual void setDropOverload(UnitFloat drop_overload) PURE;
@@ -187,6 +193,11 @@ public:
    * Set up the drop_category value for the thread local cluster.
    */
   virtual void setDropCategory(absl::string_view drop_category) PURE;
+
+  /**
+   * Set up the drop_overload_no_healthy_endpoint value for the thread local cluster.
+   */
+  virtual void setDropOverloadNoHealthyEndpoint(bool drop_overload_no_healthy_endpoint) PURE;
 };
 
 using ThreadLocalClusterOptRef = absl::optional<std::reference_wrapper<ThreadLocalCluster>>;

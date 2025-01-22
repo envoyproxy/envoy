@@ -19,12 +19,18 @@ MockCluster::MockCluster() {
       }));
   ON_CALL(*this, dropOverload()).WillByDefault(Return(drop_overload_));
   ON_CALL(*this, dropCategory()).WillByDefault(ReturnRef(drop_category_));
+  ON_CALL(*this, dropOverloadNoHealthyEndpoint())
+      .WillByDefault(Return(drop_overload_no_healthy_endpoint_));
   ON_CALL(*this, setDropOverload(_)).WillByDefault(Invoke([this](UnitFloat drop_overload) -> void {
     drop_overload_ = drop_overload;
   }));
   ON_CALL(*this, setDropCategory(_))
       .WillByDefault(Invoke(
           [this](absl::string_view drop_category) -> void { drop_category_ = drop_category; }));
+  ON_CALL(*this, setDropOverloadNoHealthyEndpoint(_))
+      .WillByDefault(Invoke([this](bool drop_overload_no_healthy_endpoint) -> void {
+        drop_overload_no_healthy_endpoint_ = drop_overload_no_healthy_endpoint;
+      }));
 }
 
 MockCluster::~MockCluster() = default;

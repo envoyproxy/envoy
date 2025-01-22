@@ -27,14 +27,17 @@ public:
   MOCK_METHOD(const PrioritySet&, prioritySet, (), (const));
   MOCK_METHOD(UnitFloat, dropOverload, (), (const));
   MOCK_METHOD(const std::string&, dropCategory, (), (const));
+  MOCK_METHOD(bool, dropOverloadNoHealthyEndpoint, (), (const));
   MOCK_METHOD(void, setDropOverload, (UnitFloat));
   MOCK_METHOD(void, setDropCategory, (absl::string_view));
+  MOCK_METHOD(void, setDropOverloadNoHealthyEndpoint, (bool));
 
   std::shared_ptr<MockClusterInfo> info_{new ::testing::NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;
   Network::Address::InstanceConstSharedPtr source_address_;
   UnitFloat drop_overload_{0};
   std::string drop_category_{"drop_overload"};
+  bool drop_overload_no_healthy_endpoint_{false};
 };
 } // namespace Upstream
 } // namespace Envoy

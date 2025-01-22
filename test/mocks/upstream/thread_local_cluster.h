@@ -44,8 +44,10 @@ public:
               (LoadBalancerContext * context, Tcp::AsyncTcpClientOptionsConstSharedPtr options));
   MOCK_METHOD(UnitFloat, dropOverload, (), (const));
   MOCK_METHOD(const std::string&, dropCategory, (), (const));
+  MOCK_METHOD(bool, dropOverloadNoHealthyEndpoint, (), (const));
   MOCK_METHOD(void, setDropOverload, (UnitFloat));
   MOCK_METHOD(void, setDropCategory, (absl::string_view));
+  MOCK_METHOD(void, setDropOverloadNoHealthyEndpoint, (bool));
 
   NiceMock<MockClusterMockPrioritySet> cluster_;
   NiceMock<MockLoadBalancer> lb_;

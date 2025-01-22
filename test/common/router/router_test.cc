@@ -859,6 +859,53 @@ TEST_F(RouterTest, DropOverloadDropped) {
   EXPECT_EQ(callbacks_.details(), "drop_overload");
 }
 
+// DropOverloadNoHealthyEndpoint pass test
+TEST_F(RouterTest, DropOverloadNoHealthyEndpointPassed) {
+  EXPECT_CALL(cm_.thread_local_cluster_, dropOverloadNoHealthyEndpoint())
+      .WillRepeatedly(Return(false));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_drop_overload")
+                    .value());
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_dropped")
+                    .value());
+  router_->onDestroy();
+}
+
+// DropOverloadNoHealthyEndpoint drop test
+TEST_F(RouterTest, DropOverloadNoHealthyEndpointDropped) {
+  EXPECT_CALL(cm_.thread_local_cluster_, dropOverload()).WillRepeatedly(Return(UnitFloat(1.0)));
+  EXPECT_CALL(cm_.thread_local_cluster_, dropOverloadNoHealthyEndpoint())
+      .WillRepeatedly(Return(true));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "503"},
+      {"content-length", "33"},
+      {"content-type", "text/plain"},
+      {"x-envoy-drop-overload-no-healthy-endpoint", "true"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::DropOverloadNoHealthyEndpoint));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_drop_overload")
+                    .value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_EQ(0U,
+            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->load_report_stats_store_
+                    .counter("upstream_rq_dropped")
+                    .value());
+  EXPECT_EQ(callbacks_.details(), "drop_overload_no_healthy_endpoint");
+}
+
 TEST_F(RouterTest, ResponseCodeDetailsSetByUpstream) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;

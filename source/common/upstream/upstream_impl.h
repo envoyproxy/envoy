@@ -1234,8 +1234,12 @@ public:
   void initialize(std::function<absl::Status()> callback) override;
   UnitFloat dropOverload() const override { return drop_overload_; }
   const std::string& dropCategory() const override { return drop_category_; }
+  bool dropOverloadNoHealthyEndpoint() const override { return drop_overload_no_healthy_endpoint_; }
   void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
   void setDropCategory(absl::string_view drop_category) override { drop_category_ = drop_category; }
+  void setDropOverloadNoHealthyEndpoint(bool drop_overload_no_healthy_endpoint) override {
+    drop_overload_no_healthy_endpoint_ = drop_overload_no_healthy_endpoint;
+  }
 
 protected:
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
@@ -1307,6 +1311,7 @@ private:
   Common::CallbackHandlePtr priority_update_cb_;
   UnitFloat drop_overload_{0};
   std::string drop_category_;
+  bool drop_overload_no_healthy_endpoint_{false};
   static constexpr int kDropOverloadSize = 1;
 };
 

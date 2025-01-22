@@ -428,14 +428,16 @@ protected:
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,
                                 HostMapConstSharedPtr map, UnitFloat drop_overload,
-                                absl::string_view drop_category);
+                                absl::string_view drop_category,
+                                bool drop_overload_no_healthy_endpoint);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
             per_priority_state,
         const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
         LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-        UnitFloat drop_overload, absl::string_view drop_category);
+        UnitFloat drop_overload, absl::string_view drop_category,
+        bool drop_overload_no_healthy_endpoint);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
     const ClusterInfoConstSharedPtr cluster_info_;
@@ -443,6 +445,7 @@ protected:
     const HostMapConstSharedPtr cross_priority_host_map_;
     UnitFloat drop_overload_{0};
     const std::string drop_category_;
+    bool drop_overload_no_healthy_endpoint_;
   };
 
   using ClusterInitializationObjectConstSharedPtr =
@@ -616,9 +619,15 @@ private:
                           ConnectionPool::DrainBehavior behavior);
       UnitFloat dropOverload() const override { return drop_overload_; }
       const std::string& dropCategory() const override { return drop_category_; }
+      bool dropOverloadNoHealthyEndpoint() const override {
+        return drop_overload_no_healthy_endpoint_;
+      }
       void setDropOverload(UnitFloat drop_overload) override { drop_overload_ = drop_overload; }
       void setDropCategory(absl::string_view drop_category) override {
         drop_category_ = drop_category;
+      }
+      void setDropOverloadNoHealthyEndpoint(bool drop_overload_no_healthy_endpoint) override {
+        drop_overload_no_healthy_endpoint_ = drop_overload_no_healthy_endpoint;
       }
 
     private:
@@ -637,6 +646,7 @@ private:
       PrioritySetImpl priority_set_;
       UnitFloat drop_overload_{0};
       std::string drop_category_;
+      bool drop_overload_no_healthy_endpoint_{false};
 
       // Don't change the order of cluster_info_ and lb_factory_/lb_ as the the lb_factory_/lb_
       // may keep a reference to the cluster_info_.
@@ -902,7 +912,8 @@ private:
   ClusterInitializationObjectConstSharedPtr addOrUpdateClusterInitializationObjectIfSupported(
       const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
       LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-      UnitFloat drop_overload, absl::string_view drop_category);
+      UnitFloat drop_overload, absl::string_view drop_category,
+      bool drop_overload_no_healthy_endpoint);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 
