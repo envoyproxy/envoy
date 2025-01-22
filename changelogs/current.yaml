@@ -27,6 +27,9 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: http
   change: |
+    Removed runtime guard ``envoy.reloadable_features.consistent_header_validation`` and legacy code paths.
+- area: http
+  change: |
     Removed runtime guard ``envoy.reloadable_features.sanitize_http2_headers_without_nghttp2`` and legacy code paths.
 - area: access_log
   change: |
