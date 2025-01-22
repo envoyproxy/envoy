@@ -118,10 +118,11 @@ public:
       Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
       MockLocalClusterUpdate& local_cluster_update, MockLocalHostsRemoved& local_hosts_removed,
       Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-      Server::Instance& server, absl::Status& creation_status)
+      Server::Instance& server, Config::XdsManager& xds_manager, absl::Status& creation_status)
       : TestClusterManagerImpl(bootstrap, factory, factory_context, stats, tls, runtime, local_info,
                                log_manager, main_thread_dispatcher, admin, validation_context, api,
-                               http_context, grpc_context, router_context, server, creation_status),
+                               http_context, grpc_context, router_context, server, xds_manager,
+                               creation_status),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:
@@ -198,19 +199,17 @@ public:
 // solves the problem outlined in https://github.com/envoyproxy/envoy/issues/27702.
 class UpdateOverrideClusterManagerImpl : public TestClusterManagerImpl {
 public:
-  UpdateOverrideClusterManagerImpl(const Bootstrap& bootstrap, ClusterManagerFactory& factory,
-                                   Server::Configuration::CommonFactoryContext& factory_context,
-                                   Stats::Store& stats, ThreadLocal::Instance& tls,
-                                   Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-                                   AccessLog::AccessLogManager& log_manager,
-                                   Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                                   ProtobufMessage::ValidationContext& validation_context,
-                                   Api::Api& api, Http::Context& http_context,
-                                   Grpc::Context& grpc_context, Router::Context& router_context,
-                                   Server::Instance& server, absl::Status& creation_status)
+  UpdateOverrideClusterManagerImpl(
+      const Bootstrap& bootstrap, ClusterManagerFactory& factory,
+      Server::Configuration::CommonFactoryContext& factory_context, Stats::Store& stats,
+      ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
+      Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+      Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
+      Server::Instance& server, Config::XdsManager& xds_manager, absl::Status& creation_status)
       : TestClusterManagerImpl(bootstrap, factory, factory_context, stats, tls, runtime, local_info,
                                log_manager, main_thread_dispatcher, admin, validation_context, api,
-                               http_context, grpc_context, router_context, server,
+                               http_context, grpc_context, router_context, server, xds_manager,
                                creation_status) {}
 
 protected:
@@ -252,8 +251,8 @@ public:
     cluster_manager_ = TestClusterManagerImpl::createAndInit(
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_,
-        server_);
+        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
+        xds_manager_);
     cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
       THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
     });
@@ -321,7 +320,7 @@ public:
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
         validation_context_, *factory_.api_, local_cluster_update_, local_hosts_removed_,
-        http_context_, grpc_context_, router_context_, server_, creation_status);
+        http_context_, grpc_context_, router_context_, server_, xds_manager_, creation_status);
     THROW_IF_NOT_OK(creation_status);
     THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
   }
@@ -332,7 +331,7 @@ public:
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
         validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
-        creation_status);
+        xds_manager_, creation_status);
     THROW_IF_NOT_OK(creation_status);
     THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
   }
@@ -379,6 +378,7 @@ public:
   Event::SimulatedTimeSystem time_system_;
   NiceMock<TestClusterManagerFactory> factory_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
+  NiceMock<Config::MockXdsManager> xds_manager_;
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;

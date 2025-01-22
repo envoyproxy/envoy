@@ -296,6 +296,7 @@ public:
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     ads_mux_.reset();
+    xds_manager_.shutdown();
     active_clusters_.clear();
     warming_clusters_.clear();
     updateClusterCounts();
@@ -381,14 +382,17 @@ public:
 protected:
   // ClusterManagerImpl's constructor should not be invoked directly; create instances from the
   // clusterManagerFromProto() static method. The init() method must be called after construction.
-  ClusterManagerImpl(
-      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-      Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-      OptRef<Server::Admin> admin, ProtobufMessage::ValidationContext& validation_context,
-      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
-      Router::Context& router_context, Server::Instance& server, absl::Status& creation_status);
+  ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                     ClusterManagerFactory& factory,
+                     Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
+                     ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                     const LocalInfo::LocalInfo& local_info,
+                     AccessLog::AccessLogManager& log_manager,
+                     Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
+                     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+                     Http::Context& http_context, Grpc::Context& grpc_context,
+                     Router::Context& router_context, Server::Instance& server,
+                     Config::XdsManager& xds_manager, absl::Status& creation_status);
 
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -913,6 +917,7 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
   // Contains information about ongoing on-demand cluster discoveries.
   ClusterCreationsMap pending_cluster_creations_;
+  Config::XdsManager& xds_manager_;
   Random::RandomGenerator& random_;
   ClusterMap warming_clusters_;
   const bool deferred_cluster_creation_;
