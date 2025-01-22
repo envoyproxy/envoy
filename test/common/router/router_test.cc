@@ -4996,8 +4996,7 @@ TEST_P(RouterShadowingTest, ShadowRequestCarriesMatchingRoute) {
   const auto should_end_stream = !streaming_shadow_;
   router_->decodeHeaders(headers, should_end_stream);
 
-  if (streaming_shadow_)
-  {
+  if (streaming_shadow_) {
     EXPECT_CALL(foo_request, removeWatermarkCallbacks());
     EXPECT_CALL(foo_request, cancel());
   }
