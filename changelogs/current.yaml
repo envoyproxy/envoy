@@ -91,5 +91,9 @@ new_features:
 - area: redis
   change: |
     Added support for multi-key commands on transactions.
+- area: xds
+  change: |
+    Reporting a locality_stats to LRS server when rq_issued > 0, disable by setting runtime guard
+    ``envoy.reloadable_features.report_load_with_rq_issued`` to ``false``.
 
 deprecated:
