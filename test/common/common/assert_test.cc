@@ -7,7 +7,7 @@
 
 namespace Envoy {
 
-static void releaseAssertInAFunction() { RELEASE_ASSERT(0, ""); }
+static void __attribute__((noinline)) releaseAssertInAFunction() { RELEASE_ASSERT(0, ""); }
 
 TEST(ReleaseAssertDeathTest, VariousLogs) {
   EXPECT_DEATH({ RELEASE_ASSERT(0, ""); }, ".*assert failure: 0.*");
