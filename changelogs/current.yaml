@@ -8,6 +8,11 @@ minor_behavior_changes:
 - area: http2
   change: |
     Sets runtime guard ``envoy.reloadable_features.http2_use_oghttp2`` to true by default.
+- area: dfp
+  change: |
+    Setting :ref:`dns_query_timeout
+    <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>`
+    to 0 will disable the the Envoy DNS query timeout and use the underlying DNS implementation timeout.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -34,6 +39,9 @@ removed_config_or_runtime:
 - area: thread_local
   change: |
     Removed runtime guard  ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads`` and legacy code paths.
+- area: runtime
+  change: |
+    Removed runtime flag ``envoy.reloadable_features.reject_invalid_yaml`` and legacy code paths.
 - area: dns
   change: |
     Removed runtime flag ``envoy.reloadable_features.dns_details`` and legacy code paths.
