@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/time.h"
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 
 #include "source/common/common/thread.h"
 
@@ -39,31 +40,10 @@ public:
   // Public getter method for max_cache_size
   std::size_t getMaxCacheSize() const { return max_cache_size; }
 
-  bool Insert(const char* key, uint16_t value, int ttl_seconds = -1) {
-    Thread::LockGuard lock{mutex_};
-    const char* c_key = strdup(key);
-    if (ttl_seconds == -1) {
-      ttl_seconds = default_ttl_seconds;
-    }
-
-    // Add 5% jitter to TTL
-    std::uniform_real_distribution<double> distribution(-0.05, 0.05);
-    double jitter_factor = distribution(random_generator);
-    auto jittered_ttl = std::chrono::seconds(ttl_seconds) +
-                        std::chrono::seconds(static_cast<int>(ttl_seconds * jitter_factor));
-
-    auto expiration_time = time_source_.monotonicTime() + jittered_ttl;
-    CacheItem item = {value, expiration_time};
-    auto it = cache_items_map.find(c_key);
-    if (it == cache_items_map.end()) {
-      if (cache_items_map.size() >= max_cache_size) {
-        Evict();
-      }
-      cache_items_map[c_key] = item;
-    } else {
-      cache_items_map[c_key] = item;
-    }
-    return true;
+  template <typename T> bool Insert(const char* key, const T& value, int ttl_seconds = -1) {
+    auto expiration_time = CalculateExpirationTime(ttl_seconds);
+    CacheItem item(value, expiration_time);
+    return InsertInternal(key, std::move(item));
   }
 
   bool Erase(const char* key) {
@@ -77,12 +57,12 @@ public:
     return false;
   }
 
-  absl::optional<uint16_t> Get(const char* key) {
+  template <typename T> absl::optional<T> Get(const char* key) {
     Thread::LockGuard lock{mutex_};
     auto it = cache_items_map.find(key);
     if (it != cache_items_map.end()) {
       if (time_source_.monotonicTime() < it->second.expiration_time) {
-        return it->second.value;
+        return *std::static_pointer_cast<T>(it->second.value);
       } else {
         // Item has expired
         free(const_cast<char*>(it->first));
@@ -98,10 +78,48 @@ public:
   }
 
 private:
+  // struct to define the cache item stored in the cache.
+  // It takes a template so that it can be only status code (to minimize memory footprint),
+  // or it can be the full response (to take advantage of full functionality of authz server).
   struct CacheItem {
-    uint16_t value;
+    std::shared_ptr<void> value;
     std::chrono::steady_clock::time_point expiration_time;
+
+    CacheItem() = default; // default-constructed
+
+    template <typename T>
+    CacheItem(const T& val, std::chrono::steady_clock::time_point exp_time)
+        : value(std::make_shared<T>(val)), expiration_time(exp_time) {}
   };
+
+  // Calculate expiration time with 5% jitter
+  std::chrono::steady_clock::time_point CalculateExpirationTime(int ttl_seconds) {
+    if (ttl_seconds == -1) {
+      ttl_seconds = default_ttl_seconds;
+    }
+
+    std::uniform_real_distribution<double> distribution(-0.05, 0.05);
+    double jitter_factor = distribution(random_generator);
+    auto jittered_ttl = std::chrono::seconds(ttl_seconds) +
+                        std::chrono::seconds(static_cast<int>(ttl_seconds * jitter_factor));
+
+    return time_source_.monotonicTime() + jittered_ttl;
+  }
+
+  bool InsertInternal(const char* key, CacheItem&& item) {
+    Thread::LockGuard lock{mutex_};
+    const char* c_key = strdup(key);
+    auto it = cache_items_map.find(c_key);
+    if (it == cache_items_map.end()) {
+      if (cache_items_map.size() >= max_cache_size) {
+        Evict();
+      }
+      cache_items_map[c_key] = std::move(item);
+    } else {
+      cache_items_map[c_key] = std::move(item);
+    }
+    return true;
+  }
 
   // Eviction algorithm emulates LRU by:
   // 1. Advance iterator on the cache randomly

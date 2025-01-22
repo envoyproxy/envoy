@@ -313,29 +313,45 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       }
     }
 
-    // Retrieve the HTTP status code from the cache
-    auto cached_status_code = config_->responseCache().Get(auth_header_str.c_str());
-    if (cached_status_code.has_value()) {
-      ENVOY_STREAM_LOG(info, "Cache HIT for token {}: HTTP status {}", *decoder_callbacks_,
-                       auth_header_str, *cached_status_code);
-
-      if (*cached_status_code >= 200 && *cached_status_code < 300) {
-        // Any 2xx response is a success: let the request proceed
-        return Http::FilterHeadersStatus::Continue;
-      } else {
-        // Non-2xx response: reject the request
-        decoder_callbacks_->streamInfo().setResponseFlag(
-            StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
-        decoder_callbacks_->sendLocalReply(
-            static_cast<Http::Code>(*cached_status_code), "Unauthorized", nullptr, absl::nullopt,
-            Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
-
+    if (config_->responseCacheRememberBodyHeaders()) {
+      auto cached_response = config_->responseCache().Get<Filters::Common::ExtAuthz::Response>(
+          auth_header_str.c_str());
+      if (cached_response.has_value()) {
+        ENVOY_STREAM_LOG(info, "Cache HIT for token (full response) {}: {}", *decoder_callbacks_,
+                         auth_header_str, "response");
+        onCompleteSub(std::make_unique<Filters::Common::ExtAuthz::Response>(
+            std::move(cached_response.value())));
         return Http::FilterHeadersStatus::StopIteration;
+      } else {
+        ENVOY_STREAM_LOG(info, "Cache miss for token (full response) {}: {}", *decoder_callbacks_,
+                         auth_header_str, "response");
       }
     } else {
-      ENVOY_STREAM_LOG(info, "Cache miss for auth token {}. Will call external authz.",
-                       *decoder_callbacks_, auth_header_str);
+      // Retrieve the HTTP status code from the cache
+      auto cached_status_code = config_->responseCache().Get<uint16_t>(auth_header_str.c_str());
+      if (cached_status_code.has_value()) {
+        ENVOY_STREAM_LOG(info, "Cache HIT for token {}: HTTP status {}", *decoder_callbacks_,
+                         auth_header_str, *cached_status_code);
+
+        if (*cached_status_code >= 200 && *cached_status_code < 300) {
+          // Any 2xx response is a success: let the request proceed
+          return Http::FilterHeadersStatus::Continue;
+        } else {
+          // Non-2xx response: reject the request
+          decoder_callbacks_->streamInfo().setResponseFlag(
+              StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
+          decoder_callbacks_->sendLocalReply(
+              static_cast<Http::Code>(*cached_status_code), "Unauthorized", nullptr, absl::nullopt,
+              Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
+
+          return Http::FilterHeadersStatus::StopIteration;
+        }
+      } else {
+        ENVOY_STREAM_LOG(info, "Cache miss for auth token {}. Will call external authz.",
+                         *decoder_callbacks_, auth_header_str);
+      }
     }
+
   } else {
     ENVOY_STREAM_LOG(info, "Cannot check cache because auth_header is empty. Expected header: {}",
                      *decoder_callbacks_, config_->responseCacheHeaderName().get());
@@ -554,11 +570,13 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   if (!auth_header.empty()) {
     const std::string auth_header_str(auth_header[0]->value().getStringView());
     ENVOY_LOG(info, "Caching response: {} with HTTP status: {}", auth_header_str, http_status_code);
-    config_->responseCache().Insert(auth_header_str.c_str(),
-                                    http_status_code); // Store the HTTP status code
     // If response_cache_remember_body_headers_ is set, remember the whole response
     if (config_->responseCacheRememberBodyHeaders()) {
-      config_->responseCache().RememberBody(auth_header_str.c_str(), response->body);
+      config_->responseCache().Insert<Filters::Common::ExtAuthz::Response>(auth_header_str.c_str(),
+                                                                           *response);
+    } else {
+      config_->responseCache().Insert<uint16_t>(auth_header_str.c_str(),
+                                                http_status_code); // Store the HTTP status code
     }
   }
 

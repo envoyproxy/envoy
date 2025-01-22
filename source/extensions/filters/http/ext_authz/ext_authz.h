@@ -140,6 +140,8 @@ public:
     return response_cache_header_name_;
   }
 
+  bool responseCacheRememberBodyHeaders() const { return response_cache_remember_body_headers_; }
+
   Filters::Common::MutationRules::CheckResult
   checkDecoderHeaderMutation(const Filters::Common::MutationRules::CheckOperation& operation,
                              const Http::LowerCaseString& key, absl::string_view value) const {
