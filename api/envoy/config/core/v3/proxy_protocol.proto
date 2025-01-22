@@ -70,19 +70,19 @@ message ProxyProtocolConfig {
   // .. code-block:: yaml
   //
   //  clusters:
-  //    - name: cluster_0
-  //      load_assignment:
-  //        endpoints:
-  //          - lbEndpoints:
-  //              - metadata:
-  //                  typed_filter_metadata:
-  //                    envoy.transport_sockets.proxy_protocol:
-  //                      "@type": type.googleapis.com/envoy.config.core.v3.ProxyProtocolConfig
-  //                      added_tlvs:
-  //                        - type: 0xD7
-  //                          value: b3Zy
-  //                        - type: 0xD8
-  //                          value: bmV3
+  //  - name: cluster_0
+  //    load_assignment:
+  //      endpoints:
+  //      - lbEndpoints:
+  //        - metadata:
+  //            typed_filter_metadata:
+  //              envoy.transport_sockets.proxy_protocol:
+  //                "@type": type.googleapis.com/envoy.config.core.v3.ProxyProtocolConfig
+  //                added_tlvs:
+  //                - type: 0xD7
+  //                  value: b3Zy
+  //                - type: 0xD8
+  //                  value: bmV3
   //
   // **Precedence behavior**:
   //
