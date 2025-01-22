@@ -688,7 +688,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn get_request_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a> {
-    Box::new(buffer::RequestBodyReader::<'a>::new(self.raw_ptr))
+    Box::new(buffer::HttpBodyReader::<'a>::new(
+      self.raw_ptr,
+      abi::envoy_dynamic_module_callback_http_read_request_body,
+    ))
   }
 
   fn drain_request_body(&mut self, size: usize) {
@@ -698,7 +701,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn get_request_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a> {
-    Box::new(buffer::RequestBodyWriter::<'a>::new(self.raw_ptr))
+    Box::new(buffer::HttpBodyWriter::<'a>::new(
+      self.raw_ptr,
+      abi::envoy_dynamic_module_callback_http_write_request_body,
+    ))
   }
 
   fn get_response_body_size(&self) -> Option<usize> {
@@ -714,7 +720,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn get_response_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a> {
-    Box::new(buffer::ResponseBodyReader::<'a>::new(self.raw_ptr))
+    Box::new(buffer::HttpBodyReader::<'a>::new(
+      self.raw_ptr,
+      abi::envoy_dynamic_module_callback_http_read_response_body,
+    ))
   }
 
   fn drain_response_body(&mut self, _size: usize) {
@@ -724,7 +733,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
   }
 
   fn get_response_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a> {
-    Box::new(buffer::ResponseBodyWriter::<'a>::new(self.raw_ptr))
+    Box::new(buffer::HttpBodyWriter::<'a>::new(
+      self.raw_ptr,
+      abi::envoy_dynamic_module_callback_http_write_response_body,
+    ))
   }
 }
 
