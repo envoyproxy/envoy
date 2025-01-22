@@ -32,7 +32,9 @@
 using Envoy::Server::ServerLifecycleNotifier;
 using StageCallbackWithCompletion =
     Envoy::Server::ServerLifecycleNotifier::StageCallbackWithCompletion;
+using testing::AtMost;
 using testing::Eq;
+using testing::HasSubstr;
 using testing::Return;
 
 namespace Envoy {
@@ -326,6 +328,9 @@ TEST_P(WasmCommonTest, DivByZero) {
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
         EXPECT_CALL(*root_context, log_(spdlog::level::err, Eq("before div by zero")));
+        // Division by zero may yield a value with more recent versions of Emscripten
+        EXPECT_CALL(*root_context, log_(spdlog::level::err, HasSubstr("divide by zero:")))
+            .Times(AtMost(1));
         return root_context;
       });
   wasm->start(plugin);

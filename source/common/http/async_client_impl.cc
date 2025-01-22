@@ -265,6 +265,12 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
       buffered_body_->add(data);
     }
   }
+  if (router_.awaitingHost()) {
+    ENVOY_LOG_EVERY_POW_2(warn, "the buffer limit for the async client has been exceeded "
+                                "due to async host selection");
+    reset();
+    return;
+  }
 
   router_.decodeData(data, end_stream);
   closeLocal(end_stream);

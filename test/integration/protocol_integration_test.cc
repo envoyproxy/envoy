@@ -2734,6 +2734,9 @@ name: passthrough-filter
 // Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-filter sets buffer
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(DownstreamProtocolIntegrationTest, TestDecodeHeadersReturnsStopAllWatermark) {
+  // The StopAllIteration with async host resolution messes with the expectations of this test.
+  async_lb_ = false;
+
   config_helper_.prependFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
 )EOF");
@@ -5583,6 +5586,18 @@ TEST_P(DownstreamProtocolIntegrationTest, UnknownPseudoHeader) {
                               ? "violation"
                               : "invalid"));
   }
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ConfigureAsyncLbWhenUnsupported) {
+  // Configure the async round robin load balancer but disable async host
+  // selection. This should result in host selection failing.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.async_host_selection", "false");
+  config_helper_.setAsyncLb();
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 } // namespace Envoy

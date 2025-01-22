@@ -730,23 +730,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.upstream_remote_address_use_connection", "false"}});
-
-    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS");
-
-    // Has valid upstream remote address but it would not be used because of the runtime feature.
-    stream_info.upstreamInfo()->setUpstreamRemoteAddress(test_upstream_remote_address);
-    EXPECT_EQ("10.0.0.1:443", upstream_format.formatWithContext({}, stream_info));
-    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
-
-    // Reset to default one.
-    stream_info.upstreamInfo()->setUpstreamRemoteAddress(default_upstream_remote_address);
-  }
-
-  {
     StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT");
 
     // Has valid upstream remote address and it will be used as priority.

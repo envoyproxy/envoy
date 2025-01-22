@@ -170,7 +170,6 @@ paths:
     - source/extensions/filters/http/aws_lambda
     - source/extensions/filters/http/basic_auth
     - source/extensions/filters/http/cache
-    - source/extensions/filters/http/cdn_loop
     - source/extensions/filters/http/common
     - source/extensions/filters/http/composite
     - source/extensions/filters/http/ext_authz
