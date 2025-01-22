@@ -279,10 +279,8 @@ enum class LoggerMode { Envoy, FineGrainLog };
  * called individually as well, e.g. to set the log level without changing the
  * lock or format.
  *
- * Contexts can be nested. When a nested context is destroyed, the previous
- * context is restored. When all contexts are destroyed, the lock is cleared,
- * and logging will remain unlocked, the same state it is in prior to
- * instantiating a Context.
+ * There is at most one Context per running process, which gets initialized via
+ * the static init() method.
  *
  * Settings for Fine-Grain Logger, a file level logger without explicit implementation
  * of Envoy::Logger:Loggable, are integrated here, as they should be updated when
@@ -290,9 +288,27 @@ enum class LoggerMode { Envoy, FineGrainLog };
  */
 class Context {
 public:
-  Context(spdlog::level::level_enum log_level, const std::string& log_format,
-          Thread::BasicLockable& lock, bool should_escape, bool enable_fine_grain_logging = false);
   ~Context();
+
+  /**
+   * Initialize the global Context instance. This method should be called once to initialize
+   * logging. Returns true if the Context was successfully initialized, false if the Context was
+   * already initialized via a prior call to this method.
+   */
+  static bool init(spdlog::level::level_enum log_level, const std::string& log_format,
+                   Thread::BasicLockable& lock, bool should_escape,
+                   bool enable_fine_grain_logging = false);
+
+  /**
+   * Reset the global Context instance. After calling this method, the Context can be
+   * re-initialized via init().
+   */
+  static void reset();
+
+  /**
+   * Returns a pointer to the current global Context.
+   */
+  static Context* instance();
 
   /**
    * Same as before, with boolean returned to use in log macros.
@@ -309,15 +325,19 @@ public:
   static spdlog::level::level_enum getFineGrainDefaultLevel();
 
 private:
+  static std::atomic<Context*> instance_;
+
+  // The constructor is private to ensure that the Context is only created via init().
+  Context(spdlog::level::level_enum log_level, const std::string& log_format,
+          Thread::BasicLockable& lock, bool should_escape, bool enable_fine_grain_logging = false);
+
   void activate();
 
   const spdlog::level::level_enum log_level_;
   const std::string log_format_;
   Thread::BasicLockable& lock_;
-  bool should_escape_;
+  const bool should_escape_;
   bool enable_fine_grain_logging_;
-  Context* const save_context_;
-
   std::string fine_grain_log_format_;
   spdlog::level::level_enum fine_grain_default_level_ = spdlog::level::info;
 };

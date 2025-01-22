@@ -61,8 +61,9 @@ private:
 
 TEST(Logger, StreamFineGrainLoggerRegistration) {
   Envoy::Thread::MutexBasicLockable lock;
-  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
-                                  lock, false};
+  // Reset in case context was set previously.
+  Logger::Context::reset();
+  Logger::Context::init(spdlog::level::warn, Logger::Context::getFineGrainLogFormat(), lock, false);
   Logger::Context::enableFineGrainLogger();
   TestFilterLog filter;
   getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
@@ -74,12 +75,14 @@ TEST(Logger, StreamFineGrainLoggerRegistration) {
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
+  Logger::Context::reset();
 }
 
 TEST(Logger, EventFineGrainLoggerRegistration) {
   Envoy::Thread::MutexBasicLockable lock;
-  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
-                                  lock, false};
+  // Reset in case context was set previously.
+  Logger::Context::reset();
+  Logger::Context::init(spdlog::level::warn, Logger::Context::getFineGrainLogFormat(), lock, false);
   Logger::Context::enableFineGrainLogger();
   TestFilterLog filter;
   getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
@@ -91,12 +94,14 @@ TEST(Logger, EventFineGrainLoggerRegistration) {
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
+  Logger::Context::reset();
 }
 
 TEST(Logger, ConnFineGrainLoggerRegistration) {
   Envoy::Thread::MutexBasicLockable lock;
-  Logger::Context logging_context{spdlog::level::warn, Logger::Context::getFineGrainLogFormat(),
-                                  lock, false};
+  // Reset in case context was set previously.
+  Logger::Context::reset();
+  Logger::Context::init(spdlog::level::warn, Logger::Context::getFineGrainLogFormat(), lock, false);
   Logger::Context::enableFineGrainLogger();
   TestFilterLog filter;
   getFineGrainLogContext().removeFineGrainLogEntryForTest(__FILE__);
@@ -108,6 +113,7 @@ TEST(Logger, ConnFineGrainLoggerRegistration) {
   SpdLoggerSharedPtr p = getFineGrainLogContext().getFineGrainLogEntry(__FILE__);
   ASSERT_NE(p, nullptr);
   EXPECT_EQ(p->level(), spdlog::level::warn);
+  Logger::Context::reset();
 }
 
 TEST(Logger, All) {

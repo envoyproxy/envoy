@@ -146,7 +146,7 @@ void TestServer::start(TestServerType type, int port) {
   port_ = port;
   ASSERT(!upstream_);
   // pre-setup: see https://github.com/envoyproxy/envoy/blob/main/test/test_runner.cc
-  Logger::Context logging_state(spdlog::level::level_enum::err,
+  Logger::Context::init(spdlog::level::level_enum::err,
                                 "[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v", lock_, false, false);
   // end pre-setup
   Network::DownstreamTransportSocketFactoryPtr factory;
