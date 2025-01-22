@@ -515,6 +515,12 @@ void ActiveCacheEntry::getLookupResult(ActiveCacheImpl& cache, ActiveLookupReque
   case State::Inserting: {
     CacheEntryStatus status = CacheEntryStatus::Hit;
     if (requiresValidationFor(sub.context_->lookup())) {
+      if (sub.context_->lookup().requestHeaders().getMethodValue() ==
+          Http::Headers::get().MethodValues.Head) {
+        // A HEAD request that requires validation can't write to the
+        // cache or use the cache entry, so just turn it into a pass-through.
+        return postUpstreamPassThrough(std::move(sub), CacheEntryStatus::Uncacheable);
+      }
       if (state_ == State::Inserting) {
         // Skip validation if the cache write is still in progress.
         status = CacheEntryStatus::ValidatedFree;
@@ -687,11 +693,16 @@ void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, End
   ASSERT(headers);
   if (state_ == State::Validating) {
     if (Http::Utility::getResponseStatus(*headers) == enumToInt(Http::Code::NotModified)) {
-      upstream_request_.reset();
+      upstream_request_ = nullptr;
       return processSuccessfulValidation(std::move(headers));
     } else {
       // Validate failed, so going down the 'insert' path instead.
       state_ = State::Pending;
+      auto active_cache = cache_.lock();
+      if (active_cache) {
+        active_cache->cache().evict(*dispatcher_, key_);
+      }
+      body_length_available_ = 0;
     }
   } else {
     ASSERT(state_ == State::Pending, "should only get upstreamHeaders for Validating or Pending");
@@ -738,7 +749,8 @@ void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, End
   if (end_stream == EndStream::End) {
     upstream_request_ = nullptr;
   }
-  // Posted to ensure no deadlock on the mutex if callback is called directly.
+  // We're already on this subscriber's thread; this is posted to ensure no
+  // deadlock on the mutex if the insert operation calls back directly.
   lookup_subscribers_.front().dispatcher().post(
       [p = shared_from_this(), &dispatcher = lookup_subscribers_.front().dispatcher(), key = key_,
        active_cache, headers = std::move(headers),
@@ -765,9 +777,9 @@ ResponseMetadata ActiveCacheImpl::makeMetadata() {
 
 void ActiveCacheEntry::performValidation() {
   mu_.AssertHeld();
+  ASSERT(!lookup_subscribers_.empty());
   ENVOY_LOG(debug, "validating");
   state_ = State::Validating;
-  ASSERT(!lookup_subscribers_.empty());
   LookupSubscriber& first_sub = lookup_subscribers_.front();
   const ActiveLookupRequest& lookup = first_sub.context_->lookup();
   Http::RequestHeaderMapPtr req = requestHeadersWithRangeRemoved(lookup.requestHeaders());

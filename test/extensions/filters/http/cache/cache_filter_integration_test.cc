@@ -12,6 +12,7 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
+using Http::HeaderValueOf;
 using testing::AllOf;
 using testing::Eq;
 using testing::HasSubstr;
@@ -337,8 +338,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
         sendHeaderOnlyRequestAwaitResponse(request_headers, [&]() {
           waitForNextUpstreamRequest();
           // Check for injected precondition headers
-          Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "abc123"}};
-          EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
+          EXPECT_THAT(upstream_request_->headers(), HeaderValueOf("if-none-match", "abc123"));
 
           upstream_request_->encodeHeaders(not_modified_response_headers, /*end_stream=*/true);
         });
@@ -416,8 +416,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
         sendHeaderOnlyRequestAwaitResponse(request_headers, [&]() {
           waitForNextUpstreamRequest();
           // Check for injected precondition headers
-          Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "a1"}};
-          EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
+          EXPECT_THAT(upstream_request_->headers(), HeaderValueOf("if-none-match", "a1"));
 
           // Reply with the updated response -> cached response is invalid
           upstream_request_->encodeHeaders(response_headers, /*end_stream=*/false);
@@ -627,73 +626,7 @@ TEST_P(CacheIntegrationTest, ServeGetFromUpstreamAfterHeadRequest) {
   }
 }
 
-TEST_P(CacheIntegrationTest, ServeGetFollowedByHead304WithValidation) {
-  initializeFilter(default_config);
-
-  const std::string response_body(42, 'a');
-  Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(
-      response_body, /*cache_control=*/"max-age=10", /*extra_headers=*/{{"etag", "abc123"}});
-
-  // Send GET request, and get response from upstream.
-  {
-    // Include test name and params in URL to make each test's requests unique.
-    const Http::TestRequestHeaderMapImpl request_headers =
-        httpRequestHeader("GET", /*authority=*/"ServeGetFollowedByHead304WithValidation");
-
-    IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers,
-        simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_));
-    EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
-    EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
-    EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
-  }
-  // Advance time for the cached response to be stale (expired)
-  // Also to make sure response date header gets updated with the 304 date
-  simTime().advanceTimeWait(Seconds(11));
-
-  // Send HEAD request, the cached response should be validate then served
-  {
-    // Include test name and params in URL to make each test's requests unique.
-    const Http::TestRequestHeaderMapImpl request_headers =
-        httpRequestHeader("HEAD", "ServeGetFollowedByHead304WithValidation");
-
-    // Create a 304 (not modified) response -> cached response is valid
-    const std::string not_modified_date = formatter_.now(simTime());
-    const Http::TestResponseHeaderMapImpl not_modified_response_headers = {
-        {":status", "304"}, {"date", not_modified_date}};
-
-    IntegrationStreamDecoderPtr response_decoder =
-        sendHeaderOnlyRequestAwaitResponse(request_headers, [&]() {
-          waitForNextUpstreamRequest();
-
-          // Check for injected precondition headers
-          const Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "abc123"}};
-          EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
-
-          upstream_request_->encodeHeaders(not_modified_response_headers,
-                                           /*end_stream=*/true);
-        });
-
-    // The original response headers should be updated with 304 response headers
-    response_headers.setDate(not_modified_date);
-
-    EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
-    EXPECT_EQ(response_decoder->body().size(), 0);
-
-    // A response that has been validated should not contain an Age header as it is equivalent to
-    // a freshly served response from the origin, unless the 304 response has an Age header, which
-    // means it was served by an upstream cache.
-    EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
-
-    // Advance time to force a log flush.
-    simTime().advanceTimeWait(Seconds(1));
-    EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
-                HasSubstr("RFCF cache.response_from_cache_filter"));
-  }
-}
-
-TEST_P(CacheIntegrationTest, ServeGetFollowedByHead200WithValidation) {
+TEST_P(CacheIntegrationTest, ServeGetFollowedByHead200ThatNeedsValidationPassesThroughHeadRequest) {
   initializeFilter(default_config);
 
   // Send GET request, and get response from upstream.
@@ -732,10 +665,6 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead200WithValidation) {
     IntegrationStreamDecoderPtr response_decoder =
         sendHeaderOnlyRequestAwaitResponse(request_headers, [&]() {
           waitForNextUpstreamRequest();
-
-          // Check for injected precondition headers
-          Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "a1"}};
-          EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
 
           // Reply with the updated response -> cached response is invalid
           upstream_request_->encodeHeaders(response_headers,
