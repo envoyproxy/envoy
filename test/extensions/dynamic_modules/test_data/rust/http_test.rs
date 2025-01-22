@@ -112,9 +112,8 @@ fn test_body_callbacks_filter_on_request_body() {
       writer
     })
     .once();
-  f.on_request_body(envoy_filter, true);
+  f.on_request_body(&mut envoy_filter, true);
 
-  let mut envoy_filter = MockEnvoyHttpFilter::default();
   envoy_filter
     .expect_get_response_body_reader()
     .returning(move || {
@@ -135,5 +134,5 @@ fn test_body_callbacks_filter_on_request_body() {
       writer
     })
     .once();
-  f.on_response_body(envoy_filter, true);
+  f.on_response_body(&mut envoy_filter, true);
 }

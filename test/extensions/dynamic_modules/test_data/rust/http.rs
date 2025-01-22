@@ -380,8 +380,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
 /// to test the body related callbacks.
 struct BodyCallbacksFilterConfig {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BodyCallbacksFilterConfig {
-  fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter<EHF>> {
+impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
+  for BodyCallbacksFilterConfig
+{
+  fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BodyCallbacksFilter::default())
   }
 }
@@ -419,7 +421,7 @@ impl Default for BodyCallbacksFilter {
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
   fn on_request_body(
     &mut self,
-    mut envoy_filter: EHF,
+    envoy_filter: &mut EHF,
     end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
     // Test reading request body.
@@ -440,7 +442,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
 
   fn on_response_body(
     &mut self,
-    mut envoy_filter: EHF,
+    envoy_filter: &mut EHF,
     end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
     // Test reading response body.
