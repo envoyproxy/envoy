@@ -1,15 +1,17 @@
-edition = "2023";
+syntax = "proto3";
 
 package envoy_api_envoy_extensions_filters_http_api_filter_v3;
 
-// import "envoy/config/core/v3/base.proto";
-import "udpa/annotations/status.proto";
+import "envoy/config/core/v3/base.proto";
+
 import "xds/annotations/v3/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_api_scrubber.v3";
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy_api_envoy_extensions_filters_http_api_filter_v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/proto_api_scrubber/v3;proto_api_scrubberv3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy_api_envoy_extensions_filters_http_api_filter_v3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
@@ -197,18 +199,30 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // the response since the request entitlement of type "USER_TYPE" is PROD while
 // the restrictions on the fields `debug_info` and `book.debug_info` is DEV.
 
+// Specifies the filtering mode of this filter.
+// Currently only `OVERRIDE` mode is supported.
+enum FilteringMode {
+  // If unspecified, falls back to `OVERRIDE`.
+  FILTERING_MODE_UNSPECIFIED = 0;
+
+  // Override the original request/response body with the filtered
+  // request/response body.
+  OVERRIDE = 1;
+}
+
+// [#next-free-field: 6]
 message ProtoApiScrubberConfig {
   // The proto descriptor set for the proto services.
   oneof descriptor_set {
     // It could be passed by a local file through ``Datasource.filename`` or
     // embedded in the ``Datasource.inline_bytes``.
-    // config.core.v3.DataSource data_source = 1;
+    envoy.config.core.v3.DataSource data_source = 1;
 
     // Unimplemented, the key of proto descriptor TypedMetadata.
     // Among filters depending on the proto descriptor, we can have a
     // TypedMetadata for proto descriptors, so that these filters can share one
     // copy of proto descriptor in memory.
-    string proto_descriptor_typed_metadata = 1;
+    string proto_descriptor_typed_metadata = 2;
   }
 
   // Data sources for the request entitlements.
@@ -306,15 +320,4 @@ message CompositeRestriction {
 
   // The list of restrictions.
   repeated Restriction restrictions = 2;
-}
-
-// Specifies the filtering mode of this filter.
-// Currently only `OVERRIDE` mode is supported.
-enum FilteringMode {
-  // If unspecified, falls back to `OVERRIDE`.
-  FILTERING_MODE_UNSPECIFIED = 0;
-
-  // Override the original request/response body with the filtered
-  // request/response body.
-  OVERRIDE = 1;
 }
