@@ -7,17 +7,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-HttpSourcePtr UpstreamRequestImplFactory::create(Http::RequestHeaderMap& request_headers) {
+UpstreamRequestPtr UpstreamRequestImplFactory::create() {
   // Can't use make_unique because the constructor is private.
-  auto ret =
-      std::unique_ptr<UpstreamRequestImpl>(new UpstreamRequestImpl(async_client_, stream_options_));
-  ret->postHeaders(dispatcher_, request_headers);
+  auto ret = std::unique_ptr<UpstreamRequestImpl>(
+      new UpstreamRequestImpl(dispatcher_, async_client_, stream_options_));
   return ret;
 }
 
-UpstreamRequestImpl::UpstreamRequestImpl(Http::AsyncClient& async_client,
+UpstreamRequestImpl::UpstreamRequestImpl(Event::Dispatcher& dispatcher,
+                                         Http::AsyncClient& async_client,
                                          const Http::AsyncClient::StreamOptions& options)
-    : stream_(async_client.start(*this, options)),
+    : dispatcher_(dispatcher), stream_(async_client.start(*this, options)),
       body_buffer_([this]() { onBelowLowWatermark(); }, [this]() { onAboveHighWatermark(); },
                    nullptr) {
   ASSERT(stream_ != nullptr);
@@ -25,16 +25,19 @@ UpstreamRequestImpl::UpstreamRequestImpl(Http::AsyncClient& async_client,
 }
 
 void UpstreamRequestImpl::onAboveHighWatermark() {
+  ASSERT(dispatcher_.isThreadSafe());
   // TODO(ravenblack): currently AsyncRequest::Stream does not support pausing.
   // Waiting on issue #33319
 }
 
 void UpstreamRequestImpl::onBelowLowWatermark() {
+  ASSERT(dispatcher_.isThreadSafe());
   // TODO(ravenblack): currently AsyncRequest::Stream does not support pausing.
   // Waiting on issue #33319
 }
 
 void UpstreamRequestImpl::getHeaders(GetHeadersCallback&& cb) {
+  ASSERT(dispatcher_.isThreadSafe());
   ASSERT(callbackEmpty());
   if (!stream_ && !end_stream_after_headers_ && !end_stream_after_body_ && !trailers_) {
     return cb(nullptr, EndStream::Reset);
@@ -44,12 +47,14 @@ void UpstreamRequestImpl::getHeaders(GetHeadersCallback&& cb) {
 }
 
 void UpstreamRequestImpl::onHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+  ASSERT(dispatcher_.isThreadSafe());
   headers_ = std::move(headers);
   end_stream_after_headers_ = end_stream;
   return maybeDeliverHeaders();
 }
 
 void UpstreamRequestImpl::maybeDeliverHeaders() {
+  ASSERT(dispatcher_.isThreadSafe());
   if (!absl::holds_alternative<GetHeadersCallback>(callback_) || !headers_) {
     return;
   }
@@ -58,6 +63,7 @@ void UpstreamRequestImpl::maybeDeliverHeaders() {
 }
 
 void UpstreamRequestImpl::getBody(AdjustedByteRange range, GetBodyCallback&& cb) {
+  ASSERT(dispatcher_.isThreadSafe());
   ASSERT(callbackEmpty());
   ASSERT(range.begin() == stream_pos_, "UpstreamRequest does not support out of order reads");
   ASSERT(!end_stream_after_headers_);
@@ -70,12 +76,14 @@ void UpstreamRequestImpl::getBody(AdjustedByteRange range, GetBodyCallback&& cb)
 }
 
 void UpstreamRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
+  ASSERT(dispatcher_.isThreadSafe());
   end_stream_after_body_ = end_stream;
   body_buffer_.move(data);
   return maybeDeliverBody();
 }
 
 void UpstreamRequestImpl::maybeDeliverBody() {
+  ASSERT(dispatcher_.isThreadSafe());
   if (!absl::holds_alternative<GetBodyCallback>(callback_)) {
     return;
   }
@@ -107,6 +115,7 @@ void UpstreamRequestImpl::maybeDeliverBody() {
 }
 
 void UpstreamRequestImpl::getTrailers(GetTrailersCallback&& cb) {
+  ASSERT(dispatcher_.isThreadSafe());
   ASSERT(callbackEmpty());
   ASSERT(!end_stream_after_headers_ && !end_stream_after_body_);
   if (!stream_ && !trailers_) {
@@ -117,11 +126,13 @@ void UpstreamRequestImpl::getTrailers(GetTrailersCallback&& cb) {
 }
 
 void UpstreamRequestImpl::onTrailers(Http::ResponseTrailerMapPtr&& trailers) {
+  ASSERT(dispatcher_.isThreadSafe());
   trailers_ = std::move(trailers);
   return maybeDeliverTrailers();
 }
 
 void UpstreamRequestImpl::maybeDeliverTrailers() {
+  ASSERT(dispatcher_.isThreadSafe());
   if (!absl::holds_alternative<GetTrailersCallback>(callback_) || !trailers_) {
     if (body_buffer_.length() == 0 && absl::holds_alternative<GetBodyCallback>(callback_)) {
       // If we received trailers while requesting body it means that we didn't
@@ -136,6 +147,7 @@ void UpstreamRequestImpl::maybeDeliverTrailers() {
 }
 
 UpstreamRequestImpl::~UpstreamRequestImpl() {
+  ASSERT(dispatcher_.isThreadSafe());
   // Cancel in-flight callbacks on destroy.
   callback_ = absl::monostate{};
   cancel_();
@@ -145,34 +157,30 @@ UpstreamRequestImpl::~UpstreamRequestImpl() {
   }
 }
 
-void UpstreamRequestImpl::postHeaders(Event::Dispatcher& dispatcher,
-                                      Http::RequestHeaderMap& request_headers) {
-  // UpstreamRequest must take a copy of the headers as the upstream request may
+void UpstreamRequestImpl::sendHeaders(Http::RequestHeaderMapPtr request_headers) {
+  ASSERT(dispatcher_.isThreadSafe());
+  // UpstreamRequest must take a copy of the headers as the AsyncStream may
   // still use the reference provided to it after the original reference has moved.
-  request_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers);
-  dispatcher.post(CancelWrapper::cancelWrapped(
-      [this]() {
-        // If this request had a body or trailers, CacheFilter::decodeHeaders
-        // would have bypassed cache lookup and insertion, so this class wouldn't
-        // be instantiated. So end_stream will always be true.
-        stream_->sendHeaders(*request_headers_, /*end_stream=*/true);
-        absl::optional<absl::string_view> range_header =
-            RangeUtils::getRangeHeader(*request_headers_);
-        if (range_header) {
-          absl::optional<std::vector<RawByteRange>> ranges =
-              RangeUtils::parseRangeHeader(range_header.value(), 1);
-          if (ranges) {
-            stream_pos_ = ranges.value().front().firstBytePos();
-          }
-        }
-      },
-      &cancel_));
+  request_headers_ = std::move(request_headers);
+  // If this request had a body or trailers, CacheFilter::decodeHeaders
+  // would have bypassed cache lookup and insertion, so this class wouldn't
+  // be instantiated. So end_stream will always be true.
+  stream_->sendHeaders(*request_headers_, /*end_stream=*/true);
+  absl::optional<absl::string_view> range_header = RangeUtils::getRangeHeader(*request_headers_);
+  if (range_header) {
+    absl::optional<std::vector<RawByteRange>> ranges =
+        RangeUtils::parseRangeHeader(range_header.value(), 1);
+    if (ranges) {
+      stream_pos_ = ranges.value().front().firstBytePos();
+    }
+  }
 }
 
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 void UpstreamRequestImpl::onReset() {
+  ASSERT(dispatcher_.isThreadSafe());
   stream_ = nullptr;
   absl::visit(overloaded{
                   [](absl::monostate&&) {},
@@ -183,7 +191,10 @@ void UpstreamRequestImpl::onReset() {
               consumeCallback());
 }
 
-void UpstreamRequestImpl::onComplete() { stream_ = nullptr; }
+void UpstreamRequestImpl::onComplete() {
+  ASSERT(dispatcher_.isThreadSafe());
+  stream_ = nullptr;
+}
 
 } // namespace Cache
 } // namespace HttpFilters

@@ -71,22 +71,6 @@ requestHeadersWithRangeRemoved(const Http::RequestHeaderMap& original_headers) {
   return headers;
 }
 
-static ActiveLookupResultPtr
-upstreamPassThrough(ActiveLookupRequestPtr lookup,
-                    CacheEntryStatus status = CacheEntryStatus::Uncacheable,
-                    std::shared_ptr<ActiveCacheEntry> entry = nullptr) {
-  auto result = std::make_unique<ActiveLookupResult>();
-  auto upstream = lookup->upstreamRequestFactory().create(lookup->requestHeaders());
-  if (entry) {
-    result->http_source_ =
-        std::make_unique<UpstreamRequestWithCacheabilityReset>(std::move(upstream), entry);
-  } else {
-    result->http_source_ = std::move(upstream);
-  }
-  result->status_ = status;
-  return result;
-}
-
 static Http::ResponseHeaderMapPtr notSatisfiableHeaders() {
   static const std::string not_satisfiable =
       std::to_string(enumToInt(Http::Code::RangeNotSatisfiable));
@@ -316,10 +300,39 @@ void ActiveCacheEntry::onInsertFailed() {
   onCacheError();
 }
 
+static void postUpstreamPassThrough(ActiveCacheEntry::LookupSubscriber&& sub,
+                                    CacheEntryStatus status) {
+  Event::Dispatcher& dispatcher = sub.dispatcher();
+  dispatcher.post([sub = std::move(sub), status]() mutable {
+    auto result = std::make_unique<ActiveLookupResult>();
+    auto upstream = sub.context_->lookup().upstreamRequestFactory().create();
+    upstream->sendHeaders(
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(sub.context_->lookup().requestHeaders()));
+    result->http_source_ = std::move(upstream);
+    result->status_ = status;
+    sub.callback_(std::move(result));
+  });
+}
+
+static void postUpstreamPassThroughWithReset(ActiveCacheEntry::LookupSubscriber&& sub,
+                                             std::shared_ptr<ActiveCacheEntry> entry) {
+  Event::Dispatcher& dispatcher = sub.dispatcher();
+  dispatcher.post([sub = std::move(sub), entry = std::move(entry)]() mutable {
+    auto result = std::make_unique<ActiveLookupResult>();
+    auto upstream = sub.context_->lookup().upstreamRequestFactory().create();
+    upstream->sendHeaders(
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(sub.context_->lookup().requestHeaders()));
+    result->http_source_ =
+        std::make_unique<UpstreamRequestWithCacheabilityReset>(std::move(upstream), entry);
+    result->status_ = CacheEntryStatus::Uncacheable;
+    sub.callback_(std::move(result));
+  });
+}
+
 void ActiveCacheEntry::onCacheError() {
   mu_.AssertHeld();
   for (LookupSubscriber& sub : lookup_subscribers_) {
-    sub.callback_(upstreamPassThrough(sub.context_->movedLookup(), CacheEntryStatus::LookupError));
+    postUpstreamPassThrough(std::move(sub), CacheEntryStatus::LookupError);
   }
   for (BodySubscriber& sub : body_subscribers_) {
     sub.callback_(nullptr, EndStream::Reset);
@@ -481,76 +494,66 @@ ActiveCacheEntry::~ActiveCacheEntry() {}
 
 void ActiveCacheEntry::getLookupResult(ActiveCacheImpl& cache, ActiveLookupRequestPtr lookup,
                                        ActiveLookupResultCallback&& cb) {
+  ASSERT(lookup->dispatcher().isThreadSafe());
   absl::MutexLock lock(&mu_);
+  LookupSubscriber sub{std::make_unique<ActiveLookupContext>(std::move(lookup), shared_from_this(),
+                                                             content_length_header_),
+                       std::move(cb)};
   switch (state_) {
   case State::Vary:
     ASSERT(&cache); // Do another lookup
     IS_ENVOY_BUG("not implemented yet");
   case State::NotCacheable: {
-    Event::Dispatcher& dispatcher = lookup->dispatcher();
-    auto upstream =
-        upstreamPassThrough(std::move(lookup), CacheEntryStatus::Uncacheable, shared_from_this());
-    dispatcher.post([cb = std::move(cb), upstream = std::move(upstream)]() mutable {
-      cb(std::move(upstream));
-    });
+    postUpstreamPassThroughWithReset(std::move(sub), shared_from_this());
     return;
   }
   case State::Validating:
   case State::Pending:
-    lookup_subscribers_.emplace_back(std::make_unique<ActiveLookupContext>(std::move(lookup),
-                                                                           shared_from_this(),
-                                                                           content_length_header_),
-                                     std::move(cb));
+    lookup_subscribers_.push_back(std::move(sub));
     return;
   case State::Exists:
   case State::Inserting: {
     CacheEntryStatus status = CacheEntryStatus::Hit;
-    if (requiresValidationFor(*lookup)) {
+    if (requiresValidationFor(sub.context_->lookup())) {
       if (state_ == State::Inserting) {
         // Skip validation if the cache write is still in progress.
         status = CacheEntryStatus::ValidatedFree;
       } else {
-        lookup_subscribers_.emplace_back(
-            std::make_unique<ActiveLookupContext>(std::move(lookup), shared_from_this(),
-                                                  content_length_header_),
-            std::move(cb));
+        lookup_subscribers_.push_back(std::move(sub));
         return performValidation();
       }
     }
     auto result = std::make_unique<ActiveLookupResult>();
-    Event::Dispatcher& dispatcher = lookup->dispatcher();
-    result->http_source_ = std::make_unique<ActiveLookupContext>(
-        std::move(lookup), shared_from_this(), content_length_header_);
+    Event::Dispatcher& dispatcher = sub.dispatcher();
+    result->http_source_ = std::move(sub.context_);
     result->status_ = status;
-    dispatcher.post(
-        [cb = std::move(cb), result = std::move(result)]() mutable { cb(std::move(result)); });
+    dispatcher.post([cb = std::move(sub.callback_), result = std::move(result)]() mutable {
+      cb(std::move(result));
+    });
     return;
   }
   case State::New: {
-    Event::Dispatcher& dispatcher = lookup->dispatcher();
-    if (lookup->requestHeaders().getMethodValue() == Http::Headers::get().MethodValues.Head) {
+    Event::Dispatcher& dispatcher = sub.dispatcher();
+    if (sub.context_->lookup().requestHeaders().getMethodValue() ==
+        Http::Headers::get().MethodValues.Head) {
       // HEAD requests are not cacheable, just pass through.
-      dispatcher.post([cb = std::move(cb), lookup = std::move(lookup)]() mutable {
-        cb(upstreamPassThrough(std::move(lookup), CacheEntryStatus::Uncacheable));
-      });
+      postUpstreamPassThrough(std::move(sub), CacheEntryStatus::Uncacheable);
       return;
     }
-    LookupRequest request(Key{lookup->key()}, dispatcher);
-    lookup_subscribers_.emplace_back(
-        std::make_unique<ActiveLookupContext>(std::move(lookup), shared_from_this()),
-        std::move(cb));
+    LookupRequest request(Key{sub.context_->lookup().key()}, dispatcher);
+    lookup_subscribers_.emplace_back(std::move(sub));
     state_ = State::Pending;
     std::shared_ptr<ActiveCacheImpl> active_cache = cache_.lock();
-    ASSERT(active_cache, "should be impossible for cache entry to be deleted in getLookupResult");
+    ASSERT(active_cache, "should be impossible for cache to be deleted in getLookupResult");
     // posted to prevent callback mutex-deadlock.
     return dispatcher.post([active_cache = std::move(active_cache), p = shared_from_this(),
                             request = std::move(request)]() mutable {
       // p is captured as shared_ptr to ensure 'this' is not deleted while the
       // lookup is in flight.
-      active_cache->cache().lookup(std::move(request),
-                                   [p](absl::StatusOr<LookupResult>&& lookup_result) {
-                                     p->onCacheLookupResult(std::move(lookup_result));
-                                   });
+      active_cache->cache().lookup(
+          std::move(request), [p = std::move(p)](absl::StatusOr<LookupResult>&& lookup_result) {
+            p->onCacheLookupResult(std::move(lookup_result));
+          });
     });
   }
   }
@@ -581,28 +584,29 @@ void ActiveCacheEntry::performUpstreamRequest() {
   ASSERT(!upstream_request_, "should only be one upstream request in flight");
   LookupSubscriber& last_sub = lookup_subscribers_.back();
   const ActiveLookupRequest& lookup = last_sub.context_->lookup();
-  bool deranged = false;
-  if (lookup.isRangeRequest()) {
-    Http::RequestHeaderMapPtr deranged_headers =
-        requestHeadersWithRangeRemoved(lookup.requestHeaders());
-    upstream_request_ = lookup.upstreamRequestFactory().create(*deranged_headers);
-    deranged = true;
+  Http::RequestHeaderMapPtr request_headers;
+  bool was_ranged_request = lookup.isRangeRequest();
+  if (was_ranged_request) {
+    request_headers = requestHeadersWithRangeRemoved(lookup.requestHeaders());
   } else {
-    upstream_request_ = lookup.upstreamRequestFactory().create(lookup.requestHeaders());
+    request_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(lookup.requestHeaders());
   }
-  upstream_request_->getHeaders([this, p = shared_from_this(), deranged](
-                                    Http::ResponseHeaderMapPtr headers, EndStream end_stream) {
-    onUpstreamHeaders(std::move(headers), end_stream, deranged);
+  upstream_request_ = lookup.upstreamRequestFactory().create();
+  last_sub.dispatcher().post([upstream_request = upstream_request_.get(),
+                              request_headers = std::move(request_headers), this,
+                              p = shared_from_this(), was_ranged_request]() mutable {
+    upstream_request->sendHeaders(std::move(request_headers));
+    upstream_request->getHeaders([this, p = std::move(p), was_ranged_request](
+                                     Http::ResponseHeaderMapPtr headers, EndStream end_stream) {
+      onUpstreamHeaders(std::move(headers), end_stream, was_ranged_request);
+    });
   });
 }
 
 void ActiveCacheEntry::onCacheWentAway() {
   mu_.AssertHeld();
   for (LookupSubscriber& sub : lookup_subscribers_) {
-    auto result = upstreamPassThrough(sub.context_->movedLookup());
-    sub.dispatcher().post([result = std::move(result), cb = std::move(sub.callback_)]() mutable {
-      cb(std::move(result));
-    });
+    postUpstreamPassThrough(std::move(sub), CacheEntryStatus::LookupError);
   }
   lookup_subscribers_.clear();
 }
@@ -707,19 +711,16 @@ void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, End
     state_ = State::NotCacheable;
     for (LookupSubscriber& sub : lookup_subscribers_) {
       sub.context_->setContentLength(content_length_header_);
-      ActiveLookupResultPtr result;
       if (!range_header_was_stripped && &sub == &lookup_subscribers_.front()) {
-        result = std::make_unique<ActiveLookupResult>();
+        ActiveLookupResultPtr result = std::make_unique<ActiveLookupResult>();
         result->status_ = CacheEntryStatus::Uncacheable;
         result->http_source_ = std::make_unique<UpstreamRequestWithHeadersPrepopulated>(
             std::move(upstream_request_), std::move(headers), end_stream);
+        sub.dispatcher().post([result = std::move(result),
+                               cb = std::move(sub.callback_)]() mutable { cb(std::move(result)); });
       } else {
-        result = upstreamPassThrough(sub.context_->movedLookup(), CacheEntryStatus::Uncacheable,
-                                     shared_from_this());
+        postUpstreamPassThrough(std::move(sub), CacheEntryStatus::Uncacheable);
       }
-      sub.dispatcher().post([result = std::move(result), cb = std::move(sub.callback_)]() mutable {
-        cb(std::move(result));
-      });
     }
     lookup_subscribers_.clear();
     return;
@@ -771,11 +772,15 @@ void ActiveCacheEntry::performValidation() {
   const ActiveLookupRequest& lookup = last_sub.context_->lookup();
   Http::RequestHeaderMapPtr req = requestHeadersWithRangeRemoved(lookup.requestHeaders());
   CacheHeadersUtils::injectValidationHeaders(*req, *entry_.response_headers_);
-  upstream_request_ = lookup.upstreamRequestFactory().create(*req);
-  upstream_request_->getHeaders(
-      [this, p = shared_from_this()](Http::ResponseHeaderMapPtr headers, EndStream end_stream) {
-        onUpstreamHeaders(std::move(headers), end_stream, false);
-      });
+  upstream_request_ = lookup.upstreamRequestFactory().create();
+  last_sub.dispatcher().post([upstream_request = upstream_request_.get(), req = std::move(req),
+                              this, p = shared_from_this()]() mutable {
+    upstream_request->sendHeaders(std::move(req));
+    upstream_request->getHeaders(
+        [this, p = std::move(p)](Http::ResponseHeaderMapPtr headers, EndStream end_stream) {
+          onUpstreamHeaders(std::move(headers), end_stream, false);
+        });
+  });
 }
 
 std::shared_ptr<ActiveCacheEntry> ActiveCacheImpl::getEntry(const Key& key) {

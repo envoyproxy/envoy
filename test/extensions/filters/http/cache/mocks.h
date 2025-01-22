@@ -97,9 +97,19 @@ public:
                Server::Configuration::FactoryContext& context));
 };
 
+class MockUpstreamRequest : public UpstreamRequest {
+public:
+  // HttpSource
+  MOCK_METHOD(void, getHeaders, (GetHeadersCallback && cb));
+  MOCK_METHOD(void, getBody, (AdjustedByteRange range, GetBodyCallback&& cb));
+  MOCK_METHOD(void, getTrailers, (GetTrailersCallback && cb));
+  // UpstreamRequest only
+  MOCK_METHOD(void, sendHeaders, (Http::RequestHeaderMapPtr h));
+};
+
 class MockUpstreamRequestFactory : public UpstreamRequestFactory {
 public:
-  MOCK_METHOD(HttpSourcePtr, create, (Http::RequestHeaderMap & headers));
+  MOCK_METHOD(UpstreamRequestPtr, create, ());
 };
 
 } // namespace Cache

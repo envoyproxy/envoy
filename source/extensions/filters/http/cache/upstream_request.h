@@ -7,6 +7,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+class UpstreamRequest : public HttpSource {
+public:
+  virtual void sendHeaders(Http::RequestHeaderMapPtr headers) PURE;
+};
+
+using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
+
 // UpstreamRequest acts as a bridge between the "pull" operations preferred by
 // the cache filter (getHeaders/getBody/getTrailers) and the "push" operations
 // preferred by most of envoy (encodeHeaders etc. being called by the source).
@@ -19,7 +26,7 @@ namespace Cache {
 // TODO(#33319): AsyncClient::Stream does not currently support watermark events.
 class UpstreamRequestFactory {
 public:
-  virtual HttpSourcePtr create(Http::RequestHeaderMap& request_headers) PURE;
+  virtual UpstreamRequestPtr create() PURE;
   virtual ~UpstreamRequestFactory() = default;
 };
 

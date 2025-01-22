@@ -47,7 +47,7 @@ protected:
   MockHttpCache* mock_http_cache_;
   Http::MockAsyncClient mock_async_client_;
   std::vector<HttpCache::LookupCallback> captured_lookup_callbacks_;
-  std::vector<HttpSource*> fake_upstreams_;
+  std::vector<UpstreamRequest*> fake_upstreams_;
   std::vector<Http::RequestHeaderMapPtr> fake_upstream_sent_headers_;
   std::vector<GetHeadersCallback> fake_upstream_get_headers_callbacks_;
   std::unique_ptr<VaryAllowList> vary_allow_list_;
@@ -95,23 +95,24 @@ protected:
 
   UpstreamRequestFactoryPtr mockUpstreamFactory() {
     auto factory = std::make_unique<MockUpstreamRequestFactory>();
-    EXPECT_CALL(*factory, create)
-        .WillRepeatedly([this](Http::RequestHeaderMap& request_headers) -> HttpSourcePtr {
-          auto p = std::make_unique<MockHttpSource>();
-          fake_upstreams_.emplace_back(p.get());
-          fake_upstream_sent_headers_.push_back(
-              Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers));
-          fake_upstream_get_headers_callbacks_.push_back(nullptr);
-          // We can't capture the callback inside the FakeUpstream because that
-          // causes an ownership cycle.
-          int i = fake_upstreams_.size() - 1;
-          EXPECT_CALL(*p, getHeaders)
-              .Times(Between(0, 1))
-              .WillRepeatedly([this, i](GetHeadersCallback&& cb) {
-                fake_upstream_get_headers_callbacks_[i] = std::move(cb);
-              });
-          return std::move(p);
-        });
+    EXPECT_CALL(*factory, create).WillRepeatedly([this]() -> UpstreamRequestPtr {
+      auto p = std::make_unique<MockUpstreamRequest>();
+      fake_upstreams_.emplace_back(p.get());
+      fake_upstream_sent_headers_.push_back(nullptr);
+      fake_upstream_get_headers_callbacks_.push_back(nullptr);
+      // We can't capture the callback inside the FakeUpstream because that
+      // causes an ownership cycle.
+      int i = fake_upstreams_.size() - 1;
+      EXPECT_CALL(*p, sendHeaders).WillOnce([this, i](Http::RequestHeaderMapPtr headers) {
+        fake_upstream_sent_headers_[i] = std::move(headers);
+      });
+      EXPECT_CALL(*p, getHeaders)
+          .Times(Between(0, 1))
+          .WillRepeatedly([this, i](GetHeadersCallback&& cb) {
+            fake_upstream_get_headers_callbacks_[i] = std::move(cb);
+          });
+      return std::move(p);
+    });
     return factory;
   }
 
@@ -247,6 +248,7 @@ TEST_F(ActiveCacheTest, CacheDeletionDuringLookupStillCompletesLookup) {
   active_cache_.reset();
   pumpDispatcher();
   consumeCallback(captured_lookup_callbacks_[0])(absl::UnknownError("cache fail"));
+  pumpDispatcher();
   ASSERT_THAT(result, NotNull());
   EXPECT_THAT(result->status_, Eq(CacheEntryStatus::LookupError));
   // Should have become an upstream pass-through request.
@@ -264,6 +266,7 @@ TEST_F(ActiveCacheTest, CacheMissWithUncacheableResponseProvokesPassThrough) {
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
   // Upstream request should have been sent.
   ASSERT_THAT(fake_upstreams_.size(), Eq(1));
   EXPECT_THAT(fake_upstream_sent_headers_[0],
@@ -295,6 +298,7 @@ TEST_F(ActiveCacheTest, CacheMissWithUncacheableResponseProvokesPassThrough) {
   ASSERT_THAT(fake_upstream_get_headers_callbacks_[1], NotNull());
   consumeCallback(fake_upstream_get_headers_callbacks_[1])(uncacheableResponseHeaders(),
                                                            EndStream::End);
+  pumpDispatcher();
   EXPECT_THAT(headers1, Pointee(IsSupersetOfHeaders(
                             Http::TestResponseHeaderMapImpl{{"cache-control", "no-cache"}})));
   EXPECT_THAT(headers2, Pointee(IsSupersetOfHeaders(
@@ -310,6 +314,7 @@ TEST_F(ActiveCacheTest, CacheMissWithUncacheableResponseProvokesPassThrough) {
       [&headers3](Http::ResponseHeaderMapPtr h, EndStream) { headers3 = std::move(h); });
   consumeCallback(fake_upstream_get_headers_callbacks_[2])(uncacheableResponseHeaders(),
                                                            EndStream::End);
+  pumpDispatcher();
   EXPECT_THAT(headers3, Pointee(IsSupersetOfHeaders(
                             Http::TestResponseHeaderMapImpl{{"cache-control", "no-cache"}})));
 }
@@ -326,6 +331,7 @@ TEST_F(ActiveCacheTest, CacheMissWithCacheableResponseProvokesSharedInsertStream
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
   // Upstream request should have been sent.
   ASSERT_THAT(fake_upstreams_.size(), Eq(1));
   EXPECT_THAT(fake_upstream_sent_headers_[0],
@@ -382,6 +388,7 @@ TEST_F(ActiveCacheTest,
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
   // Upstream request should have been sent.
   ASSERT_THAT(fake_upstreams_.size(), Eq(1));
   EXPECT_THAT(fake_upstream_sent_headers_[0],
@@ -546,6 +553,7 @@ TEST_F(ActiveCacheTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAgain
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
   // Upstream request should have been sent.
   ASSERT_THAT(fake_upstreams_.size(), Eq(1));
   EXPECT_THAT(fake_upstream_sent_headers_[0],
@@ -581,6 +589,7 @@ TEST_F(ActiveCacheTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAgain
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), EndStream::End);
   consumeCallback(fake_upstream_get_headers_callbacks_[2])(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), EndStream::End);
+  pumpDispatcher();
   // A new request should provoke a new lookup because the previous insertion failed.
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   active_cache_->lookup(testLookupRequest("/a"),
@@ -590,6 +599,7 @@ TEST_F(ActiveCacheTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAgain
   ASSERT_THAT(captured_lookup_callbacks_.size(), Eq(2));
   // Cache miss again.
   consumeCallback(captured_lookup_callbacks_[1])(LookupResult{});
+  pumpDispatcher();
   // Should be the original request, the two that pass-through, and the new request.
   ASSERT_THAT(fake_upstream_get_headers_callbacks_.size(), Eq(4));
   EXPECT_CALL(
@@ -622,6 +632,7 @@ TEST_F(ActiveCacheTest, CacheInsertFailureResetsStreamingContexts) {
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
   // Upstream request should have been sent.
   ASSERT_THAT(fake_upstreams_.size(), Eq(1));
   EXPECT_THAT(fake_upstream_sent_headers_[0],
@@ -667,6 +678,7 @@ TEST_F(ActiveCacheTest, RangeRequestMissGetsFullResourceFromUpstreamAndServesRan
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
   // Upstream request should have been sent.
   ASSERT_THAT(fake_upstreams_.size(), Eq(1));
   // Upstream request should have had the range header removed.
@@ -719,6 +731,7 @@ TEST_F(ActiveCacheTest, RangeRequestWhenLengthIsUnknownReturnsNotSatisfiable) {
   pumpDispatcher();
   // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
   // Upstream request should have been sent.
   ASSERT_THAT(fake_upstreams_.size(), Eq(1));
   // Upstream request should have had the range header removed.

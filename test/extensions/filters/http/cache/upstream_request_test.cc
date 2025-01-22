@@ -27,18 +27,21 @@ class UpstreamRequestTest : public ::testing::Test {
     EXPECT_CALL(http_stream_, sendHeaders(HeaderMapEqualRef(&request_headers_), true));
     Http::AsyncClient::StreamOptions options;
     options.setBufferLimit(1024);
-    Event::MockDispatcher dispatcher;
-    EXPECT_CALL(dispatcher, post).WillOnce([](Event::PostCb cb) { cb(); });
-    upstream_request_ =
-        UpstreamRequestImplFactory(dispatcher, async_client_, options).create(request_headers_);
+    EXPECT_CALL(dispatcher_, isThreadSafe())
+        .Times(testing::AnyNumber())
+        .WillRepeatedly(testing::Return(true));
+    upstream_request_ = UpstreamRequestImplFactory(dispatcher_, async_client_, options).create();
+    upstream_request_->sendHeaders(
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers_));
   }
 
 protected:
+  Event::MockDispatcher dispatcher_;
   Http::AsyncClient::StreamCallbacks* http_callbacks_;
   Http::MockAsyncClientStream http_stream_;
   Http::MockAsyncClient async_client_;
   Http::TestRequestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/banana"}};
-  HttpSourcePtr upstream_request_;
+  UpstreamRequestPtr upstream_request_;
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"}};
   Http::TestResponseTrailerMapImpl response_trailers_{{"x", "y"}};
 };

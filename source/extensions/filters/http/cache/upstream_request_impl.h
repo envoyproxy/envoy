@@ -15,11 +15,11 @@ namespace HttpFilters {
 namespace Cache {
 
 class UpstreamRequestImpl : public Logger::Loggable<Logger::Id::cache_filter>,
-                            public HttpSource,
+                            public UpstreamRequest,
                             public Http::AsyncClient::StreamCallbacks {
 public:
   // Called from the factory.
-  void postHeaders(Event::Dispatcher& dispatcher, Http::RequestHeaderMap& request_headers);
+  void sendHeaders(Http::RequestHeaderMapPtr request_headers) override;
   // HttpSource.
   void getHeaders(GetHeadersCallback&& cb) override;
   // Though range is an argument here, only the length is used by UpstreamRequest
@@ -43,7 +43,7 @@ public:
 
 private:
   friend class UpstreamRequestImplFactory;
-  UpstreamRequestImpl(Http::AsyncClient& async_client,
+  UpstreamRequestImpl(Event::Dispatcher& dispatcher, Http::AsyncClient& async_client,
                       const Http::AsyncClient::StreamOptions& options);
   // If the headers and callback are both present, call the callback.
   void maybeDeliverHeaders();
@@ -64,6 +64,7 @@ private:
   // assert that it's empty.
   CallbackTypes consumeCallback() { return std::exchange(callback_, absl::monostate{}); }
 
+  Event::Dispatcher& dispatcher_;
   Http::AsyncClient::Stream* stream_;
   Http::RequestHeaderMapPtr request_headers_;
   Http::ResponseHeaderMapPtr headers_;
@@ -84,7 +85,7 @@ public:
       : dispatcher_(dispatcher), async_client_(async_client),
         stream_options_(std::move(stream_options)) {}
 
-  HttpSourcePtr create(Http::RequestHeaderMap& request_headers) override;
+  UpstreamRequestPtr create() override;
 
 private:
   Event::Dispatcher& dispatcher_;

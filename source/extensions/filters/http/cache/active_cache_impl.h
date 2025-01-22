@@ -68,6 +68,37 @@ public:
 
   ~ActiveCacheEntry();
 
+  class Subscriber {
+  public:
+    explicit Subscriber(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+    Event::Dispatcher& dispatcher() { return dispatcher_.get(); }
+
+  private:
+    // In order to be moveable in a vector we can't use a plain reference.
+    std::reference_wrapper<Event::Dispatcher> dispatcher_;
+  };
+  class BodySubscriber : public Subscriber {
+  public:
+    BodySubscriber(Event::Dispatcher& dispatcher, AdjustedByteRange range, GetBodyCallback&& cb)
+        : Subscriber(dispatcher), callback_(std::move(cb)), range_(std::move(range)) {}
+    GetBodyCallback callback_;
+    AdjustedByteRange range_;
+  };
+  class TrailerSubscriber : public Subscriber {
+  public:
+    TrailerSubscriber(Event::Dispatcher& dispatcher, GetTrailersCallback&& cb)
+        : Subscriber(dispatcher), callback_(std::move(cb)) {}
+    GetTrailersCallback callback_;
+  };
+  class LookupSubscriber : public Subscriber {
+  public:
+    LookupSubscriber(std::unique_ptr<ActiveLookupContext> context, ActiveLookupResultCallback&& cb)
+        : Subscriber(context->dispatcher()), callback_(std::move(cb)),
+          context_(std::move(context)) {}
+    ActiveLookupResultCallback callback_;
+    std::unique_ptr<ActiveLookupContext> context_;
+  };
+
 private:
   enum class State {
     // New state means this is the first client of the cache entry - it should immediately
@@ -147,38 +178,6 @@ private:
   // Populates the trailers in memory, and calls sendTrailers.
   void trailersWritten(Http::ResponseTrailerMapPtr response_trailers) ABSL_LOCKS_EXCLUDED(mu_);
 
-private:
-  class Subscriber {
-  public:
-    explicit Subscriber(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-    Event::Dispatcher& dispatcher() { return dispatcher_.get(); }
-
-  private:
-    // In order to be moveable in a vector we can't use a plain reference.
-    std::reference_wrapper<Event::Dispatcher> dispatcher_;
-  };
-  class BodySubscriber : public Subscriber {
-  public:
-    BodySubscriber(Event::Dispatcher& dispatcher, AdjustedByteRange range, GetBodyCallback&& cb)
-        : Subscriber(dispatcher), callback_(std::move(cb)), range_(std::move(range)) {}
-    GetBodyCallback callback_;
-    AdjustedByteRange range_;
-  };
-  class TrailerSubscriber : public Subscriber {
-  public:
-    TrailerSubscriber(Event::Dispatcher& dispatcher, GetTrailersCallback&& cb)
-        : Subscriber(dispatcher), callback_(std::move(cb)) {}
-    GetTrailersCallback callback_;
-  };
-  class LookupSubscriber : public Subscriber {
-  public:
-    LookupSubscriber(std::unique_ptr<ActiveLookupContext> context, ActiveLookupResultCallback&& cb)
-        : Subscriber(context->dispatcher()), callback_(std::move(cb)),
-          context_(std::move(context)) {}
-    ActiveLookupResultCallback callback_;
-    std::unique_ptr<ActiveLookupContext> context_;
-  };
-
   // Attempts to open the cache file.
   //
   // On failure notifies the first queued LookupContext of a cache miss, so
@@ -251,7 +250,7 @@ private:
   std::vector<LookupSubscriber> lookup_subscribers_ ABSL_GUARDED_BY(mu_);
   std::vector<BodySubscriber> body_subscribers_ ABSL_GUARDED_BY(mu_);
   std::vector<TrailerSubscriber> trailer_subscribers_ ABSL_GUARDED_BY(mu_);
-  HttpSourcePtr upstream_request_ ABSL_GUARDED_BY(mu_);
+  UpstreamRequestPtr upstream_request_ ABSL_GUARDED_BY(mu_);
   CancelWrapper::CancelFunction cancel_action_in_flight_ ABSL_GUARDED_BY(mu_);
 
   // The following fields and functions are only used by ActiveCache.
