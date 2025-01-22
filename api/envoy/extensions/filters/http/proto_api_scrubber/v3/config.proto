@@ -1,0 +1,299 @@
+edition = "2023";
+
+package envoy_api_envoy_extensions_filters_http_api_filter_v3;
+
+import "envoy/config/core/v3/base.proto";
+import "udpa/annotations/status.proto";
+import "xds/annotations/v3/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_api_scrubber.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/proto_api_scrubber/v3;proto_api_scrubberv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#not-implemented-hide:]
+// [#protodoc-title: Proto API Scrubber]
+// [#extension: envoy.filters.http.proto_api_scrubber]
+// Overview
+// --------
+// ProtoApiScrubber filter supports filtering the request and response payloads based on configured restrictions and request entitlements. Restrictions are simple strings which can be applied to any proto elements (eg, API, method, message, field, etc.) and are provided as part of the filter configuration. Entitlements are also simple strings which are fetched from the request. The filter matches the request entitlements with the restrictions configured to produce the filtered output.
+// 
+// This filter currently supports only field level restrictions. Support for other proto elements are planned to be implemented in future.
+// 
+// The source of entitlements for a request can be configured in the filter config. As of now, it supports `REQUEST_HEADER` and `FILTER_STATE` as sources.
+// 
+// Assumptions
+// -----------
+// 
+// This filter assumes the request and response payloads are backed by proto descriptors which are provided as part of the filter config.
+// 
+// 
+// Process Flow
+// ------------
+// (I) Request Path
+// 
+// 1. Fetch the request `entitlements` from the configured sources. Note that these entitlements would be stored and used for the corresponding response as well. 
+// 2. Buffer the incoming data to build the complete request body.
+// 3. Filter the request body as per the configured restrictions using the request entitlements.
+// 
+// (II) Response Path
+// 1. Buffer the incoming data to build the complete response body.
+// 2. Filter the response body as per the configured restrictions using request entitlements stored in the request flow.
+// 
+// Example
+// -------
+// 
+// API Proto Definition
+// --------------------
+// 
+// .. code-block:: proto
+// 
+// package library;
+// 
+// service BookService {
+//   rpc GetBook(GetBookRequest) returns GetBookResponse;
+// }
+// 
+// message GetBookRequest {
+//   // The id of the book.
+//   string book_id = 1;
+// }
+// 
+// message GetBookResponse {
+//   Book book = 1;
+// 
+//   // A field containing debugging information which is expected to be visibile only for the development team (ie, USER_TYPE = DEV) and would be filtered out for other users.
+//   string debug_info = 2; 
+// }
+// 
+// message Book {
+//   // The title of the book.
+//   string title = 1;
+// 
+//   // The author of the book.
+//   string author = 2;
+// 
+//   // The publisher of the book.
+//   string publisher = 3;
+// 
+//   // Debugging information about a book which is expected to be visible only for the development team (ie, USER_TYPE = DEV) and would be filtered out for other users.
+//   string debug_info = 4;
+// }
+// 
+// 
+// Filter Config (in JSON)
+// -----------------------
+// 
+// .. code-block:: json
+// 
+// {
+//   "data_source": {...},
+//   "request_entitlement_sources": {
+//     "USER_TYPE": {
+//       "source": REQUEST_HEADER,
+//       "key": "X-User-Type"
+//     }
+//   },
+//   "restrictions": {
+//     "method_restrictions": {
+//       "library.book_service.get_books": {
+//         "request_field_restrictions": {},
+//         "response_field_restrictions": {
+//           "debug_info": {
+//             "restrictions":{
+//               "USER_TYPE": {
+//                 "any": {
+//                   "restrictions": [{"value": "DEV"}]
+//                 }
+//               }
+//             }
+//           },
+//           "book.debug_info": {
+//             "restrictions":{
+//               "USER_TYPE": {
+//                 "any": {
+//                   "restrictions": [{"value": "DEV"}]
+//                 }
+//               }
+//             }
+//           }
+//         }
+//       }
+//     }
+//   }
+// }
+// 
+// Request and Response
+// --------------------
+// 
+// Consider the following request sent by client to BookService.GetBook method:
+// 
+// Request Headers
+// 
+// .. code-block:: json
+// 
+// {
+//   "header1": "value1",
+//   "header2": "value2",
+//   "X-USER-TYPE": "PROD"
+// }
+// 
+// Request Body
+// 
+// .. code-block:: json
+// 
+// {
+//   "book_id": ABC1234
+// }
+// 
+// And consider the following response body sent by the API backend for the above request:
+// 
+// .. code-block:: json
+// 
+// {
+//   "book": {
+//     "title": "Book Title",
+//     "author": "Book Author",
+//     "publisher": "Book Publisher",
+//     "debug_info": "This books metadata is stored in database shard - 0004"
+//   },
+//   "debug_info": "Served from server with IP: 172.164.1.2"
+// }
+// 
+// The filtered response sent to the client will be following:
+// 
+// .. code-block:: json
+// 
+// {
+//   "book": {
+//     "title": "Book Title",
+//     "author": "Book Author",
+//     "publisher": "Book Publisher"
+//   }
+// }
+// 
+// Note that the fields `debug_info` and `book.debug_info` are filtered out from the response since the request entitlement of type "USER_TYPE" is PROD while the restrictions on the fields `debug_info` and `book.debug_info` is DEV.
+
+message ProtoApiScrubberConfig {
+  // The proto descriptor set for the proto services.
+  oneof descriptor_set {
+    // It could be passed by a local file through ``Datasource.filename`` or
+    // embedded in the ``Datasource.inline_bytes``.
+    config.core.v3.DataSource data_source = 1;
+
+    // Unimplemented, the key of proto descriptor TypedMetadata.
+    // Among filters depending on the proto descriptor, we can have a
+    // TypedMetadata for proto descriptors, so that these filters can share one
+    // copy of proto descriptor in memory.
+    string proto_descriptor_typed_metadata = 2;
+  }
+
+  // Data sources for the request entitlements.
+  // Entitlements are matched with restrictions of the same name at runtime.
+  // Make sure that the entitlement source is present for each of the
+  // corresponding restrictions.
+  // Key - entitlement name
+  // Value - entitlement source
+  map<string, RequestEntitlementSource> request_entitlement_sources = 3;
+
+  // Contains the restrictions for the API, methods, messages, fields, etc.
+  Restrictions restrictions = 4;
+
+  // The filtering mode.
+  FilteringMode filering_mode = 5;
+}
+
+// Specifies the source of entitlements for a request.
+// The value for each entitlement is expected to be a comma separated list of
+// strings.
+message RequestEntitlementSource {
+  enum Source {
+    // If unspecified, the entitlement will be empty string.
+    SOURCE_UNSPECIFIED = 0;
+
+    // The entitlement will be fetched from the request header `key`.
+    REQUEST_HEADER = 1;
+
+    // The entitlement will be fetched from the filter state `key`.
+    FILTER_STATE = 2;
+  }
+
+  Source source = 1;
+
+  // The key to lookup the entitlement from the specified `source`.
+  string key = 2;
+}
+
+// Contains the restrictions for the API, methods, messages, fields, etc.
+message Restrictions {
+  // Specifies the method restrictions.
+  // Key - Fully qualified method name.
+  //     - ``${package}.${Service}.${Method}``, like
+  //     - ``endpoints.examples.bookstore.BookStore.GetShelf``
+  // Value - Method restrictions.
+  map<string, MethodRestrictions> method_restrictions = 1;
+}
+
+// Contains the method restrictions which include the method level restrictions
+// as well as the field level restrictions for the request and response fields.
+message MethodRestrictions {
+  // Maps restriction types to its values.
+  message RestrictionMap {
+    // Key - Restriction type.
+    // Value - Restriction values.
+    map<string, Restriction> restrictions = 1;
+  }
+
+  // Restrictions that apply to request fields of the method.
+  // Key - field mask like path of the field eg, foo.bar.baz
+  // Value - Restrictions map containing the mapping from restriction type to
+  // the restriction values.
+  map<string, RestrictionMap> request_field_restrictions = 1;
+
+  // Restrictions that apply to response fields of the method.
+  // Key - field mask like path of the field eg, foo.bar.baz
+  // Value - Restrictions map containing the mapping from restriction type to
+  // the restriction values.
+  map<string, RestrictionMap> response_field_restrictions = 2;
+}
+
+// Represents a singular or composite restriction.
+message Restriction {
+  oneof kind {
+    // A composite restriction.
+    CompositeRestriction composite = 1;
+
+    // The restriction value.
+    string value = 2;
+  }
+}
+
+// Represents a composite restriction combined with an `combinator`.
+message CompositeRestriction {
+  enum Combinator {
+    // All of the `restrictions` must be satisfied.
+    ALL = 0;
+
+    // At least one of the `restrictions` must be satisfied.
+    ANY = 1;
+  }
+
+  // The combinator to combine the `restrictions`.
+  Combinator combinator = 1;
+
+  // The list of restrictions.
+  repeated Restriction restrictions = 2;
+}
+
+// Specifies the filtering mode of this filter.
+// Currently only `OVERRIDE` mode is supported.
+enum FilteringMode {
+  // If unspecified, falls back to `OVERRIDE`.
+  FILTERING_MODE_UNSPECIFIED = 0;
+
+  // Override the original request/response body with the filtered
+  // request/response body.
+  OVERRIDE = 1;
+}
