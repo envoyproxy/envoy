@@ -209,7 +209,6 @@ private:
   void maybeTriggerBodyReadForWaitingSubscriber() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
   bool selectBodyToRead() ABSL_LOCKS_EXCLUDED(mu_);
   void abortBodyOutOfRangeSubscribers() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
-  Event::Dispatcher* dispatcher() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) { return &*dispatcher_; }
 
   bool canReadBodyRangeFromCacheEntry(BodySubscriber& subscriber);
   void onBodyChunkFromCache(AdjustedByteRange range, Buffer::InstancePtr buffer,
@@ -235,7 +234,6 @@ private:
   bool headersAreReady() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
 
   mutable absl::Mutex mu_;
-  OptRef<Event::Dispatcher> dispatcher_ ABSL_GUARDED_BY(mu_);
   State state_ ABSL_GUARDED_BY(mu_) = State::New;
   uint64_t content_length_header_ = 0;
   LookupResult entry_ ABSL_GUARDED_BY(mu_);

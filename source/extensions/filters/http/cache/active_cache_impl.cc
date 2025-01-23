@@ -333,6 +333,20 @@ static void postUpstreamPassThroughWithReset(ActiveCacheEntry::LookupSubscriber&
 
 void ActiveCacheEntry::onCacheError() {
   mu_.AssertHeld();
+  auto active_cache = cache_.lock();
+  if (active_cache) {
+    Event::Dispatcher* dispatcher = nullptr;
+    if (!lookup_subscribers_.empty()) {
+      dispatcher = &lookup_subscribers_.front().dispatcher();
+    } else if (!body_subscribers_.empty()) {
+      dispatcher = &body_subscribers_.front().dispatcher();
+    } else if (!trailer_subscribers_.empty()) {
+      dispatcher = &trailer_subscribers_.front().dispatcher();
+    }
+    if (dispatcher) {
+      active_cache->cache().evict(*dispatcher, key_);
+    }
+  }
   for (LookupSubscriber& sub : lookup_subscribers_) {
     postUpstreamPassThrough(std::move(sub), CacheEntryStatus::LookupError);
   }
@@ -345,10 +359,6 @@ void ActiveCacheEntry::onCacheError() {
   lookup_subscribers_.clear();
   body_subscribers_.clear();
   trailer_subscribers_.clear();
-  auto active_cache = cache_.lock();
-  if (active_cache) {
-    active_cache->cache().evict(*dispatcher_, key_);
-  }
   state_ = State::New;
 }
 
@@ -678,6 +688,7 @@ void ActiveCacheEntry::processSuccessfulValidation(Http::ResponseHeaderMapPtr he
 void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
                                          bool range_header_was_stripped) {
   absl::MutexLock lock(&mu_);
+  Event::Dispatcher& dispatcher = lookup_subscribers_.front().dispatcher();
   ASSERT(upstream_request_);
   if (end_stream == EndStream::Reset) {
     upstream_request_ = nullptr;
@@ -702,7 +713,7 @@ void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, End
       state_ = State::Pending;
       auto active_cache = cache_.lock();
       if (active_cache) {
-        active_cache->cache().evict(*dispatcher_, key_);
+        active_cache->cache().evict(dispatcher, key_);
       }
       body_length_available_ = 0;
     }
