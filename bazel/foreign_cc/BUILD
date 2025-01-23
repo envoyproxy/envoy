@@ -97,7 +97,7 @@ configure_make(
     ],
     tags = ["skip_on_windows"],
     targets = [
-        "ARFLAGS='' libs install-subdirs",
+        "ARFLAGS='' WITH_LDS='n' libs install-subdirs",
     ],
     deps = [":lz4"],
     alwayslink = True,
