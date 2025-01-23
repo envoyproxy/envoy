@@ -26,6 +26,8 @@ def _android_autoconf_impl(repository_ctx):
         api_level={},
         build_tools_version="{}",
     )
+    native.register_toolchains("@androidsdk//:sdk-toolchain", "@androidsdk//:all")
+
 """.format(sdk_home, sdk_api_level, build_tools_version)
 
     ndk_rule = ""
