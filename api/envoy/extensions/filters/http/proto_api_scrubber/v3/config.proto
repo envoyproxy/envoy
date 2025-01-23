@@ -3,10 +3,8 @@ syntax = "proto3";
 package envoy.extensions.filters.http.proto_api_scrubber.v3;
 
 import "envoy/config/core/v3/base.proto";
-
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
+import "xds/annotations/v3/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_api_scrubber.v3";
 option java_outer_classname = "ConfigProto";
@@ -32,7 +30,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // other proto elements are planned to be implemented in future.
 //
 // The source of entitlements for a request can be configured in the filter
-// config. As of now, it supports `REQUEST_HEADER` and `FILTER_STATE` as
+// config. As of now, it supports ``REQUEST_HEADER`` and ``FILTER_STATE`` as
 // sources.
 //
 // Assumptions
@@ -203,9 +201,9 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#next-free-field: 6]
 message ProtoApiScrubberConfig {
   // Specifies the filtering mode of this filter.
-  // Currently only `OVERRIDE` mode is supported.
+  // Currently only ``OVERRIDE`` mode is supported.
   enum FilteringMode {
-    // If unspecified, falls back to `OVERRIDE`.
+    // If unspecified, falls back to ``OVERRIDE``.
     FILTERING_MODE_UNSPECIFIED = 0;
 
     // Override the original request/response body with the filtered
@@ -248,16 +246,16 @@ message RequestEntitlementSource {
     // If unspecified, the entitlement will be empty string.
     SOURCE_UNSPECIFIED = 0;
 
-    // The entitlement will be fetched from the request header `key`.
+    // The entitlement will be fetched from the request header ``key``.
     REQUEST_HEADER = 1;
 
-    // The entitlement will be fetched from the filter state `key`.
+    // The entitlement will be fetched from the filter state ``key``.
     FILTER_STATE = 2;
   }
 
   Source source = 1;
 
-  // The key to lookup the entitlement from the specified `source`.
+  // The key to lookup the entitlement from the specified ``source``.
   string key = 2;
 }
 
@@ -305,17 +303,17 @@ message Restriction {
   }
 }
 
-// Represents a composite restriction combined with an `combinator`.
+// Represents a composite restriction combined with an operator.
 message CompositeRestriction {
   enum Combinator {
-    // All of the `restrictions` must be satisfied.
+    // All of the ``restrictions`` must be satisfied.
     ALL = 0;
 
-    // At least one of the `restrictions` must be satisfied.
+    // At least one of the ``restrictions`` must be satisfied.
     ANY = 1;
   }
 
-  // The operator to combine the `restrictions`.
+  // The operator to combine the ``restrictions``.
   Combinator combinator = 1;
 
   // The list of restrictions.
