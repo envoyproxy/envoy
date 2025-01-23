@@ -85,7 +85,8 @@ build:mobile-dbg-ios --config=ios
 build:mobile-test-android --define=static_extension_registration=disabled
 # build:mobile-android --android_crosstool_top=@androidndk//:toolchain
 # build:mobile-android --noincompatible_enable_android_toolchain_resolution
-build:mobile-android --android_platforms=//:android_x86_64
+build:mobile-android --android_platforms=@rules_android//:x86_64
+build:mobile-android --toolchain_resolution_debug='@@bazel_tools//tools/android:sdk_toolchain_type'
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
