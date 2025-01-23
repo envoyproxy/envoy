@@ -618,7 +618,6 @@ protected:
   // The callback upon on demand cluster discovery response.
   void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
 
-  Upstream::ThreadLocalCluster* getThreadLocalCluster();
   bool maybeTunnel(Upstream::ThreadLocalCluster& cluster);
   void onConnectMaxAttempts();
   void onConnectTimeout();

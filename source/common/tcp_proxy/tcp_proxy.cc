@@ -447,7 +447,8 @@ void Filter::UpstreamCallbacks::drain(Drainer& drainer) {
 
 Network::FilterStatus Filter::establishUpstreamConnection() {
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
-  Upstream::ThreadLocalCluster* thread_local_cluster = getThreadLocalCluster();
+  Upstream::ThreadLocalCluster* thread_local_cluster =
+      cluster_manager_.getThreadLocalCluster(cluster_name);
   if (!thread_local_cluster) {
     auto odcds = config_->onDemandCds();
     if (!odcds.has_value()) {
@@ -489,6 +490,18 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
+  if (!config_->backoffStrategy() &&
+      !Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop")) {
+    const uint32_t max_connect_attempts = config_->maxConnectAttempts();
+    if (connect_attempts_ >= max_connect_attempts) {
+      getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
+      cluster->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
+      onInitFailure(UpstreamFailureReason::ConnectFailed);
+      return Network::FilterStatus::StopIteration;
+    }
+  }
+
   auto& downstream_connection = read_callbacks_->connection();
   auto& filter_state = downstream_connection.streamInfo().filterState();
   if (!filter_state->hasData<Network::ProxyProtocolFilterState>(
@@ -521,11 +534,6 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
     onInitFailure(UpstreamFailureReason::NoHealthyUpstream);
   }
   return Network::FilterStatus::StopIteration;
-}
-
-Upstream::ThreadLocalCluster* Filter::getThreadLocalCluster() {
-  const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
-  return cluster_manager_.getThreadLocalCluster(cluster_name);
 }
 
 void Filter::onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status) {
@@ -889,15 +897,15 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         }
       }
       if (!downstream_closed_) {
-        if (connect_attempts_ >= config_->maxConnectAttempts()) {
-          onConnectMaxAttempts();
-          return;
-        }
-
         if (!config_->backoffStrategy() &&
             !Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop")) {
           onRetryTimer();
+          return;
+        }
+
+        if (connect_attempts_ >= config_->maxConnectAttempts()) {
+          onConnectMaxAttempts();
           return;
         }
 
@@ -914,7 +922,9 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
 void Filter::onConnectMaxAttempts() {
   getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
-  Upstream::ThreadLocalCluster* thread_local_cluster = getThreadLocalCluster();
+  const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
+  Upstream::ThreadLocalCluster* thread_local_cluster =
+      cluster_manager_.getThreadLocalCluster(cluster_name);
   if (thread_local_cluster) {
     thread_local_cluster->info()->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
   }
