@@ -100,6 +100,7 @@ register_toolchains(
     "@rules_android//toolchains/android:android_default_toolchain",
     "@rules_android//toolchains/android_sdk:android_sdk_tools",
 )
+register_toolchains("@androidsdk//:sdk-toolchain", "@androidsdk//:all")
 
 load("@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:repositories.bzl", "xcodeproj_rules_dependencies")
 
