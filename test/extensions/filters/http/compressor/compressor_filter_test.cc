@@ -358,7 +358,8 @@ TEST_F(CompressorFilterTest, CompressRequestAndDisabledWithXHeaderFalse) {
   }
 }
 )EOF");
-  doRequestNoCompression({{":method", "post"}, {"X-Request-Compression", "false"}, {"content-length", "256"}});
+  doRequestNoCompression(
+      {{":method", "post"}, {"X-Request-Compression", "false"}, {"content-length", "256"}});
   Http::TestResponseHeaderMapImpl headers{{":method", "post"}, {"content-length", "256"}};
   doResponseNoCompression(headers);
 }
