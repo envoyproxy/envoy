@@ -68,7 +68,7 @@ message GenericRds {
 
 // Generic proxy log formatter which could be configured at
 // the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>`
-// extension point for generic proxy specific custom formatters (command operators) support.
+// extension point of logger to support generic proxy specific substitution commands.
 //
 // .. note::
 //
