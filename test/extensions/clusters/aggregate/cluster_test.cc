@@ -34,12 +34,8 @@ class AggregateClusterTest : public Event::TestUsingSimulatedTime, public testin
 public:
   AggregateClusterTest()
       : stat_names_(server_context_.store_.symbolTable()),
-        cluster_circuit_breakers_stat_names_(server_context_.store_.symbolTable()),
         traffic_stats_(Upstream::ClusterInfoImpl::generateStats(server_context_.store_.rootScope(),
-                                                                stat_names_, false)),
-        circuit_breakers_stats_(Upstream::ClusterInfoImpl::generateCircuitBreakersStats(
-            *server_context_.store_.rootScope(), cluster_circuit_breakers_stat_names_.default_,
-            false, cluster_circuit_breakers_stat_names_)) {
+                                                                stat_names_, false)) {
     ON_CALL(*primary_info_, name()).WillByDefault(ReturnRef(primary_name));
     ON_CALL(*secondary_info_, name()).WillByDefault(ReturnRef(secondary_name));
 
@@ -146,9 +142,7 @@ public:
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
   Upstream::ClusterTrafficStatNames stat_names_;
-  Upstream::ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   Upstream::DeferredCreationCompatibleClusterTrafficStats traffic_stats_;
-  Upstream::ClusterCircuitBreakersStats circuit_breakers_stats_;
   std::shared_ptr<Upstream::MockClusterInfo> primary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
   std::shared_ptr<Upstream::MockClusterInfo> secondary_info_{
@@ -195,42 +189,53 @@ TEST_F(AggregateClusterTest, CircuitBreakerPreventsChildClusterTraffic) {
 
   initialize(yaml_config);
 
+  Upstream::HostSharedPtr host =
+      Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
+
+  {
+    testing::InSequence s;
+
+    // the first call: the circuit breaker is closed, so the load balancer should return a host
+    EXPECT_CALL(primary_load_balancer_, chooseHost(_))
+        .WillOnce(Invoke([host](Upstream::LoadBalancerContext*) -> Upstream::HostSelectionResponse {
+          return {host};
+        }));
+
+    // the second call: the circuit breaker is open so the load balancer should not return a host
+    EXPECT_CALL(primary_load_balancer_, chooseHost(_))
+        .WillOnce(Invoke([host](Upstream::LoadBalancerContext*) -> Upstream::HostSelectionResponse {
+          return {nullptr};
+        }));
+
+    // the third call: the circuit breaker is closed again so the load balancer should return a host
+    EXPECT_CALL(primary_load_balancer_, chooseHost(_))
+        .WillOnce(Invoke([host](Upstream::LoadBalancerContext*) -> Upstream::HostSelectionResponse {
+          return {host};
+        }));
+  }
+
   Upstream::ResourceManager& resource_manager =
       cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
+  EXPECT_TRUE(resource_manager.connections().canCreate());
 
-  std::cout << circuit_breakers_stats_.cx_open_.value() << std::endl;
+  // first call to the load balancer: it should return a host from the primary cluster
+  EXPECT_EQ(host.get(), lb_->chooseHost(nullptr).host.get());
 
+  // open the circuit breaker
   resource_manager.connections().inc();
+  EXPECT_FALSE(resource_manager.connections().canCreate());
 
-  std::cout << circuit_breakers_stats_.cx_open_.value() << std::endl;
+  // second call to the load balancer: it should not return a host
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 
+  // close the circuit breaker
   resource_manager.connections().dec();
+  EXPECT_TRUE(resource_manager.connections().canCreate());
 
-  std::cout << circuit_breakers_stats_.cx_open_.value() << std::endl;
-
-  // // resource manager for the DEFAULT priority (look above^)
-  // Upstream::ResourceManager& resource_manager =
-  //     cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
-
-  // Upstream::HostSharedPtr host =
-  //     Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
-
-  // EXPECT_TRUE(resource_manager.connections().canCreate());
-
-  // // try to get a host (should work because the circuit breaker is closed)
-  // Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr).host;
-  // EXPECT_EQ(host.get(), target.get());
-
-  // // create the one connection (which will trigger the circuit breaker to open)
-  // resource_manager.connections().inc();
-
-  // // try to get a host (should fail because the circuit breaker should now be open)
-  // target = lb_->chooseHost(nullptr).host;
-  // EXPECT_EQ(nullptr, target);
-
-  // // remove the one connection
-  // resource_manager.connections().dec();
+  // third call to the load balancer: it should return a host from the primary cluster again
+  EXPECT_EQ(host.get(), lb_->chooseHost(nullptr).host.get());
 }
+
 
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
   initialize(default_yaml_config_);
