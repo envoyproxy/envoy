@@ -17,6 +17,7 @@ load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
 load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
+load("@rules_java//java:rules_java_deps.bzl", "rules_java_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
 load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
@@ -79,6 +80,7 @@ def envoy_dependency_imports(
         oss_fuzz = True,
         honggfuzz = False,
     )
+    rules_java_dependencies()
     register_jq_toolchains(version = jq_version)
     register_yq_toolchains(version = yq_version)
     parser_deps()
