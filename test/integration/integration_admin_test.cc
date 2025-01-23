@@ -492,6 +492,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
     inbound_listener->set_traffic_direction(envoy::config::core::v3::INBOUND);
     inbound_listener->set_name("inbound_0");
   });
+  drain_strategy_ = Server::DrainStrategy::Immediate;
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
@@ -518,23 +519,25 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_EQ("OK\n", response->body());
 
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  codec_client_ = makeHttpConnection(lookupPort("inbound_0"));
   EXPECT_FALSE(codec_client_->disconnected());
 
-  IntegrationStreamDecoderPtr response_2;
-  while (!test_server_->counter("inbound_only.config_test.downstream_cx_drain_close")->value()) {
-    response_2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    ASSERT_TRUE(response_2->waitForEndStream());
-  }
-  EXPECT_TRUE(response_2->complete());
+  IntegrationStreamDecoderPtr response4;
+  response4 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response4->waitForEndStream());
+  EXPECT_TRUE(response4->complete());
+  EXPECT_THAT(response4->headers(), Http::HttpStatusIs("200"));
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   } else {
-    EXPECT_EQ("close", response_2->headers().getConnectionValue());
+    EXPECT_EQ("close", response4->headers().getConnectionValue());
   }
 
-  // Validate that the inbound listener has been stopped.
+  // Validate that the inbound listener has been stopped and that we don't double count
+  // the inbound_only drain and the universal drain.
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
@@ -557,14 +560,21 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulConnectionCloseForInbo
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_EQ("OK\n", response->body());
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("inbound_0"), "GET", "/", "",
-                                                downstreamProtocol(), version_);
-  EXPECT_TRUE(response->complete());
+  codec_client_ = makeHttpConnection(lookupPort("inbound_0"));
+  EXPECT_FALSE(codec_client_->disconnected());
 
+  IntegrationStreamDecoderPtr response4;
+  response4 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response4->waitForEndStream());
+  EXPECT_TRUE(response4->complete());
+  EXPECT_THAT(response4->headers(), Http::HttpStatusIs("200"));
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   } else {
-    EXPECT_EQ("close", response->headers().getConnectionValue());
+    EXPECT_EQ("close", response4->headers().getConnectionValue());
   }
 
   // Validate that the inbound listener has been stopped.
@@ -590,13 +600,22 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulNoConnectionCloseForOu
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_EQ("OK\n", response->body());
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("outbound_0"), "GET", "/", "",
-                                                downstreamProtocol(), version_);
-  EXPECT_TRUE(response->complete());
+  codec_client_ = makeHttpConnection(lookupPort("outbound_0"));
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  IntegrationStreamDecoderPtr response4;
+  response4 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response4->waitForEndStream());
+  EXPECT_TRUE(response4->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  EXPECT_FALSE(
+      codec_client_->disconnected()); // Should still be connected because we only drained inbound
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
     EXPECT_FALSE(codec_client_->sawGoAway());
   } else {
-    EXPECT_NE("close", response->headers().getConnectionValue());
+    EXPECT_NE("close", response4->headers().getConnectionValue());
   }
 
   // Validate that the inbound listener has been stopped.
