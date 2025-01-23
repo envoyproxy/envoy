@@ -440,7 +440,6 @@ TEST_P(IntegrationAdminTest, Admin) {
   name_filtered_config_dump.configs(5).UnpackTo(&secret_config_dump);
   EXPECT_EQ(secret_config_dump.static_secrets().size(), 0);
 
-  // Validate that the "inboundonly" does not stop the default listener.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 "/drain_listeners?inboundonly", "",
                                                 downstreamProtocol(), version_);
