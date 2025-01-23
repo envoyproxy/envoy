@@ -29,7 +29,7 @@ import org.robolectric.RobolectricTestRunner;
 @RunWith(RobolectricTestRunner.class)
 public class ErrorsTest {
   @Rule
-  public GrantPermissionRule mRuntimePermissionRule =
+  public GrantPermissionRule grantPermissionRule =
       GrantPermissionRule.grant(Manifest.permission.ACCESS_NETWORK_STATE);
 
   private NetworkCapabilities networkCapabilities;
