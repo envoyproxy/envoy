@@ -233,7 +233,7 @@ void ActiveCacheEntry::handleValidationAndSendLookupResponses(CacheEntryStatus s
   lookup_subscribers_.erase(it, lookup_subscribers_.end());
   if (!lookup_subscribers_.empty()) {
     // At least one subscriber required validation.
-    performValidation();
+    return performValidation();
   }
 }
 
@@ -490,7 +490,7 @@ void ActiveCacheEntry::sendBodyChunkTo(BodySubscriber& subscriber, AdjustedByteR
   });
 }
 
-ActiveCacheEntry::~ActiveCacheEntry() {}
+ActiveCacheEntry::~ActiveCacheEntry() { ASSERT(!upstream_request_); }
 
 void ActiveCacheEntry::getLookupResult(ActiveCacheImpl& cache, ActiveLookupRequestPtr lookup,
                                        ActiveLookupResultCallback&& cb) {

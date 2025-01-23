@@ -30,7 +30,6 @@ public:
 
   Event::Dispatcher& dispatcher() const { return lookup().dispatcher(); }
   ActiveLookupRequest& lookup() const { return *lookup_; }
-  ActiveLookupRequestPtr movedLookup() { return std::move(lookup_); }
 
   void setContentLength(uint64_t l) { content_length_ = l; }
 

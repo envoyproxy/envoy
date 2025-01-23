@@ -82,6 +82,7 @@ protected:
         // Cache entries will be evicted when cache returns an error for lookup.
         EXPECT_CALL(*mock_http_cache_, evict);
         consumeCallback(cb)(absl::UnknownError("test teardown"));
+        pumpDispatcher();
       }
     }
     // Any residual upstreams must complete their callbacks to close out
@@ -89,6 +90,7 @@ protected:
     for (auto& cb : fake_upstream_get_headers_callbacks_) {
       if (cb) {
         consumeCallback(cb)(nullptr, EndStream::Reset);
+        pumpDispatcher();
       }
     }
   }
