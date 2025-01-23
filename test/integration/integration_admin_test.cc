@@ -485,7 +485,7 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
-// Validates that successive calls to /drain_listeners?inboundonly are idempotent.
+// Validates that successive calls to "/drain_listeners?inboundonly" are idempotent.
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* inbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
