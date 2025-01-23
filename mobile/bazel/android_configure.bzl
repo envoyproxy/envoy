@@ -26,6 +26,7 @@ def _android_autoconf_impl(repository_ctx):
         api_level={},
         build_tools_version="{}",
     )
+    print("REGISTER SDK TOOLCHAIN")
     native.register_toolchains("@androidsdk//:sdk-toolchain", "@androidsdk//:all")
 
 """.format(sdk_home, sdk_api_level, build_tools_version)
@@ -51,9 +52,7 @@ load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
 load("@rules_android//rules:rules.bzl", "android_sdk_repository")
 
 def android_workspace():
-    print("SDK SETUP")
     {}
-    print("NDK SETUP")
     {}
     """.format(sdk_rule, ndk_rule))
 
