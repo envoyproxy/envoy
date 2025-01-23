@@ -36,6 +36,9 @@ removed_config_or_runtime:
 - area: access_log
   change: |
     Removed runtime guard ``envoy.reloadable_features.upstream_remote_address_use_connection`` and legacy code paths.
+- area: xds
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.xdstp_path_avoid_colon_encoding`` and legacy code paths.
 - area: thread_local
   change: |
     Removed runtime guard  ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads`` and legacy code paths.
