@@ -3,10 +3,8 @@ syntax = "proto3";
 package envoy.extensions.filters.http.proto_api_scrubber.v3;
 
 import "envoy/config/core/v3/base.proto";
-
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
+import "xds/annotations/v3/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_api_scrubber.v3";
 option java_outer_classname = "ConfigProto";
@@ -81,7 +79,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   Book book = 1;
 //
 //   // A field containing debugging information which is expected to be
-//   // visible only for the development team (ie, USER_TYPE = DEV) and would
+//   // visible only for the development team (i.e., USER_TYPE = DEV) and would
 //   // be filtered out for other users.
 //   string debug_info = 2;
 // }
@@ -97,7 +95,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   string publisher = 3;
 //
 //   // Debugging information about a book which is expected to be visible only
-//   // for the development team (ie, USER_TYPE = DEV) and would be filtered out
+//   // for the development team (i.e., USER_TYPE = DEV) and would be filtered
+//   out
 //   // for other users.
 //   string debug_info = 4;
 // }
@@ -314,7 +313,7 @@ message CompositeRestriction {
     ANY = 1;
   }
 
-  // The combinator to combine the `restrictions`.
+  // The operator to combine the `restrictions`.
   Combinator combinator = 1;
 
   // The list of restrictions.
