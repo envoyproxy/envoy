@@ -130,7 +130,10 @@ private:
   // - Eviction threshold ratio: Evict items with TTL lower than X% of the average TTL
   void Evict() {
     // TODO: convert duration logging to log
-    // auto start_time = std::chrono::high_resolution_clock::now();
+    // Start measuring real time
+    // auto start_real_time = std::chrono::high_resolution_clock::now();
+    //  Start measuring CPU time
+    // std::clock_t start_cpu_time = std::clock();
 
     // Step 1: Advance pointer randomly
     std::uniform_int_distribution<std::size_t> distribution(0, (1.0 - eviction_candidate_ratio) *
@@ -183,13 +186,20 @@ private:
       }
     }
 
-    // auto end_time = std::chrono::high_resolution_clock::now();
-    // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time -
-    // start_time).count();
-    // TODO: convert to log - std::cout << "Removed " << removed << " objects in " << duration << "
-    // microseconds" << std::endl;
-    // TODO: convert to log - std::cout << "Resulting cache size: " << cache_items_map.size() <<
-    // std::endl;
+    // Stop measuring real time
+    // auto end_real_time = std::chrono::high_resolution_clock::now();
+    // Stop measuring CPU time
+    // std::clock_t end_cpu_time = std::clock();
+
+    // Calculate elapsed real time in microseconds
+    // auto elapsed_real_time = std::chrono::duration_cast<std::chrono::microseconds>(end_real_time
+    // - start_real_time);
+    // Calculate elapsed CPU time
+    // double elapsed_cpu_time = double(end_cpu_time - start_cpu_time) * 1000000 / CLOCKS_PER_SEC;
+
+    // Output the results
+    // std::cout << "Real time: " << elapsed_real_time.count() << " microseconds\n";
+    // std::cout << "CPU time: " << elapsed_cpu_time << " microseconds\n";
   }
   struct CharPtrHash {
     std::size_t operator()(const char* str) const {

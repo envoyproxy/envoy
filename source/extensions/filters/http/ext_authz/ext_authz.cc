@@ -306,11 +306,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         std::string test_key = "test_key_" + std::to_string(i);
         config_->responseCache().Insert(test_key.c_str(), 200);
       }
-    } else if (auth_header_str == "magic_fill_cache_for_testing_1000") {
-      for (std::size_t i = 0; i < 1000; ++i) {
-        std::string test_key = "test_key_" + std::to_string(i);
-        config_->responseCache().Insert(test_key.c_str(), 200);
-      }
     }
 
     if (config_->responseCacheRememberBodyHeaders()) {
