@@ -129,10 +129,10 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
   EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
   EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
-  EXPECT_FALSE(drain_manager.draining());
+  EXPECT_FALSE(drain_manager.draining(Network::DrainDirection::All));
 
   drain_manager.startDrainSequence(Network::DrainDirection::All, [] {});
-  EXPECT_TRUE(drain_manager.draining());
+  EXPECT_TRUE(drain_manager.draining(Network::DrainDirection::All));
 
   if (drain_gradually) {
     // random() should be called when elapsed time < drain timeout

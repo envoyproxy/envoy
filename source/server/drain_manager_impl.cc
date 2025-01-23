@@ -33,7 +33,7 @@ bool DrainManagerImpl::drainClose(Network::DrainDirection direction) const {
   }
 
   // If the direction passed in is greater than the current draining direction
-  // (e.g. direction = ALL, but draining_.second == Inbound_Only), then don't
+  // (e.g. direction = ALL, but draining_.second == INBOUND_ONLY), then don't
   // drain. We also don't want to drain if the direction is None (which doesn't really
   // make sense, but it's the correct behavior).
   if (direction == Network::DrainDirection::None || direction > draining_.load().second) {
@@ -73,20 +73,33 @@ bool DrainManagerImpl::drainClose(Network::DrainDirection direction) const {
 
 void DrainManagerImpl::startDrainSequence(Network::DrainDirection direction,
                                           std::function<void()> drain_complete_cb) {
-  ASSERT(direction != Network::DrainDirection::None, "a valid direction must be specified");
-  ASSERT(drain_tick_timers_.size() <= 1, "a max of 2 drain sequences can run at the same time");
+  ASSERT(direction != Network::DrainDirection::None, "a valid direction must be specified.");
+  ASSERT(drain_tick_timers_.count(direction) == 0,
+         "cannot run two drain sequences for the same direction.");
   auto new_timer = server_.dispatcher().createTimer(drain_complete_cb);
   const std::chrono::seconds drain_delay(server_.options().drainTime());
   new_timer->enableTimer(drain_delay);
-  drain_tick_timers_.emplace_back(std::move(new_timer));
+  drain_tick_timers_[direction] = std::move(new_timer);
   // Note https://github.com/envoyproxy/envoy/issues/31457, previous to which,
   // drain_deadline_ was set *after* draining_ resulting in a read/write race between
   // the main thread running this function from admin, and the worker thread calling
   // drainClose. Note that drain_deadline_ is default-constructed which guarantees
   // to set the time-since epoch to a count of 0
   // (https://en.cppreference.com/w/cpp/chrono/time_point/time_point).
+  std::string direction_str;
+  switch (direction) {
+  case Network::DrainDirection::InboundOnly:
+    direction_str = "inbound";
+    break;
+  case Network::DrainDirection::All:
+    direction_str = "all";
+    break;
+  case Network::DrainDirection::None:
+    direction_str = "none";
+    break;
+  }
   ASSERT(drain_deadlines_[direction].time_since_epoch().count() == 0,
-         "drain_deadline_ cannot be set twice for the same direction.");
+         "drain_deadline_ cannot be set twice for the same direction");
   // Since draining_ is atomic, it is safe to set drain_deadline_ without a mutex
   // as drain_close() only reads from drain_deadline_ if draining_ is true, and
   // C++ will not re-order an assign to an atomic. See

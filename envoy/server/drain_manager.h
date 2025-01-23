@@ -24,9 +24,9 @@ public:
                                   std::function<void()> drain_complete_cb) PURE;
 
   /**
-   * @return whether the drain sequence has started.
+   * @return whether the drain sequence has started for this direction.
    */
-  virtual bool draining() const PURE;
+  virtual bool draining(Network::DrainDirection) const PURE;
 
   /**
    * Invoked in the newly launched primary process to begin the parent shutdown sequence. At the end

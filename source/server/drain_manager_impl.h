@@ -30,7 +30,9 @@ public:
   // Server::DrainManager
   void startDrainSequence(Network::DrainDirection direction,
                           std::function<void()> drain_complete_cb) override;
-  bool draining() const override { return draining_.load().first; }
+  bool draining(Network::DrainDirection direction) const override {
+    return draining_.load().first && direction <= draining_.load().second;
+  }
   void startParentShutdownSequence() override;
 
 private:
@@ -41,8 +43,8 @@ private:
     Network::DrainDirection second;
   };
   std::atomic<DrainPair> draining_{DrainPair{false, Network::DrainDirection::None}};
-  // A vector of timers keyed by the direction that triggered the drain
-  std::vector<Event::TimerPtr> drain_tick_timers_;
+  // A map of timers keyed by the direction that triggered the drain
+  std::map<Network::DrainDirection, Event::TimerPtr> drain_tick_timers_;
   std::map<Network::DrainDirection, MonotonicTime> drain_deadlines_ = {
       {Network::DrainDirection::InboundOnly, MonotonicTime()},
       {Network::DrainDirection::All, MonotonicTime()}};

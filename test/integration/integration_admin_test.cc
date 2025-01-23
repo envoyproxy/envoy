@@ -518,13 +518,20 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_EQ("OK\n", response->body());
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("inbound_0"), "GET", "/", "",
-                                                downstreamProtocol(), version_);
-  EXPECT_TRUE(response->complete());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  IntegrationStreamDecoderPtr response_2;
+  while (!test_server_->counter("inbound_only.config_test.downstream_cx_drain_close")->value()) {
+    response_2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response_2->waitForEndStream());
+  }
+  EXPECT_TRUE(response_2->complete());
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   } else {
-    EXPECT_EQ("close", response->headers().getConnectionValue());
+    EXPECT_EQ("close", response_2->headers().getConnectionValue());
   }
 
   // Validate that the inbound listener has been stopped.

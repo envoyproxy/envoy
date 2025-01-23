@@ -37,7 +37,7 @@ Http::Code ListenersHandler::handlerDrainListeners(Http::ResponseHeaderMap&,
     // 1. we are already draining
     // 2. That drain includes the direction we're being asked to drain
     // We should just return a 200
-    auto duplicate_drain = server_.drainManager().drainClose(direction);
+    auto duplicate_drain = server_.drainManager().draining(direction);
     if (duplicate_drain) {
       response.add("OK\n");
       return Http::Code::OK;
