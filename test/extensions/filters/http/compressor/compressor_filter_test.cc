@@ -309,7 +309,7 @@ TEST_F(CompressorFilterTest, CompressRequestAndDisabled) {
   }
 }
 )EOF");
-  doRequestNoCompression({{":method", "post"}, {"content-length", "256"}}, false);
+  doRequestNoCompression({{":method", "post"}, {"content-length", "256"}});
   Http::TestResponseHeaderMapImpl headers{{":method", "post"}, {"content-length", "256"}};
   doResponseNoCompression(headers);
 }
@@ -358,8 +358,7 @@ TEST_F(CompressorFilterTest, CompressRequestAndDisabledWithXHeaderFalse) {
   }
 }
 )EOF");
-  doRequestNoCompression(
-      {{":method", "post"}, {"X-Request-Compression", "false"}, {"content-length", "256"}}, false);
+  doRequestNoCompression({{":method", "post"}, {"X-Request-Compression", "false"}, {"content-length", "256"}});
   Http::TestResponseHeaderMapImpl headers{{":method", "post"}, {"content-length", "256"}};
   doResponseNoCompression(headers);
 }
