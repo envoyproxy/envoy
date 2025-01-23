@@ -5,6 +5,7 @@
 #include "source/common/http/utility.h"
 #include "source/extensions/filters/http/cache/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
 #include "source/extensions/filters/http/cache/cacheability_utils.h"
 #include "source/extensions/filters/http/cache/range_utils.h"
 #include "source/extensions/filters/http/cache/upstream_request.h"
@@ -18,14 +19,19 @@ using CancelWrapper::cancelWrapped;
 
 class UpstreamRequestWithCacheabilityReset : public HttpSource {
 public:
-  UpstreamRequestWithCacheabilityReset(std::unique_ptr<HttpSource> original_source,
-                                       std::shared_ptr<ActiveCacheEntry> entry)
-      : original_source_(std::move(original_source)), entry_(std::move(entry)) {}
+  UpstreamRequestWithCacheabilityReset(
+      std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker,
+      std::unique_ptr<HttpSource> original_source, std::shared_ptr<ActiveCacheEntry> entry)
+      : cacheable_response_checker_(cacheable_response_checker),
+        original_source_(std::move(original_source)), entry_(std::move(entry)) {}
   void getHeaders(GetHeadersCallback&& cb) override {
     original_source_->getHeaders(
-        [entry = std::move(entry_), cb = std::move(cb)](Http::ResponseHeaderMapPtr headers,
-                                                        EndStream end_stream) mutable {
-          entry->maybeBecomeCacheable(*headers);
+        [entry = std::move(entry_), cb = std::move(cb),
+         cacheable_response_checker = std::move(cacheable_response_checker_)](
+            Http::ResponseHeaderMapPtr headers, EndStream end_stream) mutable {
+          if (cacheable_response_checker->isCacheableResponse(*headers)) {
+            entry->clearUncacheableState();
+          }
           cb(std::move(headers), end_stream);
         });
   }
@@ -37,6 +43,7 @@ public:
   }
 
 private:
+  std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker_;
   std::unique_ptr<HttpSource> original_source_;
   std::shared_ptr<ActiveCacheEntry> entry_;
 };
@@ -133,17 +140,12 @@ std::shared_ptr<ActiveCache> ActiveCache::create(TimeSource& time_source,
 ActiveCacheEntry::ActiveCacheEntry(std::weak_ptr<ActiveCacheImpl> cache, const Key& key)
     : cache_(std::move(cache)), key_(key) {}
 
-void ActiveCacheEntry::maybeBecomeCacheable(Http::ResponseHeaderMap& response_headers) {
+void ActiveCacheEntry::clearUncacheableState() {
   absl::MutexLock lock(&mu_);
   if (state_ != State::NotCacheable) {
     return;
   }
-  ASSERT(!response_headers.empty());
-  // TODO: check cacheability, only change state if response is cacheable.
-  // Without this, an upstream error will prevent caching on subsequent success.
-  if (false) {
-    state_ = State::New;
-  }
+  state_ = State::New;
 }
 
 void ActiveCacheEntry::wantHeaders(Event::Dispatcher&, SystemTime lookup_timestamp,
@@ -322,8 +324,8 @@ static void postUpstreamPassThroughWithReset(ActiveCacheEntry::LookupSubscriber&
     auto upstream = sub.context_->lookup().upstreamRequestFactory().create();
     upstream->sendHeaders(
         Http::createHeaderMap<Http::RequestHeaderMapImpl>(sub.context_->lookup().requestHeaders()));
-    result->http_source_ =
-        std::make_unique<UpstreamRequestWithCacheabilityReset>(std::move(upstream), entry);
+    result->http_source_ = std::make_unique<UpstreamRequestWithCacheabilityReset>(
+        sub.context_->lookup().cacheableResponseChecker(), std::move(upstream), entry);
     result->status_ = CacheEntryStatus::Uncacheable;
     sub.callback_(std::move(result));
   });
@@ -716,9 +718,7 @@ void ActiveCacheEntry::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, End
   if (!cl.empty()) {
     absl::SimpleAtoi(cl, &content_length_header_) || (content_length_header_ = 0);
   }
-  const VaryAllowList& vary_allow_list =
-      lookup_subscribers_.front().context_->lookup().varyAllowList();
-  if (!CacheabilityUtils::isCacheableResponse(*headers, vary_allow_list)) {
+  if (!lookup_subscribers_.front().context_->lookup().isCacheableResponse(*headers)) {
     state_ = State::NotCacheable;
     for (LookupSubscriber& sub : lookup_subscribers_) {
       sub.context_->setContentLength(content_length_header_);

@@ -51,6 +51,10 @@ CacheFilterConfig::CacheFilterConfig(
       cluster_manager_(context.clusterManager()), active_cache_(std::move(active_cache)),
       stats_(std::move(stats)) {}
 
+bool CacheFilterConfig::isCacheableResponse(const Http::ResponseHeaderMap& headers) const {
+  return CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_);
+}
+
 CacheFilter::CacheFilter(std::shared_ptr<const CacheFilterConfig> config) : config_(config) {}
 
 void CacheFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
@@ -134,8 +138,7 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
       decoder_callbacks_->dispatcher(), *async_client, config_->upstreamOptions());
   auto lookup_request = std::make_unique<ActiveLookupRequest>(
       headers, std::move(upstream_request_factory), *cluster_name, decoder_callbacks_->dispatcher(),
-      config_->timeSource().systemTime(), config_->varyAllowList(),
-      config_->ignoreRequestCacheControlHeader());
+      config_->timeSource().systemTime(), config_, config_->ignoreRequestCacheControlHeader());
   is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
   config_->activeCache().lookup(

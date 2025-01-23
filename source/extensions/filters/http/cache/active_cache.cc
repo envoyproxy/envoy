@@ -11,16 +11,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-ActiveLookupRequest::ActiveLookupRequest(const Http::RequestHeaderMap& request_headers,
-                                         UpstreamRequestFactoryPtr upstream_request_factory,
-                                         absl::string_view cluster_name,
-                                         Event::Dispatcher& dispatcher, SystemTime timestamp,
-                                         const VaryAllowList& vary_allow_list,
-                                         bool ignore_request_cache_control_header)
+ActiveLookupRequest::ActiveLookupRequest(
+    const Http::RequestHeaderMap& request_headers,
+    UpstreamRequestFactoryPtr upstream_request_factory, absl::string_view cluster_name,
+    Event::Dispatcher& dispatcher, SystemTime timestamp,
+    const std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker,
+    bool ignore_request_cache_control_header)
     : upstream_request_factory_(std::move(upstream_request_factory)), dispatcher_(dispatcher),
       key_(CacheHeadersUtils::makeKey(request_headers, cluster_name)),
       request_headers_(Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers)),
-      vary_allow_list_(vary_allow_list), timestamp_(timestamp) {
+      cacheable_response_checker_(std::move(cacheable_response_checker)), timestamp_(timestamp) {
   if (!ignore_request_cache_control_header) {
     initializeRequestCacheControl(request_headers);
   }

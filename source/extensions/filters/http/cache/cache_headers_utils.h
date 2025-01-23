@@ -137,6 +137,14 @@ void getAllMatchingHeaderNames(const Http::HeaderMap& headers,
 std::vector<absl::string_view> parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& entry);
 } // namespace CacheHeadersUtils
 
+// Helper abstraction for a container that contains a VaryAllowList.
+class CacheableResponseChecker {
+public:
+  // Calls CacheabilityUtils::isCacheableResponse with the contained VaryAllowList.
+  virtual bool isCacheableResponse(const Http::ResponseHeaderMap& headers) const PURE;
+  virtual ~CacheableResponseChecker() = default;
+};
+
 class VaryAllowList {
 public:
   // Parses the allow list from the Cache Config into the object's private allow_list_.

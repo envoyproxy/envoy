@@ -17,12 +17,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-class CacheFilterConfig {
+class CacheFilterConfig : public CacheableResponseChecker {
 public:
   CacheFilterConfig(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
                     std::shared_ptr<ActiveCache> active_cache, CacheFilterStatsPtr stats,
                     Server::Configuration::CommonFactoryContext& context);
 
+  // Implements CacheableResponseChecker::isCacheableResponse.
+  bool isCacheableResponse(const Http::ResponseHeaderMap& headers) const override;
   // The allow list rules that decide if a header can be varied upon.
   const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
   TimeSource& timeSource() const { return time_source_; }

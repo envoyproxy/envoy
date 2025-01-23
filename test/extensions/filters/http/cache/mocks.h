@@ -112,6 +112,11 @@ public:
   MOCK_METHOD(UpstreamRequestPtr, create, ());
 };
 
+class MockCacheableResponseChecker : public CacheableResponseChecker {
+public:
+  MOCK_METHOD(bool, isCacheableResponse, (const Http::ResponseHeaderMap& h), (const));
+};
+
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

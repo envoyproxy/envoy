@@ -20,6 +20,7 @@ namespace {
 
 using ::testing::_;
 using ::testing::AllOf;
+using ::testing::AnyNumber;
 using ::testing::Between;
 using ::testing::ElementsAre;
 using ::testing::Eq;
@@ -31,6 +32,7 @@ using ::testing::MockFunction;
 using ::testing::NotNull;
 using ::testing::Pointee;
 using ::testing::Property;
+using ::testing::Return;
 
 template <typename T> T consumeCallback(T& cb) {
   T ret = std::move(cb);
@@ -50,7 +52,8 @@ protected:
   std::vector<UpstreamRequest*> fake_upstreams_;
   std::vector<Http::RequestHeaderMapPtr> fake_upstream_sent_headers_;
   std::vector<GetHeadersCallback> fake_upstream_get_headers_callbacks_;
-  std::unique_ptr<VaryAllowList> vary_allow_list_;
+  std::shared_ptr<MockCacheableResponseChecker> mock_cacheable_response_checker_ =
+      std::make_shared<MockCacheableResponseChecker>();
 
   void advanceTime(std::chrono::milliseconds increment) {
     SystemTime current_time = time_system_.systemTime();
@@ -59,9 +62,9 @@ protected:
   }
 
   void SetUp() override {
-    Protobuf::RepeatedPtrField<::envoy::type::matcher::v3::StringMatcher> proto_allow_list;
-    NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
-    vary_allow_list_ = std::make_unique<VaryAllowList>(proto_allow_list, factory_context);
+    EXPECT_CALL(*mock_cacheable_response_checker_, isCacheableResponse)
+        .Times(AnyNumber())
+        .WillRepeatedly(Return(true));
     auto mock_http_cache = std::make_unique<MockHttpCache>();
     mock_http_cache_ = mock_http_cache.get();
     active_cache_ = ActiveCache::create(api_->timeSource(), std::move(mock_http_cache));
@@ -126,7 +129,7 @@ protected:
   ActiveLookupRequestPtr testLookupRequest(Http::RequestHeaderMap& headers) {
     return std::make_unique<ActiveLookupRequest>(headers, mockUpstreamFactory(), "test_cluster",
                                                  *dispatcher_, api_->timeSource().systemTime(),
-                                                 *vary_allow_list_, false);
+                                                 mock_cacheable_response_checker_, false);
   }
 
   ActiveLookupRequestPtr testLookupRequest(absl::string_view path) {
@@ -258,6 +261,10 @@ TEST_F(ActiveCacheTest, CacheDeletionDuringLookupStillCompletesLookup) {
 }
 
 TEST_F(ActiveCacheTest, CacheMissWithUncacheableResponseProvokesPassThrough) {
+  Mock::VerifyAndClearExpectations(mock_cacheable_response_checker_.get());
+  EXPECT_CALL(*mock_cacheable_response_checker_, isCacheableResponse)
+      .Times(testing::AnyNumber())
+      .WillRepeatedly(testing::Return(false));
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(3);
   ActiveLookupResultPtr result1, result2, result3;

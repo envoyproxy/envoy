@@ -16,11 +16,12 @@ namespace Cache {
 class ActiveLookupRequest {
 public:
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
-  ActiveLookupRequest(const Http::RequestHeaderMap& request_headers,
-                      UpstreamRequestFactoryPtr upstream_request_factory,
-                      absl::string_view cluster_name, Event::Dispatcher& dispatcher,
-                      SystemTime timestamp, const VaryAllowList& vary_allow_list,
-                      bool ignore_request_cache_control_header);
+  ActiveLookupRequest(
+      const Http::RequestHeaderMap& request_headers,
+      UpstreamRequestFactoryPtr upstream_request_factory, absl::string_view cluster_name,
+      Event::Dispatcher& dispatcher, SystemTime timestamp,
+      const std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker,
+      bool ignore_request_cache_control_header);
 
   const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
 
@@ -29,7 +30,12 @@ public:
   const Key& key() const { return key_; }
 
   Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
-  const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
+  bool isCacheableResponse(const Http::ResponseHeaderMap& headers) const {
+    return cacheable_response_checker_->isCacheableResponse(headers);
+  }
+  std::shared_ptr<const CacheableResponseChecker> cacheableResponseChecker() const {
+    return cacheable_response_checker_;
+  }
   UpstreamRequestFactory& upstreamRequestFactory() const { return *upstream_request_factory_; }
   Event::Dispatcher& dispatcher() const { return dispatcher_; }
   SystemTime timestamp() const { return timestamp_; }
@@ -49,7 +55,7 @@ private:
   Key key_;
   std::vector<RawByteRange> request_range_spec_;
   Http::RequestHeaderMapPtr request_headers_;
-  const VaryAllowList& vary_allow_list_;
+  const std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker_;
   // Time when this LookupRequest was created (in response to an HTTP request).
   SystemTime timestamp_;
   RequestCacheControl request_cache_control_;
