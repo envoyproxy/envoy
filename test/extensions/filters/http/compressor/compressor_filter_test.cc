@@ -290,6 +290,78 @@ TEST_F(CompressorFilterTest, CompressRequest) {
   doResponseNoCompression(headers);
 }
 
+TEST_F(CompressorFilterTest, CompressRequestAndDisabled) {
+  setUpFilter(R"EOF(
+{
+  "request_direction_config": {
+     "common_config": {
+        "enabled": {
+          "default_value": false,
+          "runtime_key": "foo_key"
+        }
+     }
+  },
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+  doRequestNoCompression({{":method", "post"}, {"content-length", "256"}}, false);
+  Http::TestResponseHeaderMapImpl headers{{":method", "post"}, {"content-length", "256"}};
+  doResponseNoCompression(headers);
+}
+
+TEST_F(CompressorFilterTest, CompressRequestAndDisabledWithXHeader) {
+  setUpFilter(R"EOF(
+{
+  "request_direction_config": {
+     "common_config": {
+        "enabled": {
+          "default_value": false,
+          "runtime_key": "foo_key"
+        }
+     }
+  },
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+  doRequestCompression({{":method", "post"}, {"X-Request-Compression", "true"}, {"content-length", "256"}}, false);
+  Http::TestResponseHeaderMapImpl headers{{":method", "post"}, {"content-length", "256"}};
+  doResponseNoCompression(headers);
+}
+
+TEST_F(CompressorFilterTest, CompressRequestAndDisabledWithXHeaderFalse) {
+  setUpFilter(R"EOF(
+{
+  "request_direction_config": {
+     "common_config": {
+        "enabled": {
+          "default_value": false,
+          "runtime_key": "foo_key"
+        }
+     }
+  },
+  "compressor_library": {
+     "name": "test",
+     "typed_config": {
+       "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+     }
+  }
+}
+)EOF");
+  doRequestNoCompression({{":method", "post"}, {"X-Request-Compression", "false"}, {"content-length", "256"}}, false);
+  Http::TestResponseHeaderMapImpl headers{{":method", "post"}, {"content-length", "256"}};
+  doResponseNoCompression(headers);
+}
+
 TEST_F(CompressorFilterTest, CompressRequestAndResponseNoContentLength) {
   setUpFilter(R"EOF(
 {
