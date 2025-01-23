@@ -62,9 +62,9 @@ MainCommonBase::MainCommonBase(const Server::Options& options, Event::TimeSystem
 #endif
 {
   if (options.mode() == Server::Mode::Serve) {
-      // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a
-      // try/catch block or not.
-      std::set_new_handler([]() { PANIC("out of memory"); });
+    // Provide consistent behavior for out-of-memory, regardless of whether it occurs in a
+    // try/catch block or not.
+    std::set_new_handler([]() { PANIC("out of memory"); });
   }
 
   logging_context_ = std::make_unique<Logger::Context>(
