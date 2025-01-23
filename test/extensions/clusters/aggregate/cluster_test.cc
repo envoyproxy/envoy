@@ -34,8 +34,12 @@ class AggregateClusterTest : public Event::TestUsingSimulatedTime, public testin
 public:
   AggregateClusterTest()
       : stat_names_(server_context_.store_.symbolTable()),
+        cluster_circuit_breakers_stat_names_(server_context_.store_.symbolTable()),
         traffic_stats_(Upstream::ClusterInfoImpl::generateStats(server_context_.store_.rootScope(),
-                                                                stat_names_, false)) {
+                                                                stat_names_, false)),
+        circuit_breakers_stats_(Upstream::ClusterInfoImpl::generateCircuitBreakersStats(
+            *server_context_.store_.rootScope(), cluster_circuit_breakers_stat_names_.default_,
+            false, cluster_circuit_breakers_stat_names_)) {
     ON_CALL(*primary_info_, name()).WillByDefault(ReturnRef(primary_name));
     ON_CALL(*secondary_info_, name()).WillByDefault(ReturnRef(secondary_name));
 
@@ -142,7 +146,9 @@ public:
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
   Upstream::ClusterTrafficStatNames stat_names_;
+  Upstream::ClusterCircuitBreakersStatNames cluster_circuit_breakers_stat_names_;
   Upstream::DeferredCreationCompatibleClusterTrafficStats traffic_stats_;
+  Upstream::ClusterCircuitBreakersStats circuit_breakers_stats_;
   std::shared_ptr<Upstream::MockClusterInfo> primary_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
   std::shared_ptr<Upstream::MockClusterInfo> secondary_info_{
@@ -168,6 +174,63 @@ public:
         - secondary
 )EOF";
 }; // namespace Aggregate
+
+TEST_F(AggregateClusterTest, CircuitBreakerPreventsChildClusterTraffic) {
+  const std::string yaml_config = R"EOF(
+    name: aggregate_cluster
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 1
+    cluster_type:
+      name: envoy.clusters.aggregate
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
+        clusters:
+        - primary
+        - secondary
+  )EOF";
+
+  initialize(yaml_config);
+
+  Upstream::ResourceManager& resource_manager =
+      cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
+
+  std::cout << circuit_breakers_stats_.cx_open_.value() << std::endl;
+
+  resource_manager.connections().inc();
+
+  std::cout << circuit_breakers_stats_.cx_open_.value() << std::endl;
+
+  resource_manager.connections().dec();
+
+  std::cout << circuit_breakers_stats_.cx_open_.value() << std::endl;
+
+  // // resource manager for the DEFAULT priority (look above^)
+  // Upstream::ResourceManager& resource_manager =
+  //     cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
+
+  // Upstream::HostSharedPtr host =
+  //     Upstream::makeTestHost(primary_info_, "tcp://127.0.0.1:80", simTime());
+
+  // EXPECT_TRUE(resource_manager.connections().canCreate());
+
+  // // try to get a host (should work because the circuit breaker is closed)
+  // Upstream::HostConstSharedPtr target = lb_->chooseHost(nullptr).host;
+  // EXPECT_EQ(host.get(), target.get());
+
+  // // create the one connection (which will trigger the circuit breaker to open)
+  // resource_manager.connections().inc();
+
+  // // try to get a host (should fail because the circuit breaker should now be open)
+  // target = lb_->chooseHost(nullptr).host;
+  // EXPECT_EQ(nullptr, target);
+
+  // // remove the one connection
+  // resource_manager.connections().dec();
+}
 
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
   initialize(default_yaml_config_);
