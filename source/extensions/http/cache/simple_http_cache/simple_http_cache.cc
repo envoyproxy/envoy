@@ -82,6 +82,8 @@ void InsertContext::onBody(AdjustedByteRange range, Buffer::InstancePtr buffer,
     return source_->getTrailers([this](Http::ResponseTrailerMapPtr trailers, EndStream end_stream) {
       onTrailers(std::move(trailers), end_stream);
     });
+  } else {
+    range = AdjustedByteRange(0, entry_->bodySize());
   }
   progress_receiver_->onBodyInserted(std::move(range), end_stream == EndStream::End);
   if (end_stream != EndStream::End) {

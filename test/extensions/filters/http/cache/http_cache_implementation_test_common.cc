@@ -282,6 +282,46 @@ TEST_P(HttpCacheImplementationTest, PutGetWithTrailers) {
   EXPECT_THAT(getBody(*lookup_result.cache_reader_, 3, 8), Pair("Value", EndStream::More));
 }
 
+TEST_P(HttpCacheImplementationTest, InsertReadingNullBufferBodyWithEndStream) {
+  const std::string request_path1("/name");
+  LookupResult lookup_result = lookup(request_path1);
+  EXPECT_THAT(lookup_result.body_length_, Eq(absl::nullopt));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"cache-control", "public,max-age=3600"}};
+  const std::string body("Hello World");
+  auto source = std::make_unique<MockHttpSource>();
+  GetBodyCallback get_body_1, get_body_2;
+  EXPECT_CALL(*source, getBody(RangeIs(0, Ge(11)), _))
+      .WillOnce([&](AdjustedByteRange, GetBodyCallback cb) { get_body_1 = std::move(cb); });
+  EXPECT_CALL(*source, getBody(RangeIs(11, Ge(11)), _))
+      .WillOnce([&](AdjustedByteRange, GetBodyCallback cb) { get_body_2 = std::move(cb); });
+  const ResponseMetadata metadata{time_system_.systemTime()};
+  auto mock_progress_receiver = std::make_shared<MockCacheProgressReceiver>();
+  CacheReaderPtr cache_reader;
+  EXPECT_CALL(*mock_progress_receiver,
+              onHeadersInserted(_, HeaderMapEqualIgnoreOrder(&response_headers), false))
+      .WillOnce([&cache_reader](CacheReaderPtr cr, Http::ResponseHeaderMapPtr, bool) {
+        cache_reader = std::move(cr);
+      });
+  cache().insert(dispatcher(), simpleKey(request_path1),
+                 Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers), metadata,
+                 std::move(source), mock_progress_receiver);
+  pumpDispatcher();
+  Mock::VerifyAndClearExpectations(mock_progress_receiver.get());
+  ASSERT_THAT(cache_reader, NotNull());
+  ASSERT_THAT(get_body_1, NotNull());
+  EXPECT_CALL(*mock_progress_receiver, onBodyInserted(RangeIs(0, 11), false));
+  get_body_1(std::make_unique<Buffer::OwnedImpl>("Hello World"), EndStream::More);
+  pumpDispatcher();
+  Mock::VerifyAndClearExpectations(mock_progress_receiver.get());
+  ASSERT_THAT(get_body_2, NotNull());
+  EXPECT_CALL(*mock_progress_receiver, onBodyInserted(RangeIs(0, 11), true));
+  get_body_2(nullptr, EndStream::End);
+  pumpDispatcher();
+}
+
 TEST_P(HttpCacheImplementationTest, ReadingFromBodyDuringInsert) {
   const std::string request_path1("/name");
   LookupResult lookup_result = lookup(request_path1);
