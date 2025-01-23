@@ -85,6 +85,7 @@ build:mobile-dbg-ios --config=ios
 build:mobile-test-android --define=static_extension_registration=disabled
 # build:mobile-android --android_crosstool_top=@androidndk//:toolchain
 # build:mobile-android --noincompatible_enable_android_toolchain_resolution
+build:mobile-android --android_platforms=//:android_x86_64
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -110,7 +111,6 @@ build:mobile-remote-release-clang --config=ci
 build:mobile-remote-release-clang --config=remote
 
 build:mobile-remote-release-clang-android --config=mobile-remote-release-clang
-build:mobile-remote-release-clang-android --android_platforms=//:android_x86_64
 build:mobile-remote-release-clang-android --linkopt=-fuse-ld=lld
 build:mobile-remote-release-clang-android --config=mobile-android
 # build:mobile-remote-release-clang-android --fat_apk_cpu=x86_64
