@@ -304,13 +304,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     if (auth_header_str == "magic_fill_cache_for_testing") {
       for (std::size_t i = 0; i < config_->responseCache().getMaxCacheSize() - 10; ++i) {
         std::string test_key = "test_key_" + std::to_string(i);
-        config_->responseCache().Insert(test_key.c_str(), 200);
+        config_->responseCache().Insert(test_key, 200);
       }
     }
 
     if (config_->responseCacheRememberBodyHeaders()) {
-      auto cached_response = config_->responseCache().Get<Filters::Common::ExtAuthz::Response>(
-          auth_header_str.c_str());
+      auto cached_response =
+          config_->responseCache().Get<Filters::Common::ExtAuthz::Response>(auth_header_str);
       if (cached_response.has_value()) {
         ENVOY_STREAM_LOG(info, "Cache HIT for token (full response) {}: {}", *decoder_callbacks_,
                          auth_header_str, "response");
@@ -323,7 +323,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       }
     } else {
       // Retrieve the HTTP status code from the cache
-      auto cached_status_code = config_->responseCache().Get<uint16_t>(auth_header_str.c_str());
+      auto cached_status_code = config_->responseCache().Get<uint16_t>(auth_header_str);
       if (cached_status_code.has_value()) {
         ENVOY_STREAM_LOG(info, "Cache HIT for token {}: HTTP status {}", *decoder_callbacks_,
                          auth_header_str, *cached_status_code);
@@ -567,10 +567,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     ENVOY_LOG(info, "Caching response: {} with HTTP status: {}", auth_header_str, http_status_code);
     // If response_cache_remember_body_headers_ is set, remember the whole response
     if (config_->responseCacheRememberBodyHeaders()) {
-      config_->responseCache().Insert<Filters::Common::ExtAuthz::Response>(auth_header_str.c_str(),
+      config_->responseCache().Insert<Filters::Common::ExtAuthz::Response>(auth_header_str,
                                                                            *response);
     } else {
-      config_->responseCache().Insert<uint16_t>(auth_header_str.c_str(),
+      config_->responseCache().Insert<uint16_t>(auth_header_str,
                                                 http_status_code); // Store the HTTP status code
     }
   }

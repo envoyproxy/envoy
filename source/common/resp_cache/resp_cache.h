@@ -31,33 +31,28 @@ public:
         eviction_threshold_ratio(eviction_threshold_ratio),
         random_generator(std::random_device{}()), time_source_(time_source) {}
 
-  ~RespCache() {
-    for (auto& pair : cache_items_map) {
-      free(const_cast<char*>(pair.first));
-    }
-  }
+  ~RespCache() = default;
 
   // Public getter method for max_cache_size
   std::size_t getMaxCacheSize() const { return max_cache_size; }
 
-  template <typename T> bool Insert(const char* key, const T& value, int ttl_seconds = -1) {
+  template <typename T> bool Insert(const std::string& key, const T& value, int ttl_seconds = -1) {
     auto expiration_time = CalculateExpirationTime(ttl_seconds);
     CacheItem item(value, expiration_time);
     return InsertInternal(key, std::move(item));
   }
 
-  bool Erase(const char* key) {
+  bool Erase(const std::string& key) {
     Thread::LockGuard lock{mutex_};
     auto it = cache_items_map.find(key);
     if (it != cache_items_map.end()) {
-      free(const_cast<char*>(it->first));
       cache_items_map.erase(it);
       return true;
     }
     return false;
   }
 
-  template <typename T> absl::optional<T> Get(const char* key) {
+  template <typename T> absl::optional<T> Get(const std::string& key) {
     Thread::LockGuard lock{mutex_};
     auto it = cache_items_map.find(key);
     if (it != cache_items_map.end()) {
@@ -65,7 +60,6 @@ public:
         return *std::static_pointer_cast<T>(it->second.value);
       } else {
         // Item has expired
-        free(const_cast<char*>(it->first));
         cache_items_map.erase(it);
       }
     }
@@ -106,17 +100,16 @@ private:
     return time_source_.monotonicTime() + jittered_ttl;
   }
 
-  bool InsertInternal(const char* key, CacheItem&& item) {
+  bool InsertInternal(const std::string& key, CacheItem&& item) {
     Thread::LockGuard lock{mutex_};
-    const char* c_key = strdup(key);
-    auto it = cache_items_map.find(c_key);
+    auto it = cache_items_map.find(key);
     if (it == cache_items_map.end()) {
       if (cache_items_map.size() >= max_cache_size) {
         Evict();
       }
-      cache_items_map[c_key] = std::move(item);
+      cache_items_map[key] = std::move(item);
     } else {
-      cache_items_map[c_key] = std::move(item);
+      cache_items_map[key] = std::move(item);
     }
     return true;
   }
@@ -176,7 +169,6 @@ private:
       auto item_ttl = it->second.expiration_time - current_time;
       if (item_ttl.count() < 0 || item_ttl < eviction_threshold) {
         auto it_next = std::next(it);
-        free(const_cast<char*>(it->first));
         cache_items_map.erase(it);
         it = it_next;
         removed++;
@@ -201,21 +193,8 @@ private:
     // std::cout << "Real time: " << elapsed_real_time.count() << " microseconds\n";
     // std::cout << "CPU time: " << elapsed_cpu_time << " microseconds\n";
   }
-  struct CharPtrHash {
-    std::size_t operator()(const char* str) const {
-      std::size_t hash = 0;
-      while (*str) {
-        hash = hash * 101 + *str++;
-      }
-      return hash;
-    }
-  };
 
-  struct CharPtrEqual {
-    bool operator()(const char* lhs, const char* rhs) const { return std::strcmp(lhs, rhs) == 0; }
-  };
-
-  absl::flat_hash_map<const char*, CacheItem, CharPtrHash, CharPtrEqual> cache_items_map;
+  absl::flat_hash_map<std::string, CacheItem> cache_items_map;
 
   mutable Thread::MutexBasicLockable
       mutex_; // Mark mutex_ as mutable to allow locking in const methods
