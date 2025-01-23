@@ -217,10 +217,10 @@ TEST_F(AggregateClusterTest, CircuitBreakerPreventsChildClusterTraffic) {
   Upstream::ResourceManager& resource_manager =
       cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
 
-  // we can create new connections    
+  // the circuit breaker starts closed, so we should be able to create new connections    
   EXPECT_TRUE(resource_manager.connections().canCreate());
 
-  // first call to the load balancer: it should return a host from the primary cluster
+  // first call to the load balancer: should return a host from the primary cluster
   EXPECT_EQ(host.get(), lb_->chooseHost(nullptr).host.get());
 
   // add a connection, the circuit breaker is now open
@@ -229,16 +229,16 @@ TEST_F(AggregateClusterTest, CircuitBreakerPreventsChildClusterTraffic) {
   // we should not be able to create anymore connections
   EXPECT_FALSE(resource_manager.connections().canCreate());
 
-  // second call to the load balancer: it should not return a host
+  // second call to the load balancer: should not return a host
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 
-  // remove thec connection, the circuit breaker is now closed
+  // remove the connection, the circuit breaker is now closed
   resource_manager.connections().dec();
 
   // we should be able to create new connections
   EXPECT_TRUE(resource_manager.connections().canCreate());
 
-  // third call to the load balancer: it should return a host from the primary cluster again
+  // third call to the load balancer: should return a host from the primary cluster again
   EXPECT_EQ(host.get(), lb_->chooseHost(nullptr).host.get());
 }
 
