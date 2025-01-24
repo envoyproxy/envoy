@@ -83,6 +83,11 @@ protected:
   ThreadLocal::InstanceImplPtr tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
   Stats::ThreadLocalStoreImplPtr stats_store_;
+  // logging_context_ is only used in (some) subclasses, but it must be declared here so that it's
+  // destructed after the server_. This is necessary because the Server and its threads may log
+  // during destruction, causing data race issues with the Context's destruction and activation of
+  // the saved context.
+  std::unique_ptr<Logger::Context> logging_context_;
   std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
   std::unique_ptr<Server::Instance> server_;
 

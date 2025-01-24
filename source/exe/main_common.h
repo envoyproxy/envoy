@@ -37,9 +37,6 @@ public:
 
   bool run();
 
-private:
-  std::unique_ptr<Logger::Context> logging_context_;
-
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 public:
   using AdminRequestFn =
