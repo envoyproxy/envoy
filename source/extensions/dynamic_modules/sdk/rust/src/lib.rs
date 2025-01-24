@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 
 pub mod buffer;
-pub use buffer::*;
+pub use buffer::EnvoyBuffer;
 use mockall::predicate::*;
 use mockall::*;
 

@@ -93,19 +93,14 @@ fn test_body_callbacks_filter_on_bodies() {
   let mut f = BodyCallbacksFilter::default();
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
-  // This serves as a buffer provided by Envoy. To test the write and drain methods, we need to
-  // ensure that the buffer is mutable.
-  static mut BUF: [[u8; 4]; 3] = [*b"nice", *b"nice", *b"nice"];
-
   envoy_filter
     .expect_get_request_body()
-    .returning(move || {
-      let ret = vec![
-        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[0]) }),
-        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[1]) }),
-        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[2]) }),
-      ];
-      Some(ret)
+    .returning(|| {
+      Some(vec![
+        EnvoyBuffer::new("nice"),
+        EnvoyBuffer::new("nice"),
+        EnvoyBuffer::new("nice"),
+      ])
     })
     .times(2);
   envoy_filter
@@ -119,16 +114,14 @@ fn test_body_callbacks_filter_on_bodies() {
     .times(2);
   f.on_request_body(&mut envoy_filter, true);
 
-  unsafe { BUF = [*b"cool", *b"cool", *b"cool"] };
   envoy_filter
     .expect_get_response_body()
-    .returning(move || {
-      let ret = vec![
-        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[0]) }),
-        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[1]) }),
-        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[2]) }),
-      ];
-      Some(ret)
+    .returning(|| {
+      Some(vec![
+        EnvoyBuffer::new("cool"),
+        EnvoyBuffer::new("cool"),
+        EnvoyBuffer::new("cool"),
+      ])
     })
     .times(2);
   envoy_filter
