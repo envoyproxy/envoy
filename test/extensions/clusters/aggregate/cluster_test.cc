@@ -276,7 +276,8 @@ TEST_F(AggregateClusterTest, CircuitBreakerMaxPendingRequestsTest) {
 
   // get the circuit breaker stats we are interested in, to assert against
   Stats::Gauge& rq_pending_open = getCircuitBreakersStatByPriority("default", "rq_pending_open");
-  Stats::Gauge& remaining_pending = getCircuitBreakersStatByPriority("default", "remaining_pending");
+  Stats::Gauge& remaining_pending =
+      getCircuitBreakersStatByPriority("default", "remaining_pending");
 
   // check the yaml config is set correctly
   // we should have a maximum of 1 pending request
@@ -314,6 +315,72 @@ TEST_F(AggregateClusterTest, CircuitBreakerMaxPendingRequestsTest) {
   EXPECT_EQ(1U, remaining_pending.value());
   // check that the circuit breaker is closed again
   EXPECT_EQ(0U, rq_pending_open.value());
+}
+
+TEST_F(AggregateClusterTest, CircuitBreakerMaxRequestsTest) {
+  const std::string yaml_config = R"EOF(
+    name: aggregate_cluster
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_requests: 1
+        track_remaining: true
+    cluster_type:
+      name: envoy.clusters.aggregate
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
+        clusters:
+        - primary
+        - secondary
+)EOF";
+
+  initialize(yaml_config);
+
+  // resource manager for the DEFAULT priority (look above^)
+  Upstream::ResourceManager& resource_manager =
+      cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
+
+  Stats::Gauge& rq_open = getCircuitBreakersStatByPriority("default", "rq_open");
+  Stats::Gauge& remaining_rq = getCircuitBreakersStatByPriority("default", "remaining_rq");
+
+  // check the yaml config is set correctly
+  // we should have a maximum of 1 request available to use
+  EXPECT_EQ(1U, resource_manager.requests().max());
+
+  // check that we can create a new request
+  EXPECT_TRUE(resource_manager.requests().canCreate());
+  // check the requests count is 0
+  EXPECT_EQ(0U, resource_manager.requests().count());
+  // check that we have 1 remaining request
+  EXPECT_EQ(1U, remaining_rq.value());
+  // check the circuit breaker is closed
+  EXPECT_EQ(0U, rq_open.value());
+
+  // create that one request
+  resource_manager.requests().inc();
+
+  // check the request count is now 1
+  EXPECT_EQ(1U, resource_manager.requests().count());
+  // make sure we are NOT allowed to create anymore request
+  EXPECT_FALSE(resource_manager.requests().canCreate());
+  // check that we have 0 remaining requests
+  EXPECT_EQ(0U, remaining_rq.value());
+  // check the circuit breaker is now open
+  EXPECT_EQ(1U, rq_open.value());
+
+  // remove that one request
+  resource_manager.requests().dec();
+
+  // check the request count is now 0 again
+  EXPECT_EQ(0U, resource_manager.requests().count());
+  // check that we can create a new request again
+  EXPECT_TRUE(resource_manager.requests().canCreate());
+  // check that we have 1 remaining request again
+  EXPECT_EQ(1U, remaining_rq.value());
+  // check that the circuit breaker is closed again
+  EXPECT_EQ(0U, rq_open.value());
 }
 
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
