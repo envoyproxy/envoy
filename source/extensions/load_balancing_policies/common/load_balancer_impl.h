@@ -237,7 +237,7 @@ class ZoneAwareLoadBalancerBase : public LoadBalancerBase {
 public:
   using LocalityLbConfig = envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig;
 
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+  HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
 
 protected:
   // Both priority_set and local_priority_set if non-null must have at least one host set.

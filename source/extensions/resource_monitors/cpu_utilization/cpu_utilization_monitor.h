@@ -1,7 +1,6 @@
 #pragma once
 
-#include <chrono>
-
+#include "envoy/common/time.h"
 #include "envoy/extensions/resource_monitors/cpu_utilization/v3/cpu_utilization.pb.h"
 #include "envoy/server/resource_monitor.h"
 

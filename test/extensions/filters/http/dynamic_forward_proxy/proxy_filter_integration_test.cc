@@ -463,7 +463,7 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithTrace) {
       name: envoy.network.dns_resolver.getaddrinfo
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
-  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000000001);
+  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.001);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -494,7 +494,7 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
       name: envoy.network.dns_resolver.getaddrinfo
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
-  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.000000001);
+  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.001);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -504,6 +504,49 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
   EXPECT_THAT(waitForAccessLog(access_log_name_),
               HasSubstr("dns_resolution_failure{resolve_timeout}"));
 }
+
+TEST_P(ProxyFilterIntegrationTest, DisableResolveTimeout) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+)EOF"));
+
+  upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
+  autonomous_upstream_ = true;
+  std::string resolver_config = R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+  initializeWithArgs(1024, 1024, "", resolver_config, false, /* dns_query_timeout= */ 0);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// TODO(yanavlasov) Enable per #26642
+#ifndef ENVOY_ENABLE_UHV
+TEST_P(ProxyFilterIntegrationTest, FailOnEmptyHostHeader) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", ""}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("empty_host_header"));
+}
+#endif
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -571,7 +614,18 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) { requestWithUnknow
 // TODO(yanavlasov) Enable per #26642
 #ifndef ENVOY_ENABLE_UHV
 TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
-  requestWithUnknownDomainTest("", "\x00\x00.google.com");
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initializeWithArgs(1024, 1024, "", "");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  default_request_headers_.setHost("\x00\x00.google.com");
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  // The suspicious host will be set to an empty host resulting in a bad request (400).
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  std::string access_log = waitForAccessLog(access_log_name_);
+  EXPECT_THAT(access_log, HasSubstr("empty_host_header"));
+  EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
 }
 #endif
 

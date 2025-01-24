@@ -1,3 +1,4 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 load("@rules_foreign_cc//foreign_cc:make.bzl", "make")
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cmake", "envoy_package")
@@ -96,7 +97,7 @@ configure_make(
     ],
     tags = ["skip_on_windows"],
     targets = [
-        "ARFLAGS='' libs install-subdirs",
+        "ARFLAGS='' WITH_LDS='n' libs install-subdirs",
     ],
     deps = [":lz4"],
     alwayslink = True,
@@ -267,6 +268,7 @@ envoy_cmake(
     cache_entries = {
         "BUILD_CURL_EXE": "off",
         "BUILD_TESTING": "off",
+        "BUILD_LIBCURL_DOCS": "off",
         "BUILD_SHARED_LIBS": "off",
         "CURL_HIDDEN_SYMBOLS": "off",
         "CURL_USE_LIBSSH2": "off",

@@ -653,12 +653,12 @@ public:
 
     init({{"tcp://127.0.0.1:80", {{"version", "1.0"}}}});
 
-    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+    EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
     HostSharedPtr added_host = makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}});
     modifyHosts({added_host}, {host_set_.hosts_.back()});
 
-    EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
+    EXPECT_EQ(added_host, lb_->chooseHost(nullptr).host);
     EXPECT_EQ(lb_->childLoadBalancerName(), child_lb_name);
   }
 
@@ -735,7 +735,7 @@ TEST_F(SubsetLoadBalancerTest, NoFallback) {
 
   init();
 
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
   EXPECT_EQ(0U, stats_.lb_subsets_fallback_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_selected_.value());
 
@@ -760,11 +760,11 @@ TEST_P(SubsetLoadBalancerTest, NoFallbackAfterUpdate) {
 
   init();
 
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}})}, {host_set_.hosts_.back()});
 
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, FallbackAnyEndpoint) {
@@ -773,7 +773,7 @@ TEST_F(SubsetLoadBalancerTest, FallbackAnyEndpoint) {
 
   init();
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_subsets_fallback_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_selected_.value());
 }
@@ -784,13 +784,13 @@ TEST_P(SubsetLoadBalancerTest, FallbackAnyEndpointAfterUpdate) {
 
   init();
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 
   HostSharedPtr added_host = makeHost("tcp://127.0.0.1:8000", {{"version", "1.0"}});
   modifyHosts({added_host}, {host_set_.hosts_.back()});
 
-  EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(added_host, lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, FallbackDefaultSubset) {
@@ -805,7 +805,7 @@ TEST_F(SubsetLoadBalancerTest, FallbackDefaultSubset) {
       {"tcp://127.0.0.1:81", {{"version", "default"}}},
   });
 
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_subsets_fallback_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_selected_.value());
 }
@@ -824,7 +824,7 @@ TEST_F(SubsetLoadBalancerTest, FallbackPanicMode) {
       {"tcp://127.0.0.1:81", {{"version", "default"}}},
   });
 
-  EXPECT_TRUE(lb_->chooseHost(nullptr) != nullptr);
+  EXPECT_TRUE(lb_->chooseHost(nullptr).host != nullptr);
   EXPECT_EQ(1U, stats_.lb_subsets_fallback_panic_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_fallback_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_selected_.value());
@@ -840,14 +840,14 @@ TEST_P(SubsetLoadBalancerTest, FallbackPanicModeWithUpdates) {
   EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
 
   init({{"tcp://127.0.0.1:80", {{"version", "default"}}}});
-  EXPECT_TRUE(lb_->chooseHost(nullptr) != nullptr);
+  EXPECT_TRUE(lb_->chooseHost(nullptr).host != nullptr);
 
   // Removing current host, adding a new one.
   HostSharedPtr added_host = makeHost("tcp://127.0.0.2:8000", {{"version", "new"}});
   modifyHosts({added_host}, {host_set_.hosts_[0]});
 
   EXPECT_EQ(1, host_set_.hosts_.size());
-  EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
+  EXPECT_EQ(added_host, lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, FallbackDefaultSubsetAfterUpdate) {
@@ -862,14 +862,14 @@ TEST_P(SubsetLoadBalancerTest, FallbackDefaultSubsetAfterUpdate) {
       {"tcp://127.0.0.1:81", {{"version", "default"}}},
   });
 
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(nullptr).host);
 
   HostSharedPtr added_host1 = makeHost("tcp://127.0.0.1:8000", {{"version", "new"}});
   HostSharedPtr added_host2 = makeHost("tcp://127.0.0.1:8001", {{"version", "default"}});
 
   modifyHosts({added_host1, added_host2}, {host_set_.hosts_.back()});
 
-  EXPECT_EQ(added_host2, lb_->chooseHost(nullptr));
+  EXPECT_EQ(added_host2, lb_->chooseHost(nullptr).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, FallbackEmptyDefaultSubsetConvertsToAnyEndpoint) {
@@ -881,8 +881,8 @@ TEST_F(SubsetLoadBalancerTest, FallbackEmptyDefaultSubsetConvertsToAnyEndpoint) 
 
   init();
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(2U, stats_.lb_subsets_fallback_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_selected_.value());
 }
@@ -896,8 +896,8 @@ TEST_F(SubsetLoadBalancerTest, FallbackOnUnknownMetadata) {
   TestLoadBalancerContext context_unknown_key({{"unknown", "unknown"}});
   TestLoadBalancerContext context_unknown_value({{"version", "unknown"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_unknown_key));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_unknown_value));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_unknown_key).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_unknown_value).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, BalancesSubset) {
@@ -920,10 +920,10 @@ TEST_F(SubsetLoadBalancerTest, BalancesSubset) {
   TestLoadBalancerContext context_10({{"version", "1.0"}});
   TestLoadBalancerContext context_11({{"version", "1.1"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_11));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_11).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11).host);
   EXPECT_EQ(0U, stats_.lb_subsets_fallback_.value());
   EXPECT_EQ(4U, stats_.lb_subsets_selected_.value());
 }
@@ -948,10 +948,10 @@ TEST_P(SubsetLoadBalancerTest, BalancesSubsetAfterUpdate) {
   TestLoadBalancerContext context_10({{"version", "1.0"}});
   TestLoadBalancerContext context_11({{"version", "1.1"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_11));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_11).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11).host);
   EXPECT_EQ(2U, stats_.lb_subsets_created_.value());
 
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),
@@ -960,10 +960,10 @@ TEST_P(SubsetLoadBalancerTest, BalancesSubsetAfterUpdate) {
 
   TestLoadBalancerContext context_12({{"version", "1.2"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_11));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_11).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_12).host);
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
 }
@@ -986,14 +986,14 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabled) {
 
   {
     TestLoadBalancerContext context({{"version", "1.0"}});
-    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context).host);
   }
   {
     TestLoadBalancerContext context({{"version", "1.2"}});
-    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context).host);
   }
   TestLoadBalancerContext context({{"version", "1.2.1"}});
-  EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+  EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleLists) {
@@ -1015,25 +1015,25 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleLists) {
 
   {
     TestLoadBalancerContext context({{"version", "1.0"}});
-    EXPECT_TRUE(host_set_.hosts()[2] == lb_->chooseHost(&context));
-    EXPECT_TRUE(host_set_.hosts()[2] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[2] == lb_->chooseHost(&context).host);
+    EXPECT_TRUE(host_set_.hosts()[2] == lb_->chooseHost(&context).host);
   }
   {
     // This should LB between both hosts marked with version 1.2.
     TestLoadBalancerContext context({{"version", "1.2"}});
-    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
-    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context).host);
+    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context).host);
   }
   {
     // Choose a host multiple times to ensure that hosts()[0] is the *only*
     // thing selected for this subset.
     TestLoadBalancerContext context({{"version", "1.2.1"}});
-    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
-    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context).host);
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context).host);
   }
 
   TestLoadBalancerContext context({{"version", "1.2.2"}});
-  EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+  EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleListsForSingleHost) {
@@ -1056,24 +1056,24 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyEnabledMultipleListsForSingleHost) {
 
   {
     TestLoadBalancerContext context({{"version", "1.2"}, {"hardware", "a"}});
-    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
-    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context).host);
+    EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context).host);
   }
 
   {
     TestLoadBalancerContext context({{"version", "1.1"}, {"hardware", "b"}});
-    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
-    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context).host);
+    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context).host);
   }
 
   {
     TestLoadBalancerContext context({{"version", "1.1"}, {"hardware", "a"}});
-    EXPECT_TRUE(nullptr == lb_->chooseHost(&context));
+    EXPECT_TRUE(nullptr == lb_->chooseHost(&context).host);
   }
 
   TestLoadBalancerContext context({{"version", "1.2.1"}, {"hardware", "b"}});
-  EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
-  EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context));
+  EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context).host);
+  EXPECT_TRUE(host_set_.hosts()[0] == lb_->chooseHost(&context).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, ListAsAnyDisable) {
@@ -1093,10 +1093,10 @@ TEST_P(SubsetLoadBalancerTest, ListAsAnyDisable) {
 
   {
     TestLoadBalancerContext context({{"version", "1.0"}});
-    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context));
+    EXPECT_TRUE(host_set_.hosts()[1] == lb_->chooseHost(&context).host);
   }
   TestLoadBalancerContext context({{"version", "1.2"}});
-  EXPECT_TRUE(nullptr == lb_->chooseHost(&context));
+  EXPECT_TRUE(nullptr == lb_->chooseHost(&context).host);
 }
 
 // Test that adding backends to a failover group causes no problems.
@@ -1114,20 +1114,20 @@ TEST_P(SubsetLoadBalancerTest, UpdateFailover) {
 
   // Start with an empty lb. Choosing a host should result in failure.
   init({});
-  EXPECT_TRUE(nullptr == lb_->chooseHost(&context_10).get());
+  EXPECT_TRUE(nullptr == lb_->chooseHost(&context_10).host.get());
 
   // Add hosts to the group at priority 1.
   // These hosts should be selected as there are no healthy hosts with priority 0
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),
                makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})},
               {}, {}, 1);
-  EXPECT_FALSE(nullptr == lb_->chooseHost(&context_10).get());
+  EXPECT_FALSE(nullptr == lb_->chooseHost(&context_10).host.get());
 
   // Finally update the priority 0 hosts. The LB should now select hosts.
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),
                makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})},
               {}, {}, 0);
-  EXPECT_FALSE(nullptr == lb_->chooseHost(&context_10).get());
+  EXPECT_FALSE(nullptr == lb_->chooseHost(&context_10).host.get());
 }
 
 TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
@@ -1158,10 +1158,10 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13).host);
 
   // Swap the default version.
   host_set_.hosts_[0]->metadata(buildMetadata("1.2", true));
@@ -1172,10 +1172,10 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13).host);
 
   // Bump 1.0 to 1.3, one subset should be removed.
   host_set_.hosts_[1]->metadata(buildMetadata("1.3"));
@@ -1186,10 +1186,10 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10).host);
 
   // Rollback from 1.3 to 1.0.
   host_set_.hosts_[1]->metadata(buildMetadata("1.0"));
@@ -1199,10 +1199,10 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13).host);
 
   // Make 1.0 default again.
   host_set_.hosts_[1]->metadata(buildMetadata("1.0", true));
@@ -1213,10 +1213,10 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, EmptySubsetsPurged) {
@@ -1355,10 +1355,10 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13).host);
 
   // Swap the default version.
   host_set_.hosts_[0]->metadata(buildMetadata("1.2", true));
@@ -1370,10 +1370,10 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
   EXPECT_EQ(4U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_13).host);
 
   // Swap default again and remove the previous one.
   host_set_.hosts_[0]->metadata(buildMetadata("1.2"));
@@ -1384,10 +1384,10 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13).host);
 
   // Swap the default version once more, this time adding a new host and removing
   // the current default version.
@@ -1399,11 +1399,11 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_14));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_14).host);
 
   // Make 1.4 default, without hosts being added/removed.
   host_set_.hosts_[0]->metadata(buildMetadata("1.2"));
@@ -1414,11 +1414,11 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
   EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_14));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_14).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
@@ -1439,7 +1439,7 @@ TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
   HostSharedPtr host_v11 = host_set_.hosts_[1];
 
   TestLoadBalancerContext context({{"version", "1.0"}});
-  EXPECT_EQ(host_v10, lb_->chooseHost(&context));
+  EXPECT_EQ(host_v10, lb_->chooseHost(&context).host);
   EXPECT_EQ(1U, stats_.lb_subsets_selected_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_fallback_.value());
   EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
@@ -1448,7 +1448,7 @@ TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
   modifyHosts({}, {host_v10});
 
   // fallback to any endpoint
-  EXPECT_EQ(host_v11, lb_->chooseHost(&context));
+  EXPECT_EQ(host_v11, lb_->chooseHost(&context).host);
   EXPECT_EQ(1U, stats_.lb_subsets_selected_.value());
   EXPECT_EQ(1U, stats_.lb_subsets_fallback_.value());
   EXPECT_EQ(1U, stats_.lb_subsets_active_.value());
@@ -1477,12 +1477,12 @@ TEST_P(SubsetLoadBalancerTest, UpdateRemovingUnknownHost) {
 
   TestLoadBalancerContext context({{"stage", "prod"}, {"version", "1.0"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context).host);
 
   modifyHosts({}, {makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),
                    makeHost("tcp://127.0.0.1:8001", {{"stage", "prod"}, {"version", "1.2"}})});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, UpdateModifyingOnlyHostHealth) {
@@ -1510,10 +1510,10 @@ TEST_F(SubsetLoadBalancerTest, UpdateModifyingOnlyHostHealth) {
   TestLoadBalancerContext context_11({{"version", "1.1"}});
 
   // All hosts are healthy.
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_11));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_11).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11).host);
 
   host_set_.hosts_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   host_set_.hosts_[2]->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
@@ -1521,10 +1521,10 @@ TEST_F(SubsetLoadBalancerTest, UpdateModifyingOnlyHostHealth) {
   host_set_.runCallbacks({}, {});
 
   // Unhealthy hosts are excluded.
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, BalancesDisjointSubsets) {
@@ -1551,10 +1551,10 @@ TEST_F(SubsetLoadBalancerTest, BalancesDisjointSubsets) {
   TestLoadBalancerContext context_10({{"version", "1.0"}});
   TestLoadBalancerContext context_bigmem({{"hardware", "bigmem"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_bigmem));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_bigmem));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_bigmem).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_bigmem).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, BalancesOverlappingSubsets) {
@@ -1584,18 +1584,18 @@ TEST_F(SubsetLoadBalancerTest, BalancesOverlappingSubsets) {
   TestLoadBalancerContext context_dev({{"version", "999"}, {"stage", "dev"}});
   TestLoadBalancerContext context_unknown({{"version", "2.0"}, {"stage", "prod"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_10).host);
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10_prod));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10_prod));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10_prod));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10_prod).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10_prod).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10_prod).host);
 
-  EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context_dev));
-  EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context_dev));
+  EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context_dev).host);
+  EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&context_dev).host);
 
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, BalancesNestedSubsets) {
@@ -1625,16 +1625,16 @@ TEST_F(SubsetLoadBalancerTest, BalancesNestedSubsets) {
   TestLoadBalancerContext context_unknown_stage({{"stage", "larval"}});
   TestLoadBalancerContext context_unknown_version({{"version", "2.0"}, {"stage", "prod"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_prod));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_prod));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_prod));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_prod).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_prod).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_prod).host);
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_prod_10));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_prod_10));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_prod_10));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_prod_10).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_prod_10).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_prod_10).host);
 
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_stage));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_version));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_stage).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_version).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, IgnoresUnselectedMetadata) {
@@ -1656,10 +1656,10 @@ TEST_F(SubsetLoadBalancerTest, IgnoresUnselectedMetadata) {
   TestLoadBalancerContext context_ignore({{"ignore", "value"}});
   TestLoadBalancerContext context_version({{"version", "1.0"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_version));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_version));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_version).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_version).host);
 
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_ignore));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_ignore).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
@@ -1686,8 +1686,8 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   initLbConfigAndLB();
   TestLoadBalancerContext context_version({{"version", "1.0"}});
 
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_version));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_version));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_version).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_version).host);
 }
 
 // TODO(mattklein123): The following 4 tests verify basic functionality with all sub-LB tests.
@@ -1752,11 +1752,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
                  }});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
@@ -1797,11 +1797,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
                  }});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(nullptr).host);
 
   envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
@@ -1814,11 +1814,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
                    {local_hosts_->at(0)}, 0);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
@@ -1871,11 +1871,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
                  }});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(nullptr).host);
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
@@ -1928,11 +1928,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
                  }});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(nullptr).host);
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(nullptr).host);
 
   envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
@@ -1945,11 +1945,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "default"}}, local_locality)}, 0);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(nullptr).host);
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(nullptr).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
@@ -2000,11 +2000,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context).host);
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
@@ -2055,11 +2055,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context).host);
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context).host);
 
   envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
@@ -2072,11 +2072,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
                    {makeHost("tcp://127.0.0.1:9001", {{"version", "1.1"}}, local_locality)}, 0);
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(100));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context).host);
 
   // Force request out of small zone.
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsets) {
@@ -2139,11 +2139,11 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsets) {
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(666));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context).host);
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(667));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(&context).host);
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(1334));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
@@ -2208,11 +2208,11 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
   TestLoadBalancerContext context({{"version", "1.1"}});
 
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(666));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context).host);
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(667));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[2][1], lb_->chooseHost(&context).host);
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(0)).WillOnce(Return(1334));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context).host);
 
   envoy::config::core::v3::Locality local_locality;
   local_locality.set_zone("0");
@@ -2242,13 +2242,13 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
   EXPECT_CALL(random_, random())
       .WillOnce(Return(0))
       .WillOnce(Return(5830)); // 58.31% local routing chance due to rounding error
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context).host);
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(5831)).WillOnce(Return(475));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context).host);
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(476));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[3][0], lb_->chooseHost(&context).host);
   EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(9999)).WillOnce(Return(2143));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {
@@ -2294,7 +2294,7 @@ TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
 
   // Since we don't respect locality weights, the first locality is selected.
   EXPECT_CALL(random_, random()).WillOnce(Return(0));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context).host);
 }
 
 // Verifies that we do *not* invoke coarseHealth() on hosts when constructing the load balancer.
@@ -2341,7 +2341,7 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
 
   // Since we respect locality weights, the second locality is selected.
   EXPECT_CALL(random_, random()).WillOnce(Return(0));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
@@ -2381,15 +2381,15 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeights) {
   // locality to be selected less because we've excluded more hosts in that locality than in the
   // first.
   // The localities are split 50/50, but because of the scaling we expect to see 66/33 instead.
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][3], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][1], lb_->chooseHost(&context).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
@@ -2427,13 +2427,13 @@ TEST_F(SubsetLoadBalancerTest, EnabledScaleLocalityWeightsRounding) {
   TestLoadBalancerContext context({{"version", "1.0"}});
 
   // We expect to see a 33/66 split because 2 * 1 / 2 = 1 and 2 * 3 / 4 = 1.5 -> 2
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][2], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][2], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][1], lb_->chooseHost(&context).host);
 }
 
 // Regression for bug where missing locality weights crashed scaling and locality aware subset LBs.
@@ -2499,11 +2499,11 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackPerSelector) {
   TestLoadBalancerContext context_11({{"version", "1.1"}});
   TestLoadBalancerContext context_12({{"version", "1.2"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_11));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_11).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_11).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_12).host);
   EXPECT_EQ(0U, stats_.lb_subsets_fallback_.value());
   EXPECT_EQ(4U, stats_.lb_subsets_selected_.value());
 }
@@ -2528,10 +2528,10 @@ TEST_P(SubsetLoadBalancerTest, FallbackNotDefinedForIntermediateSelector) {
   TestLoadBalancerContext context_match_host0({{"stage", "dev"}});
   TestLoadBalancerContext context_stage_nx({{"stage", "test"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_stage_nx));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_stage_nx));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_stage_nx).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_stage_nx).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorFallbackOverridesTopLevelOne) {
@@ -2549,8 +2549,8 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorFallbackOverridesTopLevelOne) {
   TestLoadBalancerContext context_unknown_key({{"unknown", "unknown"}});
   TestLoadBalancerContext context_unknown_value({{"version", "unknown"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_unknown_key));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_unknown_key).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackMatchesTopLevelOne) {
@@ -2568,9 +2568,9 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorNoFallbackMatchesTopLevelOne) {
   TestLoadBalancerContext context_unknown_key({{"unknown", "unknown"}});
   TestLoadBalancerContext context_unknown_value({{"version", "unknown"}});
 
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_key));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_key).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_unknown_value).host);
 }
 
 TEST_F(SubsetLoadBalancerTest, AllowRedundantKeysForSubset) {
@@ -2619,62 +2619,62 @@ TEST_F(SubsetLoadBalancerTest, AllowRedundantKeysForSubset) {
   TestLoadBalancerContext context_empty(
       std::initializer_list<std::map<std::string, std::string>::value_type>{});
   context_empty.matches_.reset();
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_empty));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_empty).host);
 
   // Request metadata is same with {version, stage}.
   // version, stage will be kept and host 6 will be selected.
   TestLoadBalancerContext context_v_s_0({{"version", "1.0"}, {"stage", "canary"}});
-  EXPECT_EQ(host_set_.hosts_[6], lb_->chooseHost(&context_v_s_0));
+  EXPECT_EQ(host_set_.hosts_[6], lb_->chooseHost(&context_v_s_0).host);
 
   // Request metadata is superset of {version, stage}. The redundant key will be ignored.
   // version, stage will be kept and host 5 will be selected.
   TestLoadBalancerContext context_v_s_1({{"version", "1.0"}, {"stage", "dev"}, {"redundant", "X"}});
-  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context_v_s_1));
+  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&context_v_s_1).host);
 
   // Request metadata is superset of {version, stage}. The redundant key will be ignored.
   // But one of value not match, so no host will be selected.
   TestLoadBalancerContext context_v_s_2(
       {{"version", "1.0"}, {"stage", "prod"}, {"redundant", "X"}});
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_v_s_2));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_v_s_2).host);
 
   // Request metadata is same with {A, B, C} and is superset of selectors {A}, {A, B}.
   // All A, B, C will be kept and host 0 will be selected.
   TestLoadBalancerContext context_0({{"A", "A-V-0"}, {"B", "B-V-0"}, {"C", "C-V-0"}});
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_0));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_0).host);
 
   // Request metadata is same with {A, B, C} and is superset of selectors {A}, {A, B}.
   // All A, B, C will be kept But one of value not match, so no host will be selected.
   TestLoadBalancerContext context_1({{"A", "A-V-0"}, {"B", "B-V-0"}, {"C", "C-V-X"}});
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_1));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_1).host);
 
   // Request metadata is superset of selectors {A}, {A, B} {A, B, C}, {A, D}, the longest win.
   // A, B, C will be kept and D will be ignored, so host 1 will be selected.
   TestLoadBalancerContext context_2(
       {{"A", "A-V-1"}, {"B", "B-V-1"}, {"C", "C-V-1"}, {"D", "D-V-X"}});
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_2));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_2).host);
 
   // Request metadata is superset of selectors {A}, {A, B} {A, B, C}, {A, D}, the longest win.
   // A, B, C will be kept and D will be ignored, but one of value not match, so no host will be
   // selected.
   TestLoadBalancerContext context_3(
       {{"A", "A-V-1"}, {"B", "B-V-1"}, {"C", "C-V-X"}, {"D", "D-V-X"}});
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_3));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_3).host);
 
   // Request metadata is superset of selectors {A}, {A, B}, {A, D}, the longest and first win.
   // Only A, B will be kept and D will be ignored, so host 2 will be selected.
   TestLoadBalancerContext context_4({{"A", "A-V-2"}, {"B", "B-V-2"}, {"D", "D-V-X"}});
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_4));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_4).host);
 
   // Request metadata is superset of selectors {A}, {A, B}, {A, D}, the longest and first win.
   // Only A, B will be kept and D will be ignored, but one of value not match, so no host will be
   // selected.
   TestLoadBalancerContext context_5({{"A", "A-V-3"}, {"B", "B-V-X"}, {"D", "D-V-3"}});
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_5));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_5).host);
 
   // Request metadata is superset of selectors {A}, {A, D}, the longest win.
   // Only A, D will be kept and C will be ignored, so host 3 will be selected.
   TestLoadBalancerContext context_6({{"A", "A-V-3"}, {"C", "C-V-X"}, {"D", "D-V-3"}});
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_6));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_6).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAnyFallbackPerSelector) {
@@ -2709,11 +2709,11 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAnyFallbackPerSelector) {
   TestLoadBalancerContext context_app_nx({{"app", "ngnix"}});
   TestLoadBalancerContext context_foo({{"foo", "abc"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_app_nx));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_app_nx));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_app));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_ver_nx));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_foo));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_app_nx).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_app_nx).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_app).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_ver_nx).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_foo).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAfterUpdate) {
@@ -2734,7 +2734,7 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAfterUpdate) {
       {"tcp://127.0.0.1:81", {{"version", "default"}}},
   });
 
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(nullptr));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(nullptr).host);
 
   HostSharedPtr added_host1 = makeHost("tcp://127.0.0.1:8000", {{"version", "new"}});
   HostSharedPtr added_host2 = makeHost("tcp://127.0.0.1:8001", {{"version", "default"}});
@@ -2743,7 +2743,7 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorDefaultAfterUpdate) {
 
   modifyHosts({added_host1, added_host2}, {host_set_.hosts_.back()});
 
-  EXPECT_EQ(added_host2, lb_->chooseHost(&context_ver_nx));
+  EXPECT_EQ(added_host2, lb_->chooseHost(&context_ver_nx).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, SubsetSelectorAnyAfterUpdate) {
@@ -2763,13 +2763,13 @@ TEST_P(SubsetLoadBalancerTest, SubsetSelectorAnyAfterUpdate) {
 
   TestLoadBalancerContext context_ver_nx({{"version", "x"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_ver_nx));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_ver_nx).host);
 
   HostSharedPtr added_host1 = makeHost("tcp://127.0.0.1:83", {{"version", "3"}});
 
   modifyHosts({added_host1}, {host_set_.hosts_.back()});
 
-  EXPECT_EQ(added_host1, lb_->chooseHost(&context_ver_nx));
+  EXPECT_EQ(added_host1, lb_->chooseHost(&context_ver_nx).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, FallbackForCompoundSelector) {
@@ -2813,17 +2813,17 @@ TEST_P(SubsetLoadBalancerTest, FallbackForCompoundSelector) {
   TestLoadBalancerContext context_ver_stage_match_host2({{"version", "2.0"}, {"stage", "dev"}});
   TestLoadBalancerContext context_ver_stage_nx({{"version", "2.0"}, {"stage", "canary"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_ver_nx));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_hardware_nx));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_stage_nx));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_match_host2));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_match_host2));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_20));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_stage_match_host2));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_stage_match_host2));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_ver_stage_nx));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_stage_nx));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_ver_nx).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_hardware_nx).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_stage_nx).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_match_host2).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_match_host2).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_20).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_stage_match_host2).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_stage_match_host2).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&context_ver_stage_nx).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_ver_stage_nx).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, KeysSubsetFallbackChained) {
@@ -2856,12 +2856,12 @@ TEST_P(SubsetLoadBalancerTest, KeysSubsetFallbackChained) {
   TestLoadBalancerContext context_ver_hw_nx(
       {{"version", "1.2"}, {"hardware", "arm"}, {"stage", "dev"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_hw_nx));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_hw_nx));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_ver_hw_nx));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_ver_hw_nx));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_match_host0).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_hw_nx).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_hw_nx).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_ver_hw_nx).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_ver_hw_nx).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, KeysSubsetFallbackToNotExistingSelector) {
@@ -2879,7 +2879,7 @@ TEST_P(SubsetLoadBalancerTest, KeysSubsetFallbackToNotExistingSelector) {
 
   TestLoadBalancerContext context_nx({{"version", "1.0"}, {"stage", "test"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_nx));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_nx).host);
   EXPECT_EQ(1U, stats_.lb_subsets_fallback_.value());
 }
 
@@ -2901,13 +2901,13 @@ TEST_P(SubsetLoadBalancerTest, MetadataFallbackList) {
   const auto version3_host = host_set_.hosts_[2];
 
   // No context.
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 
   TestLoadBalancerContext context_without_metadata({{"key", "value"}});
   context_without_metadata.matches_ = nullptr;
 
   // No metadata in context.
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_without_metadata));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_without_metadata).host);
 
   TestLoadBalancerContext context_with_fallback({{"fallback_list", valueFromJson(R""""(
     [
@@ -2917,16 +2917,16 @@ TEST_P(SubsetLoadBalancerTest, MetadataFallbackList) {
   )"""")}});
 
   // version 2.0 is preferred, should be selected
-  EXPECT_EQ(version2_host, lb_->chooseHost(&context_with_fallback));
-  EXPECT_EQ(version2_host, lb_->chooseHost(&context_with_fallback));
-  EXPECT_EQ(version2_host, lb_->chooseHost(&context_with_fallback));
+  EXPECT_EQ(version2_host, lb_->chooseHost(&context_with_fallback).host);
+  EXPECT_EQ(version2_host, lb_->chooseHost(&context_with_fallback).host);
+  EXPECT_EQ(version2_host, lb_->chooseHost(&context_with_fallback).host);
 
   modifyHosts({}, {version2_host});
 
   // version 1.0 is a fallback, should be used when host with version 2.0 is removed
-  EXPECT_EQ(version1_host, lb_->chooseHost(&context_with_fallback));
-  EXPECT_EQ(version1_host, lb_->chooseHost(&context_with_fallback));
-  EXPECT_EQ(version1_host, lb_->chooseHost(&context_with_fallback));
+  EXPECT_EQ(version1_host, lb_->chooseHost(&context_with_fallback).host);
+  EXPECT_EQ(version1_host, lb_->chooseHost(&context_with_fallback).host);
+  EXPECT_EQ(version1_host, lb_->chooseHost(&context_with_fallback).host);
 
   // if fallback_list is not a list, it should be ignored
   // regular metadata is in effect
@@ -2935,8 +2935,8 @@ TEST_P(SubsetLoadBalancerTest, MetadataFallbackList) {
   TestLoadBalancerContext context_with_invalid_fallback_list_null(
       {{"version", valueFromJson("\"3.0\"")}, {"fallback_list", null_value}});
 
-  EXPECT_EQ(version3_host, lb_->chooseHost(&context_with_invalid_fallback_list_null));
-  EXPECT_EQ(version3_host, lb_->chooseHost(&context_with_invalid_fallback_list_null));
+  EXPECT_EQ(version3_host, lb_->chooseHost(&context_with_invalid_fallback_list_null).host);
+  EXPECT_EQ(version3_host, lb_->chooseHost(&context_with_invalid_fallback_list_null).host);
 
   // should ignore fallback list entry which is not a struct
   TestLoadBalancerContext context_with_invalid_fallback_list_entry(
@@ -2947,13 +2947,13 @@ TEST_P(SubsetLoadBalancerTest, MetadataFallbackList) {
         ]
       )"""")}});
 
-  EXPECT_EQ(version1_host, lb_->chooseHost(&context_with_invalid_fallback_list_entry));
-  EXPECT_EQ(version1_host, lb_->chooseHost(&context_with_invalid_fallback_list_entry));
+  EXPECT_EQ(version1_host, lb_->chooseHost(&context_with_invalid_fallback_list_entry).host);
+  EXPECT_EQ(version1_host, lb_->chooseHost(&context_with_invalid_fallback_list_entry).host);
 
   // simple metadata with no fallback should work as usual
   TestLoadBalancerContext context_no_fallback({{"version", "1.0"}});
-  EXPECT_EQ(version1_host, lb_->chooseHost(&context_no_fallback));
-  EXPECT_EQ(version1_host, lb_->chooseHost(&context_no_fallback));
+  EXPECT_EQ(version1_host, lb_->chooseHost(&context_no_fallback).host);
+  EXPECT_EQ(version1_host, lb_->chooseHost(&context_no_fallback).host);
 
   // fallback metadata overrides regular metadata value
   TestLoadBalancerContext context_fallback_overrides_metadata_value(
@@ -2964,8 +2964,8 @@ TEST_P(SubsetLoadBalancerTest, MetadataFallbackList) {
           {"version": "3.0"}
         ]
       )"""")}});
-  EXPECT_EQ(version3_host, lb_->chooseHost(&context_fallback_overrides_metadata_value));
-  EXPECT_EQ(version3_host, lb_->chooseHost(&context_fallback_overrides_metadata_value));
+  EXPECT_EQ(version3_host, lb_->chooseHost(&context_fallback_overrides_metadata_value).host);
+  EXPECT_EQ(version3_host, lb_->chooseHost(&context_fallback_overrides_metadata_value).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, MetadataFallbackDisabled) {
@@ -2984,8 +2984,8 @@ TEST_P(SubsetLoadBalancerTest, MetadataFallbackDisabled) {
 
   // should treat 'fallback_list' as a regular metadata key
   TestLoadBalancerContext context({{"fallback_list", "ipsum"}});
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context).host);
 }
 
 TEST_P(SubsetLoadBalancerTest, MetadataFallbackAndSubsetFallback) {
@@ -3026,8 +3026,8 @@ TEST_P(SubsetLoadBalancerTest, MetadataFallbackAndSubsetFallback) {
   // when it doesn't match on requested 'stage' - because of the subset fallback policy.
   // There is the c64_canary_host which exactly matches second fallback entry, but
   // that entry is not used.
-  EXPECT_EQ(c32_production_host, lb_->chooseHost(&context_canary_c32_preffered));
-  EXPECT_EQ(c32_production_host, lb_->chooseHost(&context_canary_c32_preffered));
+  EXPECT_EQ(c32_production_host, lb_->chooseHost(&context_canary_c32_preffered).host);
+  EXPECT_EQ(c32_production_host, lb_->chooseHost(&context_canary_c32_preffered).host);
 
   TestLoadBalancerContext context_canary_c16_preffered(
       {{"stage", valueFromJson("\"canary\"")}, {"fallback_list", valueFromJson(R""""(
@@ -3039,8 +3039,8 @@ TEST_P(SubsetLoadBalancerTest, MetadataFallbackAndSubsetFallback) {
 
   // Should select c64_canary_host using second fallback entry. First fallback
   // entry doesn't match anything even considering subset fallback policy.
-  EXPECT_EQ(c64_canary_host, lb_->chooseHost(&context_canary_c16_preffered));
-  EXPECT_EQ(c64_canary_host, lb_->chooseHost(&context_canary_c16_preffered));
+  EXPECT_EQ(c64_canary_host, lb_->chooseHost(&context_canary_c16_preffered).host);
+  EXPECT_EQ(c64_canary_host, lb_->chooseHost(&context_canary_c16_preffered).host);
 
   TestLoadBalancerContext context_unknown_or_c64({{"fallback_list", valueFromJson(R""""(
     [
@@ -3051,9 +3051,9 @@ TEST_P(SubsetLoadBalancerTest, MetadataFallbackAndSubsetFallback) {
 
   // should select any host using first fallback entry, because of ANY_ENDPOINT
   // subset fallback policy
-  EXPECT_EQ(c32_production_host, lb_->chooseHost(&context_unknown_or_c64));
-  EXPECT_EQ(c64_canary_host, lb_->chooseHost(&context_unknown_or_c64));
-  EXPECT_EQ(c64_production_host, lb_->chooseHost(&context_unknown_or_c64));
+  EXPECT_EQ(c32_production_host, lb_->chooseHost(&context_unknown_or_c64).host);
+  EXPECT_EQ(c64_canary_host, lb_->chooseHost(&context_unknown_or_c64).host);
+  EXPECT_EQ(c64_production_host, lb_->chooseHost(&context_unknown_or_c64).host);
 }
 
 INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerTest,
@@ -3120,19 +3120,19 @@ TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, AcceptMultipleSelectors) {
   TestLoadBalancerContext stage_prod({{"stage", "prod"}});
   TestLoadBalancerContext stage_test({{"stage", "test"}});
 
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&version_v1));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&version_v1));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&version_v1).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&version_v1).host);
 
-  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&version_v2));
-  EXPECT_EQ(host_set_.hosts_[6], lb_->chooseHost(&version_v2));
+  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&version_v2).host);
+  EXPECT_EQ(host_set_.hosts_[6], lb_->chooseHost(&version_v2).host);
 
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&stage_dev));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&stage_dev));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&stage_dev).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&stage_dev).host);
 
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&stage_prod));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&stage_prod));
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&stage_prod).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&stage_prod).host);
 
-  EXPECT_EQ(nullptr, lb_->chooseHost(&stage_test));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&stage_test).host);
 }
 
 TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, AcceptMultipleKeys) {
@@ -3162,11 +3162,11 @@ TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, AcceptMultipleKeys) {
   TestLoadBalancerContext v2_prod({{"version", "v2"}, {"stage", "prod"}});
   TestLoadBalancerContext v2_test({{"version", "v2"}, {"stage", "test"}});
 
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&v1_dev));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&v1_prod));
-  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&v2_dev));
-  EXPECT_EQ(host_set_.hosts_[7], lb_->chooseHost(&v2_prod));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&v2_test));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&v1_dev).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&v1_prod).host);
+  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&v2_dev).host);
+  EXPECT_EQ(host_set_.hosts_[7], lb_->chooseHost(&v2_prod).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(&v2_test).host);
 }
 
 TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, HybridMultipleSelectorsAndKeys) {
@@ -3200,16 +3200,16 @@ TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, HybridMultipleSelectorsAndKeys
   TestLoadBalancerContext stage_prod({{"stage", "prod"}});
   TestLoadBalancerContext stage_test({{"stage", "test"}});
 
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&v1_dev));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&v1_prod));
-  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&v2_dev));
-  EXPECT_EQ(host_set_.hosts_[7], lb_->chooseHost(&v2_prod));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&v2_test));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&stage_dev));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&stage_dev));
-  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&stage_prod));
-  EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&stage_prod));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&stage_test));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&v1_dev).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&v1_prod).host);
+  EXPECT_EQ(host_set_.hosts_[5], lb_->chooseHost(&v2_dev).host);
+  EXPECT_EQ(host_set_.hosts_[7], lb_->chooseHost(&v2_prod).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(&v2_test).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&stage_dev).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&stage_dev).host);
+  EXPECT_EQ(host_set_.hosts_[3], lb_->chooseHost(&stage_prod).host);
+  EXPECT_EQ(host_set_.hosts_[4], lb_->chooseHost(&stage_prod).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(&stage_test).host);
 }
 
 TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, DuplicateMetadataStat) {
@@ -3235,10 +3235,10 @@ TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, Match) {
   TestLoadBalancerContext host_1({{"key", "a"}});
   TestLoadBalancerContext host_2({{"key", "b"}});
 
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_1));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_1));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_2));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_2));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_1).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_1).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_2).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_2).host);
 }
 
 TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, FallbackOnUnknownMetadata) {
@@ -3247,8 +3247,8 @@ TEST_F(SubsetLoadBalancerSingleHostPerSubsetTest, FallbackOnUnknownMetadata) {
   TestLoadBalancerContext context_unknown_key({{"unknown", "unknown"}});
   TestLoadBalancerContext context_unknown_value({{"key", "unknown"}});
 
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_unknown_key));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_unknown_value));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_unknown_key).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_unknown_value).host);
 }
 
 TEST_P(SubsetLoadBalancerSingleHostPerSubsetTest, Update) {
@@ -3257,25 +3257,25 @@ TEST_P(SubsetLoadBalancerSingleHostPerSubsetTest, Update) {
   TestLoadBalancerContext host_a({{"key", "a"}});
   TestLoadBalancerContext host_b({{"key", "b"}});
   TestLoadBalancerContext host_c({{"key", "c"}});
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b));
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&host_c)); // fallback
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_c)); // fallback
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b).host);
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&host_c).host); // fallback
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_c).host); // fallback
 
   HostSharedPtr added_host = makeHost("tcp://127.0.0.1:8000", {{"key", "c"}});
 
   // Remove b, add c
   modifyHosts({added_host}, {host_set_.hosts_.back()});
 
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_c));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_c));
-  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b)); // fallback
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&host_b)); // fallback
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_b)); // fallback
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a).host);
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_a).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_c).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_c).host);
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&host_b).host); // fallback
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&host_b).host); // fallback
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&host_b).host); // fallback
 }
 
 INSTANTIATE_TEST_SUITE_P(UpdateOrderings, SubsetLoadBalancerSingleHostPerSubsetTest,

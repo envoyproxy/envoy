@@ -6,13 +6,30 @@
 namespace Envoy {
 namespace Rds {
 
+absl::StatusOr<std::unique_ptr<RdsRouteConfigSubscription>> RdsRouteConfigSubscription::create(
+    RouteConfigUpdatePtr&& config_update,
+    Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
+    const envoy::config::core::v3::ConfigSource& config_source,
+    const std::string& route_config_name, const uint64_t manager_identifier,
+    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+    const std::string& rds_type, RouteConfigProviderManager& route_config_provider_manager) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<RdsRouteConfigSubscription>(new RdsRouteConfigSubscription(
+      std::move(config_update), std::move(resource_decoder), config_source, route_config_name,
+      manager_identifier, factory_context, stat_prefix, rds_type, route_config_provider_manager,
+      creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
+}
+
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     RouteConfigUpdatePtr&& config_update,
     Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& route_config_name, const uint64_t manager_identifier,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    const std::string& rds_type, RouteConfigProviderManager& route_config_provider_manager)
+    const std::string& rds_type, RouteConfigProviderManager& route_config_provider_manager,
+    absl::Status& creation_status)
     : route_config_name_(route_config_name),
       scope_(factory_context.scope().createScope(stat_prefix + route_config_name_ + ".")),
       factory_context_(factory_context),
@@ -31,11 +48,12 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       manager_identifier_(manager_identifier), config_update_info_(std::move(config_update)),
       resource_decoder_(std::move(resource_decoder)) {
   const auto resource_type = route_config_provider_manager_.protoTraits().resourceType();
-  subscription_ = THROW_OR_RETURN_VALUE(
+  auto subscription_or_error =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_source, Envoy::Grpc::Common::typeUrl(resource_type), *scope_, *this,
-          resource_decoder_, {}),
-      Envoy::Config::SubscriptionPtr);
+          resource_decoder_, {});
+  SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
+  subscription_ = std::move(*subscription_or_error);
   local_init_manager_.add(local_init_target_);
 }
 
