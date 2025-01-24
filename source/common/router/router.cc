@@ -2198,6 +2198,29 @@ bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
   if (cluster.dropOverload().value()) {
     ENVOY_STREAM_LOG(debug, "Router filter: cluster DROP_OVERLOAD configuration: {}", *callbacks_,
                      cluster.dropOverload().value());
+
+    if (cluster.dropOverloadNoHealthyEndpoint()) {
+      ENVOY_STREAM_LOG(debug, "The request is dropped by DROP_OVERLOAD_NO_HEALTHY_ENDPOINT",
+                       *callbacks_);
+      callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::CoreResponseFlag::DropOverloadNoHealthyEndpoint);
+      chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, true);
+      callbacks_->sendLocalReply(
+          Http::Code::ServiceUnavailable, "drop overload no healthy endpoint",
+          [modify_headers, this](Http::ResponseHeaderMap& headers) {
+            if (!config_->suppress_envoy_headers_) {
+              headers.addReference(
+                  Http::Headers::get().EnvoyDropOverloadNoHealthyEndpoint,
+                  Http::Headers::get().EnvoyDropOverloadNoHealthyEndpointValues.True);
+            }
+            modify_headers(headers);
+          },
+          absl::nullopt, StreamInfo::ResponseCodeDetails::get().DropOverloadNoHealthyEndpoint);
+
+      cluster.info()->loadReportStats().upstream_rq_drop_overload_.inc();
+      return true;
+    }
+
     if (config_->random_.bernoulli(cluster.dropOverload())) {
       ENVOY_STREAM_LOG(debug, "The request is dropped by DROP_OVERLOAD", *callbacks_);
       callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DropOverLoad);

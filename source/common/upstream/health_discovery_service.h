@@ -71,8 +71,12 @@ public:
   std::vector<HostSharedPtr> hosts() { return *hosts_; };
   UnitFloat dropOverload() const override { return drop_overload_; }
   const std::string& dropCategory() const override { return drop_category_; }
+  bool dropOverloadNoHealthyEndpoint() const override { return drop_overload_no_healthy_endpoint_; }
   void setDropOverload(UnitFloat) override {}
   void setDropCategory(absl::string_view) override {}
+  void setDropOverloadNoHealthyEndpoint(bool drop_overload_no_healthy_endpoint) override {
+    drop_overload_no_healthy_endpoint_ = drop_overload_no_healthy_endpoint;
+  }
 
 protected:
   PrioritySetImpl priority_set_;
@@ -100,6 +104,7 @@ private:
   TimeSource& time_source_;
   UnitFloat drop_overload_{0};
   const std::string drop_category_;
+  bool drop_overload_no_healthy_endpoint_{false};
 
   absl::Status updateHealthchecks(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck>& health_checks);

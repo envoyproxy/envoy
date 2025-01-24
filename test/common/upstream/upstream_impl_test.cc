@@ -432,6 +432,104 @@ TEST_P(StrictDnsParamTest, DropOverLoadRuntimeOverrideTooLarge) {
   dropOverloadRuntimeTest(150, 0.5);
 }
 
+TEST_P(StrictDnsParamTest, DropOverLoadRatioNotOneHealthyEndpointExist) {
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+  ReadyWatcher initialized;
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
+    lb_policy: round_robin
+    load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 50052
+        policy:
+          drop_overloads:
+            category: test
+            drop_percentage:
+              numerator: 35
+              denominator: HUNDRED
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
+  EXPECT_EQ(0.35f, cluster->dropOverload().value());
+  EXPECT_EQ("test", cluster->dropCategory());
+  EXPECT_EQ(false, cluster->dropOverloadNoHealthyEndpoint());
+}
+
+TEST_P(StrictDnsParamTest, DropOverLoadRatioOneNoHealthyEndpoint) {
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+  ReadyWatcher initialized;
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
+    lb_policy: round_robin
+    load_assignment:
+         policy:
+          drop_overloads:
+            category: test
+            drop_percentage:
+              numerator: 100
+              denominator: HUNDRED
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
+  EXPECT_EQ(1.0f, cluster->dropOverload().value());
+  EXPECT_EQ("test", cluster->dropCategory());
+  EXPECT_EQ(true, cluster->dropOverloadNoHealthyEndpoint());
+}
+
+TEST_P(StrictDnsParamTest, DropOverLoadRatioOneHealthyEndpointExist) {
+  auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
+  ReadyWatcher initialized;
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: strict_dns
+    )EOF" + std::get<0>(GetParam()) +
+                           R"EOF(
+    lb_policy: round_robin
+    load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 50052
+        policy:
+          drop_overloads:
+            category: test
+            drop_percentage:
+              numerator: 100
+              denominator: HUNDRED
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
+  EXPECT_EQ(1.0f, cluster->dropOverload().value());
+  EXPECT_EQ("test", cluster->dropCategory());
+  EXPECT_EQ(false, cluster->dropOverloadNoHealthyEndpoint());
+}
+
 class StrictDnsClusterImplTest : public testing::Test, public UpstreamImplTestBase {
 protected:
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_ =
