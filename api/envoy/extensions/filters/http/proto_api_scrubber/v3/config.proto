@@ -3,10 +3,8 @@ syntax = "proto3";
 package envoy.extensions.filters.http.proto_api_scrubber.v3;
 
 import "envoy/config/core/v3/base.proto";
-
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
+import "xds/annotations/v3/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_api_scrubber.v3";
 option java_outer_classname = "ConfigProto";
@@ -149,7 +147,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // Request and Response
 // --------------------
 //
-// Consider the following request sent by client to BookService.GetBook method:
+// Consider the following request headers and body received by the filter for
+// the BookService.GetBook method:
 //
 // Request Headers
 //
@@ -169,8 +168,8 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   "book_id": ABC1234
 // }
 //
-// And consider the following response body sent by the API backend for the
-// above request:
+// And consider the following response body received by the filter corresponding
+// to the above request:
 //
 // .. code-block:: json
 //
@@ -184,7 +183,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   "debug_info": "Served from server with IP: 172.164.1.2"
 // }
 //
-// The filtered response sent to the client will be following:
+// The filtered response output by this filter will be the following:
 //
 // .. code-block:: json
 //
