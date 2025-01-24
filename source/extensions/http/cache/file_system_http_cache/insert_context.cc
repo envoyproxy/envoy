@@ -57,20 +57,22 @@ void FileInsertContext::complete() {
 void FileInsertContext::createFile(AsyncFileManager& file_manager) {
   absl::string_view cache_path = absl::string_view{filepath_};
   cache_path = absl::string_view{cache_path.begin(), cache_path.rfind('/') + 1};
-  file_manager.createAnonymousFile(&dispatcher_, cache_path,
-                                   [this](absl::StatusOr<AsyncFileHandle> open_result) -> void {
-                                     if (!open_result.ok()) {
-                                       return fail();
-                                     }
-                                     file_handle_ = std::move(open_result.value());
-                                     dupFile();
-                                   });
+  file_manager.createAnonymousFile(
+      &dispatcher_, cache_path, [this](absl::StatusOr<AsyncFileHandle> open_result) -> void {
+        if (!open_result.ok()) {
+          ENVOY_LOG(debug, "create file failed: {}", open_result.status());
+          return fail();
+        }
+        file_handle_ = std::move(open_result.value());
+        dupFile();
+      });
 }
 
 void FileInsertContext::dupFile() {
   auto queued =
       file_handle_->duplicate(&dispatcher_, [this](absl::StatusOr<AsyncFileHandle> dup_result) {
         if (!dup_result.ok()) {
+          ENVOY_LOG(debug, "duplicate file failed: {}", dup_result.status());
           return fail();
         }
         bool end_stream = source_ == nullptr;
@@ -89,6 +91,7 @@ void FileInsertContext::writeEmptyHeaderBlock() {
   auto queued = file_handle_->write(
       &dispatcher_, unset_header, 0, [this](absl::StatusOr<size_t> write_result) {
         if (!write_result.ok() || write_result.value() != CacheFileFixedBlock::size()) {
+          ENVOY_LOG(debug, "write to file failed: {}", write_result.status());
           return source_ ? fail() : complete();
         }
         if (source_) {
@@ -105,6 +108,7 @@ void FileInsertContext::getBody() {
   source_->getBody(AdjustedByteRange(read_pos_, read_pos_ + MaxInsertFragmentSize),
                    [this](Buffer::InstancePtr buf, EndStream end_stream) {
                      if (end_stream == EndStream::Reset) {
+                       ENVOY_LOG(debug, "cache write failed due to upstream reset");
                        return fail();
                      }
                      if (buf == nullptr) {
@@ -128,6 +132,7 @@ void FileInsertContext::onBody(Buffer::InstancePtr buf, bool end_stream) {
       &dispatcher_, *buf, header_block_.offsetToBody() + header_block_.bodySize(),
       [this, len, end_stream](absl::StatusOr<size_t> write_result) {
         if (!write_result.ok() || write_result.value() != len) {
+          ENVOY_LOG(debug, "write to file failed: {}", write_result.status());
           return fail();
         }
         progress_receiver_->onBodyInserted(
@@ -146,6 +151,7 @@ void FileInsertContext::onBody(Buffer::InstancePtr buf, bool end_stream) {
 void FileInsertContext::getTrailers() {
   source_->getTrailers([this](Http::ResponseTrailerMapPtr trailers, EndStream end_stream) {
     if (end_stream == EndStream::Reset) {
+      ENVOY_LOG(debug, "write to cache failed, upstream reset during getTrailers");
       return fail();
     }
     onTrailers(std::move(trailers));

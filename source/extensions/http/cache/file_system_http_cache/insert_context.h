@@ -28,7 +28,6 @@ private:
                     Http::ResponseHeaderMapPtr headers, ResponseMetadata metadata,
                     HttpSourcePtr source, std::shared_ptr<CacheProgressReceiver> progress,
                     std::shared_ptr<CacheShared> stat_recorder);
-  void fail();
   void complete();
 
   // The sequence of actions involved in writing the cache entry to a file. Each
