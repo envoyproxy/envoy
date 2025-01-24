@@ -159,6 +159,7 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = "6gig",
+    shard_count = 4,
     deps = [
         "//source/extensions/filters/http/cache:config",
         "//source/extensions/filters/http/cache:http_cache_lib",

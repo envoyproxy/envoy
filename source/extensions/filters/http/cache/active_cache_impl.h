@@ -52,7 +52,7 @@ public:
   void onTrailersInserted(Http::ResponseTrailerMapPtr trailers) override;
   void onInsertFailed() override;
 
-  void getLookupResult(ActiveCacheImpl& cache, ActiveLookupRequestPtr lookup,
+  void getLookupResult(ActiveLookupRequestPtr lookup,
                        ActiveLookupResultCallback&& lookup_result_callback)
       ABSL_LOCKS_EXCLUDED(mu_);
   void onCacheLookupResult(absl::StatusOr<LookupResult>&& result) ABSL_LOCKS_EXCLUDED(mu_);

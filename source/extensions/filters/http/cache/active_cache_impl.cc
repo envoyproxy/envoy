@@ -504,7 +504,7 @@ void ActiveCacheEntry::sendBodyChunkTo(BodySubscriber& subscriber, AdjustedByteR
 
 ActiveCacheEntry::~ActiveCacheEntry() { ASSERT(!upstream_request_); }
 
-void ActiveCacheEntry::getLookupResult(ActiveCacheImpl& cache, ActiveLookupRequestPtr lookup,
+void ActiveCacheEntry::getLookupResult(ActiveLookupRequestPtr lookup,
                                        ActiveLookupResultCallback&& cb) {
   ASSERT(lookup->dispatcher().isThreadSafe());
   absl::MutexLock lock(&mu_);
@@ -513,8 +513,8 @@ void ActiveCacheEntry::getLookupResult(ActiveCacheImpl& cache, ActiveLookupReque
                        std::move(cb)};
   switch (state_) {
   case State::Vary:
-    ASSERT(&cache); // Do another lookup
     IS_ENVOY_BUG("not implemented yet");
+    ABSL_FALLTHROUGH_INTENDED;
   case State::NotCacheable: {
     postUpstreamPassThroughWithReset(std::move(sub), shared_from_this());
     return;
@@ -777,7 +777,7 @@ void ActiveCacheImpl::lookup(ActiveLookupRequestPtr request, ActiveLookupResultC
   ASSERT(request);
   ASSERT(cb);
   std::shared_ptr<ActiveCacheEntry> entry = getEntry(request->key());
-  entry->getLookupResult(*this, std::move(request), std::move(cb));
+  entry->getLookupResult(std::move(request), std::move(cb));
 }
 
 ResponseMetadata ActiveCacheImpl::makeMetadata() {
