@@ -22,9 +22,13 @@ envoy_cc_extension(
         "config.cc",
         "redis_http_cache.cc",
         "cache_header_proto_util.cc",
+        "redis_http_cache_lookup.cc",
+        "redis_http_cache_client.cc",
     ],
     hdrs = [
         "redis_http_cache.h",
+        "redis_http_cache_lookup.h",
+        "redis_http_cache_client.h",
         "cache_header_proto_util.h",
     ],
     deps = [
@@ -34,4 +38,5 @@ envoy_cc_extension(
         "@envoy_api//envoy/extensions/http/cache/redis_http_cache/v3:pkg_cc_proto",
     ],
 )
+
 

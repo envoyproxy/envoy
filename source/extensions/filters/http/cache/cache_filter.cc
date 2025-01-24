@@ -332,6 +332,8 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
   case CacheEntryStatus::LookupError:
     filter_state_ = FilterState::NotServingFromCache;
     insert_status_ = InsertStatus::NoInsertLookupError;
+    lookup_->onDestroy();
+    lookup_ = nullptr;
     decoder_callbacks_->continueDecoding();
     return;
   }

@@ -7,6 +7,7 @@
 
 #include "envoy/extensions/http/cache/redis_http_cache/v3/redis_http_cache.pb.h"
 #include "envoy/extensions/http/cache/redis_http_cache/v3/redis_http_cache.pb.validate.h"
+#include "source/extensions/http/cache/redis_http_cache/redis_http_cache_lookup.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,13 +20,17 @@ using ConfigProto = envoy::extensions::http::cache::redis_http_cache::v3::RedisH
 
 class RedisHttpCache : public HttpCache {
 public:
+#if 0
     struct ThreadLocalRedisClient : public ThreadLocal::ThreadLocalObject {
     ThreadLocalRedisClient() {}
     ~ThreadLocalRedisClient() override {}
 
 
+    // This really should be hash table of cluster -> redis_client_.
+    // The same thread may serve redis cache pointing to several different clusters.
     Extensions::Common::Redis::RedisAsyncClient redis_client_;
     };
+#endif
     RedisHttpCache(Upstream::ClusterManager& cluster_manager, ThreadLocal::SlotAllocator& tls) : cluster_manager_(cluster_manager), tls_slot_(tls) {
 
     tls_slot_.set([&](Event::Dispatcher&) {return std::make_shared<ThreadLocalRedisClient>();});
@@ -80,7 +85,7 @@ NetworkFilters::Common::Redis::RespValue request;
 static absl::string_view name() {return "redis cache";}
 
 private:
-    Extensions::Common::Redis::RedisAsyncClient redis_client_;
+    //Extensions::Common::Redis::RedisAsyncClient redis_client_;
     Upstream::ClusterManager& cluster_manager_;
 
     ThreadLocal::TypedSlot<ThreadLocalRedisClient> tls_slot_;
