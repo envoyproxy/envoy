@@ -3096,7 +3096,7 @@ traffic_direction: OUTBOUND
 
   // In this scenario, we have an inbound only drain, but the conn manager for an outbound listener
   // is checking to see if it should drain. We set the expectation here that the answer is no,
-  // so we SHOULDN'T see a conection: close header.
+  // so we SHOULDN'T see a conection close header.
   EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(false));
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -3147,7 +3147,7 @@ traffic_direction: INBOUND
 
   // In this scenario, we have an inbound only drain, and the conn manager for an inbound listener
   // is checking to see if it should drain. We set the expectation here that the answer is yes,
-  // so we SHOULD see a conection: close header.
+  // so we SHOULD see a conection close header.
   EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::InboundOnly))
       .WillOnce(Return(true));
 
