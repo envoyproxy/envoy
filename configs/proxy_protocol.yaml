@@ -40,6 +40,7 @@ static_resources:
     connect_timeout: 2s
     lb_policy: ROUND_ROBIN
     load_assignment:
+      cluster_name: cluster_0
       endpoints:
       - lb_endpoints:
         - endpoint:
