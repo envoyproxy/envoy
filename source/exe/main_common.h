@@ -38,7 +38,6 @@ public:
   bool run();
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
-public:
   using AdminRequestFn =
       std::function<void(const Http::ResponseHeaderMap& response_headers, absl::string_view body)>;
 
