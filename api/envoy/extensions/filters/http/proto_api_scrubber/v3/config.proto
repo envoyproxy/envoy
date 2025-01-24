@@ -15,7 +15,6 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#not-implemented-hide:]
 // [#protodoc-title: Proto API Scrubber]
 // [#extension: envoy.filters.http.proto_api_scrubber]
 // Overview
@@ -238,7 +237,7 @@ message ProtoApiScrubberConfig {
   // Contains the restrictions for the API, methods, messages, fields, etc.
   Restrictions restrictions = 4;
 
-  FilteringMode filtering_mode = 5;
+  FilteringMode filtering_mode = 6;
 }
 
 // Specifies the source of entitlements for a request.
