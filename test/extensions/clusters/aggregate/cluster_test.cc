@@ -123,12 +123,25 @@ public:
 
     setupPrioritySet();
 
+    EXPECT_CALL(*primary_info_, resourceManager(Upstream::ResourcePriority::Default)).Times(0);
+    EXPECT_CALL(*secondary_info_, resourceManager(Upstream::ResourcePriority::Default)).Times(0);
+
     ON_CALL(primary_, loadBalancer()).WillByDefault(ReturnRef(primary_load_balancer_));
     ON_CALL(secondary_, loadBalancer()).WillByDefault(ReturnRef(secondary_load_balancer_));
 
     thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     lb_ = lb_factory_->create(lb_params_);
+  }
+
+  // NOTE: in order to use remaining_<name> (and for it to not always be 0)
+  // we need to use "track_remaining: true" in the config to get the remaining_<name> stat
+  Stats::Gauge& getCircuitBreakersStatByPriority(std::string priority, std::string stat) {
+    std::string stat_name_ = "circuit_breakers." + priority + "." + stat;
+    Stats::StatNameManagedStorage statStore(stat_name_,
+                                            cluster_->info()->statsScope().symbolTable());
+    return cluster_->info()->statsScope().gaugeFromStatName(statStore.statName(),
+                                                            Stats::Gauge::ImportMode::Accumulate);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -168,6 +181,73 @@ public:
         - secondary
 )EOF";
 }; // namespace Aggregate
+
+TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsTest) {
+  const std::string yaml_config = R"EOF(
+    name: aggregate_cluster
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 1
+        track_remaining: true
+    cluster_type:
+      name: envoy.clusters.aggregate
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
+        clusters:
+        - primary
+        - secondary
+)EOF";
+
+  initialize(yaml_config);
+
+  // resource manager for the DEFAULT priority (look above^)
+  Upstream::ResourceManager& resource_manager =
+      cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
+
+  // get the circuit breaker stats we are interested in, to assert against
+  Stats::Gauge& cx_open = getCircuitBreakersStatByPriority("default", "cx_open");
+  Stats::Gauge& remaining_cx = getCircuitBreakersStatByPriority("default", "remaining_cx");
+
+  // check the yaml config is set correctly
+  // we should have a maximum of 1 connection available to use
+  EXPECT_EQ(1U, resource_manager.connections().max());
+
+  // check that we can create a new connection
+  EXPECT_TRUE(resource_manager.connections().canCreate());
+  // check the connection count is 0
+  EXPECT_EQ(0U, resource_manager.connections().count());
+  // check that we have 1 remaining connection
+  EXPECT_EQ(1U, remaining_cx.value());
+  // check the circuit breaker is closed
+  EXPECT_EQ(0U, cx_open.value());
+
+  // create that one connection
+  resource_manager.connections().inc();
+
+  // check the connection count is now 1
+  EXPECT_EQ(1U, resource_manager.connections().count());
+  // make sure we are NOT allowed to create anymore connections
+  EXPECT_FALSE(resource_manager.connections().canCreate());
+  // check that we have 0 remaining connections
+  EXPECT_EQ(0U, remaining_cx.value());
+  // check the circuit breaker is now open
+  EXPECT_EQ(1U, cx_open.value());
+
+  // remove that one connection
+  resource_manager.connections().dec();
+
+  // check the connection count is now 0 again
+  EXPECT_EQ(0U, resource_manager.connections().count());
+  // check that we can create a new connection again
+  EXPECT_TRUE(resource_manager.connections().canCreate());
+  // check that we have 1 remaining connection again
+  EXPECT_EQ(1U, remaining_cx.value());
+  // check that the circuit breaker is closed again
+  EXPECT_EQ(0U, cx_open.value());
+}
 
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
   initialize(default_yaml_config_);
