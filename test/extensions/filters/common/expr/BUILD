@@ -23,6 +23,7 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/network:filter_state_dst_address_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
@@ -36,6 +37,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

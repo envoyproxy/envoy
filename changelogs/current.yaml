@@ -98,5 +98,8 @@ new_features:
   change: |
     Reporting a locality_stats to LRS server when rq_issued > 0, disable by setting runtime guard
     ``envoy.reloadable_features.report_load_with_rq_issued`` to ``false``.
+- area: attributes
+  change: |
+    Added :ref:`attribute <arch_overview_attributes>` ``upstream.locality`` to obtain upstream locality information.
 
 deprecated:
