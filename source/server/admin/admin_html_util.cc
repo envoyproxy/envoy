@@ -54,12 +54,15 @@ namespace Server {
 namespace {
 class BuiltinResourceProvider : public AdminHtmlUtil::ResourceProvider {
 public:
-  BuiltinResourceProvider() : histogram_js_(absl::StrCat(HistogramsJs1, HistogramsJs2)) {
+  BuiltinResourceProvider()
+      : histogram_js_(absl::StrCat(HistogramsJs1, HistogramsJs2)),
+        json_viewer_js_(absl::StrCat(JsonViewerJs1, JsonViewerJs2)) {
     map_["admin_head_start.html"] = AdminHtmlStart;
     map_["admin.css"] = AdminCss;
     map_["active_stats.js"] = AdminActiveStatsJs;
     map_["histograms.js"] = histogram_js_;
     map_["active_params.html"] = AdminActiveParamsHtml;
+    map_["json_viewer.js"] = json_viewer_js_;
   }
 
   absl::string_view getResource(absl::string_view resource_name, std::string&) override {
@@ -68,6 +71,7 @@ public:
 
 private:
   const std::string histogram_js_;
+  const std::string json_viewer_js_;
   absl::flat_hash_map<absl::string_view, absl::string_view> map_;
 };
 
