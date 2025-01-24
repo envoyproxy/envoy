@@ -268,6 +268,7 @@ envoy_cmake(
     cache_entries = {
         "BUILD_CURL_EXE": "off",
         "BUILD_TESTING": "off",
+        "BUILD_LIBCURL_DOCS": "off",
         "BUILD_SHARED_LIBS": "off",
         "CURL_HIDDEN_SYMBOLS": "off",
         "CURL_USE_LIBSSH2": "off",
