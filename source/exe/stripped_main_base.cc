@@ -70,11 +70,12 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
     configureHotRestarter(*random_generator);
 
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
-    Thread::BasicLockable& log_lock = restarter_->logLock();
-    Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         log_lock, options_.logFormatEscaped(),
-                                                         options_.enableFineGrainLogging());
+    // Only create a logging context if one has not been created externally.
+    if (Logger::Context::current_context() == nullptr) {
+      logging_context_ = std::make_unique<Logger::Context>(
+          options_.logLevel(), options_.logFormat(), restarter_->logLock(),
+          options_.logFormatEscaped(), options_.enableFineGrainLogging());
+    }
 
     configureComponentLogLevels();
 
@@ -87,16 +88,18 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(stats_allocator_);
 
     server_ = create_instance(*init_manager_, options_, time_system, listener_hooks, *restarter_,
-                              *stats_store_, access_log_lock, component_factory,
+                              *stats_store_, restarter_->accessLogLock(), component_factory,
                               std::move(random_generator), *tls_, platform_impl_->threadFactory(),
                               platform_impl_->fileSystem(), std::move(process_context), nullptr);
     break;
   }
   case Server::Mode::Validate:
     restarter_ = std::make_unique<Server::HotRestartNopImpl>();
-    logging_context_ =
-        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                          restarter_->logLock(), options_.logFormatEscaped());
+    if (Logger::Context::current_context() == nullptr) {
+      logging_context_ =
+          std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
+                                            restarter_->logLock(), options_.logFormatEscaped());
+    }
     process_context_ = std::move(process_context);
     break;
   }
