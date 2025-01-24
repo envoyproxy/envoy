@@ -328,6 +328,7 @@ envoy_cc_test(
         "router_2_test.cc",
     ],
     rbe_pool = "6gig",
+    shard_count = 5,
     deps = [
         ":router_test_base_lib",
         "//source/common/buffer:buffer_lib",
