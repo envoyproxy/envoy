@@ -490,7 +490,7 @@ TEST(ABIImpl, RequestBody) {
       .WillRepeatedly(Invoke(
           [&](std::function<void(Buffer::Instance&)> callback) -> void { callback(buffer); }));
 
-  // Empty buffer should return size 0 and drain should return work withouth problems.
+  // Empty buffer should return size 0 and drain should return work without problems.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_request_body_vector_size(&filter, &length));
   EXPECT_EQ(length, 0);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_request_body(&filter, 0));
@@ -563,7 +563,7 @@ TEST(ABIImpl, ResponseBody) {
       .WillRepeatedly(Invoke(
           [&](std::function<void(Buffer::Instance&)> callback) -> void { callback(buffer); }));
 
-  // Empty buffer should return size 0 and drain should return work withouth problems.
+  // Empty buffer should return size 0 and drain should return work without problems.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_response_body_vector_size(&filter, &length));
   EXPECT_EQ(length, 0);
   EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_response_body(&filter, 0));
