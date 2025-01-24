@@ -108,8 +108,7 @@ public:
   void testOnUpstreamData(MessageType message_type = MessageType::Reply, bool success = true,
                           bool on_data_throw_app_exception = false,
                           bool on_data_throw_regular_exception = false,
-                          bool close_before_response = false,
-                          bool null_metadata = false) {
+                          bool close_before_response = false, bool null_metadata = false) {
     NiceMock<Network::MockClientConnection> connection;
 
     EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
@@ -173,7 +172,6 @@ public:
       decoder_ptr->success_ = success;
     }
 
-
     if (on_data_throw_regular_exception || on_data_throw_app_exception) {
       EXPECT_CALL(connection, close(_));
       EXPECT_CALL(*decoder_ptr, upstreamData(_))
@@ -195,7 +193,8 @@ public:
 
     if (null_metadata) {
       EXPECT_EQ(1UL, cluster_.cluster_.info_->statsScope()
-        .counterFromString("thrift.upstream_resp_decoding_error").value());
+                         .counterFromString("thrift.upstream_resp_decoding_error")
+                         .value());
       return;
     }
 

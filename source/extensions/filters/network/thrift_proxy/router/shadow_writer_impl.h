@@ -46,9 +46,7 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     decoder_->onData(upstream_buffer_, underflow);
     return underflow;
   }
-  MessageMetadataSharedPtr& responseMetadata() {
-    return metadata_;
-  }
+  MessageMetadataSharedPtr& responseMetadata() { return metadata_; }
   bool responseSuccess() { return success_.value_or(false); }
 
   // ProtocolConverter
