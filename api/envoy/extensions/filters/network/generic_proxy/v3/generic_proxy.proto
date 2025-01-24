@@ -74,5 +74,5 @@ message GenericRds {
 //
 //   If the ``envoy.access_loggers.file`` logger is used for generic proxy, this formatter will
 //   be enabled by default.
-message GenericProxyLogFormatter {
+message GenericProxySubstitutionFormatter {
 }

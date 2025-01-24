@@ -153,8 +153,8 @@ public:
     return createGenericProxyCommandParser();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::filters::network::generic_proxy::v3::GenericProxyLogFormatter>();
+    return std::make_unique<envoy::extensions::filters::network::generic_proxy::v3::
+                                GenericProxySubstitutionFormatter>();
   }
 
   std::string name() const override { return "envoy.formatters.generic_proxy_commands"; }
@@ -191,7 +191,8 @@ absl::Status initializeFormatterForFileLogger(
         "Access log: no format and no default format for file access log");
   }
 
-  envoy::extensions::filters::network::generic_proxy::v3::GenericProxyLogFormatter formatter;
+  envoy::extensions::filters::network::generic_proxy::v3::GenericProxySubstitutionFormatter
+      formatter;
   auto* formatter_extension = config.mutable_log_format()->mutable_formatters()->Add();
   formatter_extension->set_name("envoy.formatters.generic_proxy_commands");
   formatter_extension->mutable_typed_config()->PackFrom(formatter);

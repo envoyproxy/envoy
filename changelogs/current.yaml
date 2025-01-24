@@ -105,9 +105,9 @@ new_features:
 - area: generic_proxy
   change: |
     Added :ref:`generic proxy log formatter support
-    <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxyLogFormatter>` which could be configured
-    at the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>` extension point
-    of logger to support generic proxy specific substitution commands. And all access loggers could be used in
-    generic proxy now.
+    <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxySubstitutionFormatter>` which could be
+    configured at the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>`
+    extension point of logger to support generic proxy specific substitution commands. And all access loggers could be
+    used in generic proxy now.
 
 deprecated:
