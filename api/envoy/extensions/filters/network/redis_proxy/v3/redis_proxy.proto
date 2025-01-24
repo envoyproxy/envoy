@@ -133,6 +133,9 @@ message RedisProxy {
     // storm to busy redis server. This config is a protection to rate limit reconnection rate.
     // If not set, there will be no rate limiting on the reconnection.
     ConnectionRateLimit connection_rate_limit = 10;
+
+
+    repeated string custom_commands = 11;
   }
 
   message PrefixRoutes {

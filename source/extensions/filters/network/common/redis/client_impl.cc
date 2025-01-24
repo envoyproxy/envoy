@@ -1,6 +1,7 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "source/extensions/filters/network/common/redis/supported_commands.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -56,6 +57,10 @@ ConfigImpl::ConfigImpl(
   } else {
     connection_rate_limit_enabled_ = false;
     connection_rate_limit_per_sec_ = 100;
+  }
+
+  for (int i=0; i < config.custom_commands_size(); i++) {
+     Extensions::NetworkFilters::Common::Redis::SupportedCommands::addCustomCommand(config.custom_commands(i));
   }
 }
 
