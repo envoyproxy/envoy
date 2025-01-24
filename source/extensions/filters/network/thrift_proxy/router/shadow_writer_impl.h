@@ -47,7 +47,6 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     return underflow;
   }
   MessageMetadataSharedPtr& responseMetadata() {
-    ASSERT(metadata_ != nullptr);
     return metadata_;
   }
   bool responseSuccess() { return success_.value_or(false); }

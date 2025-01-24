@@ -108,7 +108,8 @@ public:
   void testOnUpstreamData(MessageType message_type = MessageType::Reply, bool success = true,
                           bool on_data_throw_app_exception = false,
                           bool on_data_throw_regular_exception = false,
-                          bool close_before_response = false) {
+                          bool close_before_response = false,
+                          bool null_metadata = false) {
     NiceMock<Network::MockClientConnection> connection;
 
     EXPECT_CALL(cm_, getThreadLocalCluster(_)).WillOnce(Return(&cluster_));
@@ -153,22 +154,25 @@ public:
       return;
     }
 
-    // Prepare response metadata & data processing.
-    MessageMetadataSharedPtr response_metadata = std::make_shared<MessageMetadata>();
-    response_metadata->setMessageType(message_type);
-    response_metadata->setSequenceId(1);
-    if (message_type == MessageType::Reply) {
-      const auto reply_type = success ? ReplyType::Success : ReplyType::Error;
-      response_metadata->setReplyType(reply_type);
-    }
-
     auto transport_ptr =
         NamedTransportConfigFactory::getFactory(TransportType::Framed).createTransport();
     auto protocol_ptr =
         NamedProtocolConfigFactory::getFactory(ProtocolType::Binary).createProtocol();
     auto decoder_ptr = std::make_unique<MockNullResponseDecoder>(*transport_ptr, *protocol_ptr);
-    decoder_ptr->messageBegin(response_metadata);
-    decoder_ptr->success_ = success;
+
+    if (!null_metadata) {
+      // Prepare response metadata & data processing.
+      MessageMetadataSharedPtr response_metadata = std::make_shared<MessageMetadata>();
+      response_metadata->setMessageType(message_type);
+      response_metadata->setSequenceId(1);
+      if (message_type == MessageType::Reply) {
+        const auto reply_type = success ? ReplyType::Success : ReplyType::Error;
+        response_metadata->setReplyType(reply_type);
+      }
+      decoder_ptr->messageBegin(response_metadata);
+      decoder_ptr->success_ = success;
+    }
+
 
     if (on_data_throw_regular_exception || on_data_throw_app_exception) {
       EXPECT_CALL(connection, close(_));
@@ -186,6 +190,12 @@ public:
     shadow_router.onUpstreamData(response_buffer, false);
 
     if (on_data_throw_regular_exception || on_data_throw_app_exception) {
+      return;
+    }
+
+    if (null_metadata) {
+      EXPECT_EQ(1UL, cluster_.cluster_.info_->statsScope()
+        .counterFromString("thrift.upstream_resp_decoding_error").value());
       return;
     }
 
@@ -434,6 +444,10 @@ TEST_F(ShadowWriterTest, ShadowRequestOnUpstreamDataRegularException) {
 
 TEST_F(ShadowWriterTest, ShadowRequestOnUpstreamRemoteClose) {
   testOnUpstreamData(MessageType::Reply, false, false, false, true);
+}
+
+TEST_F(ShadowWriterTest, ShadowRequestOnUpstreamDataNullMetadata) {
+  testOnUpstreamData(MessageType::Reply, true, false, false, false, true);
 }
 
 TEST_F(ShadowWriterTest, TestNullResponseDecoder) {
