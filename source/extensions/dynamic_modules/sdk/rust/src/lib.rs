@@ -40,17 +40,20 @@ pub mod abi {
 ///   true
 /// }
 ///
-/// fn my_new_http_filter_config_fn<EHF: EnvoyHttpFilter>(
-///   _envoy_filter_config: EnvoyHttpFilterConfig,
+/// fn my_new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
+///   _envoy_filter_config: &mut EC,
 ///   _name: &str,
 ///   _config: &str,
-/// ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
+/// ) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
 ///   Some(Box::new(MyHttpFilterConfig {}))
 /// }
 ///
 /// struct MyHttpFilterConfig {}
 ///
-/// impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MyHttpFilterConfig {}
+/// impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
+///   for MyHttpFilterConfig
+/// {
+/// }
 /// ```
 #[macro_export]
 macro_rules! declare_init_functions {
@@ -86,16 +89,16 @@ pub type ProgramInitFunction = fn() -> bool;
 // TODO(@mathetake): I guess there would be a way to avoid the use of dyn in the first place.
 // E.g. one idea is to accept all concrete type parameters for HttpFilterConfig and HttpFilter
 // traits in declare_init_functions!, and generate the match statement based on that.
-pub type NewHttpFilterConfigFunction<EHF> = fn(
-  envoy_filter_config: EnvoyHttpFilterConfig,
+pub type NewHttpFilterConfigFunction<EC, EHF> = fn(
+  envoy_filter_config: &mut EC,
   name: &str,
   config: &str,
-) -> Option<Box<dyn HttpFilterConfig<EHF>>>;
+) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>>;
 
 /// The global init function for HTTP filter configurations. This is set via the
 /// `declare_init_functions` macro, and is not intended to be set directly.
 pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<
-  NewHttpFilterConfigFunction<EnvoyHttpFilterImpl>,
+  NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
 > = OnceLock::new();
 
 /// The trait that represents the configuration for an Envoy Http filter configuration.
@@ -104,9 +107,9 @@ pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<
 /// The object is created when the corresponding Envoy Http filter config is created, and it is
 /// dropped when the corresponding Envoy Http filter config is destroyed. Therefore, the
 /// imlementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
-pub trait HttpFilterConfig<EHF: EnvoyHttpFilter> {
+pub trait HttpFilterConfig<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> {
   /// This is called when a HTTP filter chain is created for a new stream.
-  fn new_http_filter(&self, _envoy: EnvoyHttpFilterConfig) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
     panic!("not implemented");
   }
 }
@@ -126,7 +129,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the request headers processing.
   fn on_request_headers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
@@ -140,7 +143,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the request body processing.
   fn on_request_body(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
     abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
@@ -153,7 +156,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the request trailers processing.
   fn on_request_trailers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
     abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
   }
@@ -166,7 +169,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the response headers processing.
   fn on_response_headers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
@@ -180,7 +183,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the response body processing.
   fn on_response_body(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
@@ -194,7 +197,7 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// indicate the status of the response trailers processing.
   fn on_response_trailers(
     &mut self,
-    _envoy_filter: EHF,
+    _envoy_filter: &mut EHF,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
     abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
@@ -202,20 +205,15 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
 
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
 /// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
-///
-/// This is a shallow wrapper around the raw pointer to the Envoy HTTP filter config object, and it
-/// can be copied and used up until the corresponding [`HttpFilterConfig`] is dropped.
-//
-// TODO(@mathetake): make this only avaialble for non-test code, and provide a mock for testing so
-// that users can write unit tests for their HttpFilterConfig implementations.
-#[derive(Debug, Clone, Copy)]
-pub struct EnvoyHttpFilterConfig {
+pub trait EnvoyHttpFilterConfig {
+  // TODO: add methods like defining metrics, filter metadata, etc.
+}
+
+pub struct EnvoyHttpFilterConfigImpl {
   raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
 }
 
-impl EnvoyHttpFilterConfig {
-  // TODO: add methods like defining metrics, etc.
-}
+impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {}
 
 /// An opaque object that represents the underlying Envoy Http filter. This has one to one
 /// mapping with the Envoy Http filter object as well as [`HttpFilter`] object per HTTP stream.
@@ -781,12 +779,12 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
   let config =
     std::str::from_utf8(std::slice::from_raw_parts(config_ptr, config_size)).unwrap_or_default();
 
-  let envoy_filter_config = EnvoyHttpFilterConfig {
+  let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
     raw_ptr: envoy_filter_config_ptr,
   };
 
   envoy_dynamic_module_on_http_filter_config_new_impl(
-    envoy_filter_config,
+    &mut envoy_filter_config,
     name,
     config,
     NEW_HTTP_FILTER_CONFIG_FUNCTION
@@ -815,8 +813,8 @@ macro_rules! wrap_into_c_void_ptr {
 // Implementation note: this cannot be a function as we need to cast as *mut *mut dyn T which is
 // not feasible via usual function type params.
 macro_rules! drop_wrapped_c_void_ptr {
-  ($ptr:expr, $trait_:ident < $($args:ident),* $(,)* >) => {{
-    let config = $ptr as *mut *mut dyn $trait_<$($args)*>;
+  ($ptr:expr, $trait_:ident < $($args:ident),* >) => {{
+    let config = $ptr as *mut *mut dyn $trait_< $($args),* >;
 
     // Drop the Box<*mut $t>, and then the Box<$t>, which also
     // drops the underlying object.
@@ -828,10 +826,10 @@ macro_rules! drop_wrapped_c_void_ptr {
 }
 
 fn envoy_dynamic_module_on_http_filter_config_new_impl(
-  envoy_filter_config: EnvoyHttpFilterConfig,
+  envoy_filter_config: &mut EnvoyHttpFilterConfigImpl,
   name: &str,
   config: &str,
-  new_fn: &NewHttpFilterConfigFunction<EnvoyHttpFilterImpl>,
+  new_fn: &NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
 ) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
   if let Some(config) = new_fn(envoy_filter_config, name, config) {
     wrap_into_c_void_ptr!(config)
@@ -844,7 +842,8 @@ fn envoy_dynamic_module_on_http_filter_config_new_impl(
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(config_ptr, HttpFilterConfig<EnvoyHttpFilterImpl>);
+  drop_wrapped_c_void_ptr!(config_ptr,
+    HttpFilterConfig<EnvoyHttpFilterConfigImpl,EnvoyHttpFilterImpl>);
 }
 
 #[no_mangle]
@@ -852,19 +851,20 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_new(
   filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
   filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
-  let envoy_filter_config = EnvoyHttpFilterConfig {
+  let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
     raw_ptr: filter_envoy_ptr,
   };
   let filter_config = {
-    let raw = filter_config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+    let raw = filter_config_ptr
+      as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>;
     &**raw
   };
-  envoy_dynamic_module_on_http_filter_new_impl(envoy_filter_config, filter_config)
+  envoy_dynamic_module_on_http_filter_new_impl(&mut envoy_filter_config, filter_config)
 }
 
 fn envoy_dynamic_module_on_http_filter_new_impl(
-  envoy_filter_config: EnvoyHttpFilterConfig,
-  filter_config: &dyn HttpFilterConfig<EnvoyHttpFilterImpl>,
+  envoy_filter_config: &mut EnvoyHttpFilterConfigImpl,
+  filter_config: &dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
 ) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
   let filter = filter_config.new_http_filter(envoy_filter_config);
   wrap_into_c_void_ptr!(filter)
@@ -885,7 +885,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_headers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_request_headers(EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
+  filter.on_request_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
 #[no_mangle]
@@ -896,7 +896,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_body(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_request_body(EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
+  filter.on_request_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
 #[no_mangle]
@@ -906,7 +906,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_trailers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_request_trailers(EnvoyHttpFilterImpl::new(envoy_ptr))
+  filter.on_request_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
 }
 
 #[no_mangle]
@@ -917,7 +917,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_headers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_response_headers(EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
+  filter.on_response_headers(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
 #[no_mangle]
@@ -928,7 +928,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_body(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_response_body(EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
+  filter.on_response_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream)
 }
 
 #[no_mangle]
@@ -938,5 +938,5 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_response_trailers(
 ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
-  filter.on_response_trailers(EnvoyHttpFilterImpl::new(envoy_ptr))
+  filter.on_response_trailers(&mut EnvoyHttpFilterImpl::new(envoy_ptr))
 }
