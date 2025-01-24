@@ -89,50 +89,56 @@ fn test_header_callbacks_on_request_headers_local_resp() {
 }
 
 #[test]
-fn test_body_callbacks_filter_on_request_body() {
+fn test_body_callbacks_filter_on_bodies() {
   let mut f = BodyCallbacksFilter::default();
   let mut envoy_filter = MockEnvoyHttpFilter::default();
-  envoy_filter
-    .expect_get_request_body_reader()
-    .returning(move || {
-      let reader: Box<dyn std::io::Read> = Box::new(std::io::Cursor::new(
-        String::from("nicenicenice").into_bytes(),
-      ));
-      reader
-    })
-    .once();
-  envoy_filter
-    .expect_drain_request_body()
-    .return_const(())
-    .once();
-  envoy_filter
-    .expect_get_request_body_writer()
-    .returning(move || {
-      let writer: Box<dyn std::io::Write> = Box::new(std::io::sink());
-      writer
-    })
-    .once();
-  f.on_request_body(&mut envoy_filter, true);
+
+  // This serves as a buffer provided by Envoy. To test the write and drain methods, we need to
+  // ensure that the buffer is mutable.
+  static mut BUF: [[u8; 4]; 3] = [*b"nice", *b"nice", *b"nice"];
 
   envoy_filter
-    .expect_get_response_body_reader()
+    .expect_get_request_body()
     .returning(move || {
-      let reader: Box<dyn std::io::Read> = Box::new(std::io::Cursor::new(
-        String::from("coolcoolcool").into_bytes(),
-      ));
-      reader
+      let ret = vec![
+        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[0]) }),
+        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[1]) }),
+        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[2]) }),
+      ];
+      Some(ret)
     })
+    .times(2);
+  envoy_filter
+    .expect_drain_request_body()
+    .return_const(true)
     .once();
+
+  envoy_filter
+    .expect_append_request_body()
+    .return_const(true)
+    .times(2);
+  f.on_request_body(&mut envoy_filter, true);
+
+  unsafe { BUF = [*b"cool", *b"cool", *b"cool"] };
+  envoy_filter
+    .expect_get_response_body()
+    .returning(move || {
+      let ret = vec![
+        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[0]) }),
+        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[1]) }),
+        EnvoyBuffer::new(unsafe { std::str::from_utf8_unchecked(&BUF[2]) }),
+      ];
+      Some(ret)
+    })
+    .times(2);
   envoy_filter
     .expect_drain_response_body()
-    .return_const(())
+    .return_const(true)
     .once();
+
   envoy_filter
-    .expect_get_response_body_writer()
-    .returning(move || {
-      let writer: Box<dyn std::io::Write> = Box::new(std::io::sink());
-      writer
-    })
-    .once();
+    .expect_append_response_body()
+    .return_const(true)
+    .times(2);
   f.on_response_body(&mut envoy_filter, true);
 }

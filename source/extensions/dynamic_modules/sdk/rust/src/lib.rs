@@ -358,54 +358,71 @@ pub trait EnvoyHttpFilter {
     key: &str,
   ) -> Option<EnvoyBuffer<'a>>;
 
-  // TODO(mathetake): find a clean way to avoid dyn Write and dyn Read. It seems a bit tricky
-  // because of the mock + lifetime, but there should be a way to do it.
-
   /// Set the string-typed dynamic metadata value with the given key.
   /// If the namespace is not found, this will create a new namespace.
   ///
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_string(&mut self, namespace: &str, key: &str, value: &str) -> bool;
 
-  /// Get the currently buffered request body size.
-  fn get_request_body_size(&self) -> Option<usize>;
-
-  /// Get the currently buffered request body reader.
+  /// Get the currently buffered request body. The body is represented as a list of [`EnvoyBuffer`].
+  /// Memory contents pointed by each [`EnvoyBuffer`] is mutable and can be modified in place.
+  /// However, the vector itself is a "copied view". For example, adding or removing
+  /// [`EnvoyBuffer`] from the vector has no effect on the underlying Envoy buffer. To write beyond
+  /// the end of the buffer, use [`EnvoyHttpFilter::append_request_body`]. To remove data from the
+  /// buffer, use [`EnvoyHttpFilter::drain_request_body`].
   ///
-  /// The returned reader will read the data from the beginning of the currently buffered request,
-  /// and return error when the buffer is not available on read.
-  fn get_request_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a>;
-
-  /// Discard the given number of bytes from the beginning of the currently buffered request body.
-  fn drain_request_body(&mut self, size: usize);
-
-  /// Get the currently buffered request body reader.
+  /// Envoy's buffer is implemented as a ring buffer of contiguous memory regions. Hence, draining
+  /// via [`EnvoyHttpFilter::drain_request_body`] can be used to reuse the buffer space to write
+  /// completely new data.
   ///
-  /// The returned writer will append the data to the existing request body buffer.
-  /// To read from the beginning, use [`EnvoyHttpFilter::drain_request_body`] first.
-  ///
-  /// The returned writer will return error when the buffer is not available on write.
-  fn get_request_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a>;
+  /// Returns None if the request body is not available.
+  fn get_request_body<'a>(&'a mut self) -> Option<Vec<EnvoyBuffer<'a>>>;
 
-  /// Get the currently buffered response body size.
-  fn get_response_body_size(&self) -> Option<usize>;
-
-  /// Get the currently buffered response body reader.
+  /// Drain the given number of bytes from the front of the request body.
   ///
-  /// The returned reader will read the data from the beginning of the currently buffered response,
-  /// and return error when the buffer is not available on read.
-  fn get_response_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a>;
-
-  /// Discard the given number of bytes from the beginning of the currently buffered request body.
-  fn drain_response_body(&mut self, size: usize);
-
-  /// Get the currently buffered response body writer.
+  /// Returns false if the request body is not available.
   ///
-  /// The returned writer will append the data to the existing response body buffer.
-  /// To write from the beginning, use [`EnvoyHttpFilter::drain_response_body`] first.
+  /// Note that after changing the request body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn drain_request_body(&mut self, number_of_bytes: usize) -> bool;
+
+  /// Append the given data to the request body.
   ///
-  /// The returned writer will return error when the buffer is not available on write.
-  fn get_response_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a>;
+  /// Returns false if the request body is not available.
+  ///
+  /// Note that after changing the request body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn append_request_body(&mut self, data: &[u8]) -> bool;
+
+  /// Get the currently buffered response body. The body is represented as a list of
+  /// [`EnvoyBuffer`]. Memory contents pointed by each [`EnvoyBuffer`] is mutable and can be
+  /// modified in place. However, the buffer itself is immutable. For example, adding or removing
+  /// [`EnvoyBuffer`] from the vector has no effect on the underlying Envoy buffer. To write the
+  /// contents by changing its length, use [`EnvoyHttpFilter::drain_response_body`] or
+  /// [`EnvoyHttpFilter::append_response_body`].
+  ///
+  /// Envoy's buffer is implemented as a ring buffer of contiguous memory regions. Hence, draining
+  /// via [`EnvoyHttpFilter::drain_response_body`] can be used to reuse the buffer space to write
+  /// completely new data.
+  ///
+  /// Returns None if the response body is not available.
+  fn get_response_body<'a>(&'a mut self) -> Option<Vec<EnvoyBuffer<'a>>>;
+
+  /// Drain the given number of bytes from the front of the response body.
+  ///
+  /// Returns false if the response body is not available.
+  ///
+  /// Note that after changing the response body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn drain_response_body(&mut self, number_of_bytes: usize) -> bool;
+
+  /// Append the given data to the response body.
+  ///
+  /// Returns false if the response body is not available.
+  ///
+  /// Note that after changing the response body, it is caller's responsibility to modify the
+  /// content-length header if necessary.
+  fn append_response_body(&mut self, data: &[u8]) -> bool;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -675,68 +692,82 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_request_body_size(&self) -> Option<usize> {
+  fn get_request_body(&mut self) -> Option<Vec<EnvoyBuffer>> {
     let mut size: usize = 0;
     let ok = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_request_body_size(self.raw_ptr, &mut size)
+      abi::envoy_dynamic_module_callback_http_get_request_body_vector_size(self.raw_ptr, &mut size)
     };
-    if ok {
-      Some(size)
+    if !ok || size == 0 {
+      return None;
+    }
+
+    let buffers: Vec<EnvoyBuffer> = vec![EnvoyBuffer::default(); size];
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_request_body_vector(
+        self.raw_ptr,
+        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if success {
+      Some(buffers)
     } else {
       None
     }
   }
 
-  fn get_request_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a> {
-    Box::new(buffer::HttpBodyReader::<'a>::new(
-      self.raw_ptr,
-      abi::envoy_dynamic_module_callback_http_read_request_body,
-    ))
-  }
-
-  fn drain_request_body(&mut self, size: usize) {
+  fn drain_request_body(&mut self, number_of_bytes: usize) -> bool {
     unsafe {
-      abi::envoy_dynamic_module_callback_http_drain_request_body(self.raw_ptr, size);
+      abi::envoy_dynamic_module_callback_http_drain_request_body(self.raw_ptr, number_of_bytes)
     }
   }
 
-  fn get_request_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a> {
-    Box::new(buffer::HttpBodyWriter::<'a>::new(
-      self.raw_ptr,
-      abi::envoy_dynamic_module_callback_http_write_request_body,
-    ))
+  fn append_request_body(&mut self, data: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_append_request_body(
+        self.raw_ptr,
+        data.as_ptr() as *const _ as *mut _,
+        data.len(),
+      )
+    }
   }
 
-  fn get_response_body_size(&self) -> Option<usize> {
+  fn get_response_body(&mut self) -> Option<Vec<EnvoyBuffer>> {
     let mut size: usize = 0;
     let ok = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_response_body_size(self.raw_ptr, &mut size)
+      abi::envoy_dynamic_module_callback_http_get_response_body_vector_size(self.raw_ptr, &mut size)
     };
-    if ok {
-      Some(size)
+    if !ok || size == 0 {
+      return None;
+    }
+
+    let buffers: Vec<EnvoyBuffer> = vec![EnvoyBuffer::default(); size];
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_http_get_response_body_vector(
+        self.raw_ptr,
+        buffers.as_ptr() as *mut abi::envoy_dynamic_module_type_envoy_buffer,
+      )
+    };
+    if success {
+      Some(buffers)
     } else {
       None
     }
   }
 
-  fn get_response_body_reader<'a>(&'a self) -> Box<dyn std::io::Read + 'a> {
-    Box::new(buffer::HttpBodyReader::<'a>::new(
-      self.raw_ptr,
-      abi::envoy_dynamic_module_callback_http_read_response_body,
-    ))
-  }
-
-  fn drain_response_body(&mut self, _size: usize) {
+  fn drain_response_body(&mut self, number_of_bytes: usize) -> bool {
     unsafe {
-      abi::envoy_dynamic_module_callback_http_drain_response_body(self.raw_ptr, _size);
+      abi::envoy_dynamic_module_callback_http_drain_response_body(self.raw_ptr, number_of_bytes)
     }
   }
 
-  fn get_response_body_writer<'a>(&'a mut self) -> Box<dyn std::io::Write + 'a> {
-    Box::new(buffer::HttpBodyWriter::<'a>::new(
-      self.raw_ptr,
-      abi::envoy_dynamic_module_callback_http_write_response_body,
-    ))
+  fn append_response_body(&mut self, data: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_append_response_body(
+        self.raw_ptr,
+        data.as_ptr() as *const _ as *mut _,
+        data.len(),
+      )
+    }
   }
 }
 

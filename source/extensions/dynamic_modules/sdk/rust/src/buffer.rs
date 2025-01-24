@@ -1,5 +1,3 @@
-use crate::abi::*;
-
 /// A buffer struct that represents a contiguous memory region owned by Envoy.
 ///
 /// This is cloneable and copyable, but the underlying memory is not copied. It can be
@@ -14,6 +12,16 @@ pub struct EnvoyBuffer<'a> {
   raw_ptr: *const u8,
   length: usize,
   _marker: std::marker::PhantomData<&'a ()>,
+}
+
+impl Default for EnvoyBuffer<'_> {
+  fn default() -> Self {
+    Self {
+      raw_ptr: std::ptr::null(),
+      length: 0,
+      _marker: std::marker::PhantomData,
+    }
+  }
 }
 
 impl EnvoyBuffer<'_> {
@@ -49,103 +57,5 @@ impl EnvoyBuffer<'_> {
 
   pub fn as_mut_slice(&mut self) -> &mut [u8] {
     unsafe { std::slice::from_raw_parts_mut(self.raw_ptr as *mut u8, self.length) }
-  }
-}
-
-type ReadHttpBodyFn = unsafe extern "C" fn(
-  raw_ptr: crate::abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  offset: usize,
-  buf: envoy_dynamic_module_type_buffer_module_ptr,
-  buf_len: usize,
-  size: *mut usize,
-) -> bool;
-
-type WriteHttpBodyFn = unsafe extern "C" fn(
-  raw_ptr: crate::abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  buf: envoy_dynamic_module_type_buffer_module_ptr,
-  buf_len: usize,
-  size: *mut usize,
-) -> bool;
-
-/// This implements the [`std::io::Read`] for reading http request body data.
-pub struct HttpBodyReader<'a> {
-  raw_ptr: crate::abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  _marker: std::marker::PhantomData<&'a ()>,
-  offset: usize,
-  read_fn: ReadHttpBodyFn,
-}
-
-impl std::io::Read for HttpBodyReader<'_> {
-  fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-    let mut size: usize = 0;
-    let ok = unsafe {
-      (self.read_fn)(
-        self.raw_ptr,
-        self.offset,
-        buf.as_ptr() as _,
-        buf.len(),
-        &mut size,
-      )
-    };
-    if !ok {
-      return Result::Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "Request body not available",
-      ));
-    }
-    self.offset += size;
-    Result::Ok(size)
-  }
-}
-
-impl HttpBodyReader<'_> {
-  pub fn new(
-    raw_ptr: envoy_dynamic_module_type_http_filter_envoy_ptr,
-    read_fn: ReadHttpBodyFn,
-  ) -> Self {
-    Self {
-      raw_ptr,
-      _marker: std::marker::PhantomData,
-      offset: 0,
-      read_fn,
-    }
-  }
-}
-
-/// This implements the [`std::io::Write`] for writing http request body data.
-pub struct HttpBodyWriter<'a> {
-  raw_ptr: envoy_dynamic_module_type_http_filter_envoy_ptr,
-  _marker: std::marker::PhantomData<&'a ()>,
-  write_fn: WriteHttpBodyFn,
-}
-
-impl HttpBodyWriter<'_> {
-  pub fn new(
-    raw_ptr: envoy_dynamic_module_type_http_filter_envoy_ptr,
-    write_fn: WriteHttpBodyFn,
-  ) -> Self {
-    Self {
-      raw_ptr,
-      _marker: std::marker::PhantomData,
-      write_fn,
-    }
-  }
-}
-
-impl std::io::Write for HttpBodyWriter<'_> {
-  fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-    let mut size: usize = 0;
-    let ok = unsafe { (self.write_fn)(self.raw_ptr, buf.as_ptr() as _, buf.len(), &mut size) };
-    if !ok {
-      return Result::Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "Request body not available",
-      ));
-    }
-    Result::Ok(size)
-  }
-
-  fn flush(&mut self) -> std::io::Result<()> {
-    Result::Ok(())
   }
 }
