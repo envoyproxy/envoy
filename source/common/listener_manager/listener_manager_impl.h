@@ -361,7 +361,7 @@ private:
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
   FailureStates overall_error_state_;
   Quic::QuicStatNames& quic_stat_names_;
-  std::set<uint64_t> stopped_listener_tags_;
+  absl::flat_hash_set<uint64_t> stopped_listener_tags_;
 };
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {

@@ -484,7 +484,6 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
 }
 
-// Validates that successive calls to "/drain_listeners?inboundonly" are idempotent.
 TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* inbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -521,8 +520,8 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
   codec_client_ = makeHttpConnection(lookupPort("inbound_0"));
   EXPECT_FALSE(codec_client_->disconnected());
 
-  IntegrationStreamDecoderPtr response4;
-  response4 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  IntegrationStreamDecoderPtr response4 =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response4->waitForEndStream());
@@ -562,18 +561,18 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulConnectionCloseForInbo
   codec_client_ = makeHttpConnection(lookupPort("inbound_0"));
   EXPECT_FALSE(codec_client_->disconnected());
 
-  IntegrationStreamDecoderPtr response4;
-  response4 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  IntegrationStreamDecoderPtr response2 =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response4->waitForEndStream());
-  EXPECT_TRUE(response4->complete());
-  EXPECT_THAT(response4->headers(), Http::HttpStatusIs("200"));
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_THAT(response2->headers(), Http::HttpStatusIs("200"));
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
     EXPECT_TRUE(codec_client_->sawGoAway());
   } else {
-    EXPECT_EQ("close", response4->headers().getConnectionValue());
+    EXPECT_EQ("close", response2->headers().getConnectionValue());
   }
 
   // Validate that the inbound listener has been stopped.
@@ -602,19 +601,19 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulNoConnectionCloseForOu
   codec_client_ = makeHttpConnection(lookupPort("outbound_0"));
   EXPECT_FALSE(codec_client_->disconnected());
 
-  IntegrationStreamDecoderPtr response4;
-  response4 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  IntegrationStreamDecoderPtr response2;
+  response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response4->waitForEndStream());
-  EXPECT_TRUE(response4->complete());
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
   EXPECT_FALSE(
       codec_client_->disconnected()); // Should still be connected because we only drained inbound
   if (downstreamProtocol() == Http::CodecType::HTTP2) {
     EXPECT_FALSE(codec_client_->sawGoAway());
   } else {
-    EXPECT_NE("close", response4->headers().getConnectionValue());
+    EXPECT_NE("close", response2->headers().getConnectionValue());
   }
 
   // Validate that the inbound listener has been stopped.
