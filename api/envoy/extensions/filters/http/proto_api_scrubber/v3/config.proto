@@ -237,7 +237,7 @@ message ProtoApiScrubberConfig {
   // Contains the restrictions for the API, methods, messages, fields, etc.
   Restrictions restrictions = 4;
 
-  FilteringMode filtering_mode = 6;
+  FilteringMode filtering_mode = 5;
 }
 
 // Specifies the source of entitlements for a request.
