@@ -278,7 +278,7 @@ Or, through ``bodyChunks()`` API, which let Envoy to skip buffering the upstream
 Complete example
 ----------------
 
-A complete example using Docker is available in :repo:`/examples/lua`.
+A complete example using Docker is available in `here <https://github.com/envoyproxy/examples/tree/main/lua>`__.
 
 Stream handle API
 -----------------
