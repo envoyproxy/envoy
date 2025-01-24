@@ -383,6 +383,10 @@ TEST_F(AggregateClusterTest, CircuitBreakerMaxRequestsTest) {
   EXPECT_EQ(0U, rq_open.value());
 }
 
+TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionPoolsTest) {
+  // TODO
+}
+
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
   initialize(default_yaml_config_);
   // Health value:
