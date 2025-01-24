@@ -126,6 +126,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info_.route_ = parent_.callbacks()->route();
+  stream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
