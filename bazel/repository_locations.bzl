@@ -1301,6 +1301,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.rbac.matchers.upstream_ip_port",
             "envoy.matching.inputs.cel_data_input",
             "envoy.matching.matchers.cel_matcher",
+            "envoy.tracers.opentelemetry",
         ],
         release_date = "2024-12-23",
         cpe = "cpe:2.3:a:google:flatbuffers:*",
