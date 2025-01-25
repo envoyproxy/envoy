@@ -95,6 +95,7 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
   }
   case Server::Mode::Validate:
     restarter_ = std::make_unique<Server::HotRestartNopImpl>();
+    // Only create a logging context if one has not been created externally.
     if (Logger::Context::current_context() == nullptr) {
       logging_context_ =
           std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
