@@ -371,11 +371,35 @@ pub trait EnvoyHttpFilter {
   /// the end of the buffer, use [`EnvoyHttpFilter::append_request_body`]. To remove data from the
   /// buffer, use [`EnvoyHttpFilter::drain_request_body`].
   ///
-  /// Envoy's buffer is implemented as a ring buffer of contiguous memory regions. Hence, draining
-  /// via [`EnvoyHttpFilter::drain_request_body`] can be used to reuse the buffer space to write
-  /// completely new data.
+  /// To write completely new data, use [`EnvoyHttpFilter::drain_request_body`] for the size of the
+  /// buffer, and then use [`EnvoyHttpFilter::append_request_body`] to write the new data.
   ///
-  /// Returns None if the request body is not available.
+  /// ```
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  ///
+  /// // This is the test setup.
+  /// let mut envoy_filter = MockEnvoyHttpFilter::default();
+  /// envoy_filter
+  ///   .expect_get_request_body()
+  ///   .returning(|| vec![EnvoyBuffer::new("hello"), EnvoyBuffer::new("world")].into());
+  /// envoy_filter.expect_drain_request_body().return_const(true);
+  ///
+  ///
+  /// // Calculate the size of the request body in bytes.
+  /// let mut buffers = envoy_filter.get_request_body().unwrap();
+  /// let mut size = 0;
+  /// for buffer in &mut buffers {
+  ///   size += buffer.as_slice().len();
+  /// }
+  /// assert_eq!(size, 10);
+  ///
+  /// // drain the entire request body.
+  /// assert!(envoy_filter.drain_request_body(10));
+  ///
+  /// // Now start writing new data from the beginning of the request body.
+  /// ```
+  ///
+  /// This returns None if the request body is not available.
   fn get_request_body<'a>(&'a mut self) -> Option<Vec<EnvoyBuffer<'a>>>;
 
   /// Drain the given number of bytes from the front of the request body.
@@ -386,7 +410,7 @@ pub trait EnvoyHttpFilter {
   /// content-length header if necessary.
   fn drain_request_body(&mut self, number_of_bytes: usize) -> bool;
 
-  /// Append the given data to the request body.
+  /// Append the given data to the end of request body.
   ///
   /// Returns false if the request body is not available.
   ///
@@ -401,9 +425,33 @@ pub trait EnvoyHttpFilter {
   /// contents by changing its length, use [`EnvoyHttpFilter::drain_response_body`] or
   /// [`EnvoyHttpFilter::append_response_body`].
   ///
-  /// Envoy's buffer is implemented as a ring buffer of contiguous memory regions. Hence, draining
-  /// via [`EnvoyHttpFilter::drain_response_body`] can be used to reuse the buffer space to write
-  /// completely new data.
+  /// To write completely new data, use [`EnvoyHttpFilter::drain_response_body`] for the size of the
+  /// buffer, and then use [`EnvoyHttpFilter::append_response_body`] to write the new data.
+  ///
+  /// ```
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  ///
+  /// // This is the test setup.
+  /// let mut envoy_filter = MockEnvoyHttpFilter::default();
+  /// envoy_filter
+  ///   .expect_get_response_body()
+  ///   .returning(|| vec![EnvoyBuffer::new("hello"), EnvoyBuffer::new("world")].into());
+  /// envoy_filter.expect_drain_response_body().return_const(true);
+  ///
+  ///
+  /// // Calculate the size of the response body in bytes.
+  /// let mut buffers = envoy_filter.get_response_body().unwrap();
+  /// let mut size = 0;
+  /// for buffer in &mut buffers {
+  ///   size += buffer.as_slice().len();
+  /// }
+  /// assert_eq!(size, 10);
+  ///
+  /// // drain the entire response body.
+  /// assert!(envoy_filter.drain_response_body(10));
+  ///
+  /// // Now start writing new data from the beginning of the request body.
+  /// ```
   ///
   /// Returns None if the response body is not available.
   fn get_response_body<'a>(&'a mut self) -> Option<Vec<EnvoyBuffer<'a>>>;
@@ -416,7 +464,7 @@ pub trait EnvoyHttpFilter {
   /// content-length header if necessary.
   fn drain_response_body(&mut self, number_of_bytes: usize) -> bool;
 
-  /// Append the given data to the response body.
+  /// Append the given data to the end of the response body.
   ///
   /// Returns false if the response body is not available.
   ///
