@@ -386,9 +386,9 @@ pub trait EnvoyHttpFilter {
   ///
   ///
   /// // Calculate the size of the request body in bytes.
-  /// let mut buffers = envoy_filter.get_request_body().unwrap();
+  /// let buffers = envoy_filter.get_request_body().unwrap();
   /// let mut size = 0;
-  /// for buffer in &mut buffers {
+  /// for buffer in &buffers {
   ///   size += buffer.as_slice().len();
   /// }
   /// assert_eq!(size, 10);
@@ -440,9 +440,9 @@ pub trait EnvoyHttpFilter {
   ///
   ///
   /// // Calculate the size of the response body in bytes.
-  /// let mut buffers = envoy_filter.get_response_body().unwrap();
+  /// let buffers = envoy_filter.get_response_body().unwrap();
   /// let mut size = 0;
-  /// for buffer in &mut buffers {
+  /// for buffer in &buffers {
   ///   size += buffer.as_slice().len();
   /// }
   /// assert_eq!(size, 10);
