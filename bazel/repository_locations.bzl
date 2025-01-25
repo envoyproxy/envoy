@@ -1269,7 +1269,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.formatter.cel",
             "envoy.matching.inputs.cel_data_input",
             "envoy.matching.matchers.cel_matcher",
-            "envoy.tracers.opentelemetry.samplers.cel",
+            "envoy.tracers.opentelemetry",
         ],
         release_date = "2024-10-25",
         cpe = "N/A",
