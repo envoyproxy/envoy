@@ -27,6 +27,10 @@ bug_fixes:
     matcher would incorrectly handle ``present_match`` configurations by treating them as default present checks. This
     behavior can be temporarily reverted by setting runtime feature
     ``envoy_reloadable_features_enable_new_query_param_present_match_behavior`` to ``false``.
+- area: oauth2
+  change: |
+    Fixed oauth2 credential injector to send scope (if specified) to authorization server
+    when requesting new access token using client_credentials flow.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
