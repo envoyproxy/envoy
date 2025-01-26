@@ -157,9 +157,6 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
   const absl::optional<std::string> resource =
       Utility::nonEmptyQueryParam(query_params, "resource");
   const absl::optional<std::string> mask = Utility::nonEmptyQueryParam(query_params, "mask");
-  const absl::optional<std::string> format = Utility::nonEmptyQueryParam(query_params, "format");
-  const bool gen_html = format.has_value() && *format == "html";
-
   const bool include_eds = shouldIncludeEdsInDump(query_params);
   const absl::StatusOr<Matchers::StringMatcherPtr> name_matcher =
       buildNameMatcher(query_params, server_.regexEngine());
@@ -187,6 +184,8 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
   MessageUtil::redact(dump);
 
 #ifdef ENVOY_ADMIN_HTML
+  const absl::optional<std::string> format = Utility::nonEmptyQueryParam(query_params, "format");
+  const bool gen_html = format.has_value() && *format == "html";
   if (gen_html) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
     AdminHtmlUtil::renderTableBegin(response);
