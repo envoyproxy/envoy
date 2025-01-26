@@ -449,6 +449,7 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
   Upstream::ThreadLocalCluster* thread_local_cluster =
       cluster_manager_.getThreadLocalCluster(cluster_name);
+
   if (!thread_local_cluster) {
     auto odcds = config_->onDemandCds();
     if (!odcds.has_value()) {
