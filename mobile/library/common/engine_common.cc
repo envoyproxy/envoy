@@ -98,10 +98,7 @@ EngineCommon::EngineCommon(std::shared_ptr<Envoy::OptionsImplBase> options) : op
         server->initialize(local_address, component_factory);
         return server;
       };
-  // `set_new_handler` is false because the application using Envoy Mobile should decide how to
-  // handle `new` memory allocation failures.
-  std::unique_ptr<Random::RandomGeneratorImpl> random_generator =
-      std::make_unique<Random::RandomGeneratorImpl>();
+  auto random_generator = std::make_unique<Random::RandomGeneratorImpl>();
   base_ = std::make_unique<StrippedMainBase>(*options_, prod_component_factory_,
                                              std::make_unique<PlatformImpl>(), *random_generator);
   base_->init(real_time_system_, default_listener_hooks_, std::move(random_generator), nullptr,

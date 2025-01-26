@@ -26,11 +26,9 @@ constexpr uint32_t IPV6_PROBE_PORT = 53;
 // This helps avoid issues on Logger::Context destruction when the previous saved context
 // could be activated in a thread-unsafe manner.
 void initOnceLoggerContext(const OptionsImplBase& options) {
-  static Thread::MutexBasicLockable* log_lock = new Thread::MutexBasicLockable();
-  static Logger::Context* context =
-      new Logger::Context(options.logLevel(), options.logFormat(), *log_lock,
-                          options.logFormatEscaped(), options.enableFineGrainLogging());
-  UNREFERENCED_PARAMETER(context);
+  Thread::MutexBasicLockable& log_lock = MUTABLE_CONSTRUCT_ON_FIRST_USE(Thread::MutexBasicLockable);
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(Logger::Context, options.logLevel(), options.logFormat(), log_lock,
+                                 options.logFormatEscaped(), options.enableFineGrainLogging());
 }
 } // namespace
 
