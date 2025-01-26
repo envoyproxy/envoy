@@ -186,7 +186,6 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
   }
   MessageUtil::redact(dump);
 
-
 #ifdef ENVOY_ADMIN_HTML
   if (gen_html) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
@@ -196,19 +195,19 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
     AdminHtmlUtil::renderTableEnd(response);
 
     std::string buf;
-    response.addFragments(
-        {"<script>\n", AdminHtmlUtil::getResource("json_viewer.js", buf), "</script>\n"
-         "<andypf-json-viewer"
-         " indent='2'"
-         " expanded='2'"
-         " theme='monokai'"
-         " show-data-types='true'"
-         " show-toolbar='true'"
-         " expand-icon-type='square'"
-         " show-copy='true'"
-         " show-size='true'>",
-         MessageUtil::getJsonStringFromMessageOrError(dump, false),
-         "</andypf-json-viewer>"});
+    response.addFragments({"<script>\n", AdminHtmlUtil::getResource("json_viewer.js", buf),
+                           "</script>\n"
+                           "<andypf-json-viewer"
+                           " indent='2'"
+                           " expanded='2'"
+                           " theme='monokai'"
+                           " show-data-types='true'"
+                           " show-toolbar='true'"
+                           " expand-icon-type='square'"
+                           " show-copy='true'"
+                           " show-size='true'>",
+                           MessageUtil::getJsonStringFromMessageOrError(dump, false),
+                           "</andypf-json-viewer>"});
   } else
 #endif
   {
