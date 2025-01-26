@@ -56,13 +56,14 @@ class ScopedRdsConfigSubscription;
 
 class RdsRouteConfigSubscription : public Rds::RdsRouteConfigSubscription {
 public:
-  RdsRouteConfigSubscription(
-      RouteConfigUpdatePtr&& config_update,
-      Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
-      const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
-      const uint64_t manager_identifier,
-      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-      Rds::RouteConfigProviderManager& route_config_provider_manager);
+  static absl::StatusOr<std::unique_ptr<RdsRouteConfigSubscription>>
+  create(RouteConfigUpdatePtr&& config_update,
+         Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
+         const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
+         const uint64_t manager_identifier,
+         Server::Configuration::ServerFactoryContext& factory_context,
+         const std::string& stat_prefix,
+         Rds::RouteConfigProviderManager& route_config_provider_manager);
   ~RdsRouteConfigSubscription() override;
 
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
@@ -70,6 +71,16 @@ public:
   void maybeCreateInitManager(const std::string& version_info,
                               std::unique_ptr<Init::ManagerImpl>& init_manager,
                               std::unique_ptr<Cleanup>& resume_rds);
+
+protected:
+  RdsRouteConfigSubscription(
+      RouteConfigUpdatePtr&& config_update,
+      Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
+      const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
+      const uint64_t manager_identifier,
+      Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
+      Rds::RouteConfigProviderManager& route_config_provider_manager,
+      absl::Status& creation_status);
 
 private:
   absl::Status beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>& noop_init_manager,
