@@ -11,6 +11,7 @@
 #include "test/integration/filters/add_header_filter.pb.h"
 #include "test/integration/filters/repick_cluster_filter.h"
 #include "test/integration/http_integration.h"
+#include "test/mocks/http/mocks.h"
 
 #include "http_integration.h"
 
@@ -30,6 +31,8 @@ constexpr absl::string_view expected_types[] = {
 
 using HttpFilterProto =
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
+using Http::HeaderValueOf;
+using testing::Not;
 
 class UpstreamHttpFilterIntegrationTestBase : public HttpIntegrationTest {
 public:
@@ -61,7 +64,7 @@ public:
         [config](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
-          HttpFilterProto& router_filter = *hcm.mutable_http_filters(0);
+          HttpFilterProto& router_filter = *hcm.mutable_http_filters()->rbegin();
           ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
           envoy::extensions::filters::http::router::v3::Router router;
           router_filter.typed_config().UnpackTo(&router);
@@ -156,6 +159,43 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest, BasicSuccess) {
 
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_key_, default_header_value_);
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
+       ClusterUpstreamFiltersOverrideRouterUpstreamFilters) {
+  // If both cluster and router upstream filters are set, only the cluster ones are applied.
+  addStaticRouterFilter(
+      getAddHeaderFilterConfig("envoy.test.add_header_upstream", "x-test-router", "aa"));
+  addCodecRouterFilter();
+  addStaticClusterFilter(
+      getAddHeaderFilterConfig("envoy.test.add_header_upstream", "x-test-cluster", "bb"));
+  addCodecClusterFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  EXPECT_THAT(*headers, Not(HeaderValueOf("x-test-router", "aa")));
+  EXPECT_THAT(*headers, HeaderValueOf("x-test-cluster", "bb"));
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
+       AsyncClientUsesClusterFiltersButNotRouterFilters) {
+  // This filter intercepts the downstream request and reissues it via AsyncClient,
+  // which should bypass the main filter chain and should use cluster upstream filters.
+  config_helper_.prependFilter(R"(
+  name: "envoy.test.async_upstream"
+  typed_config:
+      "@type": "type.googleapis.com/test.integration.filters.AsyncUpstreamFilterConfig"
+  )");
+  addStaticFilter("envoy.test.add_header_upstream", default_header_key_, default_header_value_);
+  addCodecFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  if (useRouterFilters()) {
+    EXPECT_THAT(*headers, Not(HeaderValueOf(default_header_key_, default_header_value_)));
+  } else {
+    EXPECT_THAT(*headers, HeaderValueOf(default_header_key_, default_header_value_));
+  }
 }
 
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest, TwoFilters) {
