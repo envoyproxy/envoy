@@ -465,6 +465,7 @@ private:
   NullScopeKeyBuilder scope_key_builder_;
   Server::ClustersHandler clusters_handler_;
   Server::ConfigDumpHandler config_dump_handler_;
+  Admin::UrlHandler config_dump_url_handler_;
   Server::InitDumpHandler init_dump_handler_;
   Server::StatsHandler stats_handler_;
   Server::LogsHandler logs_handler_;

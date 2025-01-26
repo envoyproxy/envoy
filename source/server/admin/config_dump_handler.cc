@@ -190,6 +190,11 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
 #ifdef ENVOY_ADMIN_HTML
   if (gen_html) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
+    AdminHtmlUtil::renderTableBegin(response);
+    AdminHtmlUtil::renderEndpointTableRow(response, *url_handler_, query_params, 1,
+                                          true /* submit_on_change */, false /* active */);
+    AdminHtmlUtil::renderTableEnd(response);
+
     std::string buf;
     response.addFragments(
         {"<script>\n", AdminHtmlUtil::getResource("json_viewer.js", buf), "</script>\n"

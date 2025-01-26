@@ -118,10 +118,27 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                                                                        *no_op_store_.rootScope())),
       route_config_provider_(server.timeSource()),
       scoped_route_config_provider_(server.timeSource()), clusters_handler_(server),
-      config_dump_handler_(config_tracker_, server), init_dump_handler_(server),
+      config_dump_handler_(config_tracker_, server),
+      config_dump_url_handler_(makeHandler(
+          "/config_dump", "dump current Envoy configs (experimental)",
+          MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false,
+          {{Admin::ParamDescriptor::Type::Enum, "format", "Format to use", {"html", "json"}},
+            {Admin::ParamDescriptor::Type::String, "resource", "The resource to dump"},
+            {Admin::ParamDescriptor::Type::String, "mask",
+                  "The mask to apply. When both resource and mask are specified, "
+                  "the mask is applied to every element in the desired repeated field so that only a "
+                  "subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask"},
+            {Admin::ParamDescriptor::Type::String, "name_regex",
+                  "Dump only the currently loaded configurations whose names match the specified "
+                  "regex. Can be used with both resource and mask query parameters."},
+            {Admin::ParamDescriptor::Type::Boolean, "include_eds",
+                  "Dump currently loaded configuration including EDS. See the response definition "
+                  "for more information"}})),
+      init_dump_handler_(server),
       stats_handler_(server), logs_handler_(server), profiling_handler_(profile_path),
       runtime_handler_(server), listeners_handler_(server), server_cmd_handler_(server),
       server_info_handler_(server),
+
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           makeHandler("/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false),
@@ -129,20 +146,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false),
           makeHandler("/clusters", "upstream cluster status",
                       MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false),
-          makeHandler(
-              "/config_dump", "dump current Envoy configs (experimental)",
-              MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false,
-              {{Admin::ParamDescriptor::Type::String, "resource", "The resource to dump"},
-               {Admin::ParamDescriptor::Type::String, "mask",
-                "The mask to apply. When both resource and mask are specified, "
-                "the mask is applied to every element in the desired repeated field so that only a "
-                "subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask"},
-               {Admin::ParamDescriptor::Type::String, "name_regex",
-                "Dump only the currently loaded configurations whose names match the specified "
-                "regex. Can be used with both resource and mask query parameters."},
-               {Admin::ParamDescriptor::Type::Boolean, "include_eds",
-                "Dump currently loaded configuration including EDS. See the response definition "
-                "for more information"}}),
+          config_dump_url_handler_,
           makeHandler("/init_dump", "dump current Envoy init manager information (experimental)",
                       MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump), false, false,
                       {{Admin::ParamDescriptor::Type::String, "mask",
@@ -270,6 +274,9 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       local_reply_(LocalReply::Factory::createDefault()),
       ignore_global_conn_limit_(ignore_global_conn_limit),
       header_validator_factory_(createHeaderValidatorFactory(server.serverFactoryContext())) {
+
+  config_dump_handler_.setUrlHandler(config_dump_url_handler_);
+
 #ifndef NDEBUG
   // Verify that no duplicate handlers exist.
   absl::flat_hash_set<absl::string_view> handlers;
