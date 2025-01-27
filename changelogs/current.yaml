@@ -70,7 +70,7 @@ new_features:
     ``trust_bundles`` takes precedence.
 - area: resource_monitors
   change: |
-    Added support to monitor Container CPU utilization in Linux K8s environment using
+    Added support to monitor container CPU utilization in Linux K8s environment using
     :ref:`existing extension <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>`.
 - area: lua
   change: |
