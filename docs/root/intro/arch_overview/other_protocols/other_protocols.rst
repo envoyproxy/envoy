@@ -9,3 +9,4 @@ Other protocols
   dynamo
   redis
   postgres
+  smtp
