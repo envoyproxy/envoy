@@ -32,6 +32,15 @@ message ProxyProtocolPassThroughTLVs {
   repeated uint32 tlv_type = 2 [(validate.rules).repeated = {items {uint32 {lt: 256}}}];
 }
 
+message ProxyProtocolTLV {
+  // TLV type is defined as uint8_t in proxy protocol. See `the spec
+  // <https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt>`_ for details.
+  uint32 type = 1 [(validate.rules).uint32 = {lt: 256}];
+
+  // TLV value.
+  bytes value = 2;
+}
+
 message ProxyProtocolConfig {
   enum Version {
     // PROXY protocol version 1. Human readable format.
