@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package envoy.common.resp_cache.v3;
+
+message CacheKeyBuilder {
+  // A list of CEL expressions used to build a composite cache key.
+  // An empty list indicates no caching.
+  // The CEL expression will be evaluated against the envoy attributes.
+  repeated string cel_expressions = 1;
+}

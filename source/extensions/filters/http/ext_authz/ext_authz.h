@@ -20,6 +20,8 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/resp_cache/resp_cache.h" // For response cache
+#include "source/common/resp_cache/resp_cache_factory.h"
+#include "source/common/resp_cache/simple_cache.h" // For simple cache, which is a type of response cache
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
@@ -134,7 +136,15 @@ public:
 
   bool headersAsBytes() const { return encode_raw_headers_; }
 
-  RespCache& responseCache() { return response_cache_; }
+  template <typename T> Envoy::Common::RespCache::RespCache<T>& responseCache() {
+    if constexpr (std::is_same_v<T, uint16_t>) {
+      return *response_cache_status_;
+    } else if constexpr (std::is_same_v<T, Filters::Common::ExtAuthz::Response>) {
+      return *response_cache_full_;
+    } else {
+      throw std::runtime_error("Unsupported type");
+    }
+  }
 
   const Envoy::Http::LowerCaseString& responseCacheHeaderName() const {
     return response_cache_header_name_;
@@ -290,7 +300,17 @@ private:
   double response_cache_eviction_candidate_ratio_;
   double response_cache_eviction_threshold_ratio_;
   bool response_cache_remember_body_headers_;
-  RespCache response_cache_;
+
+  // Declare two caches.
+  // The cache functionality has two modes:
+  //   1. Remember only the status code for a given request. This minimizes memory usage.
+  //   2. Remember the full response (headers, body, status) from external authorization server.
+  //   This maximizes functionality.
+  // Depending on configuration (response_cache_remember_body_headers_), one of the two caches are
+  // used.
+  std::unique_ptr<Envoy::Common::RespCache::RespCache<uint16_t>> response_cache_status_;
+  std::unique_ptr<Envoy::Common::RespCache::RespCache<Filters::Common::ExtAuthz::Response>>
+      response_cache_full_;
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats
