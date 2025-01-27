@@ -146,3 +146,8 @@ envoy.tracers.fluentd:
   status: wip
   type_urls:
   - envoy.extensions.tracers.fluentd.v3alpha.FluentdConfig
+envoy.upstreams.http.tcp.golang:
+  categories:
+  - envoy.upstreams
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha

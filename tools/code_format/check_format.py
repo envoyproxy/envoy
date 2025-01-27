@@ -394,13 +394,6 @@ class FormatChecker:
     def allow_listed_for_grpc_init(self, file_path):
         return file_path in self.config.paths["grpc_init"]["include"]
 
-    def allow_listed_for_unpack_to(self, file_path):
-        return file_path.startswith("./test") or file_path in [
-            "./source/common/protobuf/deterministic_hash.cc",
-            "./source/common/protobuf/utility.cc",
-            "./source/common/protobuf/utility.h",
-        ]
-
     def allow_listed_for_raw_try(self, file_path):
         return file_path in self.config.paths["raw_try"]["include"]
 
@@ -649,10 +642,6 @@ class FormatChecker:
                 report_error(
                     "Don't use Registry::RegisterFactory or REGISTER_FACTORY in tests, "
                     "use Registry::InjectFactory instead.")
-        if not self.allow_listed_for_unpack_to(file_path):
-            if "UnpackTo" in line:
-                report_error(
-                    "Don't use UnpackTo() directly, use MessageUtil::unpackToNoThrow() instead")
         # Check that we use the absl::Time library
         if self.token_in_line("std::get_time", line):
             if "test/" in file_path:

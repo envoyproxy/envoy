@@ -116,7 +116,8 @@ paths:
     - source/common/upstream/od_cds_api_impl.cc
     - source/common/upstream/cds_api_impl.cc
     - source/common/router/vhds.cc
-    - source/common/rds/rds_route_config_subscription.cc
+    - source/common/rds/common/route_config_provider_manager_impl.h
+    - source/common/rds/route_config_provider_manager.h
     - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
@@ -170,7 +171,6 @@ paths:
     - source/extensions/filters/http/aws_lambda
     - source/extensions/filters/http/basic_auth
     - source/extensions/filters/http/cache
-    - source/extensions/filters/http/cdn_loop
     - source/extensions/filters/http/common
     - source/extensions/filters/http/composite
     - source/extensions/filters/http/ext_authz
@@ -208,7 +208,6 @@ paths:
     - source/extensions/filters/network/ext_authz
     - source/extensions/filters/network/mongo_proxy
     - source/extensions/filters/network/thrift_proxy
-    - source/extensions/filters/network/direct_response
     - source/extensions/filters/network/generic_proxy
     - source/extensions/filters/network/ratelimit
     - source/extensions/filters/common

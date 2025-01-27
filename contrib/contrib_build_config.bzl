@@ -95,4 +95,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.tracers.fluentd":                                    "//contrib/fluentd_tracer/source:config",
+
+    #
+    # http tcp bridge plugin
+    #
+
+    "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
 }

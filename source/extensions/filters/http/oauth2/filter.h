@@ -168,6 +168,26 @@ public:
   }
   bool shouldUseRefreshToken(
       const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const;
+  struct CookieSettings {
+    CookieSettings(const envoy::extensions::filters::http::oauth2::v3::CookieConfig& config)
+        : same_site_(config.same_site()) {}
+
+    // Default constructor
+    CookieSettings()
+        : same_site_(envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
+                         CookieConfig_SameSite_DISABLED) {}
+
+    const envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite same_site_;
+  };
+
+  const CookieSettings& bearerTokenCookieSettings() const { return bearer_token_cookie_settings_; }
+  const CookieSettings& hmacCookieSettings() const { return hmac_cookie_settings_; }
+  const CookieSettings& expiresCookieSettings() const { return expires_cookie_settings_; }
+  const CookieSettings& idTokenCookieSettings() const { return id_token_cookie_settings_; }
+  const CookieSettings& refreshTokenCookieSettings() const {
+    return refresh_token_cookie_settings_;
+  }
+  const CookieSettings& nonceCookieSettings() const { return nonce_cookie_settings_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -199,6 +219,12 @@ private:
   const bool disable_access_token_set_cookie_ : 1;
   const bool disable_refresh_token_set_cookie_ : 1;
   absl::optional<RouteRetryPolicy> retry_policy_;
+  const CookieSettings bearer_token_cookie_settings_;
+  const CookieSettings hmac_cookie_settings_;
+  const CookieSettings expires_cookie_settings_;
+  const CookieSettings id_token_cookie_settings_;
+  const CookieSettings refresh_token_cookie_settings_;
+  const CookieSettings nonce_cookie_settings_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -268,7 +294,7 @@ class OAuth2Filter : public Http::PassThroughFilter,
                      Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
-               TimeSource& time_source, Random::RandomGenerator& random);
+               TimeSource& time_source, Random::RandomGenerator& randomhmacCookieSettings);
 
   // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -331,6 +357,7 @@ private:
                                             const std::chrono::seconds& expires_in) const;
   std::string getExpiresTimeForIdToken(const std::string& id_token,
                                        const std::chrono::seconds& expires_in) const;
+  std::string BuildCookieTail(int cookie_type) const;
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
