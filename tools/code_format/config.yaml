@@ -208,7 +208,6 @@ paths:
     - source/extensions/filters/network/ext_authz
     - source/extensions/filters/network/mongo_proxy
     - source/extensions/filters/network/thrift_proxy
-    - source/extensions/filters/network/direct_response
     - source/extensions/filters/network/generic_proxy
     - source/extensions/filters/network/ratelimit
     - source/extensions/filters/common
