@@ -23,11 +23,6 @@ public:
   virtual void onClusterAddOrUpdate() PURE;
 };
 
-// class AwsManagedClusterUpdateCallbacksHandle {
-// public:
-//   virtual ~AwsManagedClusterUpdateCallbacksHandle() = default;
-// };
-
 class AwsManagedClusterUpdateCallbacksHandle
     : public RaiiListElement<AwsManagedClusterUpdateCallbacks*> {
 public:
@@ -40,19 +35,36 @@ using AwsManagedClusterUpdateCallbacksHandlePtr =
     std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle>;
 
 /**
- * Manages clusters for a number of async credentials provider instances
+ * Manages clusters for any number of credentials provider instances
+ *
+ * Credentials providers in async mode require clusters to be created so that they can use the async http client to retrieve credentials.
+ * The aws cluster manager is responsible for creating these clusters, and notifying a credential provider when a cluster comes on line so they can
+ * begin retrieving credentials.
+ *
+ * - For InstanceProfileCredentialsProvider, a cluster is created with the uri of the instance metadata service. Only one cluster is required
+ * for any number of instantiations of the aws request signing extension. 
+ *
+ * - For ContainerCredentialsProvider (including ECS and EKS), a cluster is created with the uri of the container agent. Only one cluster is required
+ * for any number of instantiations of the aws request signing extension.
+ *
+ * - For WebIdentityCredentialsProvider, a cluster is required for the STS service in any region configured. There may be many WebIdentityCredentialsProvider instances
+ * instances configured, each with their own region, or their own role ARN or role session name. The aws cluster manager will maintain only a single
+ * cluster per region, and notify all relevant WebIdentityCredentialsProvider instances when their cluster is ready.
+ *
+ * - For IAMRolesAnywhere, this behaves similarly to WebIdentityCredentialsProvider, where there may be many instantiations of the credential provider
+ * for different roles, regions and profiles. The aws cluster manager will dedupe these clusters as required.
  */
-class AwsCredentialsProviderClusterManager : public Envoy::Singleton::Instance,
+class AwsClusterManager : public Envoy::Singleton::Instance,
                                              public Upstream::ClusterUpdateCallbacks {
   // Friend class for testing callbacks
-  friend class AwsCredentialsProviderClusterManagerFriend;
+  friend class AwsClusterManagerFriend;
 
 public:
   // token and token_file_path are mutually exclusive. If token is not empty, token_file_path is
   // not used, and vice versa.
-  AwsCredentialsProviderClusterManager(Server::Configuration::ServerFactoryContext& context);
+  AwsClusterManager(Server::Configuration::ServerFactoryContext& context);
 
-  ~AwsCredentialsProviderClusterManager() override {
+  ~AwsClusterManager() override {
     ENVOY_LOG_MISC(debug, "******** acm destructor called");
   };
 
@@ -90,9 +102,9 @@ private:
   std::unique_ptr<Init::TargetImpl> init_target_;
 };
 
-using AwsCredentialsProviderClusterManagerPtr =
-    std::shared_ptr<AwsCredentialsProviderClusterManager>;
-using AwsCredentialsProviderClusterManagerOptRef = OptRef<AwsCredentialsProviderClusterManagerPtr>;
+using AwsClusterManagerPtr =
+    std::shared_ptr<AwsClusterManager>;
+using AwsClusterManagerOptRef = OptRef<AwsClusterManagerPtr>;
 
 } // namespace Aws
 } // namespace Common

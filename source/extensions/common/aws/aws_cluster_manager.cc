@@ -7,7 +7,7 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-AwsCredentialsProviderClusterManager::AwsCredentialsProviderClusterManager(
+AwsClusterManager::AwsClusterManager(
     Server::Configuration::ServerFactoryContext& context)
     : context_(context) {
   ENVOY_LOG_MISC(debug, "******** acm constructor called");
@@ -29,7 +29,7 @@ AwsCredentialsProviderClusterManager::AwsCredentialsProviderClusterManager(
 };
 
 absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
-AwsCredentialsProviderClusterManager::addManagedClusterUpdateCallbacks(
+AwsClusterManager::addManagedClusterUpdateCallbacks(
     absl::string_view cluster_name, AwsManagedClusterUpdateCallbacks& cb) {
   auto it = managed_clusters_.find(cluster_name);
   ENVOY_LOG_MISC(debug, "Adding callback for cluster {}", cluster_name);
@@ -48,7 +48,7 @@ AwsCredentialsProviderClusterManager::addManagedClusterUpdateCallbacks(
       cb, managed_cluster->update_callbacks_);
 }
 
-void AwsCredentialsProviderClusterManager::onClusterAddOrUpdate(
+void AwsClusterManager::onClusterAddOrUpdate(
     absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand&) {
 
   // Mark our cluster as ready for use
@@ -66,9 +66,9 @@ void AwsCredentialsProviderClusterManager::onClusterAddOrUpdate(
 // If we have a cluster removal event, such as during cds update, recreate the cluster but leave the
 // refresh timer as-is
 
-void AwsCredentialsProviderClusterManager::onClusterRemoval(const std::string&) {}
+void AwsClusterManager::onClusterRemoval(const std::string&) {}
 
-void AwsCredentialsProviderClusterManager::createQueuedClusters() {
+void AwsClusterManager::createQueuedClusters() {
   for (const auto& it : managed_clusters_) {
     auto cluster_name = it.first;
     auto cluster_type = it.second->cluster_type_;
@@ -78,7 +78,7 @@ void AwsCredentialsProviderClusterManager::createQueuedClusters() {
   }
 }
 
-absl::Status AwsCredentialsProviderClusterManager::addManagedCluster(
+absl::Status AwsClusterManager::addManagedCluster(
     absl::string_view cluster_name,
     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri) {
 
@@ -106,7 +106,7 @@ absl::Status AwsCredentialsProviderClusterManager::addManagedCluster(
 }
 
 absl::StatusOr<std::string>
-AwsCredentialsProviderClusterManager::getUriFromClusterName(absl::string_view cluster_name) {
+AwsClusterManager::getUriFromClusterName(absl::string_view cluster_name) {
   ASSERT(!managed_clusters_.empty());
   for (const auto& it : managed_clusters_) {
     ENVOY_LOG_MISC(debug, "************* hashmap element {} searching for {} ***", it.first,

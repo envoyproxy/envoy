@@ -40,6 +40,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "aws_cluster_manager_test",
+    srcs = ["aws_cluster_manager_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/common/aws:aws_cluster_manager_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "sigv4_signer_corpus_test",
     srcs = ["sigv4_signer_corpus_test.cc"],
     data = ["@com_github_awslabs_aws_c_auth//:sigv4_tests"],
