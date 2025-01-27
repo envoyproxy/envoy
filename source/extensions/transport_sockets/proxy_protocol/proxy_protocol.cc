@@ -16,6 +16,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
+using envoy::config::core::v3::PerHostConfig;
 using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
 using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
@@ -188,7 +189,7 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
       const auto filter_it = metadata->typed_filter_metadata().find(
           Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL);
       if (filter_it != metadata->typed_filter_metadata().end()) {
-        ProxyProtocolConfig host_tlv_metadata;
+        PerHostConfig host_tlv_metadata;
         auto status = MessageUtil::unpackTo(filter_it->second, host_tlv_metadata);
         if (!status.ok()) {
           ENVOY_LOG(warn,
@@ -196,7 +197,7 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
                     "Error: {}. Will still use config-level TLVs.",
                     upstream_info->upstreamHost()->address()->asString(), status.message());
         } else {
-          // Insert host-level TLVs
+          // Insert host-level TLVs.
           for (const auto& entry : host_tlv_metadata.added_tlvs()) {
             if (processed_tlv_types.contains(entry.type())) {
               ENVOY_LOG_EVERY_POW_2_MISC(info, "Skipping duplicate TLV type from host metadata {}",
@@ -213,7 +214,7 @@ std::vector<Envoy::Network::ProxyProtocolTLV> UpstreamProxyProtocolSocket::build
     }
   }
 
-  // If host-level parse failed or was not present, we still read config-level TLVs
+  // If host-level parse failed or was not present, we still read config-level TLVs.
   for (const auto& tlv : added_tlvs_) {
     if (processed_tlv_types.contains(tlv.type)) {
       ENVOY_LOG_EVERY_POW_2_MISC(info, "Skipping duplicate TLV type from added_tlvs {}", tlv.type);

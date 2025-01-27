@@ -9,6 +9,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 
+using envoy::config::core::v3::PerHostConfig;
 using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
 namespace Envoy {
 namespace {
@@ -478,7 +479,7 @@ public:
                              ->mutable_lb_endpoints(0)
                              ->mutable_metadata();
 
-        envoy::config::core::v3::ProxyProtocolConfig tlvs_metadata;
+        PerHostConfig tlvs_metadata;
         for (const auto& tlv : custom_tlvs_from_host_) {
           auto entry = tlvs_metadata.add_added_tlvs();
           entry->set_type(tlv.first);

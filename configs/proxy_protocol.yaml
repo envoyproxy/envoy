@@ -51,7 +51,7 @@ static_resources:
           metadata:
             typed_filter_metadata:
               envoy.transport_sockets.proxy_protocol:
-                "@type": type.googleapis.com/envoy.config.core.v3.ProxyProtocolConfig
+                "@type": type.googleapis.com/envoy.config.core.v3.PerHostConfig
                 added_tlvs:
                 - type: 0xEE
                   value: b3ZlcnJpZGU=

@@ -25,10 +25,10 @@ using testing::Return;
 using testing::ReturnNull;
 using testing::ReturnRef;
 
+using envoy::config::core::v3::PerHostConfig;
 using envoy::config::core::v3::ProxyProtocolConfig;
 using envoy::config::core::v3::ProxyProtocolConfig_Version;
 using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -736,9 +736,9 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromConfig) {
 
   ProxyProtocolConfig config;
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
-  auto valid_tlv_entry = config.add_added_tlvs();
-  valid_tlv_entry->set_type(0x96);
-  valid_tlv_entry->set_value("moredata");
+  auto host_added_tlvs = config.add_added_tlvs();
+  host_added_tlvs->set_type(0x96);
+  host_added_tlvs->set_value("moredata");
   initialize(config, socket_options);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
@@ -776,13 +776,13 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
   const std::string metadata_key =
       Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
 
-  ProxyProtocolConfig custom_tlv_metadata;
-  auto valid_entry = custom_tlv_metadata.add_added_tlvs();
-  valid_entry->set_type(0x96);
-  valid_entry->set_value("moredata");
+  PerHostConfig host_metadata_config;
+  auto host_added_tlvs = host_metadata_config.add_added_tlvs();
+  host_added_tlvs->set_type(0x96);
+  host_added_tlvs->set_value("moredata");
 
   ProtobufWkt::Any typed_metadata;
-  typed_metadata.PackFrom(custom_tlv_metadata);
+  typed_metadata.PackFrom(host_metadata_config);
   metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, typed_metadata));
   EXPECT_CALL(*host, metadata()).Times(testing::AnyNumber()).WillRepeatedly(Return(metadata));
   transport_callbacks_.connection_.streamInfo().upstreamInfo()->setUpstreamHost(host);
@@ -797,6 +797,9 @@ TEST_F(ProxyProtocolTest, V2CustomTLVsFromHostMetadata) {
 
   ProxyProtocolConfig config;
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
+  auto config_added_tlvs = config.add_added_tlvs();
+  config_added_tlvs->set_type(0x96);
+  config_added_tlvs->set_value("moredata");
   initialize(config, socket_options);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
@@ -836,10 +839,10 @@ TEST_F(ProxyProtocolTest, V2CombinedPrecedenceHostConfigPassthrough) {
   const std::string metadata_key =
       Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
 
-  ProxyProtocolConfig host_metadata_config;
-  auto host_entry = host_metadata_config.add_added_tlvs();
-  host_entry->set_type(0x99);
-  host_entry->set_value("hostValue");
+  PerHostConfig host_metadata_config;
+  auto host_added_tlvs = host_metadata_config.add_added_tlvs();
+  host_added_tlvs->set_type(0x99);
+  host_added_tlvs->set_value("hostValue");
 
   ProtobufWkt::Any typed_metadata;
   typed_metadata.PackFrom(host_metadata_config);
@@ -858,9 +861,9 @@ TEST_F(ProxyProtocolTest, V2CombinedPrecedenceHostConfigPassthrough) {
 
   ProxyProtocolConfig config;
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
-  auto config_entry = config.add_added_tlvs();
-  config_entry->set_type(0x99);
-  config_entry->set_value("configValue");
+  auto config_added_tlvs = config.add_added_tlvs();
+  config_added_tlvs->set_type(0x99);
+  config_added_tlvs->set_value("configValue");
   initialize(config, socket_options);
 
   EXPECT_CALL(io_handle_, write(BufferStringEqual(expected_buff.toString())))
@@ -898,10 +901,10 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperly) {
   const std::string metadata_key =
       Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
 
-  ProxyProtocolConfig host_metadata_config;
-  auto host_entry = host_metadata_config.add_added_tlvs();
-  host_entry->set_type(0x98);
-  host_entry->set_value("d1");
+  PerHostConfig host_metadata_config;
+  auto host_added_tlvs = host_metadata_config.add_added_tlvs();
+  host_added_tlvs->set_type(0x98);
+  host_added_tlvs->set_value("d1");
   auto duplicate_host_entry = host_metadata_config.add_added_tlvs();
   duplicate_host_entry->set_type(0x98);
   duplicate_host_entry->set_value("d2"); // Last duplicate value
@@ -925,9 +928,9 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperly) {
   // Configure duplicate TLVs in the configuration.
   ProxyProtocolConfig config;
   config.set_version(ProxyProtocolConfig_Version::ProxyProtocolConfig_Version_V2);
-  auto tlv_entry = config.add_added_tlvs();
-  tlv_entry->set_type(0x96);
-  tlv_entry->set_value("bar");
+  auto tlv = config.add_added_tlvs();
+  tlv->set_type(0x96);
+  tlv->set_value("bar");
   auto duplicate_tlv_entry = config.add_added_tlvs();
   duplicate_tlv_entry->set_type(0x96);
   duplicate_tlv_entry->set_value("baz"); // Last duplicate value for type 0x96
@@ -950,7 +953,7 @@ TEST_F(ProxyProtocolTest, V2DuplicateTLVsInConfigAndMetadataHandledProperly) {
 }
 
 // Test handles edge case where the well-known host metadata namespace is present, but the
-// TLVs are invalid and cannot be unpacked properly.
+// TLVs are invalid and cannot be unpacked properly. Needed for code coverage.
 TEST_F(ProxyProtocolTest, V2CustomTLVMetadataInvalidFormat) {
   auto src_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
@@ -1006,6 +1009,7 @@ TEST_F(ProxyProtocolTest, V2CustomTLVMetadataInvalidFormat) {
 }
 
 // Test verifies edge case where host has metadata available, but does not include the expected key.
+// Needed for code coverage.
 TEST_F(ProxyProtocolTest, V2CustomTLVHostMetadataMissing) {
   auto src_addr =
       Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));

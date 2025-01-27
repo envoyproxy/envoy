@@ -83,3 +83,8 @@ message ProxyProtocolConfig {
   //   or transport socket-level TLV.
   repeated TlvEntry added_tlvs = 3;
 }
+
+message PerHostConfig {
+  // Enables per-host configuration for Proxy Protocol.
+  repeated TlvEntry added_tlvs = 1;
+}
