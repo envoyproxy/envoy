@@ -554,7 +554,10 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsFailedHost) {
     typed_dns_resolver_config:
       name: envoy.network.dns_resolver.getaddrinfo
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+        num_retries: {
+          value: 1
+        })EOF";
   initializeWithArgs(1024, 1024, "", resolver_config, false, /* dns_query_timeout= */ 0,
                      /* disable_dns_refresh_on_failure= */ true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
