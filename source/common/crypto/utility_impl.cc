@@ -81,7 +81,7 @@ const EVP_MD* UtilityImpl::getHashFunction(absl::string_view name) {
   const std::string hash = absl::AsciiStrToLower(name);
 
   // Hash algorithms set refers
-  // https://github.com/google/boringssl/blob/master/include/openssl/digest.h
+  // https://github.com/google/boringssl/blob/main/include/openssl/digest.h
   if (hash == "sha1") {
     return EVP_sha1();
   } else if (hash == "sha224") {

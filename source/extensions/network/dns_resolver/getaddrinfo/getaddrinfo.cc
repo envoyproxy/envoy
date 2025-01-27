@@ -36,6 +36,7 @@ ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
                                                 ResolveCb callback) {
   ENVOY_LOG(debug, "adding new query [{}] to pending queries", dns_name);
   auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback);
+  new_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted));
   ActiveDnsQuery* active_query;
   {
     absl::MutexLock guard(&mutex_);
@@ -48,7 +49,6 @@ ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
     }
     active_query = pending_queries_.back().pending_query_.get();
   }
-  active_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted));
   return active_query;
 }
 

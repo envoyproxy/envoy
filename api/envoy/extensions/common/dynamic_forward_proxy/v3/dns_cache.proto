@@ -136,8 +136,9 @@ message DnsCacheConfig {
   // The timeout used for DNS queries. This timeout is independent of any timeout and retry policy
   // used by the underlying DNS implementation (e.g., c-areas and Apple DNS) which are opaque.
   // Setting this timeout will ensure that queries succeed or fail within the specified time frame
-  // and are then retried using the standard refresh rates. Defaults to 5s if not set.
-  google.protobuf.Duration dns_query_timeout = 11 [(validate.rules).duration = {gt {}}];
+  // and are then retried using the standard refresh rates. Setting it to 0 will disable the Envoy DNS
+  // query timeout and use the underlying DNS implementation timeout. Defaults to 5s if not set.
+  google.protobuf.Duration dns_query_timeout = 11 [(validate.rules).duration = {gte {}}];
 
   // Configuration to flush the DNS cache to long term storage.
   config.common.key_value.v3.KeyValueStoreConfig key_value_config = 13;
