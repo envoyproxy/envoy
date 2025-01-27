@@ -58,13 +58,6 @@ jobs:
           run: |
             cd mobile
             tar -czf coverage.tar.gz generated/coverage
-      # TODO(phlax): This is a highly undesirable workaround - remove once
-      #   https://github.com/bazelbuild/bazel/issues/23247 is resolved/available
-      steps-pre: |
-        - name: Inject bazel version
-          shell: bash
-          run: |
-            echo "7.1.2" > .bazelversion
       target: mobile-coverage
       timeout-minutes: 120
       upload-name: coverage.tar.gz
