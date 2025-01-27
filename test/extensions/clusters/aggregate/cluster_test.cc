@@ -144,6 +144,17 @@ public:
                                                             Stats::Gauge::ImportMode::Accumulate);
   }
 
+  void assertResourceManagerStat(ResourceLimit& resource, Stats::Gauge& remaining,
+                                 Stats::Gauge& open, bool expected_can_create,
+                                 unsigned int expected_count, unsigned int expected_remaining,
+                                 unsigned int expected_open) {
+
+    EXPECT_EQ(expected_can_create, resource.canCreate());
+    EXPECT_EQ(expected_count, resource.count());
+    EXPECT_EQ(expected_remaining, remaining.value());
+    EXPECT_EQ(expected_open, open.value());
+  }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Ssl::MockContextManager ssl_context_manager_;
 
@@ -257,38 +268,20 @@ TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsTest) {
   // we should have a maximum of 1 connection available to use
   EXPECT_EQ(1U, resource_manager.connections().max());
 
-  // check that we can create a new connection
-  EXPECT_TRUE(resource_manager.connections().canCreate());
-  // check the connection count is 0
-  EXPECT_EQ(0U, resource_manager.connections().count());
-  // check that we have 1 remaining connection
-  EXPECT_EQ(1U, remaining_cx.value());
-  // check the circuit breaker is closed
-  EXPECT_EQ(0U, cx_open.value());
+  assertResourceManagerStat(resource_manager.connections(), remaining_cx, cx_open, true, 0U, 1U,
+                            0U);
 
   // create that one connection
   resource_manager.connections().inc();
 
-  // check the connection count is now 1
-  EXPECT_EQ(1U, resource_manager.connections().count());
-  // make sure we are NOT allowed to create anymore connections
-  EXPECT_FALSE(resource_manager.connections().canCreate());
-  // check that we have 0 remaining connections
-  EXPECT_EQ(0U, remaining_cx.value());
-  // check the circuit breaker is now open
-  EXPECT_EQ(1U, cx_open.value());
+  assertResourceManagerStat(resource_manager.connections(), remaining_cx, cx_open, false, 1U, 0U,
+                            1U);
 
   // remove that one connection
   resource_manager.connections().dec();
 
-  // check the connection count is now 0 again
-  EXPECT_EQ(0U, resource_manager.connections().count());
-  // check that we can create a new connection again
-  EXPECT_TRUE(resource_manager.connections().canCreate());
-  // check that we have 1 remaining connection again
-  EXPECT_EQ(1U, remaining_cx.value());
-  // check that the circuit breaker is closed again
-  EXPECT_EQ(0U, cx_open.value());
+  assertResourceManagerStat(resource_manager.connections(), remaining_cx, cx_open, true, 0U, 1U,
+                            0U);
 }
 
 TEST_F(AggregateClusterTest, CircuitBreakerMaxPendingRequestsTest) {
@@ -325,38 +318,20 @@ TEST_F(AggregateClusterTest, CircuitBreakerMaxPendingRequestsTest) {
   // we should have a maximum of 1 pending request
   EXPECT_EQ(1U, resource_manager.pendingRequests().max());
 
-  // check that we can create a new pending request
-  EXPECT_TRUE(resource_manager.pendingRequests().canCreate());
-  // check the pending requests count is 0
-  EXPECT_EQ(0U, resource_manager.pendingRequests().count());
-  // check that we have 1 remaining pending request
-  EXPECT_EQ(1U, remaining_pending.value());
-  // check the circuit breaker is closed
-  EXPECT_EQ(0U, rq_pending_open.value());
+  assertResourceManagerStat(resource_manager.pendingRequests(), remaining_pending, rq_pending_open,
+                            true, 0U, 1U, 0U);
 
   // create that one pending request
   resource_manager.pendingRequests().inc();
 
-  // check the pending requests count is now 1
-  EXPECT_EQ(1U, resource_manager.pendingRequests().count());
-  // make sure we are NOT allowed to create anymore pending requests
-  EXPECT_FALSE(resource_manager.pendingRequests().canCreate());
-  // check that we have 0 remaining pending requests
-  EXPECT_EQ(0U, remaining_pending.value());
-  // check the circuit breaker is now open
-  EXPECT_EQ(1U, rq_pending_open.value());
+  assertResourceManagerStat(resource_manager.pendingRequests(), remaining_pending, rq_pending_open,
+                            false, 1U, 0U, 1U);
 
   // remove that one pending request
   resource_manager.pendingRequests().dec();
 
-  // check the pending requests count is now 0 again
-  EXPECT_EQ(0U, resource_manager.pendingRequests().count());
-  // check that we can create a new pending request again
-  EXPECT_TRUE(resource_manager.pendingRequests().canCreate());
-  // check that we have 1 remaining pending request again
-  EXPECT_EQ(1U, remaining_pending.value());
-  // check that the circuit breaker is closed again
-  EXPECT_EQ(0U, rq_pending_open.value());
+  assertResourceManagerStat(resource_manager.pendingRequests(), remaining_pending, rq_pending_open,
+                            true, 0U, 1U, 0U);
 }
 
 TEST_F(AggregateClusterTest, CircuitBreakerMaxRequestsTest) {
@@ -391,38 +366,17 @@ TEST_F(AggregateClusterTest, CircuitBreakerMaxRequestsTest) {
   // we should have a maximum of 1 request available to use
   EXPECT_EQ(1U, resource_manager.requests().max());
 
-  // check that we can create a new request
-  EXPECT_TRUE(resource_manager.requests().canCreate());
-  // check the requests count is 0
-  EXPECT_EQ(0U, resource_manager.requests().count());
-  // check that we have 1 remaining request
-  EXPECT_EQ(1U, remaining_rq.value());
-  // check the circuit breaker is closed
-  EXPECT_EQ(0U, rq_open.value());
+  assertResourceManagerStat(resource_manager.requests(), remaining_rq, rq_open, true, 0U, 1U, 0U);
 
   // create that one request
   resource_manager.requests().inc();
 
-  // check the request count is now 1
-  EXPECT_EQ(1U, resource_manager.requests().count());
-  // make sure we are NOT allowed to create anymore request
-  EXPECT_FALSE(resource_manager.requests().canCreate());
-  // check that we have 0 remaining requests
-  EXPECT_EQ(0U, remaining_rq.value());
-  // check the circuit breaker is now open
-  EXPECT_EQ(1U, rq_open.value());
+  assertResourceManagerStat(resource_manager.requests(), remaining_rq, rq_open, false, 1U, 0U, 1U);
 
   // remove that one request
   resource_manager.requests().dec();
 
-  // check the request count is now 0 again
-  EXPECT_EQ(0U, resource_manager.requests().count());
-  // check that we can create a new request again
-  EXPECT_TRUE(resource_manager.requests().canCreate());
-  // check that we have 1 remaining request again
-  EXPECT_EQ(1U, remaining_rq.value());
-  // check that the circuit breaker is closed again
-  EXPECT_EQ(0U, rq_open.value());
+  assertResourceManagerStat(resource_manager.requests(), remaining_rq, rq_open, true, 0U, 1U, 0U);
 }
 
 TEST_F(AggregateClusterTest, CircuitBreakerMaxRetriesTest) {
@@ -457,37 +411,20 @@ TEST_F(AggregateClusterTest, CircuitBreakerMaxRetriesTest) {
   // check the yaml config is set correctly
   // we should have a maximum of 1 retry available to use
   EXPECT_EQ(1U, resource_manager.retries().max());
-  // check that we can retry
-  EXPECT_TRUE(resource_manager.retries().canCreate());
-  // check the retries count is 0
-  EXPECT_EQ(0U, resource_manager.retries().count());
-  // check that we have 1 remaining retry
-  EXPECT_EQ(1U, remaining_retries.value());
-  // check the circuit breaker is closed
-  EXPECT_EQ(0U, rq_retry_open.value());
+
+  assertResourceManagerStat(resource_manager.retries(), remaining_retries, rq_retry_open, true, 0U,
+                            1U, 0U);
 
   resource_manager.retries().inc();
 
-  // check the retries count is now 1
-  EXPECT_EQ(1U, resource_manager.retries().count());
-  // make sure we are NOT allowed to create anymore retries
-  EXPECT_FALSE(resource_manager.retries().canCreate());
-  // check that we have 0 remaining retries
-  EXPECT_EQ(0U, remaining_retries.value());
-  // check the circuit breaker is now open
-  EXPECT_EQ(1U, rq_retry_open.value());
+  assertResourceManagerStat(resource_manager.retries(), remaining_retries, rq_retry_open, false, 1U,
+                            0U, 1U);
 
   // remove that one retry
   resource_manager.retries().dec();
 
-  // check the retries count is now 0 again
-  EXPECT_EQ(0U, resource_manager.retries().count());
-  // check that we can create a new retry again
-  EXPECT_TRUE(resource_manager.retries().canCreate());
-  // check that we have 1 remaining retry again
-  EXPECT_EQ(1U, remaining_retries.value());
-  // check that the circuit breaker is closed again
-  EXPECT_EQ(0U, rq_retry_open.value());
+  assertResourceManagerStat(resource_manager.retries(), remaining_retries, rq_retry_open, true, 0U,
+                            1U, 0U);
 }
 
 TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionPoolsTest) {
@@ -523,38 +460,20 @@ TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionPoolsTest) {
   // we should have a maximum of 1 request available to use
   EXPECT_EQ(1U, resource_manager.connectionPools().max());
 
-  // check that we can create a new connection pool
-  EXPECT_TRUE(resource_manager.connectionPools().canCreate());
-  // check the connection pool count is 0
-  EXPECT_EQ(0U, resource_manager.connectionPools().count());
-  // check that we have 1 remaining connection pool
-  EXPECT_EQ(1U, remaining_cx_pools.value());
-  // check the circuit breaker is closed
-  EXPECT_EQ(0U, cx_pool_open.value());
+  assertResourceManagerStat(resource_manager.connectionPools(), remaining_cx_pools, cx_pool_open,
+                            true, 0U, 1U, 0U);
 
   // create that one request
   resource_manager.connectionPools().inc();
 
-  // check the connection pool count is now 1
-  EXPECT_EQ(1U, resource_manager.connectionPools().count());
-  // make sure we are NOT allowed to create anymore connection pools
-  EXPECT_FALSE(resource_manager.connectionPools().canCreate());
-  // check that we have 0 remaining connection pools
-  EXPECT_EQ(0U, remaining_cx_pools.value());
-  // check the circuit breaker is now open
-  EXPECT_EQ(1U, cx_pool_open.value());
+  assertResourceManagerStat(resource_manager.connectionPools(), remaining_cx_pools, cx_pool_open,
+                            false, 1U, 0U, 1U);
 
   // remove that one request
   resource_manager.connectionPools().dec();
 
-  // check the connection pool count is now 0 again
-  EXPECT_EQ(0U, resource_manager.connectionPools().count());
-  // check that we can create a new connection pool again
-  EXPECT_TRUE(resource_manager.connectionPools().canCreate());
-  // check that we have 1 remaining connection pool again
-  EXPECT_EQ(1U, remaining_cx_pools.value());
-  // check that the circuit breaker is closed again
-  EXPECT_EQ(0U, cx_pool_open.value());
+  assertResourceManagerStat(resource_manager.connectionPools(), remaining_cx_pools, cx_pool_open,
+                            true, 0U, 1U, 0U);
 }
 
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
