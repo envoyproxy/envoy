@@ -193,7 +193,7 @@ public:
 
     if (null_metadata) {
       EXPECT_EQ(1UL, cluster_.cluster_.info_->statsScope()
-                         .counterFromString("thrift.upstream_resp_decoding_error")
+                         .counterFromString("thrift.upstream_resp_metadata_null")
                          .value());
       return;
     }
