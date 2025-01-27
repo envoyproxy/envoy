@@ -3,6 +3,8 @@ package org.chromium.net;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import android.Manifest;
+
 import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import org.chromium.net.impl.CronvoyUrlRequestContext;
 import io.envoyproxy.envoymobile.engine.EnvoyEngine;
@@ -10,6 +12,7 @@ import org.chromium.net.impl.CronvoyLogger;
 import androidx.test.core.app.ApplicationProvider;
 import org.chromium.net.testing.TestUploadDataProvider;
 import androidx.test.filters.SmallTest;
+import androidx.test.rule.GrantPermissionRule;
 
 import org.chromium.net.impl.NativeCronvoyEngineBuilderImpl;
 import org.chromium.net.testing.CronetTestRule;
@@ -32,6 +35,10 @@ import java.util.Collections;
  */
 @RunWith(RobolectricTestRunner.class)
 public class CronetHttp3Test {
+  @Rule
+  public GrantPermissionRule grantPermissionRule =
+      GrantPermissionRule.grant(Manifest.permission.ACCESS_NETWORK_STATE);
+
   @Rule public final CronetTestRule mTestRule = new CronetTestRule();
 
   private static final String TAG = CronetHttp3Test.class.getSimpleName();

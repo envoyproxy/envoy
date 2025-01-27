@@ -1368,7 +1368,7 @@ envoy.upstreams.http.http:
   status: stable
 envoy.upstreams.http.http_protocol_options:
   categories:
-  - envoy.upstreams
+  - envoy.upstream_options
   security_posture: robust_to_untrusted_downstream
   status: stable
 envoy.upstreams.http.tcp:
@@ -1388,7 +1388,7 @@ envoy.upstreams.tcp.generic:
   status: stable
 envoy.upstreams.tcp.tcp_protocol_options:
   categories:
-  - envoy.upstreams
+  - envoy.upstream_options
   security_posture: unknown
   status: alpha
 envoy.upstream.local_address_selector.default_local_address_selector:

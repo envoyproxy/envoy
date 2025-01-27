@@ -54,6 +54,7 @@ public:
   MOCK_METHOD(const std::string&, postPath, (), (const));
   MOCK_METHOD(Http::HeaderEvaluator&, headerEvaluator, (), (const));
   MOCK_METHOD(uint32_t, maxConnectAttempts, (), (const));
+  MOCK_METHOD(const BackOffStrategyPtr&, backoffStrategy, (), (const));
   MOCK_METHOD(bool, bufferEnabled, (), (const));
   MOCK_METHOD(uint32_t, maxBufferedDatagrams, (), (const));
   MOCK_METHOD(uint64_t, maxBufferedBytes, (), (const));
@@ -106,12 +107,12 @@ public:
 
   MOCK_METHOD(void, onStreamReady,
               (StreamInfo::StreamInfo * info, std::unique_ptr<HttpUpstream>&& upstream,
-               Upstream::HostDescriptionConstSharedPtr& host,
+               const Upstream::HostDescription& host,
                const Network::ConnectionInfoProvider& address_provider,
                Ssl::ConnectionInfoConstSharedPtr ssl_info));
   MOCK_METHOD(void, onStreamFailure,
               (ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
-               Upstream::HostDescriptionConstSharedPtr host));
+               const Upstream::HostDescription& host));
   MOCK_METHOD(void, resetIdleTimer, ());
 };
 

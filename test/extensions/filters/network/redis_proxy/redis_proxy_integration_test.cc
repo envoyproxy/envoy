@@ -1609,17 +1609,31 @@ TEST_P(RedisProxyIntegrationTest, DiscardEmptyTransaction) {
   redis_client->close();
 }
 
-// This test tries to insert a multi-key command in a transaction, which is not
-// supported. The proxy responds with an error.
-
+// MultiKey commands are allowed to go through. The underlying server may fail with
+// CROSSSLOT or MOVED errors, and the client must handle it.
 TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
   initialize();
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
 
-  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-  proxyResponseStep(makeBulkStringArray({"mget", "foo1", "foo2"}),
-                    "-'mget' command is not supported within transaction\r\n", redis_client);
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
 
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"del", "b"})));
+  expectUpstreamRequestResponse(upstream,
+                                makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"del", "b"}),
+                                "+QUEUED\r\n", fake_upstream_conn, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"del", "a"}),
+                          "-ERR MOVED 15495 0.0.0.0:6379\r\n", redis_client, fake_upstream_conn, "",
+                          "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"del", "b", "a"}),
+                          "-ERR CROSSSLOT Keys in request don't hash to the same slot\r\n",
+                          redis_client, fake_upstream_conn, "", "");
+
+  EXPECT_TRUE(fake_upstream_conn->close());
   redis_client->close();
 }
 

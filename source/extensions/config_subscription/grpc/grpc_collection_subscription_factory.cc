@@ -30,7 +30,8 @@ SubscriptionPtr DeltaGrpcCollectionConfigSubscriptionFactory::create(
       Utility::parseRateLimitSettings(api_config_source);
   THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
   GrpcMuxContext grpc_mux_context{
-      factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+      THROW_OR_RETURN_VALUE(factory_primary_or_error.value()->createUncachedRawAsyncClient(),
+                            Grpc::RawAsyncClientPtr),
       /*failover_async_client_=*/nullptr,
       /*dispatcher_=*/data.dispatcher_,
       /*service_method_=*/deltaGrpcMethod(data.type_url_),

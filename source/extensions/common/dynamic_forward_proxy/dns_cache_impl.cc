@@ -7,7 +7,6 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
-#include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -327,10 +326,14 @@ void DnsCacheImpl::forceRefreshHosts() {
       primary_host.second->active_query_->cancel(
           Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
       primary_host.second->active_query_ = nullptr;
-      primary_host.second->timeout_timer_->disableTimer();
+      if (timeout_interval_.count() > 0) {
+        primary_host.second->timeout_timer_->disableTimer();
+      }
     }
 
-    ASSERT(!primary_host.second->timeout_timer_->enabled());
+    if (timeout_interval_.count() > 0) {
+      ASSERT(!primary_host.second->timeout_timer_->enabled());
+    }
     primary_host.second->refresh_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
     ENVOY_LOG_EVENT(debug, "force_refresh_host", "force refreshing host='{}'", primary_host.first);
   }
@@ -355,8 +358,10 @@ void DnsCacheImpl::stop() {
       primary_host.second->active_query_ = nullptr;
     }
 
-    primary_host.second->timeout_timer_->disableTimer();
-    ASSERT(!primary_host.second->timeout_timer_->enabled());
+    if (timeout_interval_.count() > 0) {
+      primary_host.second->timeout_timer_->disableTimer();
+      ASSERT(!primary_host.second->timeout_timer_->enabled());
+    }
     primary_host.second->refresh_timer_->disableTimer();
     ENVOY_LOG_EVENT(debug, "stop_host", "stop host='{}'", primary_host.first);
   }
@@ -368,8 +373,9 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   ASSERT(host_info.active_query_ == nullptr);
 
   stats_.dns_query_attempt_.inc();
-
-  host_info.timeout_timer_->enableTimer(timeout_interval_, nullptr);
+  if (timeout_interval_.count() > 0) {
+    host_info.timeout_timer_->enableTimer(timeout_interval_, nullptr);
+  }
   host_info.active_query_ = resolver_->resolve(
       host_info.host_info_->resolvedHost(), dns_lookup_family_,
       [this, host](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
@@ -437,7 +443,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   if (!from_cache) {
     first_resolve = !primary_host_info->host_info_->firstResolveComplete();
-    primary_host_info->timeout_timer_->disableTimer();
+    if (timeout_interval_.count() > 0) {
+      primary_host_info->timeout_timer_->disableTimer();
+    }
     primary_host_info->active_query_ = nullptr;
 
     if (status == Network::DnsResolver::ResolutionStatus::Failure) {

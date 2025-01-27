@@ -206,8 +206,10 @@ message Policy {
 // metadata should be sourced from, rather than only matching against dynamic metadata.
 //
 // The matcher can be configured to look up metadata from:
+//
 // * Dynamic metadata: Runtime metadata added by filters during request processing
 // * Route metadata: Static metadata configured on the route entry
+//
 message SourcedMetadata {
   // Metadata matcher configuration that defines what metadata to match against. This includes the filter name,
   // metadata key path, and expected value.

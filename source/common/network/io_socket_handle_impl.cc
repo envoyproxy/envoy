@@ -231,18 +231,26 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 
 Address::InstanceConstSharedPtr
 IoSocketHandleImpl::getOrCreateEnvoyAddressInstance(sockaddr_storage ss, socklen_t ss_len) {
-  if (recent_received_addresses_ == nullptr) {
+  if (!recent_received_addresses_) {
     return Address::addressFromSockAddrOrDie(ss, ss_len, fd_, socket_v6only_);
   }
   quic::QuicSocketAddress quic_address(ss);
-  auto it = recent_received_addresses_->Lookup(quic_address);
+  auto it = std::find_if(
+      recent_received_addresses_->begin(), recent_received_addresses_->end(),
+      [&quic_address](const QuicEnvoyAddressPair& pair) { return pair.first == quic_address; });
   if (it != recent_received_addresses_->end()) {
-    return *it->second;
+    Address::InstanceConstSharedPtr cached_addr = it->second;
+    // Move the entry to the back of the list since it's the most recently accessed entry.
+    std::rotate(it, it + 1, recent_received_addresses_->end());
+    return cached_addr;
   }
   Address::InstanceConstSharedPtr new_address =
       Address::addressFromSockAddrOrDie(ss, ss_len, fd_, socket_v6only_);
-  recent_received_addresses_->Insert(
-      quic_address, std::make_unique<Address::InstanceConstSharedPtr>(new_address));
+  recent_received_addresses_->push_back(QuicEnvoyAddressPair(quic_address, new_address));
+  if (recent_received_addresses_->size() > address_cache_max_capacity_) {
+    // Over capacity so remove the first element in the list, which is the least recently accessed.
+    recent_received_addresses_->erase(recent_received_addresses_->begin());
+  }
   return new_address;
 }
 
@@ -404,11 +412,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
         }
       }
 #endif
-      if (receive_ecn_) {
-        absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
-        if (maybe_tos) {
-          output.msg_[0].tos_ = *maybe_tos;
-        }
+      absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
+      if (maybe_tos) {
+        output.msg_[0].tos_ = *maybe_tos;
       }
     }
   }
@@ -494,12 +500,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
           output.msg_[0].saved_cmsg_ = cmsg_slice;
         }
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
-        if (receive_ecn_) {
-          absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
-          if (maybe_tos) {
-            output.msg_[0].tos_ = *maybe_tos;
-            continue;
-          }
+        absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
+        if (maybe_tos) {
+          output.msg_[0].tos_ = *maybe_tos;
+          continue;
         }
         if (addr != nullptr) {
           // This is a IP packet info message.
