@@ -47,7 +47,6 @@ envoy_cc_test(
     deps = [
         "//source/extensions/common/aws:aws_cluster_manager_lib",
         "//test/mocks/server:server_factory_context_mocks",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 

@@ -23,11 +23,6 @@ public:
   virtual void onClusterAddOrUpdate() PURE;
 };
 
-// class AwsManagedClusterUpdateCallbacksHandle {
-// public:
-//   virtual ~AwsManagedClusterUpdateCallbacksHandle() = default;
-// };
-
 class AwsManagedClusterUpdateCallbacksHandle
     : public RaiiListElement<AwsManagedClusterUpdateCallbacks*> {
 public:
@@ -88,7 +83,7 @@ class AwsClusterManagerImpl : public AwsClusterManager,
                               public Envoy::Singleton::Instance,
                               public Upstream::ClusterUpdateCallbacks {
   // Friend class for testing callbacks
-  friend class AwsCredentialsProviderClusterManagerFriend;
+  friend class AwsClusterManagerFriend;
 
 public:
   AwsClusterManagerImpl(Server::Configuration::ServerFactoryContext& context);

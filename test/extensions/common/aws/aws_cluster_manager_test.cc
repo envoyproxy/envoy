@@ -1,14 +1,13 @@
-#include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "source/extensions/common/aws/aws_cluster_manager.h"
-
 #include "test/mocks/server/server_factory_context.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
-using testing::Return;
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -101,7 +100,6 @@ TEST_F(AwsClusterManagerTest, AddClusterCallbacks) {
   manager_friend.onClusterAddOrUpdate("cluster_1", command);
 }
 
-// Checks that RAII cleans up callbacks correctly
 TEST_F(AwsClusterManagerTest, ClusterCallbacksAreDeleted) {
   auto callbacks1 = std::make_unique<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
   EXPECT_CALL(*callbacks1, onClusterAddOrUpdate).Times(0);
@@ -119,10 +117,9 @@ TEST_F(AwsClusterManagerTest, ClusterCallbacksAreDeleted) {
   auto handle1Or = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks1);
   auto handle2Or = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks2);
   auto handle3Or = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks3);
-  // Delete the handles, which should clean up the callback list via RAII
-  handle1Or->reset();
-  handle2Or->reset();
-  handle3Or->reset();
+  handle1Or->release();
+  handle2Or->release();
+  handle3Or->release();
   auto command = Upstream::ThreadLocalClusterCommand();
   manager_friend.onClusterAddOrUpdate("cluster_1", command);
 }
