@@ -37,25 +37,31 @@ using AwsManagedClusterUpdateCallbacksHandlePtr =
 /**
  * Manages clusters for any number of credentials provider instances
  *
- * Credentials providers in async mode require clusters to be created so that they can use the async http client to retrieve credentials.
- * The aws cluster manager is responsible for creating these clusters, and notifying a credential provider when a cluster comes on line so they can
- * begin retrieving credentials.
+ * Credentials providers in async mode require clusters to be created so that they can use the async
+ * http client to retrieve credentials. The aws cluster manager is responsible for creating these
+ * clusters, and notifying a credential provider when a cluster comes on line so they can begin
+ * retrieving credentials.
  *
- * - For InstanceProfileCredentialsProvider, a cluster is created with the uri of the instance metadata service. Only one cluster is required
- * for any number of instantiations of the aws request signing extension. 
+ * - For InstanceProfileCredentialsProvider, a cluster is created with the uri of the instance
+ * metadata service. Only one cluster is required for any number of instantiations of the aws
+ * request signing extension.
  *
- * - For ContainerCredentialsProvider (including ECS and EKS), a cluster is created with the uri of the container agent. Only one cluster is required
- * for any number of instantiations of the aws request signing extension.
+ * - For ContainerCredentialsProvider (including ECS and EKS), a cluster is created with the uri of
+ * the container agent. Only one cluster is required for any number of instantiations of the aws
+ * request signing extension.
  *
- * - For WebIdentityCredentialsProvider, a cluster is required for the STS service in any region configured. There may be many WebIdentityCredentialsProvider instances
- * instances configured, each with their own region, or their own role ARN or role session name. The aws cluster manager will maintain only a single
- * cluster per region, and notify all relevant WebIdentityCredentialsProvider instances when their cluster is ready.
+ * - For WebIdentityCredentialsProvider, a cluster is required for the STS service in any region
+ * configured. There may be many WebIdentityCredentialsProvider instances instances configured, each
+ * with their own region, or their own role ARN or role session name. The aws cluster manager will
+ * maintain only a single cluster per region, and notify all relevant WebIdentityCredentialsProvider
+ * instances when their cluster is ready.
  *
- * - For IAMRolesAnywhere, this behaves similarly to WebIdentityCredentialsProvider, where there may be many instantiations of the credential provider
- * for different roles, regions and profiles. The aws cluster manager will dedupe these clusters as required.
+ * - For IAMRolesAnywhere, this behaves similarly to WebIdentityCredentialsProvider, where there may
+ * be many instantiations of the credential provider for different roles, regions and profiles. The
+ * aws cluster manager will dedupe these clusters as required.
  */
 class AwsClusterManager : public Envoy::Singleton::Instance,
-                                             public Upstream::ClusterUpdateCallbacks {
+                          public Upstream::ClusterUpdateCallbacks {
   // Friend class for testing callbacks
   friend class AwsClusterManagerFriend;
 
@@ -64,9 +70,7 @@ public:
   // not used, and vice versa.
   AwsClusterManager(Server::Configuration::ServerFactoryContext& context);
 
-  ~AwsClusterManager() override {
-    ENVOY_LOG_MISC(debug, "******** acm destructor called");
-  };
+  ~AwsClusterManager() override { ENVOY_LOG_MISC(debug, "******** acm destructor called"); };
 
   absl::Status
   addManagedCluster(absl::string_view cluster_name,
@@ -102,8 +106,7 @@ private:
   std::unique_ptr<Init::TargetImpl> init_target_;
 };
 
-using AwsClusterManagerPtr =
-    std::shared_ptr<AwsClusterManager>;
+using AwsClusterManagerPtr = std::shared_ptr<AwsClusterManager>;
 using AwsClusterManagerOptRef = OptRef<AwsClusterManagerPtr>;
 
 } // namespace Aws

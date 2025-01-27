@@ -7,8 +7,7 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-AwsClusterManager::AwsClusterManager(
-    Server::Configuration::ServerFactoryContext& context)
+AwsClusterManager::AwsClusterManager(Server::Configuration::ServerFactoryContext& context)
     : context_(context) {
   ENVOY_LOG_MISC(debug, "******** acm constructor called");
 
@@ -29,8 +28,8 @@ AwsClusterManager::AwsClusterManager(
 };
 
 absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
-AwsClusterManager::addManagedClusterUpdateCallbacks(
-    absl::string_view cluster_name, AwsManagedClusterUpdateCallbacks& cb) {
+AwsClusterManager::addManagedClusterUpdateCallbacks(absl::string_view cluster_name,
+                                                    AwsManagedClusterUpdateCallbacks& cb) {
   auto it = managed_clusters_.find(cluster_name);
   ENVOY_LOG_MISC(debug, "Adding callback for cluster {}", cluster_name);
   if (it == managed_clusters_.end()) {
@@ -48,8 +47,8 @@ AwsClusterManager::addManagedClusterUpdateCallbacks(
       cb, managed_cluster->update_callbacks_);
 }
 
-void AwsClusterManager::onClusterAddOrUpdate(
-    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand&) {
+void AwsClusterManager::onClusterAddOrUpdate(absl::string_view cluster_name,
+                                             Upstream::ThreadLocalClusterCommand&) {
 
   // Mark our cluster as ready for use
   auto it = managed_clusters_.find(cluster_name);

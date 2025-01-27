@@ -1,7 +1,8 @@
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "source/extensions/common/aws/aws_cluster_manager.h"
+
 #include "test/mocks/server/server_factory_context.h"
-#include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -53,8 +54,7 @@ public:
 
 class AwsClusterManagerFriend {
 public:
-  AwsClusterManagerFriend(
-      std::shared_ptr<AwsClusterManager> aws_cluster_manager)
+  AwsClusterManagerFriend(std::shared_ptr<AwsClusterManager> aws_cluster_manager)
       : aws_cluster_manager_(aws_cluster_manager) {}
 
   void onClusterAddOrUpdate(absl::string_view cluster_name,
