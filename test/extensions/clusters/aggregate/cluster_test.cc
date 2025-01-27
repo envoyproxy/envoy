@@ -383,6 +383,71 @@ TEST_F(AggregateClusterTest, CircuitBreakerMaxRequestsTest) {
   EXPECT_EQ(0U, rq_open.value());
 }
 
+TEST_F(AggregateClusterTest, CircuitBreakerMaxRetriesTest) {
+  const std::string yaml_config = R"EOF(
+    name: aggregate_cluster
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_retries: 1
+        track_remaining: true
+    cluster_type:
+      name: envoy.clusters.aggregate
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
+        clusters:
+        - primary
+        - secondary
+)EOF";
+
+  initialize(yaml_config);
+
+  // resource manager for the DEFAULT priority (look above^)
+  Upstream::ResourceManager& resource_manager =
+      cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
+
+  Stats::Gauge& rq_retry_open = getCircuitBreakersStatByPriority("default", "rq_retry_open");
+  Stats::Gauge& remaining_retries =
+      getCircuitBreakersStatByPriority("default", "remaining_retries");
+
+  // check the yaml config is set correctly
+  // we should have a maximum of 1 retry available to use
+  EXPECT_EQ(1U, resource_manager.retries().max());
+  // check that we can retry
+  EXPECT_TRUE(resource_manager.retries().canCreate());
+  // check the retries count is 0
+  EXPECT_EQ(0U, resource_manager.retries().count());
+  // check that we have 1 remaining retry
+  EXPECT_EQ(1U, remaining_retries.value());
+  // check the circuit breaker is closed
+  EXPECT_EQ(0U, rq_retry_open.value());
+
+  resource_manager.retries().inc();
+
+  // check the retries count is now 1
+  EXPECT_EQ(1U, resource_manager.retries().count());
+  // make sure we are NOT allowed to create anymore retries
+  EXPECT_FALSE(resource_manager.retries().canCreate());
+  // check that we have 0 remaining retries
+  EXPECT_EQ(0U, remaining_retries.value());
+  // check the circuit breaker is now open
+  EXPECT_EQ(1U, rq_retry_open.value());
+
+  // remove that one retry
+  resource_manager.retries().dec();
+
+  // check the retries count is now 0 again
+  EXPECT_EQ(0U, resource_manager.retries().count());
+  // check that we can create a new retry again
+  EXPECT_TRUE(resource_manager.retries().canCreate());
+  // check that we have 1 remaining retry again
+  EXPECT_EQ(1U, remaining_retries.value());
+  // check that the circuit breaker is closed again
+  EXPECT_EQ(0U, rq_retry_open.value());
+}
+
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
   initialize(default_yaml_config_);
   // Health value:
