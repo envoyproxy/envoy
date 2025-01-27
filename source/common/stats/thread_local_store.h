@@ -477,7 +477,7 @@ private:
    */
   void assertLocked(const ScopeImpl& scope) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_)
       ABSL_ASSERT_EXCLUSIVE_LOCK(scope.parent_.lock_) {
-    (void)scope;
+    UNREFERENCED_PARAMETER(scope);
   }
 
   /**
