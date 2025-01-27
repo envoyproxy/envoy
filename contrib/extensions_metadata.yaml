@@ -139,3 +139,8 @@ envoy.router.cluster_specifier_plugin.golang:
   - envoy.router.cluster_specifier_plugin
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.upstreams.http.tcp.golang:
+  categories:
+  - envoy.upstreams
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
