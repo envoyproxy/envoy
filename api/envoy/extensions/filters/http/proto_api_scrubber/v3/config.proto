@@ -118,7 +118,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   },
 //   "restrictions": {
 //     "method_restrictions": {
-//       "library.book_service.get_books": {
+//       "library.BookService.GetBook": {
 //         "request_field_restrictions": {},
 //         "response_field_restrictions": {
 //           "debug_info": {
