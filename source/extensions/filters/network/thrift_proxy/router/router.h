@@ -321,7 +321,6 @@ public:
     upstream_host->stats().rq_error_.inc();
   }
 
-
   /**
    * Record a value for the request size histogram.
    * @param cluster Upstream::ClusterInfo& describing the upstream cluster
