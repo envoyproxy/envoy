@@ -57,7 +57,7 @@ new_features:
 - area: oauth2
   change: |
     Add the option to specify SameSite cookie attribute values for oauth2 supported cookies.
-    To specify SameSite attribute, choose one of the values from ``strict``, ``lax`` or ``none``. If not specified,
+    To specify ``SameSite`` attribute, choose one of the values from ``strict``, ``lax`` or ``none``. If not specified,
     a default value of ``disabled`` will be assigned and there will be no ``SameSite`` value in the cookie attribute. See
     :ref:`apply_on_stream_done <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.cookie_configs>`
     for more details.
