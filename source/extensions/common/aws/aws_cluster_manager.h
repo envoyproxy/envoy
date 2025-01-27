@@ -23,17 +23,19 @@ public:
   virtual void onClusterAddOrUpdate() PURE;
 };
 
+// class AwsManagedClusterUpdateCallbacksHandle {
+// public:
+//   virtual ~AwsManagedClusterUpdateCallbacksHandle() = default;
+// };
+
 class AwsManagedClusterUpdateCallbacksHandle
     : public RaiiListElement<AwsManagedClusterUpdateCallbacks*> {
 public:
-  AwsManagedClusterUpdateCallbacksHandle(Server::Configuration::ServerFactoryContext& context,
-                                         AwsManagedClusterUpdateCallbacks& cb,
+  AwsManagedClusterUpdateCallbacksHandle(AwsManagedClusterUpdateCallbacks& cb,
                                          std::list<AwsManagedClusterUpdateCallbacks*>& parent)
-      : RaiiListElement<AwsManagedClusterUpdateCallbacks*>(parent, &cb), context_(context) {}
-
-public:
-  Server::Configuration::ServerFactoryContext& context_;
+      : RaiiListElement<AwsManagedClusterUpdateCallbacks*>(parent, &cb) {}
 };
+
 using AwsManagedClusterUpdateCallbacksHandlePtr =
     std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle>;
 
@@ -86,7 +88,7 @@ class AwsClusterManagerImpl : public AwsClusterManager,
                               public Envoy::Singleton::Instance,
                               public Upstream::ClusterUpdateCallbacks {
   // Friend class for testing callbacks
-  friend class AwsClusterManagerFriend;
+  friend class AwsCredentialsProviderClusterManagerFriend;
 
 public:
   AwsClusterManagerImpl(Server::Configuration::ServerFactoryContext& context);
@@ -107,7 +109,7 @@ public:
   absl::Status
   addManagedCluster(absl::string_view cluster_name,
                     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
-                    absl::string_view uri) override;
+                    absl::string_view uri);
 
   /**
    * Add a callback to be signaled when a managed cluster comes online. This is used to kick off
@@ -121,7 +123,6 @@ public:
   absl::StatusOr<std::string> getUriFromClusterName(absl::string_view cluster_name) override;
 
 private:
-  // Callbacks for cluster manager
   void onClusterAddOrUpdate(absl::string_view, Upstream::ThreadLocalClusterCommand&) override;
   void onClusterRemoval(const std::string&) override;
 
@@ -147,6 +148,7 @@ private:
   std::atomic<bool> queue_clusters_ = true;
   Server::Configuration::ServerFactoryContext& context_;
   Upstream::ClusterUpdateCallbacksHandlePtr cm_handle_;
+  Server::ServerLifecycleNotifier::HandlePtr shutdown_handle_;
   std::unique_ptr<Init::TargetImpl> init_target_;
 };
 
