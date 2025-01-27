@@ -2,17 +2,65 @@ package org.chromium.net.impl;
 
 import static org.chromium.net.impl.Errors.mapEnvoyMobileErrorToNetError;
 import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.robolectric.Shadows.shadowOf;
 
+import android.Manifest;
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkCapabilities;
+
+import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.rule.GrantPermissionRule;
+
+import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
+import io.envoyproxy.envoymobile.engine.EnvoyEngine;
 import io.envoyproxy.envoymobile.engine.UpstreamHttpProtocol;
 import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 
 import org.chromium.net.impl.Errors.NetError;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.runner.RunWith;
 import org.junit.Test;
 import org.robolectric.RobolectricTestRunner;
 
 @RunWith(RobolectricTestRunner.class)
 public class ErrorsTest {
+  @Rule
+  public GrantPermissionRule grantPermissionRule =
+      GrantPermissionRule.grant(Manifest.permission.ACCESS_NETWORK_STATE);
+
+  private NetworkCapabilities networkCapabilities;
+
+  @Before
+  public void setUp() {
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    AndroidNetworkMonitor.load(context, mock(EnvoyEngine.class));
+    ConnectivityManager connectivityManager =
+        AndroidNetworkMonitor.getInstance().getConnectivityManager();
+    networkCapabilities =
+        connectivityManager.getNetworkCapabilities(connectivityManager.getActiveNetwork());
+
+    shadowOf(networkCapabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+  }
+
+  @After
+  public void tearDown() {
+    AndroidNetworkMonitor.shutdown();
+  }
+
+  @Test
+  public void testMapEnvoyMobileErrorToInternetDisconnected() {
+    shadowOf(networkCapabilities).removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+
+    long responseFlags = 1L << 4;
+    EnvoyFinalStreamIntel intel = constructStreamIntel(responseFlags, UpstreamHttpProtocol.HTTP3);
+    NetError error = mapEnvoyMobileErrorToNetError(intel);
+    assertEquals(NetError.ERR_INTERNET_DISCONNECTED, error);
+  }
+
   @Test
   public void testMapEnvoyMobileErrorToNetErrorHttp3() throws Exception {
     // 8 corresponds to NoRouteFound in StreamInfo::CoreResponseFlag:

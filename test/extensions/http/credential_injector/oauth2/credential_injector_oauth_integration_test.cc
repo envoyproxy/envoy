@@ -65,6 +65,16 @@ resources:
     EXPECT_EQ(secret.value(), client_secret);
   }
 
+  virtual void checkScopeInRequest(absl::string_view desired_scope) {
+    std::string request_body = oauth2_request_->body().toString();
+    const auto query_parameters =
+        Http::Utility::QueryParamsMulti::parseParameters(request_body, 0, true);
+    auto actual_scope = query_parameters.getFirstValue("scope");
+
+    ASSERT_TRUE(actual_scope.has_value());
+    EXPECT_EQ(actual_scope.value(), desired_scope);
+  }
+
   void getFakeOuth2Connection() {
     AssertionResult result =
         fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_oauth2_connection_);
@@ -437,6 +447,9 @@ typed_config:
 
   // wait for retried token request and respond with good response
   handleOauth2TokenRequest("test_client_secret");
+
+  // make sure scope is actually sent
+  checkScopeInRequest("scope1");
 
   EXPECT_EQ(
       1UL,
