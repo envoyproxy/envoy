@@ -979,32 +979,31 @@ std::string sessionName(Api::Api& api) {
   return actual_session_name;
 }
 
-// Edge case handling for cluster naming.
-//
-// Region is appended to the cluster name, to differentiate between multiple web identity
-// credential providers configured with different regions.
-//
-// UUID is also appended, to differentiate two identically configured web identity credential
-// providers, as we cannot make these singletons
-//
-// TODO: @nbaws: Modify cluster creation logic for web identity credential providers
-// to allow these also to be created as singletons
-
 std::string stsClusterName(absl::string_view region) {
   return absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
 }
+
+SINGLETON_MANAGER_REGISTRATION(aws_credentials_provider_cluster_manager);
 
 CustomCredentialsProviderChain::CustomCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
     const CustomCredentialsProviderChainFactories& factories) {
 
+  aws_cluster_manager_ =
+      context.singletonManager()
+          .getTyped<Envoy::Extensions::Common::Aws::AwsClusterManager>(
+              SINGLETON_MANAGER_REGISTERED_NAME(aws_credentials_provider_cluster_manager),
+              [&context] {
+                return std::make_shared<
+                    Envoy::Extensions::Common::Aws::AwsClusterManager>(context);
+              });
+  
   // Custom chain currently only supports file based and web identity credentials
   if (credential_provider_config.has_assume_role_with_web_identity_provider()) {
     auto web_identity = credential_provider_config.assume_role_with_web_identity_provider();
     const std::string sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-    const auto region_uuid = absl::StrCat(region, "_", context.api().randomGenerator().uuid());
-    const std::string cluster_name = stsClusterName(region_uuid);
+    const std::string cluster_name = stsClusterName(region);
     std::string role_session_name = web_identity.role_session_name();
     if (role_session_name.empty()) {
       web_identity.set_role_session_name(sessionName(context.api()));
@@ -1023,11 +1022,23 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
 }
 
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
-    Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+    Api::Api& api, ServerFactoryContextOptRef context, 
     absl::string_view region,
     const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
     const CredentialsProviderChainFactories& factories) {
+
+  if(context)
+  {
+    aws_cluster_manager_ =
+        context->singletonManager()
+            .getTyped<Envoy::Extensions::Common::Aws::AwsClusterManager>(
+                SINGLETON_MANAGER_REGISTERED_NAME(aws_credentials_provider_cluster_manager),
+                [&context] {
+                  return std::make_shared<
+                      Envoy::Extensions::Common::Aws::AwsClusterManager>(context);
+                });
+  }
 
   ENVOY_LOG(debug, "Using environment credentials provider");
   add(factories.createEnvironmentCredentialsProvider());
@@ -1091,7 +1102,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     const auto uri = absl::StrCat(CONTAINER_METADATA_HOST, relative_uri);
     ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", uri);
     add(factories.createContainerCredentialsProvider(
-        api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
+        api, context,  fetch_metadata_using_curl, MetadataFetcher::create,
         CONTAINER_METADATA_CLUSTER, uri, refresh_state, initialization_timer));
   } else if (!full_uri.empty()) {
     auto authorization_token =
@@ -1102,61 +1113,49 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
                 "{} and authorization token",
                 full_uri);
       add(factories.createContainerCredentialsProvider(
-          api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
+          api, context,  fetch_metadata_using_curl, MetadataFetcher::create,
           CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer,
           authorization_token));
     } else {
       ENVOY_LOG(debug, "Using container role credentials provider with URI: {}", full_uri);
       add(factories.createContainerCredentialsProvider(
-          api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
+          api, context,  fetch_metadata_using_curl, MetadataFetcher::create,
           CONTAINER_METADATA_CLUSTER, full_uri, refresh_state, initialization_timer));
     }
   } else if (metadata_disabled != TRUE) {
     ENVOY_LOG(debug, "Using instance profile credentials provider");
     add(factories.createInstanceProfileCredentialsProvider(
-        api, context, singleton_manager, fetch_metadata_using_curl, MetadataFetcher::create,
+        api, context,  fetch_metadata_using_curl, MetadataFetcher::create,
         refresh_state, initialization_timer, EC2_METADATA_CLUSTER));
   }
 }
 
-// Container credentials and instance profile credentials are both singletons, as they exist only
-// once on the underlying host and can be shared across all invocations of request signing consumer
-// extensions
-SINGLETON_MANAGER_REGISTRATION(container_credentials_provider);
-SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
 
 CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCredentialsProvider(
-    Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+    Api::Api& api, ServerFactoryContextOptRef context, 
     const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
     absl::string_view credential_uri, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view authorization_token = {}) const {
 
-  return singleton_manager.getTyped<ContainerCredentialsProvider>(
-      SINGLETON_MANAGER_REGISTERED_NAME(container_credentials_provider),
-      [&context, fetch_metadata_using_curl, create_metadata_fetcher_cb, credential_uri,
-       refresh_state, initialization_timer, authorization_token, cluster_name, &api] {
+  
         return std::make_shared<ContainerCredentialsProvider>(
             api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, credential_uri,
             refresh_state, initialization_timer, authorization_token, cluster_name);
-      });
+
 }
 
 CredentialsProviderSharedPtr
 DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
-    Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+    Api::Api& api, ServerFactoryContextOptRef context, 
     const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
     CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view cluster_name) const {
-  return singleton_manager.getTyped<InstanceProfileCredentialsProvider>(
-      SINGLETON_MANAGER_REGISTERED_NAME(instance_profile_credentials_provider),
-      [&context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
-       initialization_timer, cluster_name, &api] {
-        return std::make_shared<InstanceProfileCredentialsProvider>(
+   return std::make_shared<InstanceProfileCredentialsProvider>(
             api, context, fetch_metadata_using_curl, create_metadata_fetcher_cb, refresh_state,
             initialization_timer, cluster_name);
-      });
+      
 }
 
 } // namespace Aws
