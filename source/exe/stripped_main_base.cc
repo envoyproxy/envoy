@@ -72,9 +72,8 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                                         log_lock, options_.logFormatEscaped(),
-                                                         options_.enableFineGrainLogging());
+    Logger::Context::init(options_.logLevel(), options_.logFormat(), log_lock,
+                          options_.logFormatEscaped(), options_.enableFineGrainLogging());
 
     configureComponentLogLevels();
 
@@ -94,9 +93,8 @@ StrippedMainBase::StrippedMainBase(const Server::Options& options, Event::TimeSy
   }
   case Server::Mode::Validate:
     restarter_ = std::make_unique<Server::HotRestartNopImpl>();
-    logging_context_ =
-        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
-                                          restarter_->logLock(), options_.logFormatEscaped());
+    Logger::Context::init(options_.logLevel(), options_.logFormat(), restarter_->logLock(),
+                          options_.logFormatEscaped());
     process_context_ = std::move(process_context);
     break;
   }

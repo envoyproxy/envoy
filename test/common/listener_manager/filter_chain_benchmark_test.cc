@@ -209,13 +209,13 @@ public:
   }
 
   Envoy::Thread::MutexBasicLockable lock_;
-  Logger::Context logging_state_{spdlog::level::warn, Logger::Logger::DEFAULT_LOG_FORMAT, lock_,
-                                 false};
+  Logger::Context::init(spdlog::level::warn, Logger::Logger::DEFAULT_LOG_FORMAT, lock_, false);
   std::string listener_yaml_config_;
   envoy::config::listener::v3::Listener listener_config_;
   absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
   MockFilterChainFactoryBuilder dummy_builder_;
   Init::ManagerImpl init_manager_{"fcm_benchmark"};
+  Logger::Context::reset();
 };
 
 // NOLINTNEXTLINE(readability-redundant-member-init)

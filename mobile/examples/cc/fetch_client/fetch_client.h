@@ -40,7 +40,6 @@ private:
   envoy_status_t sendRequest(absl::string_view url, std::vector<Http::Protocol>& protocols);
 
   Thread::MutexBasicLockable lock_;
-  Logger::Context logging_context_;
   PlatformImpl platform_impl_;
   Stats::SymbolTableImpl symbol_table_;
   Event::RealTimeSystem time_system_; // NO_CHECK_FORMAT(real_time)
