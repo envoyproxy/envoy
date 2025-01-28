@@ -33,7 +33,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // Can be overridden in the per-route and per-host configurations.
 // The more specific definition completely overrides the less specific definition.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RateLimitQuotaFilterConfig {
   // Configures the gRPC Rate Limit Quota Service (RLQS) RateLimitQuotaService.
   config.core.v3.GrpcService rlqs_server = 1 [(validate.rules).message = {required: true}];
@@ -136,6 +136,23 @@ message RateLimitQuotaFilterConfig {
   // filter is enabled but not enforced.
   repeated config.core.v3.HeaderValueOption request_headers_to_add_when_not_enforced = 6
       [(validate.rules).repeated = {max_items: 10}];
+
+  // Optional matcher tree to use when previewing the effects of new bucket
+  // matchers.
+  //
+  // If set, the filter will separately match against the
+  // ``preview_bucket_matchers`` and ``bucket_matchers`` trees. Between the
+  // selected buckets, if the preview bucket is higher priority than the
+  // actionable bucket, the preview bucket is logged & its usage recorded before
+  // executing against the actionable bucket.
+  //
+  // Note: evaluating the preview matcher can still affect rate limiting
+  // decisions if configured to target a bucket that is already in-use.
+  // The recommended solution is to target buckets not referenced in
+  // ``bucket_matchers`` when writing preview matchers.
+  //
+  // Regarding field formatting, reference ``bucket_matchers`` for examples.
+  xds.type.matcher.v3.Matcher preview_bucket_matchers = 7;
 }
 
 // Per-route and per-host configuration overrides. The more specific definition completely
@@ -165,7 +182,7 @@ message RateLimitQuotaOverride {
 // ``bucket_matchers`` matcher tree to assign the matched requests to the Quota Bucket.
 // Usage example: :ref:`RateLimitQuotaFilterConfig.bucket_matchers
 // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.bucket_matchers>`.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message RateLimitQuotaBucketSettings {
   // Configures the behavior after the first request has been matched to the bucket, and before the
   // the RLQS server returns the first quota assignment.
@@ -420,4 +437,11 @@ message RateLimitQuotaBucketSettings {
   // :ref:`AbandonAction <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.AbandonAction>`
   // message.
   ExpiredAssignmentBehavior expired_assignment_behavior = 5;
+
+  // The priority of the bucket.
+  //
+  // Priority is used to determine the selected bucket when a request matches
+  // against multiple (e.g. preview & actionable buckets). A lower value
+  // has higher priority: 0 -> max_int64 is highest -> lowest priority.
+  int64 priority = 6;
 }
