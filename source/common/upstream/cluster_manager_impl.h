@@ -889,7 +889,6 @@ private:
   void notifyClusterDiscoveryStatus(absl::string_view name, ClusterDiscoveryStatus status);
 
 protected:
-  ClusterMap active_clusters_;
   ClusterInitializationMap cluster_initialization_map_;
 
 private:
@@ -914,7 +913,6 @@ private:
   // Contains information about ongoing on-demand cluster discoveries.
   ClusterCreationsMap pending_cluster_creations_;
   Random::RandomGenerator& random_;
-  ClusterMap warming_clusters_;
   const bool deferred_cluster_creation_;
   absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
@@ -957,6 +955,17 @@ private:
   bool initialized_{};
   bool ads_mux_initialized_{};
   std::atomic<bool> shutdown_{};
+
+  // Keep all the ClusterMaps at the end, so that they get destroyed first.
+  // Clusters may keep references to the cluster manager and in destructor can call
+  // cluster manager methods.
+  //
+  // This might make MSAN unhappy because it thinks that we are accessing uninitialized
+  // memory when those methods access fields of the cluster manager class.
+  ClusterMap warming_clusters_;
+
+protected:
+  ClusterMap active_clusters_;
 };
 
 } // namespace Upstream
