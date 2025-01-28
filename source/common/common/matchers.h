@@ -91,71 +91,162 @@ public:
 StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtensionConfig& config,
                                            Server::Configuration::CommonFactoryContext& context);
 
-template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
+// A matcher for the `exact` StringMatcher.
+class ExactStringMatcher {
+public:
+  ExactStringMatcher(absl::string_view exact, bool ignore_case)
+      : exact_(exact), ignore_case_(ignore_case) {}
+
+  // StringMatcher
+  bool match(const absl::string_view value) const {
+    return ignore_case_ ? absl::EqualsIgnoreCase(value, exact_) : value == exact_;
+  }
+
+  const std::string& stringRepresentation() const { return exact_; }
+
+private:
+  const std::string exact_;
+  const bool ignore_case_;
+};
+
+// A matcher for the `prefix` StringMatcher.
+class PrefixStringMatcher {
+public:
+  PrefixStringMatcher(absl::string_view prefix, bool ignore_case)
+      : prefix_(prefix), ignore_case_(ignore_case) {}
+
+  // StringMatcher
+  bool match(const absl::string_view value) const {
+    return ignore_case_ ? absl::StartsWithIgnoreCase(value, prefix_)
+                        : absl::StartsWith(value, prefix_);
+  }
+
+  const std::string& stringRepresentation() const { return prefix_; }
+
+private:
+  friend class StringMatcherImpl;
+  const std::string prefix_;
+  const bool ignore_case_;
+};
+
+// A matcher for the `suffix` StringMatcher.
+class SuffixStringMatcher {
+public:
+  SuffixStringMatcher(absl::string_view suffix, bool ignore_case)
+      : suffix_(suffix), ignore_case_(ignore_case) {}
+
+  // StringMatcher
+  bool match(const absl::string_view value) const {
+    return ignore_case_ ? absl::EndsWithIgnoreCase(value, suffix_) : absl::EndsWith(value, suffix_);
+  }
+
+  const std::string& stringRepresentation() const { return suffix_; }
+
+private:
+  const std::string suffix_;
+  const bool ignore_case_;
+};
+
+// A matcher for the `safe_regex` StringMatcher.
+class RegexStringMatcher {
+public:
+  // The RegexMatcher can either be from the ::envoy or ::xds type,
+  // and the templated c'tor handles both cases.
+  template <class RegexMatcherType>
+  RegexStringMatcher(const RegexMatcherType& safe_regex,
+                     Server::Configuration::CommonFactoryContext& context)
+      : regex_(THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(safe_regex, context.regexEngine()),
+                                     Regex::CompiledMatcherPtr)) {}
+
+  RegexStringMatcher(RegexStringMatcher&& other) { regex_ = std::move(other.regex_); }
+
+  // StringMatcher
+  bool match(const absl::string_view value) const { return regex_->match(value); }
+
+  const std::string& stringRepresentation() const { return regex_->pattern(); }
+
+private:
+  Regex::CompiledMatcherPtr regex_;
+};
+
+// A matcher for the `contains` StringMatcher.
+class ContainsStringMatcher {
+public:
+  ContainsStringMatcher(absl::string_view contents, bool ignore_case)
+      : contents_(ignore_case ? absl::AsciiStrToLower(contents) : contents),
+        ignore_case_(ignore_case) {}
+
+  // StringMatcher
+  bool match(const absl::string_view value) const {
+    return ignore_case_ ? absl::StrContains(absl::AsciiStrToLower(value), contents_)
+                        : absl::StrContains(value, contents_);
+  }
+
+  const std::string& stringRepresentation() const {
+    // Note that in case where the matcher is configured to be case-insensitive
+    // this will return the lower-case configured string (as opposed to the
+    // other matchers). This is incompatible with the other matchers, but achieves
+    // the intent of this method.
+    return contents_;
+  }
+
+private:
+  // If ignore_case is set the contents_ will contain lower-case letters.
+  const std::string contents_;
+  const bool ignore_case_;
+};
+
+// A matcher for the `custom` StringMatcher.
+class CustomStringMatcher {
+public:
+  CustomStringMatcher(const xds::core::v3::TypedExtensionConfig& custom,
+                      Server::Configuration::CommonFactoryContext& context)
+      : custom_(getExtensionStringMatcher(custom, context)) {}
+
+  // StringMatcher
+  bool match(const absl::string_view value) const { return custom_->match(value); }
+
+  const std::string& stringRepresentation() const { return EMPTY_STRING; }
+
+private:
+  StringMatcherPtr custom_;
+};
+
+// An implementation that holds one of the string matchers.
 class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
+  // Creates a StringMatcher given a config.
+  // Note that Envoy supports both matchers that are created using the
+  // `envoy::type::matcher::v3::StringMatcher` type and the
+  // `xds::core::v3::StringMatcher` type and therefore this function is templated.
+  template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
   explicit StringMatcherImpl(const StringMatcherType& matcher,
                              Server::Configuration::CommonFactoryContext& context)
-      : matcher_(matcher) {
-    if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kSafeRegex) {
-      if (matcher.ignore_case()) {
-        ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
-      }
-      regex_ = THROW_OR_RETURN_VALUE(
-          Regex::Utility::parseRegex(matcher_.safe_regex(), context.regexEngine()),
-          Regex::CompiledMatcherPtr);
-    } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kContains) {
-      if (matcher_.ignore_case()) {
-        // Cache the lowercase conversion of the Contains matcher for future use
-        lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
-      }
-    } else if (matcher.has_custom()) {
-      custom_ = getExtensionStringMatcher(matcher.custom(), context);
-    }
-  }
+      : matcher_(createVariant(matcher, context)) {}
 
   // Helper to create an exact matcher in contexts where there is no factory context available.
   // This is a static member instead of constructor so that it can be named for clarity of what it
   // produces.
   static StringMatcherImpl createExactMatcher(absl::string_view match) {
-    return StringMatcherImpl(match);
+    return StringMatcherImpl(ExactStringMatcher(match, false));
   }
 
   // StringMatcher
   bool match(const absl::string_view value) const override {
-    switch (matcher_.match_pattern_case()) {
-    case StringMatcherType::MatchPatternCase::kExact:
-      return matcher_.ignore_case() ? absl::EqualsIgnoreCase(value, matcher_.exact())
-                                    : value == matcher_.exact();
-    case StringMatcherType::MatchPatternCase::kPrefix:
-      return matcher_.ignore_case() ? absl::StartsWithIgnoreCase(value, matcher_.prefix())
-                                    : absl::StartsWith(value, matcher_.prefix());
-    case StringMatcherType::MatchPatternCase::kSuffix:
-      return matcher_.ignore_case() ? absl::EndsWithIgnoreCase(value, matcher_.suffix())
-                                    : absl::EndsWith(value, matcher_.suffix());
-    case StringMatcherType::MatchPatternCase::kContains:
-      return matcher_.ignore_case()
-                 ? absl::StrContains(absl::AsciiStrToLower(value), lowercase_contains_match_)
-                 : absl::StrContains(value, matcher_.contains());
-    case StringMatcherType::MatchPatternCase::kSafeRegex:
-      return regex_->match(value);
-    case StringMatcherType::MatchPatternCase::kCustom:
-      return custom_->match(value);
-    default:
-      PANIC("unexpected");
-    }
+    // Implementing polymorphism for match(absl::string_value) on the different
+    // types that can be in the matcher_ variant.
+    auto call_match = [value](const auto& obj) -> bool { return obj.match(value); };
+    return absl::visit(call_match, matcher_);
   }
 
+  // ValueMatcher
   bool match(const ProtobufWkt::Value& value) const override {
-
     if (value.kind_case() != ProtobufWkt::Value::kStringValue) {
       return false;
     }
 
     return match(value.string_value());
   }
-
-  const StringMatcherType& matcher() const { return matcher_; }
 
   /**
    * Helps applications optimize the case where a matcher is a case-sensitive
@@ -165,27 +256,62 @@ public:
    * @return true if the matcher is a case-sensitive prefix-match.
    */
   bool getCaseSensitivePrefixMatch(std::string& prefix) const {
-    if (matcher_.match_pattern_case() ==
-            envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kPrefix &&
-        !matcher_.ignore_case()) {
-      prefix = matcher_.prefix();
-      return true;
+    if (const PrefixStringMatcher* prefix_matcher = absl::get_if<PrefixStringMatcher>(&matcher_)) {
+      if (!prefix_matcher->ignore_case_) {
+        prefix = prefix_matcher->prefix_;
+        return true;
+      }
     }
     return false;
   }
 
-private:
-  StringMatcherImpl(absl::string_view exact_match)
-      : matcher_([&]() -> StringMatcherType {
-          StringMatcherType cfg;
-          cfg.set_exact(exact_match);
-          return cfg;
-        }()) {}
+  /**
+   * Returns a string representation of the matcher (the contents to be
+   * matched).
+   */
+  const std::string& stringRepresentation() const {
+    // Implementing polymorphism for stringRepresentation() on the different
+    // types that can be in the matcher_ variant.
+    auto call_func = [](const auto& obj) -> const std::string& {
+      return obj.stringRepresentation();
+    };
+    return absl::visit(call_func, matcher_);
+  }
 
-  const StringMatcherType matcher_;
-  Regex::CompiledMatcherPtr regex_;
-  std::string lowercase_contains_match_;
-  StringMatcherPtr custom_;
+private:
+  explicit StringMatcherImpl(ExactStringMatcher&& exact_matcher)
+      : matcher_(std::move(exact_matcher)) {}
+
+  using StringMatcherVariant =
+      absl::variant<ExactStringMatcher, PrefixStringMatcher, SuffixStringMatcher,
+                    RegexStringMatcher, ContainsStringMatcher, CustomStringMatcher>;
+
+  template <class StringMatcherType = envoy::type::matcher::v3::StringMatcher>
+  static StringMatcherVariant createVariant(const StringMatcherType& matcher,
+                                            Server::Configuration::CommonFactoryContext& context) {
+    switch (matcher.match_pattern_case()) {
+    case StringMatcherType::MatchPatternCase::kExact:
+      return ExactStringMatcher(matcher.exact(), matcher.ignore_case());
+    case StringMatcherType::MatchPatternCase::kPrefix:
+      return PrefixStringMatcher(matcher.prefix(), matcher.ignore_case());
+    case StringMatcherType::MatchPatternCase::kSuffix:
+      return SuffixStringMatcher(matcher.suffix(), matcher.ignore_case());
+    case StringMatcherType::MatchPatternCase::kSafeRegex:
+      if (matcher.ignore_case()) {
+        ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
+      }
+      return RegexStringMatcher(matcher.safe_regex(), context);
+    case StringMatcherType::MatchPatternCase::kContains:
+      return ContainsStringMatcher(matcher.contains(), matcher.ignore_case());
+    case StringMatcherType::MatchPatternCase::kCustom:
+      return CustomStringMatcher(matcher.custom(), context);
+    default:
+      ExceptionUtil::throwEnvoyException(
+          fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
+    }
+  }
+
+  StringMatcherVariant matcher_;
 };
 
 class StringMatcherExtensionFactory : public Config::TypedFactory {
@@ -280,12 +406,10 @@ public:
                   Server::Configuration::CommonFactoryContext& context);
 
   bool match(const absl::string_view path) const override;
-  const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>& matcher() const {
-    return matcher_;
-  }
+  const std::string& stringRepresentation() const { return matcher_.stringRepresentation(); }
 
 private:
-  const StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;
+  const StringMatcherImpl matcher_;
 };
 
 } // namespace Matchers

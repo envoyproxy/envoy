@@ -233,10 +233,8 @@ public:
   public:
     HeaderDataStringMatch(const envoy::config::route::v3::HeaderMatcher& config,
                           Server::Configuration::CommonFactoryContext& factory_context)
-        : HeaderDataBaseImpl(config),
-          string_match_(std::make_unique<
-                        Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              config.string_match(), factory_context)) {}
+        : HeaderDataBaseImpl(config), string_match_(std::make_unique<Matchers::StringMatcherImpl>(
+                                          config.string_match(), factory_context)) {}
 
   private:
     bool specificMatchesHeaders(absl::string_view header_value) const override {
