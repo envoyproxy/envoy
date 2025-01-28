@@ -150,6 +150,11 @@ new_features:
   change: |
     Added support for :ref:`backoff_options <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.backoff_options>`
     to configure the backoff strategy for TCP proxy retries.
+- area: http
+  change: |
+    Added :ref:`propagate_unsampled
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.propagate_unsampled>`
+    to support not modifying the existing trace context when requests aren't sampled.
 - area: redis
   change: |
     Added support for multi-key commands on transactions.

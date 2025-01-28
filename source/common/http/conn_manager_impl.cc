@@ -1452,6 +1452,10 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
   ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
                                             connection_manager_.config_->tracingStats());
 
+  if (!connection_manager_tracing_config_->propagateUnsampled()) {
+    return;
+  }
+
   Tracing::HttpTraceContext trace_context(*request_headers_);
   active_span_ = connection_manager_.tracer().startSpan(
       *this, trace_context, filter_manager_.streamInfo(), tracing_decision);

@@ -1576,7 +1576,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   }
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
       TracingConnectionManagerConfig{Tracing::OperationName::Ingress, conn_tracing_tags, percent1,
-                                     percent2, percent1, false, 256});
+                                     percent2, percent1, true, false, 256});
   NiceMock<Router::MockRouteTracing> route_tracing;
   ON_CALL(route_tracing, getClientSampling()).WillByDefault(ReturnRef(percent1));
   ON_CALL(route_tracing, getRandomSampling()).WillByDefault(ReturnRef(percent2));
@@ -1865,6 +1865,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      percent2,
                                      percent1,
+                                     true,
                                      false,
                                      256});
 
@@ -1949,6 +1950,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      percent2,
                                      percent1,
+                                     true,
                                      false,
                                      256});
 
@@ -2035,6 +2037,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
                                      percent1,
                                      percent2,
                                      percent1,
+                                     true,
                                      false,
                                      256});
 
@@ -2113,6 +2116,7 @@ TEST_F(HttpConnectionManagerImplTest,
                                      percent1,
                                      percent2,
                                      percent1,
+                                     true,
                                      false,
                                      256});
 
@@ -2192,6 +2196,66 @@ TEST_F(HttpConnectionManagerImplTest, NoHCMTracingConfigAndActiveSpanWouldBeNull
         filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 
         // Active span always be null span when there is no HCM tracing config.
+        EXPECT_EQ(&Tracing::NullSpan::instance(), &filter->callbacks_->activeSpan());
+        // Child span should also be null span.
+        Tracing::SpanPtr child_span = filter->callbacks_->activeSpan().spawnChild(
+            Tracing::EgressConfig::get(), "null_child", test_time_.systemTime());
+        Tracing::SpanPtr null_span = std::make_unique<Tracing::NullSpan>();
+        auto& child_span_ref = *child_span;
+        auto& null_span_ref = *null_span;
+        EXPECT_EQ(typeid(child_span_ref).name(), typeid(null_span_ref).name());
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, SkipUnsampledSpan) {
+  setup();
+  envoy::type::v3::FractionalPercent zero_percent;
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
+      TracingConnectionManagerConfig{Tracing::OperationName::Egress,
+                                     {{":method", requestHeaderCustomTag(":method")}},
+                                     zero_percent,
+                                     zero_percent,
+                                     zero_percent,
+                                     false,
+                                     false,
+                                     256});
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(filter);
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":method", "GET"},
+                                         {":authority", "host"},
+                                         {":path", "/"},
+                                         {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{
+            {":status", "200"}, {"x-envoy-decorator-operation", "testOp"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+
+        // Active span always be null span when sampling didn't occur.
         EXPECT_EQ(&Tracing::NullSpan::instance(), &filter->callbacks_->activeSpan());
         // Child span should also be null span.
         Tracing::SpanPtr child_span = filter->callbacks_->activeSpan().spawnChild(

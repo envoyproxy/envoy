@@ -550,6 +550,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
   EXPECT_EQ(10000, config.tracingConfig()->overall_sampling_.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->overall_sampling_.denominator());
+  EXPECT_TRUE(config.tracingConfig()->propagate_unsampled_);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
@@ -566,6 +567,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
       value: 2
     overall_sampling:
       value: 3
+    propagate_unsampled: false
   http_filters:
   - name: envoy.filters.http.router
     typed_config:
@@ -587,6 +589,7 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
   EXPECT_EQ(300, config.tracingConfig()->overall_sampling_.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->overall_sampling_.denominator());
+  EXPECT_FALSE(config.tracingConfig()->propagate_unsampled_);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
@@ -624,6 +627,7 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
   EXPECT_EQ(30, config.tracingConfig()->overall_sampling_.numerator());
   EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->overall_sampling_.denominator());
+  EXPECT_TRUE(config.tracingConfig()->propagate_unsampled_);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
@@ -680,6 +684,40 @@ TEST_F(HttpConnectionManagerConfigTest, OverallSampling) {
 
   EXPECT_LE(800, sampled_count);
   EXPECT_GE(1200, sampled_count);
+}
+
+TEST_F(HttpConnectionManagerConfigTest, PropagateUnsampledExplicitTrue) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  internal_address_config:
+    unix_sockets: true
+  route_config:
+    name: local_route
+  tracing:
+    propagate_unsampled: true
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+
+  EXPECT_EQ(100, config.tracingConfig()->client_sampling_.numerator());
+  EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config.tracingConfig()->max_path_tag_length_);
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
+            config.tracingConfig()->client_sampling_.denominator());
+  EXPECT_EQ(10000, config.tracingConfig()->random_sampling_.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
+            config.tracingConfig()->random_sampling_.denominator());
+  EXPECT_EQ(10000, config.tracingConfig()->overall_sampling_.numerator());
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
+            config.tracingConfig()->overall_sampling_.denominator());
+  EXPECT_TRUE(config.tracingConfig()->propagate_unsampled_);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {

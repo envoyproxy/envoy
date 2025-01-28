@@ -71,6 +71,9 @@ public:
         tracing_config, overall_sampling, 10000, 10000)};
     overall_sampling_.set_numerator(overall_sampling_numerator);
     overall_sampling_.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
+    propagate_unsampled_ = tracing_config.has_propagate_unsampled()
+                               ? tracing_config.propagate_unsampled().value()
+                               : true;
 
     verbose_ = tracing_config.verbose();
     max_path_tag_length_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(tracing_config, max_path_tag_length,
@@ -82,11 +85,12 @@ public:
                                      envoy::type::v3::FractionalPercent client_sampling,
                                      envoy::type::v3::FractionalPercent random_sampling,
                                      envoy::type::v3::FractionalPercent overall_sampling,
-                                     bool verbose, uint32_t max_path_tag_length)
+                                     bool propagate_unsampled, bool verbose,
+                                     uint32_t max_path_tag_length)
       : operation_name_(operation_name), custom_tags_(custom_tags),
         client_sampling_(client_sampling), random_sampling_(random_sampling),
-        overall_sampling_(overall_sampling), verbose_(verbose),
-        max_path_tag_length_(max_path_tag_length) {}
+        overall_sampling_(overall_sampling), propagate_unsampled_(propagate_unsampled),
+        verbose_(verbose), max_path_tag_length_(max_path_tag_length) {}
 
   ConnectionManagerTracingConfigImpl() = default;
 
@@ -99,6 +103,7 @@ public:
   const envoy::type::v3::FractionalPercent& getOverallSampling() const override {
     return overall_sampling_;
   }
+  bool propagateUnsampled() const override { return propagate_unsampled_; }
   const Tracing::CustomTagMap& getCustomTags() const override { return custom_tags_; }
 
   Tracing::OperationName operationName() const override { return operation_name_; }
@@ -113,6 +118,7 @@ public:
   envoy::type::v3::FractionalPercent client_sampling_;
   envoy::type::v3::FractionalPercent random_sampling_;
   envoy::type::v3::FractionalPercent overall_sampling_;
+  bool propagate_unsampled_{};
   bool verbose_{};
   uint32_t max_path_tag_length_{};
   bool spawn_upstream_span_{};
