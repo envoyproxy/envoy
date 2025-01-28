@@ -56,6 +56,7 @@ AwsClusterManagerImpl::addManagedClusterUpdateCallbacks(absl::string_view cluste
                    cluster_name);
     cb.onClusterAddOrUpdate();
     return absl::AlreadyExistsError("Cluster already online");
+    return absl::AlreadyExistsError("Cluster already online");
   }
   return std::make_unique<AwsManagedClusterUpdateCallbacksHandle>(
       context_, cb, managed_cluster->update_callbacks_);
