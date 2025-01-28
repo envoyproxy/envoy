@@ -143,6 +143,30 @@ TEST_F(AwsClusterManagerTest, DontUseInitWhenInitialized) {
   auto aws_cluster_manager = std::make_shared<AwsClusterManager>(context_);
 }
 
+// Cluster callbacks should not be added for non-existent clusters
+TEST_F(AwsClusterManagerTest, CantAddCallbacksForNonExistentCluster) {
+
+  auto aws_cluster_manager = std::make_shared<AwsClusterManager>(context_);
+  auto callbacks1 = std::make_unique<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
+  auto status = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks1);
+  EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.status().code());
+}
+
+// If the cluster is online, then adding a callback should trigger the callback immediately
+TEST_F(AwsClusterManagerTest, CallbacksTriggeredImmediatelyWhenClusterIsLive) {
+  auto aws_cluster_manager = std::make_shared<AwsClusterManager>(context_);
+  auto status = aws_cluster_manager->addManagedCluster(
+      "cluster_1",
+      envoy::config::cluster::v3::Cluster::DiscoveryType::Cluster_DiscoveryType_STRICT_DNS,
+      "new_url");
+  auto manager_friend = AwsClusterManagerFriend(aws_cluster_manager);
+  auto command = Upstream::ThreadLocalClusterCommand();
+  manager_friend.onClusterAddOrUpdate("cluster_1", command);
+  auto callbacks1 = std::make_unique<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
+  EXPECT_CALL(*callbacks1, onClusterAddOrUpdate);
+  auto status1 = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks1);
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

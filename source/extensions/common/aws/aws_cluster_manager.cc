@@ -46,6 +46,7 @@ AwsClusterManager::addManagedClusterUpdateCallbacks(absl::string_view cluster_na
     ENVOY_LOG_MISC(debug, "Managed cluster {} is ready immediately, calling callback",
                    cluster_name);
     cb.onClusterAddOrUpdate();
+    return absl::AlreadyExistsError("Cluster already online");
   }
   return std::make_unique<AwsManagedClusterUpdateCallbacksHandle>(
       cb, managed_cluster->update_callbacks_);
@@ -53,7 +54,6 @@ AwsClusterManager::addManagedClusterUpdateCallbacks(absl::string_view cluster_na
 
 void AwsClusterManager::onClusterAddOrUpdate(absl::string_view cluster_name,
                                              Upstream::ThreadLocalClusterCommand&) {
-
   // Mark our cluster as ready for use
   auto it = managed_clusters_.find(cluster_name);
   if (it != managed_clusters_.end()) {
@@ -67,7 +67,7 @@ void AwsClusterManager::onClusterAddOrUpdate(absl::string_view cluster_name,
 }
 
 // No removal handler required, as we are using avoid_cds_removal flag
-void AwsClusterManager::onClusterRemoval(const std::string&) {}
+void AwsClusterManager::onClusterRemoval(const std::string&){};
 
 void AwsClusterManager::createQueuedClusters() {
   for (const auto& it : managed_clusters_) {
@@ -75,7 +75,11 @@ void AwsClusterManager::createQueuedClusters() {
     auto cluster_type = it.second->cluster_type_;
     auto uri = it.second->uri_;
     auto cluster = Utility::createInternalClusterStatic(cluster_name, cluster_type, uri);
-    THROW_IF_NOT_OK(context_.clusterManager().addOrUpdateCluster(cluster, "", true).status());
+    auto status = context_.clusterManager().addOrUpdateCluster(cluster, "", true);
+    if (!status.ok()) {
+      ENVOY_LOG_MISC(debug, "Failed to add cluster {} to cluster manager: {}", cluster_name,
+                     status.status().ToString());
+    }
   }
 }
 
@@ -95,10 +99,15 @@ absl::Status AwsClusterManager::addManagedCluster(
 
       auto cluster = Utility::createInternalClusterStatic(cluster_name, cluster_type, uri);
       if (!queue_clusters_) {
-        THROW_IF_NOT_OK(context_.clusterManager().addOrUpdateCluster(cluster, "", true).status());
+        auto status = context_.clusterManager().addOrUpdateCluster(cluster, "", true);
+        if (!status.ok()) {
+          ENVOY_LOG_MISC(debug, "Failed to add cluster {} to cluster manager: {}", cluster_name,
+                         status.status().ToString());
+
+          return status.status();
+        }
       }
     }
-
     return absl::OkStatus();
   } else {
     ENVOY_LOG_MISC(debug, "Cluster {} already exists, not readding", cluster_name);
