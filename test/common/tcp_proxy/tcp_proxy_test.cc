@@ -600,6 +600,10 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   std::array<char, 256> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   EXPECT_NO_THROW(stream_decoder_callbacks.dumpState(ostream, 0));
+
+  // Release filter explicitly. Filter destructor tries to use access logger, so we want filter
+  // to be destroyed before the access logger to avoid accessing released memory.
+  filter_.reset();
 }
 
 TEST_P(TcpProxyTest, RouteWithMetadataMatch) {
