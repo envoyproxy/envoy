@@ -13,26 +13,13 @@ namespace Cache {
 namespace {
 
 using Http::HeaderValueOf;
+using testing::_;
 using testing::AllOf;
 using testing::Eq;
 using testing::HasSubstr;
+using testing::Not;
 using testing::Pointee;
 using testing::Property;
-
-MATCHER_P(GetResultHasValue, matcher, "") {
-  if (!ExplainMatchResult(Property("size", &Http::HeaderMap::GetResult::size, 1), arg,
-                          result_listener)) {
-    return false;
-  }
-  return ExplainMatchResult(matcher, arg[0]->value().getStringView(), result_listener);
-}
-
-MATCHER_P2(HasHeader, key, matcher, "") {
-  *result_listener << arg;
-  return ExplainMatchResult(GetResultHasValue(matcher),
-                            arg.get(::Envoy::Http::LowerCaseString(std::string(key))),
-                            result_listener);
-}
 
 // TODO(toddmgreer): Expand integration test to include age header values,
 // expiration, HEAD requests, config customizations,
@@ -266,14 +253,14 @@ TEST_P(CacheIntegrationTest, ParallelRangeRequestsShareInsertAndGetDistinctRespo
   awaitResponse(response_decoder2);
   awaitResponse(response_decoder3);
   EXPECT_THAT(response_decoder1->headers(),
-              AllOf(HasHeader("content-range", "bytes 0-4/10"), HasHeader("content-length", "5"),
-                    HasHeader(":status", "206")));
+              AllOf(HeaderValueOf("content-range", "bytes 0-4/10"),
+                    HeaderValueOf("content-length", "5"), HeaderValueOf(":status", "206")));
   EXPECT_THAT(response_decoder2->headers(),
-              AllOf(HasHeader("content-range", "bytes 5-9/10"), HasHeader("content-length", "5"),
-                    HasHeader(":status", "206")));
+              AllOf(HeaderValueOf("content-range", "bytes 5-9/10"),
+                    HeaderValueOf("content-length", "5"), HeaderValueOf(":status", "206")));
   EXPECT_THAT(response_decoder3->headers(),
-              AllOf(HasHeader("content-range", "bytes 3-6/10"), HasHeader("content-length", "4"),
-                    HasHeader(":status", "206")));
+              AllOf(HeaderValueOf("content-range", "bytes 3-6/10"),
+                    HeaderValueOf("content-length", "4"), HeaderValueOf(":status", "206")));
   // Two of the responses should have an age, and one should not.
   // Which of the requests get the age header depends on the order of
   // parallel request resolution, which is not relevant to this test.
@@ -289,6 +276,96 @@ TEST_P(CacheIntegrationTest, ParallelRangeRequestsShareInsertAndGetDistinctRespo
   // Advance time to force a log flush.
   simTime().advanceTimeWait(Seconds(1));
 
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true),
+              HasSubstr("RFCF cache.insert_via_upstream"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1, true),
+              HasSubstr("RFCF cache.response_from_cache_filter"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 2, true),
+              HasSubstr("RFCF cache.response_from_cache_filter"));
+}
+
+TEST_P(CacheIntegrationTest, RequestNoCacheProvokesValidationAndOnFailureInsert) {
+  initializeFilter(default_config);
+  Http::TestRequestHeaderMapImpl request_headers =
+      httpRequestHeader("GET", /*authority=*/"RequestNoCacheProvokesValidationAndOnFailureInsert");
+  request_headers.setReference(Http::CustomHeaders::get().CacheControl, "no-cache");
+  const std::string response_body("helloworld");
+  Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(response_body);
+  // send two requests in parallel, they should share a response because
+  // validation is implicit if it's cacheable and same-time.
+  auto codec_client_2 = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationStreamDecoderPtr response_decoder1 =
+      codec_client_->makeHeaderOnlyRequest(request_headers);
+  IntegrationStreamDecoderPtr response_decoder2 =
+      codec_client_2->makeHeaderOnlyRequest(request_headers);
+  simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_, true)();
+  EXPECT_THAT(upstream_request_->headers(), AllOf(HeaderValueOf("cache-control", "no-cache"),
+                                                  Not(HeaderValueOf("if-modified-since", _))));
+  awaitResponse(response_decoder1);
+  awaitResponse(response_decoder2);
+  EXPECT_EQ(response_decoder1->body(), "helloworld");
+  EXPECT_EQ(response_decoder2->body(), "helloworld");
+  codec_client_2->close();
+  // send a request subsequent to cache being populated, which should validate
+  auto codec_client_3 = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationStreamDecoderPtr response_decoder3 =
+      codec_client_3->makeHeaderOnlyRequest(request_headers);
+  // Response with a 200 status, implying validation failed.
+  simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_, true)();
+  // Additional upstream request should be a validation, so should have if-modified-since
+  EXPECT_THAT(upstream_request_->headers(), AllOf(HeaderValueOf("cache-control", "no-cache"),
+                                                  HeaderValueOf("if-modified-since", _)));
+  awaitResponse(response_decoder3);
+  EXPECT_EQ(response_decoder3->body(), "helloworld");
+  codec_client_3->close();
+  // Advance time to force a log flush.
+  simTime().advanceTimeWait(Seconds(1));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true),
+              HasSubstr("RFCF cache.insert_via_upstream"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 1, true),
+              HasSubstr("RFCF cache.response_from_cache_filter"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_, 2, true),
+              HasSubstr("RFCF cache.insert_via_upstream"));
+}
+
+TEST_P(CacheIntegrationTest, RequestNoCacheProvokesValidationAndOnSuccessReadsFromCache) {
+  initializeFilter(default_config);
+  Http::TestRequestHeaderMapImpl request_headers = httpRequestHeader(
+      "GET", /*authority=*/"RequestNoCacheProvokesValidationAndOnSuccessReadsFromCache");
+  request_headers.setReference(Http::CustomHeaders::get().CacheControl, "no-cache");
+  const std::string response_body("helloworld");
+  Http::TestResponseHeaderMapImpl response_headers = httpResponseHeadersForBody(response_body);
+  // send two requests in parallel, they should share a response because
+  // validation is implicit if it's cacheable and same-time.
+  auto codec_client_2 = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationStreamDecoderPtr response_decoder1 =
+      codec_client_->makeHeaderOnlyRequest(request_headers);
+  IntegrationStreamDecoderPtr response_decoder2 =
+      codec_client_2->makeHeaderOnlyRequest(request_headers);
+  simulateUpstreamResponse(response_headers, makeOptRef(response_body), no_trailers_, true)();
+  EXPECT_THAT(upstream_request_->headers(), AllOf(HeaderValueOf("cache-control", "no-cache"),
+                                                  Not(HeaderValueOf("if-modified-since", _))));
+  awaitResponse(response_decoder1);
+  awaitResponse(response_decoder2);
+  EXPECT_EQ(response_decoder1->body(), "helloworld");
+  EXPECT_EQ(response_decoder2->body(), "helloworld");
+  codec_client_2->close();
+  // send a request subsequent to cache being populated, which should validate
+  auto codec_client_3 = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationStreamDecoderPtr response_decoder3 =
+      codec_client_3->makeHeaderOnlyRequest(request_headers);
+  // Response with a 304 status, implying validation succeeded.
+  Http::TestResponseHeaderMapImpl response_headers_304{
+      {":status", "304"}, {"last-modified", "Mon, 01 Jan 1970 00:30:00 GMT"}};
+  simulateUpstreamResponse(response_headers_304, absl::nullopt, no_trailers_, true)();
+  // Additional upstream request should be a validation, so should have if-modified-since
+  EXPECT_THAT(upstream_request_->headers(), AllOf(HeaderValueOf("cache-control", "no-cache"),
+                                                  HeaderValueOf("if-modified-since", _)));
+  awaitResponse(response_decoder3);
+  EXPECT_EQ(response_decoder3->body(), "helloworld");
+  codec_client_3->close();
+  // Advance time to force a log flush.
+  simTime().advanceTimeWait(Seconds(1));
   EXPECT_THAT(waitForAccessLog(access_log_name_, 0, true),
               HasSubstr("RFCF cache.insert_via_upstream"));
   EXPECT_THAT(waitForAccessLog(access_log_name_, 1, true),

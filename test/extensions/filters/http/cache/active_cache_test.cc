@@ -143,6 +143,12 @@ protected:
     headers.addCopy("range", absl::StrCat("bytes=", start, "-", end));
     return testLookupRequest(headers);
   }
+
+  ActiveLookupRequestPtr testLookupRequestWithNoCache(absl::string_view path) {
+    auto headers = requestHeaders(path);
+    headers.addCopy("cache-control", "no-cache");
+    return testLookupRequest(headers);
+  }
 };
 
 Http::ResponseHeaderMapPtr uncacheableResponseHeaders() {

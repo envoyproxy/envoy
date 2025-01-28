@@ -218,12 +218,15 @@ bool ActiveCacheEntry::requiresValidationFor(const ActiveLookupRequest& lookup) 
 void ActiveCacheEntry::handleValidationAndSendLookupResponses(CacheEntryStatus status) {
   mu_.AssertHeld();
   ASSERT(state_ == State::Exists || state_ == State::Inserting);
-  // Reorder subscribers so those who do not require validation are at the end,
-  // and 'it' is the first subscriber that does not require validation.
-  auto it = std::partition(lookup_subscribers_.begin(), lookup_subscribers_.end(),
-                           [this](LookupSubscriber& s) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
-                             return requiresValidationFor(s.context_->lookup());
-                           });
+  auto it = lookup_subscribers_.begin();
+  if (status != CacheEntryStatus::Miss) {
+    // Reorder subscribers so those who do not require validation are at the end,
+    // and 'it' is the first subscriber that does not require validation.
+    it = std::partition(lookup_subscribers_.begin(), lookup_subscribers_.end(),
+                        [this](LookupSubscriber& s) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+                          return requiresValidationFor(s.context_->lookup());
+                        });
+  }
   for (auto recipient = it; recipient != lookup_subscribers_.end(); recipient++) {
     sendSuccessfulLookupResultTo(*recipient, status);
     // If there was more than one recipient, and the first one was a miss, the

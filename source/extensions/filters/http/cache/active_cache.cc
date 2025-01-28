@@ -42,11 +42,11 @@ void ActiveLookupRequest::initializeRequestCacheControl(
     const Http::RequestHeaderMap& request_headers) {
   const absl::string_view cache_control =
       request_headers.getInlineValue(CacheCustomHeaders::requestCacheControl());
-  const absl::string_view pragma = request_headers.getInlineValue(CacheCustomHeaders::pragma());
 
   if (!cache_control.empty()) {
     request_cache_control_ = RequestCacheControl(cache_control);
   } else {
+    const absl::string_view pragma = request_headers.getInlineValue(CacheCustomHeaders::pragma());
     // According to: https://httpwg.org/specs/rfc7234.html#header.pragma,
     // when Cache-Control header is missing, "Pragma:no-cache" is equivalent to
     // "Cache-Control:no-cache". Any other directives are ignored.
