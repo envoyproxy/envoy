@@ -282,7 +282,86 @@ TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsTest) {
                             0U);
 }
 
-TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsPriorityTest) {}
+TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsPriorityTest) {
+  const std::string yaml_config = R"EOF(
+    name: aggregate_cluster
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 1
+        track_remaining: true
+      - priority: HIGH
+        max_connections: 1
+        track_remaining: true
+    cluster_type:
+      name: envoy.clusters.aggregate
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
+        clusters:
+        - primary
+        - secondary
+)EOF";
+
+  initialize(yaml_config);
+
+  Upstream::ResourceManager& resource_manager_default =
+      cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
+  Upstream::ResourceManager& resource_manager_high =
+      cluster_->info()->resourceManager(Upstream::ResourcePriority::High);
+
+  Stats::Gauge& cx_open_default = getCircuitBreakersStatByPriority("default", "cx_open");
+  Stats::Gauge& remaining_cx_default = getCircuitBreakersStatByPriority("default", "remaining_cx");
+  Stats::Gauge& cx_open_high = getCircuitBreakersStatByPriority("high", "cx_open");
+  Stats::Gauge& remaining_cx_high = getCircuitBreakersStatByPriority("high", "remaining_cx");
+
+  // check the initial max_connections for DEFAULT priority matches the config
+  EXPECT_EQ(1U, resource_manager_default.connections().max());
+  assertResourceManagerStat(resource_manager_default.connections(), remaining_cx_default,
+                            cx_open_default, true, 0U, 1U, 0U);
+
+  // check the initial max_connections for HIGH priority matches the config
+  EXPECT_EQ(1U, resource_manager_high.connections().max());
+  assertResourceManagerStat(resource_manager_high.connections(), remaining_cx_high, cx_open_high,
+                            true, 0U, 1U, 0U);
+
+  // add a connection to DEFAULT priority
+  resource_manager_default.connections().inc();
+  // check the state of DEFAULT priority circuit breaker state and statistics
+  assertResourceManagerStat(resource_manager_default.connections(), remaining_cx_default,
+                            cx_open_default, false, 1U, 0U, 1U);
+  // check the HIGH priority circuit breaker state and statistics
+  assertResourceManagerStat(resource_manager_high.connections(), remaining_cx_high, cx_open_high,
+                            true, 0U, 1U, 0U);
+
+  // remove the connection from DEFAULT priority
+  resource_manager_default.connections().dec();
+  // check the DEFAULT priority circuit breaker state and statistics
+  assertResourceManagerStat(resource_manager_default.connections(), remaining_cx_default,
+                            cx_open_default, true, 0U, 1U, 0U);
+  // check the HIGH priority circuit breaker state and statistics
+  assertResourceManagerStat(resource_manager_high.connections(), remaining_cx_high, cx_open_high,
+                            true, 0U, 1U, 0U);
+
+  // add a connection to HIGH priority
+  resource_manager_high.connections().inc();
+  // check the HIGH priority circuit breaker state and statistics
+  assertResourceManagerStat(resource_manager_high.connections(), remaining_cx_high, cx_open_high,
+                            false, 1U, 0U, 1U);
+  // check the DEFAULT priority circuit breaker state and statistics
+  assertResourceManagerStat(resource_manager_default.connections(), remaining_cx_default,
+                            cx_open_default, true, 0U, 1U, 0U);
+
+  // remove the connection from HIGH priority
+  resource_manager_high.connections().dec();
+  // check the HIGH priority circuit breaker state and statistics
+  assertResourceManagerStat(resource_manager_high.connections(), remaining_cx_high, cx_open_high,
+                            true, 0U, 1U, 0U);
+  // check the DEFAULT priority circuit breaker and statistics
+  assertResourceManagerStat(resource_manager_default.connections(), remaining_cx_default,
+                            cx_open_default, true, 0U, 1U, 0U);
+}
 
 TEST_F(AggregateClusterTest, CircuitBreakerMaxPendingRequestsTest) {}
 
