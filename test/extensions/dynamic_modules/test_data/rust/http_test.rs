@@ -87,3 +87,51 @@ fn test_header_callbacks_on_request_headers_local_resp() {
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   );
 }
+
+#[test]
+fn test_body_callbacks_filter_on_bodies() {
+  let mut f = BodyCallbacksFilter::default();
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  envoy_filter
+    .expect_get_request_body()
+    .returning(|| {
+      Some(vec![
+        EnvoyBuffer::new("nice"),
+        EnvoyBuffer::new("nice"),
+        EnvoyBuffer::new("nice"),
+      ])
+    })
+    .times(2);
+  envoy_filter
+    .expect_drain_request_body()
+    .return_const(true)
+    .once();
+
+  envoy_filter
+    .expect_append_request_body()
+    .return_const(true)
+    .times(2);
+  f.on_request_body(&mut envoy_filter, true);
+
+  envoy_filter
+    .expect_get_response_body()
+    .returning(|| {
+      Some(vec![
+        EnvoyBuffer::new("cool"),
+        EnvoyBuffer::new("cool"),
+        EnvoyBuffer::new("cool"),
+      ])
+    })
+    .times(2);
+  envoy_filter
+    .expect_drain_response_body()
+    .return_const(true)
+    .once();
+
+  envoy_filter
+    .expect_append_response_body()
+    .return_const(true)
+    .times(2);
+  f.on_response_body(&mut envoy_filter, true);
+}
