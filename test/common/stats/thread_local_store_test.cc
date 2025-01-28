@@ -1532,13 +1532,13 @@ protected:
 
   static constexpr size_t million_ = 1000 * 1000;
 
+  NiceMock<ThreadLocal::MockInstance> tls_;
   MockSink sink_;
   SymbolTableImpl symbol_table_;
   AllocatorImpl alloc_;
   ThreadLocalStoreImpl store_;
   Scope& scope_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
-  NiceMock<ThreadLocal::MockInstance> tls_;
   bool threading_enabled_{false};
 };
 

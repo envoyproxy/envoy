@@ -1,6 +1,6 @@
 # This should match the schema defined in external_deps.bzl.
 
-PROTOBUF_VERSION = "29.2"
+PROTOBUF_VERSION = "29.3"
 
 # These names of these deps *must* match the names used in `/bazel/protobuf.patch`,
 # and both must match the names from the protobuf releases (see
@@ -8,11 +8,11 @@ PROTOBUF_VERSION = "29.2"
 # The names change in upcoming versions.
 # The shas are calculated from the downloads on the releases page.
 PROTOC_VERSIONS = dict(
-    linux_aarch_64 = "29cf483e2fb21827e5fac4964e35eae472a238e28c762f02fb17dcd93ff8b89f",
-    linux_x86_64 = "52e9e7ece55c7e30e7e8bbd254b4b21b408a5309bca826763c7124b696a132e9",
-    osx_aarch_64 = "0e153a38d6da19594c980e7f7cd3ea0ddd52c9da1068c03c0d8533369fbfeb20",
-    osx_x86_64 = "ba2bd983b5f06ec38d663b602884a597dea3990a43803d7e153ed8f7c54269e1",
-    win64 = "59ea61efb24b9d8a214171e2ca3fec55c3f1517eff067656c875d8a1cd06ce4f",
+    linux_aarch_64 = "6427349140e01f06e049e707a58709a4f221ae73ab9a0425bc4a00c8d0e1ab32",
+    linux_x86_64 = "3e866620c5be27664f3d2fa2d656b5f3e09b5152b42f1bedbf427b333e90021a",
+    osx_aarch_64 = "2b8a3403cd097f95f3ba656e14b76c732b6b26d7f183330b11e36ef2bc028765",
+    osx_x86_64 = "9a788036d8f9854f7b03c305df4777cf0e54e5b081e25bf15252da87e0e90875",
+    win64 = "57ea59e9f551ad8d71ffaa9b5cfbe0ca1f4e720972a1db7ec2d12ab44bff9383",
 )
 
 REPOSITORY_LOCATIONS_SPEC = dict(
@@ -147,14 +147,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     boringssl_fips = dict(
         project_name = "BoringSSL (FIPS)",
         project_desc = "FIPS compliant BoringSSL",
-        project_url = "https://boringssl.googlesource.com/boringssl/+/master/crypto/fipsmodule/FIPS.md",
+        project_url = "https://boringssl.googlesource.com/boringssl/+/main/crypto/fipsmodule/FIPS.md",
         # When this is updated to a revision newer than 2022-08-12,
         # CertValidatorUtil::setIgnoreCertificateExpiration can be simplified.
         #
         # !!! NOTE !!!
         # Anytime the FIPS BoringSSL version is upgraded, `bazel/external/boringssl_fips.genrule_cmd` must be updated to use the toolchain
         # specified in the associated accreditation certificate, which can be found linked from
-        # https://boringssl.googlesource.com/boringssl/+/refs/heads/master/crypto/fipsmodule/FIPS.md, for example
+        # https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md, for example
         # https://csrc.nist.gov/projects/cryptographic-module-validation-program/certificate/4735.
         version = "fips-20220613",
         sha256 = "62f733289f2d677c2723f556aa58034c438f3a7bbca6c12b156538a88e38da8a",
@@ -181,12 +181,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Abseil",
         project_desc = "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase",
         project_url = "https://abseil.io/",
-        version = "20240722.0",
-        sha256 = "f50e5ac311a81382da7fa75b97310e4b9006474f9560ac46f54a9967f07d4ae3",
+        version = "20240722.1",
+        sha256 = "40cee67604060a7c8794d931538cb55f4d444073e556980c88b6c49bb9b19bb7",
         strip_prefix = "abseil-cpp-{version}",
         urls = ["https://github.com/abseil/abseil-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2024-08-01",
+        release_date = "2025-01-23",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/abseil/abseil-cpp/blob/{version}/LICENSE",
@@ -461,11 +461,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "libipp-crypto",
         project_desc = "Intel® Integrated Performance Primitives Cryptography",
         project_url = "https://github.com/intel/cryptography-primitives",
-        version = "2021.11.1",
-        sha256 = "76779724378fb3ec8b59047be02f6ca609c1ee70372b0205d937d451987bdb6c",
-        strip_prefix = "cryptography-primitives-ippcp_{version}",
-        urls = ["https://github.com/intel/cryptography-primitives/archive/ippcp_{version}.tar.gz"],
-        release_date = "2024-02-28",
+        version = "1.0.1",
+        sha256 = "8cf31ecb47c705603d6c41401ef92d4f104bbf8b510df90cce3d41b35c13b61c",
+        strip_prefix = "cryptography-primitives-{version}",
+        urls = ["https://github.com/intel/cryptography-primitives/archive/refs/tags/v{version}.tar.gz"],
+        release_date = "2024-12-11",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.tls.key_providers.cryptomb"],
         cpe = "cpe:2.3:a:intel:cryptography_for_intel_integrated_performance_primitives:*",
@@ -936,11 +936,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # test/common/json:gen_excluded_unicodes to recompute the ranges
         # excluded from differential fuzzing that are populated in
         # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "63150aba23f7a90fd7d87bdf514e459dd5fe7023fdde01b56ac53335df64d4bd",
+        sha256 = "008a11cc56f9b96679b4c285fd05f46d317d685be3ab524b2a310be0fbad987e",
         strip_prefix = "protobuf-{version}",
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2024-12-18",
+        release_date = "2025-01-08",
         cpe = "cpe:2.3:a:google:protobuf:*",
         license = "Protocol Buffers",
         license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
@@ -1590,7 +1590,7 @@ def _compiled_protoc_deps(locations, versions):
             sha256 = sha,
             urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protoc-{version}-%s.zip" % platform.replace("_", "-", 1)],
             use_category = ["dataplane_core", "controlplane"],
-            release_date = "2024-12-18",
+            release_date = "2025-01-08",
             cpe = "N/A",
             license = "Protocol Buffers",
             license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",

@@ -1382,3 +1382,10 @@ UDP
     The trace ID of the request. If the request does not have a trace ID, this will be an empty string.
   TCP/UDP
     Not implemented ("-").
+
+%QUERY_PARAM(X):Z%
+  HTTP
+    The value of the query parameter X. If the query parameter X is not present, '-' symbol will be used.
+    Z is an optional parameter denoting string truncation up to Z characters long.
+  TCP/UDP
+    Not implemented ("-").
