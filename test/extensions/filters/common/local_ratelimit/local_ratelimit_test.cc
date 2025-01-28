@@ -173,16 +173,6 @@ public:
   std::vector<RateLimit::Descriptor> descriptor2_{{{{"hello", "world"}, {"foo", "bar"}}}};
 };
 
-// Verify descriptor rate limit time interval is multiple of token bucket fill interval.
-TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitDivisibleByTokenFillInterval) {
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 10, 10, "60s"),
-                            *descriptors_.Add());
-
-  EXPECT_THROW_WITH_MESSAGE(
-      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_),
-      EnvoyException, "local rate descriptor limit is not a multiple of token bucket fill timer");
-}
-
 // Verify descriptor rate limit time with small fill interval is rejected.
 TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitSmallFillInterval) {
   // Set fill interval to 10 milliseconds.

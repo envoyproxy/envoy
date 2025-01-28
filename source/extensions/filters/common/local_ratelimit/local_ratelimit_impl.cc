@@ -97,12 +97,15 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     : time_source_(dispatcher.timeSource()), share_provider_(std::move(shared_provider)),
       always_consume_default_token_bucket_(always_consume_default_token_bucket) {
 
-  if (fill_interval < std::chrono::milliseconds(50)) {
-    throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
+  // Ignore the default token bucket if fill_interval is 0 because 0 fill_interval means nothing
+  // and has undefined behavior.
+  if (fill_interval.count() > 0) {
+    if (fill_interval < std::chrono::milliseconds(50)) {
+      throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
+    }
+    default_token_bucket_ = std::make_shared<RateLimitTokenBucket>(max_tokens, tokens_per_fill,
+                                                                   fill_interval, time_source_);
   }
-
-  default_token_bucket_ = std::make_shared<RateLimitTokenBucket>(max_tokens, tokens_per_fill,
-                                                                 fill_interval, time_source_);
 
   for (const auto& descriptor : descriptors) {
     RateLimit::LocalDescriptor new_descriptor;
@@ -121,11 +124,6 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     // constraint of >=50msec as for fill_interval).
     if (per_descriptor_fill_interval < std::chrono::milliseconds(50)) {
       throw EnvoyException("local rate limit descriptor token bucket fill timer must be >= 50ms");
-    }
-
-    if (per_descriptor_fill_interval.count() % fill_interval.count() != 0) {
-      throw EnvoyException(
-          "local rate descriptor limit is not a multiple of token bucket fill timer");
     }
 
     RateLimitTokenBucketSharedPtr per_descriptor_token_bucket =
@@ -187,6 +185,13 @@ LocalRateLimiterImpl::Result LocalRateLimiterImpl::requestAllowed(
 
   // See if the request is forbidden by the default token bucket.
   if (matched_results.empty() || always_consume_default_token_bucket_) {
+    if (default_token_bucket_ == nullptr) {
+      return {true, matched_results.empty()
+                        ? makeOptRefFromPtr<TokenBucketContext>(nullptr)
+                        : makeOptRef<TokenBucketContext>(matched_results[0].token_bucket.get())};
+    }
+    ASSERT(default_token_bucket_ != nullptr);
+
     if (const bool result = default_token_bucket_->consume(share_factor); !result) {
       // If the request is forbidden by the default token bucket, return the result and the
       // default token bucket.
