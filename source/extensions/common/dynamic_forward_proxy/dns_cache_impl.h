@@ -168,6 +168,16 @@ private:
       first_resolve_complete_ = true;
     }
 
+    void setResolutionStatus(Network::DnsResolver::ResolutionStatus resolution_status) {
+      absl::WriterMutexLock lock{&resolve_lock_};
+      resolution_status_ = resolution_status;
+    }
+
+    Network::DnsResolver::ResolutionStatus resolutionStatus() const override {
+      absl::WriterMutexLock lock{&resolve_lock_};
+      return resolution_status_;
+    }
+
   private:
     friend class DnsCacheImplTest;
     TimeSource& time_source_;
@@ -178,6 +188,7 @@ private:
     std::vector<Network::Address::InstanceConstSharedPtr>
         address_list_ ABSL_GUARDED_BY(resolve_lock_);
     std::string details_ ABSL_GUARDED_BY(resolve_lock_){"not_resolved"};
+    Network::DnsResolver::ResolutionStatus resolution_status_ ABSL_GUARDED_BY(resolve_lock_);
 
     // Using std::chrono::steady_clock::duration is required for compilation within an atomic vs.
     // using MonotonicTime.
