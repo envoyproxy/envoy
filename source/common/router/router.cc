@@ -899,15 +899,25 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalClu
     return nullptr;
   }
   GenericConnPoolFactory* factory = nullptr;
+  ProtobufTypes::MessagePtr message;
   if (cluster_->upstreamConfig().has_value()) {
     factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
         cluster_->upstreamConfig().ref());
     ENVOY_BUG(factory != nullptr,
               fmt::format("invalid factory type '{}', failing over to default upstream",
                           cluster_->upstreamConfig().ref().DebugString()));
+    if (!cluster_->upstreamConfig()->typed_config().value().empty()) {
+      message = Envoy::Config::Utility::translateToFactoryConfig(
+          *cluster_->upstreamConfig(), config_->factory_context_.messageValidationVisitor(),
+          *factory);
+    }
   }
   if (!factory) {
     factory = &config_->router_context_.genericConnPoolFactory();
+  }
+
+  if (!message) {
+    message = factory->createEmptyConfigProto();
   }
 
   using UpstreamProtocol = Envoy::Router::GenericConnPoolFactory::UpstreamProtocol;
@@ -925,7 +935,7 @@ std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalClu
   }
 
   return factory->createGenericConnPool(host, cluster, upstream_protocol, route_entry_->priority(),
-                                        callbacks_->streamInfo().protocol(), this);
+                                        callbacks_->streamInfo().protocol(), this, *message);
 }
 
 void Filter::sendNoHealthyUpstreamResponse() {
