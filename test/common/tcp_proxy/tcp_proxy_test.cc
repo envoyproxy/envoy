@@ -312,15 +312,22 @@ TEST_P(TcpProxyTest, UpstreamRemoteDisconnect) {
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// Test that reconnect is attempted after a local connect failure
-TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFail) {
+// Test that reconnect is attempted after a local connect failure, backoff options not configured.
+TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailNoBackoffOptions) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
   config.mutable_max_connect_attempts()->set_value(2);
 
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   setup(2, config);
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
 
   timeSystem().advanceTimeWait(std::chrono::microseconds(10));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+  retry_timer->invokeCallback();
+
   timeSystem().advanceTimeWait(std::chrono::microseconds(40));
   raiseEventUpstreamConnected(1);
 
@@ -332,11 +339,48 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFail) {
       filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
   ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
   EXPECT_EQ(std::chrono::microseconds(50), upstream_connection_establishment_latency.value());
+
+  EXPECT_CALL(*retry_timer, disableTimer());
 }
 
-// Make sure that the tcp proxy code handles reentrant calls to onPoolFailure.
-TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrant) {
+// Test that reconnect is attempted after a local connect failure, backoff options configured.
+TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailWithBackoffOptions) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(2);
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  setup(2, config);
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(100));
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(100), _));
+
+  timeSystem().advanceTimeWait(std::chrono::microseconds(10));
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+  retry_timer->invokeCallback();
+
+  timeSystem().advanceTimeWait(std::chrono::microseconds(40));
+  raiseEventUpstreamConnected(1);
+
+  EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
+  EXPECT_EQ(2U, filter_->getStreamInfo().attemptCount().value());
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  EXPECT_EQ(std::chrono::microseconds(50), upstream_connection_establishment_latency.value());
+
+  EXPECT_CALL(*retry_timer, disableTimer());
+}
+
+// Make sure that the tcp proxy code handles reentrant calls to onPoolFailure, backoff options not
+// configured.
+TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrantNoBackoffOptions) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
   config.mutable_max_connect_attempts()->set_value(2);
 
   // Set up a call to onPoolFailure from inside the first newConnection call.
@@ -348,6 +392,11 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrant) {
         return nullptr;
       });
 
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
+
   setup(2, config);
 
   // Make sure the last connection pool to be created is the one which gets the
@@ -355,42 +404,155 @@ TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrant) {
   EXPECT_CALL(*conn_pool_handles_.at(0), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess))
       .Times(0);
   EXPECT_CALL(*conn_pool_handles_.at(1), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess));
+
+  retry_timer->invokeCallback();
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_CALL(*retry_timer, disableTimer());
 }
 
-// Test that reconnect is attempted after a remote connect failure
-TEST_P(TcpProxyTest, ConnectAttemptsUpstreamRemoteFail) {
+// Make sure that the tcp proxy code handles reentrant calls to onPoolFailure, backoff options
+// configured.
+TEST_P(TcpProxyTest, ConnectAttemptsUpstreamLocalFailReentrantWithBackoffOptions) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
   config.mutable_max_connect_attempts()->set_value(2);
+
+  // Set up a call to onPoolFailure from inside the first newConnection call.
+  // This simulates a connection failure from under the stack of newStream.
+  new_connection_functions_.push_back(
+      [&](Tcp::ConnectionPool::Cancellable*) -> Tcp::ConnectionPool::Cancellable* {
+        raiseEventUpstreamConnectFailed(0,
+                                        ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+        return nullptr;
+      });
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(100));
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(100), _));
+
   setup(2, config);
+
+  // Make sure the last connection pool to be created is the one which gets the
+  // cancellation call.
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess))
+      .Times(0);
+  EXPECT_CALL(*conn_pool_handles_.at(1), cancel(Tcp::ConnectionPool::CancelPolicy::CloseExcess));
+
+  retry_timer->invokeCallback();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_CALL(*retry_timer, disableTimer());
+}
+
+// Test that reconnect is attempted after a remote connect failure, backoff options not configured.
+TEST_P(TcpProxyTest, ConnectAttemptsUpstreamRemoteFailNoBackoffOptions) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_max_connect_attempts()->set_value(2);
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  setup(2, config);
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
 
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  retry_timer->invokeCallback();
   raiseEventUpstreamConnected(1);
 
   EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                     .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
+
+  EXPECT_CALL(*retry_timer, disableTimer());
 }
 
-// Test that reconnect is attempted after a connect timeout.
-TEST_P(TcpProxyTest, ConnectAttemptsUpstreamTimeout) {
+// Test that reconnect is attempted after a remote connect failure, backoff options configured.
+TEST_P(TcpProxyTest, ConnectAttemptsUpstreamRemoteFailWithBackoffOptions) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
   config.mutable_max_connect_attempts()->set_value(2);
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   setup(2, config);
 
-  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(100));
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(100), _));
+
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  retry_timer->invokeCallback();
   raiseEventUpstreamConnected(1);
 
   EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                     .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
+
+  EXPECT_CALL(*retry_timer, disableTimer());
 }
 
-// Test that only the configured number of connect attempts occur
-TEST_P(TcpProxyTest, ConnectAttemptsLimit) {
+// Test that reconnect is attempted after a connect timeout, backoff options not configured.
+TEST_P(TcpProxyTest, ConnectAttemptsUpstreamTimeoutNoBackoffOptions) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_max_connect_attempts()->set_value(2);
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  setup(2, config);
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
+
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+  retry_timer->invokeCallback();
+  raiseEventUpstreamConnected(1);
+
+  EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
+
+  EXPECT_CALL(*retry_timer, disableTimer());
+}
+
+// Test that reconnect is attempted after a connect timeout, backoff options configured.
+TEST_P(TcpProxyTest, ConnectAttemptsUpstreamTimeoutWithBackoffOptions) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(2);
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  setup(2, config);
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(100));
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(100), _));
+
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+  retry_timer->invokeCallback();
+  raiseEventUpstreamConnected(1);
+
+  EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
+
+  EXPECT_CALL(*retry_timer, disableTimer());
+}
+
+// Test that only the configured number of connect attempts occur, backoff options not configured.
+TEST_P(TcpProxyTest, ConnectAttemptsLimitNoBackoffOptions) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
       accessLogConfig("%RESPONSE_FLAGS%");
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
   config.mutable_max_connect_attempts()->set_value(3);
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+
   setup(3, config);
 
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
@@ -403,9 +565,18 @@ TEST_P(TcpProxyTest, ConnectAttemptsLimit) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   // Try both failure modes
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+  retry_timer->invokeCallback();
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
   timeSystem().advanceTimeWait(std::chrono::microseconds(10));
   raiseEventUpstreamConnectFailed(1, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  retry_timer->invokeCallback();
+
+  // This one should not enable the retry timer.
   timeSystem().advanceTimeWait(std::chrono::microseconds(15));
   raiseEventUpstreamConnectFailed(2, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
@@ -414,6 +585,56 @@ TEST_P(TcpProxyTest, ConnectAttemptsLimit) {
   ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
   EXPECT_EQ(std::chrono::microseconds(25), upstream_connection_establishment_latency.value());
 
+  EXPECT_CALL(*retry_timer, disableTimer());
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "UF,URX");
+}
+
+// Test that only the configured number of connect attempts occur, backoff options configured.
+TEST_P(TcpProxyTest, ConnectAttemptsLimitWithBackoffOptions) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
+      accessLogConfig("%RESPONSE_FLAGS%");
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(3);
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+
+  setup(3, config);
+
+  EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+
+  // Try both failure modes
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(100));
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(100), _));
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+  retry_timer->invokeCallback();
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(200));
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(200), _));
+  timeSystem().advanceTimeWait(std::chrono::microseconds(10));
+  raiseEventUpstreamConnectFailed(1, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  retry_timer->invokeCallback();
+
+  // This one should not enable the retry timer.
+  timeSystem().advanceTimeWait(std::chrono::microseconds(15));
+  raiseEventUpstreamConnectFailed(2, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+
+  const absl::optional<std::chrono::nanoseconds> upstream_connection_establishment_latency =
+      filter_->getStreamInfo().upstreamInfo()->upstreamTiming().connectionPoolCallbackLatency();
+  ASSERT_TRUE(upstream_connection_establishment_latency.has_value());
+  EXPECT_EQ(std::chrono::microseconds(25), upstream_connection_establishment_latency.value());
+
+  EXPECT_CALL(*retry_timer, disableTimer());
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UF,URX");
 }
@@ -427,23 +648,69 @@ TEST_P(TcpProxyTest, ConnectedNoOp) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// Test that the tcp proxy sends the correct notifications to the outlier detector
-TEST_P(TcpProxyTest, OutlierDetection) {
+// Test that the tcp proxy sends the correct notifications to the outlier detector, backoff options
+// not configured.
+TEST_P(TcpProxyTest, OutlierDetectionNoBackoffOptions) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
   config.mutable_max_connect_attempts()->set_value(3);
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   setup(3, config);
 
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
   EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
   raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+  retry_timer->invokeCallback();
 
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
   EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   raiseEventUpstreamConnectFailed(1, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  retry_timer->invokeCallback();
 
   EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal, _));
   raiseEventUpstreamConnected(2);
+
+  EXPECT_CALL(*retry_timer, disableTimer());
+}
+
+// Test that the tcp proxy sends the correct notifications to the outlier detector, backoff options
+// configured.
+TEST_P(TcpProxyTest, OutlierDetectionWithBackoffOptions) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(3);
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  setup(3, config);
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(100));
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(100), _));
+  EXPECT_CALL(upstream_hosts_.at(0)->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::Timeout);
+  retry_timer->invokeCallback();
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(200));
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(200), _));
+  EXPECT_CALL(upstream_hosts_.at(1)->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  raiseEventUpstreamConnectFailed(1, ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+  retry_timer->invokeCallback();
+
+  EXPECT_CALL(upstream_hosts_.at(2)->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal, _));
+  raiseEventUpstreamConnected(2);
+
+  EXPECT_CALL(*retry_timer, disableTimer());
 }
 
 TEST_P(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
@@ -600,6 +867,10 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
   std::array<char, 256> buffer;
   OutputBufferStream ostream{buffer.data(), buffer.size()};
   EXPECT_NO_THROW(stream_decoder_callbacks.dumpState(ostream, 0));
+
+  // Release filter explicitly. Filter destructor tries to use access logger, so we want filter
+  // to be destroyed before the access logger to avoid accessing released memory.
+  filter_.reset();
 }
 
 TEST_P(TcpProxyTest, RouteWithMetadataMatch) {
@@ -1419,10 +1690,13 @@ TEST_P(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
             upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().sslConnection());
 }
 
-TEST_P(TcpProxyTest, PickClusterOnUpstreamFailure) {
+TEST_P(TcpProxyTest, PickClusterOnUpstreamFailureNoBackoffOptions) {
   auto config = defaultConfig();
   set2Cluster(config);
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
   config.mutable_max_connect_attempts()->set_value(2);
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
 
   // The random number lead into picking the first one in the weighted clusters.
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(0));
@@ -1433,24 +1707,71 @@ TEST_P(TcpProxyTest, PickClusterOnUpstreamFailure) {
 
   setup(1, config);
 
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
+
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+
   // The random number lead into picking the second cluster.
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(1));
-
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
               getThreadLocalCluster("fake_cluster_1"))
       .WillOnce(
           Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
 
-  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+  retry_timer->invokeCallback();
+
   EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                     .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
+  EXPECT_CALL(*retry_timer, disableTimer());
 }
 
-// Verify that odcds callback does not re-pick cluster. Upstream connect failure does.
-TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
+TEST_P(TcpProxyTest, PickClusterOnUpstreamFailureWithBackoffOptions) {
+  auto config = defaultConfig();
+  set2Cluster(config);
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(2);
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+
+  // The random number lead into picking the first one in the weighted clusters.
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(0));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_0"))
+      .WillOnce(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+
+  setup(1, config);
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(100));
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(100), _));
+
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+
+  // The random number lead into picking the second cluster.
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(1));
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_1"))
+      .WillOnce(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+
+  retry_timer->invokeCallback();
+
+  EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
+  EXPECT_CALL(*retry_timer, disableTimer());
+}
+
+// Verify that odcds callback does not re-pick cluster. Upstream connect failure does, backoff
+// options not configured.
+TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedClusterNoBackoffOptions) {
   auto config = onDemandConfig();
   set2Cluster(config);
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
   config.mutable_max_connect_attempts()->set_value(2);
   mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
 
@@ -1474,6 +1795,7 @@ TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
       }));
 
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   setup(1, config);
 
   // When the on-demand look up callback is invoked, the target cluster should not change.
@@ -1482,6 +1804,11 @@ TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
 
   // Start to raise connect failure.
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(0), _));
+
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 
   // random() is raised in the cluster pick. `fake_cluster_1` will be picked.
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(1));
@@ -1497,12 +1824,83 @@ TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedCluster) {
         return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
       }));
 
-  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+  retry_timer->invokeCallback();
   EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                     .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
                     .value());
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
+  EXPECT_CALL(*retry_timer, disableTimer());
+  std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
+}
+
+// Verify that odcds callback does not re-pick cluster. Upstream connect failure does, backoff
+// options configured.
+TEST_P(TcpProxyTest, OnDemandCallbackStickToTheSelectedClusterWithBackoffOptions) {
+  auto config = onDemandConfig();
+  set2Cluster(config);
+  config.mutable_idle_timeout()->set_seconds(0); // Disable idle timeout.
+  config.mutable_backoff_options()->mutable_base_interval()->set_seconds(1);
+  config.mutable_max_connect_attempts()->set_value(2);
+  mock_odcds_api_handle_ = Upstream::MockOdCdsApiHandle::create().release();
+
+  // The random number lead to select the first one in the weighted clusters.
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(0));
+
+  // The first cluster is requested 2 times.
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_0"))
+      // Invoked on new connection. Null is returned which would trigger on demand.
+      .WillOnce(Return(nullptr))
+      // Invoked in the callback of on demand look up. The cluster is ready upon callback.
+      .WillOnce(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_))
+      .RetiresOnSaturation();
+
+  Upstream::ClusterDiscoveryCallbackPtr cluster_discovery_callback;
+  EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster_0", _, _))
+      .WillOnce(Invoke([&](auto&&, auto&& cb, auto&&) {
+        cluster_discovery_callback = std::move(cb);
+        return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
+      }));
+
+  Event::MockTimer* retry_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  setup(1, config);
+
+  // When the on-demand look up callback is invoked, the target cluster should not change.
+  // The behavior is verified by checking the random() which is used during cluster re-pick.
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).Times(0);
+  std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Available);
+
+  // Start to raise connect failure.
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+      .WillOnce(Return(100));
+  EXPECT_CALL(*retry_timer, enableTimer(std::chrono::milliseconds(100), _));
+
+  raiseEventUpstreamConnectFailed(0, ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+
+  // random() is raised in the cluster pick. `fake_cluster_1` will be picked.
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random()).WillOnce(Return(1));
+
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("fake_cluster_1"))
+      // Invoked on connect attempt. Null is returned which would trigger on demand.
+      .WillOnce(Return(nullptr))
+      .RetiresOnSaturation();
+
+  EXPECT_CALL(*mock_odcds_api_handle_, requestOnDemandClusterDiscovery("fake_cluster_1", _, _))
+      .WillOnce(Invoke([&](auto&&, auto&&, auto&&) {
+        return std::make_unique<Upstream::MockClusterDiscoveryCallbackHandle>();
+      }));
+
+  retry_timer->invokeCallback();
+  EXPECT_EQ(0U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
+  EXPECT_CALL(*retry_timer, disableTimer());
   std::invoke(*cluster_discovery_callback, Upstream::ClusterDiscoveryStatus::Missing);
 }
 
