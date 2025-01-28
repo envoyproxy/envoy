@@ -256,6 +256,14 @@ TEST_F(AwsClusterManagerTest, ClusterManagerCannotAdd) {
       envoy::config::cluster::v3::Cluster::DiscoveryType::Cluster_DiscoveryType_STRICT_DNS,
       "new_url");
   EXPECT_EQ(absl::StatusCode::kInternal, status.code());
+  EXPECT_FALSE(aws_cluster_manager->getUriFromClusterName("cluster_1").ok());
+}
+
+// Noop test for coverage
+TEST_F(AwsClusterManagerTest, OnClusterRemovalCoverage) {
+  auto aws_cluster_manager = std::make_shared<AwsClusterManager>(context_);
+  auto manager_friend = AwsClusterManagerFriend(aws_cluster_manager);
+  manager_friend.onClusterRemoval("cluster_1");
 }
 
 } // namespace Aws

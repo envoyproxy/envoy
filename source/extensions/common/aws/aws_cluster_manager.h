@@ -86,20 +86,7 @@ class AwsClusterManagerImpl : public AwsClusterManager,
   friend class AwsClusterManagerFriend;
 
 public:
-  AwsClusterManagerImpl(Server::Configuration::ServerFactoryContext& context);
-  ~AwsClusterManagerImpl() override {
-    if (cm_handle_) {
-      // We exit last due to being pinned, so we must call cancel on the callbacks handle as it will
-      // already be invalid by this time
-      auto* handle = dynamic_cast<RaiiListElement<ClusterUpdateCallbacks*>*>(cm_handle_.get());
-      handle->cancel();
-    }
-  };
-
-  /**
-   * Add a managed cluster to the aws cluster manager
-   * @return absl::Status based on whether the cluster could be added to the cluster manager
-   */
+  AwsClusterManager(Server::Configuration::ServerFactoryContext& context);
 
   absl::Status
   addManagedCluster(absl::string_view cluster_name,
@@ -118,6 +105,7 @@ public:
   absl::StatusOr<std::string> getUriFromClusterName(absl::string_view cluster_name) override;
 
 private:
+  // Callbacks for cluster manager
   void onClusterAddOrUpdate(absl::string_view, Upstream::ThreadLocalClusterCommand&) override;
   void onClusterRemoval(const std::string&) override;
 
