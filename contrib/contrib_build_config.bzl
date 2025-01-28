@@ -30,6 +30,12 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
 
     #
+    #
+    # Reverse Connection
+    #
+    "envoy.reverse_connection.conn_pool":                           "//contrib/reverse_connection/conn_pool/source:conn_pool_lib",
+
+    #
     # Sip proxy
     #
 
