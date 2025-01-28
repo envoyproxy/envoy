@@ -135,6 +135,14 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
 
   const auto status = callbacks.upstreamData(data);
   if (status == ThriftFilters::ResponseStatus::Complete) {
+    if (!callbacks.responseMetadata()) {
+      ENVOY_LOG(debug, "No response metadata produced; resetting stream");
+      upstream_host_->outlierDetector().putResult(
+          Upstream::Outlier::Result::ExtOriginRequestFailed);
+      stats_.incResponseMetadataNull(cluster, upstream_host_);
+      resetStream();
+      return ThriftFilters::ResponseStatus::Reset;
+    }
 
     stats_.recordUpstreamResponseSize(cluster, response_size_);
 
