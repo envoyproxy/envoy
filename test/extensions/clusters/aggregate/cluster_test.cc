@@ -142,6 +142,16 @@ public:
                                                             Stats::Gauge::ImportMode::Accumulate);
   }
 
+  void assertResourceManagerStat(ResourceLimit& resource, Stats::Gauge& remaining,
+                                 Stats::Gauge& open, bool expected_can_create,
+                                 unsigned int expected_count, unsigned int expected_remaining,
+                                 unsigned int expected_open) {
+    EXPECT_EQ(expected_can_create, resource.canCreate());
+    EXPECT_EQ(expected_count, resource.count());
+    EXPECT_EQ(expected_remaining, remaining.value());
+    EXPECT_EQ(expected_open, open.value());
+  }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Ssl::MockContextManager ssl_context_manager_;
 
@@ -221,7 +231,56 @@ TEST_F(AggregateClusterTest, CircuitBreakerDefaultsTest) {
   EXPECT_FALSE(resource_manager.retries().canCreate());
 }
 
-TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsTest) {}
+TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsTest) {
+  const std::string yaml_config = R"EOF(
+    name: aggregate_cluster
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 1
+        track_remaining: true
+    cluster_type:
+      name: envoy.clusters.aggregate
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
+        clusters:
+        - primary
+        - secondary
+)EOF";
+
+  initialize(yaml_config);
+
+  // resource manager for the DEFAULT priority (see the yaml config above)
+  Upstream::ResourceManager& resource_manager =
+      cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
+
+  // get the circuit breaker statistics we are interested in, to assert against
+  Stats::Gauge& cx_open = getCircuitBreakersStatByPriority("default", "cx_open");
+  Stats::Gauge& remaining_cx = getCircuitBreakersStatByPriority("default", "remaining_cx");
+
+  // check the yaml config is set correctly,
+  // we should have a maximum of 1 connection available to use
+  EXPECT_EQ(1U, resource_manager.connections().max());
+
+  // test the specific stat's remaining value and it's related circuit breaker's state
+  // eg. max_connections, the remaining connections, and the connections circuit breaker state
+  assertResourceManagerStat(resource_manager.connections(), remaining_cx, cx_open, true, 0U, 1U,
+                            0U);
+
+  // create that one connection
+  resource_manager.connections().inc();
+
+  assertResourceManagerStat(resource_manager.connections(), remaining_cx, cx_open, false, 1U, 0U,
+                            1U);
+
+  // remove that one connection
+  resource_manager.connections().dec();
+
+  assertResourceManagerStat(resource_manager.connections(), remaining_cx, cx_open, true, 0U, 1U,
+                            0U);
+}
 
 TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsPriorityTest) {}
 
