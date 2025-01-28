@@ -68,10 +68,21 @@ class AwsClusterManager : public Envoy::Singleton::Instance,
 public:
   AwsClusterManager(Server::Configuration::ServerFactoryContext& context);
 
+  /**
+   * Add a managed cluster to the aws cluster manager
+   * @return absl::Status based on whether the cluster could be added to the cluster manager
+   */
+
   absl::Status
   addManagedCluster(absl::string_view cluster_name,
                     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
                     absl::string_view uri);
+
+  /**
+   * Add a callback to be signaled when a managed cluster comes online. This is used to kick off
+   * credential refresh
+   * @return RAII handle for the callback
+   */
 
   absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
   addManagedClusterUpdateCallbacks(absl::string_view cluster_name,
@@ -79,8 +90,15 @@ public:
   absl::StatusOr<std::string> getUriFromClusterName(absl::string_view cluster_name);
 
 private:
+  // Callbacks for cluster manager
   void onClusterAddOrUpdate(absl::string_view, Upstream::ThreadLocalClusterCommand&) override;
   void onClusterRemoval(const std::string&) override;
+
+  /**
+   * Create all queued clusters, if we were unable to create them in real time due to envoy cluster
+   * manager initialization
+   */
+
   void createQueuedClusters();
   struct CredentialsProviderCluster {
     CredentialsProviderCluster(envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,

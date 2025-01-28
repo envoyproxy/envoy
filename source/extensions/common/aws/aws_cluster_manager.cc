@@ -69,6 +69,7 @@ void AwsClusterManager::onClusterAddOrUpdate(absl::string_view cluster_name,
 void AwsClusterManager::onClusterRemoval(const std::string&){};
 
 void AwsClusterManager::createQueuedClusters() {
+  std::vector<std::string> failed_clusters;
   for (const auto& it : managed_clusters_) {
     auto cluster_name = it.first;
     auto cluster_type = it.second->cluster_type_;
@@ -78,7 +79,11 @@ void AwsClusterManager::createQueuedClusters() {
     if (!status.ok()) {
       ENVOY_LOG_MISC(debug, "Failed to add cluster {} to cluster manager: {}", cluster_name,
                      status.status().ToString());
+      failed_clusters.push_back(cluster_name);
     }
+  }
+  for (const auto& cluster_name : failed_clusters) {
+    managed_clusters_.erase(cluster_name);
   }
 }
 
@@ -102,7 +107,7 @@ absl::Status AwsClusterManager::addManagedCluster(
         if (!status.ok()) {
           ENVOY_LOG_MISC(debug, "Failed to add cluster {} to cluster manager: {}", cluster_name,
                          status.status().ToString());
-
+          managed_clusters_.erase(cluster_name);
           return status.status();
         }
       }
@@ -116,8 +121,6 @@ absl::Status AwsClusterManager::addManagedCluster(
 
 absl::StatusOr<std::string>
 AwsClusterManager::getUriFromClusterName(absl::string_view cluster_name) {
-  ASSERT(!managed_clusters_.empty());
-
   auto it = managed_clusters_.find(cluster_name);
   if (it == managed_clusters_.end()) {
     return absl::InvalidArgumentError("Cluster not found");

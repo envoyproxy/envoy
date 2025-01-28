@@ -36,6 +36,11 @@ public:
                             Upstream::ThreadLocalClusterCommand& command) {
     return aws_cluster_manager_->onClusterAddOrUpdate(cluster_name, command);
   }
+
+  void onClusterRemoval(const std::string& cluster_name) {
+    return aws_cluster_manager_->onClusterRemoval(cluster_name);
+  }
+
   std::shared_ptr<AwsClusterManager> aws_cluster_manager_;
 };
 
@@ -66,6 +71,12 @@ TEST_F(AwsClusterManagerTest, AddClusters) {
       "new_url");
   EXPECT_EQ(absl::StatusCode::kAlreadyExists, status.code());
   EXPECT_EQ(aws_cluster_manager->getUriFromClusterName("cluster_1").value(), "uri_1");
+}
+
+TEST_F(AwsClusterManagerTest, CantGetUriForNonExistentCluster) {
+  auto aws_cluster_manager = std::make_unique<AwsClusterManager>(context_);
+  auto status = aws_cluster_manager->getUriFromClusterName("cluster_1");
+  EXPECT_EQ(status.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
 // Checks that the cluster callbacks are called
@@ -133,6 +144,24 @@ TEST_F(AwsClusterManagerTest, CreateQueuedViaInitManager) {
   init_target_->initialize(init_watcher_);
 }
 
+// Checks that aws cluster manager constructor adds an init target and the target is called
+TEST_F(AwsClusterManagerTest, CreateQueuedViaInitManagerWithFailedCluster) {
+  EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+    init_target_ = target.createHandle("test");
+  }));
+  EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cm_));
+  EXPECT_CALL(cm_, addOrUpdateCluster(_, _, _)).WillOnce(Return(absl::InternalError("")));
+
+  auto aws_cluster_manager = std::make_shared<AwsClusterManager>(context_);
+  auto status = aws_cluster_manager->addManagedCluster(
+      "cluster_1",
+      envoy::config::cluster::v3::Cluster::DiscoveryType::Cluster_DiscoveryType_STRICT_DNS,
+      "new_url");
+  // Cluster creation should be queued at this point
+  init_target_->initialize(init_watcher_);
+  EXPECT_FALSE(aws_cluster_manager->getUriFromClusterName("cluster_1").ok());
+}
+
 // Checks that aws cluster manager constructor does not add an init target if the init manager is
 // already initialized
 TEST_F(AwsClusterManagerTest, DontUseInitWhenInitialized) {
@@ -180,6 +209,14 @@ TEST_F(AwsClusterManagerTest, ClusterManagerCannotAdd) {
       envoy::config::cluster::v3::Cluster::DiscoveryType::Cluster_DiscoveryType_STRICT_DNS,
       "new_url");
   EXPECT_EQ(absl::StatusCode::kInternal, status.code());
+  EXPECT_FALSE(aws_cluster_manager->getUriFromClusterName("cluster_1").ok());
+}
+
+// Noop test for coverage
+TEST_F(AwsClusterManagerTest, OnClusterRemovalCoverage) {
+  auto aws_cluster_manager = std::make_shared<AwsClusterManager>(context_);
+  auto manager_friend = AwsClusterManagerFriend(aws_cluster_manager);
+  manager_friend.onClusterRemoval("cluster_1");
 }
 
 } // namespace Aws
