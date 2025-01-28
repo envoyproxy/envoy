@@ -1012,11 +1012,7 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
     return false;
   }
 
-  if (connect_attempts_ >= filter_.config_->tunnelingConfig()->maxConnectAttempts()) {
-    udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
-    cluster_->cluster_info_->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
-    return false;
-  } else if (connect_attempts_ >= 1) {
+  if (connect_attempts_ >= 1) {
     cluster_->cluster_info_->trafficStats()->upstream_rq_retry_.inc();
   }
 
@@ -1117,6 +1113,14 @@ void UdpProxyFilter::TunnelingActiveSession::onUpstreamEvent(Network::Connection
     upstream_.reset();
 
     if (!connecting) {
+      filter_.removeSession(this);
+      return;
+    }
+
+    if (connect_attempts_ >= filter_.config_->tunnelingConfig()->maxConnectAttempts()) {
+      udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
+      cluster_->cluster_info_->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
+      cluster_->cluster_stats_.sess_tunnel_failure_.inc();
       filter_.removeSession(this);
       return;
     }
