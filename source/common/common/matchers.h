@@ -92,13 +92,13 @@ StringMatcherPtr getExtensionStringMatcher(const ::xds::core::v3::TypedExtension
                                            Server::Configuration::CommonFactoryContext& context);
 
 // A matcher for the `exact` StringMatcher.
-class ExactStringMatcher : public StringMatcher {
+class ExactStringMatcher {
 public:
   ExactStringMatcher(absl::string_view exact, bool ignore_case)
       : exact_(exact), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value) const override {
+  bool match(const absl::string_view value) const {
     return ignore_case_ ? absl::EqualsIgnoreCase(value, exact_) : value == exact_;
   }
 
@@ -110,13 +110,13 @@ private:
 };
 
 // A matcher for the `prefix` StringMatcher.
-class PrefixStringMatcher : public StringMatcher {
+class PrefixStringMatcher {
 public:
   PrefixStringMatcher(absl::string_view prefix, bool ignore_case)
       : prefix_(prefix), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value) const override {
+  bool match(const absl::string_view value) const {
     return ignore_case_ ? absl::StartsWithIgnoreCase(value, prefix_)
                         : absl::StartsWith(value, prefix_);
   }
@@ -130,13 +130,13 @@ private:
 };
 
 // A matcher for the `suffix` StringMatcher.
-class SuffixStringMatcher : public StringMatcher {
+class SuffixStringMatcher {
 public:
   SuffixStringMatcher(absl::string_view suffix, bool ignore_case)
       : suffix_(suffix), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value) const override {
+  bool match(const absl::string_view value) const {
     return ignore_case_ ? absl::EndsWithIgnoreCase(value, suffix_) : absl::EndsWith(value, suffix_);
   }
 
@@ -148,7 +148,7 @@ private:
 };
 
 // A matcher for the `safe_regex` StringMatcher.
-class RegexStringMatcher : public StringMatcher {
+class RegexStringMatcher {
 public:
   // The RegexMatcher can either be from the ::envoy or ::xds type,
   // and the templated c'tor handles both cases.
@@ -161,7 +161,7 @@ public:
   RegexStringMatcher(RegexStringMatcher&& other) { regex_ = std::move(other.regex_); }
 
   // StringMatcher
-  bool match(const absl::string_view value) const override { return regex_->match(value); }
+  bool match(const absl::string_view value) const { return regex_->match(value); }
 
   const std::string& stringRepresentation() const { return regex_->pattern(); }
 
@@ -170,14 +170,14 @@ private:
 };
 
 // A matcher for the `contains` StringMatcher.
-class ContainsStringMatcher : public StringMatcher {
+class ContainsStringMatcher {
 public:
   ContainsStringMatcher(absl::string_view contents, bool ignore_case)
       : contents_(ignore_case ? absl::AsciiStrToLower(contents) : contents),
         ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value) const override {
+  bool match(const absl::string_view value) const {
     return ignore_case_ ? absl::StrContains(absl::AsciiStrToLower(value), contents_)
                         : absl::StrContains(value, contents_);
   }
@@ -197,14 +197,14 @@ private:
 };
 
 // A matcher for the `custom` StringMatcher.
-class CustomStringMatcher : public StringMatcher {
+class CustomStringMatcher {
 public:
   CustomStringMatcher(const xds::core::v3::TypedExtensionConfig& custom,
                       Server::Configuration::CommonFactoryContext& context)
       : custom_(getExtensionStringMatcher(custom, context)) {}
 
   // StringMatcher
-  bool match(const absl::string_view value) const override { return custom_->match(value); }
+  bool match(const absl::string_view value) const { return custom_->match(value); }
 
   const std::string& stringRepresentation() const { return EMPTY_STRING; }
 
