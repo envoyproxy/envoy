@@ -123,12 +123,23 @@ public:
 
     setupPrioritySet();
 
+    EXPECT_CALL(*primary_info_, resourceManager(Upstream::ResourcePriority::Default)).Times(0);
+    EXPECT_CALL(*secondary_info_, resourceManager(Upstream::ResourcePriority::Default)).Times(0);
+
     ON_CALL(primary_, loadBalancer()).WillByDefault(ReturnRef(primary_load_balancer_));
     ON_CALL(secondary_, loadBalancer()).WillByDefault(ReturnRef(secondary_load_balancer_));
 
     thread_aware_lb_ = std::make_unique<AggregateThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     lb_ = lb_factory_->create(lb_params_);
+  }
+
+  Stats::Gauge& getCircuitBreakersStatByPriority(std::string priority, std::string stat) {
+    std::string stat_name_ = "circuit_breakers." + priority + "." + stat;
+    Stats::StatNameManagedStorage statStore(stat_name_,
+                                            cluster_->info()->statsScope().symbolTable());
+    return cluster_->info()->statsScope().gaugeFromStatName(statStore.statName(),
+                                                            Stats::Gauge::ImportMode::Accumulate);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -169,7 +180,46 @@ public:
 )EOF";
 }; // namespace Aggregate
 
-TEST_F(AggregateClusterTest, CircuitBreakerDefaultsTest) {}
+TEST_F(AggregateClusterTest, CircuitBreakerDefaultsTest) {
+  initialize(default_yaml_config_);
+
+  Upstream::ResourceManager& resource_manager =
+      cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
+
+  // the default circuit breaker values are:
+  // max_connections : 1024
+  // max_pending_requests : 1024
+  // max_requests : 1024
+  // max_retries : 3
+
+  EXPECT_EQ(1024U, resource_manager.connections().max());
+  for (int i = 0; i < 1024; ++i) {
+    resource_manager.connections().inc();
+  }
+  EXPECT_EQ(1024U, resource_manager.connections().count());
+  EXPECT_FALSE(resource_manager.connections().canCreate());
+
+  EXPECT_EQ(1024U, resource_manager.pendingRequests().max());
+  for (int i = 0; i < 1024; ++i) {
+    resource_manager.pendingRequests().inc();
+  }
+  EXPECT_EQ(1024U, resource_manager.pendingRequests().count());
+  EXPECT_FALSE(resource_manager.pendingRequests().canCreate());
+
+  EXPECT_EQ(1024U, resource_manager.requests().max());
+  for (int i = 0; i < 1024; ++i) {
+    resource_manager.requests().inc();
+  }
+  EXPECT_EQ(1024U, resource_manager.requests().count());
+  EXPECT_FALSE(resource_manager.requests().canCreate());
+
+  EXPECT_EQ(3U, resource_manager.retries().max());
+  for (int i = 0; i < 3; ++i) {
+    resource_manager.retries().inc();
+  }
+  EXPECT_EQ(3U, resource_manager.retries().count());
+  EXPECT_FALSE(resource_manager.retries().canCreate());
+}
 
 TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsTest) {}
 
