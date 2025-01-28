@@ -101,22 +101,23 @@ protected:
   UpstreamRequestFactoryPtr mockUpstreamFactory() {
     auto factory = std::make_unique<MockUpstreamRequestFactory>();
     EXPECT_CALL(*factory, create).WillRepeatedly([this]() -> UpstreamRequestPtr {
-      auto p = std::make_unique<MockUpstreamRequest>();
-      fake_upstreams_.emplace_back(p.get());
+      auto upstream_request = std::make_unique<MockUpstreamRequest>();
+      fake_upstreams_.emplace_back(upstream_request.get());
       fake_upstream_sent_headers_.push_back(nullptr);
       fake_upstream_get_headers_callbacks_.push_back(nullptr);
       // We can't capture the callback inside the FakeUpstream because that
       // causes an ownership cycle.
       int i = fake_upstreams_.size() - 1;
-      EXPECT_CALL(*p, sendHeaders).WillOnce([this, i](Http::RequestHeaderMapPtr headers) {
-        fake_upstream_sent_headers_[i] = std::move(headers);
-      });
-      EXPECT_CALL(*p, getHeaders)
+      EXPECT_CALL(*upstream_request, sendHeaders)
+          .WillOnce([this, i](Http::RequestHeaderMapPtr headers) {
+            fake_upstream_sent_headers_[i] = std::move(headers);
+          });
+      EXPECT_CALL(*upstream_request, getHeaders)
           .Times(Between(0, 1))
           .WillRepeatedly([this, i](GetHeadersCallback&& cb) {
             fake_upstream_get_headers_callbacks_[i] = std::move(cb);
           });
-      return std::move(p);
+      return upstream_request;
     });
     return factory;
   }
