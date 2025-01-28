@@ -99,6 +99,11 @@ new_features:
   change: |
     Added :ref:`max_metadata_size <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_metadata_size>` to make
     HTTP/2 metadata limits configurable.
+- area: http
+  change: |
+    Added :ref:`propagate_unsampled
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.Tracing.propagate_unsampled>`
+    to support not modifying the existing trace context when requests aren't sampled.
 - area: redis
   change: |
     Added support for multi-key commands on transactions.
@@ -106,5 +111,4 @@ new_features:
   change: |
     Reporting a locality_stats to LRS server when rq_issued > 0, disable by setting runtime guard
     ``envoy.reloadable_features.report_load_with_rq_issued`` to ``false``.
-
 deprecated:
