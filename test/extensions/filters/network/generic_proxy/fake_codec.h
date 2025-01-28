@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "envoy/access_log/access_log_config.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/generic_proxy/access_log.h"
 #include "source/extensions/filters/network/generic_proxy/interface/codec.h"
@@ -421,17 +423,17 @@ public:
   std::string name() const override { return "envoy.generic_proxy.codecs.fake"; }
 };
 
-class FakeAccessLogExtensionFilter : public AccessLogFilter {
-  bool evaluate(const FormatterContext&, const StreamInfo::StreamInfo&) const override {
+class FakeAccessLogExtensionFilter : public AccessLog::Filter {
+  bool evaluate(const Formatter::Context&, const StreamInfo::StreamInfo&) const override {
     return true;
   }
 };
 
-class FakeAccessLogExtensionFilterFactory : public AccessLogFilterFactory {
+class FakeAccessLogExtensionFilterFactory : public AccessLog::ExtensionFilterFactory {
 public:
   // AccessLogFilterFactory
-  AccessLogFilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter&,
-                                  Server::Configuration::FactoryContext&) override {
+  AccessLog::FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter&,
+                                    Server::Configuration::FactoryContext&) override {
     return std::make_unique<FakeAccessLogExtensionFilter>();
   }
 
