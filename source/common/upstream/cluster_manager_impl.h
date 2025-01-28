@@ -684,7 +684,8 @@ private:
 
     void httpConnPoolIsIdle(HostConstSharedPtr host, ResourcePriority priority,
                             const std::vector<uint8_t>& hash_key);
-    void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key);
+    void tcpConnPoolIsIdle(HostConstSharedPtr host, const std::vector<uint8_t>& hash_key,
+                           const Envoy::Tcp::ConnectionPool::Instance* pool_to_erase);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
     void removeHosts(const std::string& name, const HostVector& hosts_removed);
     void updateClusterMembership(const std::string& name, uint32_t priority,
