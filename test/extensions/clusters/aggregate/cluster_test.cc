@@ -173,6 +173,8 @@ TEST_F(AggregateClusterTest, CircuitBreakerDefaultsTest) {}
 
 TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsTest) {}
 
+TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsHighPriorityTest) {}
+
 TEST_F(AggregateClusterTest, CircuitBreakerMaxPendingRequestsTest) {}
 
 TEST_F(AggregateClusterTest, CircuitBreakerMaxRequestsTest) {}
