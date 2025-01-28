@@ -24,10 +24,9 @@ public:
                                  absl::string_view substitution) const PURE;
 
   /**
-   * Returns a string representation of the Regex matcher (the pattern to be
-   * matched).
+   * Returns the pattern of the Regex matcher.
    */
-  virtual const std::string& stringRepresentation() const PURE;
+  virtual const std::string& pattern() const PURE;
 };
 
 using CompiledMatcherPtr = std::unique_ptr<const CompiledMatcher>;

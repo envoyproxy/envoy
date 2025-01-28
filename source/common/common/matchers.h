@@ -163,7 +163,7 @@ public:
   // StringMatcher
   bool match(const absl::string_view value) const override { return regex_->match(value); }
 
-  const std::string& stringRepresentation() const { return regex_->stringRepresentation(); }
+  const std::string& stringRepresentation() const { return regex_->pattern(); }
 
 private:
   Regex::CompiledMatcherPtr regex_;
