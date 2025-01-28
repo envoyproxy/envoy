@@ -450,3 +450,102 @@ var (
 )
 
 // *************** errors end **************//
+
+// Info types called by http-tcp bridge that can get the corresponding info from c++ side.
+type HttpTcpBridgeInfoType int
+
+const (
+	HttpTcpBridgeInfoRouterName  HttpTcpBridgeInfoType = 0
+	HttpTcpBridgeInfoClusterName HttpTcpBridgeInfoType = 1
+)
+
+func (t HttpTcpBridgeInfoType) String() string {
+	switch t {
+	case HttpTcpBridgeInfoRouterName:
+		return "HttpTcpBridgeInfoRouterName"
+	case HttpTcpBridgeInfoClusterName:
+		return "HttpTcpBridgeInfoClusterName"
+	}
+	return "unknown"
+}
+
+type EndStreamType int
+
+const (
+	NotEndStream EndStreamType = 0
+	EndStream    EndStreamType = 1
+)
+
+func (t EndStreamType) String() string {
+	switch t {
+	case NotEndStream:
+		return "NotEndStream"
+	case EndStream:
+		return "EndStream"
+	}
+	return "unknown"
+}
+
+// Status codes returned by tcp upstream extension.
+type HttpTcpBridgeStatus int
+
+const (
+	/**
+	 *
+	 * Used when you want to leave the current func area and continue further func. (when streaming,
+	 * go side get each_data_piece, may be called multipled times)
+	 *
+	 * Here is the specific explanation in different funcs:
+	 *
+	 * encodeHeaders: will go to encodeData, go side in encodeData will streaming get each_data_piece.
+	 *
+	 * encodeData: streaming send data to upstream, go side get each_data_piece, may be called
+	 * multipled times.
+	 *
+	 * onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data
+	 * and headers to downstream streaming.
+	 */
+	HttpTcpBridgeContinue HttpTcpBridgeStatus = 0
+
+	/**
+	*
+	* Used when you want to buffer data.
+	*
+	* Here is the specific explanation in different funcs:
+	*
+	* encodeHeaders: will go to encodeData, encodeData will buffer whole data, go side in encodeData
+	* get whole data one-off.
+	*
+	* encodeData: buffer further whole data, go side in encodeData get whole
+	* data one-off. (Be careful: cannot be used when end_stream=true)
+	*
+	* onUpstreamData: every data
+	* trigger will call go side, and go side get whloe buffered data ever since at every time.
+	 */
+	HttpTcpBridgeStopAndBuffer HttpTcpBridgeStatus = 1
+
+	/**
+	*
+	* Used when you want to endStream for sending resp to downstream.
+	*
+	* Here is the specific explanation in different funcs:
+	*
+	* encodeHeaders, encodeData: endStream to upstream&downstream and send data to
+	* downstream(if not blank), which means the whole resp to http has finished.
+	*
+	* onUpstreamData: endStream to downstream which means the whole resp to http has finished.
+	 */
+	HttpTcpBridgeEndStream HttpTcpBridgeStatus = 2
+)
+
+func (s HttpTcpBridgeStatus) String() string {
+	switch s {
+	case HttpTcpBridgeContinue:
+		return "HttpTcpBridgeContinue"
+	case HttpTcpBridgeStopAndBuffer:
+		return "HttpTcpBridgeStopAndBuffer"
+	case HttpTcpBridgeEndStream:
+		return "HttpTcpBridgeEndStream"
+	}
+	return "unknown"
+}
