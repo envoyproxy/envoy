@@ -110,5 +110,10 @@ new_features:
   change: |
     Reporting a locality_stats to LRS server when ``rq_issued > 0``, disable by setting runtime guard
     ``envoy.reloadable_features.report_load_with_rq_issued`` to ``false``.
+- area: tcp_proxy
+  change: |
+    Added :ref:`proxy_protocol_tlvs
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlvs>` to the TCP proxy filter.
+    This field allows specifying the list of Proxy Protocol TLVs to be sent in the Proxy Protocol header.
 
 deprecated:
