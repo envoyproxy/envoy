@@ -61,6 +61,7 @@ public:
   }
 
 protected:
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   NiceMock<Envoy::Server::Configuration::MockTracerFactoryContext> tracer_factory_context_;
   envoy::extensions::tracers::opentelemetry::samplers::v3::DynatraceSamplerConfig proto_config_;
   SamplerConfig sampler_config_{SamplerConfig::ROOT_SPANS_PER_MINUTE_DEFAULT};
@@ -76,7 +77,7 @@ TEST_F(DynatraceSamplerTest, TestGetDescription) {
 // Verify sampler being invoked with an invalid/empty span context
 TEST_F(DynatraceSamplerTest, TestWithoutParentContext) {
   auto sampling_result =
-      sampler_->shouldSample(absl::nullopt, trace_id, "operation_name",
+      sampler_->shouldSample(stream_info_, absl::nullopt, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes->size(), 1);
@@ -93,7 +94,7 @@ TEST_F(DynatraceSamplerTest, TestWithUnknownParentContext) {
   SpanContext parent_context("00", trace_id, parent_span_id, true, "some_vendor=some_value");
 
   auto sampling_result =
-      sampler_->shouldSample(parent_context, trace_id, "operation_name",
+      sampler_->shouldSample(stream_info_, parent_context, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes->size(), 1);
@@ -112,7 +113,7 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextSampled) {
   SpanContext parent_context("00", trace_id, parent_span_id, true, dt_tracestate_sampled);
 
   auto sampling_result =
-      sampler_->shouldSample(parent_context, trace_id, "operation_name",
+      sampler_->shouldSample(stream_info_, parent_context, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_EQ(sampling_result.attributes->size(), 1);
@@ -132,7 +133,7 @@ TEST_F(DynatraceSamplerTest, TestWithInvalidDynatraceParentContext) {
   SpanContext parent_context("00", trace_id, parent_span_id, true, invalidts);
 
   auto sampling_result =
-      sampler_->shouldSample(parent_context, trace_id, "operation_name",
+      sampler_->shouldSample(stream_info_, parent_context, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_STREQ(sampling_result.tracestate.c_str(),
@@ -148,7 +149,7 @@ TEST_F(DynatraceSamplerTest, TestWithInvalidDynatraceParentContext1) {
   SpanContext parent_context("00", trace_id, parent_span_id, true, invalidts);
 
   auto sampling_result =
-      sampler_->shouldSample(parent_context, trace_id, "operation_name",
+      sampler_->shouldSample(stream_info_, parent_context, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_STREQ(
@@ -166,7 +167,7 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextOtherVersion) {
   SpanContext parent_context("00", trace_id, parent_span_id, true, oldts);
 
   auto sampling_result =
-      sampler_->shouldSample(parent_context, trace_id, "operation_name",
+      sampler_->shouldSample(stream_info_, parent_context, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
   EXPECT_STREQ(
@@ -182,7 +183,7 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextIgnored) {
   SpanContext parent_context("00", trace_id, parent_span_id, true, dt_tracestate_ignored);
 
   auto sampling_result =
-      sampler_->shouldSample(parent_context, trace_id, "operation_name",
+      sampler_->shouldSample(stream_info_, parent_context, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   EXPECT_EQ(sampling_result.decision, Decision::Drop);
   EXPECT_EQ(sampling_result.attributes->size(), 2);
@@ -206,7 +207,7 @@ TEST_F(DynatraceSamplerTest, TestWithDynatraceParentContextFromDifferentTenant) 
                              dt_tracestate_ignored_different_tenant);
 
   auto sampling_result =
-      sampler_->shouldSample(parent_context, trace_id, "operation_name",
+      sampler_->shouldSample(stream_info_, parent_context, trace_id, "operation_name",
                              ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {});
   // sampling decision on tracestate should be ignored because it is from a different tenant.
   EXPECT_EQ(sampling_result.decision, Decision::RecordAndSample);
@@ -237,9 +238,9 @@ TEST_F(DynatraceSamplerTest, TestWarmup) {
   uint32_t ignored = 0;
   uint32_t sampled = 0;
   for (int i = 0; i < 99; i++) {
-    auto result = sampler_->shouldSample({}, std::to_string(1000 + i), "operation_name",
-                                         ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER,
-                                         trace_context_1, {});
+    auto result = sampler_->shouldSample(
+        stream_info_, {}, std::to_string(1000 + i), "operation_name",
+        ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, trace_context_1, {});
     result.isSampled() ? sampled++ : ignored++;
   }
   EXPECT_EQ(ignored, 0);
@@ -247,9 +248,9 @@ TEST_F(DynatraceSamplerTest, TestWarmup) {
 
   // next (threshold/2) spans will get exponent 1, every second span will be sampled
   for (int i = 0; i < 100; i++) {
-    auto result = sampler_->shouldSample({}, std::to_string(1000 + i), "operation_name",
-                                         ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER,
-                                         trace_context_1, {});
+    auto result = sampler_->shouldSample(
+        stream_info_, {}, std::to_string(1000 + i), "operation_name",
+        ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, trace_context_1, {});
     result.isSampled() ? sampled++ : ignored++;
   }
   // should be 50 ignored, but the used "random" in shouldSample does not produce the same odd/even
@@ -259,9 +260,9 @@ TEST_F(DynatraceSamplerTest, TestWarmup) {
 
   // send more requests
   for (int i = 0; i < 100; i++) {
-    auto result = sampler_->shouldSample({}, std::to_string(1000 + i), "operation_name",
-                                         ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER,
-                                         trace_context_1, {});
+    auto result = sampler_->shouldSample(
+        stream_info_, {}, std::to_string(1000 + i), "operation_name",
+        ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, trace_context_1, {});
     result.isSampled() ? sampled++ : ignored++;
   }
   // exponent should be 2, with a perfect random we would get 25 sampled and 75 ignored.
@@ -270,9 +271,9 @@ TEST_F(DynatraceSamplerTest, TestWarmup) {
 
   // send more requests.
   for (int i = 0; i < 700; i++) {
-    auto result = sampler_->shouldSample({}, std::to_string(1000 + i), "operation_name",
-                                         ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER,
-                                         trace_context_1, {});
+    auto result = sampler_->shouldSample(
+        stream_info_, {}, std::to_string(1000 + i), "operation_name",
+        ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, trace_context_1, {});
     result.isSampled() ? sampled++ : ignored++;
   }
   // with a perfect random, the number of sampled paths would be lower than threshold (200)
@@ -298,15 +299,15 @@ TEST_F(DynatraceSamplerTest, TestSampling) {
 
   // simulate requests
   for (int i = 0; i < 180; i++) {
-    sampler_->shouldSample({}, trace_id, "operation_name",
+    sampler_->shouldSample(stream_info_, {}, trace_id, "operation_name",
                            ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER,
                            trace_context_1, {});
-    sampler_->shouldSample({}, trace_id, "operation_name",
+    sampler_->shouldSample(stream_info_, {}, trace_id, "operation_name",
                            ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER,
                            trace_context_2, {});
   }
 
-  sampler_->shouldSample({}, trace_id, "operation_name",
+  sampler_->shouldSample(stream_info_, {}, trace_id, "operation_name",
                          ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, trace_context_3,
                          {});
 
@@ -318,7 +319,7 @@ TEST_F(DynatraceSamplerTest, TestSampling) {
   // 'i' is used as 'random trace_id'
   bool ignored = false;
   for (int i = 0; i < 10; i++) {
-    auto result = sampler_->shouldSample({}, std::to_string(i), "operation_name",
+    auto result = sampler_->shouldSample(stream_info_, {}, std::to_string(i), "operation_name",
                                          ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER,
                                          trace_context_1, {});
     if (!result.isSampled()) {
@@ -330,7 +331,7 @@ TEST_F(DynatraceSamplerTest, TestSampling) {
 
   // trace_context_3 should always be sampled.
   for (int i = 0; i < 10; i++) {
-    auto result = sampler_->shouldSample({}, std::to_string(i), "operation_name",
+    auto result = sampler_->shouldSample(stream_info_, {}, std::to_string(i), "operation_name",
                                          ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER,
                                          trace_context_2, {});
     EXPECT_TRUE(result.isSampled());

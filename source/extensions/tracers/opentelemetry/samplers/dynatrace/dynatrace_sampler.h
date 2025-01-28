@@ -34,7 +34,8 @@ public:
       SamplerConfigProviderPtr sampler_config_provider);
 
   /** @see Sampler#shouldSample */
-  SamplingResult shouldSample(const absl::optional<SpanContext> parent_context,
+  SamplingResult shouldSample(const StreamInfo::StreamInfo& stream_info,
+                              const absl::optional<SpanContext> parent_context,
                               const std::string& trace_id, const std::string& name,
                               OTelSpanKind spankind,
                               OptRef<const Tracing::TraceContext> trace_context,
