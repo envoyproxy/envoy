@@ -8,7 +8,7 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
-
+using testing::Return;
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -101,6 +101,7 @@ TEST_F(AwsClusterManagerTest, AddClusterCallbacks) {
   manager_friend.onClusterAddOrUpdate("cluster_1", command);
 }
 
+// Checks that RAII cleans up callbacks correctly
 TEST_F(AwsClusterManagerTest, ClusterCallbacksAreDeleted) {
   auto callbacks1 = std::make_unique<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
   EXPECT_CALL(*callbacks1, onClusterAddOrUpdate).Times(0);
