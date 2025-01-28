@@ -272,7 +272,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   ASSERT(getStreamInfo().getDownstreamBytesMeter() == nullptr);
   ASSERT(getStreamInfo().getUpstreamBytesMeter() != nullptr);
 
-  auto receive_before_connect =
+  StreamInfo::BoolAccessor* receive_before_connect =
       read_callbacks_->connection()
           .streamInfo()
           .filterState()
@@ -281,7 +281,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   // If receive_before_connect is set, we will not read disable the downstream connection
   // as a filter before TCP_PROXY has set this state so that it can process data before
   // the upstream connection is established.
-  if (receive_before_connect && receive_before_connect->value()) {
+  if (receive_before_connect != nullptr && receive_before_connect->value()) {
     ENVOY_CONN_LOG(debug, "receive_before_connect is enabled", read_callbacks_->connection());
     receive_before_connect_ = true;
   } else {
