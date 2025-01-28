@@ -363,7 +363,49 @@ TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsPriorityTest) {
                             cx_open_default, true, 0U, 1U, 0U);
 }
 
-TEST_F(AggregateClusterTest, CircuitBreakerMaxPendingRequestsTest) {}
+TEST_F(AggregateClusterTest, CircuitBreakerMaxPendingRequestsTest) {
+  const std::string yaml_config = R"EOF(
+    name: aggregate_cluster
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_pending_requests: 1
+        track_remaining: true
+    cluster_type:
+      name: envoy.clusters.aggregate
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
+        clusters:
+        - primary
+        - secondary
+)EOF";
+
+  initialize(yaml_config);
+
+  Upstream::ResourceManager& resource_manager =
+      cluster_->info()->resourceManager(Upstream::ResourcePriority::Default);
+
+  Stats::Gauge& rq_pending_open = getCircuitBreakersStatByPriority("default", "rq_pending_open");
+  Stats::Gauge& remaining_pending =
+      getCircuitBreakersStatByPriority("default", "remaining_pending");
+
+  EXPECT_EQ(1U, resource_manager.pendingRequests().max());
+
+  assertResourceManagerStat(resource_manager.pendingRequests(), remaining_pending, rq_pending_open,
+                            true, 0U, 1U, 0U);
+
+  resource_manager.pendingRequests().inc();
+
+  assertResourceManagerStat(resource_manager.pendingRequests(), remaining_pending, rq_pending_open,
+                            false, 1U, 0U, 1U);
+
+  resource_manager.pendingRequests().dec();
+
+  assertResourceManagerStat(resource_manager.pendingRequests(), remaining_pending, rq_pending_open,
+                            true, 0U, 1U, 0U);
+}
 
 TEST_F(AggregateClusterTest, CircuitBreakerMaxRequestsTest) {}
 
