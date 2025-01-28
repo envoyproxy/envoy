@@ -169,6 +169,18 @@ public:
 )EOF";
 }; // namespace Aggregate
 
+TEST_F(AggregateClusterTest, CircuitBreakerDefaultsTest) {}
+
+TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionsTest) {}
+
+TEST_F(AggregateClusterTest, CircuitBreakerMaxPendingRequestsTest) {}
+
+TEST_F(AggregateClusterTest, CircuitBreakerMaxRequestsTest) {}
+
+TEST_F(AggregateClusterTest, CircuitBreakerMaxRetriesTest) {}
+
+TEST_F(AggregateClusterTest, CircuitBreakerMaxConnectionPoolsTest) {}
+
 TEST_F(AggregateClusterTest, LoadBalancerTest) {
   initialize(default_yaml_config_);
   // Health value:
