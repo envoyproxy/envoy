@@ -243,6 +243,21 @@ TEST_F(AwsClusterManagerTest, CallbacksTriggeredImmediatelyWhenClusterIsLive) {
   auto status1 = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks1);
 }
 
+// Cluster manager cannot add a cluster
+TEST_F(AwsClusterManagerTest, ClusterManagerCannotAdd) {
+  EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cm_));
+  EXPECT_CALL(cm_, addOrUpdateCluster(_, _, _)).WillOnce(Return(absl::InternalError("")));
+  EXPECT_CALL(context_.init_manager_, state())
+      .WillRepeatedly(Return(Envoy::Init::Manager::State::Initialized));
+
+  auto aws_cluster_manager = std::make_shared<AwsClusterManager>(context_);
+  auto status = aws_cluster_manager->addManagedCluster(
+      "cluster_1",
+      envoy::config::cluster::v3::Cluster::DiscoveryType::Cluster_DiscoveryType_STRICT_DNS,
+      "new_url");
+  EXPECT_EQ(absl::StatusCode::kInternal, status.code());
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

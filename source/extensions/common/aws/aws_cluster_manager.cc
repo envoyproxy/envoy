@@ -1,7 +1,5 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 
-#include <memory>
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -10,6 +8,7 @@ namespace Aws {
 AwsClusterManagerImpl::AwsClusterManagerImpl(Server::Configuration::ServerFactoryContext& context)
     : context_(context) {
 
+  // If we are still initializing, defer cluster creation using an init target
   if (context_.initManager().state() == Envoy::Init::Manager::State::Initialized) {
     queue_clusters_.exchange(false);
     cm_handle_ = context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
