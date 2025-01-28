@@ -29,8 +29,8 @@ bug_fixes:
     ``envoy_reloadable_features_enable_new_query_param_present_match_behavior`` to ``false``.
 - area: oauth2
   change: |
-    Fixed oauth2 credential injector to send scope (if specified) to authorization server
-    when requesting new access token using client_credentials flow.
+    Fixed OAuth2 credential injector to send scope (if specified) to authorization server when requesting new access
+    token using ``client_credentials`` flow.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -60,8 +60,8 @@ new_features:
 - area: oauth2
   change: |
     Add the option to specify SameSite cookie attribute values for oauth2 supported cookies.
-    To specify SameSite attribute, choose one of the values from ``strict``,``lax`` or ``none``. If not specified,
-    a default value of ``disabled`` will be assigned and there will be no SameSite value in the cookie attribute. See
+    To specify ``SameSite`` attribute, choose one of the values from ``strict``, ``lax`` or ``none``. If not specified,
+    a default value of ``disabled`` will be assigned and there will be no ``SameSite`` value in the cookie attribute. See
     :ref:`apply_on_stream_done <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.cookie_configs>`
     for more details.
 - area: spiffe
@@ -69,12 +69,12 @@ new_features:
     Added :ref:`trust_bundles
     <envoy_v3_api_field_extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig.trust_bundles>`
     to the SPIFFE certificate validator configuration. This field allows specifying a SPIFFE trust
-    bundle mapping as a DataSource. If both trust_bundles and trust_domains are specified,
-    trust_bundles takes precedence.
+    bundle mapping as a ``DataSource``. If both ``trust_bundles`` and ``trust_domains`` are specified,
+    ``trust_bundles`` takes precedence.
 - area: resource_monitors
   change: |
-    Added support to monitor Container CPU utilization in Linux K8s environment using existing
-    extension <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>.
+    Added support to monitor container CPU utilization in Linux K8s environment using
+    :ref:`existing extension <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>`.
 - area: lua
   change: |
     Added :ref:`virtualClusterName() <config_http_filters_lua_stream_info_virtual_cluster_name>` API to the Stream Info
@@ -88,11 +88,12 @@ new_features:
     ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
 - area: http
   change: |
-    Alpha support for asynchronous load balancing.  See <arch_overview_load_balancing_policies> for details. Support can
+    Added alpha support for asynchronous load balancing. See
+    :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details. Support can
     be temporarily reverted by setting runtime guard ``envoy.reloadable_features.async_host_selection`` to ``false``.
 - area: ext_proc
   change: |
-    Adding support for a new body mode: FULL_DUPLEX_STREAMED in the ext_proc filter
+    Adding support for a new body mode: ``FULL_DUPLEX_STREAMED`` in the ``ext_proc`` filter
     :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
 - area: formatter
   change: |
@@ -107,7 +108,7 @@ new_features:
     Added support for multi-key commands on transactions.
 - area: xds
   change: |
-    Reporting a locality_stats to LRS server when rq_issued > 0, disable by setting runtime guard
+    Reporting a locality_stats to LRS server when ``rq_issued > 0``, disable by setting runtime guard
     ``envoy.reloadable_features.report_load_with_rq_issued`` to ``false``.
 
 deprecated:
