@@ -103,32 +103,6 @@ bool ActiveLookupRequest::requiresValidation(const Http::ResponseHeaderMap& resp
   }
 }
 
-Http::RequestHeaderMapPtr ActiveLookupRequest::requestHeadersWithValidation(
-    const Http::ResponseHeaderMap& response_headers) const {
-  Http::RequestHeaderMapPtr validation_headers =
-      Http::createHeaderMap<Http::RequestHeaderMapImpl>(*request_headers_);
-  const Http::HeaderEntry* etag_header = response_headers.getInline(CacheCustomHeaders::etag());
-  const Http::HeaderEntry* last_modified_header =
-      response_headers.getInline(CacheCustomHeaders::lastModified());
-
-  if (etag_header) {
-    absl::string_view etag = etag_header->value().getStringView();
-    validation_headers->setInline(CacheCustomHeaders::ifNoneMatch(), etag);
-  }
-  if (DateUtil::timePointValid(CacheHeadersUtils::httpTime(last_modified_header))) {
-    // Valid Last-Modified header exists.
-    absl::string_view last_modified = last_modified_header->value().getStringView();
-    validation_headers->setInline(CacheCustomHeaders::ifModifiedSince(), last_modified);
-  } else {
-    // Either Last-Modified is missing or invalid, fallback to Date.
-    // A correct behaviour according to:
-    // https://httpwg.org/specs/rfc7232.html#header.if-modified-since
-    absl::string_view date = response_headers.getDateValue();
-    validation_headers->setInline(CacheCustomHeaders::ifModifiedSince(), date);
-  }
-  return validation_headers;
-}
-
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

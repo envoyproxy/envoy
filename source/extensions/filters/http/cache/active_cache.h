@@ -39,9 +39,6 @@ public:
   UpstreamRequestFactory& upstreamRequestFactory() const { return *upstream_request_factory_; }
   Event::Dispatcher& dispatcher() const { return dispatcher_; }
   SystemTime timestamp() const { return timestamp_; }
-  // Returns a copy of request_headers_ with validation headers added.
-  Http::RequestHeaderMapPtr
-  requestHeadersWithValidation(const Http::ResponseHeaderMap& response_headers) const;
   bool requiresValidation(const Http::ResponseHeaderMap& response_headers,
                           SystemTime::duration age) const;
   absl::optional<std::vector<RawByteRange>> parseRange() const;
