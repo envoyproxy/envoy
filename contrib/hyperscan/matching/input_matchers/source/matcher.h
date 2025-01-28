@@ -44,7 +44,7 @@ public:
   // Envoy::Matcher::InputMatcher
   bool match(const ::Envoy::Matcher::MatchingDataType& input) override;
 
-  const std::string& stringRepresentation() const override { return EMPTY_STRING; }
+  const std::string& pattern() const override { return EMPTY_STRING; }
 
 private:
   hs_database_t* database_{};
