@@ -43,7 +43,7 @@ AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
 
   auto commands = THROW_OR_RETURN_VALUE(
       Formatter::SubstitutionFormatStringUtils::parseFormatters(proto_config.formatters(), context),
-      std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>>);
+      std::vector<Formatter::CommandParserPtr>);
 
   return std::make_shared<AccessLog>(
       std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),

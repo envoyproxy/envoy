@@ -64,7 +64,7 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
   proxy_host_formatter_ =
       THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                                 proxy_substitution_format_config, context),
-                            Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
+                            Formatter::FormatterPtr);
 
   if (config.has_proxy_port()) {
     uint32_t port = config.proxy_port().value();
@@ -81,7 +81,7 @@ TunnelingConfigImpl::TunnelingConfigImpl(const TunnelingConfig& config,
   target_host_formatter_ =
       THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                                 target_substitution_format_config, context),
-                            Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
+                            Formatter::FormatterPtr);
 
   if (config.has_retry_options() && config.retry_options().has_backoff_options()) {
     const uint64_t base_interval_ms =
