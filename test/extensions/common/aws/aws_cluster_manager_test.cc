@@ -118,9 +118,10 @@ TEST_F(AwsClusterManagerTest, ClusterCallbacksAreDeleted) {
   auto handle1Or = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks1);
   auto handle2Or = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks2);
   auto handle3Or = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks3);
-  handle1Or->release();
-  handle2Or->release();
-  handle3Or->release();
+  // Delete the handles, which should clean up the callback list via RAII
+  handle1Or->reset();
+  handle2Or->reset();
+  handle3Or->reset();
   auto command = Upstream::ThreadLocalClusterCommand();
   manager_friend.onClusterAddOrUpdate("cluster_1", command);
 }

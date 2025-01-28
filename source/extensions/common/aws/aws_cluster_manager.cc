@@ -10,6 +10,15 @@ namespace Aws {
 AwsClusterManagerImpl::AwsClusterManagerImpl(Server::Configuration::ServerFactoryContext& context)
     : context_(context) {
 
+  if (context_.initManager().state() == Envoy::Init::Manager::State::Initialized) {
+    queue_clusters_.exchange(false);
+    cm_handle_ = context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
+  } else {
+    init_target_ = std::make_unique<Init::TargetImpl>("aws_cluster_manager", [this]() -> void {
+      queue_clusters_.exchange(false);
+      cm_handle_ = context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
+      createQueuedClusters();
+
   // If we are still initializing, defer cluster creation using an init target
   if (context_.initManager().state() == Envoy::Init::Manager::State::Initialized) {
     queue_clusters_.exchange(false);
@@ -20,11 +29,15 @@ AwsClusterManagerImpl::AwsClusterManagerImpl(Server::Configuration::ServerFactor
       cm_handle_ = context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
       createQueuedClusters();
 
-      init_target_->ready();
-      init_target_.reset();
-    });
-    context_.initManager().add(*init_target_);
-  }
+    init_target_->ready();
+    init_target_.reset();
+  });
+  context_.initManager().add(*init_target_);
+  // We're pinned, so ensure that we remove our cluster update callbacks before cluster manager
+  // terminates
+  shutdown_handle_ = context.lifecycleNotifier().registerCallback(
+      Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+      [&](Event::PostCb) { cm_handle_.reset(); });
 };
 
 absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
