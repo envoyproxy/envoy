@@ -308,7 +308,11 @@ public:
   static std::string getFineGrainLogFormat();
   static spdlog::level::level_enum getFineGrainDefaultLevel();
 
+  static Context* current_context();
+
 private:
+  static std::atomic<Context*> current_context_;
+
   void activate();
 
   const spdlog::level::level_enum log_level_;

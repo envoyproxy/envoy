@@ -169,25 +169,30 @@ void DelegatingLogSink::logWithStableName(absl::string_view stable_name, absl::s
   sink_->logWithStableName(stable_name, level, component, message);
 }
 
-static std::atomic<Context*> current_context = nullptr;
+// static
+std::atomic<Context*> Context::current_context_ = nullptr;
 static_assert(std::atomic<Context*>::is_always_lock_free);
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
                  Thread::BasicLockable& lock, bool should_escape, bool enable_fine_grain_logging)
     : log_level_(log_level), log_format_(log_format), lock_(lock), should_escape_(should_escape),
-      enable_fine_grain_logging_(enable_fine_grain_logging), save_context_(current_context) {
-  current_context = this;
+      enable_fine_grain_logging_(enable_fine_grain_logging),
+      save_context_(Context::current_context()) {
+  Context::current_context_ = this;
   activate();
 }
 
 Context::~Context() {
-  current_context = save_context_;
-  if (current_context != nullptr) {
-    current_context.load()->activate();
+  Context::current_context_ = save_context_;
+  if (Context* context = Context::current_context(); context != nullptr) {
+    context->activate();
   } else {
     Registry::getSink()->clearLock();
   }
 }
+
+// static
+Context* Context::current_context() { return Context::current_context_.load(); }
 
 void Context::activate() {
   Registry::getSink()->setLock(lock_);
@@ -208,8 +213,8 @@ void Context::activate() {
 }
 
 bool Context::useFineGrainLogger() {
-  if (current_context) {
-    return current_context.load()->enable_fine_grain_logging_;
+  if (Context* context = Context::current_context(); context != nullptr) {
+    return context->enable_fine_grain_logging_;
   }
   return false;
 }
@@ -230,37 +235,37 @@ void Context::changeAllLogLevels(spdlog::level::level_enum level) {
 }
 
 void Context::enableFineGrainLogger() {
-  if (current_context) {
-    current_context.load()->enable_fine_grain_logging_ = true;
-    current_context.load()->fine_grain_default_level_ = current_context.load()->log_level_;
-    current_context.load()->fine_grain_log_format_ = current_context.load()->log_format_;
-    if (current_context.load()->log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
-      current_context.load()->fine_grain_log_format_ = kDefaultFineGrainLogFormat;
+  if (Context* context = Context::current_context(); context != nullptr) {
+    context->enable_fine_grain_logging_ = true;
+    context->fine_grain_default_level_ = context->log_level_;
+    context->fine_grain_log_format_ = context->log_format_;
+    if (context->log_format_ == Logger::Logger::DEFAULT_LOG_FORMAT) {
+      context->fine_grain_log_format_ = kDefaultFineGrainLogFormat;
     }
-    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(
-        current_context.load()->fine_grain_default_level_,
-        current_context.load()->fine_grain_log_format_);
+    getFineGrainLogContext().setDefaultFineGrainLogLevelFormat(context->fine_grain_default_level_,
+                                                               context->fine_grain_log_format_);
   }
 }
 
 void Context::disableFineGrainLogger() {
-  if (current_context) {
-    current_context.load()->enable_fine_grain_logging_ = false;
+  if (Context* context = Context::current_context(); context != nullptr) {
+    context->enable_fine_grain_logging_ = false;
   }
 }
 
 std::string Context::getFineGrainLogFormat() {
-  if (!current_context) { // Context is not instantiated in benchmark test
-    return kDefaultFineGrainLogFormat;
+  if (Context* context = Context::current_context(); context != nullptr) {
+    return context->fine_grain_log_format_;
   }
-  return current_context.load()->fine_grain_log_format_;
+  // Context is not instantiated in benchmark test.
+  return kDefaultFineGrainLogFormat;
 }
 
 spdlog::level::level_enum Context::getFineGrainDefaultLevel() {
-  if (!current_context) {
-    return spdlog::level::info;
+  if (Context* context = Context::current_context(); context != nullptr) {
+    return context->fine_grain_default_level_;
   }
-  return current_context.load()->fine_grain_default_level_;
+  return spdlog::level::info;
 }
 
 std::vector<Logger>& Registry::allLoggers() {

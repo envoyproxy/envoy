@@ -4,6 +4,8 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/http_server_properties_cache_manager_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
@@ -19,6 +21,17 @@ constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(30);
 // Google DNS address used for IPv6 probes.
 constexpr absl::string_view IPV6_PROBE_ADDRESS = "2001:4860:4860::8888";
 constexpr uint32_t IPV6_PROBE_PORT = 53;
+
+// There is only one shared static Logger::Context instance for all Envoy Mobile engines.
+// This helps avoid issues on Logger::Context destruction when the previous saved context
+// could be activated in a thread-unsafe manner.
+void initOnceLoggerContext(const OptionsImplBase& options) {
+  static Thread::MutexBasicLockable* log_lock = new Thread::MutexBasicLockable();
+  static Logger::Context* context =
+      new Logger::Context(options.logLevel(), options.logFormat(), *log_lock,
+                          options.logFormatEscaped(), options.enableFineGrainLogging());
+  UNREFERENCED_PARAMETER(context);
+}
 } // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
@@ -90,7 +103,8 @@ envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
 // This function takes a `std::shared_ptr` instead of `std::unique_ptr` because `std::function` is a
 // copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
 // `std::function`.
-envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
+envoy_status_t InternalEngine::run(std::shared_ptr<OptionsImplBase> options) {
+  initOnceLoggerContext(*options);
   Thread::Options thread_options;
   thread_options.priority_ = thread_priority_;
   main_thread_ = thread_factory_->createThread([this, options]() mutable -> void { main(options); },
@@ -98,7 +112,7 @@ envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> optio
   return (main_thread_ != nullptr) ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
 
-envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> options) {
+envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
   {
