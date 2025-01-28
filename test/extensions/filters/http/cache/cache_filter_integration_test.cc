@@ -456,6 +456,52 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
   }
 }
 
+TEST_P(CacheIntegrationTest, TemporarilyUncacheableEventuallyCaches) {
+  initializeFilter(default_config);
+
+  // Include test name and params in URL to make each test's requests unique.
+  const Http::TestRequestHeaderMapImpl request_headers =
+      httpRequestHeader("GET", /*authority=*/"TemporarilyUncacheableEventuallyCaches");
+  std::string response_body{"aaaaaaaaaa"};
+  Http::TestResponseHeaderMapImpl cacheable_response_headers = httpResponseHeadersForBody(
+      response_body, /*cache_control=*/"max-age=10", /*extra_headers=*/{{"etag", "abc123"}});
+
+  // Send first request, and get 500 response from upstream.
+  {
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
+    IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
+        request_headers,
+        simulateUpstreamResponse(response_headers, absl::nullopt, no_trailers_));
+    EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
+  }
+  // Send second request, and get cacheable 200 response from upstream.
+  // This should reset the uncacheable state imposed by the first request.
+  // *Ideally* this would write to the cache this time as well, but getting
+  // to this state means we already started an inexpensive pass-through, so
+  // it's too late to start writing to the cache from this request without
+  // adding unnecessary complexity.
+  {
+    IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
+        request_headers,
+        simulateUpstreamResponse(cacheable_response_headers, response_body, no_trailers_));
+    EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(cacheable_response_headers));
+    // Advance time to force a log flush.
+    simTime().advanceTimeWait(Seconds(1));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("via_upstream"));
+  }
+  // Send third request, and get cacheable 200 response from upstream, it should be cached this time.
+  {
+    IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
+        request_headers,
+        simulateUpstreamResponse(cacheable_response_headers, response_body, no_trailers_));
+    EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(cacheable_response_headers));
+    // Advance time to force a log flush.
+    simTime().advanceTimeWait(Seconds(1));
+    EXPECT_THAT(waitForAccessLog(access_log_name_, 2), HasSubstr("cache.insert_via_upstream"));
+  }
+}
+
 TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
   initializeFilter(default_config);
 
