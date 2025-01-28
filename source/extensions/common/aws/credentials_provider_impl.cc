@@ -924,7 +924,8 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
     const CredentialsProviderChainFactories& factories) {
 
-  if (context) {
+  if(context)
+  {
     aws_cluster_manager_ =
         context->singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(
             SINGLETON_MANAGER_REGISTERED_NAME(aws_cluster_manager),

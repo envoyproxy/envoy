@@ -23,7 +23,7 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-
+#include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -217,7 +217,6 @@ protected:
  * https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#instance-metadata-security-credentials
  */
 class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBase,
-                                           public Envoy::Singleton::Instance,
                                            public MetadataFetcher::MetadataReceiver {
 public:
   InstanceProfileCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
@@ -257,7 +256,6 @@ private:
  * https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html#enable_task_iam_roles
  */
 class ContainerCredentialsProvider : public MetadataCredentialsProviderBase,
-                                     public Envoy::Singleton::Instance,
                                      public MetadataFetcher::MetadataReceiver {
 public:
   ContainerCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
