@@ -96,7 +96,8 @@ message DnsCacheConfig {
 
   // Disable the DNS refresh on failure. If this field is set to true, it will ignore the
   // :ref:`typed_dns_resolver_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_failure_refresh_rate>`.
-  // If not specified, it defaults to false.
+  // If not specified, it defaults to false. By enabling this feature, the failed hosts will now be treated as a cache miss,
+  // allowing the failed hosts to be resolved on demand.
   bool disable_dns_refresh_on_failure = 15;
 
   // If the DNS failure refresh rate is specified,
