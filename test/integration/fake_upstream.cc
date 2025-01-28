@@ -276,6 +276,7 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
                                         absl::string_view data, milliseconds timeout) {
   auto succeeded = waitForData(client_dispatcher, data.length(), timeout);
   if (succeeded) {
+    absl::MutexLock lock(&lock_);
     Buffer::OwnedImpl buffer(data.data(), data.length());
     if (!TestUtility::buffersEqual(body(), buffer)) {
       return AssertionFailure() << body().toString() << " not equal to " << data;

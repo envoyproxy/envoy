@@ -75,10 +75,7 @@ public:
     absl::MutexLock lock(&lock_);
     return body_.length();
   }
-  Buffer::Instance& body() {
-    absl::MutexLock lock(&lock_);
-    return body_;
-  }
+  Buffer::Instance& body() ABSL_NO_THREAD_SAFETY_ANALYSIS { return body_; }
   bool complete() {
     absl::MutexLock lock(&lock_);
     return end_stream_;
@@ -97,12 +94,9 @@ public:
   void encodeResetStream();
   void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector);
   void readDisable(bool disable);
-  const Http::RequestHeaderMap& headers() {
-    absl::MutexLock lock(&lock_);
-    return *headers_;
-  }
+  const Http::RequestHeaderMap& headers() ABSL_NO_THREAD_SAFETY_ANALYSIS { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
-  const Http::RequestTrailerMapPtr& trailers() { return trailers_; }
+  const Http::RequestTrailerMapPtr& trailers() ABSL_NO_THREAD_SAFETY_ANALYSIS { return trailers_; }
   bool receivedData() { return received_data_; }
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
     return encoder_.http1StreamEncoderOptions();
