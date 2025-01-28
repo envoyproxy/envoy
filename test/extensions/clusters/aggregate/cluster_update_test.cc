@@ -10,6 +10,7 @@
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/common/upstream/utility.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
@@ -45,8 +46,8 @@ public:
     cluster_manager_ = Upstream::TestClusterManagerImpl::createAndInit(
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_,
-        server_);
+        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
+        xds_manager_);
     ASSERT_TRUE(cluster_manager_->initializeSecondaryClusters(bootstrap).ok());
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
@@ -58,6 +59,7 @@ public:
   Upstream::ThreadLocalCluster* cluster_;
 
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
+  NiceMock<Config::MockXdsManager> xds_manager_;
   std::unique_ptr<Upstream::TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   Http::ContextImpl http_context_;
@@ -282,7 +284,8 @@ TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
   cluster_manager_ = Upstream::TestClusterManagerImpl::createAndInit(
       bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
       factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-      validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_);
+      validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
+      xds_manager_);
   ASSERT_TRUE(cluster_manager_->initializeSecondaryClusters(bootstrap).ok());
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
   cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");

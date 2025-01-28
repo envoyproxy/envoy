@@ -542,6 +542,7 @@ envoy_cc_test_library(
         "//test/integration/clusters:custom_static_cluster",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",

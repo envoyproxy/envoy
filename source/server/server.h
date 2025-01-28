@@ -178,6 +178,7 @@ public:
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
+  Config::XdsManager& xdsManager() override { return server_.xdsManager(); }
   Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
     return server_.httpServerPropertiesCacheManager();
   }

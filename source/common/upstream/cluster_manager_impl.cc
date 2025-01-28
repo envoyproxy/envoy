@@ -325,9 +325,10 @@ ClusterManagerImpl::ClusterManagerImpl(
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     OptRef<Server::Admin> admin, ProtobufMessage::ValidationContext& validation_context,
     Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
-    Router::Context& router_context, Server::Instance& server, absl::Status& creation_status)
+    Router::Context& router_context, Server::Instance& server, Config::XdsManager& xds_manager,
+    absl::Status& creation_status)
     : server_(server), factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
-      random_(api.randomGenerator()),
+      xds_manager_(xds_manager), random_(api.randomGenerator()),
       deferred_cluster_creation_(bootstrap.cluster_manager().enable_deferred_cluster_creation()),
       bind_config_(bootstrap.cluster_manager().has_upstream_bind_config()
                        ? absl::make_optional(bootstrap.cluster_manager().upstream_bind_config())
@@ -375,6 +376,12 @@ ClusterManagerImpl::ClusterManagerImpl(
     local_cluster_name_ = cm_config.local_cluster_name();
   }
 
+  // Now that the async-client manager is set, the xDS-Manager can be initialized.
+  absl::Status status = xds_manager_.initialize(this);
+  SET_AND_RETURN_IF_NOT_OK(status, creation_status);
+
+  // TODO(adisuissa): refactor and move the following data members to the
+  // xDS-manager class.
   // Initialize the XdsResourceDelegate extension, if set on the bootstrap config.
   if (bootstrap.has_xds_delegate_extension()) {
     auto& factory = Config::Utility::getAndCheckFactory<Config::XdsResourcesDelegateFactory>(
@@ -2338,7 +2345,7 @@ absl::StatusOr<ClusterManagerPtr> ProdClusterManagerFactory::clusterManagerFromP
       bootstrap, *this, context_, stats_, tls_, context_.runtime(), context_.localInfo(),
       context_.accessLogManager(), context_.mainThreadDispatcher(), context_.admin(),
       context_.messageValidationContext(), context_.api(), http_context_, context_.grpcContext(),
-      context_.routerContext(), server_, creation_status)};
+      context_.routerContext(), server_, context_.xdsManager(), creation_status)};
   RETURN_IF_NOT_OK(creation_status);
   return cluster_manager_impl;
 }

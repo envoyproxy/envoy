@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "absl/status/status.h"
 
@@ -21,6 +22,20 @@ namespace Config {
 class XdsManager {
 public:
   virtual ~XdsManager() = default;
+
+  /**
+   * Initializes the xDS-Manager.
+   * This should be called after the cluster-manager is created.
+   * @param cm - a pointer to a valid cluster manager.
+   * @return Ok if the initialization was successful, or an error otherwise.
+   */
+  virtual absl::Status initialize(Upstream::ClusterManager* cm) PURE;
+
+  /**
+   * Shuts down the xDS-Manager and all the configured connections to the config
+   * servers.
+   */
+  virtual void shutdown() PURE;
 
   /**
    * Set the ADS ConfigSource Envoy should use that will replace the current ADS

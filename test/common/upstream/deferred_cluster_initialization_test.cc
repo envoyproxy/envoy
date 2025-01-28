@@ -11,6 +11,7 @@
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/simulated_time_system.h"
@@ -65,8 +66,8 @@ protected:
     cluster_manager_ = TestClusterManagerImpl::createAndInit(
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_,
-        server_);
+        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
+        xds_manager_);
     cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
       THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
     });
@@ -112,6 +113,7 @@ protected:
 
   NiceMock<TestClusterManagerFactory> factory_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
+  NiceMock<Config::MockXdsManager> xds_manager_;
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;

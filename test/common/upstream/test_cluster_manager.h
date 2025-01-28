@@ -28,6 +28,7 @@
 #include "test/integration/clusters/custom_static_cluster.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -172,12 +173,12 @@ public:
       AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
       Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
       Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-      Server::Instance& server) {
+      Server::Instance& server, Config::XdsManager& xds_manager) {
     absl::Status creation_status = absl::OkStatus();
     auto cluster_manager = std::unique_ptr<TestClusterManagerImpl>{new TestClusterManagerImpl(
         bootstrap, factory, context, stats, tls, runtime, local_info, log_manager,
         main_thread_dispatcher, admin, validation_context, api, http_context, grpc_context,
-        router_context, server, creation_status)};
+        router_context, server, xds_manager, creation_status)};
     THROW_IF_NOT_OK(creation_status);
     THROW_IF_NOT_OK(cluster_manager->initialize(bootstrap));
     return cluster_manager;
@@ -217,10 +218,11 @@ protected:
       AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
       Server::Admin& admin, ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
       Http::Context& http_context, Grpc::Context& grpc_context, Router::Context& router_context,
-      Server::Instance& server, absl::Status& creation_status)
+      Server::Instance& server, Config::XdsManager& xds_manager, absl::Status& creation_status)
       : ClusterManagerImpl(bootstrap, factory, context, stats, tls, runtime, local_info,
                            log_manager, main_thread_dispatcher, admin, validation_context, api,
-                           http_context, grpc_context, router_context, server, creation_status) {}
+                           http_context, grpc_context, router_context, server, xds_manager,
+                           creation_status) {}
 };
 
 } // namespace Upstream
