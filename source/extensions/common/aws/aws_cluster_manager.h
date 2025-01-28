@@ -66,11 +66,7 @@ class AwsClusterManager : public Envoy::Singleton::Instance,
   friend class AwsClusterManagerFriend;
 
 public:
-  // token and token_file_path are mutually exclusive. If token is not empty, token_file_path is
-  // not used, and vice versa.
   AwsClusterManager(Server::Configuration::ServerFactoryContext& context);
-
-  ~AwsClusterManager() override { ENVOY_LOG_MISC(debug, "******** acm destructor called"); };
 
   absl::Status
   addManagedCluster(absl::string_view cluster_name,

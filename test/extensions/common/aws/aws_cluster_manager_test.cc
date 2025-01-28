@@ -17,6 +17,10 @@ namespace Aws {
 class AwsClusterManagerTest : public testing::Test {
 public:
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+    Init::TargetHandlePtr init_target_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+
 };
 
 TEST_F(AwsClusterManagerTest, AddClusters) {
@@ -86,9 +90,12 @@ TEST_F(AwsClusterManagerTest, AddClusterCallbacks) {
 }
 
 TEST_F(AwsClusterManagerTest, ClusterCallbacksAreDeleted) {
-  auto callbacks1 = std::make_shared<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
-  auto callbacks2 = std::make_shared<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
-  auto callbacks3 = std::make_shared<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
+  auto callbacks1 = std::make_unique<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
+  EXPECT_CALL(*callbacks1, onClusterAddOrUpdate).Times(0);
+  auto callbacks2 = std::make_unique<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
+  EXPECT_CALL(*callbacks2, onClusterAddOrUpdate).Times(0);
+  auto callbacks3 = std::make_unique<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
+  EXPECT_CALL(*callbacks3, onClusterAddOrUpdate).Times(0);
   auto aws_cluster_manager = std::make_shared<AwsClusterManager>(context_);
   auto manager_friend = AwsClusterManagerFriend(aws_cluster_manager);
 
@@ -99,11 +106,28 @@ TEST_F(AwsClusterManagerTest, ClusterCallbacksAreDeleted) {
   auto handle1Or = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks1);
   auto handle2Or = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks2);
   auto handle3Or = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks3);
-  handle1Or->release();
-  handle2Or->release();
-  handle3Or->release();
+  // Delete the handles, which should clean up the callback list via RAII
+  handle1Or->reset();
+  handle2Or->reset();
+  handle3Or->reset();
   auto command = Upstream::ThreadLocalClusterCommand();
   manager_friend.onClusterAddOrUpdate("cluster_1", command);
+}
+
+TEST_F(AwsClusterManagerTest, CreateQueuedViaIinitManager) {
+      EXPECT_CALL(context_.init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+      init_target_ = target.createHandle("test");
+    }));
+    EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cm_));
+    auto aws_cluster_manager = std::make_shared<AwsClusterManager>(context_);
+    auto status = aws_cluster_manager->addManagedCluster(
+      "cluster_1",
+      envoy::config::cluster::v3::Cluster::DiscoveryType::Cluster_DiscoveryType_STRICT_DNS,
+      "new_url");
+    // Cluster creation should be queued at this point
+    EXPECT_CALL(cm_, addOrUpdateCluster(_,_,_)).Times(1);
+
+    init_target_->initialize(init_watcher_);
 }
 
 } // namespace Aws

@@ -9,17 +9,21 @@ namespace Aws {
 
 AwsClusterManager::AwsClusterManager(Server::Configuration::ServerFactoryContext& context)
     : context_(context) {
-  ENVOY_LOG_MISC(debug, "******** acm constructor called");
 
-  init_target_ = std::make_unique<Init::TargetImpl>("aws_cluster_manager", [this]() -> void {
+  if (context_.initManager().state() == Envoy::Init::Manager::State::Initialized) {
     queue_clusters_.exchange(false);
     cm_handle_ = context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
-    createQueuedClusters();
+  } else {
+    init_target_ = std::make_unique<Init::TargetImpl>("aws_cluster_manager", [this]() -> void {
+      queue_clusters_.exchange(false);
+      cm_handle_ = context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
+      createQueuedClusters();
 
-    init_target_->ready();
-    init_target_.reset();
-  });
-  context_.initManager().add(*init_target_);
+      init_target_->ready();
+      init_target_.reset();
+    });
+    context_.initManager().add(*init_target_);
+  }
   // We're pinned, so ensure that we remove our cluster update callbacks before cluster manager
   // terminates
   shutdown_handle_ = context.lifecycleNotifier().registerCallback(
@@ -62,9 +66,7 @@ void AwsClusterManager::onClusterAddOrUpdate(absl::string_view cluster_name,
   }
 }
 
-// If we have a cluster removal event, such as during cds update, recreate the cluster but leave the
-// refresh timer as-is
-
+// No removal handler required, as we are using avoid_cds_removal flag
 void AwsClusterManager::onClusterRemoval(const std::string&) {}
 
 void AwsClusterManager::createQueuedClusters() {
@@ -107,10 +109,6 @@ absl::Status AwsClusterManager::addManagedCluster(
 absl::StatusOr<std::string>
 AwsClusterManager::getUriFromClusterName(absl::string_view cluster_name) {
   ASSERT(!managed_clusters_.empty());
-  for (const auto& it : managed_clusters_) {
-    ENVOY_LOG_MISC(debug, "************* hashmap element {} searching for {} ***", it.first,
-                   cluster_name);
-  }
 
   auto it = managed_clusters_.find(cluster_name);
   if (it == managed_clusters_.end()) {
