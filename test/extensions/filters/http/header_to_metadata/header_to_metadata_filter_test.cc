@@ -449,9 +449,21 @@ response_rules:
 /**
  * Rules with no on_header{present,missing} fields should be rejected.
  */
-TEST_F(HeaderToMetadataTest, RejectInvalidRule) {
+TEST_F(HeaderToMetadataTest, RejectInvalidRuleOnRequestRules) {
   const std::string config = R"EOF(
 request_rules:
+  - header: x-something
+)EOF";
+  auto expected = "header to metadata filter: rule for header 'x-something' has neither "
+                  "`on_header_present` nor `on_header_missing` set";
+  auto status = initializeFilter(config);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), expected);
+}
+
+TEST_F(HeaderToMetadataTest, RejectInvalidRuleOnResponseRules) {
+  const std::string config = R"EOF(
+response_rules:
   - header: x-something
 )EOF";
   auto expected = "header to metadata filter: rule for header 'x-something' has neither "
