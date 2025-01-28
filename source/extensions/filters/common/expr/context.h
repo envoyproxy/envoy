@@ -177,16 +177,9 @@ public:
       return {};
     }
     auto str = std::string(key.StringOrDie().value());
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consistent_header_validation")) {
-      if (!Http::HeaderUtility::headerNameIsValid(str)) {
-        // Reject key if it is an invalid header string
-        return {};
-      }
-    } else {
-      if (!::Envoy::Http::validHeaderString(str)) {
-        // Reject key if it is an invalid header string
-        return {};
-      }
+    if (!Http::HeaderUtility::headerNameIsValid(str)) {
+      // Reject key if it is an invalid header string
+      return {};
     }
     return convertHeaderEntry(arena_, ::Envoy::Http::HeaderUtility::getAllOfHeaderAsString(
                                           *value_, ::Envoy::Http::LowerCaseString(str)));
