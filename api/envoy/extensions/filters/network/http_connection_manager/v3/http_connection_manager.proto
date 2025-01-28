@@ -129,7 +129,7 @@ message HttpConnectionManager {
     UNESCAPE_AND_FORWARD = 4;
   }
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message Tracing {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing";
@@ -170,6 +170,10 @@ message HttpConnectionManager {
     // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
     // Default: 100%
     type.v3.Percent overall_sampling = 5;
+
+    // Whether tracing metadata should be propagated upstream when the request is not sampled.
+    // Default: true.
+    google.protobuf.BoolValue propagate_unsampled = 11;
 
     // Whether to annotate spans with additional data. If true, spans will include logs for stream
     // events.
