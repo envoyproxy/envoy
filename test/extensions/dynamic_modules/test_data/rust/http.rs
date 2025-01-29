@@ -422,13 +422,13 @@ impl Default for BodyCallbacksFilter {
 ///
 /// Imlements the [`std::io::Read`].
 struct BodyReader<'a> {
-  data: Vec<EnvoyBuffer<'a>>,
+  data: Vec<EnvoyMutBuffer<'a>>,
   vec_idx: usize,
   buf_idx: usize,
 }
 
 impl<'a> BodyReader<'a> {
-  fn new(data: Vec<EnvoyBuffer<'a>>) -> Self {
+  fn new(data: Vec<EnvoyMutBuffer<'a>>) -> Self {
     Self {
       data,
       vec_idx: 0,

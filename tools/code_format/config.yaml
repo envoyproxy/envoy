@@ -139,7 +139,6 @@ paths:
     - source/common/secret/sds_api.cc
     - source/common/config/config_provider_impl.h
     - source/common/grpc/google_grpc_creds_impl.cc
-    - source/common/local_reply/local_reply.cc
     - source/common/router/rds_impl.cc
     - source/server/hot_restarting_parent.cc
     - source/common/io/io_uring_worker_impl.cc

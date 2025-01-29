@@ -60,6 +60,9 @@ removed_config_or_runtime:
 - area: dns
   change: |
     Removed runtime flag ``envoy.reloadable_features.dns_details`` and legacy code paths.
+- area: local_ratelimit
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.no_timer_based_rate_limit_token_bucket`` and legacy code paths.
 
 new_features:
 - area: oauth2
