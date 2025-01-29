@@ -536,7 +536,12 @@ private:
     }
     const Buffer::Instance* bufferedBody() override { return callbacks_->decodingBuffer(); }
     void continueIteration() override { return callbacks_->continueDecoding(); }
-    void onHeadersModified() override { callbacks_->downstreamCallbacks()->clearRouteCache(); }
+    void onHeadersModified() override {
+      auto downstream_callbacks = callbacks_->downstreamCallbacks();
+      if (downstream_callbacks.has_value()) {
+        downstream_callbacks->clearRouteCache();
+      }
+    }
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
