@@ -23,7 +23,7 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
-#include "source/extensions/common/aws/aws_cluster_manager.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
