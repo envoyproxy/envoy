@@ -422,13 +422,13 @@ impl Default for BodyCallbacksFilter {
 ///
 /// Imlements the [`std::io::Read`].
 struct BodyReader<'a> {
-  data: Vec<EnvoyBuffer<'a>>,
+  data: Vec<EnvoyMutBuffer<'a>>,
   vec_idx: usize,
   buf_idx: usize,
 }
 
 impl<'a> BodyReader<'a> {
-  fn new(data: Vec<EnvoyBuffer<'a>>) -> Self {
+  fn new(data: Vec<EnvoyMutBuffer<'a>>) -> Self {
     Self {
       data,
       vec_idx: 0,
@@ -470,7 +470,8 @@ struct BodyWriter<'a, EHF: EnvoyHttpFilter> {
 impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
   fn new(envoy_filter: &'a mut EHF, request: bool) -> Self {
     // Before starting to write, drain the existing buffer content.
-    let current_vec = if request {
+    // To do this, we need to calculate the total buffer size.
+    let buffer_bytes = if request {
       envoy_filter
         .get_request_body()
         .expect("request body is None")
@@ -478,13 +479,10 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
       envoy_filter
         .get_response_body()
         .expect("response body is None")
-    };
-
-
-    let buffer_bytes = current_vec
-      .iter()
-      .map(|buf| buf.as_slice().len())
-      .sum::<usize>();
+    }
+    .iter()
+    .map(|buf| buf.as_slice().len())
+    .sum::<usize>();
 
     if request {
       assert!(envoy_filter.drain_request_body(buffer_bytes));
