@@ -13,7 +13,7 @@
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_context_impl.h"
-#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
+#include "source/extensions/quic/connection_id_generator/deterministic/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
