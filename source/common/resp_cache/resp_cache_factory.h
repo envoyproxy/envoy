@@ -6,6 +6,8 @@
 
 #include <memory>
 
+#include "source/common/protobuf/utility.h"
+
 #include "absl/status/statusor.h"
 #include "resp_cache.h"
 #include "simple_cache.h"
@@ -18,14 +20,17 @@ enum class CacheType { Simple };
 
 template <typename T>
 absl::StatusOr<std::unique_ptr<RespCache<T>>>
-createCache(CacheType type, std::size_t max_size, int default_ttl_seconds,
-            double eviction_candidate_ratio, double eviction_threshold_ratio,
+createCache(CacheType type, const envoy::config::core::v3::TypedExtensionConfig& config,
             Envoy::TimeSource& time_source) {
-  switch (type) {
-  case CacheType::Simple:
-    return std::make_unique<SimpleCache<T>>(max_size, default_ttl_seconds, eviction_candidate_ratio,
-                                            eviction_threshold_ratio, time_source);
-  default:
+  if (type == CacheType::Simple) {
+    envoy::common::resp_cache::v3::SimpleCacheConfig simple_cache_config;
+    if (!Envoy::MessageUtil::unpackTo(config.typed_config(), simple_cache_config).ok()) {
+      return absl::InvalidArgumentError("Invalid config type for SimpleCache");
+    }
+    auto config_ptr =
+        std::make_shared<envoy::common::resp_cache::v3::SimpleCacheConfig>(simple_cache_config);
+    return std::make_unique<SimpleCache<T>>(config_ptr, time_source);
+  } else {
     return absl::InvalidArgumentError("Unsupported cache type");
   }
 }

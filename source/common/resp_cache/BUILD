@@ -1,6 +1,17 @@
 licenses(["notice"])  # Apache 2
 
-# exports_files(["resp_cache.h", "simple_cache.h"])
+proto_library(
+    name = "simple_cache_proto",
+    srcs = ["simple_cache.proto"],
+    deps = [
+        "@com_google_protobuf//:descriptor_proto",
+    ],
+)
+
+cc_proto_library(
+    name = "simple_cache_cc_proto",
+    deps = [":simple_cache_proto"],
+)
 
 cc_library(
     name = "resp_cache",
@@ -14,10 +25,8 @@ cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        #"//source/common/common:thread",
-        #"//source/common/common:time",
-        "@com_google_absl//absl/types:optional",
+        ":simple_cache_cc_proto",
         "@com_google_absl//absl/container:flat_hash_map",
-        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
+        "@com_google_absl//absl/types:optional",
     ],
 )

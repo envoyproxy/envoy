@@ -136,6 +136,7 @@ public:
 
   bool headersAsBytes() const { return encode_raw_headers_; }
 
+  // Return the right response cache, based on the template type.
   template <typename T> Envoy::Common::RespCache::RespCache<T>& responseCache() {
     if constexpr (std::is_same_v<T, uint16_t>) {
       return *response_cache_status_;
@@ -146,8 +147,13 @@ public:
     }
   }
 
-  const Envoy::Http::LowerCaseString& responseCacheHeaderName() const {
+  /*const Envoy::Http::LowerCaseString& responseCacheHeaderName() const {
     return response_cache_header_name_;
+  }*/
+
+  // Access to response_cache_config configuration parameters.
+  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& responseCacheConfig() const {
+    return response_cache_config_;
   }
 
   bool responseCacheRememberBodyHeaders() const { return response_cache_remember_body_headers_; }
@@ -292,17 +298,11 @@ private:
   Filters::Common::ExtAuthz::MatcherSharedPtr allowed_headers_matcher_;
   Filters::Common::ExtAuthz::MatcherSharedPtr disallowed_headers_matcher_;
 
-  // Fields for response cache configuration
-  uint32_t response_cache_max_size_;
-  uint32_t response_cache_ttl_;
-  Envoy::Http::LowerCaseString response_cache_header_name_; // New field for header names
-  // Response cache
-  double response_cache_eviction_candidate_ratio_;
-  double response_cache_eviction_threshold_ratio_;
+  // Private fields and methods for response cache
+  absl::optional<envoy::config::core::v3::TypedExtensionConfig> response_cache_config_;
   bool response_cache_remember_body_headers_;
 
-  // Declare two caches.
-  // The cache functionality has two modes:
+  // Declare two caches. The response cache functionality has two modes:
   //   1. Remember only the status code for a given request. This minimizes memory usage.
   //   2. Remember the full response (headers, body, status) from external authorization server.
   //   This maximizes functionality.
@@ -311,6 +311,7 @@ private:
   std::unique_ptr<Envoy::Common::RespCache::RespCache<uint16_t>> response_cache_status_;
   std::unique_ptr<Envoy::Common::RespCache::RespCache<Filters::Common::ExtAuthz::Response>>
       response_cache_full_;
+  void initializeCache(Server::Configuration::ServerFactoryContext& factory_context);
 
 public:
   // TODO(nezdolik): deprecate cluster scope stats counters in favor of filter scope stats

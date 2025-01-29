@@ -9,13 +9,14 @@
 #include <vector>
 
 #include "envoy/common/time.h"
-#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
+#include "source/common/resp_cache/simple_cache.pb.h" // For configuration in simple_cache.proto
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/types/optional.h"
-#include "resp_cache.h" // This class implements the interface decfined in resp_cache.h
+#include "resp_cache.h" // For interface RespCache, which is implemented by SimpleCache.
 
 namespace Envoy {
 namespace Common {
@@ -27,27 +28,35 @@ namespace RespCache {
   the order of elements. It restricts stored values to 16-bit unsigned integers, making it
   memory efficient.
  */
-template <typename T> class SimpleCache : public RespCache<T> {
+template <typename T>
+class SimpleCache : public RespCache<T>, public Logger::Loggable<Logger::Id::filter> {
 public:
-  SimpleCache(std::size_t max_size, int default_ttl_seconds, double eviction_candidate_ratio,
-              double eviction_threshold_ratio, Envoy::TimeSource& time_source)
-      : max_cache_size(max_size), default_ttl_seconds(default_ttl_seconds),
-        eviction_candidate_ratio(eviction_candidate_ratio),
-        eviction_threshold_ratio(eviction_threshold_ratio),
-        random_generator(std::random_device{}()), time_source_(time_source) {}
+  SimpleCache(std::shared_ptr<envoy::common::resp_cache::v3::SimpleCacheConfig> config,
+              Envoy::TimeSource& time_source)
+      : config_(std::move(config)), random_generator_(std::random_device{}()),
+        time_source_(time_source) {}
 
   ~SimpleCache() = default;
 
   // Public getter method for max_cache_size
-  std::size_t getMaxCacheSize() const override { return max_cache_size; }
+  std::size_t getMaxCacheSize() const override { return config_->max_cache_size(); }
 
-  bool Insert(const std::string& key, const T& value, int ttl_seconds = -1) override {
+  bool Insert(const Http::RequestHeaderMap& headers, const T& value,
+              int ttl_seconds = -1) override {
+    std::string key = makeCacheKey(headers);
+    if (key.empty()) {
+      return false;
+    }
     auto expiration_time = CalculateExpirationTime(ttl_seconds);
     CacheItem item(value, expiration_time);
     return InsertInternal(key, std::move(item));
   }
 
-  bool Erase(const std::string& key) override {
+  bool Erase(const Http::RequestHeaderMap& headers) override {
+    std::string key = makeCacheKey(headers);
+    if (key.empty()) {
+      return false;
+    }
     Thread::LockGuard lock{mutex_};
     auto it = cache_items_map.find(key);
     if (it != cache_items_map.end()) {
@@ -57,17 +66,24 @@ public:
     return false;
   }
 
-  absl::optional<T> Get(const std::string& key) override {
+  absl::optional<T> Get(const Http::RequestHeaderMap& headers) override {
+    std::string key = makeCacheKey(headers);
+    if (key.empty()) {
+      return absl::nullopt;
+    }
     Thread::LockGuard lock{mutex_};
     auto it = cache_items_map.find(key);
     if (it != cache_items_map.end()) {
       if (time_source_.monotonicTime() < it->second.expiration_time) {
+        ENVOY_LOG(debug, "Cache hit: key {}", key);
         return it->second.value;
       } else {
         // Item has expired
+        ENVOY_LOG(debug, "Cache miss: key {} has expired", key);
         cache_items_map.erase(it);
       }
     }
+    ENVOY_LOG(debug, "Cache miss: key {} not found", key);
     return absl::nullopt;
   }
 
@@ -90,14 +106,23 @@ private:
         : value(val), expiration_time(exp_time) {}
   };
 
+  // Make cache key from request header
+  std::string makeCacheKey(const Http::RequestHeaderMap& headers) const {
+    const auto header_entry = headers.get(Http::LowerCaseString(config_->cache_key_header()));
+    if (!header_entry.empty()) {
+      return std::string(header_entry[0]->value().getStringView());
+    }
+    return "";
+  }
+
   // Calculate expiration time with 5% jitter
   std::chrono::steady_clock::time_point CalculateExpirationTime(int ttl_seconds) {
     if (ttl_seconds == -1) {
-      ttl_seconds = default_ttl_seconds;
+      ttl_seconds = config_->ttl_seconds();
     }
 
     std::uniform_real_distribution<double> distribution(-0.05, 0.05);
-    double jitter_factor = distribution(random_generator);
+    double jitter_factor = distribution(random_generator_);
     auto jittered_ttl = std::chrono::seconds(ttl_seconds) +
                         std::chrono::seconds(static_cast<int>(ttl_seconds * jitter_factor));
 
@@ -108,13 +133,14 @@ private:
     Thread::LockGuard lock{mutex_};
     auto it = cache_items_map.find(key);
     if (it == cache_items_map.end()) {
-      if (cache_items_map.size() >= max_cache_size) {
+      if (cache_items_map.size() >= config_->max_cache_size()) {
         Evict();
       }
       cache_items_map[key] = std::move(item);
     } else {
       cache_items_map[key] = std::move(item);
     }
+    ENVOY_LOG(debug, "Inserted cache key {}", key);
     return true;
   }
 
@@ -133,9 +159,9 @@ private:
     // std::clock_t start_cpu_time = std::clock();
 
     // Step 1: Advance pointer randomly
-    std::uniform_int_distribution<std::size_t> distribution(0, (1.0 - eviction_candidate_ratio) *
-                                                                   max_cache_size);
-    std::size_t advance_steps = distribution(random_generator);
+    std::uniform_int_distribution<std::size_t> distribution(
+        0, (1.0 - config_->eviction_candidate_ratio()) * config_->max_cache_size());
+    std::size_t advance_steps = distribution(random_generator_);
 
     auto it = cache_items_map.begin();
     for (std::size_t i = 0; i < advance_steps && it != cache_items_map.end(); ++i) {
@@ -145,7 +171,7 @@ private:
 
     // Step 2: Read the next min(1000, num_remove_candidates) items and calculate the sum of TTLs
     auto num_remove_candidates =
-        static_cast<std::size_t>(eviction_candidate_ratio * max_cache_size);
+        static_cast<std::size_t>(config_->eviction_candidate_ratio() * config_->max_cache_size());
     auto current_time = time_source_.monotonicTime();
     std::size_t items_to_read = std::min(static_cast<std::size_t>(1000), num_remove_candidates);
     double sum_ttl = 0.0;
@@ -163,7 +189,7 @@ private:
     std::size_t removed = 0;
     // Evict items with TTL lower than X% of the average TTL
     auto eviction_threshold = std::chrono::milliseconds(
-        static_cast<int>(min_ttl + (average_ttl - min_ttl) * eviction_threshold_ratio));
+        static_cast<int>(min_ttl + (average_ttl - min_ttl) * config_->eviction_threshold_ratio()));
 
     // TODO: convert to log - std::cout << "Average TTL: " << average_ttl << " ms, Min TTL: " <<
     // min_ttl << " ms, Eviction threshold: " << eviction_threshold.count() << " ms" << std::endl;
@@ -207,12 +233,9 @@ private:
   // mutex and flat_hash_map into 100 buckets. We then tested with 1,000 threads making requests at
   // the same time. The result - the number of buckets (1 or 100) did not make any difference.
 
-  std::size_t max_cache_size;
-  int default_ttl_seconds;
-  double eviction_candidate_ratio;
-  double eviction_threshold_ratio;
-  std::default_random_engine random_generator; // Random number generator
-  Envoy::TimeSource& time_source_;             // Reference to TimeSource
+  std::shared_ptr<envoy::common::resp_cache::v3::SimpleCacheConfig> config_;
+  std::default_random_engine random_generator_; // Random number generator
+  Envoy::TimeSource& time_source_;              // Reference to TimeSource
 };
 
 } // namespace RespCache
