@@ -470,8 +470,7 @@ struct BodyWriter<'a, EHF: EnvoyHttpFilter> {
 impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
   fn new(envoy_filter: &'a mut EHF, request: bool) -> Self {
     // Before starting to write, drain the existing buffer content.
-    // To do this, we need to calculate the total buffer size.
-    let buffer_bytes = if request {
+    let current_vec = if request {
       envoy_filter
         .get_request_body()
         .expect("request body is None")
@@ -479,10 +478,13 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
       envoy_filter
         .get_response_body()
         .expect("response body is None")
-    }
-    .iter()
-    .map(|buf| buf.as_slice().len())
-    .sum::<usize>();
+    };
+
+
+    let buffer_bytes = current_vec
+      .iter()
+      .map(|buf| buf.as_slice().len())
+      .sum::<usize>();
 
     if request {
       assert!(envoy_filter.drain_request_body(buffer_bytes));
