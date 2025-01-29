@@ -11,14 +11,15 @@ namespace Cache {
 namespace RedisHttpCache {
 
     struct ThreadLocalRedisClient : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalRedisClient() {}
+    ThreadLocalRedisClient(Upstream::ClusterManager& cluster_manager) : redis_client_(cluster_manager) {}
     ~ThreadLocalRedisClient() override {}
 
 
     // This really should be hash table of cluster -> redis_client_.
     // The same thread may serve redis cache pointing to several different clusters.
     Extensions::Common::Redis::RedisAsyncClient redis_client_;
-    void send(std::string command);
+
+    void send(std::string command, Common::Redis::RedisAsyncClient::ResultCallback&& callback);
 
     };
 

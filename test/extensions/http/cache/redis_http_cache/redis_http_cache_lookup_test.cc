@@ -30,12 +30,12 @@ class RedisHttpCacheLookupTest : public ::testing::TestWithParam<std::tuple<std:
 public:
     RedisHttpCacheLookupTest()
                                     :  tls_slot_(tls_allocator_) {
-    thread_local_redis_client_ = std::make_shared<ThreadLocalRedisClient>();;
+EXPECT_CALL(cluster_manager_, getThreadLocalCluster("redis_cluster")).WillOnce(testing::Return(&thread_local_cluster_));
+    thread_local_redis_client_ = std::make_shared<ThreadLocalRedisClient>(cluster_manager_);;
     tls_slot_.set([&](Event::Dispatcher&) {return thread_local_redis_client_;});
 
 async_client_ = new Tcp::AsyncClient::MockAsyncTcpClient();
 
-EXPECT_CALL(cluster_manager_, getThreadLocalCluster("redis_cluster")).WillOnce(testing::Return(&thread_local_cluster_));
 //ON_CALL(thread_local_cluster_, tcpAsyncClient(_, _)).WillByDefault(testing::Return(std::make_unique<Tcp::AsyncTcpClient>((Tcp::AsyncTcpClient*)async_client)));
 EXPECT_CALL(thread_local_cluster_, tcpAsyncClient(_, _)).WillOnce(Invoke([&] {
     return Tcp::AsyncTcpClientPtr{async_client_};

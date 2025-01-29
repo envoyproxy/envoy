@@ -33,7 +33,7 @@ public:
 #endif
     RedisHttpCache(Upstream::ClusterManager& cluster_manager, ThreadLocal::SlotAllocator& tls) : cluster_manager_(cluster_manager), tls_slot_(tls) {
 
-    tls_slot_.set([&](Event::Dispatcher&) {return std::make_shared<ThreadLocalRedisClient>();});
+    tls_slot_.set([&](Event::Dispatcher&) {return std::make_shared<ThreadLocalRedisClient>(cluster_manager_);});
 
 #if 0
     auto* cluster = cluster_manager_.getThreadLocalCluster("redis_cluster");

@@ -7,7 +7,7 @@ namespace HttpFilters {
 namespace Cache {
 namespace RedisHttpCache {
 
-    void ThreadLocalRedisClient::send(std::string command) {
+    void ThreadLocalRedisClient::send(std::string command, Common::Redis::RedisAsyncClient::ResultCallback&& callback) {
 
     std::vector<std::string_view> v = absl::StrSplit(command, " ");
 
@@ -24,7 +24,7 @@ NetworkFilters::Common::Redis::RespValue request;
   request.asArray().swap(values);
   redis_client_.encoder_.encode(request, buf);  
 
-  redis_client_.client_->write(buf, false);
+  redis_client_.write(buf, false, std::move(callback));
     }
 
 

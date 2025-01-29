@@ -13,15 +13,13 @@ namespace RedisHttpCache {
 
 void RedisHttpCacheLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb)
 {
-    //ASSERT(false);
-
-//////
     cb1_ = std::move(cb);
-    // allocate thread local tcp async client and wrap it with redis protocol 
-    // The client should be allocated and ready to use. Just update the callback.
-    // Maybe move callback to a routine called when it is sent ->write(....
-    tls_slot_->redis_client_.callback_ = [this] (bool success, std::string redis_value) {
+  // TODO: handle here situation when client cannot connect to the redis server.
+    // maybe connect it when the first request comes and it is not connected.
 
+    
+  tls_slot_->send(fmt::format("getrange cache-{}-body {} {}", stableHashKey(lookup_.key()), range.begin(), range.begin() + range.length() - 1),
+    [this] (bool success, std::string redis_value) mutable {
     if (!success) {
         // TODO: make sure that this path is tested.
         ASSERT(false);
@@ -36,50 +34,12 @@ void RedisHttpCacheLookupContext::getBody(const AdjustedByteRange& range, Lookup
     // TODO: maybe move to redis async client.
     redis_value = redis_value.substr(1, redis_value.length() - 2);
 
-    std::cout << redis_value << " length: " << redis_value.length() << "\n";
+  // TODO: this is not very efficient.
   std::unique_ptr<Buffer::OwnedImpl> buf;
     buf = std::make_unique<Buffer::OwnedImpl>();
     buf->add(redis_value);
-    // call the callback with a result read from redis.
-        /*std::move(cb)*/cb1_(std::move(buf), true);
-
-        // TODO: check if the last byte was read and if trailers are present.
-#if 0
-                      /* end_stream = */ range.end() == header_block_.bodySize() &&
-                          header_block_.trailerSize() == 0);
-#endif
-
-    // We need to strip quotes on both sides of the string.
-    // TODO: maybe move to redis async client.
-    };
-  // TODO: handle here situation when client cannot connect to the redis server.
-    // maybe connect it when the first request comes and it is not connected.
-//    tls_slot_->redis_client_.client_->connect();
-  Buffer::OwnedImpl buf;
-NetworkFilters::Common::Redis::RespValue request;
-  std::vector<NetworkFilters::Common::Redis::RespValue> values(4);
-  values[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
-  values[0].asString() = "getrange";
-  values[1].type(NetworkFilters::Common::Redis::RespType::BulkString);
-  values[1].asString() = absl::StrCat("cache-", stableHashKey(lookup_.key()), "-body");
-  //std::cout << "LOOKING FOR " << absl::StrCat("cache-", stableHashKey(lookup_.key())) << "\n";
-  values[2].type(NetworkFilters::Common::Redis::RespType::BulkString);
-  values[2].asString() = fmt::format("{}", range.begin());
-  values[3].type(NetworkFilters::Common::Redis::RespType::BulkString);
-  // TODO: when it is out of range, success in callback is true and message is 
-  // ERR value is not an integer or out of range. How to recognize it as error?
-  values[3].asString() = fmt::format("{}", range.begin() + range.length() - 1);
-  request.type(NetworkFilters::Common::Redis::RespType::Array);
-  request.asArray().swap(values);
-  tls_slot_->redis_client_.encoder_.encode(request, buf);  
-
-  std::cout << "RANGE: " << range.begin() << "-" << range.length() << "\n";
-
-  tls_slot_->redis_client_.client_->write(buf, false);
-
-//auto client = cluster->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
-    
-//////
+        /*std::move(cb1_)*/cb1_(std::move(buf), true);
+    });
 }
 
 
