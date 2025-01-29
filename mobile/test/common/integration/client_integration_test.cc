@@ -266,7 +266,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   std::atomic<bool> found_cache_miss{false};
   auto logger = std::make_unique<EnvoyLogger>();
   logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
-    if (msg.find("ignoring failed address cache hit for miss for host 'doesnotexist:443'") !=
+    if (msg.find("ignoring failed address cache hit for miss for host 'doesnotexist") !=
         std::string::npos) {
       found_cache_miss = true;
     }
