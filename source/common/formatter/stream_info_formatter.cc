@@ -2006,40 +2006,33 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                          });
 }
 
-class BuiltInStreamInfoCommandParser : public StreamInfoCommandParser {
-public:
-  BuiltInStreamInfoCommandParser() = default;
-
-  // StreamInfoCommandParser
-  StreamInfoFormatterProviderPtr parse(absl::string_view command, absl::string_view sub_command,
-                                       absl::optional<size_t> max_length) const override {
-
-    auto it = getKnownStreamInfoFormatterProviders().find(command);
-
-    // No throw because the stream info command parser may not be the last parser and other
-    // formatter parsers may be tried.
-    if (it == getKnownStreamInfoFormatterProviders().end()) {
-      return nullptr;
-    }
-    // Check flags for the command.
-    THROW_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax(
-        (*it).second.first, command, sub_command, max_length));
-
-    return (*it).second.second(sub_command, max_length);
-  }
-};
-
 std::string DefaultBuiltInStreamInfoCommandParserFactory::name() const {
   return "envoy.built_in_formatters.stream_info.default";
 }
 
-StreamInfoCommandParserPtr
-DefaultBuiltInStreamInfoCommandParserFactory::createCommandParser() const {
+FormatterProviderPtr
+BuiltInStreamInfoCommandParser::parse(absl::string_view command, absl::string_view sub_command,
+                                      absl::optional<size_t> max_length) const {
+
+  auto it = getKnownStreamInfoFormatterProviders().find(command);
+
+  // No throw because the stream info command parser may not be the last parser and other
+  // formatter parsers may be tried.
+  if (it == getKnownStreamInfoFormatterProviders().end()) {
+    return nullptr;
+  }
+  // Check flags for the command.
+  THROW_IF_NOT_OK(Envoy::Formatter::CommandSyntaxChecker::verifySyntax((*it).second.first, command,
+                                                                       sub_command, max_length));
+
+  return (*it).second.second(sub_command, max_length);
+}
+
+CommandParserPtr DefaultBuiltInStreamInfoCommandParserFactory::createCommandParser() const {
   return std::make_unique<BuiltInStreamInfoCommandParser>();
 }
 
-REGISTER_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory,
-                 BuiltInStreamInfoCommandParserFactory);
+REGISTER_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory, BuiltInCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy

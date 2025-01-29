@@ -62,7 +62,7 @@ FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
   //                 will directly serialize the record to msgpack payload.
   auto commands = THROW_OR_RETURN_VALUE(
       Formatter::SubstitutionFormatStringUtils::parseFormatters(proto_config.formatters(), context),
-      std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>>);
+      std::vector<Formatter::CommandParserPtr>);
 
   Formatter::FormatterPtr json_formatter =
       Formatter::SubstitutionFormatStringUtils::createJsonFormatter(proto_config.record(), true,

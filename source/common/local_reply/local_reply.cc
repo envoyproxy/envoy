@@ -24,7 +24,7 @@ public:
                 Server::Configuration::GenericFactoryContext& context)
       : formatter_(THROW_OR_RETURN_VALUE(
             Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, context),
-            Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>)),
+            Formatter::FormatterPtr)),
         content_type_(
             !config.content_type().empty() ? config.content_type()
             : config.format_case() ==
