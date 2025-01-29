@@ -161,7 +161,8 @@ void TestServer::start(TestServerType type, int port) {
     Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
     Quic::forceRegisterQuicServerTransportSocketConfigFactory();
     Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
-    Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
+    Quic::Extensions::ConnectionIdGenerator::Deterministic::
+        forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
 
     // envoy.quic.crypto_stream.server.quiche
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP3;
