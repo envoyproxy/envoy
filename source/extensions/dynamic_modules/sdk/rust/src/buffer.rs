@@ -14,6 +14,16 @@ pub struct EnvoyBuffer<'a> {
   _marker: std::marker::PhantomData<&'a ()>,
 }
 
+impl Default for EnvoyBuffer<'_> {
+  fn default() -> Self {
+    Self {
+      raw_ptr: std::ptr::null(),
+      length: 0,
+      _marker: std::marker::PhantomData,
+    }
+  }
+}
+
 impl EnvoyBuffer<'_> {
   /// This is a helper function to create an [`EnvoyBuffer`] from a static string.
   ///
