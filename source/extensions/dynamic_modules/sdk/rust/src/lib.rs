@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 
 pub mod buffer;
-pub use buffer::EnvoyBuffer;
+pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
 use mockall::*;
 
@@ -379,9 +379,11 @@ pub trait EnvoyHttpFilter {
   ///
   /// // This is the test setup.
   /// let mut envoy_filter = MockEnvoyHttpFilter::default();
+  /// // Mutable static storage is used for the test to simulate the response body operation.
+  /// static mut BUFFER: [u8; 10] = *b"helloworld";
   /// envoy_filter
   ///   .expect_get_request_body()
-  ///   .returning(|| vec![EnvoyBuffer::new("hello"), EnvoyBuffer::new("world")].into());
+  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
   /// envoy_filter.expect_drain_request_body().return_const(true);
   ///
   ///
@@ -400,7 +402,7 @@ pub trait EnvoyHttpFilter {
   /// ```
   ///
   /// This returns None if the request body is not available.
-  fn get_request_body<'a>(&'a mut self) -> Option<Vec<EnvoyBuffer<'a>>>;
+  fn get_request_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
 
   /// Drain the given number of bytes from the front of the request body.
   ///
@@ -433,9 +435,11 @@ pub trait EnvoyHttpFilter {
   ///
   /// // This is the test setup.
   /// let mut envoy_filter = MockEnvoyHttpFilter::default();
+  /// // Mutable static storage is used for the test to simulate the response body operation.
+  /// static mut BUFFER: [u8; 10] = *b"helloworld";
   /// envoy_filter
   ///   .expect_get_response_body()
-  ///   .returning(|| vec![EnvoyBuffer::new("hello"), EnvoyBuffer::new("world")].into());
+  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
   /// envoy_filter.expect_drain_response_body().return_const(true);
   ///
   ///
@@ -454,7 +458,7 @@ pub trait EnvoyHttpFilter {
   /// ```
   ///
   /// Returns None if the response body is not available.
-  fn get_response_body<'a>(&'a mut self) -> Option<Vec<EnvoyBuffer<'a>>>;
+  fn get_response_body<'a>(&'a mut self) -> Option<Vec<EnvoyMutBuffer<'a>>>;
 
   /// Drain the given number of bytes from the front of the response body.
   ///
@@ -740,7 +744,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_request_body(&mut self) -> Option<Vec<EnvoyBuffer>> {
+  fn get_request_body(&mut self) -> Option<Vec<EnvoyMutBuffer>> {
     let mut size: usize = 0;
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_http_get_request_body_vector_size(self.raw_ptr, &mut size)
@@ -749,7 +753,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       return None;
     }
 
-    let buffers: Vec<EnvoyBuffer> = vec![EnvoyBuffer::default(); size];
+    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_request_body_vector(
         self.raw_ptr,
@@ -779,7 +783,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_response_body(&mut self) -> Option<Vec<EnvoyBuffer>> {
+  fn get_response_body(&mut self) -> Option<Vec<EnvoyMutBuffer>> {
     let mut size: usize = 0;
     let ok = unsafe {
       abi::envoy_dynamic_module_callback_http_get_response_body_vector_size(self.raw_ptr, &mut size)
@@ -788,7 +792,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       return None;
     }
 
-    let buffers: Vec<EnvoyBuffer> = vec![EnvoyBuffer::default(); size];
+    let buffers: Vec<EnvoyMutBuffer> = vec![EnvoyMutBuffer::default(); size];
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_response_body_vector(
         self.raw_ptr,

@@ -96,10 +96,11 @@ fn test_body_callbacks_filter_on_bodies() {
   envoy_filter
     .expect_get_request_body()
     .returning(|| {
+      static mut BUF: [[u8; 4]; 3] = [*b"nice", *b"nice", *b"nice"];
       Some(vec![
-        EnvoyBuffer::new("nice"),
-        EnvoyBuffer::new("nice"),
-        EnvoyBuffer::new("nice"),
+        EnvoyMutBuffer::new(unsafe { &mut BUF[0] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF[1] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF[2] }),
       ])
     })
     .times(2);
@@ -117,10 +118,11 @@ fn test_body_callbacks_filter_on_bodies() {
   envoy_filter
     .expect_get_response_body()
     .returning(|| {
+      static mut BUF2: [[u8; 4]; 3] = [*b"cool", *b"cool", *b"cool"];
       Some(vec![
-        EnvoyBuffer::new("cool"),
-        EnvoyBuffer::new("cool"),
-        EnvoyBuffer::new("cool"),
+        EnvoyMutBuffer::new(unsafe { &mut BUF2[0] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF2[1] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF2[2] }),
       ])
     })
     .times(2);
