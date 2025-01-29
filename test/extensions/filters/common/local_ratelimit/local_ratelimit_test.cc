@@ -171,6 +171,7 @@ public:
   // Default token bucket
   std::vector<RateLimit::Descriptor> descriptor_{{{{"foo2", "bar2"}}}};
   std::vector<RateLimit::Descriptor> descriptor2_{{{{"hello", "world"}, {"foo", "bar"}}}};
+  std::vector<RateLimit::Descriptor> no_match_descriptor_{{{{"no_match", "no_match"}}}};
 };
 
 // Verify descriptor rate limit time with small fill interval is rejected.
@@ -530,6 +531,27 @@ TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptorStatus) {
   // Note that the route descriptors are not changed so we can reuse the same token bucket context.
   EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
   EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 2);
+}
+
+// Verify null default token bucket.
+TEST_F(LocalRateLimiterDescriptorImplTest, NullDefaultTokenBucket) {
+  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "3s"),
+                            *descriptors_.Add());
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(0), 0, 0);
+
+  // 2 -> 1 tokens
+  auto rate_limit_result = rate_limiter_->requestAllowed(descriptor_);
+
+  EXPECT_TRUE(rate_limit_result.allowed);
+
+  // Note that the route descriptors are not changed so we can reuse the same token bucket context.
+  EXPECT_EQ(rate_limit_result.token_bucket_context->maxTokens(), 2);
+  EXPECT_EQ(rate_limit_result.token_bucket_context->remainingTokens(), 1);
+
+  // Not match any descriptor and default token bucket is null.
+  auto no_match_result = rate_limiter_->requestAllowed(no_match_descriptor_);
+  EXPECT_TRUE(no_match_result.allowed);
+  EXPECT_FALSE(no_match_result.token_bucket_context.has_value());
 }
 
 } // Namespace LocalRateLimit

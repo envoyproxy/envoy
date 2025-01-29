@@ -64,7 +64,6 @@ public:
 
   virtual uint64_t maxTokens() const PURE;
   virtual uint64_t remainingTokens() const PURE;
-  virtual absl::optional<int64_t> remainingFillInterval() const PURE;
 };
 
 class LocalRateLimiterImpl;
@@ -82,7 +81,6 @@ public:
   uint64_t remainingTokens() const override {
     return static_cast<uint64_t>(token_bucket_.remainingTokens());
   }
-  absl::optional<int64_t> remainingFillInterval() const override { return {}; }
 
 private:
   AtomicTokenBucketImpl token_bucket_;
