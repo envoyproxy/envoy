@@ -74,9 +74,7 @@ request_rules:
     envoy::extensions::filters::http::header_to_metadata::v3::Config config;
     TestUtility::loadFromYaml(yaml, config);
     absl::StatusOr<ConfigSharedPtr> config_or = Config::create(config, regex_engine_);
-    if (!config_or.ok()) {
-      return config_or.status();
-    }
+    RETURN_IF_NOT_OK_REF(config_or.status());
     config_ = std::move(*config_or);
     filter_ = std::make_shared<HeaderToMetadataFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);

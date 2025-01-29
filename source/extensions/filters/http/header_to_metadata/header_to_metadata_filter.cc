@@ -103,10 +103,7 @@ Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& cre
   if (rule.on_header_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule.on_header_present().regex_value_rewrite();
     auto regex_rewrite_or = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
-    if (!regex_rewrite_or.ok()) {
-      creation_status = regex_rewrite_or.status();
-      return;
-    }
+    SET_AND_RETURN_IF_NOT_OK(regex_rewrite_or.status(), creation_status);
     regex_rewrite_ = std::move(regex_rewrite_or.value());
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
@@ -125,18 +122,12 @@ Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::C
                Regex::Engine& regex_engine, const bool per_route, absl::Status& creation_status) {
   absl::StatusOr<bool> request_set_or =
       Config::configToVector(config.request_rules(), request_rules_, regex_engine);
-  if (!request_set_or.ok()) {
-    creation_status = request_set_or.status();
-    return;
-  }
+  SET_AND_RETURN_IF_NOT_OK(request_set_or.status(), creation_status);
   request_set_ = request_set_or.value();
 
   absl::StatusOr<bool> response_set_or =
       Config::configToVector(config.response_rules(), response_rules_, regex_engine);
-  if (!response_set_or.ok()) {
-    creation_status = response_set_or.status();
-    return;
-  }
+  SET_AND_RETURN_IF_NOT_OK(response_set_or.status(), creation_status);
   response_set_ = response_set_or.value();
 
   // Note: empty configs are fine for the global config, which would be the case for enabling
