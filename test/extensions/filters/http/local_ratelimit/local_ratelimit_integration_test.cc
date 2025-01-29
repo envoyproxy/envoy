@@ -388,6 +388,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, PermitRequestAcrossDifferentConnecti
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, BasicTestPerRouteAndRds) {
+  async_lb_ = false; // Fails due to the async client's body arriving before the host is selected.
   initializeFilterWithRds(fmt::format(filter_config_, true), "basic_routes", initial_route_config_);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -432,6 +433,7 @@ TEST_P(LocalRateLimitFilterIntegrationTest, BasicTestPerRouteAndRds) {
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, TestLocalClusterRateLimit) {
+  async_lb_ = false; // Fails due to the async client's body arriving before the host is selected.
   initializeFilterWithLocalCluster(filter_config_with_local_cluster_rate_limit_,
                                    initial_local_cluster_endpoints_);
 

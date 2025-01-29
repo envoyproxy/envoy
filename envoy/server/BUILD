@@ -173,6 +173,7 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/config:typed_metadata_interface",
+        "//envoy/config:xds_manager_interface",
         "//envoy/grpc:context_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:context_interface",

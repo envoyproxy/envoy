@@ -30,8 +30,9 @@ public:
                       Upstream::ClusterFactoryContext& context, uint32_t priority,
                       std::string address, uint32_t port, absl::Status& creation_status)
       : ClusterImplBase(cluster, context, creation_status), priority_(priority),
-        address_(std::move(address)), port_(port), host_(makeHost()) {
-    THROW_IF_NOT_OK(creation_status);
+        address_(std::move(address)), port_(port) {
+    THROW_IF_NOT_OK_REF(creation_status);
+    host_ = makeHost();
   }
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -47,7 +48,7 @@ private:
   const uint32_t priority_;
   const std::string address_;
   const uint32_t port_;
-  const Upstream::HostSharedPtr host_;
+  Upstream::HostSharedPtr host_;
 
   friend class CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig1>;
   friend class CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig2>;

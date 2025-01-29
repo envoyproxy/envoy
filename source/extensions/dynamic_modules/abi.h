@@ -130,8 +130,28 @@ typedef char* envoy_dynamic_module_type_buffer_module_ptr;
 typedef char* envoy_dynamic_module_type_buffer_envoy_ptr;
 
 /**
- * envoy_dynamic_module_type_Header represents a key-value pair of an HTTP header owned by Envoy's
- * HeaderMap.
+ * envoy_dynamic_module_type_envoy_buffer represents a buffer owned by Envoy.
+ * This is to give the direct access to the buffer in Envoy.
+ */
+typedef struct {
+  envoy_dynamic_module_type_buffer_envoy_ptr ptr;
+  size_t length;
+} envoy_dynamic_module_type_envoy_buffer;
+
+/**
+ * envoy_dynamic_module_type_module_http_header represents a key-value pair of an HTTP header owned
+ * by the module.
+ */
+typedef struct {
+  envoy_dynamic_module_type_buffer_module_ptr key_ptr;
+  size_t key_length;
+  envoy_dynamic_module_type_buffer_module_ptr value_ptr;
+  size_t value_length;
+} envoy_dynamic_module_type_module_http_header;
+
+/**
+ * envoy_dynamic_module_type_http_header represents a key-value pair of an HTTP header owned by
+ * Envoy's HeaderMap.
  */
 typedef struct {
   envoy_dynamic_module_type_buffer_envoy_ptr key_ptr;
@@ -609,6 +629,121 @@ bool envoy_dynamic_module_callback_http_set_response_trailer(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
     envoy_dynamic_module_type_buffer_module_ptr value, size_t value_length);
+
+/**
+ * envoy_dynamic_module_callback_http_send_response is called by the module to send the response
+ * to the downstream.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param status_code is the status code of the response.
+ * @param headers_vector is the array of envoy_dynamic_module_type_module_http_header that contains
+ * the headers of the response.
+ * @param headers_vector_size is the size of the headers_vector.
+ * @param body is the pointer to the buffer of the body of the response.
+ * @param body_length is the length of the body.
+ */
+void envoy_dynamic_module_callback_http_send_response(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
+    envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
+    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_length);
+
+// ------------------- HTTP Request/Response body callbacks --------------------
+
+/**
+ * envoy_dynamic_module_callback_http_get_request_body_vector is called by the module to get the
+ * request body as a vector of buffers. The body is returned as an array of
+ * envoy_dynamic_module_type_envoy_buffer.
+ *
+ * PRECONDITION: The module must ensure that the result_buffer_vector is valid and has enough length
+ * to store all the buffers. The module can use
+ * envoy_dynamic_module_callback_http_get_request_body_vector_size to get the number of buffers
+ * before calling this function.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param result_buffer_vector is the pointer to the array of envoy_dynamic_module_type_envoy_buffer
+ * where the buffers of the body will be stored. The lifetime of the buffer is guaranteed until the
+ * end of the current event hook unless the setter callback is called.
+ * @return true if the body is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_request_body_vector(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
+/**
+ * envoy_dynamic_module_callback_http_get_request_body_vector_size is called by the module to get
+ * the number of buffers in the request body. Combined with
+ * envoy_dynamic_module_callback_http_get_request_body_vector, this can be used to iterate over all
+ * buffers in the request body.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param size is the pointer to the variable where the number of buffers will be stored.
+ * @return true if the body is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_request_body_vector_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size);
+
+/**
+ * envoy_dynamic_module_callback_http_append_request_body is called by the module to append the
+ * given data to the end of the request body.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param data is the pointer to the buffer of the data to be appended.
+ * @param length is the length of the data.
+ * @return true if the body is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_append_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length);
+
+/**
+ * envoy_dynamic_module_callback_http_drain_request_body is called by the module to drain the given
+ * number of bytes from the request body. If the number of bytes to drain is greater than
+ * the size of the body, the whole body will be drained.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param number_of_bytes is the number of bytes to drain.
+ * @return true if the body is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_drain_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes);
+
+/**
+ * This is the same as envoy_dynamic_module_callback_http_get_request_body_vector, but for the
+ * response body. See the comments on envoy_dynamic_module_callback_http_get_request_body_vector
+ * for more details.
+ */
+bool envoy_dynamic_module_callback_http_get_response_body_vector(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector);
+
+/**
+ * This is the same as envoy_dynamic_module_callback_http_get_request_body_vector_size, but for the
+ * response body. See the comments on
+ * envoy_dynamic_module_callback_http_get_request_body_vector_size for more details.
+ */
+bool envoy_dynamic_module_callback_http_get_response_body_vector_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size);
+
+/**
+ * This is the same as envoy_dynamic_module_callback_http_append_request_body, but for the response
+ * body. See the comments on envoy_dynamic_module_callback_http_append_request_body for more
+ * details.
+ */
+bool envoy_dynamic_module_callback_http_append_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length);
+
+/**
+ * This is the same as envoy_dynamic_module_callback_http_drain_request_body, but for the response
+ * body. See the comments on envoy_dynamic_module_callback_http_drain_request_body for more details.
+ */
+bool envoy_dynamic_module_callback_http_drain_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes);
 
 // ------------------------ Dynamic Metadata Callbacks -------------------------
 

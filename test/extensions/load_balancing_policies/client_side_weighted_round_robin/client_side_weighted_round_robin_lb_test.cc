@@ -20,7 +20,7 @@ public:
       std::shared_ptr<ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb> worker_lb)
       : lb_(std::move(lb)), worker_lb_(std::move(worker_lb)) {}
 
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) {
+  HostSelectionResponse chooseHost(LoadBalancerContext* context) {
     return worker_lb_->chooseHost(context);
   }
 
@@ -134,7 +134,7 @@ public:
       EXPECT_EQ(hostSet().healthy_hosts_[i], lb_->peekAnotherHost(nullptr));
     }
     for (auto i : picks) {
-      EXPECT_EQ(hostSet().healthy_hosts_[i], lb_->chooseHost(nullptr));
+      EXPECT_EQ(hostSet().healthy_hosts_[i], lb_->chooseHost(nullptr).host);
     }
   }
 
@@ -280,7 +280,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
   hostSet().runCallbacks({}, {});
   simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(5)));
   for (const auto& host_ptr : hostSet().hosts_) {
-    HostConstSharedPtr host = lb_->chooseHost(&lb_context_);
+    HostConstSharedPtr host = lb_->chooseHost(&lb_context_).host;
     // Hosts have equal weights, so chooseHost returns the current host.
     ASSERT_EQ(host, host_ptr);
     // Invoke the callback with an Orca load report.

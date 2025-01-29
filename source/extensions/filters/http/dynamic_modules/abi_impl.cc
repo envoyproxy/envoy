@@ -198,6 +198,31 @@ bool envoy_dynamic_module_callback_http_get_response_trailers(
   return getHeadersImpl(filter->response_trailers_, result_headers);
 }
 
+void envoy_dynamic_module_callback_http_send_response(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t status_code,
+    envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
+    envoy_dynamic_module_type_buffer_module_ptr body_ptr, size_t body_length) {
+  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+
+  std::function<void(ResponseHeaderMap & headers)> modify_headers = nullptr;
+  if (headers_vector != nullptr && headers_vector_size != 0) {
+    modify_headers = [headers_vector, headers_vector_size](ResponseHeaderMap& headers) {
+      for (size_t i = 0; i < headers_vector_size; i++) {
+        const auto& header = &headers_vector[i];
+        const absl::string_view key(static_cast<const char*>(header->key_ptr), header->key_length);
+        const absl::string_view value(static_cast<const char*>(header->value_ptr),
+                                      header->value_length);
+        headers.addCopy(Http::LowerCaseString(key), value);
+      }
+    };
+  }
+  const absl::string_view body =
+      body_ptr ? absl::string_view(static_cast<const char*>(body_ptr), body_length) : "";
+
+  filter->sendLocalReply(static_cast<Http::Code>(status_code), body, modify_headers, 0,
+                         "dynamic_module");
+}
+
 /**
  * Helper to get the metadata namespace from the stream info.
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
@@ -341,6 +366,118 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
   const auto& value = key_metadata->string_value();
   *result = const_cast<char*>(value.data());
   *result_length = value.size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_request_body_vector(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto buffer = filter->decoder_callbacks_->decodingBuffer();
+  if (!buffer) {
+    return false;
+  }
+  auto raw_slices = buffer->getRawSlices(std::nullopt);
+  auto counter = 0;
+  for (const auto& slice : raw_slices) {
+    result_buffer_vector[counter].length = slice.len_;
+    result_buffer_vector[counter].ptr = static_cast<char*>(slice.mem_);
+    counter++;
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_request_body_vector_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto buffer = filter->decoder_callbacks_->decodingBuffer();
+  if (!buffer) {
+    return false;
+  }
+  *size = buffer->getRawSlices(std::nullopt).size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_append_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (!filter->decoder_callbacks_->decodingBuffer()) {
+    return false;
+  }
+  filter->decoder_callbacks_->modifyDecodingBuffer([data, length](Buffer::Instance& buffer) {
+    buffer.add(absl::string_view(static_cast<const char*>(data), length));
+  });
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_drain_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (!filter->decoder_callbacks_->decodingBuffer()) {
+    return false;
+  }
+
+  filter->decoder_callbacks_->modifyDecodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
+    auto size = std::min(buffer.length(), number_of_bytes);
+    buffer.drain(size);
+  });
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_response_body_vector(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result_buffer_vector) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto buffer = filter->encoder_callbacks_->encodingBuffer();
+  if (!buffer) {
+    return false;
+  }
+  auto raw_slices = buffer->getRawSlices(std::nullopt);
+  auto counter = 0;
+  for (const auto& slice : raw_slices) {
+    result_buffer_vector[counter].length = slice.len_;
+    result_buffer_vector[counter].ptr = static_cast<char*>(slice.mem_);
+    counter++;
+  }
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_get_response_body_vector_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t* size) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto buffer = filter->encoder_callbacks_->encodingBuffer();
+  if (!buffer) {
+    return false;
+  }
+  *size = buffer->getRawSlices(std::nullopt).size();
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_append_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (!filter->encoder_callbacks_->encodingBuffer()) {
+    return false;
+  }
+  filter->encoder_callbacks_->modifyEncodingBuffer([data, length](Buffer::Instance& buffer) {
+    buffer.add(absl::string_view(static_cast<const char*>(data), length));
+  });
+  return true;
+}
+
+bool envoy_dynamic_module_callback_http_drain_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  if (!filter->encoder_callbacks_->encodingBuffer()) {
+    return false;
+  }
+
+  filter->encoder_callbacks_->modifyEncodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
+    auto size = std::min(buffer.length(), number_of_bytes);
+    buffer.drain(size);
+  });
   return true;
 }
 }

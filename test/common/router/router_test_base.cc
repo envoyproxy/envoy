@@ -45,8 +45,9 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
 
   EXPECT_CALL(callbacks_.route_->route_entry_.early_data_policy_, allowsEarlyDataForRequest(_))
       .WillRepeatedly(Invoke(Http::Utility::isSafeRequest));
-  ON_CALL(cm_.thread_local_cluster_, chooseHost(_))
-      .WillByDefault(Return(cm_.thread_local_cluster_.lb_.host_));
+  ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
+    return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+  }));
 }
 
 void RouterTestBase::expectResponseTimerCreate() {

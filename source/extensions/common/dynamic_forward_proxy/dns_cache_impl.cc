@@ -121,13 +121,18 @@ DnsCacheImpl::loadDnsCacheEntryWithForceRefresh(absl::string_view raw_host, uint
     if (tls_host != primary_hosts_.end() && tls_host->second->host_info_->firstResolveComplete()) {
       host_info = tls_host->second->host_info_;
     }
-  };
+  }
 
   if (host_info) {
     ENVOY_LOG(debug, "cache hit for host '{}'", host);
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reresolve_null_addresses") &&
         !is_proxy_lookup && *host_info && (*host_info)->address() == nullptr) {
       ENVOY_LOG(debug, "ignoring null address cache hit for miss for host '{}'", host);
+      ignore_cached_entries = true;
+    }
+    if (config_.disable_dns_refresh_on_failure() && !is_proxy_lookup &&
+        (*host_info)->resolutionStatus() == Network::DnsResolver::ResolutionStatus::Failure) {
+      ENVOY_LOG(debug, "ignoring failed address cache hit for miss for host '{}'", host);
       ignore_cached_entries = true;
     }
     if (!ignore_cached_entries) {
@@ -326,10 +331,14 @@ void DnsCacheImpl::forceRefreshHosts() {
       primary_host.second->active_query_->cancel(
           Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
       primary_host.second->active_query_ = nullptr;
-      primary_host.second->timeout_timer_->disableTimer();
+      if (timeout_interval_.count() > 0) {
+        primary_host.second->timeout_timer_->disableTimer();
+      }
     }
 
-    ASSERT(!primary_host.second->timeout_timer_->enabled());
+    if (timeout_interval_.count() > 0) {
+      ASSERT(!primary_host.second->timeout_timer_->enabled());
+    }
     primary_host.second->refresh_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
     ENVOY_LOG_EVENT(debug, "force_refresh_host", "force refreshing host='{}'", primary_host.first);
   }
@@ -354,8 +363,10 @@ void DnsCacheImpl::stop() {
       primary_host.second->active_query_ = nullptr;
     }
 
-    primary_host.second->timeout_timer_->disableTimer();
-    ASSERT(!primary_host.second->timeout_timer_->enabled());
+    if (timeout_interval_.count() > 0) {
+      primary_host.second->timeout_timer_->disableTimer();
+      ASSERT(!primary_host.second->timeout_timer_->enabled());
+    }
     primary_host.second->refresh_timer_->disableTimer();
     ENVOY_LOG_EVENT(debug, "stop_host", "stop host='{}'", primary_host.first);
   }
@@ -367,8 +378,9 @@ void DnsCacheImpl::startResolve(const std::string& host, PrimaryHostInfo& host_i
   ASSERT(host_info.active_query_ == nullptr);
 
   stats_.dns_query_attempt_.inc();
-
-  host_info.timeout_timer_->enableTimer(timeout_interval_, nullptr);
+  if (timeout_interval_.count() > 0) {
+    host_info.timeout_timer_->enableTimer(timeout_interval_, nullptr);
+  }
   host_info.active_query_ = resolver_->resolve(
       host_info.host_info_->resolvedHost(), dns_lookup_family_,
       [this, host](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
@@ -436,7 +448,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   if (!from_cache) {
     first_resolve = !primary_host_info->host_info_->firstResolveComplete();
-    primary_host_info->timeout_timer_->disableTimer();
+    if (timeout_interval_.count() > 0) {
+      primary_host_info->timeout_timer_->disableTimer();
+    }
     primary_host_info->active_query_ = nullptr;
 
     if (status == Network::DnsResolver::ResolutionStatus::Failure) {
@@ -496,6 +510,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                     new_address ? new_address->asStringView() : "<empty>");
     primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
     primary_host_info->host_info_->setDetails(details_with_maybe_trace);
+    primary_host_info->host_info_->setResolutionStatus(status);
 
     absl::Status host_status = runAddUpdateCallbacks(host, primary_host_info->host_info_);
     ENVOY_BUG(host_status.ok(),
@@ -508,6 +523,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     // non-null->null resolutions we don't update the address so will use a
     // previously resolved address + details.
     primary_host_info->host_info_->setDetails(details_with_maybe_trace);
+    primary_host_info->host_info_->setResolutionStatus(status);
   }
 
   if (first_resolve) {
@@ -526,10 +542,13 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', refresh rate {} ms", host,
               dns_ttl.count() * 1000);
   } else {
-    const uint64_t refresh_interval = primary_host_info->failure_backoff_strategy_->nextBackOffMs();
-    primary_host_info->refresh_timer_->enableTimer(std::chrono::milliseconds(refresh_interval));
-    ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', (failure) refresh rate {} ms", host,
-              refresh_interval);
+    if (!config_.disable_dns_refresh_on_failure()) {
+      const uint64_t refresh_interval =
+          primary_host_info->failure_backoff_strategy_->nextBackOffMs();
+      primary_host_info->refresh_timer_->enableTimer(std::chrono::milliseconds(refresh_interval));
+      ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', (failure) refresh rate {} ms", host,
+                refresh_interval);
+    }
   }
 }
 

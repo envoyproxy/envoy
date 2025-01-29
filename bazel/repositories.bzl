@@ -219,11 +219,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_features")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive(
-        name = "envoy_examples",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:envoy_examples.patch"],
-    )
+    external_http_archive("envoy_examples")
 
     _com_github_maxmind_libmaxminddb()
 
@@ -870,6 +866,8 @@ def _com_github_luajit_luajit():
 def _com_github_google_tcmalloc():
     external_http_archive(
         name = "com_github_google_tcmalloc",
+        patches = ["@envoy//bazel:tcmalloc.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_gperftools_gperftools():

@@ -50,6 +50,11 @@ public:
   }
   void encodeComplete() override;
 
+  void sendLocalReply(Code code, absl::string_view body,
+                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details);
+
   // The callbacks for the filter. They are only valid until onDestroy() is called.
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;

@@ -11,6 +11,7 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/http/mocks.h"
@@ -57,6 +58,7 @@ public:
   ~MockServerFactoryContext() override;
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
+  MOCK_METHOD(Config::XdsManager&, xdsManager, ());
   MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, ());
   MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
   MOCK_METHOD(const Server::Options&, options, ());
@@ -89,6 +91,7 @@ public:
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
 
+  testing::NiceMock<Config::MockXdsManager> xds_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
@@ -141,6 +144,7 @@ public:
   ~StatelessMockServerFactoryContext() override = default;
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
+  MOCK_METHOD(Config::XdsManager&, xdsManager, ());
   MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, ());
   MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
   MOCK_METHOD(const Server::Options&, options, ());
