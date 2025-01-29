@@ -25,7 +25,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // Redis Proxy :ref:`configuration overview <config_network_filters_redis_proxy>`.
 // [#extension: envoy.filters.network.redis_proxy]
 
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message RedisProxy {
   // Redis connection pool settings.
   // [#next-free-field: 9]
@@ -234,10 +234,6 @@ message RedisProxy {
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no password is set" error will be returned.
   api.v2.core.DataSource downstream_auth_password = 6 [(udpa.annotations.sensitive) = true];
-
-  // A List of custom command names already defined on Redis other than the already supported commands,
-  // the list of commands mentioned below will get passed on to Redis.
-  repeated string redis_custom_command_names = 7;
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
