@@ -28,6 +28,8 @@ build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
 build --enable_platform_specific_config
 build --incompatible_merge_fixed_and_default_shell_env
+# A workaround for slow ICU download.
+build --http_timeout_scaling=2.0
 
 # Pass CC, CXX and LLVM_CONFIG variables from the environment.
 # We assume they have stable values, so this won't cause action cache misses.
