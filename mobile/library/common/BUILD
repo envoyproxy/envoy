@@ -97,11 +97,11 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "mobile_process_wide_lib",
-    hdrs = [
-        "mobile_process_wide.h",
-    ],
     srcs = [
         "mobile_process_wide.cc",
+    ],
+    hdrs = [
+        "mobile_process_wide.h",
     ],
     repository = "@envoy",
     deps = [
