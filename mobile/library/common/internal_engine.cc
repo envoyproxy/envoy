@@ -12,6 +12,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/synchronization/notification.h"
+#include "library/common/mobile_process_wide.h"
 #include "library/common/network/proxy_api.h"
 #include "library/common/stats/utility.h"
 
@@ -22,13 +23,9 @@ constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(30);
 constexpr absl::string_view IPV6_PROBE_ADDRESS = "2001:4860:4860::8888";
 constexpr uint32_t IPV6_PROBE_PORT = 53;
 
-// There is only one shared static Logger::Context instance for all Envoy Mobile engines.
-// This helps avoid issues on Logger::Context destruction when the previous saved context
-// could be activated in a thread-unsafe manner.
-void initOnceLoggerContext(const OptionsImplBase& options) {
-  Thread::MutexBasicLockable& log_lock = MUTABLE_CONSTRUCT_ON_FIRST_USE(Thread::MutexBasicLockable);
-  MUTABLE_CONSTRUCT_ON_FIRST_USE(Logger::Context, options.logLevel(), options.logFormat(), log_lock,
-                                 options.logFormatEscaped(), options.enableFineGrainLogging());
+// There is only one shared MobileProcessWide instance for all Envoy Mobile engines.
+MobileProcessWide& initOnceMobileProcessWide(const OptionsImplBase& options) {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(MobileProcessWide, options);
 }
 } // namespace
 
@@ -102,7 +99,7 @@ envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
 // copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
 // `std::function`.
 envoy_status_t InternalEngine::run(std::shared_ptr<OptionsImplBase> options) {
-  initOnceLoggerContext(*options);
+  initOnceMobileProcessWide(*options);
   Thread::Options thread_options;
   thread_options.priority_ = thread_priority_;
   main_thread_ = thread_factory_->createThread([this, options]() mutable -> void { main(options); },
