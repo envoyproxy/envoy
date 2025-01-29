@@ -447,7 +447,7 @@ envoy_cc_library(
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "//source/extensions/quic/connection_id_generator:envoy_deterministic_connection_id_generator_config",
+        "//source/extensions/quic/connection_id_generator/deterministic:envoy_deterministic_connection_id_generator_config",
         "//source/server:active_udp_listener",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/connection_id_generator/v3:pkg_cc_proto",

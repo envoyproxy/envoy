@@ -26,7 +26,7 @@ envoy_extension_cc_test(
     tags = ["nofips"],
     deps = [
         ":matchers",
-        "//source/extensions/quic/connection_id_generator:envoy_deterministic_connection_id_generator_lib",
+        "//source/extensions/quic/connection_id_generator/deterministic:envoy_deterministic_connection_id_generator_lib",
         "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
     ],
 )

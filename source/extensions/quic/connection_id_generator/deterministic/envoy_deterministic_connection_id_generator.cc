@@ -1,4 +1,4 @@
-#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator.h"
+#include "source/extensions/quic/connection_id_generator/deterministic/envoy_deterministic_connection_id_generator.h"
 
 #include <cstdint>
 
@@ -9,6 +9,9 @@
 
 namespace Envoy {
 namespace Quic {
+namespace Extensions {
+namespace ConnectionIdGenerator {
+namespace Deterministic {
 
 absl::optional<quic::QuicConnectionId>
 EnvoyDeterministicConnectionIdGenerator::GenerateNextConnectionId(
@@ -124,5 +127,8 @@ EnvoyDeterministicConnectionIdGeneratorFactory::getCompatibleConnectionIdWorkerS
   };
 }
 
+} // namespace Deterministic
+} // namespace ConnectionIdGenerator
+} // namespace Extensions
 } // namespace Quic
 } // namespace Envoy
