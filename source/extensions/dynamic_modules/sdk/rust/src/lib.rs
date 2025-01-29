@@ -380,14 +380,10 @@ pub trait EnvoyHttpFilter {
   /// // This is the test setup.
   /// let mut envoy_filter = MockEnvoyHttpFilter::default();
   /// // Mutable static storage is used for the test to simulate the response body operation.
-  /// static mut HELLO: [u8; 5] = *b"hello";
-  /// static mut WORLD: [u8; 5] = *b"world";
-  /// envoy_filter.expect_get_request_body().returning(|| {
-  ///   Some(vec![
-  ///     EnvoyMutBuffer::new(unsafe { &mut HELLO }),
-  ///     EnvoyMutBuffer::new(unsafe { &mut WORLD }),
-  ///   ])
-  /// });
+  /// static mut BUFFER: [u8; 10] = *b"helloworld";
+  /// envoy_filter
+  ///   .expect_get_request_body()
+  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
   /// envoy_filter.expect_drain_request_body().return_const(true);
   ///
   ///
@@ -440,14 +436,10 @@ pub trait EnvoyHttpFilter {
   /// // This is the test setup.
   /// let mut envoy_filter = MockEnvoyHttpFilter::default();
   /// // Mutable static storage is used for the test to simulate the response body operation.
-  /// static mut HELLO: [u8; 5] = *b"hello";
-  /// static mut WORLD: [u8; 5] = *b"world";
-  /// envoy_filter.expect_get_response_body().returning(|| {
-  ///   Some(vec![
-  ///     EnvoyMutBuffer::new(unsafe { &mut HELLO }),
-  ///     EnvoyMutBuffer::new(unsafe { &mut WORLD }),
-  ///   ])
-  /// });
+  /// static mut BUFFER: [u8; 10] = *b"helloworld";
+  /// envoy_filter
+  ///   .expect_get_response_body()
+  ///   .returning(|| Some(vec![EnvoyMutBuffer::new(unsafe { &mut BUFFER })]));
   /// envoy_filter.expect_drain_response_body().return_const(true);
   ///
   ///
