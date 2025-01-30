@@ -8,6 +8,7 @@
 #include "envoy/extensions/http/cache/redis_http_cache/v3/redis_http_cache.pb.h"
 #include "envoy/extensions/http/cache/redis_http_cache/v3/redis_http_cache.pb.validate.h"
 #include "source/extensions/http/cache/redis_http_cache/redis_http_cache_lookup.h"
+#include "source/extensions/http/cache/redis_http_cache/redis_http_cache_insert.h"
 
 namespace Envoy {
 namespace Extensions {

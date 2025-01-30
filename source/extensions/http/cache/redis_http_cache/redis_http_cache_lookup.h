@@ -1,8 +1,8 @@
 //#include "envoy/thread_local/thread_local.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 
-#include "envoy/extensions/http/cache/redis_http_cache/v3/redis_http_cache.pb.h"
-#include "envoy/extensions/http/cache/redis_http_cache/v3/redis_http_cache.pb.validate.h"
+//#include "envoy/extensions/http/cache/redis_http_cache/v3/redis_http_cache.pb.h"
+//#include "envoy/extensions/http/cache/redis_http_cache/v3/redis_http_cache.pb.validate.h"
 //#include "source/extensions/common/redis/async_redis_client_impl.h"
 #include "source/extensions/http/cache/redis_http_cache/redis_http_cache_client.h"
 
@@ -27,7 +27,7 @@ public:
   // From LookupContext
   void getHeaders(LookupHeadersCallback&&/* cb*/) final;// {ASSERT(false);}
   void getBody(const AdjustedByteRange& /*range*/, LookupBodyCallback&&/* cb*/) final; // {ASSERT(false);}
-  void getTrailers(LookupTrailersCallback&&/* cb*/) final {ASSERT(false);}
+  void getTrailers(LookupTrailersCallback&&/* cb*/) final;
   void onDestroy() final {/*ASSERT(false);*/}
   // This shouldn't be necessary since onDestroy is supposed to always be called, but in some
   // tests it is not.
@@ -40,8 +40,10 @@ public:
 
   LookupHeadersCallback cb_;
   LookupBodyCallback cb1_;
+  LookupTrailersCallback cb2_;
 
 private:
+  // TODO: probaly some of those methods are not required.
   void doCacheMiss();
   void doCacheEntryInvalid();
   void getHeaderBlockFromFile();
@@ -64,6 +66,7 @@ private:
   const LookupRequest lookup_;
   //Extensions::Common::Redis::RedisAsyncClient& redis_client_;
   Upstream::ClusterManager& cluster_manager_; 
+  bool has_trailers_;
 };
 
 } // namespace RedisHttpCache

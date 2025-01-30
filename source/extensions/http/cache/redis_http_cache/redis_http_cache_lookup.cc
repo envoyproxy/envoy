@@ -9,10 +9,14 @@ namespace Cache {
 namespace RedisHttpCache {
 
 void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
+    // TODO: can I capture the cb instead of storing it in this.cb_?
     cb_ = std::move(cb);
 
   // TODO: handle here situation when client cannot connect to the redis server.
     // maybe connect it when the first request comes and it is not connected.
+
+    // Get trailers proto and add headers.
+    // Convert to string and add to redis command.
 
   tls_slot_->send(fmt::format(RedisGetHeadersCmd, stableHashKey(lookup_.key())),
     [this ] (bool success, std::string redis_value) mutable {
@@ -50,7 +54,6 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
 
     if (header.headers().size() == 0) {
         std::cout << "Nothing found in the database.\n";
-        // TODO: end_stream should be taken based on info from cache.
 
         (cb_)(LookupResult{}, /* end_stream (ignored) = */ false);
         return;
@@ -59,12 +62,41 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     // get headers from proto.
     Http::ResponseHeaderMapPtr headers = headersFromHeaderProto(header);
 
-    // TODO: get end_stream from header block from redis. 
-    // Do not use fixed length of the body.
-    /*std::move*/(cb_)(lookup_.makeLookupResult(std::move(headers), metadataFromHeaderProto(header), 6), false);
+    auto body_size = header.body_size();
+    has_trailers_ = header.trailers();
+    // This is stream end when there is no body and there are no trailers in the cache.
+    bool stream_end = (body_size == 0) && (!has_trailers_);
+    /*std::move*/(cb_)(lookup_.makeLookupResult(std::move(headers), metadataFromHeaderProto(header), body_size), stream_end);
     }
 );
 }
+
+void RedisHttpCacheLookupContext::getTrailers(LookupTrailersCallback&& cb) {
+    cb2_ = std::move(cb);
+
+  tls_slot_->send(fmt::format(RedisGetTrailersCmd, stableHashKey(lookup_.key())),
+    [this ] (bool success, std::string redis_value) mutable {
+
+    if (!success) {
+        // TODO: make sure that this path is tested.
+        ASSERT(false);
+        std::cout << "Nothing found in the database.\n";
+        // TODO: end_stream should be taken based on info from cache.
+
+        //(cb_)(LookupResult{}, /* end_stream (ignored) = */ true); true -> will not call getBody.
+        return;
+    }
+
+    // We need to strip quotes on both sides of the string.
+    // TODO: maybe move to redis async client.
+    redis_value = redis_value.substr(1, redis_value.length() - 2);
+
+    CacheFileTrailer trailers;
+    trailers.ParseFromString(redis_value);
+    cb2_(trailersFromTrailerProto(trailers));
+    }
+);
+} 
     
 } // namespace RedisHttpCache
 } // namespace Cache

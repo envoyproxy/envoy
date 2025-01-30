@@ -31,6 +31,10 @@ namespace RedisHttpCache {
 // entry does not exist, it means that 
 
 constexpr std::string_view RedisGetHeadersCmd = "get cache-{}";
+constexpr std::string_view RedisGetTrailersCmd = "get cache-{}-trailers";
+
+
+constexpr std::string_view RedisInsertTrailersCmd = "set cache-{}-trailers {}";
 
 } // namespace RedisHttpCache
 } // namespace Cache

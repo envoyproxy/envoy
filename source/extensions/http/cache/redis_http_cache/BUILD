@@ -23,11 +23,13 @@ envoy_cc_extension(
         "redis_http_cache.cc",
         "cache_header_proto_util.cc",
         "redis_http_cache_lookup.cc",
+        "redis_http_cache_insert.cc",
         "redis_http_cache_client.cc",
     ],
     hdrs = [
         "redis_http_cache.h",
         "redis_http_cache_lookup.h",
+        "redis_http_cache_insert.h",
         "redis_http_cache_client.h",
         "cache_header_proto_util.h",
     ],
