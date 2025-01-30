@@ -37,7 +37,7 @@ absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
   auto ret = std::unique_ptr<VhdsSubscription>(new VhdsSubscription(
       config_update_info, factory_context, stat_prefix, route_config_provider, status));
   RETURN_IF_ERROR(status);
-  return std::move(ret);
+  return ret;
 }
 
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
