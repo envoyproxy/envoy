@@ -111,6 +111,11 @@ new_features:
   change: |
     Added :ref:`max_metadata_size <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_metadata_size>` to make
     HTTP/2 metadata limits configurable.
+- area: http
+  change: |
+    Added :ref:`disable_huffman <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.disable_huffman>` disable huffman
+    encoding of headers from envoy to the receiver. This is useful in scenarios where the bandwidth saved from huffman
+    encoding is not worth the cpu cost. e.g. for localhost, sidecar traffic. This currently only works with nghttp2.
 - area: tcp_proxy
   change: |
     Added support for :ref:`backoff_options <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.backoff_options>`
