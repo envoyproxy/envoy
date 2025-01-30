@@ -220,6 +220,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_examples")
+    external_http_archive("toolchains_llvm")
 
     _com_github_maxmind_libmaxminddb()
 

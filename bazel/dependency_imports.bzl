@@ -18,6 +18,7 @@ load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
+load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
 # go version for rules_go
 GO_VERSION = "1.23.1"
@@ -174,6 +175,11 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
 
     protoc_gen_jsonschema_go_dependencies()
     rules_proto_grpc_toolchains()
+
+    llvm_toolchain(
+        name = "llvm_toolchain",
+        llvm_version = "14.0.0",
+    )
 
 def envoy_download_go_sdks(go_version):
     go_download_sdk(
