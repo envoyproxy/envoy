@@ -137,7 +137,7 @@ public:
                                   std::chrono::seconds initialization_timer);
 
   ~MetadataCredentialsProviderBase() override {
-    // Cancel our callback handle, to handle the case that we are exiting behind our aws cluster
+    // Cancel our callback handle, to handle the case that we are exiting behind AWS cluster
     // manager
     if (callback_handle_) {
       callback_handle_->cancel();
@@ -226,7 +226,6 @@ protected:
  */
 class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBase,
                                            public Singleton::Instance,
-
                                            public MetadataFetcher::MetadataReceiver {
 public:
   InstanceProfileCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
