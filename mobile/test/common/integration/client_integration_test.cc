@@ -71,7 +71,8 @@ public:
     Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
     Quic::forceRegisterQuicServerTransportSocketConfigFactory();
     Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
-    Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
+    Quic::Extensions::ConnectionIdGenerator::Deterministic::
+        forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
     // For H2 tests.
     Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
   }
