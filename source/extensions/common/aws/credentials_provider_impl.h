@@ -136,6 +136,14 @@ public:
                                   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                   std::chrono::seconds initialization_timer);
 
+  ~MetadataCredentialsProviderBase() override {
+    // Cancel our callback handle, to handle the case that we are exiting behind our aws cluster
+    // manager
+    if (callback_handle_) {
+      callback_handle_->cancel();
+    }
+  };
+
   Credentials getCredentials() override;
 
   // Get the Metadata credentials cache duration.
@@ -217,7 +225,7 @@ protected:
  * https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#instance-metadata-security-credentials
  */
 class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBase,
-public Singleton::Instance,
+                                           public Singleton::Instance,
 
                                            public MetadataFetcher::MetadataReceiver {
 public:
@@ -258,7 +266,7 @@ private:
  * https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html#enable_task_iam_roles
  */
 class ContainerCredentialsProvider : public MetadataCredentialsProviderBase,
-public Singleton::Instance,
+                                     public Singleton::Instance,
                                      public MetadataFetcher::MetadataReceiver {
 public:
   ContainerCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
