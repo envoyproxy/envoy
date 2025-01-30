@@ -3593,16 +3593,6 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
-    name = "quic_core_qpack_blocking_manager_lib",
-    srcs = ["quiche/quic/core/qpack/qpack_blocking_manager.cc"],
-    hdrs = ["quiche/quic/core/qpack/qpack_blocking_manager.h"],
-    deps = [
-        ":quic_core_types_lib",
-        ":quic_platform_base",
-    ],
-)
-
-envoy_quic_cc_library(
     name = "quic_core_new_qpack_blocking_manager_lib",
     srcs = ["quiche/quic/core/qpack/new_qpack_blocking_manager.cc"],
     hdrs = ["quiche/quic/core/qpack/new_qpack_blocking_manager.h"],
@@ -3619,7 +3609,6 @@ envoy_quic_cc_library(
     hdrs = ["quiche/quic/core/qpack/qpack_blocking_manager_shim.h"],
     deps = [
         ":quic_core_new_qpack_blocking_manager_lib",
-        ":quic_core_qpack_blocking_manager_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
     ],
