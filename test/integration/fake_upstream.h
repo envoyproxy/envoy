@@ -75,9 +75,12 @@ public:
     absl::MutexLock lock(&lock_);
     return body_.length();
   }
-  Buffer::Instance& body() {
+  Buffer::OwnedImpl body() {
     absl::MutexLock lock(&lock_);
-    return body_;
+    Buffer::OwnedImpl body_ret;
+    body_ret.move(body_);
+    ASSERT(body_.length() == 0);
+    return body_ret;
   }
   bool complete() {
     absl::MutexLock lock(&lock_);
