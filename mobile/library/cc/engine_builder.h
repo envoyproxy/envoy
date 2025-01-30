@@ -40,6 +40,7 @@ public:
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
+  EngineBuilder& setDisableDnsRefreshOnFailure(bool dns_refresh_on_failure);
   EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
   EngineBuilder& setDnsNumRetries(uint32_t dns_num_retries);
   EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
@@ -152,7 +153,8 @@ private:
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
   int dns_query_timeout_seconds_ = 5;
-  absl::optional<uint32_t> dns_num_retries_ = absl::nullopt;
+  bool disable_dns_refresh_on_failure_{false};
+  absl::optional<uint32_t> dns_num_retries_ = 3;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
   int h2_connection_keepalive_timeout_seconds_ = 10;
   std::string app_version_ = "unspecified";

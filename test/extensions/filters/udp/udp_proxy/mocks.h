@@ -107,12 +107,12 @@ public:
 
   MOCK_METHOD(void, onStreamReady,
               (StreamInfo::StreamInfo * info, std::unique_ptr<HttpUpstream>&& upstream,
-               Upstream::HostDescriptionConstSharedPtr& host,
+               const Upstream::HostDescription& host,
                const Network::ConnectionInfoProvider& address_provider,
                Ssl::ConnectionInfoConstSharedPtr ssl_info));
   MOCK_METHOD(void, onStreamFailure,
               (ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
-               Upstream::HostDescriptionConstSharedPtr host));
+               const Upstream::HostDescription& host));
   MOCK_METHOD(void, resetIdleTimer, ());
 };
 

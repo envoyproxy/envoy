@@ -140,7 +140,6 @@ message HttpProtocolOptions {
     option (validate.required) = true;
 
     // To explicitly configure either HTTP/1 or HTTP/2 (but not both!) use ``explicit_http_config``.
-    // If the ``explicit_http_config`` is empty, HTTP/1.1 is used.
     ExplicitHttpConfig explicit_http_config = 3;
 
     // This allows switching on protocol based on what protocol the downstream

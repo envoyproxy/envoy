@@ -538,7 +538,7 @@ public:
   /**
    * @return true if the trace span should be sampled.
    */
-  virtual bool traceSampled() const PURE;
+  virtual absl::optional<bool> traceSampled() const PURE;
 
   /**
    * @return true if host name should be suffixed with "-shadow".
@@ -1609,7 +1609,7 @@ public:
       Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
       GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
       Upstream::ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
-      Upstream::LoadBalancerContext* ctx) const PURE;
+      Upstream::LoadBalancerContext* ctx, const Protobuf::Message& config) const PURE;
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;

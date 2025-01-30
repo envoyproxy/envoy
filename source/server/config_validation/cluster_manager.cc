@@ -15,7 +15,7 @@ absl::StatusOr<ClusterManagerPtr> ValidationClusterManagerFactory::clusterManage
       bootstrap, *this, context_, stats_, tls_, context_.runtime(), context_.localInfo(),
       context_.accessLogManager(), context_.mainThreadDispatcher(), context_.admin(),
       context_.messageValidationContext(), context_.api(), http_context_, context_.grpcContext(),
-      context_.routerContext(), server_, creation_status)};
+      context_.routerContext(), server_, context_.xdsManager(), creation_status)};
   RETURN_IF_NOT_OK(creation_status);
   return cluster_manager;
 }

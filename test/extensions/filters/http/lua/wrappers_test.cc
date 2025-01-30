@@ -696,6 +696,48 @@ TEST_F(LuaStreamInfoWrapperTest, GetEmptyRouteName) {
   wrapper.reset();
 }
 
+TEST_F(LuaStreamInfoWrapperTest, GetVirtualClusterName) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      testPrint(object:virtualClusterName())
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  const absl::optional<std::string> name = absl::make_optional<std::string>("test_virtual_cluster");
+  ON_CALL(stream_info, virtualClusterName()).WillByDefault(testing::ReturnRef(name));
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("test_virtual_cluster"));
+  start("callMe");
+  wrapper.reset();
+}
+
+TEST_F(LuaStreamInfoWrapperTest, GetEmptyVirtualClusterName) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      testPrint(object:virtualClusterName())
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  const absl::optional<std::string> name = absl::nullopt;
+  ON_CALL(stream_info, virtualClusterName()).WillByDefault(testing::ReturnRef(name));
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint(""));
+  start("callMe");
+  wrapper.reset();
+}
+
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters

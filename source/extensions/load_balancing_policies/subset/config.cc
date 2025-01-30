@@ -70,28 +70,34 @@ SubsetLbFactory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
   return std::make_unique<ThreadAwareLb>(std::move(lb_factory));
 }
 
-Upstream::LoadBalancerConfigPtr
+absl::StatusOr<Upstream::LoadBalancerConfigPtr>
 SubsetLbFactory::loadConfig(Server::Configuration::ServerFactoryContext& factory_context,
                             const Protobuf::Message& config) {
-  auto active_or_legacy = Common::ActiveOrLegacy<SubsetLbProto, ClusterProto>::get(&config);
-  ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
-
-  if (active_or_legacy.hasLegacy()) {
-    if (active_or_legacy.legacy()->lb_policy() ==
-        envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(
-                          active_or_legacy.legacy()->lb_policy())));
-    }
-    return std::make_unique<Upstream::SubsetLoadBalancerConfig>(factory_context,
-                                                                *active_or_legacy.legacy());
-  }
+  ASSERT(dynamic_cast<const SubsetLbProto*>(&config) != nullptr);
+  const SubsetLbProto& typed_config = dynamic_cast<const SubsetLbProto&>(config);
 
   // Load the subset load balancer configuration. This will contains child load balancer
   // config and child load balancer factory.
-  return std::make_unique<Upstream::SubsetLoadBalancerConfig>(factory_context,
-                                                              *active_or_legacy.active());
+  absl::Status status = absl::OkStatus();
+  auto lb_config =
+      std::make_unique<Upstream::SubsetLoadBalancerConfig>(factory_context, typed_config, status);
+  RETURN_IF_NOT_OK_REF(status);
+  return lb_config;
+}
+
+absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+SubsetLbFactory::loadLegacy(Server::Configuration::ServerFactoryContext& factory_context,
+                            const Upstream::ClusterProto& cluster) {
+  if (cluster.lb_policy() == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
+    return absl::InvalidArgumentError(
+        fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy())));
+  }
+  absl::Status status = absl::OkStatus();
+  auto lb_config =
+      std::make_unique<Upstream::SubsetLoadBalancerConfig>(factory_context, cluster, status);
+  RETURN_IF_NOT_OK_REF(status);
+  return lb_config;
 }
 
 /**

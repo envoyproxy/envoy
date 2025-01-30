@@ -261,6 +261,35 @@ TEST_P(ClientIntegrationTest, BasicWithCares) {
 }
 #endif
 
+TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
+  builder_.setLogLevel(Logger::Logger::debug);
+  std::atomic<bool> found_cache_miss{false};
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
+    if (msg.find("ignoring failed address cache hit for miss for host 'doesnotexist") !=
+        std::string::npos) {
+      found_cache_miss = true;
+    }
+  };
+  builder_.setLogger(std::move(logger));
+  builder_.addRuntimeGuard("dns_nodata_noname_is_success", false);
+  builder_.setDisableDnsRefreshOnFailure(true);
+  initialize();
+
+  default_request_headers_.setHost("doesnotexist");
+  stream_ = createNewStream(createDefaultStreamCallbacks());
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  terminal_callback_.waitReady();
+
+  stream_ = createNewStream(createDefaultStreamCallbacks());
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  terminal_callback_.waitReady();
+
+  EXPECT_TRUE(found_cache_miss);
+}
+
 TEST_P(ClientIntegrationTest, LargeResponse) {
   initialize();
   std::string data(1024 * 32, 'a');

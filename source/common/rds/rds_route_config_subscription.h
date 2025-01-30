@@ -43,14 +43,14 @@ struct RdsStats {
 class RdsRouteConfigSubscription : Envoy::Config::SubscriptionCallbacks,
                                    protected Logger::Loggable<Logger::Id::rds> {
 public:
-  RdsRouteConfigSubscription(RouteConfigUpdatePtr&& config_update,
-                             Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
-                             const envoy::config::core::v3::ConfigSource& config_source,
-                             const std::string& route_config_name,
-                             const uint64_t manager_identifier,
-                             Server::Configuration::ServerFactoryContext& factory_context,
-                             const std::string& stat_prefix, const std::string& rds_type,
-                             RouteConfigProviderManager& route_config_provider_manager);
+  static absl::StatusOr<std::unique_ptr<RdsRouteConfigSubscription>>
+  create(RouteConfigUpdatePtr&& config_update,
+         Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
+         const envoy::config::core::v3::ConfigSource& config_source,
+         const std::string& route_config_name, const uint64_t manager_identifier,
+         Server::Configuration::ServerFactoryContext& factory_context,
+         const std::string& stat_prefix, const std::string& rds_type,
+         RouteConfigProviderManager& route_config_provider_manager);
 
   ~RdsRouteConfigSubscription() override;
 
@@ -59,6 +59,17 @@ public:
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
 
   const Init::Target& initTarget() { return parent_init_target_; }
+
+protected:
+  RdsRouteConfigSubscription(RouteConfigUpdatePtr&& config_update,
+                             Envoy::Config::OpaqueResourceDecoderSharedPtr&& resource_decoder,
+                             const envoy::config::core::v3::ConfigSource& config_source,
+                             const std::string& route_config_name,
+                             const uint64_t manager_identifier,
+                             Server::Configuration::ServerFactoryContext& factory_context,
+                             const std::string& stat_prefix, const std::string& rds_type,
+                             RouteConfigProviderManager& route_config_provider_manager,
+                             absl::Status& creation_status);
 
 private:
   // Config::SubscriptionCallbacks

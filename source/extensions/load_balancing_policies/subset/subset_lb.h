@@ -42,7 +42,7 @@ public:
   ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+  HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
   // TODO(alyssawilk) implement for non-metadata match.
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
   // Pool selection not implemented.
@@ -199,6 +199,7 @@ public:
     absl::optional<OverrideHost> overrideHostToSelect() const override {
       return wrapped_->overrideHostToSelect();
     }
+    void onAsyncHostSelection(Upstream::HostConstSharedPtr&&) override {}
 
   private:
     LoadBalancerContext* wrapped_;
@@ -220,7 +221,7 @@ private:
   class LbSubset {
   public:
     virtual ~LbSubset() = default;
-    virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) const PURE;
+    virtual HostSelectionResponse chooseHost(LoadBalancerContext* context) const PURE;
     virtual void pushHost(uint32_t priority, HostSharedPtr host) PURE;
     virtual void finalize(uint32_t priority, uint64_t seed) PURE;
     virtual bool active() const PURE;
@@ -234,7 +235,7 @@ private:
         : subset_(subset_lb, locality_weight_aware, scale_locality_weight) {}
 
     // Subset
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context) const override {
+    HostSelectionResponse chooseHost(LoadBalancerContext* context) const override {
       return subset_.lb_->chooseHost(context);
     }
     void pushHost(uint32_t priority, HostSharedPtr host) override {
@@ -280,7 +281,7 @@ private:
 
   class SingleHostLbSubset : public LbSubset {
     // Subset
-    HostConstSharedPtr chooseHost(LoadBalancerContext*) const override { return subset_; }
+    HostSelectionResponse chooseHost(LoadBalancerContext*) const override { return subset_; }
     // This is called at most once for every update for single host subset.
     void pushHost(uint32_t priority, HostSharedPtr host) override {
       new_hosts_[priority] = std::move(host);
