@@ -150,7 +150,7 @@ public:
   // etc.
   virtual std::shared_ptr<ActiveCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-           Server::Configuration::FactoryContext& context) PURE;
+           Server::Configuration::ServerFactoryContext& context) PURE;
 
 private:
   const std::string name_;

@@ -18,7 +18,13 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP Cache Filter]
-
+//
+// .. note::
+//
+// It is generally recommended to configure the cache filter as an upstream filter,
+// as it will otherwise bypass the router filter which can result in surprising
+// outcomes.
+//
 // [#extension: envoy.filters.http.cache]
 // [#next-free-field: 7]
 message CacheConfig {
