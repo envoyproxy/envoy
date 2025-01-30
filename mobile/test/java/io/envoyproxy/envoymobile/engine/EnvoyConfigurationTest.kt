@@ -115,9 +115,11 @@ class EnvoyConfigurationTest {
     enablePlatformCertificatesValidation: Boolean = false,
     upstreamTlsSni: String = "",
     h3ConnectionKeepaliveInitialIntervalMilliseconds: Int = 0,
+    disableDnsRefreshOnFailure: Boolean = false,
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       connectTimeoutSeconds,
+      disableDnsRefreshOnFailure,
       dnsRefreshSeconds,
       dnsFailureRefreshSecondsBase,
       dnsFailureRefreshSecondsMax,
@@ -246,7 +248,8 @@ class EnvoyConfigurationTest {
       filterChain = mutableListOf(),
       runtimeGuards = mapOf("test_feature_false" to true),
       trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED,
-      h3ConnectionKeepaliveInitialIntervalMilliseconds = 200
+      h3ConnectionKeepaliveInitialIntervalMilliseconds = 200,
+      disableDnsRefreshOnFailure = true,
     )
 
     val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
@@ -295,6 +298,7 @@ class EnvoyConfigurationTest {
     val resolvedTemplate1 = TestJni.createProtoString(envoyConfiguration1)
     // h3ConnectionKeepaliveInitialIntervalMilliseconds = 200
     assertThat(resolvedTemplate1).contains("connection_keepalive { initial_interval { nanos: 200000000 }")
+    assertThat(resolvedTemplate).contains("disable_dns_refresh_on_failure: true")
   }
 
   @Test
