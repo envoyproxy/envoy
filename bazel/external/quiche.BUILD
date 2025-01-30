@@ -1,3 +1,4 @@
+load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -3623,6 +3624,7 @@ envoy_quic_cc_library(
     srcs = ["quiche/quic/core/qpack/qpack_encoder.cc"],
     hdrs = ["quiche/quic/core/qpack/qpack_encoder.h"],
     deps = [
+        ":quic_core_new_qpack_blocking_manager_lib",
         ":quic_core_qpack_qpack_decoder_stream_receiver_lib",
         ":quic_core_qpack_qpack_encoder_stream_sender_lib",
         ":quic_core_qpack_qpack_header_table_lib",
