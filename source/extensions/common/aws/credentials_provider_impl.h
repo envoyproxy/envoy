@@ -345,15 +345,11 @@ public:
       const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
           credential_file_config = {}) const PURE;
 
-  virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context, AwsClusterManagerOptRef acm,
-
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer,
-      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config,
-      absl::string_view cluster_name) const PURE;
+virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context,
+    AwsClusterManagerOptRef acm, absl::string_view region,
+    const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+        web_identity_config) const PURE;
 
   virtual CredentialsProviderSharedPtr createContainerCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context, AwsClusterManagerOptRef acm,
@@ -383,14 +379,12 @@ public:
       const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
           credential_file_config = {}) const PURE;
 
-  virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      absl::string_view sts_endpoint, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer,
-      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config,
-      absl::string_view cluster_name) const PURE;
+
+virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context,
+    AwsClusterManagerOptRef acm, absl::string_view region,
+    const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+        web_identity_config) const PURE;
 };
 
 // TODO(nbaws) Add additional providers to the custom chain.
@@ -417,18 +411,11 @@ public:
     return std::make_shared<CredentialsFileCredentialsProvider>(context, credential_file_config);
   };
 
-  CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
-      absl::string_view sts_endpoint, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer,
-      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config,
-      absl::string_view cluster_name) const override {
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        context, aws_cluster_manager, create_metadata_fetcher_cb, sts_endpoint, refresh_state,
-        initialization_timer, web_identity_config, cluster_name);
-  };
+CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context,
+    AwsClusterManagerOptRef acm, absl::string_view region,
+    const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+        web_identity_config) const override;
 
   AwsClusterManagerPtr aws_cluster_manager_;
 };
@@ -507,19 +494,13 @@ private:
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) const override;
 
-  CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context, AwsClusterManagerOptRef acm,
 
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer,
-      const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config,
-      absl::string_view cluster_name) const override {
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        context, acm, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
-        web_identity_config, cluster_name);
-  }
+CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context,
+    AwsClusterManagerOptRef acm, absl::string_view region,
+    const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
+        web_identity_config) const override;
+
   AwsClusterManagerPtr aws_cluster_manager_;
 };
 
