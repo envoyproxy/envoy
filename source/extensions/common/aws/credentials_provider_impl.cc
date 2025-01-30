@@ -132,16 +132,11 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
         ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))});
     stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
 
-    init_target_ = std::make_unique<Init::TargetImpl>(debug_name_, [this]() -> void {
-      tls_slot_ =
-          ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
-      tls_slot_->set(
-          [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(); });
+    tls_slot_ =
+        ThreadLocal::TypedSlot<ThreadLocalCredentialsCache>::makeUnique(context_->threadLocal());
 
-      init_target_->ready();
-      init_target_.reset();
-    });
-    context_->initManager().add(*init_target_);
+    tls_slot_->set(
+        [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(); });
   }
 };
 
@@ -559,7 +554,17 @@ bool ContainerCredentialsProvider::needsRefresh() {
 
 void ContainerCredentialsProvider::refresh() {
 
-  ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}", credential_uri_);
+  absl::string_view host, path;
+
+  if (!context_) {
+    ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}", credential_uri_);
+    Http::Utility::extractHostPathFromUri(credential_uri_, host, path);
+  } else {
+    ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}",
+              aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value());
+    Http::Utility::extractHostPathFromUri(
+        aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value(), host, path);
+  }
 
   // ECS Task role: use const authorization_token set during initialization
   absl::string_view authorization_header = authorization_token_;
@@ -576,8 +581,6 @@ void ContainerCredentialsProvider::refresh() {
     }
   }
 
-  absl::string_view host;
-  absl::string_view path;
   Http::Utility::extractHostPathFromUri(credential_uri_, host, path);
 
   Http::RequestMessageImpl message;
@@ -723,14 +726,15 @@ void WebIdentityCredentialsProvider::refresh() {
     return;
   }
 
-  ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}", sts_endpoint_);
-
+  ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}",
+            aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value());
   web_identity_data = web_identity_data_source_provider_.value()->data();
 
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
-  message.headers().setHost(Http::Utility::parseAuthority(sts_endpoint_).host_);
+  auto statusOr = aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_);
+  message.headers().setHost(Http::Utility::parseAuthority(statusOr.value()).host_);
   message.headers().setPath(
       fmt::format("/?Action=AssumeRoleWithWebIdentity"
                   "&Version=2011-06-15"

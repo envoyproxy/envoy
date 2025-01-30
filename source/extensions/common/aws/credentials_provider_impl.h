@@ -124,6 +124,7 @@ struct MetadataCredentialsProviderStats {
 class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase,
                                         public AwsManagedClusterUpdateCallbacks {
 public:
+  friend class MetadataCredentialsProviderBaseFriend;
   using CurlMetadataFetcher = std::function<absl::optional<std::string>(Http::RequestMessage&)>;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
 
@@ -136,7 +137,7 @@ public:
                                   std::chrono::seconds initialization_timer);
 
   ~MetadataCredentialsProviderBase() override {
-    // Cancel our callback handle, to handle the case that we are exiting behind our aws cluster
+    // Cancel our callback handle, to handle the case that we are exiting behind AWS cluster
     // manager
     if (callback_handle_) {
       callback_handle_->cancel();
@@ -148,6 +149,7 @@ public:
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
 
+  // Store the RAII cluster callback handle following registration call with AWS cluster manager
   void setClusterReadyCallbackHandle(AwsManagedClusterUpdateCallbacksHandlePtr handle) {
     callback_handle_ = std::move(handle);
   }
@@ -164,6 +166,7 @@ protected:
 
   const std::string& clusterName() const { return cluster_name_; }
 
+  // Callback from AWS cluster manager, triggered when our cluster comes online
   void onClusterAddOrUpdate() override;
 
   // Handle fetch done.
@@ -181,10 +184,6 @@ protected:
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;
   // The cluster name to use for internal static cluster pointing towards the credentials provider.
   std::string cluster_name_;
-  // // The cluster type to use for internal static cluster pointing towards the credentials
-  // provider. const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type_;
-  // // The uri of internal static cluster credentials provider.
-  // const std::string uri_;
   // The cache duration of the fetched credentials.
   std::chrono::seconds cache_duration_;
   // Metadata receiver state, describing where we are along the initial credential refresh process
@@ -206,10 +205,6 @@ protected:
   SystemTime last_updated_;
   // Cache credentials when using libcurl.
   Credentials cached_credentials_;
-  // The init target.
-  std::unique_ptr<Init::TargetImpl> init_target_;
-  // Used in logs.
-  const std::string debug_name_;
   // The expiration time received in any returned token
   absl::optional<SystemTime> expiration_time_;
   // Tls slot
@@ -231,7 +226,6 @@ protected:
  */
 class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBase,
                                            public Singleton::Instance,
-
                                            public MetadataFetcher::MetadataReceiver {
 public:
   InstanceProfileCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
