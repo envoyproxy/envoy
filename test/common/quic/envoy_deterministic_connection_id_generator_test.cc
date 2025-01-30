@@ -1,6 +1,6 @@
-#include "source/extensions/quic/connection_id_generator/deterministic/envoy_deterministic_connection_id_generator.h"
+#include "source/common/quic/envoy_deterministic_connection_id_generator.h"
 
-#include "test/extensions/quic/connection_id_generator/deterministic/matchers.h"
+#include "test/common/quic/connection_id_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
