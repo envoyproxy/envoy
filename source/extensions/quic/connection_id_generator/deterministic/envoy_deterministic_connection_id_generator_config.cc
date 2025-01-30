@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator.pb.h"
 
-#include "source/extensions/quic/connection_id_generator/deterministic/envoy_deterministic_connection_id_generator.h"
+#include "source/common/quic/envoy_deterministic_connection_id_generator.h"
 
 namespace Envoy {
 namespace Quic {

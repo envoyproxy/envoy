@@ -10,9 +10,6 @@
 
 namespace Envoy {
 namespace Quic {
-namespace Extensions {
-namespace ConnectionIdGenerator {
-namespace Deterministic {
 
 // This class modifies connection ids that are too long in an Envoy fashion.
 class EnvoyDeterministicConnectionIdGenerator : public quic::DeterministicConnectionIdGenerator {
@@ -47,8 +44,5 @@ private:
 #endif
 };
 
-} // namespace Deterministic
-} // namespace ConnectionIdGenerator
-} // namespace Extensions
 } // namespace Quic
 } // namespace Envoy
