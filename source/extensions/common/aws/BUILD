@@ -18,6 +18,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "aws_cluster_manager_lib",
+    srcs = ["aws_cluster_manager.cc"],
+    hdrs = ["aws_cluster_manager.h"],
+    deps = [
+        ":utility_lib",
+        "//envoy/http:message_interface",
+        "//envoy/singleton:manager_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/init:target_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "signer_base_impl",
     srcs = ["signer_base_impl.cc"],
     hdrs = ["signer_base_impl.h"],

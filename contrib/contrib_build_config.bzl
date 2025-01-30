@@ -89,4 +89,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.router.cluster_specifier_plugin.golang":             "//contrib/golang/router/cluster_specifier/source:config",
+
+    #
+    # http tcp bridge plugin
+    #
+
+    "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
 }

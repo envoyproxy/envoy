@@ -426,6 +426,24 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "connection_id_matchers",
+    hdrs = ["connection_id_matchers.h"],
+    deps = ["//test/mocks/network:network_mocks"],
+)
+
+envoy_cc_test(
+    name = "envoy_deterministic_connection_id_generator_test",
+    srcs = ["envoy_deterministic_connection_id_generator_test.cc"],
+    rbe_pool = "6gig",
+    tags = ["nofips"],
+    deps = [
+        ":connection_id_matchers",
+        "//source/common/quic:envoy_deterministic_connection_id_generator_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "envoy_quic_h3_fuzz_proto",
     srcs = ["envoy_quic_h3_fuzz.proto"],

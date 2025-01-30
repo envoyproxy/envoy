@@ -78,6 +78,7 @@ protected:
     return session->write_buffer_watermark_simulation_.highWatermark();
   }
 
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::unique_ptr<PersistentQuicInfoImpl> quic_info_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
@@ -92,7 +93,6 @@ protected:
   QuicStatNames quic_stat_names_{store_.symbolTable()};
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
-  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
 };
 
 TEST_P(QuicNetworkConnectionTest, BufferLimits) {

@@ -27,6 +27,7 @@ open class EngineBuilder() {
   }
   private var logLevel = LogLevel.INFO
   private var connectTimeoutSeconds = 10
+  private var disableDnsRefreshOnFailure = false
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
@@ -540,6 +541,7 @@ open class EngineBuilder() {
     val engineConfiguration =
       EnvoyConfiguration(
         connectTimeoutSeconds,
+        disableDnsRefreshOnFailure,
         dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax,

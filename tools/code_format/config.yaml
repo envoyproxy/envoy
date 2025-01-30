@@ -115,8 +115,8 @@ paths:
     - source/common/listener_manager/lds_api.cc
     - source/common/upstream/od_cds_api_impl.cc
     - source/common/upstream/cds_api_impl.cc
-    - source/common/router/vhds.cc
-    - source/common/rds/rds_route_config_subscription.cc
+    - source/common/rds/common/route_config_provider_manager_impl.h
+    - source/common/rds/route_config_provider_manager.h
     - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
@@ -138,7 +138,6 @@ paths:
     - source/common/secret/sds_api.cc
     - source/common/config/config_provider_impl.h
     - source/common/grpc/google_grpc_creds_impl.cc
-    - source/common/local_reply/local_reply.cc
     - source/common/router/rds_impl.cc
     - source/server/hot_restarting_parent.cc
     - source/common/io/io_uring_worker_impl.cc
@@ -170,7 +169,6 @@ paths:
     - source/extensions/filters/http/aws_lambda
     - source/extensions/filters/http/basic_auth
     - source/extensions/filters/http/cache
-    - source/extensions/filters/http/cdn_loop
     - source/extensions/filters/http/common
     - source/extensions/filters/http/composite
     - source/extensions/filters/http/ext_authz
@@ -181,14 +179,12 @@ paths:
     - source/extensions/filters/http/grpc_json_reverse_transcoder
     - source/extensions/filters/http/grpc_json_transcoder
     - source/extensions/filters/http/grpc_stats
-    - source/extensions/filters/http/header_to_metadata
     - source/extensions/filters/http/health_check
     - source/extensions/filters/http/ip_tagging
     - source/extensions/filters/http/json_to_metadata
     - source/extensions/filters/http/jwt_authn
     - source/extensions/filters/http/local_ratelimit
     - source/extensions/filters/http/file_system_buffer
-    - source/extensions/filters/http/header_to_metadata
     - source/extensions/filters/http/on_demand
     - source/extensions/filters/http/json_to_metadata
     - source/extensions/filters/http/json_to_metadata
@@ -208,7 +204,6 @@ paths:
     - source/extensions/filters/network/ext_authz
     - source/extensions/filters/network/mongo_proxy
     - source/extensions/filters/network/thrift_proxy
-    - source/extensions/filters/network/direct_response
     - source/extensions/filters/network/generic_proxy
     - source/extensions/filters/network/ratelimit
     - source/extensions/filters/common

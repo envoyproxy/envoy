@@ -58,7 +58,7 @@ fn test_header_callbacks_filter_on_request_headers() {
     .once();
 
   assert_eq!(
-    f.on_request_headers(envoy_filter, false),
+    f.on_request_headers(&mut envoy_filter, false),
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   );
 }
@@ -83,7 +83,57 @@ fn test_header_callbacks_on_request_headers_local_resp() {
     .return_const(());
 
   assert_eq!(
-    f.on_request_headers(envoy_filter, false),
+    f.on_request_headers(&mut envoy_filter, false),
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
   );
+}
+
+#[test]
+fn test_body_callbacks_filter_on_bodies() {
+  let mut f = BodyCallbacksFilter::default();
+  let mut envoy_filter = MockEnvoyHttpFilter::default();
+
+  envoy_filter
+    .expect_get_request_body()
+    .returning(|| {
+      static mut BUF: [[u8; 4]; 3] = [*b"nice", *b"nice", *b"nice"];
+      Some(vec![
+        EnvoyMutBuffer::new(unsafe { &mut BUF[0] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF[1] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF[2] }),
+      ])
+    })
+    .times(2);
+  envoy_filter
+    .expect_drain_request_body()
+    .return_const(true)
+    .once();
+
+  envoy_filter
+    .expect_append_request_body()
+    .return_const(true)
+    .times(2);
+  f.on_request_body(&mut envoy_filter, true);
+
+  envoy_filter
+    .expect_get_response_body()
+    .returning(|| {
+      static mut BUF2: [[u8; 4]; 3] = [*b"cool", *b"cool", *b"cool"];
+      Some(vec![
+        EnvoyMutBuffer::new(unsafe { &mut BUF2[0] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF2[1] }),
+        EnvoyMutBuffer::new(unsafe { &mut BUF2[2] }),
+      ])
+    })
+    .times(2);
+  envoy_filter
+    .expect_drain_response_body()
+    .return_const(true)
+    .once();
+
+  envoy_filter
+    .expect_append_response_body()
+    .return_const(true)
+    .times(2);
+  f.on_response_body(&mut envoy_filter, true);
 }
