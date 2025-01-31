@@ -5,6 +5,7 @@ package envoy.extensions.filters.http.ext_authz.v3;
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/core/v3/http_uri.proto";
 import "envoy/type/matcher/v3/metadata.proto";
@@ -30,7 +31,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 30]
+// [#next-free-field: 32]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -310,6 +311,11 @@ message ExtAuthz {
   // Field ``latency_us`` is exposed for CEL and logging when using gRPC or HTTP service.
   // Fields ``bytesSent`` and ``bytesReceived`` are exposed for CEL and logging only when using gRPC service.
   bool emit_filter_state_stats = 29;
+
+  // Cache configuration to store response from external auth server.
+  optional envoy.config.core.v3.TypedExtensionConfig response_cache_config = 30;
+  // Tell cache whether to remember the whole response from authz server (response body, header modification, meta data, status) or just status.
+  optional bool response_cache_remember_body_headers = 31;
 }
 
 // Configuration for buffering the request data.
