@@ -25,6 +25,7 @@ envoy_cc_library(
     deps = [
         ":engine_common_lib",
         ":engine_types_lib",
+        ":mobile_process_wide_lib",
         "//library/common/bridge:utility_lib",
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/http:client_lib",
@@ -89,5 +90,21 @@ envoy_cc_library(
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/common:base_logger_lib",
         "@envoy//source/common/http:header_map_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "mobile_process_wide_lib",
+    srcs = [
+        "mobile_process_wide.cc",
+    ],
+    hdrs = [
+        "mobile_process_wide.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        "@envoy//source/common/common:minimal_logger_lib",
+        "@envoy//source/common/common:thread_lib",
+        "@envoy//source/server:options_base",
     ],
 )
