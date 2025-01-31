@@ -105,7 +105,7 @@ public:
 };
 
 class RateLimitTokenBucket : public TokenBucketContext,
- public Logger::Loggable<Logger::Id::rate_limit_quota> {
+                             public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                        std::chrono::milliseconds fill_interval, TimeSource& time_source);

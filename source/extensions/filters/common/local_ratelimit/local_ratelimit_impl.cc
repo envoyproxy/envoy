@@ -82,7 +82,7 @@ RateLimitTokenBucket::RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_
     : token_bucket_(max_tokens, time_source,
                     // Calculate the fill rate in tokens per second.
                     tokens_per_fill / std::chrono::duration<double>(fill_interval).count()),
-                    fill_interval_(fill_interval)  {}
+      fill_interval_(fill_interval) {}
 
 bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
@@ -146,7 +146,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
       throw EnvoyException("local rate limit descriptor token bucket fill timer must be >= 50ms");
     }
 
-   RateLimitTokenBucketSharedPtr per_descriptor_token_bucket =
+    RateLimitTokenBucketSharedPtr per_descriptor_token_bucket =
         std::make_shared<RateLimitTokenBucket>(per_descriptor_max_tokens,
                                                per_descriptor_tokens_per_fill,
                                                per_descriptor_fill_interval, time_source_);
