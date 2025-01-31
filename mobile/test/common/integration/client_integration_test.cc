@@ -260,7 +260,11 @@ TEST_P(ClientIntegrationTest, BasicWithCares) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
   }
 }
+#endif
 
+// TODO(fredyw): Disable this until we support treating no DNS record as a failure in the Apple
+// resolver.
+#if not defined(__APPLE__)
 TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   builder_.setLogLevel(Logger::Logger::debug);
   std::atomic<bool> found_cache_miss{false};
