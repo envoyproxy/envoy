@@ -39,8 +39,8 @@ FluentdAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
       const envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  absl::Status status = context.serverFactoryContext().clusterManager().checkActiveStaticCluster(
-      proto_config.cluster());
+  absl::Status status =
+      context.serverFactoryContext().clusterManager().checkActiveCluster(proto_config.cluster());
   if (!status.ok()) {
     throw EnvoyException(fmt::format("cluster '{}' was not found", proto_config.cluster()));
   }
