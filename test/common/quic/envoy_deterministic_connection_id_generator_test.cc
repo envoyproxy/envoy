@@ -1,6 +1,6 @@
-#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator.h"
+#include "source/common/quic/envoy_deterministic_connection_id_generator.h"
 
-#include "test/extensions/quic/connection_id_generator/matchers.h"
+#include "test/common/quic/connection_id_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -9,6 +9,9 @@
 
 namespace Envoy {
 namespace Quic {
+namespace Extensions {
+namespace ConnectionIdGenerator {
+namespace Deterministic {
 
 using Matcher::FactoryFunctions;
 using Matcher::GivenPacket;
@@ -117,5 +120,8 @@ TEST_F(EnvoyDeterministicConnectionIdGeneratorFactoryTest,
   EXPECT_THAT(FactoryFunctions(factory_, 65536), GivenPacket(buffer).ReturnsWorkerId(0x5678));
 }
 
+} // namespace Deterministic
+} // namespace ConnectionIdGenerator
+} // namespace Extensions
 } // namespace Quic
 } // namespace Envoy

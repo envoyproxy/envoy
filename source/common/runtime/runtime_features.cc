@@ -36,7 +36,6 @@ RUNTIME_GUARD(envoy_reloadable_features_boolean_to_string_fix);
 RUNTIME_GUARD(envoy_reloadable_features_check_switch_protocol_websocket_handshake);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_fail_on_empty_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
-RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
@@ -165,6 +164,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_cl
 
 // TODO(renjietang): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_network_type_socket_option);
+// TODO(fredyw): Remove after prod testing.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

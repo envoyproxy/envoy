@@ -115,7 +115,6 @@ paths:
     - source/common/listener_manager/lds_api.cc
     - source/common/upstream/od_cds_api_impl.cc
     - source/common/upstream/cds_api_impl.cc
-    - source/common/router/vhds.cc
     - source/common/rds/common/route_config_provider_manager_impl.h
     - source/common/rds/route_config_provider_manager.h
     - source/common/filter/config_discovery_impl.cc
