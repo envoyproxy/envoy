@@ -198,6 +198,31 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
   }
 }
 
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, AsyncClientWorksFromRouterUpstreamFilters) {
+  if (!useRouterFilters()) {
+    GTEST_SKIP() << "no cluster variants of this test";
+  }
+  // Not making a 'pass through' request from upstream filters previously resulted
+  // in that connection being established anyway, such that the AsyncClient interception
+  // filter would establish a *second* connection and the test would get stuck waiting
+  // for headers from the first, illegitimate connection which was unused. This test
+  // ensures we don't regress to that behavior.
+  HttpFilterProto async_client_config;
+  TestUtility::loadFromYaml(R"(
+  name: "envoy.test.async_upstream"
+  typed_config:
+      "@type": "type.googleapis.com/test.integration.filters.AsyncUpstreamFilterConfig"
+  )",
+                            async_client_config);
+  addStaticRouterFilter(async_client_config);
+  addCodecRouterFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  EXPECT_THAT(headers, testing::NotNull());
+  std::cerr << "X" << std::endl;
+}
+
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest, TwoFilters) {
   addStaticFilter("foo", default_header_key_, "value1");
   addStaticFilter("bar", default_header_key_, "value2");
