@@ -590,6 +590,7 @@ protected:
     void writeDownstream(Network::UdpRecvData& data);
     void resetIdleTimer();
 
+    virtual bool shouldCreateUpstream() PURE;
     virtual bool createUpstream() PURE;
     virtual void writeUpstream(Network::UdpRecvData& data) PURE;
     virtual void onIdleTimer() PURE;
@@ -683,6 +684,7 @@ protected:
     ~UdpActiveSession() override = default;
 
     // ActiveSession
+    bool shouldCreateUpstream() override;
     bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
@@ -741,6 +743,7 @@ protected:
     ~TunnelingActiveSession() override = default;
 
     // ActiveSession
+    bool shouldCreateUpstream() override;
     bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
