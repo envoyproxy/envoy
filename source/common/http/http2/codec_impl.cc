@@ -1951,6 +1951,10 @@ ConnectionImpl::Http2Options::Http2Options(
                                                       http2_options.hpack_table_size().value());
   }
 
+  if (http2_options.disable_huffman()) {
+    nghttp2_option_set_disable_huffman_encoding(options_, 1);
+  }
+
   if (http2_options.allow_metadata()) {
     nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
   } else {
