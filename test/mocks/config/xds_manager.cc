@@ -6,7 +6,7 @@ using testing::_;
 using testing::Return;
 
 MockXdsManager::MockXdsManager() {
-  ON_CALL(*this, initialize(_)).WillByDefault(Return(absl::OkStatus()));
+  ON_CALL(*this, initialize(_, _)).WillByDefault(Return(absl::OkStatus()));
 }
 
 } // namespace Config

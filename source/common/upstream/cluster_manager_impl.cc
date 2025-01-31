@@ -377,7 +377,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   // Now that the async-client manager is set, the xDS-Manager can be initialized.
-  absl::Status status = xds_manager_.initialize(this);
+  absl::Status status = xds_manager_.initialize(bootstrap, this);
   SET_AND_RETURN_IF_NOT_OK(status, creation_status);
 
   // TODO(adisuissa): refactor and move the following data members to the
@@ -391,18 +391,9 @@ ClusterManagerImpl::ClusterManagerImpl(
         validation_context.dynamicValidationVisitor(), api, main_thread_dispatcher);
   }
 
-  if (bootstrap.has_xds_config_tracker_extension()) {
-    auto& tracer_factory = Config::Utility::getAndCheckFactory<Config::XdsConfigTrackerFactory>(
-        bootstrap.xds_config_tracker_extension());
-    xds_config_tracker_ = tracer_factory.createXdsConfigTracker(
-        bootstrap.xds_config_tracker_extension().typed_config(),
-        validation_context.dynamicValidationVisitor(), api, main_thread_dispatcher);
-  }
-
   subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
       local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
-      server, makeOptRefFromPtr(xds_resources_delegate_.get()),
-      makeOptRefFromPtr(xds_config_tracker_.get()));
+      server, makeOptRefFromPtr(xds_resources_delegate_.get()), xds_manager_.xdsConfigTracker());
 }
 
 absl::Status
@@ -501,7 +492,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
           factory->create(std::move(primary_client), std::move(failover_client), dispatcher_,
                           random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
                           std::move(custom_config_validators), std::move(backoff_strategy),
-                          makeOptRefFromPtr(xds_config_tracker_.get()), {}, use_eds_cache);
+                          xds_manager_.xdsConfigTracker(), {}, use_eds_cache);
     } else {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       RETURN_IF_NOT_OK(status);
@@ -531,11 +522,11 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       Grpc::RawAsyncClientPtr failover_client;
       RETURN_IF_NOT_OK(createClients(factory_primary_or_error.value(), factory_failover,
                                      primary_client, failover_client));
-      ads_mux_ = factory->create(
-          std::move(primary_client), std::move(failover_client), dispatcher_, random_,
-          *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
-          std::move(custom_config_validators), std::move(backoff_strategy),
-          makeOptRefFromPtr(xds_config_tracker_.get()), xds_delegate_opt_ref, use_eds_cache);
+      ads_mux_ =
+          factory->create(std::move(primary_client), std::move(failover_client), dispatcher_,
+                          random_, *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
+                          std::move(custom_config_validators), std::move(backoff_strategy),
+                          xds_manager_.xdsConfigTracker(), xds_delegate_opt_ref, use_eds_cache);
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();

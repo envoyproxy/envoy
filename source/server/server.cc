@@ -753,7 +753,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Create the xDS-Manager that will be passed to the cluster manager when it
   // is initialized below.
-  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(validation_context_);
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, validation_context_);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
