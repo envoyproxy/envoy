@@ -9,6 +9,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 
+using envoy::config::core::v3::PerHostConfig;
 using envoy::config::core::v3::ProxyProtocolPassThroughTLVs;
 namespace Envoy {
 namespace {
@@ -415,11 +416,16 @@ public:
     fake_upstreams_.clear();
   }
 
-  void setup(bool pass_all_tlvs, const std::vector<uint8_t>& tlvs_listener,
-             const std::vector<uint8_t>& tlvs_upstream) {
+  void setup(
+      bool pass_all_tlvs, const std::vector<uint8_t>& tlvs_listener,
+      const std::vector<uint8_t>& tlvs_upstream,
+      const std::vector<std::pair<uint8_t, std::vector<unsigned char>>>& custom_tlvs_from_host,
+      const std::vector<std::pair<uint8_t, std::vector<unsigned char>>>& custom_tlvs_from_config) {
     pass_all_tlvs_ = pass_all_tlvs;
     tlvs_listener_.assign(tlvs_listener.begin(), tlvs_listener.end());
     tlvs_upstream_.assign(tlvs_upstream.begin(), tlvs_upstream.end());
+    custom_tlvs_from_host_.assign(custom_tlvs_from_host.begin(), custom_tlvs_from_host.end());
+    custom_tlvs_from_config_.assign(custom_tlvs_from_config.begin(), custom_tlvs_from_config.end());
   }
 
   void initialize() override {
@@ -463,6 +469,38 @@ public:
         }
       }
 
+      // Add custom TLVs to host metadata if needed.
+      if (!custom_tlvs_from_host_.empty()) {
+        // Modify LB endpoints with metadata
+        auto* metadata = bootstrap.mutable_static_resources()
+                             ->mutable_clusters(0)
+                             ->mutable_load_assignment()
+                             ->mutable_endpoints(0)
+                             ->mutable_lb_endpoints(0)
+                             ->mutable_metadata();
+
+        PerHostConfig tlvs_metadata;
+        for (const auto& tlv : custom_tlvs_from_host_) {
+          auto entry = tlvs_metadata.add_added_tlvs();
+          entry->set_type(tlv.first);
+          entry->set_value(std::string(tlv.second.begin(), tlv.second.end()));
+        }
+        ProtobufWkt::Any typed_metadata;
+        typed_metadata.PackFrom(tlvs_metadata);
+        const std::string metadata_key =
+            Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKETS_PROXY_PROTOCOL;
+        metadata->mutable_typed_filter_metadata()->emplace(
+            std::make_pair(metadata_key, typed_metadata));
+      }
+      // Add custom TLVs to proxy protocol config if needed.
+      if (!custom_tlvs_from_config_.empty()) {
+        for (const auto& tlv : custom_tlvs_from_config_) {
+          auto entry = proxy_protocol.add_added_tlvs();
+          entry->set_type(tlv.first);
+          entry->set_value(std::string(tlv.second.begin(), tlv.second.end()));
+        }
+      }
+
       envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport
           proxy_proto_transport;
       proxy_proto_transport.mutable_transport_socket()->MergeFrom(inner_socket);
@@ -479,6 +517,8 @@ private:
   bool pass_all_tlvs_ = false;
   std::vector<uint8_t> tlvs_listener_;
   std::vector<uint8_t> tlvs_upstream_;
+  std::vector<std::pair<uint8_t, std::vector<unsigned char>>> custom_tlvs_from_host_;
+  std::vector<std::pair<uint8_t, std::vector<unsigned char>>> custom_tlvs_from_config_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTLVsIntegrationTest,
@@ -488,7 +528,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTLVsIntegrationTest,
 // This test adding the listener proxy protocol filter and upstream proxy filter, the TLVs
 // are passed by listener and re-generated in transport socket based on API config.
 TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassSepcificTLVs) {
-  setup(false, {0x05, 0x06}, {0x06});
+  setup(false, {0x05, 0x06}, {0x06}, {}, {});
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -559,7 +599,7 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassSepcificTLVs)
 }
 
 TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
-  setup(true, {}, {});
+  setup(true, {}, {}, {}, {});
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -641,7 +681,7 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolPassAll) {
 }
 
 TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2ProxyProtocolPassWithTypeLocal) {
-  setup(true, {}, {});
+  setup(true, {}, {}, {}, {});
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -676,6 +716,194 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2ProxyProtocolPassWithTypeLocal) {
   ASSERT_TRUE(fake_upstream_connection_->waitForData(offset + more_data.length(), &observed_data));
   EXPECT_THAT(observed_data, testing::StartsWith(header_start));
   EXPECT_EQ(more_data, absl::string_view(&observed_data[offset], more_data.length()));
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolWithCustomMetadata) {
+  std::vector<std::pair<uint8_t, std::vector<unsigned char>>> custom_tlvs = {
+      {0x96, {'f', 'o', 'o'}}, {0x97, {'b', 'a', 'r'}}};
+  setup(false, {}, {}, custom_tlvs, {});
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  std::string observed_data;
+
+  if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
+    // Expected downstream proxy protocol header (IPv4).
+    const uint8_t v2_protocol[] = {
+        0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x11, 0x00,
+        0x0c, 0x00, 0x01, 0xc0, 0xa8, 0x00, 0x01, 0xc0, 0xa8, 0x00, 0x02, 0x1f, 0x90, 0x23, 0xc4,
+    };
+    Buffer::OwnedImpl buffer(v2_protocol, sizeof(v2_protocol));
+    ASSERT_TRUE(tcp_client->write(buffer.toString()));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(
+        42, &observed_data)); // 30 inbound size + 12 for custom TLVs.
+    // Verify the custom TLV was injected from filter metadata.
+    EXPECT_EQ(observed_data.size(), 42);
+    size_t offset = 28; // Start after the header
+    // Verify custom TLV 0x96
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x96);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "foo");
+    offset += 6;
+    // Verify custom TLV 0x97
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x97);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "bar");
+    offset += 6;
+  } else if (GetParam() == Envoy::Network::Address::IpVersion::v6) {
+    // Expected downstream proxy protocol header (IPv6).
+    const uint8_t v2_protocol_ipv6[] = {
+        0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21,
+        0x21, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x08, 0x00, 0x02,
+    };
+    Buffer::OwnedImpl buffer(v2_protocol_ipv6, sizeof(v2_protocol_ipv6));
+    ASSERT_TRUE(tcp_client->write(buffer.toString()));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(
+        64, &observed_data)); // 52 inbound size + 12 for custom TLVs.
+    // Verify the custom TLV was injected from filter metadata.
+    EXPECT_EQ(observed_data.size(), 64);
+    size_t offset = 52; // Start after the header
+    // Verify custom TLV 0x96
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x96);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "foo");
+    offset += 6;
+    // Verify custom TLV 0x97
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x97);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "bar");
+    offset += 6;
+  }
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2TLVProxyProtocolWithPrecedence) {
+  // Setup with passthrough TLVs (0x05, 0x06), config-level TLVs (0x96, 0x97),
+  // and host metadata TLVs (0x96 overrides config, 0x98, and 0x05 overrides passthrough).
+  std::vector<std::pair<uint8_t, std::vector<unsigned char>>> host_metadata_tlvs = {
+      {0x96, {'o', 'v', 'r'}},
+      {0x98, {'n', 'e', 'w'}},
+      {0x05, {'f', 'o', 'o'}},
+  };
+  std::vector<std::pair<uint8_t, std::vector<unsigned char>>> config_tlvs = {
+      {0x96, {'f', 'o', 'o'}},
+      {0x97, {'b', 'a', 'r'}},
+  };
+
+  setup(true, {}, {}, host_metadata_tlvs, config_tlvs);
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  std::string observed_data;
+
+  if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
+    // 2 TLVs are included:
+    // 0x05, 0x00, 0x02, 0x06, 0x07
+    // 0x06, 0x00, 0x02, 0x11, 0x12
+    const uint8_t v2_protocol[] = {
+        0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21,
+        0x11, 0x00, 0x16, 0x7f, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01, 0x03, 0x05,
+        0x02, 0x01, 0x05, 0x00, 0x02, 0x06, 0x07, 0x06, 0x00, 0x02, 0x11, 0x12,
+    };
+    Buffer::OwnedImpl buffer(v2_protocol, sizeof(v2_protocol));
+    ASSERT_TRUE(tcp_client->write(buffer.toString()));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(57, &observed_data));
+    EXPECT_EQ(observed_data.size(), 57);
+
+    size_t offset = 28; // Start after the header
+    // Verify host metadata TLV 0x96 overrides config TLV 0x96 value.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x96);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "ovr");
+    offset += 6;
+    // Verify host metadata TLV 0x98 is present.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x98);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "new");
+    offset += 6;
+    // Verify passthrough TLV 0x05 was overridden by host metadata.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x05);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "foo");
+    offset += 6;
+    // Verify config TLV 0x97 is present.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x97);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "bar");
+    offset += 6;
+    // Verify passthrough TLV 0x06 is present.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x06);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x02);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 3]), 0x11);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 4]), 0x12);
+  } else if (GetParam() == Envoy::Network::Address::IpVersion::v6) {
+    // 2 TLVs are included:
+    // 0x05, 0x00, 0x02, 0x06, 0x07
+    // 0x06, 0x00, 0x02, 0x09, 0x0A
+    const uint8_t v2_protocol_ipv6[] = {
+        0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21,
+        0x21, 0x00, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x08, 0x00, 0x02,
+        0x05, 0x00, 0x02, 0x06, 0x07, 0x06, 0x00, 0x02, 0x09, 0x0A,
+    };
+    Buffer::OwnedImpl buffer(v2_protocol_ipv6, sizeof(v2_protocol_ipv6));
+    ASSERT_TRUE(tcp_client->write(buffer.toString()));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(81, &observed_data));
+    EXPECT_EQ(observed_data.size(), 81);
+
+    size_t offset = 52; // Start after the header
+    // Verify host metadata TLV 0x96 overrides config TLV 0x96 value.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x96);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "ovr");
+    offset += 6;
+    // Verify host metadata TLV 0x98 is present.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x98);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "new");
+    offset += 6;
+    // Verify passthrough TLV 0x05 was overridden by host metadata.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x05);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "foo");
+    offset += 6;
+    // Verify config TLV 0x97 is present.
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x97);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x03);
+    EXPECT_EQ(observed_data.substr(offset + 3, 3), "bar");
+    offset += 6;
+    // Verify passthrough TLV 0x06
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset]), 0x06);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 2]), 0x02);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 3]), 0x09);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[offset + 4]), 0x0A);
+  }
 
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
