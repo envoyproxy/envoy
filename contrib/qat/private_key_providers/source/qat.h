@@ -60,7 +60,7 @@ private:
 };
 
 /**
- * QatSection represents a section definition in QAT configuration. Its main purpose is to initalize
+ * QatSection represents a section definition in QAT configuration. Its main purpose is to initialize
  * HW and load balance operations to the QAT handles.
  */
 class QatSection : public Logger::Loggable<Logger::Id::connection> {
