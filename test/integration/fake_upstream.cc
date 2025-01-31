@@ -274,14 +274,20 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, ui
 
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
                                         absl::string_view data, milliseconds timeout) {
-  auto succeeded = waitForData(client_dispatcher, data.length(), timeout);
-  if (succeeded) {
-    Buffer::OwnedImpl buffer(data.data(), data.length());
-    if (!TestUtility::buffersEqual(body(), buffer)) {
-      return AssertionFailure() << body().toString() << " not equal to " << data;
-    }
+  absl::MutexLock lock(&lock_);
+  if (!waitForWithDispatcherRun(
+          time_system_, lock_,
+          [this, &data]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+            Buffer::OwnedImpl buffer(data.data(), data.length());
+            if (!TestUtility::buffersEqual(body_, buffer)) {
+              return AssertionFailure() << body_.toString() << " not equal to " << data;
+            }
+            return AssertionSuccess();
+          },
+          client_dispatcher, timeout)) {
+    return AssertionFailure() << "Timed out waiting for data.";
   }
-  return succeeded;
+  return AssertionSuccess();
 }
 
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
