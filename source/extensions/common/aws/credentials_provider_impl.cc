@@ -1117,6 +1117,9 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityC
 
   auto cluster_name = Utility::getSTSEndpoint(region);
   auto uri = cluster_name + ":443";
+  // Replace dns delimiters with underscore for stats generation
+  std::replace(cluster_name.begin(), cluster_name.end(), '.', '_');
+
   auto status = aws_cluster_manager.ref()->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
 
