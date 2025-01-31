@@ -225,7 +225,7 @@ protected:
  * https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html#instance-metadata-security-credentials
  */
 class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBase,
-                                           public Singleton::Instance,
+                                           public Envoy::Singleton::Instance,
                                            public MetadataFetcher::MetadataReceiver {
 public:
   InstanceProfileCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
@@ -265,7 +265,7 @@ private:
  * https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html#enable_task_iam_roles
  */
 class ContainerCredentialsProvider : public MetadataCredentialsProviderBase,
-                                     public Singleton::Instance,
+                                     public Envoy::Singleton::Instance,
                                      public MetadataFetcher::MetadataReceiver {
 public:
   ContainerCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,

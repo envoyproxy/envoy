@@ -1145,10 +1145,6 @@ CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCr
     AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
     const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
         web_identity_config) const {
-  // ENVOY_LOG_MISC(
-  //     debug,
-  //     "**************** Instantiating web identity with region {} role arn {} session name{}",
-  //     region, web_identity_config.role_arn(), web_identity_config.role_session_name());
 
   const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
   const auto initialization_timer = std::chrono::seconds(2);
