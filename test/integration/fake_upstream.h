@@ -75,6 +75,8 @@ public:
     absl::MutexLock lock(&lock_);
     return body_.length();
   }
+  // Returns a buffer containing the data that was received since the last
+  // invocation of `body()` or since the stream first received data.
   Buffer::OwnedImpl body() {
     absl::MutexLock lock(&lock_);
     Buffer::OwnedImpl body_ret;
