@@ -65,6 +65,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.no_timer_based_rate_limit_token_bucket`` and legacy code paths.
 
 new_features:
+- area: dfp
+  change: |
+    The DFP cluster will now use the async lookup path to do DNS resolutions for null hosts. This behavioral change
+    can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.dfp_cluster_resolves_hosts``
+    to false.
 - area: oauth2
   change: |
     Add the option to specify SameSite cookie attribute values for oauth2 supported cookies.

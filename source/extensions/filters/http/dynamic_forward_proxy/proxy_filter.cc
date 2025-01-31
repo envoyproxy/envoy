@@ -38,7 +38,6 @@ struct ResponseStringValues {
 struct RcDetailsValues {
   const std::string DnsCacheOverflow = "dns_cache_overflow";
   const std::string PendingRequestOverflow = "dynamic_forward_proxy_pending_request_overflow";
-  const std::string DnsResolutionFailure = "dns_resolution_failure";
   const std::string SubClusterOverflow = "sub_cluster_overflow";
   const std::string SubClusterWarmingTimeout = "sub_cluster_warming_timeout";
   const std::string DFPClusterIsGone = "dynamic_forward_proxy_cluster_is_gone";
@@ -422,12 +421,9 @@ void ProxyFilter::onDnsResolutionFail(absl::string_view details) {
 
   decoder_callbacks_->streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::DnsResolutionFailed);
-  std::string details_str = "";
-  details_str = StringUtil::replaceAllEmptySpace(details);
-  ASSERT(details_str != "not_resolved");
-  decoder_callbacks_->sendLocalReply(
-      Http::Code::ServiceUnavailable, ResponseStrings::get().DnsResolutionFailure, nullptr,
-      absl::nullopt, absl::StrCat(RcDetails::get().DnsResolutionFailure, "{", details_str, "}"));
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
+                                     ResponseStrings::get().DnsResolutionFailure, nullptr,
+                                     absl::nullopt, details);
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(
