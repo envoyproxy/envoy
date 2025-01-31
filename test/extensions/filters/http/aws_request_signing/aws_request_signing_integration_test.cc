@@ -337,6 +337,7 @@ public:
 };
 
 TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   // Web Identity Credentials only
   dnsSetup();
