@@ -23,6 +23,7 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_format_string.h"
@@ -43,6 +44,7 @@ namespace TcpProxy {
 
 constexpr absl::string_view PerConnectionIdleTimeoutMs =
     "envoy.tcp_proxy.per_connection_idle_timeout_ms";
+constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_before_connect";
 
 /**
  * All tcp proxy stats. @see stats_macros.h
@@ -54,6 +56,7 @@ constexpr absl::string_view PerConnectionIdleTimeoutMs =
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
+  COUNTER(early_data_received_count_total)                                                         \
   COUNTER(idle_timeout)                                                                            \
   COUNTER(max_downstream_connection_duration)                                                      \
   COUNTER(upstream_flush_total)                                                                    \
@@ -671,6 +674,9 @@ protected:
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
+  bool receive_before_connect_{false};
+  bool early_data_end_stream_{false};
+  Buffer::OwnedImpl early_data_buffer_{};
   HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
 };
 
