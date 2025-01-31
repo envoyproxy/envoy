@@ -36,11 +36,10 @@ AwsClusterManagerImpl::AwsClusterManagerImpl(Server::Configuration::ServerFactor
   // terminates
 
   shutdown_handle_ = context.lifecycleNotifier().registerCallback(
-      Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-      [this]() { 
+      Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this]() {
         cm_handle_.reset();
         shutdown_handle_.reset();
-         });
+      });
 };
 
 absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
