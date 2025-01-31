@@ -1064,8 +1064,9 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCre
     auto handleOr = aws_cluster_manager.ref()->addManagedClusterUpdateCallbacks(
         cluster_name,
         *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
-    credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
-
+    if (handleOr.ok()) {
+      credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+    }
     return credential_provider;
   }
 }
@@ -1101,7 +1102,10 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
     auto handleOr = aws_cluster_manager.ref()->addManagedClusterUpdateCallbacks(
         cluster_name,
         *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
-    credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+    if (handleOr.ok()) {
+
+      credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+    }
     return credential_provider;
   }
 }
@@ -1129,8 +1133,10 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityC
   auto handleOr = aws_cluster_manager.ref()->addManagedClusterUpdateCallbacks(
       cluster_name,
       *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
+  if (handleOr.ok()) {
 
-  credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+    credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+  }
   return credential_provider;
 };
 
@@ -1159,8 +1165,9 @@ CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCr
       cluster_name,
       *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
 
-  credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
-
+  if (handleOr.ok()) {
+    credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+  }
   return credential_provider;
 };
 
