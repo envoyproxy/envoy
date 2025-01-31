@@ -82,7 +82,7 @@ RateLimitTokenBucket::RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_
     : token_bucket_(max_tokens, time_source,
                     // Calculate the fill rate in tokens per second.
                     tokens_per_fill / std::chrono::duration<double>(fill_interval).count()),
-      fill_interval_(fill_interval) {}
+                    fill_interval_(fill_interval)  {}
 
 bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
@@ -146,14 +146,6 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
       throw EnvoyException("local rate limit descriptor token bucket fill timer must be >= 50ms");
     }
 
-    if (per_descriptor_fill_interval.count() % fill_interval.count() != 0) {
-      throw EnvoyException(
-          "local rate descriptor limit is not a multiple of token bucket fill timer");
-    }
-    // Save the multiplicative factor to control the descriptor refill frequency.
-    const auto per_descriptor_multiplier = per_descriptor_fill_interval / fill_interval;
-
-    RateLimitTokenBucketSharedPtr per_descriptor_token_bucket;
    RateLimitTokenBucketSharedPtr per_descriptor_token_bucket =
         std::make_shared<RateLimitTokenBucket>(per_descriptor_max_tokens,
                                                per_descriptor_tokens_per_fill,
@@ -229,8 +221,8 @@ LocalRateLimiterImpl::requestAllowed(absl::Span<const RateLimit::Descriptor> req
   if (matched_results.empty() || always_consume_default_token_bucket_) {
     if (default_token_bucket_ == nullptr) {
       return {true, matched_results.empty()
-                        ? makeOptRefFromPtr<TokenBucketContext>(nullptr)
-                        : makeOptRef<TokenBucketContext>(matched_results[0].token_bucket.get())};
+                        ? std::shared_ptr<TokenBucketContext>(nullptr)
+                        : std::shared_ptr<TokenBucketContext>(matched_results[0].token_bucket)};
     }
     ASSERT(default_token_bucket_ != nullptr);
 
@@ -325,7 +317,7 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descr
   ENVOY_LOG(trace, "max_tokens: {}, fill_rate: {}, fill_interval: {}",
             parent_token_bucket_->maxTokens(), parent_token_bucket_->fillRate(),
             std::chrono::duration<double>(parent_token_bucket_->fillInterval()).count());
-  per_descriptor_token_bucket = std::make_shared<AtomicTokenBucket>(
+  per_descriptor_token_bucket = std::make_shared<RateLimitTokenBucket>(
       parent_token_bucket_->maxTokens(),
       uint32_t(parent_token_bucket_->fillRate() *
                std::chrono::duration<double>(parent_token_bucket_->fillInterval()).count()),

@@ -113,6 +113,7 @@ public:
   // RateLimitTokenBucket
   bool consume(double factor = 1.0, uint64_t tokens = 1);
   double fillRate() const { return token_bucket_.fillRate(); }
+  std::chrono::milliseconds fillInterval() const { return fill_interval_; }
 
   uint64_t maxTokens() const override { return static_cast<uint64_t>(token_bucket_.maxTokens()); }
   uint64_t remainingTokens() const override {
@@ -121,7 +122,7 @@ public:
 
 private:
   AtomicTokenBucketImpl token_bucket_;
-  //const std::chrono::milliseconds fill_interval_;
+  const std::chrono::milliseconds fill_interval_;
 };
 using RateLimitTokenBucketSharedPtr = std::shared_ptr<RateLimitTokenBucket>;
 

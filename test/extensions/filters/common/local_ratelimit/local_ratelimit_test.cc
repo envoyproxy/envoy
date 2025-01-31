@@ -375,16 +375,6 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketsMixedRequestOrder)
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptors2).allowed);
 }
 
-// Verify descriptor rate limit time interval is multiple of token bucket fill interval.
-TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitDivisibleByTokenFillInterval) {
-  TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 10, 10, "60s"),
-                            *descriptors_.Add());
-
-  EXPECT_THROW_WITH_MESSAGE(
-      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_),
-      EnvoyException, "local rate descriptor limit is not a multiple of token bucket fill timer");
-}
-
 // Verify descriptor rate limit time with small fill interval is rejected.
 TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitSmallFillInterval) {
   // Set fill interval to 10 milliseconds.
@@ -762,7 +752,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, NullDefaultTokenBucket) {
   // Not match any descriptor and default token bucket is null.
   auto no_match_result = rate_limiter_->requestAllowed(no_match_descriptor_);
   EXPECT_TRUE(no_match_result.allowed);
-  EXPECT_FALSE(no_match_result.token_bucket_context.has_value());
+  EXPECT_FALSE(no_match_result.token_bucket_context);
 }
 
 } // Namespace LocalRateLimit
