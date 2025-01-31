@@ -215,7 +215,7 @@ protected:
   std::shared_ptr<MetadataCredentialsProviderStats> stats_;
   // AWS Cluster Manager for creating clusters and retrieving URIs when async fetch is needed
   AwsClusterManagerOptRef aws_cluster_manager_;
-  // RAII handle for callbacks from AWs cluster manager
+  // RAII handle for callbacks from AWS cluster manager
   AwsManagedClusterUpdateCallbacksHandlePtr callback_handle_;
 };
 
@@ -362,7 +362,6 @@ public:
   virtual CredentialsProviderSharedPtr createContainerCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
       AwsClusterManagerOptRef aws_cluster_manager,
-
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
@@ -373,7 +372,6 @@ public:
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
       AwsClusterManagerOptRef aws_cluster_manager,
-
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -488,7 +486,6 @@ private:
   CredentialsProviderSharedPtr createContainerCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
       AwsClusterManagerOptRef aws_cluster_manager,
-
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
@@ -499,7 +496,6 @@ private:
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
       Api::Api& api, ServerFactoryContextOptRef context,
       AwsClusterManagerOptRef aws_cluster_manager,
-
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
