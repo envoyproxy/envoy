@@ -14,5 +14,6 @@ Contrib extensions
   hyperscan/regex_engine
   dlb/dlb
   qat/qat
+  fluentd_tracer/fluentd_tracer
   http_tcp_bridge/http_tcp_bridge
   tap_sinks/tap_sinks
