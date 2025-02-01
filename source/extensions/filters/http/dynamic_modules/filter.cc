@@ -72,7 +72,7 @@ FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap& he
 FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bool end_of_stream) {
   if (end_of_stream && encoder_callbacks_->encodingBuffer()) {
     // To make the very last chunk of the body available to the filter when buffering is enabled,
-    // we need to call addDecodedData. See the code comment there for more details.
+    // we need to call addEncodedData. See the code comment there for more details.
     encoder_callbacks_->addEncodedData(chunk, false);
   }
   current_response_body_ = &chunk;
