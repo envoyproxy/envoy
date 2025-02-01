@@ -491,20 +491,12 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
 
   ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillByDefault(Return(dns_resolver_));
 
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-1.amazonaws.com");
   expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-2.amazonaws.com");
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts.eu-west-1.amazonaws.com");
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts.eu-west-2.amazonaws.com");
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts.eu-west-3.amazonaws.com");
 
-#ifdef ENVOY_SSL_FIPS
-  // Under FIPS mode Envoy should fetch the credentials from FIPS dedicated endpoints.
-  expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-west-1.amazonaws.com");
-  expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-west-2.amazonaws.com");
-  expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-east-1.amazonaws.com");
-  expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-east-2.amazonaws.com");
-#else
-  expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-west-1.amazonaws.com");
-  expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-west-2.amazonaws.com");
-  expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-east-1.amazonaws.com");
-  expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-east-2.amazonaws.com");
-#endif
   // Web Identity Credentials and Container Credentials
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -537,7 +529,7 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
         envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigningPerRoute
             per_route_config;
 
-        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "us-east-1"),
+        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "ap-southeast-1"),
                                   per_route_config);
         auto config = default_route->mutable_typed_per_filter_config();
         (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
@@ -547,7 +539,7 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
         next_route->mutable_route()->set_cluster("cluster_0");
         next_route->mutable_match()->set_prefix("/path2");
-        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "us-east-2"),
+        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "ap-southeast-2"),
                                   per_route_config);
 
         config = hcm.mutable_route_config()
@@ -558,7 +550,7 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
         next_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
         next_route->mutable_route()->set_cluster("cluster_0");
         next_route->mutable_match()->set_prefix("/path3");
-        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "us-west-1"),
+        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "eu-west-1"),
                                   per_route_config);
 
         config = hcm.mutable_route_config()
@@ -569,7 +561,7 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
         next_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
         next_route->mutable_route()->set_cluster("cluster_0");
         next_route->mutable_match()->set_prefix("/path4");
-        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "us-west-2"),
+        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "eu-west-2"),
                                   per_route_config);
 
         config = hcm.mutable_route_config()
@@ -580,7 +572,7 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
         next_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
         next_route->mutable_route()->set_cluster("cluster_0");
         next_route->mutable_match()->set_prefix("/path5");
-        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "ap-southeast-2"),
+        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "eu-west-3"),
                                   per_route_config);
 
         config = hcm.mutable_route_config()
@@ -593,19 +585,19 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
   initialize();
 
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-1.credential_refreshes_performed",
+                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
                                  "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-us-"
-                                 "east-2.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-eu-"
+                                 "west-1.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-us-"
-                                 "east-1.credential_refreshes_performed",
-                                 1, std::chrono::seconds(10));
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-us-"
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-eu-"
                                  "west-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-us-"
-                                 "west-1.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-eu-"
+                                 "west-3.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
 
