@@ -1115,10 +1115,8 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityC
   const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
   const auto initialization_timer = std::chrono::seconds(2);
 
-  auto cluster_name = Utility::getSTSEndpoint(region);
-  auto uri = cluster_name + ":443";
-  // Replace dns delimiters with underscore for stats generation
-  std::replace(cluster_name.begin(), cluster_name.end(), '.', '_');
+  auto cluster_name = stsClusterName(region);
+  auto uri = Utility::getSTSEndpoint(region) + ":443";
 
   auto status = aws_cluster_manager.ref()->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
