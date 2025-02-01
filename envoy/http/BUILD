@@ -50,6 +50,7 @@ envoy_cc_library(
         ":stream_reset_handler_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/buffer:buffer_interface",
+        "//envoy/common:matchers_interface",
         "//envoy/grpc:status",
         "//envoy/network:address_interface",
         "//envoy/stream_info:stream_info_interface",
