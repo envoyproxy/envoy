@@ -493,7 +493,7 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
 
   expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-2.amazonaws.com");
 
-  #ifdef ENVOY_SSL_FIPS
+#ifdef ENVOY_SSL_FIPS
   // Under FIPS mode Envoy should fetch the credentials from FIPS dedicated endpoints.
   expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-west-1.amazonaws.com");
   expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-west-2.amazonaws.com");
