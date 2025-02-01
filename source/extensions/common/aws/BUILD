@@ -129,6 +129,7 @@ envoy_cc_library(
     srcs = ["credentials_provider_impl.cc"],
     hdrs = ["credentials_provider_impl.h"],
     deps = [
+        ":aws_cluster_manager_lib",
         ":credentials_provider_interface",
         ":metadata_fetcher_lib",
         ":utility_lib",

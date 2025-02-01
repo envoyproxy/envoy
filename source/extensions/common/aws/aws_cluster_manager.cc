@@ -23,11 +23,15 @@ AwsClusterManager::AwsClusterManager(Server::Configuration::ServerFactoryContext
     });
     context_.initManager().add(*init_target_);
   }
-  // We're pinned, so ensure that we remove our cluster update callbacks before cluster manager
-  // terminates
+
+  // We're pinned, so ensure that we remove our RAII callback handles before cluster manager and
+  // server manager terminates
+
   shutdown_handle_ = context.lifecycleNotifier().registerCallback(
-      Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-      [&](Event::PostCb) { cm_handle_.reset(); });
+      Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this]() {
+        cm_handle_.reset();
+        shutdown_handle_.reset();
+      });
 };
 
 absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
