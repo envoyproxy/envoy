@@ -64,6 +64,13 @@ public:
   ResponseHeaderMap* response_headers_ = nullptr;
   ResponseTrailerMap* response_trailers_ = nullptr;
 
+  // current_request_body_chunk_ is used to store the current chunk of data being processed by the
+  // decodeData callback. This is used when the filter is not buffering the request body where
+  // decoder_callbacks_->decodingBuffer() is nullptr.
+  Buffer::Instance* current_request_body_ = nullptr;
+  // This is the same as current_response_body_ but for the response body.
+  Buffer::Instance* current_response_body_ = nullptr;
+
   /**
    * Helper to get the downstream information of the stream.
    */

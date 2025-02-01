@@ -168,8 +168,12 @@ TEST(DynamiModulesTest, BodyCallbacks) {
   filter->setEncoderFilterCallbacks(encoder_callbacks);
   Buffer::OwnedImpl request_body;
   EXPECT_CALL(decoder_callbacks, decodingBuffer()).WillRepeatedly(testing::Return(&request_body));
+  EXPECT_CALL(decoder_callbacks, addDecodedData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> void {}));
   Buffer::OwnedImpl response_body;
   EXPECT_CALL(encoder_callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&response_body));
+  EXPECT_CALL(encoder_callbacks, addEncodedData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> void {}));
   EXPECT_CALL(decoder_callbacks, modifyDecodingBuffer(_))
       .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(request_body);

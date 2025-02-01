@@ -66,7 +66,7 @@ envoy_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
-        "//test/extensions/dynamic_modules/test_data/rust:http",
+        "//test/extensions/dynamic_modules/test_data/rust:http_integration_test",
     ],
     rbe_pool = "6gig",
     deps = [
