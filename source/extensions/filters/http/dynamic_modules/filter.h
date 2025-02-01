@@ -70,13 +70,6 @@ public:
   Buffer::Instance* current_request_body_ = nullptr;
   // This is the same as current_response_body_ but for the response body.
   Buffer::Instance* current_response_body_ = nullptr;
-  // request_body_buffering_ is used to judge whether or not we should add the last chunk of data to
-  // the buffer returned by decoder_callbacks_->decodingBuffer(). That is the case only when the
-  // last chunk is not the very first chunk of data. As per the code comment on decoder callback's
-  // addDecodedData method, we specially handle that case.
-  bool request_body_buffering_ = false;
-  // This is the same as request_body_buffering_ but for the response body.
-  bool response_body_buffering_ = false;
 
   /**
    * Helper to get the downstream information of the stream.
