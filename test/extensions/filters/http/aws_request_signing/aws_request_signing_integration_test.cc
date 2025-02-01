@@ -490,12 +490,21 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
 TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
 
   ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillByDefault(Return(dns_resolver_));
+
   expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-2.amazonaws.com");
+
+  #ifdef ENVOY_SSL_FIPS
+  // Under FIPS mode Envoy should fetch the credentials from FIPS dedicated endpoints.
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-west-1.amazonaws.com");
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-west-2.amazonaws.com");
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-east-1.amazonaws.com");
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts-fips.us-east-2.amazonaws.com");
+#else
   expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-west-1.amazonaws.com");
   expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-west-2.amazonaws.com");
   expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-east-1.amazonaws.com");
   expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-east-2.amazonaws.com");
-
+#endif
   // Web Identity Credentials and Container Credentials
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
