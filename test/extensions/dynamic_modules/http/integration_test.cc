@@ -138,6 +138,27 @@ TEST_P(DynamicModulesIntegrationTest, BodyCallbacks) {
   EXPECT_EQ("new_response_body", response->body());
 }
 
+TEST_P(DynamicModulesIntegrationTest, BodyCallbacks_WithoutBuffering) {
+  initializeFilter("body_callbacks", "immediate_end_of_stream");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, "request_body");
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData("response_body", true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify the proxied request was received upstream, as expected.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("new_request_body", upstream_request_->body().toString());
+  // Verify the proxied response was received downstream, as expected.
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("new_response_body", response->body());
+}
+
 TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
   initializeFilter("send_response", "on_request_headers");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

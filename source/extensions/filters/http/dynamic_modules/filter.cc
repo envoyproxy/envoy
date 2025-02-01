@@ -35,11 +35,13 @@ FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& b, bool e
   if (request_body_buffering_ && end_of_stream) {
     decoder_callbacks_->addDecodedData(b, false);
   }
+  current_chunk_ = &b;
   const envoy_dynamic_module_type_on_http_filter_request_body_status status =
       config_->on_http_filter_request_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   auto ret = static_cast<FilterDataStatus>(status);
   request_body_buffering_ = ret == FilterDataStatus::StopIterationAndBuffer ||
                             ret == FilterDataStatus::StopIterationAndWatermark;
+  current_chunk_ = nullptr;
   return ret;
 };
 

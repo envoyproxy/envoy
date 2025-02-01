@@ -64,11 +64,23 @@ public:
   ResponseHeaderMap* response_headers_ = nullptr;
   ResponseTrailerMap* response_trailers_ = nullptr;
 
-  // This is necessary to make it possible to see the last chunk of data in the buffer.
-  // Note(mathetake): this seems a bit hacky, but is used everywhere in the codebase.
-  // Maybe we should fix the buffering logic in the core?
+  // These are necessary to currectly deal with the "last chunk" of data in decodeData.
   //
-  // TODO: add an integration test where end_of_stream is true at the first chunk of data.
+  // current_chunk_ is used to track the current chunk of data being processed in decodeData.
+  // When the very first chunk of data is proceed while end_stream is true, we need to use the
+  // current_chunk_ as a buffer to handle the body related callbacks since decoder_callbacks_ will
+  // not see the first chunk of data yet. That might make you feel like why not just add the first
+  // chunk to the decoder_callbacks_ directly. In the case, *if* the callback doesn't return
+  // StopBuffer* kind of status, the data will be lost when end_stream is true.
+  //
+  // request_body_buffering_ is used to judge whether or not we should add the last chunk of data to
+  // the buffer returned by decoder_callbacks_->decodingBuffer(). That is the case only when the
+  // last chunk is not the very first chunk of data. As per the code comment on decoder callback's
+  // addDecodedData method, we specially handle that case.
+  //
+  // Note(mathatke): this asymmetry between decdeData and encodeData feels a bit odd but I see this
+  // in a lot of places across the extension codebase. Maybe refactor the core code?
+  Buffer::Instance* current_chunk_ = nullptr;
   bool request_body_buffering_ = false;
 
   /**

@@ -17,7 +17,9 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "header_callbacks" => Some(Box::new(HeadersHttpFilterConfig {
       headers_to_add: config.to_string(),
     })),
-    "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
+    "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {
+      immediate_end_of_stream: config == "immediate_end_of_stream",
+    })),
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig {
       on_request_headers: config == "on_request_headers",
     })),
@@ -156,13 +158,16 @@ impl Drop for HeadersHttpFilter {
   }
 }
 
-struct BodyCallbacksFilterConfig {}
+struct BodyCallbacksFilterConfig {
+  immediate_end_of_stream: bool,
+}
 
 impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
   for BodyCallbacksFilterConfig
 {
   fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BodyCallbacksFilter {
+      immediate_end_of_stream: self.immediate_end_of_stream,
       seen_request_body: false,
       seen_response_body: false,
     })
@@ -170,6 +175,8 @@ impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
 }
 
 struct BodyCallbacksFilter {
+  /// This is true when we should not see end_of_stream=false, configured by the filter config.
+  immediate_end_of_stream: bool,
   seen_request_body: bool,
   seen_response_body: bool,
 }
@@ -181,15 +188,17 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
     if !end_of_stream {
+      assert!(!self.immediate_end_of_stream);
       // Buffer the request body until the end of stream.
       return envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer;
     }
     self.seen_request_body = true;
 
-    let request_body = envoy_filter.get_request_body().expect("request body");
+    let request_body = envoy_filter
+      .get_request_body()
+      .expect("request body not available");
     let mut body = String::new();
     for chunk in request_body {
-      println!("chunk: {:?}", chunk);
       body.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
     }
     assert_eq!(body, "request_body");
@@ -215,7 +224,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     }
     self.seen_response_body = true;
 
-    let response_body = envoy_filter.get_response_body().expect("response body");
+    let response_body = envoy_filter
+      .get_response_body()
+      .expect("response body not available");
     let mut body = String::new();
     for chunk in response_body {
       body.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
