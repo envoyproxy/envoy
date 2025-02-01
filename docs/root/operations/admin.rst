@@ -363,7 +363,8 @@ modify different aspects of the server:
 
    :ref:`Drains <arch_overview_draining>` all inbound listeners. ``traffic_direction`` field in
    :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener
-   is inbound or outbound.
+   is inbound or outbound. May not be effective for network filters like :ref:`Redis <config_network_filters_redis_proxy>`,
+   :ref:`Mongo <config_network_filters_mongo_proxy>`, or :ref:`Thrift <config_network_filters_thrift_proxy>`.
 
    .. http:post:: /drain_listeners?graceful
 

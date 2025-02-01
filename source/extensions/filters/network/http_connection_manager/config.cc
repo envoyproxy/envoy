@@ -307,12 +307,11 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
     Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
                                                     : server_context.overloadManager();
-
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource());
+        server_context.mainThreadDispatcher().timeSource(), context.listenerInfo().direction());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
@@ -897,7 +896,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource());
+        server_context.mainThreadDispatcher().timeSource(), context.listenerInfo().direction());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);
     }
