@@ -64,24 +64,19 @@ public:
   ResponseHeaderMap* response_headers_ = nullptr;
   ResponseTrailerMap* response_trailers_ = nullptr;
 
-  // These are necessary to currectly deal with the "last chunk" of data in decodeData.
-  //
-  // current_chunk_ is used to track the current chunk of data being processed in decodeData.
-  // When the very first chunk of data is proceed while end_stream is true, we need to use the
-  // current_chunk_ as a buffer to handle the body related callbacks since decoder_callbacks_ will
-  // not see the first chunk of data yet. That might make you feel like why not just add the first
-  // chunk to the decoder_callbacks_ directly. In the case, *if* the callback doesn't return
-  // StopBuffer* kind of status, the data will be lost when end_stream is true.
-  //
+  // current_request_body_chunk_ is used to store the current chunk of data being processed by the
+  // decodeData callback. This is used when the filter is not buffering the request body where
+  // decoder_callbacks_->decodingBuffer() is nullptr.
+  Buffer::Instance* current_request_body_ = nullptr;
+  // This is the same as current_response_body_ but for the response body.
+  Buffer::Instance* current_response_body_ = nullptr;
   // request_body_buffering_ is used to judge whether or not we should add the last chunk of data to
   // the buffer returned by decoder_callbacks_->decodingBuffer(). That is the case only when the
   // last chunk is not the very first chunk of data. As per the code comment on decoder callback's
   // addDecodedData method, we specially handle that case.
-  //
-  // Note(mathatke): this asymmetry between decdeData and encodeData feels a bit odd but I see this
-  // in a lot of places across the extension codebase. Maybe refactor the core code?
-  Buffer::Instance* current_chunk_ = nullptr;
   bool request_body_buffering_ = false;
+  // This is the same as request_body_buffering_ but for the response body.
+  bool response_body_buffering_ = false;
 
   /**
    * Helper to get the downstream information of the stream.

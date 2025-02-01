@@ -33,15 +33,17 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap& hea
 
 FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& b, bool end_of_stream) {
   if (request_body_buffering_ && end_of_stream) {
+    // To make the very last chunk of the body available to the filter when buffering is enabled,
+    // we need to call addDecodedData. See the code comment there for more details.
     decoder_callbacks_->addDecodedData(b, false);
   }
-  current_chunk_ = &b;
+  current_request_body_ = &b;
   const envoy_dynamic_module_type_on_http_filter_request_body_status status =
       config_->on_http_filter_request_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   auto ret = static_cast<FilterDataStatus>(status);
   request_body_buffering_ = ret == FilterDataStatus::StopIterationAndBuffer ||
                             ret == FilterDataStatus::StopIterationAndWatermark;
-  current_chunk_ = nullptr;
+  current_request_body_ = nullptr;
   return ret;
 };
 
@@ -70,9 +72,16 @@ FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap& he
   return static_cast<FilterHeadersStatus>(status);
 };
 
-FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance&, bool end_of_stream) {
+FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& b, bool end_of_stream) {
+  if (response_body_buffering_ && end_of_stream) {
+    // To make the very last chunk of the body available to the filter when buffering is enabled,
+    // we need to call addDecodedData. See the code comment there for more details.
+    encoder_callbacks_->addEncodedData(b, false);
+  }
+  current_response_body_ = &b;
   const envoy_dynamic_module_type_on_http_filter_response_body_status status =
       config_->on_http_filter_response_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
+  current_response_body_ = nullptr;
   return static_cast<FilterDataStatus>(status);
 };
 

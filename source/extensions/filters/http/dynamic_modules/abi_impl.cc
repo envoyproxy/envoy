@@ -375,11 +375,12 @@ bool envoy_dynamic_module_callback_http_get_request_body_vector(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->decoder_callbacks_->decodingBuffer();
   if (!buffer) {
-    buffer = filter->current_chunk_;
+    buffer = filter->current_request_body_;
     if (!buffer) {
       return false;
     }
-    // See the comment on current_chunk_ for when we reach this line when we use the current_chunk_.
+    // See the comment on current_request_body_ for when we reach this line when we use the
+    // current_request_body_chunk_.
   }
   auto raw_slices = buffer->getRawSlices(std::nullopt);
   auto counter = 0;
@@ -396,11 +397,12 @@ bool envoy_dynamic_module_callback_http_get_request_body_vector_size(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->decoder_callbacks_->decodingBuffer();
   if (!buffer) {
-    buffer = filter->current_chunk_;
+    buffer = filter->current_request_body_;
     if (!buffer) {
       return false;
     }
-    // See the comment on current_chunk_ for when we reach this line when we use the current_chunk_.
+    // See the comment on current_request_body_ for when we reach this line when we use the
+    // current_request_body_chunk_.
   }
   *size = buffer->getRawSlices(std::nullopt).size();
   return true;
@@ -411,8 +413,9 @@ bool envoy_dynamic_module_callback_http_append_request_body(
     envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->decoder_callbacks_->decodingBuffer()) {
-    if (filter->current_chunk_) { // See the comment on current_chunk_ for when we enter this block.
-      filter->current_chunk_->add(absl::string_view(static_cast<const char*>(data), length));
+    if (filter->current_request_body_) { // See the comment on current_request_body_ for when we
+                                         // enter this block.
+      filter->current_request_body_->add(absl::string_view(static_cast<const char*>(data), length));
       return true;
     }
     return false;
@@ -427,9 +430,10 @@ bool envoy_dynamic_module_callback_http_drain_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->decoder_callbacks_->decodingBuffer()) {
-    if (filter->current_chunk_) { // See the comment on current_chunk_ for when we enter this block.
-      auto size = std::min(filter->current_chunk_->length(), number_of_bytes);
-      filter->current_chunk_->drain(size);
+    if (filter->current_request_body_) { // See the comment on current_request_body_ for when we
+                                         // enter this block.
+      auto size = std::min(filter->current_request_body_->length(), number_of_bytes);
+      filter->current_request_body_->drain(size);
       return true;
     }
     return false;
@@ -448,7 +452,12 @@ bool envoy_dynamic_module_callback_http_get_response_body_vector(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->encoder_callbacks_->encodingBuffer();
   if (!buffer) {
-    return false;
+    buffer = filter->current_response_body_;
+    if (!buffer) {
+      return false;
+    }
+    // See the comment on current_response_body_ for when we reach this line when we use the
+    // current_response_body_chunk_.
   }
   auto raw_slices = buffer->getRawSlices(std::nullopt);
   auto counter = 0;
@@ -465,7 +474,12 @@ bool envoy_dynamic_module_callback_http_get_response_body_vector_size(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->encoder_callbacks_->encodingBuffer();
   if (!buffer) {
-    return false;
+    buffer = filter->current_response_body_;
+    if (!buffer) {
+      return false;
+    }
+    // See the comment on current_response_body_ for when we reach this line when we use the
+    // current_response_body_chunk_.
   }
   *size = buffer->getRawSlices(std::nullopt).size();
   return true;
@@ -476,6 +490,12 @@ bool envoy_dynamic_module_callback_http_append_response_body(
     envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->encoder_callbacks_->encodingBuffer()) {
+    if (filter->current_response_body_) { // See the comment on current_response_body_ for when we
+                                          // enter this block.
+      filter->current_response_body_->add(
+          absl::string_view(static_cast<const char*>(data), length));
+      return true;
+    }
     return false;
   }
   filter->encoder_callbacks_->modifyEncodingBuffer([data, length](Buffer::Instance& buffer) {
@@ -488,6 +508,12 @@ bool envoy_dynamic_module_callback_http_drain_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->encoder_callbacks_->encodingBuffer()) {
+    if (filter->current_response_body_) { // See the comment on current_response_body_ for when we
+                                          // enter this block.
+      auto size = std::min(filter->current_response_body_->length(), number_of_bytes);
+      filter->current_response_body_->drain(size);
+      return true;
+    }
     return false;
   }
 
