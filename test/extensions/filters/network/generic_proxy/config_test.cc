@@ -539,7 +539,7 @@ TEST(BasicFilterConfigTest, TestConfigurationWithAccessLogAndLogFilter2) {
   Registry::InjectFactory<CodecFactoryConfig> registration(codec_factory_config);
 
   FakeAccessLogExtensionFilterFactory fake_access_log_extension_filter_factory;
-  Registry::InjectFactory<AccessLogFilterFactory> registration_log(
+  Registry::InjectFactory<AccessLog::ExtensionFilterFactory> registration_log(
       fake_access_log_extension_filter_factory);
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
