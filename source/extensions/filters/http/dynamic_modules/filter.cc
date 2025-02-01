@@ -31,10 +31,16 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap& hea
   return static_cast<FilterHeadersStatus>(status);
 };
 
-FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance&, bool end_of_stream) {
+FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& b, bool end_of_stream) {
+  if (request_body_buffering_ && end_of_stream) {
+    decoder_callbacks_->addDecodedData(b, false);
+  }
   const envoy_dynamic_module_type_on_http_filter_request_body_status status =
       config_->on_http_filter_request_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
-  return static_cast<FilterDataStatus>(status);
+  auto ret = static_cast<FilterDataStatus>(status);
+  request_body_buffering_ = ret == FilterDataStatus::StopIterationAndBuffer ||
+                            ret == FilterDataStatus::StopIterationAndWatermark;
+  return ret;
 };
 
 FilterTrailersStatus DynamicModuleHttpFilter::decodeTrailers(RequestTrailerMap& trailers) {

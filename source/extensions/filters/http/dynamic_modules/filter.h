@@ -64,6 +64,13 @@ public:
   ResponseHeaderMap* response_headers_ = nullptr;
   ResponseTrailerMap* response_trailers_ = nullptr;
 
+  // This is necessary to make it possible to see the last chunk of data in the buffer.
+  // Note(mathetake): this seems a bit hacky, but is used everywhere in the codebase.
+  // Maybe we should fix the buffering logic in the core?
+  //
+  // TODO: add an integration test where end_of_stream is true at the first chunk of data.
+  bool request_body_buffering_ = false;
+
   /**
    * Helper to get the downstream information of the stream.
    */
