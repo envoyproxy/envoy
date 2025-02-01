@@ -33,6 +33,27 @@ typed_config:
   - exact: x-amzn-trace-id
 )EOF";
 
+const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_CUSTOM = R"EOF(
+name: envoy.filters.http.aws_request_signing
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
+  credential_provider:
+    custom_credential_provider_chain: true
+    assume_role_with_web_identity_provider:
+      web_identity_token_data_source:
+        filename: /tmp/a
+      role_arn: arn:aws:test
+      role_session_name: testing
+  service_name: vpc-lattice-svcs
+  region: ap-southeast-2
+  signing_algorithm: aws_sigv4
+  use_unsigned_payload: true
+  match_excluded_headers:
+  - prefix: x-envoy
+  - prefix: x-forwarded
+  - exact: x-amzn-trace-id
+)EOF";
+
 const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4A = R"EOF(
 name: envoy.filters.http.aws_request_signing
 typed_config:
@@ -265,6 +286,10 @@ public:
     config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4, downstream);
   }
 
+  void addCustomCredentialChainFilter(bool downstream = true) {
+    config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_CUSTOM, downstream);
+  }
+
   void addPerRouteFilter(const std::string& yaml_config) {
 
     config_helper_.addConfigModifier(
@@ -324,8 +349,22 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
 
   initialize();
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_ap-southeast-2_amazonaws_"
-                                 "com.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
+                                 1, std::chrono::seconds(10));
+}
+
+TEST_F(InitializeFilterTest, TestWithOneClusterCustomWebIdentity) {
+
+  // Web Identity Credentials only
+  dnsSetup();
+
+  TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
+  addCustomCredentialChainFilter();
+  initialize();
+
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
 
@@ -342,8 +381,8 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
   addUpstreamProtocolOptions();
   initialize();
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_ap-southeast-2_amazonaws_"
-                                 "com.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
 
@@ -386,8 +425,8 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_ap-southeast-2_amazonaws_"
-                                 "com.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
 
@@ -402,8 +441,8 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROUTE_LEVEL);
   initialize();
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_ap-southeast-2_amazonaws_"
-                                 "com.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
 
@@ -423,8 +462,8 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_ap-southeast-2_amazonaws_"
-                                 "com.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
 
@@ -443,8 +482,121 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_ap-southeast-2_amazonaws_"
-                                 "com.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
+                                 1, std::chrono::seconds(10));
+}
+
+TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
+
+  ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillByDefault(Return(dns_resolver_));
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-2.amazonaws.com");
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-west-1.amazonaws.com");
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-west-2.amazonaws.com");
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-east-1.amazonaws.com");
+  expectResolve(Network::DnsLookupFamily::V4Only, "sts.us-east-2.amazonaws.com");
+
+  // Web Identity Credentials and Container Credentials
+  TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
+  TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+  TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
+  TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
+
+  const std::string route_level_config = R"EOF(
+  aws_request_signing:
+    service_name: vpc-lattice-svcs
+    region: {}
+    use_unsigned_payload: true
+    host_rewrite: new-host
+    match_excluded_headers:
+    - prefix: x-envoy
+    - prefix: x-forwarded
+    - exact: x-amzn-trace-id
+  stat_prefix: some-prefix
+  )EOF";
+
+  config_helper_.addConfigModifier(
+      [&route_level_config](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto default_route =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        default_route->mutable_route()->set_cluster("cluster_0");
+        default_route->mutable_match()->set_prefix("/path1");
+        envoy::extensions::filters::http::aws_request_signing::v3::AwsRequestSigningPerRoute
+            per_route_config;
+
+        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "us-east-1"),
+                                  per_route_config);
+        auto config = default_route->mutable_typed_per_filter_config();
+        (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
+        // (*config)["envoy.filters.http.aws_request_signing"].PackFrom(fmt::format(fmt::runtime(route_level_config),
+        // "us-east-1")); Add route that should direct to cluster with custom bind config.
+        auto next_route =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
+        next_route->mutable_route()->set_cluster("cluster_0");
+        next_route->mutable_match()->set_prefix("/path2");
+        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "us-east-2"),
+                                  per_route_config);
+
+        config = hcm.mutable_route_config()
+                     ->mutable_virtual_hosts(0)
+                     ->mutable_routes(1)
+                     ->mutable_typed_per_filter_config();
+        (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
+        next_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
+        next_route->mutable_route()->set_cluster("cluster_0");
+        next_route->mutable_match()->set_prefix("/path3");
+        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "us-west-1"),
+                                  per_route_config);
+
+        config = hcm.mutable_route_config()
+                     ->mutable_virtual_hosts(0)
+                     ->mutable_routes(2)
+                     ->mutable_typed_per_filter_config();
+        (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
+        next_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
+        next_route->mutable_route()->set_cluster("cluster_0");
+        next_route->mutable_match()->set_prefix("/path4");
+        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "us-west-2"),
+                                  per_route_config);
+
+        config = hcm.mutable_route_config()
+                     ->mutable_virtual_hosts(0)
+                     ->mutable_routes(3)
+                     ->mutable_typed_per_filter_config();
+        (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
+        next_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes()->Add();
+        next_route->mutable_route()->set_cluster("cluster_0");
+        next_route->mutable_match()->set_prefix("/path5");
+        TestUtility::loadFromYaml(fmt::format(fmt::runtime(route_level_config), "ap-southeast-2"),
+                                  per_route_config);
+
+        config = hcm.mutable_route_config()
+                     ->mutable_virtual_hosts(0)
+                     ->mutable_routes(4)
+                     ->mutable_typed_per_filter_config();
+        (*config)["envoy.filters.http.aws_request_signing"].PackFrom(per_route_config);
+      });
+
+  initialize();
+
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
+                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-us-"
+                                 "east-2.credential_refreshes_performed",
+                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-us-"
+                                 "east-1.credential_refreshes_performed",
+                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-us-"
+                                 "west-2.credential_refreshes_performed",
+                                 1, std::chrono::seconds(10));
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-us-"
+                                 "west-1.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
 
@@ -464,8 +616,8 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_ap-southeast-2_amazonaws_"
-                                 "com.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
 
@@ -481,8 +633,8 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandardInstanceProfile) {
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_ap-southeast-2_amazonaws_"
-                                 "com.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
 
@@ -498,8 +650,8 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelInstanceProfile) {
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_ap-southeast-2_amazonaws_"
-                                 "com.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
 
@@ -516,8 +668,8 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandardInstancePro
                                  "metadata_server_internal.credential_refreshes_performed",
                                  1);
 
-  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_ap-southeast-2_amazonaws_"
-                                 "com.credential_refreshes_performed",
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
+                                 "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
 }
 

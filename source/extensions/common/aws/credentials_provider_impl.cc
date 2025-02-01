@@ -904,8 +904,6 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
   // Custom chain currently only supports file based and web identity credentials
   if (credential_provider_config.has_assume_role_with_web_identity_provider()) {
     auto web_identity = credential_provider_config.assume_role_with_web_identity_provider();
-    const std::string sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-    const std::string cluster_name = stsClusterName(region);
     std::string role_session_name = web_identity.role_session_name();
     if (role_session_name.empty()) {
       web_identity.set_role_session_name(sessionName(context.api()));
@@ -1119,10 +1117,8 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityC
   const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
   const auto initialization_timer = std::chrono::seconds(2);
 
-  auto cluster_name = Utility::getSTSEndpoint(region);
-  auto uri = cluster_name + ":443";
-  // Replace dns delimiters with underscore for stats generation
-  std::replace(cluster_name.begin(), cluster_name.end(), '.', '_');
+  auto cluster_name = stsClusterName(region);
+  auto uri = Utility::getSTSEndpoint(region) + ":443";
 
   auto status = aws_cluster_manager.ref()->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
@@ -1149,8 +1145,9 @@ CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCr
   const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
   const auto initialization_timer = std::chrono::seconds(2);
 
-  auto cluster_name = Utility::getSTSEndpoint(region);
-  auto uri = cluster_name + ":443";
+  auto cluster_name = stsClusterName(region);
+  auto uri = Utility::getSTSEndpoint(region) + ":443";
+
   auto status = aws_cluster_manager.ref()->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
 
