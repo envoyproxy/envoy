@@ -379,9 +379,12 @@ public:
       sampled_ = sampled;
       return *this;
     }
-
     StreamOptions& setSidestreamWatermarkCallbacks(SidestreamWatermarkCallbacks* callbacks) {
       sidestream_watermark_callbacks = callbacks;
+      return *this;
+    }
+    StreamOptions& setMatchingRoute(Envoy::Router::RouteConstSharedPtr route) {
+      matching_route = route;
       return *this;
     }
 
@@ -444,6 +447,8 @@ public:
     absl::optional<bool> sampled_{true};
     // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
     Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
+    // Matching route to be associated with new stream
+    Envoy::Router::RouteConstSharedPtr matching_route;
   };
 
   /**
