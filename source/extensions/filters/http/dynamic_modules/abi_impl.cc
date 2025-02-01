@@ -379,8 +379,7 @@ bool envoy_dynamic_module_callback_http_get_request_body_vector(
     if (!buffer) {
       return false;
     }
-    // See the comment on current_request_body_ for when we reach this line when we use the
-    // current_request_body_chunk_.
+    // See the comment on current_request_body_ for when we reach this.
   }
   auto raw_slices = buffer->getRawSlices(std::nullopt);
   auto counter = 0;
@@ -401,8 +400,7 @@ bool envoy_dynamic_module_callback_http_get_request_body_vector_size(
     if (!buffer) {
       return false;
     }
-    // See the comment on current_request_body_ for when we reach this line when we use the
-    // current_request_body_chunk_.
+    // See the comment on current_request_body_ for when we reach this line.
   }
   *size = buffer->getRawSlices(std::nullopt).size();
   return true;
@@ -456,8 +454,7 @@ bool envoy_dynamic_module_callback_http_get_response_body_vector(
     if (!buffer) {
       return false;
     }
-    // See the comment on current_response_body_ for when we reach this line when we use the
-    // current_response_body_chunk_.
+    // See the comment on current_response_body_ for when we reach this line.
   }
   auto raw_slices = buffer->getRawSlices(std::nullopt);
   auto counter = 0;
@@ -478,8 +475,7 @@ bool envoy_dynamic_module_callback_http_get_response_body_vector_size(
     if (!buffer) {
       return false;
     }
-    // See the comment on current_response_body_ for when we reach this line when we use the
-    // current_response_body_chunk_.
+    // See the comment on current_response_body_ for when we reach this line.
   }
   *size = buffer->getRawSlices(std::nullopt).size();
   return true;
