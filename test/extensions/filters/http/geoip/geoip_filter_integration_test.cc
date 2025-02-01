@@ -61,7 +61,7 @@ public:
 
   absl::string_view headerValue(const absl::string_view& header_name) const {
     return upstream_request_->headers()
-        .get(Http::LowerCaseString(header_name))[0]
+        ->get(Http::LowerCaseString(header_name))[0]
         ->value()
         .getStringView();
   }

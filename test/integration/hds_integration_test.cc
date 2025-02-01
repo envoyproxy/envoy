@@ -84,9 +84,9 @@ public:
     ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
     ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
 
-    EXPECT_EQ(host2_stream_->headers().getPathValue(), "/healthcheck");
-    EXPECT_EQ(host2_stream_->headers().getMethodValue(), "GET");
-    EXPECT_EQ(host2_stream_->headers().getHostValue(), cluster2);
+    EXPECT_EQ(host2_stream_->headers()->getPathValue(), "/healthcheck");
+    EXPECT_EQ(host2_stream_->headers()->getMethodValue(), "GET");
+    EXPECT_EQ(host2_stream_->headers()->getHostValue(), cluster2);
   }
 
   // Envoy sends health check messages to the endpoints
@@ -95,9 +95,9 @@ public:
     ASSERT_TRUE(host_fake_connection_->waitForNewStream(*dispatcher_, host_stream_));
     ASSERT_TRUE(host_stream_->waitForEndStream(*dispatcher_));
 
-    EXPECT_EQ(host_stream_->headers().getPathValue(), "/healthcheck");
-    EXPECT_EQ(host_stream_->headers().getMethodValue(), "GET");
-    EXPECT_EQ(host_stream_->headers().getHostValue(), "anna");
+    EXPECT_EQ(host_stream_->headers()->getPathValue(), "/healthcheck");
+    EXPECT_EQ(host_stream_->headers()->getMethodValue(), "GET");
+    EXPECT_EQ(host_stream_->headers()->getHostValue(), "anna");
 
     if (!cluster2.empty()) {
       healthcheckEndpointsCluster2(cluster2);
@@ -271,10 +271,10 @@ transport_socket_matches:
     while (!checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                                         healthy, host_upstream_->localAddress())) {
       ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-      EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
+      EXPECT_EQ("POST", hds_stream_->headers()->getMethodValue());
       EXPECT_EQ("/envoy.service.health.v3.HealthDiscoveryService/StreamHealthCheck",
-                hds_stream_->headers().getPathValue());
-      EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
+                hds_stream_->headers()->getPathValue());
+      EXPECT_EQ("application/grpc", hds_stream_->headers()->getContentTypeValue());
     }
   }
 
@@ -324,10 +324,10 @@ transport_socket_matches:
         return false;
       }
 
-      EXPECT_EQ("POST", hds_stream_->headers().getMethodValue());
+      EXPECT_EQ("POST", hds_stream_->headers()->getMethodValue());
       EXPECT_EQ("/envoy.service.health.v3.HealthDiscoveryService/StreamHealthCheck",
-                hds_stream_->headers().getPathValue());
-      EXPECT_EQ("application/grpc", hds_stream_->headers().getContentTypeValue());
+                hds_stream_->headers()->getPathValue());
+      EXPECT_EQ("application/grpc", hds_stream_->headers()->getContentTypeValue());
     }
 
     return true;
@@ -1116,9 +1116,9 @@ TEST_P(HdsIntegrationTest, UpdateEndpoints) {
   ASSERT_TRUE(host2_upstream_->waitForHttpConnection(*dispatcher_, host2_fake_connection_));
   ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
   ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
-  EXPECT_EQ(host2_stream_->headers().getPathValue(), "/healthcheck");
-  EXPECT_EQ(host2_stream_->headers().getMethodValue(), "GET");
-  EXPECT_EQ(host2_stream_->headers().getHostValue(), "anna");
+  EXPECT_EQ(host2_stream_->headers()->getPathValue(), "/healthcheck");
+  EXPECT_EQ(host2_stream_->headers()->getMethodValue(), "GET");
+  EXPECT_EQ(host2_stream_->headers()->getHostValue(), "anna");
 
   // Endpoints respond to the health check
   host2_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);

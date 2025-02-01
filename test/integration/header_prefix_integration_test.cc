@@ -42,10 +42,10 @@ TEST_P(HeaderPrefixIntegrationTest, CustomHeaderPrefix) {
             response->headers().EnvoyUpstreamServiceTime()->key().getStringView());
 
   EXPECT_FALSE(upstream_request_->headers()
-                   .get(Envoy::Http::LowerCaseString{"x-custom-expected-rq-timeout-ms"})
+                   ->get(Envoy::Http::LowerCaseString{"x-custom-expected-rq-timeout-ms"})
                    .empty());
   EXPECT_EQ("x-custom-expected-rq-timeout-ms",
-            upstream_request_->headers().EnvoyExpectedRequestTimeoutMs()->key().getStringView());
+            upstream_request_->headers()->EnvoyExpectedRequestTimeoutMs()->key().getStringView());
 }
 
 // In this case, the header prefix set in the bootstrap will not match the

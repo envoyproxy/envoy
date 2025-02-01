@@ -207,9 +207,9 @@ public:
                                                                      cluster_data.host_stream_));
     ASSERT_TRUE(cluster_data.host_stream_->waitForEndStream(*dispatcher_));
 
-    EXPECT_EQ(cluster_data.host_stream_->headers().getPathValue(), "/healthcheck");
-    EXPECT_EQ(cluster_data.host_stream_->headers().getMethodValue(), "GET");
-    EXPECT_EQ(cluster_data.host_stream_->headers().getHostValue(), cluster_data.name_);
+    EXPECT_EQ(cluster_data.host_stream_->headers()->getPathValue(), "/healthcheck");
+    EXPECT_EQ(cluster_data.host_stream_->headers()->getMethodValue(), "GET");
+    EXPECT_EQ(cluster_data.host_stream_->headers()->getHostValue(), cluster_data.name_);
   }
 };
 
@@ -291,9 +291,9 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
       *dispatcher_, clusters_[cluster_idx].host_stream_));
   ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
 
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getHostValue(),
             clusters_[cluster_idx].name_);
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);
@@ -313,9 +313,9 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
       *dispatcher_, clusters_[cluster_idx].host_stream_));
   ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
 
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getHostValue(),
             clusters_[cluster_idx].name_);
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "400"}}, false);
@@ -335,9 +335,9 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointUnhealthyThresholdHttp) {
       *dispatcher_, clusters_[cluster_idx].host_stream_));
   ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
 
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getHostValue(),
             clusters_[cluster_idx].name_);
   clusters_[cluster_idx].host_stream_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
@@ -404,9 +404,9 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointImmediateHealthcheckFailHtt
       *dispatcher_, clusters_[cluster_idx].host_stream_));
   ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
 
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getHostValue(),
             clusters_[cluster_idx].name_);
 
   clusters_[cluster_idx].host_stream_->encodeHeaders(
@@ -467,9 +467,9 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointGoAway) {
       *dispatcher_, clusters_[cluster_idx].host_stream_));
   ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
 
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getHostValue(),
             clusters_[cluster_idx].name_);
 
   clusters_[cluster_idx].host_stream_->encodeHeaders(
@@ -527,9 +527,9 @@ TEST_P(RealTimeHttpHealthCheckIntegrationTest, SingleEndpointGoAwayError) {
       *dispatcher_, clusters_[cluster_idx].host_stream_));
   ASSERT_TRUE(clusters_[cluster_idx].host_stream_->waitForEndStream(*dispatcher_));
 
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getPathValue(), "/healthcheck");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getMethodValue(), "GET");
-  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers().getHostValue(),
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getPathValue(), "/healthcheck");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getMethodValue(), "GET");
+  EXPECT_EQ(clusters_[cluster_idx].host_stream_->headers()->getHostValue(),
             clusters_[cluster_idx].name_);
 
   clusters_[cluster_idx].host_stream_->encodeHeaders(
@@ -726,10 +726,10 @@ public:
     ASSERT_TRUE(cluster_data.host_stream_->waitForGrpcMessage(*dispatcher_, request));
     ASSERT_TRUE(cluster_data.host_stream_->waitForEndStream(*dispatcher_));
 
-    EXPECT_EQ(cluster_data.host_stream_->headers().getPathValue(), "/grpc.health.v1.Health/Check");
-    EXPECT_EQ(cluster_data.host_stream_->headers().getContentTypeValue(),
+    EXPECT_EQ(cluster_data.host_stream_->headers()->getPathValue(), "/grpc.health.v1.Health/Check");
+    EXPECT_EQ(cluster_data.host_stream_->headers()->getContentTypeValue(),
               Http::Headers::get().ContentTypeValues.Grpc);
-    EXPECT_EQ(cluster_data.host_stream_->headers().getHostValue(), cluster_data.name_);
+    EXPECT_EQ(cluster_data.host_stream_->headers()->getHostValue(), cluster_data.name_);
   }
 
   // Send a gRPC message with the given headers and health check response message.

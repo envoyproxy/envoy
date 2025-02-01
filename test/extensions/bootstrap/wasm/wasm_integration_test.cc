@@ -82,7 +82,7 @@ TEST_P(WasmIntegrationTest, FilterMakesCallInConfigureTime) {
   ASSERT_TRUE(wasm_request_->waitForEndStream(*dispatcher_));
 
   EXPECT_EQ("test", wasm_request_->headers()
-                        .get(Envoy::Http::LowerCaseString("x-test"))[0]
+                        ->get(Envoy::Http::LowerCaseString("x-test"))[0]
                         ->value()
                         .getStringView());
 

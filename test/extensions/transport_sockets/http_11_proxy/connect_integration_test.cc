@@ -170,7 +170,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, NoHeader) {
 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  ASSERT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("foo")).empty());
+  ASSERT_FALSE(upstream_request_->headers()->get(Http::LowerCaseString("foo")).empty());
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("foo")).empty());
 
   // Second request reuses the connection.
@@ -347,7 +347,7 @@ TEST_P(Http11ConnectHttpIntegrationTest, TestMultipleRequestsSingleEndpoint) {
   response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("request2")).empty());
+  EXPECT_FALSE(upstream_request_->headers()->get(Http::LowerCaseString("request2")).empty());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   // Wait for the encapsulated response to be received.

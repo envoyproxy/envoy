@@ -648,7 +648,7 @@ public:
   void expectExtraHeaders(FakeStream& fake_stream) override {
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
-    const auto auth_headers = fake_stream.headers().get(Http::LowerCaseString("authorization"));
+    const auto auth_headers = fake_stream.headers()->get(Http::LowerCaseString("authorization"));
     if (!access_token_value_.empty()) {
       EXPECT_EQ("Bearer " + access_token_value_, auth_headers[0]->value().getStringView());
     }

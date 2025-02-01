@@ -99,11 +99,11 @@ TEST_P(ConnectIntegrationTest, ConnectFilterUnaryRequestE2E) {
   ASSERT_TRUE(upstream_request_->waitForGrpcMessage(*dispatcher_, grpc_request));
   EXPECT_THAT(grpc_request, ProtoEq(connect_request));
 
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderHasValueRef(Http::Headers::get().ContentType, "application/grpc+proto"));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderHasValueRef(Http::Headers::get().Path, "/Service/Method"));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderHasValueRef(Http::CustomHeaders::get().GrpcTimeout, "10000m"));
 
   helloworld::HelloReply grpc_response;
@@ -149,11 +149,11 @@ TEST_P(ConnectIntegrationTest, ConnectFilterStreamingRequestE2E) {
   ASSERT_TRUE(upstream_request_->waitForGrpcMessage(*dispatcher_, grpc_request));
   EXPECT_THAT(grpc_request, ProtoEq(connect_request));
 
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderHasValueRef(Http::Headers::get().ContentType, "application/grpc+proto"));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderHasValueRef(Http::Headers::get().Path, "/Service/Method"));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderHasValueRef(Http::CustomHeaders::get().GrpcTimeout, "10000m"));
 
   helloworld::HelloReply grpc_response;

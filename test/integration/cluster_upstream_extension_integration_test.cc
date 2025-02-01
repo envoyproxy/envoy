@@ -68,19 +68,19 @@ TEST_P(ClusterUpstreamExtensionIntegrationTest,
   EXPECT_TRUE(upstream_request_->complete());
 
   {
-    const auto header_values = upstream_request_->headers().get(Http::LowerCaseString("X-foo"));
+    const auto header_values = upstream_request_->headers()->get(Http::LowerCaseString("X-foo"));
     ASSERT_EQ(1, header_values.size());
     EXPECT_EQ("foo-common", header_values[0]->value().getStringView());
   }
   {
     const auto cluster_header_values =
-        upstream_request_->headers().get(Http::LowerCaseString("X-cluster-foo"));
+        upstream_request_->headers()->get(Http::LowerCaseString("X-cluster-foo"));
     ASSERT_EQ(1, cluster_header_values.size());
     EXPECT_EQ("cluster-value", cluster_header_values[0]->value().getStringView());
   }
   {
     const auto host_header_values =
-        upstream_request_->headers().get(Http::LowerCaseString("X-host-foo"));
+        upstream_request_->headers()->get(Http::LowerCaseString("X-host-foo"));
     ASSERT_EQ(1, host_header_values.size());
     EXPECT_EQ("host-value", host_header_values[0]->value().getStringView());
   }

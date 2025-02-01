@@ -93,11 +93,11 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
 
   waitForNextUpstreamRequest();
   const auto payload_entry =
-      upstream_request_->headers().get(Http::LowerCaseString("sec-istio-auth-userinfo"));
+      upstream_request_->headers()->get(Http::LowerCaseString("sec-istio-auth-userinfo"));
   EXPECT_FALSE(payload_entry.empty());
   EXPECT_EQ(payload_entry[0]->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_TRUE(upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
+  EXPECT_TRUE(upstream_request_->headers()->get(Http::CustomHeaders::get().Authorization).empty());
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -484,11 +484,11 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
   waitForNextUpstreamRequest();
 
   const auto payload_entry =
-      upstream_request_->headers().get(Http::LowerCaseString("sec-istio-auth-userinfo"));
+      upstream_request_->headers()->get(Http::LowerCaseString("sec-istio-auth-userinfo"));
   EXPECT_FALSE(payload_entry.empty());
   EXPECT_EQ(payload_entry[0]->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_TRUE(upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
+  EXPECT_TRUE(upstream_request_->headers()->get(Http::CustomHeaders::get().Authorization).empty());
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
@@ -589,11 +589,11 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetch) {
   waitForNextUpstreamRequest();
 
   const auto payload_entry =
-      upstream_request_->headers().get(Http::LowerCaseString("sec-istio-auth-userinfo"));
+      upstream_request_->headers()->get(Http::LowerCaseString("sec-istio-auth-userinfo"));
   EXPECT_FALSE(payload_entry.empty());
   EXPECT_EQ(payload_entry[0]->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_TRUE(upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
+  EXPECT_TRUE(upstream_request_->headers()->get(Http::CustomHeaders::get().Authorization).empty());
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
@@ -630,11 +630,11 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodTokenAsyncFetchFast) {
   waitForNextUpstreamRequest();
 
   const auto payload_entry =
-      upstream_request_->headers().get(Http::LowerCaseString("sec-istio-auth-userinfo"));
+      upstream_request_->headers()->get(Http::LowerCaseString("sec-istio-auth-userinfo"));
   EXPECT_FALSE(payload_entry.empty());
   EXPECT_EQ(payload_entry[0]->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
-  EXPECT_TRUE(upstream_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
+  EXPECT_TRUE(upstream_request_->headers()->get(Http::CustomHeaders::get().Authorization).empty());
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 

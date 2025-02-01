@@ -71,7 +71,7 @@ public:
   FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encoder,
              Event::TestTimeSystem& time_system);
 
-  uint64_t bodyLength() {
+  uint64_t bodyLength() const {
     absl::MutexLock lock(&lock_);
     return body_.length();
   }
@@ -79,7 +79,7 @@ public:
     absl::MutexLock lock(&lock_);
     return body_;
   }
-  bool complete() {
+  bool complete() const {
     absl::MutexLock lock(&lock_);
     return end_stream_;
   }
@@ -97,13 +97,21 @@ public:
   void encodeResetStream();
   void encodeMetadata(const Http::MetadataMapVector& metadata_map_vector);
   void readDisable(bool disable);
-  const Http::RequestHeaderMap& headers() {
+  Http::RequestHeaderMapConstSharedPtr headers() const {
     absl::MutexLock lock(&lock_);
-    return *headers_;
+    Http::RequestHeaderMapConstSharedPtr headers{headers_};
+    return headers;
   }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
-  const Http::RequestTrailerMapPtr& trailers() { return trailers_; }
-  bool receivedData() { return received_data_; }
+  Http::RequestTrailerMapConstSharedPtr trailers() const {
+    absl::MutexLock lock(&lock_);
+    Http::RequestTrailerMapConstSharedPtr trailers{trailers_};
+    return trailers;
+  }
+  bool receivedData() const {
+    absl::MutexLock lock(&lock_);
+    return received_data_;
+  }
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
     return encoder_.http1StreamEncoderOptions();
   }
@@ -250,14 +258,14 @@ public:
   }
 
 protected:
-  absl::Mutex lock_;
+  mutable absl::Mutex lock_;
   Http::RequestHeaderMapSharedPtr headers_ ABSL_GUARDED_BY(lock_);
   Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
   FakeHttpConnection& parent_;
 
 private:
   Http::ResponseEncoder& encoder_;
-  Http::RequestTrailerMapPtr trailers_ ABSL_GUARDED_BY(lock_);
+  Http::RequestTrailerMapSharedPtr trailers_ ABSL_GUARDED_BY(lock_);
   bool end_stream_ ABSL_GUARDED_BY(lock_){};
   bool saw_reset_ ABSL_GUARDED_BY(lock_){};
   Grpc::Decoder grpc_decoder_;
@@ -268,7 +276,7 @@ private:
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   std::shared_ptr<StreamInfo::StreamInfo> stream_info_;
   AccessLog::InstanceSharedPtrVector access_log_handlers_;
-  bool received_data_{false};
+  bool received_data_ ABSL_GUARDED_BY(lock_){false};
   bool grpc_stream_started_{false};
   Http::ServerHeaderValidatorPtr header_validator_;
 };

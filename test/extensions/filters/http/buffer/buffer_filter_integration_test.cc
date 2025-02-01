@@ -66,7 +66,7 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLength) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  auto* content_length = upstream_request_->headers().ContentLength();
+  auto* content_length = upstream_request_->headers()->ContentLength();
   ASSERT_NE(content_length, nullptr);
   EXPECT_EQ(content_length->value().getStringView(), "9");
 
@@ -98,7 +98,7 @@ TEST_P(BufferIntegrationTest, RouterRequestPopulateContentLengthOnTrailers) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  auto* content_length = upstream_request_->headers().ContentLength();
+  auto* content_length = upstream_request_->headers()->ContentLength();
   ASSERT_NE(content_length, nullptr);
   EXPECT_EQ(content_length->value().getStringView(), "10");
 

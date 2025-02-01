@@ -83,10 +83,10 @@ public:
              known_histogram_exists)) {
       envoy::service::metrics::v3::StreamMetricsMessage request_msg;
       VERIFY_ASSERTION(metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg));
-      EXPECT_EQ("POST", metrics_service_request_->headers().getMethodValue());
+      EXPECT_EQ("POST", metrics_service_request_->headers()->getMethodValue());
       EXPECT_EQ("/envoy.service.metrics.v3.MetricsService/StreamMetrics",
-                metrics_service_request_->headers().getPathValue());
-      EXPECT_EQ("application/grpc", metrics_service_request_->headers().getContentTypeValue());
+                metrics_service_request_->headers()->getPathValue());
+      EXPECT_EQ("application/grpc", metrics_service_request_->headers()->getContentTypeValue());
       EXPECT_TRUE(request_msg.envoy_metrics_size() > 0);
       const Protobuf::RepeatedPtrField<::io::prometheus::client::MetricFamily>& envoy_metrics =
           request_msg.envoy_metrics();

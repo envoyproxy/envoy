@@ -597,7 +597,7 @@ name: local-reply-during-encode
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().getStatusValue());
-  EXPECT_EQ(0, upstream_request_->body().length());
+  EXPECT_EQ(0, upstream_request_->bodyLength());
 }
 
 TEST_P(FilterIntegrationTest, LocalReplyDuringEncodingData) {

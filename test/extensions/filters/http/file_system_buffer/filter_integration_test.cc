@@ -113,8 +113,8 @@ TEST_P(FileSystemBufferIntegrationTest, RequestPopulateContentLength) {
   upstream_request_->encodeData(123, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  ASSERT_NE(upstream_request_->headers().ContentLength(), nullptr);
-  EXPECT_EQ(upstream_request_->headers().ContentLength()->value().getStringView(), "9");
+  ASSERT_NE(upstream_request_->headers()->ContentLength(), nullptr);
+  EXPECT_EQ(upstream_request_->headers()->ContentLength()->value().getStringView(), "9");
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -143,8 +143,8 @@ TEST_P(FileSystemBufferIntegrationTest, RequestPopulateContentLengthOnTrailers) 
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  ASSERT_NE(upstream_request_->headers().ContentLength(), nullptr);
-  EXPECT_EQ(upstream_request_->headers().ContentLength()->value().getStringView(), "10");
+  ASSERT_NE(upstream_request_->headers()->ContentLength(), nullptr);
+  EXPECT_EQ(upstream_request_->headers()->ContentLength()->value().getStringView(), "10");
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());

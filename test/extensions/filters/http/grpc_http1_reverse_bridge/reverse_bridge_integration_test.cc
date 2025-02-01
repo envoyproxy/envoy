@@ -86,7 +86,7 @@ TEST_P(ReverseBridgeIntegrationTest, DisabledRoute) {
 
   // Ensure that we don't do anything
   EXPECT_EQ("abcdef", upstream_request_->body().toString());
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
 
   // Respond to the request.
@@ -137,9 +137,9 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
   // Ensure that we stripped the length prefix and set the appropriate headers.
   EXPECT_EQ("f", upstream_request_->body().toString());
 
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
 
   // Respond to the request.
@@ -228,9 +228,9 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamResponse) {
   // Ensure that we stripped the length prefix and set the appropriate headers.
   EXPECT_EQ("f", upstream_request_->body().toString());
 
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
 
   // Respond to the request.
@@ -297,9 +297,9 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRouteStreamWithholdResponse) {
   // Ensure that we stripped the length prefix and set the appropriate headers.
   EXPECT_EQ("f", upstream_request_->body().toString());
 
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/x-protobuf"));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderValueOf(Http::CustomHeaders::get().Accept, "application/x-protobuf"));
 
   // Respond to the request.

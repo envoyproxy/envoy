@@ -43,11 +43,11 @@ public:
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
               upstream_request_->headers()
-                  .get(Http::CustomHeaders::get().ContentEncoding)[0]
+                  ->get(Http::CustomHeaders::get().ContentEncoding)[0]
                   ->value()
                   .getStringView());
     EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
-              upstream_request_->headers().getTransferEncodingValue());
+              upstream_request_->headers()->getTransferEncodingValue());
     EXPECT_GT(upstream_request_->bodyLength(), 0U);
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());

@@ -106,7 +106,7 @@ public:
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-    assertCompareMaps(expected_request_headers, upstream_request_->headers());
+    assertCompareMaps(expected_request_headers, *upstream_request_->headers());
     EXPECT_STREQ(expected_request_body.c_str(), upstream_request_->body().toString().c_str());
 
     if (upstream_response_body.empty()) {

@@ -73,14 +73,14 @@ TEST_P(DynatraceSamplerIntegrationTest, TestWithTraceparentAndTracestate) {
 
   // traceparent should be set: traceid should be re-used, span id should be different
   absl::string_view traceparent_value = upstream_request_->headers()
-                                            .get(Http::LowerCaseString("traceparent"))[0]
+                                            ->get(Http::LowerCaseString("traceparent"))[0]
                                             ->value()
                                             .getStringView();
   EXPECT_TRUE(absl::StartsWith(traceparent_value, TRACEPARENT_VALUE_START));
   EXPECT_NE(TRACEPARENT_VALUE, traceparent_value);
   // Dynatrace tracestate should be added to existing tracestate
   absl::string_view tracestate_value = upstream_request_->headers()
-                                           .get(Http::LowerCaseString("tracestate"))[0]
+                                           ->get(Http::LowerCaseString("tracestate"))[0]
                                            ->value()
                                            .getStringView();
   // use StartsWith because path-info (last element in trace state) contains a random value
@@ -105,14 +105,14 @@ TEST_P(DynatraceSamplerIntegrationTest, TestWithTraceparentOnly) {
 
   // traceparent should be set: traceid should be re-used, span id should be different
   absl::string_view traceparent_value = upstream_request_->headers()
-                                            .get(Http::LowerCaseString("traceparent"))[0]
+                                            ->get(Http::LowerCaseString("traceparent"))[0]
                                             ->value()
                                             .getStringView();
   EXPECT_TRUE(absl::StartsWith(traceparent_value, TRACEPARENT_VALUE_START));
   EXPECT_NE(TRACEPARENT_VALUE, traceparent_value);
   // Dynatrace tag should be added to tracestate
   absl::string_view tracestate_value = upstream_request_->headers()
-                                           .get(Http::LowerCaseString("tracestate"))[0]
+                                           ->get(Http::LowerCaseString("tracestate"))[0]
                                            ->value()
                                            .getStringView();
   // use StartsWith because path-info (last element in trace state contains a random value)
@@ -133,11 +133,11 @@ TEST_P(DynatraceSamplerIntegrationTest, TestWithoutTraceparentAndTracestate) {
 
   // traceparent will be added, trace_id and span_id will be generated, so there is nothing we can
   // assert
-  EXPECT_EQ(upstream_request_->headers().get(::Envoy::Http::LowerCaseString("traceparent")).size(),
+  EXPECT_EQ(upstream_request_->headers()->get(::Envoy::Http::LowerCaseString("traceparent")).size(),
             1);
   // Dynatrace tag should be added to tracestate
   absl::string_view tracestate_value = upstream_request_->headers()
-                                           .get(Http::LowerCaseString("tracestate"))[0]
+                                           ->get(Http::LowerCaseString("tracestate"))[0]
                                            ->value()
                                            .getStringView();
   EXPECT_TRUE(absl::StartsWith(tracestate_value, "5b3f9fed-980df25c@dt=fw4;0;0;0;0;0;0;"))

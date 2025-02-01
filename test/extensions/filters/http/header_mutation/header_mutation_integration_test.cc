@@ -499,26 +499,26 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationAllLevelsApplied) {
 
   EXPECT_EQ("downstream-request-global-flag-header-value",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("downstream-request-global-flag-header"))[0]
+                ->get(Http::LowerCaseString("downstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
 
   EXPECT_EQ("downstream-request-per-route-flag-header-value",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("downstream-request-per-route-flag-header"))[0]
+                ->get(Http::LowerCaseString("downstream-request-per-route-flag-header"))[0]
                 ->value()
                 .getStringView());
 
   EXPECT_EQ("downstream-request-global-flag-header-value-disabled-by-default",
             upstream_request_->headers()
-                .get(Http::LowerCaseString(
+                ->get(Http::LowerCaseString(
                     "downstream-request-global-flag-header-disabled-by-default"))[0]
                 ->value()
                 .getStringView());
 
   EXPECT_EQ("upstream-request-global-flag-header-value",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
+                ->get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
 
@@ -620,19 +620,19 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerRoute) {
 
   EXPECT_EQ("downstream-request-global-flag-header-value",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("downstream-request-global-flag-header"))[0]
+                ->get(Http::LowerCaseString("downstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
   EXPECT_EQ("downstream-request-global-flag-header-value-disabled-by-default",
             upstream_request_->headers()
-                .get(Http::LowerCaseString(
+                ->get(Http::LowerCaseString(
                     "downstream-request-global-flag-header-disabled-by-default"))[0]
                 ->value()
                 .getStringView());
 
   EXPECT_EQ("upstream-request-global-flag-header-value",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
+                ->get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
 
@@ -671,12 +671,12 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerVirtualHost) {
 
   EXPECT_EQ("downstream-request-global-flag-header-value",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("downstream-request-global-flag-header"))[0]
+                ->get(Http::LowerCaseString("downstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
   EXPECT_EQ("upstream-request-global-flag-header-value",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
+                ->get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
 
@@ -714,12 +714,12 @@ TEST_P(HeaderMutationIntegrationTest, TestHeaderMutationPerRouteTable) {
 
   EXPECT_EQ("downstream-request-global-flag-header-value",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("downstream-request-global-flag-header"))[0]
+                ->get(Http::LowerCaseString("downstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
   EXPECT_EQ("upstream-request-global-flag-header-value",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
+                ->get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
 
@@ -757,21 +757,21 @@ TEST_P(HeaderMutationIntegrationTest, TestDisableDownstreamHeaderMutation) {
   waitForNextUpstreamRequest();
 
   EXPECT_EQ(0, upstream_request_->headers()
-                   .get(Http::LowerCaseString("downstream-request-global-flag-header"))
+                   ->get(Http::LowerCaseString("downstream-request-global-flag-header"))
                    .size());
 
   EXPECT_EQ(0, upstream_request_->headers()
-                   .get(Http::LowerCaseString("downstream-request-global-flag-header-disabled-by-"
-                                              "default"))
+                   ->get(Http::LowerCaseString("downstream-request-global-flag-header-disabled-by-"
+                                               "default"))
                    .size());
 
   EXPECT_EQ("upstream-request-global-flag-header-value",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
+                ->get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
   EXPECT_EQ(upstream_request_->headers()
-                .get(Http::LowerCaseString("downstream-request-per-route-flag-header"))
+                ->get(Http::LowerCaseString("downstream-request-per-route-flag-header"))
                 .size(),
             0);
 
@@ -817,21 +817,21 @@ TEST_P(HeaderMutationIntegrationTest, TestDisableDownstreamHeaderMutationWithSpe
   waitForNextUpstreamRequest();
 
   EXPECT_EQ(0, upstream_request_->headers()
-                   .get(Http::LowerCaseString("downstream-request-global-flag-header"))
+                   ->get(Http::LowerCaseString("downstream-request-global-flag-header"))
                    .size());
 
   EXPECT_EQ(0, upstream_request_->headers()
-                   .get(Http::LowerCaseString("downstream-request-global-flag-header-disabled-by-"
-                                              "default"))
+                   ->get(Http::LowerCaseString("downstream-request-global-flag-header-disabled-by-"
+                                               "default"))
                    .size());
 
   EXPECT_EQ("upstream-request-global-flag-header-value",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
+                ->get(Http::LowerCaseString("upstream-request-global-flag-header"))[0]
                 ->value()
                 .getStringView());
   EXPECT_EQ(upstream_request_->headers()
-                .get(Http::LowerCaseString("downstream-request-per-route-flag-header"))
+                ->get(Http::LowerCaseString("downstream-request-per-route-flag-header"))
                 .size(),
             0);
 

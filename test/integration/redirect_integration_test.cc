@@ -198,12 +198,12 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
               HasSubstr("302 internal_redirect test-header-value"));
 
   waitForNextUpstreamRequest();
-  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  ASSERT(upstream_request_->headers()->EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
-            upstream_request_->headers().getEnvoyOriginalUrlValue());
-  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
-  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
-  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
+            upstream_request_->headers()->getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers()->getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers()->getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers()->getViaValue());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
@@ -254,12 +254,12 @@ TEST_P(RedirectIntegrationTest, ConnectionCloseHeaderHonoredInInternalRedirect) 
               HasSubstr("302 internal_redirect test-header-value"));
 
   waitForNextUpstreamRequest();
-  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  ASSERT(upstream_request_->headers()->EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
-            upstream_request_->headers().getEnvoyOriginalUrlValue());
-  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
-  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
-  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
+            upstream_request_->headers()->getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers()->getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers()->getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers()->getViaValue());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
@@ -374,13 +374,13 @@ TEST_P(RedirectIntegrationTest, InternalRedirectStripsUriFragment) {
   upstream_request_->encodeHeaders(redirect_response, true);
 
   waitForNextUpstreamRequest();
-  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  ASSERT(upstream_request_->headers()->EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
-            upstream_request_->headers().getEnvoyOriginalUrlValue());
+            upstream_request_->headers()->getEnvoyOriginalUrlValue());
   // During internal redirect Envoy always strips fragment from Location URI
-  EXPECT_EQ("/new/url?p1=v1&p2=v2", upstream_request_->headers().getPathValue());
-  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
-  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
+  EXPECT_EQ("/new/url?p1=v1&p2=v2", upstream_request_->headers()->getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers()->getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers()->getViaValue());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
@@ -419,12 +419,12 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithRequestBody) {
   // Second request to redirected upstream.
   waitForNextUpstreamRequest();
   EXPECT_EQ(request_body, upstream_request_->body().toString());
-  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  ASSERT(upstream_request_->headers()->EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
-            upstream_request_->headers().getEnvoyOriginalUrlValue());
-  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
-  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
-  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
+            upstream_request_->headers()->getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers()->getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers()->getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers()->getViaValue());
 
   // Return the response from the redirect upstream.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -478,14 +478,14 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHandlesHttp303) {
   // Second request to redirected upstream.
   waitForNextUpstreamRequest();
   EXPECT_EQ("", upstream_request_->body().toString());
-  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  ASSERT(upstream_request_->headers()->EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
-            upstream_request_->headers().getEnvoyOriginalUrlValue());
-  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
-  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
-  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
-  EXPECT_EQ("GET", upstream_request_->headers().getMethodValue());
-  EXPECT_EQ("", upstream_request_->headers().getContentLengthValue());
+            upstream_request_->headers()->getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers()->getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers()->getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers()->getViaValue());
+  EXPECT_EQ("GET", upstream_request_->headers()->getMethodValue());
+  EXPECT_EQ("", upstream_request_->headers()->getContentLengthValue());
 
   // Return the response from the redirect upstream.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -536,13 +536,13 @@ TEST_P(RedirectIntegrationTest, InternalRedirectHttp303PreservesHeadMethod) {
   // Second request to redirected upstream.
   waitForNextUpstreamRequest();
   EXPECT_EQ("", upstream_request_->body().toString());
-  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  ASSERT(upstream_request_->headers()->EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
-            upstream_request_->headers().getEnvoyOriginalUrlValue());
-  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
-  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
-  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
-  EXPECT_EQ("HEAD", upstream_request_->headers().getMethodValue());
+            upstream_request_->headers()->getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers()->getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers()->getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers()->getViaValue());
+  EXPECT_EQ("HEAD", upstream_request_->headers()->getMethodValue());
 
   // Return the response from the redirect upstream.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -657,10 +657,10 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
   for (int i = 0; i < 4; i++) {
     upstream_requests.push_back(waitForNextStream());
 
-    EXPECT_EQ(fmt::format("/path{}", i), upstream_requests.back()->headers().getPathValue());
+    EXPECT_EQ(fmt::format("/path{}", i), upstream_requests.back()->headers()->getPathValue());
     EXPECT_EQ("handle.internal.redirect.max.three.hop",
-              upstream_requests.back()->headers().getHostValue());
-    EXPECT_EQ("via_value", upstream_requests.back()->headers().getViaValue());
+              upstream_requests.back()->headers()->getHostValue());
+    EXPECT_EQ("via_value", upstream_requests.back()->headers()->getViaValue());
 
     auto next_location = fmt::format(HandleThreeHopLocationFormat, i + 1);
     redirect_response_.setLocation(next_location);
@@ -717,12 +717,12 @@ TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithResponseBody) {
               HasSubstr("302 internal_redirect test-header-value"));
 
   waitForNextUpstreamRequest();
-  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  ASSERT(upstream_request_->headers()->EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
-            upstream_request_->headers().getEnvoyOriginalUrlValue());
-  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
-  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
-  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
+            upstream_request_->headers()->getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers()->getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers()->getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers()->getViaValue());
 
   Http::TestResponseHeaderMapImpl response_with_big_body(
       {{":status", "200"}, {"content-length", "2000000"}});
@@ -820,17 +820,17 @@ TEST_P(RedirectIntegrationTest, PreserveOrClearResponseHeaders) {
               HasSubstr("302 internal_redirect test-header-value"));
 
   waitForNextUpstreamRequest();
-  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  ASSERT(upstream_request_->headers()->EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect.and.copy/test/long/url",
-            upstream_request_->headers().getEnvoyOriginalUrlValue());
-  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
-  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
-  EXPECT_EQ("via_value", upstream_request_->headers().getViaValue());
+            upstream_request_->headers()->getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers()->getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers()->getHostValue());
+  EXPECT_EQ("via_value", upstream_request_->headers()->getViaValue());
   EXPECT_EQ(0,
-            upstream_request_->headers().get(Http::LowerCaseString(kTestHeaderKeyToClear)).size());
-  EXPECT_NE(0, upstream_request_->headers().get(Http::LowerCaseString(kTestHeaderKey)).size());
+            upstream_request_->headers()->get(Http::LowerCaseString(kTestHeaderKeyToClear)).size());
+  EXPECT_NE(0, upstream_request_->headers()->get(Http::LowerCaseString(kTestHeaderKey)).size());
   EXPECT_EQ("test-header-value", upstream_request_->headers()
-                                     .get(Http::LowerCaseString(kTestHeaderKey))[0]
+                                     ->get(Http::LowerCaseString(kTestHeaderKey))[0]
                                      ->value()
                                      .getStringView());
 

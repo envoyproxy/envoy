@@ -178,9 +178,9 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamReset) {
       fake_upstream_connection_shadow->waitForNewStream(*dispatcher_, upstream_request_shadow));
   ASSERT_TRUE(upstream_request_main->waitForHeadersComplete());
   ASSERT_TRUE(upstream_request_shadow->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_main->headers().get(Http::LowerCaseString("potato"))[0]->value(),
+  EXPECT_EQ(upstream_request_main->headers()->get(Http::LowerCaseString("potato"))[0]->value(),
             "salad");
-  EXPECT_EQ(upstream_request_shadow->headers().get(Http::LowerCaseString("potato"))[0]->value(),
+  EXPECT_EQ(upstream_request_shadow->headers()->get(Http::LowerCaseString("potato"))[0]->value(),
             "salad");
 
   codec_client_->sendReset(encoder);

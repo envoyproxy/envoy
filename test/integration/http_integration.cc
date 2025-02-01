@@ -1127,7 +1127,8 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
-  EXPECT_EQ(atoi(std::string(upstream_request_->headers().getEnvoyAttemptCountValue()).c_str()), 1);
+  EXPECT_EQ(atoi(std::string(upstream_request_->headers()->getEnvoyAttemptCountValue()).c_str()),
+            1);
 
   if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -1136,7 +1137,8 @@ void HttpIntegrationTest::testRetryAttemptCountHeader() {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
   waitForNextUpstreamRequest();
-  EXPECT_EQ(atoi(std::string(upstream_request_->headers().getEnvoyAttemptCountValue()).c_str()), 2);
+  EXPECT_EQ(atoi(std::string(upstream_request_->headers()->getEnvoyAttemptCountValue()).c_str()),
+            2);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
 
@@ -1217,13 +1219,13 @@ void HttpIntegrationTest::testEnvoyHandling1xx(bool additional_continue_from_ups
   codec_client_->sendData(*request_encoder_, 10, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // Verify the Expect header is stripped.
-  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Expect).empty());
+  EXPECT_TRUE(upstream_request_->headers()->get(Http::Headers::get().Expect).empty());
   if (via.empty()) {
-    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Via).empty());
+    EXPECT_TRUE(upstream_request_->headers()->get(Http::Headers::get().Via).empty());
   } else {
     EXPECT_EQ(
         via,
-        upstream_request_->headers().get(Http::Headers::get().Via)[0]->value().getStringView());
+        upstream_request_->headers()->get(Http::Headers::get().Via)[0]->value().getStringView());
   }
 
   if (additional_continue_from_upstream) {
@@ -1623,7 +1625,7 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   codec_client_->sendData(*request_encoder_, 0, true);
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)[0]->value(), "a=b; c=d");
+  EXPECT_EQ(upstream_request_->headers()->get(Http::Headers::get().Cookie)[0]->value(), "a=b; c=d");
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, false);

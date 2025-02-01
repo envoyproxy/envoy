@@ -593,13 +593,13 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnect) {
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
+  EXPECT_EQ(upstream_request_->headers()->get(Http::Headers::get().Method)[0]->value(), "CONNECT");
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
+    EXPECT_TRUE(upstream_request_->headers()->get(Http::Headers::get().Protocol).empty());
   } else {
-    EXPECT_EQ("", upstream_request_->headers().getSchemeValue());
-    EXPECT_EQ("", upstream_request_->headers().getProtocolValue());
-    EXPECT_EQ("", upstream_request_->headers().getSchemeValue());
+    EXPECT_EQ("", upstream_request_->headers()->getSchemeValue());
+    EXPECT_EQ("", upstream_request_->headers()->getProtocolValue());
+    EXPECT_EQ("", upstream_request_->headers()->getSchemeValue());
   }
 
   // Send response headers
@@ -646,14 +646,14 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyExtendedConnect) {
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ("/", upstream_request_->headers().getPathValue());
-  EXPECT_EQ("foo.lyft.com:80", upstream_request_->headers().getHostValue());
+  EXPECT_EQ("/", upstream_request_->headers()->getPathValue());
+  EXPECT_EQ("foo.lyft.com:80", upstream_request_->headers()->getHostValue());
 
   // The fake upstream server codec will transform extended CONNECT to upgrade headers
-  EXPECT_EQ("GET", upstream_request_->headers().getMethodValue());
-  EXPECT_TRUE(upstream_request_->headers().getProtocolValue().empty());
-  EXPECT_EQ("websocket", upstream_request_->headers().getUpgradeValue());
-  EXPECT_EQ("upgrade", upstream_request_->headers().getConnectionValue());
+  EXPECT_EQ("GET", upstream_request_->headers()->getMethodValue());
+  EXPECT_TRUE(upstream_request_->headers()->getProtocolValue().empty());
+  EXPECT_EQ("websocket", upstream_request_->headers()->getUpgradeValue());
+  EXPECT_EQ("upgrade", upstream_request_->headers()->getConnectionValue());
 
   Http::TestResponseHeaderMapImpl h1_upgrade_response{
       {":status", "101"}, {"upgrade", "websocket"}, {"connection", "upgrade"}};
@@ -709,9 +709,9 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithPortStripping) {
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
-  EXPECT_EQ(upstream_request_->headers().getHostValue(), "foo.lyft.com:80");
-  auto stripped_host = upstream_request_->headers().get(Http::LowerCaseString("host-in-envoy"));
+  EXPECT_EQ(upstream_request_->headers()->getMethodValue(), "CONNECT");
+  EXPECT_EQ(upstream_request_->headers()->getHostValue(), "foo.lyft.com:80");
+  auto stripped_host = upstream_request_->headers()->get(Http::LowerCaseString("host-in-envoy"));
   ASSERT_EQ(stripped_host.size(), 1);
   EXPECT_EQ(stripped_host[0]->value(), "foo.lyft.com");
 
@@ -750,7 +750,7 @@ TEST_P(ProxyingConnectIntegrationTest, ProxyConnectWithIP) {
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
+  EXPECT_EQ(upstream_request_->headers()->get(Http::Headers::get().Method)[0]->value(), "CONNECT");
 
   // Send response headers
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -779,7 +779,7 @@ TEST_P(ProxyingConnectIntegrationTest, 2xxStatusCode) {
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
+  EXPECT_EQ(upstream_request_->headers()->get(Http::Headers::get().Method)[0]->value(), "CONNECT");
 
   // Send valid response headers, in HTTP1 all status codes in the 2xx range
   // are considered valid.
@@ -961,7 +961,7 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamHttpFilters) {
   sendBidiData(fake_upstream_connection_);
   EXPECT_EQ(
       "bar",
-      upstream_request_->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+      upstream_request_->headers()->get(Http::LowerCaseString("foo"))[0]->value().getStringView());
   closeConnection(fake_upstream_connection_);
 }
 
@@ -1090,7 +1090,7 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "POST");
+  EXPECT_EQ(upstream_request_->headers()->get(Http::Headers::get().Method)[0]->value(), "POST");
 
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -1138,7 +1138,7 @@ TEST_P(TcpTunnelingIntegrationTest, TcpTunnelingAccessLog) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+  EXPECT_EQ(upstream_request_->headers()->getMethodValue(), "CONNECT");
 
   upstream_request_->encodeHeaders(default_response_headers_, false);
   sendBidiData(fake_upstream_connection_);
@@ -1192,15 +1192,15 @@ TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+  EXPECT_EQ(upstream_request_->headers()->getMethodValue(), "CONNECT");
 
   // Verify that the connect request has a "downstream-local-ip" header and its value is the
   // loopback address.
   EXPECT_EQ(
-      upstream_request_->headers().get(Envoy::Http::LowerCaseString("downstream-local-ip")).size(),
+      upstream_request_->headers()->get(Envoy::Http::LowerCaseString("downstream-local-ip")).size(),
       1);
   EXPECT_EQ(upstream_request_->headers()
-                .get(Envoy::Http::LowerCaseString("downstream-local-ip"))[0]
+                ->get(Envoy::Http::LowerCaseString("downstream-local-ip"))[0]
                 ->value()
                 .getStringView(),
             Network::Test::getLoopbackAddressString(version_));
@@ -1247,10 +1247,10 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+  EXPECT_EQ(upstream_request_->headers()->getMethodValue(), "CONNECT");
 
   EXPECT_EQ(upstream_request_->headers()
-                .get(Envoy::Http::LowerCaseString("config-version"))[0]
+                ->get(Envoy::Http::LowerCaseString("config-version"))[0]
                 ->value()
                 .getStringView(),
             "1");
@@ -1299,7 +1299,7 @@ TEST_P(TcpTunnelingIntegrationTest, HeaderEvaluatorConfigUpdate) {
   ASSERT_TRUE(upstream_request_2->waitForHeadersComplete());
   // Verify the tcp proxy new header evaluator is applied.
   EXPECT_EQ(upstream_request_2->headers()
-                .get(Envoy::Http::LowerCaseString("config-version"))[0]
+                ->get(Envoy::Http::LowerCaseString("config-version"))[0]
                 ->value()
                 .getStringView(),
             "2");

@@ -57,8 +57,8 @@ void FakeStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool e
 }
 
 void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
-  received_data_ = true;
   absl::MutexLock lock(&lock_);
+  received_data_ = true;
   body_.add(data);
   setEndStream(end_stream);
 }
@@ -66,7 +66,7 @@ void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
 void FakeStream::decodeTrailers(Http::RequestTrailerMapPtr&& trailers) {
   absl::MutexLock lock(&lock_);
   setEndStream(true);
-  trailers_ = std::move(trailers);
+  trailers_.reset(trailers.release());
 }
 
 void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {

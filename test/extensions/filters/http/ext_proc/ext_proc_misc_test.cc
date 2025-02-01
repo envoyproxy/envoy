@@ -240,7 +240,7 @@ TEST_P(ExtProcMiscIntegrationTest, SendEmptyLastBodyChunk) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // Upstream should receive 3000 bytes data.
-  EXPECT_EQ(upstream_request_->body().length(), body_size + init_body_size);
+  EXPECT_EQ(upstream_request_->bodyLength(), body_size + init_body_size);
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);

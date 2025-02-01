@@ -180,7 +180,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
-                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->get(Http::LowerCaseString("Authorization"))[0]
                                             ->value()
                                             .getStringView());
 
@@ -225,7 +225,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
-                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->get(Http::LowerCaseString("Authorization"))[0]
                                             ->value()
                                             .getStringView());
 
@@ -272,7 +272,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("Bearer existingAccessToken", upstream_request_->headers()
-                                              .get(Http::LowerCaseString("Authorization"))[0]
+                                              ->get(Http::LowerCaseString("Authorization"))[0]
                                               ->value()
                                               .getStringView());
 
@@ -328,7 +328,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
-                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->get(Http::LowerCaseString("Authorization"))[0]
                                             ->value()
                                             .getStringView());
 
@@ -403,7 +403,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
-                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->get(Http::LowerCaseString("Authorization"))[0]
                                             ->value()
                                             .getStringView());
 
@@ -471,7 +471,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
-                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->get(Http::LowerCaseString("Authorization"))[0]
                                             ->value()
                                             .getStringView());
 
@@ -524,7 +524,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
-                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->get(Http::LowerCaseString("Authorization"))[0]
                                             ->value()
                                             .getStringView());
 
@@ -683,7 +683,7 @@ typed_config:
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("Bearer test-access-token", upstream_request_->headers()
-                                            .get(Http::LowerCaseString("Authorization"))[0]
+                                            ->get(Http::LowerCaseString("Authorization"))[0]
                                             ->value()
                                             .getStringView());
 

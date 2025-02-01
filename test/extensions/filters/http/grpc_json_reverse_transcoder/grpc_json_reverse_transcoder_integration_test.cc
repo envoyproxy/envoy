@@ -98,12 +98,12 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, SimpleRequest) {
 
   std::string expected_request = "{\"author\":\"John Doe\",\"id\":\"123\",\"title\":\"Kids book\"}";
   EXPECT_THAT(
-      upstream_request_->headers(),
+      *upstream_request_->headers(),
       HeaderValueOf(Http::Headers::get().ContentType, Http::Headers::get().ContentTypeValues.Json));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               Http::HeaderValueOf(Http::Headers::get().ContentLength,
                                   std::to_string(expected_request.size())));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               Http::HeaderValueOf(Http::Headers::get().Path, "/shelves/12345/books/123"));
   EXPECT_EQ(upstream_request_->body().toString(), expected_request);
 
@@ -167,12 +167,12 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, HttpBodyRequestResponse) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   EXPECT_THAT(
-      upstream_request_->headers(),
+      *upstream_request_->headers(),
       HeaderValueOf(Http::Headers::get().ContentType, Http::Headers::get().ContentTypeValues.Text));
   EXPECT_THAT(
-      upstream_request_->headers(),
+      *upstream_request_->headers(),
       Http::HeaderValueOf(Http::Headers::get().ContentLength, std::to_string(request_str.size())));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               Http::HeaderValueOf(Http::Headers::get().Path, "/echoRawBody"));
   EXPECT_EQ(upstream_request_->body().toString(), request_str);
 
@@ -245,11 +245,11 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, NestedHttpBodyRequest) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   EXPECT_THAT(
-      upstream_request_->headers(),
+      *upstream_request_->headers(),
       HeaderValueOf(Http::Headers::get().ContentType, Http::Headers::get().ContentTypeValues.Json));
-  EXPECT_THAT(upstream_request_->headers(), Http::HeaderValueOf(Http::Headers::get().ContentLength,
-                                                                std::to_string(book_str.size())));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(), Http::HeaderValueOf(Http::Headers::get().ContentLength,
+                                                                 std::to_string(book_str.size())));
+  EXPECT_THAT(*upstream_request_->headers(),
               Http::HeaderValueOf(Http::Headers::get().Path, "/v2/shelves/12345/books"));
   EXPECT_EQ(upstream_request_->body().toString(), book_str);
 
@@ -312,9 +312,9 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, RequestWithQueryParams) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderValueOf(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               Http::HeaderValueOf(Http::Headers::get().Path,
                                   "/shelves/12345/books:unary?author=567&theme=Science%20Fiction"));
 
@@ -377,9 +377,9 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, ErrorFromBackend) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               HeaderValueOf(Http::Headers::get().Method, Http::Headers::get().MethodValues.Put));
-  EXPECT_THAT(upstream_request_->headers(),
+  EXPECT_THAT(*upstream_request_->headers(),
               Http::HeaderValueOf(Http::Headers::get().Path, "/shelves/12345/books"));
 
   Http::TestResponseHeaderMapImpl response_headers;

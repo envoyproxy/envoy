@@ -170,7 +170,7 @@ void WebsocketWithCompressorIntegrationTest::performUpgrade(
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  validateUpgradeRequestHeaders(upstream_request_->headers(), upgrade_request_headers);
+  validateUpgradeRequestHeaders(*upstream_request_->headers(), upgrade_request_headers);
 
   // Send the upgrade response
   upstream_request_->encodeHeaders(upgrade_response_headers, false);
@@ -274,8 +274,8 @@ TEST_P(CompressorProxyingConnectIntegrationTest, ProxyConnect) {
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
   RELEASE_ASSERT(result, result.message());
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Method)[0]->value(), "CONNECT");
-  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().Protocol).empty());
+  EXPECT_EQ(upstream_request_->headers()->get(Http::Headers::get().Method)[0]->value(), "CONNECT");
+  EXPECT_TRUE(upstream_request_->headers()->get(Http::Headers::get().Protocol).empty());
 
   // Send response headers
   upstream_request_->encodeHeaders(default_response_headers_, false);

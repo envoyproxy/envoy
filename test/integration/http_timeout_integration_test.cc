@@ -368,7 +368,7 @@ void HttpTimeoutIntegrationTest::testIsTimeoutRetryHeader(bool use_hedged_retry)
 
   // Expect the x-envoy-is-timeout-header to set to indicate to the upstream this is a retry
   // initiated by a previous per try timeout.
-  EXPECT_EQ(upstream_request2->headers().getEnvoyIsTimeoutRetryValue(), "true");
+  EXPECT_EQ(upstream_request2->headers()->getEnvoyIsTimeoutRetryValue(), "true");
 
   ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 
@@ -686,7 +686,7 @@ TEST_P(HttpTimeoutIntegrationTest, OriginalRequestCompletesBeforeBackoffTimer) {
 
   // Expect the x-envoy-is-timeout-header to set to indicate to the upstream this is a retry
   // initiated by a previous per try timeout.
-  EXPECT_EQ(upstream_request2->headers().getEnvoyIsTimeoutRetryValue(), "true");
+  EXPECT_EQ(upstream_request2->headers()->getEnvoyIsTimeoutRetryValue(), "true");
 
   ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 

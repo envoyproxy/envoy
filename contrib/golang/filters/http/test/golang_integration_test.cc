@@ -342,35 +342,36 @@ typed_config:
     waitForNextUpstreamRequest();
 
     EXPECT_EQ("go_state_test_value",
-              getHeader(upstream_request_->headers(), "go-state-test-header-key"));
+              getHeader(*upstream_request_->headers(), "go-state-test-header-key"));
 
     // original header: x-test-header-0
-    EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "x-test-header-0"));
+    EXPECT_EQ("foo", getHeader(*upstream_request_->headers(), "x-test-header-0"));
 
     // check header value which set in golang: test-x-set-header-0
-    EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "test-x-set-header-0"));
+    EXPECT_EQ("foo", getHeader(*upstream_request_->headers(), "test-x-set-header-0"));
 
     // check header exists which removed in golang side: x-test-header-1
-    EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-test-header-1")).empty());
+    EXPECT_TRUE(
+        upstream_request_->headers()->get(Http::LowerCaseString("x-test-header-1")).empty());
 
     // check header value which set in golang: req-downstream-local-address
     EXPECT_TRUE(
-        absl::StrContains(getHeader(upstream_request_->headers(), "req-downstream-local-address"),
+        absl::StrContains(getHeader(*upstream_request_->headers(), "req-downstream-local-address"),
                           GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
     // check header value which set in golang: req-downstream-remote-address
     EXPECT_TRUE(
-        absl::StrContains(getHeader(upstream_request_->headers(), "req-downstream-remote-address"),
+        absl::StrContains(getHeader(*upstream_request_->headers(), "req-downstream-remote-address"),
                           GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
     // check header value which is appended in golang: existed-header
-    auto entries = upstream_request_->headers().get(Http::LowerCaseString("existed-header"));
+    auto entries = upstream_request_->headers()->get(Http::LowerCaseString("existed-header"));
     EXPECT_EQ(2, entries.size());
     EXPECT_EQ("foo", entries[0]->value().getStringView());
     EXPECT_EQ("bar", entries[1]->value().getStringView());
 
     // check header value which added in golang: newly-added-header
-    entries = upstream_request_->headers().get(Http::LowerCaseString("newly-added-header"));
+    entries = upstream_request_->headers()->get(Http::LowerCaseString("newly-added-header"));
     EXPECT_EQ(2, entries.size());
     EXPECT_EQ("foo", entries[0]->value().getStringView());
     EXPECT_EQ("bar", entries[1]->value().getStringView());
@@ -506,15 +507,15 @@ typed_config:
 
     waitForNextUpstreamRequest();
 
-    EXPECT_EQ("2", getHeader(upstream_request_->headers(), "go-metric-counter-test-header-key"));
+    EXPECT_EQ("2", getHeader(*upstream_request_->headers(), "go-metric-counter-test-header-key"));
 
-    EXPECT_EQ("3", getHeader(upstream_request_->headers(), "go-metric-gauge-test-header-key"));
+    EXPECT_EQ("3", getHeader(*upstream_request_->headers(), "go-metric-gauge-test-header-key"));
 
     EXPECT_EQ("3",
-              getHeader(upstream_request_->headers(), "go-metric-counter-record-test-header-key"));
+              getHeader(*upstream_request_->headers(), "go-metric-counter-record-test-header-key"));
 
     EXPECT_EQ("1",
-              getHeader(upstream_request_->headers(), "go-metric-gauge-record-test-header-key"));
+              getHeader(*upstream_request_->headers(), "go-metric-gauge-record-test-header-key"));
 
     Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
     upstream_request_->encodeHeaders(response_headers, true);
@@ -979,11 +980,11 @@ TEST_P(GolangIntegrationTest, AccessLog) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("206", getHeader(upstream_request_->headers(), "respCode"));
-  EXPECT_EQ("7", getHeader(upstream_request_->headers(), "respSize"));
-  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsyncly"));
-  EXPECT_EQ("foo", getHeader(upstream_request_->headers(), "x-req-trailer"));
-  EXPECT_EQ("bar", getHeader(upstream_request_->headers(), "x-resp-trailer"));
+  EXPECT_EQ("206", getHeader(*upstream_request_->headers(), "respCode"));
+  EXPECT_EQ("7", getHeader(*upstream_request_->headers(), "respSize"));
+  EXPECT_EQ("true", getHeader(*upstream_request_->headers(), "canRunAsyncly"));
+  EXPECT_EQ("foo", getHeader(*upstream_request_->headers(), "x-req-trailer"));
+  EXPECT_EQ("bar", getHeader(*upstream_request_->headers(), "x-resp-trailer"));
 
   cleanup();
 }
@@ -1017,8 +1018,8 @@ TEST_P(GolangIntegrationTest, AccessLogDownstreamStart) {
   response = sendRequestAndWaitForResponse(request_headers2, 0, default_response_headers_, 0);
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("r;r2", getHeader(upstream_request_->headers(), "referers"));
-  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsynclyForDownstreamStart"));
+  EXPECT_EQ("r;r2", getHeader(*upstream_request_->headers(), "referers"));
+  EXPECT_EQ("true", getHeader(*upstream_request_->headers(), "canRunAsynclyForDownstreamStart"));
 
   cleanup();
 }
@@ -1048,8 +1049,8 @@ TEST_P(GolangIntegrationTest, AccessLogDownstreamPeriodic) {
   response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
   EXPECT_TRUE(response->complete());
-  EXPECT_EQ("r", getHeader(upstream_request_->headers(), "referers"));
-  EXPECT_EQ("true", getHeader(upstream_request_->headers(), "canRunAsynclyForDownstreamPeriodic"));
+  EXPECT_EQ("r", getHeader(*upstream_request_->headers(), "referers"));
+  EXPECT_EQ("true", getHeader(*upstream_request_->headers(), "canRunAsynclyForDownstreamPeriodic"));
 
   cleanup();
 }
@@ -1178,7 +1179,7 @@ TEST_P(GolangIntegrationTest, AddDataInDecodeHeaders) {
 
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ("POST", getHeader(upstream_request_->headers(), ":method"));
+  EXPECT_EQ("POST", getHeader(*upstream_request_->headers(), ":method"));
   // body added
   auto body = "foo";
   EXPECT_EQ(body, upstream_request_->body().toString());

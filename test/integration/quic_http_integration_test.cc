@@ -736,7 +736,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // Send a complete request on the second connection.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
+  EXPECT_THAT(*upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());
   // Ensure 0-RTT was used by second connection.
@@ -767,7 +767,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                                          /*wait_for_1rtt_key*/ false);
   auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
+  EXPECT_THAT(*upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
   upstream_request_->encodeHeaders(too_early_response_headers, true);
   ASSERT_TRUE(response3->waitForEndStream());
   // This is downstream sending early data, so the 425 response should be forwarded back to the
@@ -787,7 +787,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   waitForNextUpstreamRequest(0);
   // If the request already has Early-Data header, no additional Early-Data header should be added
   // and the header should be forwarded as is.
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "2"));
+  EXPECT_THAT(*upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "2"));
   upstream_request_->encodeHeaders(too_early_response_headers, true);
   ASSERT_TRUE(response4->waitForEndStream());
   // 425 response should be forwarded back to the client.
@@ -1657,11 +1657,11 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithInternalRedirect) {
   EXPECT_EQ(/* RESP(test-header) */ metrics.at(21), "test-header-value");
 
   waitForNextUpstreamRequest();
-  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  ASSERT(upstream_request_->headers()->EnvoyOriginalUrl() != nullptr);
   EXPECT_EQ("http://handle.internal.redirect/test/long/url",
-            upstream_request_->headers().getEnvoyOriginalUrlValue());
-  EXPECT_EQ("/new/url", upstream_request_->headers().getPathValue());
-  EXPECT_EQ("authority2", upstream_request_->headers().getHostValue());
+            upstream_request_->headers()->getEnvoyOriginalUrlValue());
+  EXPECT_EQ("/new/url", upstream_request_->headers()->getPathValue());
+  EXPECT_EQ("authority2", upstream_request_->headers()->getHostValue());
 
   upstream_request_->encodeHeaders(default_response_headers_, true);
 

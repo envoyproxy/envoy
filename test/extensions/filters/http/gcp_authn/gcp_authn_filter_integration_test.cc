@@ -129,8 +129,8 @@ public:
     RELEASE_ASSERT(result, result.message());
     // Verify that request was constructed correctly at filter and then the request was sent to
     // fake upstream successfully from http async client.
-    EXPECT_EQ(request_->headers().Host()->value(), std::string(host));
-    EXPECT_EQ(request_->headers().Path()->value(), std::string(path));
+    EXPECT_EQ(request_->headers()->Host()->value(), std::string(host));
+    EXPECT_EQ(request_->headers()->Path()->value(), std::string(path));
     // Send response headers with end_stream false because we want to add response body next.
     request_->encodeHeaders(default_response_headers_, false);
     // Send response data with end_stream true.
@@ -172,14 +172,15 @@ public:
     // The header holding the ID token is only added when the configuration is valid (e.g., with
     // audience field).
     if (with_audience) {
-      ASSERT_FALSE(upstream_request_->headers().get(header_key).empty());
+      ASSERT_FALSE(upstream_request_->headers()->get(header_key).empty());
       // Verify the request header modification:
       // 1) Only one entry with the appropriate header key. i.e., Any existing values should be
       // overridden by response from authentication server.
-      EXPECT_EQ(upstream_request_->headers().get(header_key).size(), 1);
+      EXPECT_EQ(upstream_request_->headers()->get(header_key).size(), 1);
       // 2) the token returned from authentication server has been added to the request header that
       // is sent to destination upstream.
-      EXPECT_EQ(upstream_request_->headers().get(header_key)[0]->value().getStringView(), id_token);
+      EXPECT_EQ(upstream_request_->headers()->get(header_key)[0]->value().getStringView(),
+                id_token);
     }
 
     EXPECT_EQ(0U, upstream_request_->bodyLength());

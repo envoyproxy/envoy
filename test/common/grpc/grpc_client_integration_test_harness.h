@@ -398,7 +398,7 @@ public:
   void expectInitialHeaders(FakeStream& fake_stream, const TestMetadata& initial_metadata) {
     AssertionResult result = fake_stream.waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
-    stream_headers_ = std::make_unique<Http::TestRequestHeaderMapImpl>(fake_stream.headers());
+    stream_headers_ = std::make_unique<Http::TestRequestHeaderMapImpl>(*fake_stream.headers());
     EXPECT_EQ("POST", stream_headers_->get_(":method"));
     EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers_->get_(":path"));
     EXPECT_EQ("application/grpc", stream_headers_->get_("content-type"));

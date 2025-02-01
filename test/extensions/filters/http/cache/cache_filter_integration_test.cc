@@ -196,7 +196,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
           waitForNextUpstreamRequest();
           // Check for injected precondition headers
           Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "abc123"}};
-          EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
+          EXPECT_THAT(*upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
 
           upstream_request_->encodeHeaders(not_modified_response_headers, /*end_stream=*/true);
         });
@@ -270,7 +270,7 @@ TEST_P(CacheIntegrationTest, ExpiredFetchedNewResponse) {
           waitForNextUpstreamRequest();
           // Check for injected precondition headers
           Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "a1"}};
-          EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
+          EXPECT_THAT(*upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
 
           // Reply with the updated response -> cached response is invalid
           upstream_request_->encodeHeaders(response_headers, /*end_stream=*/false);
@@ -524,7 +524,7 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead304WithValidation) {
 
           // Check for injected precondition headers
           const Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "abc123"}};
-          EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
+          EXPECT_THAT(*upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
 
           upstream_request_->encodeHeaders(not_modified_response_headers,
                                            /*end_stream=*/true);
@@ -590,7 +590,7 @@ TEST_P(CacheIntegrationTest, ServeGetFollowedByHead200WithValidation) {
 
           // Check for injected precondition headers
           Http::TestRequestHeaderMapImpl injected_headers = {{"if-none-match", "a1"}};
-          EXPECT_THAT(upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
+          EXPECT_THAT(*upstream_request_->headers(), IsSupersetOfHeaders(injected_headers));
 
           // Reply with the updated response -> cached response is invalid
           upstream_request_->encodeHeaders(response_headers,

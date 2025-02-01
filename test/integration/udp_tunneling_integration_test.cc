@@ -302,10 +302,10 @@ TEST_P(ForwardingConnectUdpIntegrationTest, ForwardConnectUdp) {
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
   // Check the request header contains correct field values (Normalized to HTTP/1).
-  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "GET");
-  EXPECT_EQ(upstream_request_->headers().getConnectionValue(), "upgrade");
-  EXPECT_EQ(upstream_request_->headers().getUpgradeValue(), "connect-udp");
-  EXPECT_EQ(upstream_request_->headers().getHostValue(), "foo.lyft.com:80");
+  EXPECT_EQ(upstream_request_->headers()->getMethodValue(), "GET");
+  EXPECT_EQ(upstream_request_->headers()->getConnectionValue(), "upgrade");
+  EXPECT_EQ(upstream_request_->headers()->getUpgradeValue(), "connect-udp");
+  EXPECT_EQ(upstream_request_->headers()->getHostValue(), "foo.lyft.com:80");
 
   // Send response headers
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -493,7 +493,7 @@ typed_config:
 
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-    expectRequestHeaders(upstream_request_->headers());
+    expectRequestHeaders(*upstream_request_->headers());
 
     // Send upgrade headers downstream, fully establishing the connection.
     upstream_request_->encodeHeaders(response_headers_, false);
@@ -678,7 +678,7 @@ TEST_P(UdpTunnelingIntegrationTest, IdleTimeoutWithUpstreamConnectionNoResponseH
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
   test_server_->waitForCounterEq("udp.foo.idle_timeout", 1);
@@ -801,7 +801,7 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionReuse) {
   FakeStreamPtr upstream_request2;
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
   ASSERT_TRUE(upstream_request2->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request2->headers());
+  expectRequestHeaders(*upstream_request2->headers());
 
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request2->encodeHeaders(response_headers_, false);
@@ -858,7 +858,7 @@ TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(response_headers, true);
@@ -907,7 +907,7 @@ TEST_P(UdpTunnelingIntegrationTest,
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   Http::TestResponseHeaderMapImpl fail_response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(fail_response_headers, true);
@@ -918,7 +918,7 @@ TEST_P(UdpTunnelingIntegrationTest,
   // The request is retried, expect new downstream headers
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request_->encodeHeaders(response_headers_, false);
@@ -976,7 +976,7 @@ TEST_P(UdpTunnelingIntegrationTest,
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   Http::TestResponseHeaderMapImpl fail_response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(fail_response_headers, true);
@@ -987,7 +987,7 @@ TEST_P(UdpTunnelingIntegrationTest,
   // The request is retried, expect new downstream headers
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   // Send upgrade headers downstream, fully establishing the connection.
   upstream_request_->encodeHeaders(response_headers_, false);
@@ -1035,7 +1035,7 @@ TEST_P(UdpTunnelingIntegrationTest,
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
 
@@ -1048,7 +1048,7 @@ TEST_P(UdpTunnelingIntegrationTest,
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   upstream_request_->encodeHeaders(response_headers_, false);
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
@@ -1109,7 +1109,7 @@ TEST_P(UdpTunnelingIntegrationTest,
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
 
@@ -1122,7 +1122,7 @@ TEST_P(UdpTunnelingIntegrationTest,
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   upstream_request_->encodeHeaders(response_headers_, false);
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
@@ -1215,7 +1215,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeaders) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(response_headers, true);
@@ -1263,7 +1263,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeadersWithRetry) {
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(response_headers, true);
@@ -1274,7 +1274,7 @@ TEST_P(UdpTunnelingIntegrationTest, PropagateInvalidResponseHeadersWithRetry) {
   // Since retry is enabled, a new request is expected to be sent by the UDP proxy.
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   upstream_request_->encodeHeaders(response_headers, true);
 
@@ -1422,7 +1422,7 @@ TEST_P(UdpTunnelingIntegrationTest, DontFlushTunnelConnectedAccessLogWithInvalid
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  expectRequestHeaders(upstream_request_->headers());
+  expectRequestHeaders(*upstream_request_->headers());
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "404"}};
   upstream_request_->encodeHeaders(response_headers, true);
@@ -1531,7 +1531,7 @@ TEST_P(UdpTunnelingIntegrationTest, BytesMeterAccessLog) {
   EXPECT_EQ(std::to_string(request.length()), access_log_parts[1]);
   EXPECT_EQ(std::to_string(response.length()), access_log_parts[2]);
 
-  Http::TestRequestHeaderMapImpl request_headers_copy(upstream_request_->headers());
+  Http::TestRequestHeaderMapImpl request_headers_copy(*upstream_request_->headers());
   Http::Utility::transformUpgradeRequestFromH1toH2(request_headers_copy);
   auto hpack_request_headers_size = getHpackDeflatedHeadersSize(request_headers_copy);
   auto expected_request_wire_size = hpack_request_headers_size + Http::Http2::H2_FRAME_HEADER_SIZE;

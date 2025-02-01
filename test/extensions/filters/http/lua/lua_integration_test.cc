@@ -356,98 +356,98 @@ typed_config:
                                waitForNextUpstreamRequest();
                              });
   EXPECT_EQ("foo", upstream_request_->headers()
-                       .get(Http::LowerCaseString("test_header_value_0"))[0]
+                       ->get(Http::LowerCaseString("test_header_value_0"))[0]
                        ->value()
                        .getStringView());
 
   EXPECT_EQ("bar", upstream_request_->headers()
-                       .get(Http::LowerCaseString("test_header_value_1"))[0]
+                       ->get(Http::LowerCaseString("test_header_value_1"))[0]
                        ->value()
                        .getStringView());
 
   EXPECT_EQ("nil_value", upstream_request_->headers()
-                             .get(Http::LowerCaseString("test_header_value_2"))[0]
+                             ->get(Http::LowerCaseString("test_header_value_2"))[0]
                              ->value()
                              .getStringView());
 
   EXPECT_EQ("2", upstream_request_->headers()
-                     .get(Http::LowerCaseString("test_header_value_size"))[0]
+                     ->get(Http::LowerCaseString("test_header_value_size"))[0]
                      ->value()
                      .getStringView());
 
   EXPECT_EQ("foo;bar;", upstream_request_->headers()
-                            .get(Http::LowerCaseString("cookie_0"))[0]
+                            ->get(Http::LowerCaseString("cookie_0"))[0]
                             ->value()
                             .getStringView());
 
   EXPECT_EQ("1,3;2,5;", upstream_request_->headers()
-                            .get(Http::LowerCaseString("cookie_1"))[0]
+                            ->get(Http::LowerCaseString("cookie_1"))[0]
                             ->value()
                             .getStringView());
 
   EXPECT_EQ("2", upstream_request_->headers()
-                     .get(Http::LowerCaseString("cookie_size"))[0]
+                     ->get(Http::LowerCaseString("cookie_size"))[0]
                      ->value()
                      .getStringView());
 
   EXPECT_EQ("10", upstream_request_->headers()
-                      .get(Http::LowerCaseString("request_body_size"))[0]
+                      ->get(Http::LowerCaseString("request_body_size"))[0]
                       ->value()
                       .getStringView());
 
   EXPECT_EQ("bar", upstream_request_->headers()
-                       .get(Http::LowerCaseString("request_metadata_foo"))[0]
+                       ->get(Http::LowerCaseString("request_metadata_foo"))[0]
                        ->value()
                        .getStringView());
 
   EXPECT_EQ("bat", upstream_request_->headers()
-                       .get(Http::LowerCaseString("request_metadata_baz"))[0]
+                       ->get(Http::LowerCaseString("request_metadata_baz"))[0]
                        ->value()
                        .getStringView());
   EXPECT_EQ("false", upstream_request_->headers()
-                         .get(Http::LowerCaseString("request_secure"))[0]
+                         ->get(Http::LowerCaseString("request_secure"))[0]
                          ->value()
                          .getStringView());
 
   EXPECT_EQ("HTTP/1.1", upstream_request_->headers()
-                            .get(Http::LowerCaseString("request_protocol"))[0]
+                            ->get(Http::LowerCaseString("request_protocol"))[0]
                             ->value()
                             .getStringView());
 
   EXPECT_EQ("bar", upstream_request_->headers()
-                       .get(Http::LowerCaseString("request_dynamic_metadata_value"))[0]
+                       ->get(Http::LowerCaseString("request_dynamic_metadata_value"))[0]
                        ->value()
                        .getStringView());
 
   EXPECT_TRUE(absl::StrContains(
       upstream_request_->headers()
-          .get(Http::LowerCaseString("request_downstream_direct_local_address_value"))[0]
+          ->get(Http::LowerCaseString("request_downstream_direct_local_address_value"))[0]
           ->value()
           .getStringView(),
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
-  EXPECT_TRUE(
-      absl::StrContains(upstream_request_->headers()
-                            .get(Http::LowerCaseString("request_downstream_local_address_value"))[0]
-                            ->value()
-                            .getStringView(),
-                        GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
+  EXPECT_TRUE(absl::StrContains(
+      upstream_request_->headers()
+          ->get(Http::LowerCaseString("request_downstream_local_address_value"))[0]
+          ->value()
+          .getStringView(),
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
   EXPECT_TRUE(absl::StrContains(
       upstream_request_->headers()
-          .get(Http::LowerCaseString("request_downstream_directremote_address_value"))[0]
+          ->get(Http::LowerCaseString("request_downstream_directremote_address_value"))[0]
           ->value()
           .getStringView(),
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1:" : "[::1]:"));
 
   EXPECT_EQ("10.0.0.1:0",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("request_downstream_remote_address_value"))[0]
+                ->get(Http::LowerCaseString("request_downstream_remote_address_value"))[0]
                 ->value()
                 .getStringView());
 
   EXPECT_EQ("", upstream_request_->headers()
-                    .get(Http::LowerCaseString("request_requested_server_name"))[0]
+                    ->get(Http::LowerCaseString("request_requested_server_name"))[0]
                     ->value()
                     .getStringView());
 
@@ -526,11 +526,11 @@ typed_config:
 
   waitForNextUpstreamRequest();
   EXPECT_EQ("bar", upstream_request_->headers()
-                       .get(Http::LowerCaseString("upstream_foo"))[0]
+                       ->get(Http::LowerCaseString("upstream_foo"))[0]
                        ->value()
                        .getStringView());
   EXPECT_EQ("4", upstream_request_->headers()
-                     .get(Http::LowerCaseString("upstream_body_size"))[0]
+                     ->get(Http::LowerCaseString("upstream_body_size"))[0]
                      ->value()
                      .getStringView());
 
@@ -665,8 +665,8 @@ typed_config:
   ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
   ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
   // Sanity checking that we sent the expected data.
-  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Path, "/"));
+  EXPECT_THAT(*lua_request_->headers(), HeaderValueOf(Http::Headers::get().Method, "POST"));
+  EXPECT_THAT(*lua_request_->headers(), HeaderValueOf(Http::Headers::get().Path, "/"));
 
   waitForNextUpstreamRequest();
 
@@ -833,12 +833,12 @@ typed_config:
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("approved", upstream_request_->headers()
-                            .get(Http::LowerCaseString("signature_verification"))[0]
+                            ->get(Http::LowerCaseString("signature_verification"))[0]
                             ->value()
                             .getStringView());
 
   EXPECT_EQ("done", upstream_request_->headers()
-                        .get(Http::LowerCaseString("verification"))[0]
+                        ->get(Http::LowerCaseString("verification"))[0]
                         ->value()
                         .getStringView());
 
@@ -976,7 +976,7 @@ TEST_P(LuaIntegrationTest, BasicTestOfLuaPerRoute) {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
     waitForNextUpstreamRequest(1);
 
-    auto entry = upstream_request_->headers().get(Http::LowerCaseString("code"));
+    auto entry = upstream_request_->headers()->get(Http::LowerCaseString("code"));
     if (!expected_value.empty()) {
       EXPECT_EQ(expected_value, entry[0]->value().getStringView());
     } else {
@@ -1119,7 +1119,7 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
     waitForNextUpstreamRequest(1);
 
-    auto entry = upstream_request_->headers().get(Http::LowerCaseString("code"));
+    auto entry = upstream_request_->headers()->get(Http::LowerCaseString("code"));
     if (!expected_value.empty()) {
       EXPECT_EQ(expected_value, entry[0]->value().getStringView());
     } else {

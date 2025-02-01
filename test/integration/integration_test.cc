@@ -580,7 +580,7 @@ TEST_P(IntegrationTest, RouterIsTimeoutRetryHeader) {
 
   // The request did not fail due to a timeout, therefore we expect the x-envoy-is-timeout-retry
   // header to be false.
-  EXPECT_EQ(upstream_request_->headers().getEnvoyIsTimeoutRetryValue(), "false");
+  EXPECT_EQ(upstream_request_->headers()->getEnvoyIsTimeoutRetryValue(), "false");
 
   // Return 200 to the retry.
   upstream_request_->encodeHeaders(default_response_headers_, false);
@@ -1782,7 +1782,7 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
                                      {"via", "foo"},
                                      {"connection", "close"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().Via, "foo, bar"));
+  EXPECT_THAT(*upstream_request_->headers(), HeaderValueOf(Headers::get().Via, "foo, bar"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2641,7 +2641,7 @@ TEST_P(IntegrationTest, AppendXForwardedPort) {
                                      {":authority", "host"},
                                      {"connection", "close"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), Not(HeaderValueOf(Headers::get().ForwardedPort, "")));
+  EXPECT_THAT(*upstream_request_->headers(), Not(HeaderValueOf(Headers::get().ForwardedPort, "")));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2662,7 +2662,7 @@ TEST_P(IntegrationTest, DoNotAppendXForwardedPort) {
                                      {":authority", "host"},
                                      {"connection", "close"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers().ForwardedPort(), nullptr);
+  EXPECT_THAT(upstream_request_->headers()->ForwardedPort(), nullptr);
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2684,7 +2684,7 @@ TEST_P(IntegrationTest, IgnoreAppendingXForwardedPortIfHasBeenSet) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "8080"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "8080"));
+  EXPECT_THAT(*upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "8080"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2706,7 +2706,7 @@ TEST_P(IntegrationTest, PreserveXForwardedPortFromTrustedHop) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "80"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
+  EXPECT_THAT(*upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2728,7 +2728,8 @@ TEST_P(IntegrationTest, OverwriteXForwardedPortFromUntrustedHop) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "80"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), Not(HeaderValueOf(Headers::get().ForwardedPort, "80")));
+  EXPECT_THAT(*upstream_request_->headers(),
+              Not(HeaderValueOf(Headers::get().ForwardedPort, "80")));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2750,7 +2751,7 @@ TEST_P(IntegrationTest, DoNotOverwriteXForwardedPortFromUntrustedHop) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "80"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
+  EXPECT_THAT(*upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());

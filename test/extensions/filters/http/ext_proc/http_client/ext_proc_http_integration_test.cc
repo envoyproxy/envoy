@@ -176,10 +176,10 @@ public:
 
     ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
     ASSERT_TRUE(processor_stream_->waitForEndStream(*dispatcher_));
-    EXPECT_THAT(processor_stream_->headers(),
+    EXPECT_THAT(*processor_stream_->headers(),
                 SingleHeaderValueIs("content-type", "application/json"));
-    EXPECT_THAT(processor_stream_->headers(), SingleHeaderValueIs(":method", "POST"));
-    EXPECT_THAT(processor_stream_->headers(), HasHeader("x-request-id"));
+    EXPECT_THAT(*processor_stream_->headers(), SingleHeaderValueIs(":method", "POST"));
+    EXPECT_THAT(*processor_stream_->headers(), HasHeader("x-request-id"));
   }
 
   void sendHttpResponse(ProcessingResponse& response) {
@@ -311,7 +311,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoRequestHeaderMutation) {
 
   // The request is sent to the upstream.
   handleUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("foo", "yes"));
+  EXPECT_THAT(*upstream_request_->headers(), SingleHeaderValueIs("foo", "yes"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
@@ -328,7 +328,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, ServerNoResponseHeaderMutation) {
 
   // The request is sent to the upstream.
   handleUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("foo", "yes"));
+  EXPECT_THAT(*upstream_request_->headers(), SingleHeaderValueIs("foo", "yes"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   processResponseHeadersMessage(http_side_upstreams_[0], true, absl::nullopt);
   verifyDownstreamResponse(*response, 200);
@@ -359,8 +359,8 @@ TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutation) {
 
   // The request is sent to the upstream.
   handleUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
-  EXPECT_THAT(upstream_request_->headers(), HasNoHeader("x-remove-this"));
+  EXPECT_THAT(*upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(*upstream_request_->headers(), HasNoHeader("x-remove-this"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);
@@ -469,7 +469,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeadersInBothDirection) {
 
   // The request is sent to the upstream.
   handleUpstreamRequestWithTrailer();
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_THAT(*upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
   EXPECT_EQ(upstream_request_->body().toString(), "foo");
 
   processResponseHeadersMessage(http_side_upstreams_[0], false, absl::nullopt);
@@ -520,7 +520,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, StatsTestOnSuccess) {
 
   // The request is sent to the upstream.
   handleUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("foo", "yes"));
+  EXPECT_THAT(*upstream_request_->headers(), SingleHeaderValueIs("foo", "yes"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   verifyDownstreamResponse(*response, 200);

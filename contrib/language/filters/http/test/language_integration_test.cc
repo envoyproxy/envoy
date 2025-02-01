@@ -43,9 +43,9 @@ TEST_P(HttpFilterLanguageIntegrationTest, DefaultLanguageFallback) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   EXPECT_FALSE(
-      upstream_request_->headers().get(Envoy::Http::LowerCaseString{"x-language"}).empty());
+      upstream_request_->headers()->get(Envoy::Http::LowerCaseString{"x-language"}).empty());
   EXPECT_EQ("en", upstream_request_->headers()
-                      .get(Http::LowerCaseString{"x-language"})[0]
+                      ->get(Http::LowerCaseString{"x-language"})[0]
                       ->value()
                       .getStringView());
 
@@ -73,9 +73,9 @@ TEST_P(HttpFilterLanguageIntegrationTest, AcceptLanguageHeader) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   EXPECT_FALSE(
-      upstream_request_->headers().get(Envoy::Http::LowerCaseString{"x-language"}).empty());
+      upstream_request_->headers()->get(Envoy::Http::LowerCaseString{"x-language"}).empty());
   EXPECT_EQ("fr", upstream_request_->headers()
-                      .get(Http::LowerCaseString{"x-language"})[0]
+                      ->get(Http::LowerCaseString{"x-language"})[0]
                       ->value()
                       .getStringView());
 
@@ -103,9 +103,9 @@ TEST_P(HttpFilterLanguageIntegrationTest, InvalidAcceptLanguageHeader) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   EXPECT_FALSE(
-      upstream_request_->headers().get(Envoy::Http::LowerCaseString{"x-language"}).empty());
+      upstream_request_->headers()->get(Envoy::Http::LowerCaseString{"x-language"}).empty());
   EXPECT_EQ("en", upstream_request_->headers()
-                      .get(Http::LowerCaseString{"x-language"})[0]
+                      ->get(Http::LowerCaseString{"x-language"})[0]
                       ->value()
                       .getStringView());
 

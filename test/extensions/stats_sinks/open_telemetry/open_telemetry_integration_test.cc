@@ -91,10 +91,10 @@ public:
       VERIFY_ASSERTION(waitForMetricsStream());
       opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest export_request;
       VERIFY_ASSERTION(otlp_collector_request_->waitForGrpcMessage(*dispatcher_, export_request));
-      EXPECT_EQ("POST", otlp_collector_request_->headers().getMethodValue());
+      EXPECT_EQ("POST", otlp_collector_request_->headers()->getMethodValue());
       EXPECT_EQ("/opentelemetry.proto.collector.metrics.v1.MetricsService/Export",
-                otlp_collector_request_->headers().getPathValue());
-      EXPECT_EQ("application/grpc", otlp_collector_request_->headers().getContentTypeValue());
+                otlp_collector_request_->headers()->getPathValue());
+      EXPECT_EQ("application/grpc", otlp_collector_request_->headers()->getContentTypeValue());
 
       EXPECT_EQ(1, export_request.resource_metrics().size());
       EXPECT_EQ(1, export_request.resource_metrics()[0].scope_metrics().size());

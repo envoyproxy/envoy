@@ -306,10 +306,10 @@ public:
       }
       mergeLoadStats(loadstats_request, local_loadstats_request);
 
-      EXPECT_EQ("POST", loadstats_stream_->headers().getMethodValue());
+      EXPECT_EQ("POST", loadstats_stream_->headers()->getMethodValue());
       EXPECT_EQ("/envoy.service.load_stats.v3.LoadReportingService/StreamLoadStats",
-                loadstats_stream_->headers().getPathValue());
-      EXPECT_EQ("application/grpc", loadstats_stream_->headers().getContentTypeValue());
+                loadstats_stream_->headers()->getPathValue());
+      EXPECT_EQ("application/grpc", loadstats_stream_->headers()->getContentTypeValue());
       if (!bound.withinBound()) {
         return TestUtility::assertRepeatedPtrFieldEqual(expected_cluster_stats,
                                                         loadstats_request.cluster_stats(), true);

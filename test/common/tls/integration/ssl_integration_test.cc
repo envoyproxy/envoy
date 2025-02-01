@@ -338,7 +338,7 @@ TEST_P(SslIntegrationTest, RouterHeaderOnlyRequestAndResponseWithSni) {
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("www.host.com", upstream_request_->headers()
-                                .get(Http::LowerCaseString("x-envoy-client-sni"))[0]
+                                ->get(Http::LowerCaseString("x-envoy-client-sni"))[0]
                                 ->value()
                                 .getStringView());
 
@@ -372,7 +372,7 @@ TEST_P(SslIntegrationTest, LogPeerIpSanUnsupportedIpVersion) {
   waitForNextUpstreamRequest();
 
   EXPECT_EQ("www.host.com", upstream_request_->headers()
-                                .get(Http::LowerCaseString("x-envoy-client-sni"))[0]
+                                ->get(Http::LowerCaseString("x-envoy-client-sni"))[0]
                                 ->value()
                                 .getStringView());
 

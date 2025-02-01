@@ -137,7 +137,7 @@ TEST_P(TranscoderAsyncBodyInjectionIntegrationTest, UnaryGrpcTranscoding) {
   // Make sure gRPC request was received.
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(upstream_request_->receivedData());
-  EXPECT_GT(upstream_request_->body().length(), 0);
+  EXPECT_GT(upstream_request_->bodyLength(), 0);
 
   // Send gRPC response with trailers.
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
@@ -169,7 +169,7 @@ TEST_P(TranscoderAsyncBodyInjectionIntegrationTest, StreamingGrpcTranscoding) {
   // Make sure gRPC request was received.
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(upstream_request_->receivedData());
-  EXPECT_GT(upstream_request_->body().length(), 0);
+  EXPECT_GT(upstream_request_->bodyLength(), 0);
 
   // Send gRPC response with trailers.
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},

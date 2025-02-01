@@ -109,10 +109,10 @@ public:
   AssertionResult waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
     opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
-    EXPECT_EQ("POST", access_log_request_->headers().getMethodValue());
+    EXPECT_EQ("POST", access_log_request_->headers()->getMethodValue());
     EXPECT_EQ("/opentelemetry.proto.collector.logs.v1.LogsService/Export",
-              access_log_request_->headers().getPathValue());
-    EXPECT_EQ("application/grpc", access_log_request_->headers().getContentTypeValue());
+              access_log_request_->headers()->getPathValue());
+    EXPECT_EQ("application/grpc", access_log_request_->headers()->getContentTypeValue());
 
     opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest expected_request_msg;
     TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);

@@ -172,7 +172,7 @@ void WebsocketIntegrationTest::performUpgrade(
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  validateUpgradeRequestHeaders(upstream_request_->headers(), upgrade_request_headers);
+  validateUpgradeRequestHeaders(*upstream_request_->headers(), upgrade_request_headers);
 
   // Send the upgrade response
   upstream_request_->encodeHeaders(upgrade_response_headers, false);
@@ -229,7 +229,7 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
   initialize();
 
   performUpgrade(upgradeRequestHeaders(), upgradeResponseHeaders());
-  ASSERT_EQ(upstream_request_->headers().getHostValue(), "sni.lyft.com");
+  ASSERT_EQ(upstream_request_->headers()->getHostValue(), "sni.lyft.com");
 
   codec_client_->sendData(*request_encoder_, "bye!", false);
   codec_client_->close();

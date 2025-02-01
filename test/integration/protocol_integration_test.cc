@@ -224,7 +224,7 @@ TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
   auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 0);
 
   // Regression test https://github.com/envoyproxy/envoy/issues/14890 - no content-length added.
-  EXPECT_EQ(upstream_request_->headers().ContentLength(), nullptr);
+  EXPECT_EQ(upstream_request_->headers()->ContentLength(), nullptr);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("600", response->headers().getStatusValue());
 }
@@ -414,7 +414,7 @@ TEST_P(ProtocolIntegrationTest, MixedCaseScheme) {
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
 
-  auto scheme = upstream_request_->headers().getSchemeValue();
+  auto scheme = upstream_request_->headers()->getSchemeValue();
   EXPECT_TRUE(scheme.empty() || scheme == "http");
 }
 
@@ -869,10 +869,11 @@ TEST_P(ProtocolIntegrationTest, LongHeaderValueWithSpaces) {
                                      {":authority", "sni.lyft.com"},
                                      {"longrequestvalue", long_header_value_with_inner_lws}});
   waitForNextUpstreamRequest();
-  EXPECT_EQ(long_header_value_with_inner_lws, upstream_request_->headers()
-                                                  .get(Http::LowerCaseString("longrequestvalue"))[0]
-                                                  ->value()
-                                                  .getStringView());
+  EXPECT_EQ(long_header_value_with_inner_lws,
+            upstream_request_->headers()
+                ->get(Http::LowerCaseString("longrequestvalue"))[0]
+                ->value()
+                .getStringView());
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"},
                                       {"host", "host"},
@@ -1187,7 +1188,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
 
-  EXPECT_EQ(atoi(std::string(upstream_request_->headers().getEnvoyAttemptCountValue()).c_str()), 1);
+  EXPECT_EQ(atoi(std::string(upstream_request_->headers()->getEnvoyAttemptCountValue()).c_str()),
+            1);
 
   if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -1196,7 +1198,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryAttemptCountHeader) {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
   waitForNextUpstreamRequest();
-  EXPECT_EQ(atoi(std::string(upstream_request_->headers().getEnvoyAttemptCountValue()).c_str()), 2);
+  EXPECT_EQ(atoi(std::string(upstream_request_->headers()->getEnvoyAttemptCountValue()).c_str()),
+            2);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
 
@@ -1856,7 +1859,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
       Http::TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer_2", "value2"}});
   waitForNextUpstreamRequest();
 
-  EXPECT_THAT(upstream_request_->headers(), Not(HeaderHasValueRef("foo_bar", "baz")));
+  EXPECT_THAT(*upstream_request_->headers(), Not(HeaderHasValueRef("foo_bar", "baz")));
   // Headers with underscores should be dropped from request headers and trailers.
   EXPECT_THAT(*upstream_request_->trailers(), Not(HeaderHasValueRef("trailer_2", "value2")));
   upstream_request_->encodeHeaders(
@@ -1902,7 +1905,7 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
                                      {"foo_bar", "baz"}});
   waitForNextUpstreamRequest();
 
-  EXPECT_THAT(upstream_request_->headers(), HeaderHasValueRef("foo_bar", "baz"));
+  EXPECT_THAT(*upstream_request_->headers(), HeaderHasValueRef("foo_bar", "baz"));
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"bar_baz", "fooz"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
@@ -2403,7 +2406,7 @@ name: local-reply-during-encode
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("500", response->headers().getStatusValue());
-  EXPECT_EQ(0, upstream_request_->body().length());
+  EXPECT_EQ(0, upstream_request_->bodyLength());
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LocalReplyDuringEncodingData) {
@@ -2933,7 +2936,7 @@ TEST_P(ProtocolIntegrationTest, MultipleCookiesAndSetCookies) {
 
   auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
-    EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().Cookie)[0]->value(),
+    EXPECT_EQ(upstream_request_->headers()->get(Http::Headers::get().Cookie)[0]->value(),
               "a=b; c=d");
   }
 
@@ -4539,7 +4542,7 @@ TEST_P(ProtocolIntegrationTest, ValidateUpstreamMixedCaseHeaders) {
 
     // Note that the fake upstream will change the header name to lowercase
     EXPECT_EQ("some value here", upstream_request_->headers()
-                                     .get(Http::LowerCaseString("x-mixed-case"))[0]
+                                     ->get(Http::LowerCaseString("x-mixed-case"))[0]
                                      ->value()
                                      .getStringView());
 
@@ -4587,11 +4590,11 @@ TEST_P(ProtocolIntegrationTest, ValidateUpstreamHeadersWithOverride) {
     waitForNextUpstreamRequest();
 
     EXPECT_EQ("hello", upstream_request_->headers()
-                           .get(Http::LowerCaseString("x-foo"))[0]
+                           ->get(Http::LowerCaseString("x-foo"))[0]
                            ->value()
                            .getStringView());
     EXPECT_EQ("yes", upstream_request_->headers()
-                         .get(Http::LowerCaseString("x-oops"))[0]
+                         ->get(Http::LowerCaseString("x-oops"))[0]
                          ->value()
                          .getStringView());
 
@@ -4694,7 +4697,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
     waitForNextUpstreamRequest();
     // HTTP/1.x requests get the payload length from Content-Length header. The remaining bytes is
     // parsed as another request.
-    EXPECT_EQ(123u, upstream_request_->body().length());
+    EXPECT_EQ(123u, upstream_request_->bodyLength());
     upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("200", response->headers().getStatusValue());
@@ -5449,9 +5452,9 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidSchemeHeaderWithWhitespace) {
   waitForNextUpstreamRequest();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     // The scheme header is not conveyed in HTTP/1.
-    EXPECT_EQ(nullptr, upstream_request_->headers().Scheme());
+    EXPECT_EQ(nullptr, upstream_request_->headers()->Scheme());
   } else {
-    EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().Scheme, "http"));
+    EXPECT_THAT(*upstream_request_->headers(), HeaderValueOf(Http::Headers::get().Scheme, "http"));
   }
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());

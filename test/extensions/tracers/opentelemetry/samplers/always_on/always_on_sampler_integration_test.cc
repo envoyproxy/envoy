@@ -71,14 +71,14 @@ TEST_P(AlwaysOnSamplerIntegrationTest, TestWithTraceparentAndTracestate) {
 
   // traceparent should be set: traceid should be re-used, span id should be different
   absl::string_view traceparent_value = upstream_request_->headers()
-                                            .get(Http::LowerCaseString("traceparent"))[0]
+                                            ->get(Http::LowerCaseString("traceparent"))[0]
                                             ->value()
                                             .getStringView();
   EXPECT_TRUE(absl::StartsWith(traceparent_value, TRACEPARENT_VALUE_START));
   EXPECT_NE(TRACEPARENT_VALUE, traceparent_value);
   // tracestate should be forwarded
   absl::string_view tracestate_value = upstream_request_->headers()
-                                           .get(Http::LowerCaseString("tracestate"))[0]
+                                           ->get(Http::LowerCaseString("tracestate"))[0]
                                            ->value()
                                            .getStringView();
   EXPECT_EQ("key=value", tracestate_value);
@@ -99,14 +99,14 @@ TEST_P(AlwaysOnSamplerIntegrationTest, TestWithTraceparentOnly) {
 
   // traceparent should be set: traceid should be re-used, span id should be different
   absl::string_view traceparent_value = upstream_request_->headers()
-                                            .get(Http::LowerCaseString("traceparent"))[0]
+                                            ->get(Http::LowerCaseString("traceparent"))[0]
                                             ->value()
                                             .getStringView();
   EXPECT_TRUE(absl::StartsWith(traceparent_value, TRACEPARENT_VALUE_START));
   EXPECT_NE(TRACEPARENT_VALUE, traceparent_value);
   // OTLP tracer adds an empty tracestate
   absl::string_view tracestate_value = upstream_request_->headers()
-                                           .get(Http::LowerCaseString("tracestate"))[0]
+                                           ->get(Http::LowerCaseString("tracestate"))[0]
                                            ->value()
                                            .getStringView();
   EXPECT_EQ("", tracestate_value);
@@ -125,11 +125,11 @@ TEST_P(AlwaysOnSamplerIntegrationTest, TestWithoutTraceparentAndTracestate) {
 
   // traceparent will be added, trace_id and span_id will be generated, so there is nothing we can
   // assert
-  EXPECT_EQ(upstream_request_->headers().get(::Envoy::Http::LowerCaseString("traceparent")).size(),
+  EXPECT_EQ(upstream_request_->headers()->get(::Envoy::Http::LowerCaseString("traceparent")).size(),
             1);
   // OTLP tracer adds an empty tracestate
   absl::string_view tracestate_value = upstream_request_->headers()
-                                           .get(Http::LowerCaseString("tracestate"))[0]
+                                           ->get(Http::LowerCaseString("tracestate"))[0]
                                            ->value()
                                            .getStringView();
   EXPECT_EQ("", tracestate_value);

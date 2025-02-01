@@ -115,7 +115,7 @@ public:
         sotwOrDelta() == Grpc::SotwOrDelta::Sotw || sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
             ? "/envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters"
             : "/envoy.service.cluster.v3.ClusterDiscoveryService/DeltaClusters");
-    EXPECT_EQ(xds_stream_->headers().get(path_string)[0]->value(), expected_method);
+    EXPECT_EQ(xds_stream_->headers()->get(path_string)[0]->value(), expected_method);
   }
 
   void acceptXdsConnection() {

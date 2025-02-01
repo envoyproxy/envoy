@@ -365,8 +365,8 @@ protected:
     ASSERT_TRUE(host_info.connection_->waitForNewStream(*dispatcher_, host_info.defaultStream()));
     ASSERT_TRUE(host_info.defaultStream()->waitForEndStream(*dispatcher_));
 
-    EXPECT_EQ(host_info.defaultStream()->headers().getPathValue(), "/healthcheck");
-    EXPECT_EQ(host_info.defaultStream()->headers().getMethodValue(), "GET");
+    EXPECT_EQ(host_info.defaultStream()->headers()->getPathValue(), "/healthcheck");
+    EXPECT_EQ(host_info.defaultStream()->headers()->getMethodValue(), "GET");
   }
 
   envoy::type::v3::CodecClientType codec_client_type_{};

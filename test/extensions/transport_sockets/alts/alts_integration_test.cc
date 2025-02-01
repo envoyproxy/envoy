@@ -434,7 +434,7 @@ public:
 
   bool tsiPeerIdentitySet() {
     bool contain_peer_name = false;
-    Http::TestRequestHeaderMapImpl upstream_request(upstream_request_->headers());
+    Http::TestRequestHeaderMapImpl upstream_request(*upstream_request_->headers());
     upstream_request.iterate(
         [&contain_peer_name](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
           const std::string key{header.key().getStringView()};

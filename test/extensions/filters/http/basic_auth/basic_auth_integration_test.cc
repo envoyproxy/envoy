@@ -104,7 +104,8 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ValidCredential) {
 
   waitForNextUpstreamRequest();
 
-  const auto username_entry = upstream_request_->headers().get(Http::LowerCaseString("x-username"));
+  const auto username_entry =
+      upstream_request_->headers()->get(Http::LowerCaseString("x-username"));
   EXPECT_FALSE(username_entry.empty());
   EXPECT_EQ(username_entry[0]->value().getStringView(), "user1");
 
@@ -195,7 +196,8 @@ TEST_P(BasicAuthIntegrationTestAllProtocols, ExistingUsernameHeader) {
 
   waitForNextUpstreamRequest();
 
-  const auto username_entry = upstream_request_->headers().get(Http::LowerCaseString("x-username"));
+  const auto username_entry =
+      upstream_request_->headers()->get(Http::LowerCaseString("x-username"));
   EXPECT_FALSE(username_entry.empty());
   EXPECT_EQ(username_entry[0]->value().getStringView(), "user1");
 

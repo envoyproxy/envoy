@@ -130,12 +130,12 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationDownstream) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   // check that our headers have been correctly added upstream
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amz-date")).empty());
+  EXPECT_FALSE(upstream_request_->headers()->get(Http::LowerCaseString("authorization")).empty());
+  EXPECT_FALSE(upstream_request_->headers()->get(Http::LowerCaseString("x-amz-date")).empty());
   EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-amz-security-token")).empty());
+      upstream_request_->headers()->get(Http::LowerCaseString("x-amz-security-token")).empty());
   EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
+      upstream_request_->headers()->get(Http::LowerCaseString("x-amz-content-sha256")).empty());
 }
 
 TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationDownstream) {
@@ -153,13 +153,14 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationDownstream) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   // check that our headers have been correctly added upstream
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amz-date")).empty());
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amz-region-set")).empty());
+  EXPECT_FALSE(upstream_request_->headers()->get(Http::LowerCaseString("authorization")).empty());
+  EXPECT_FALSE(upstream_request_->headers()->get(Http::LowerCaseString("x-amz-date")).empty());
   EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-amz-security-token")).empty());
+      upstream_request_->headers()->get(Http::LowerCaseString("x-amz-region-set")).empty());
   EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
+      upstream_request_->headers()->get(Http::LowerCaseString("x-amz-security-token")).empty());
+  EXPECT_FALSE(
+      upstream_request_->headers()->get(Http::LowerCaseString("x-amz-content-sha256")).empty());
 }
 
 TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationUpstream) {
@@ -178,12 +179,12 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationUpstream) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   // check that our headers have been correctly added upstream
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amz-date")).empty());
+  EXPECT_FALSE(upstream_request_->headers()->get(Http::LowerCaseString("authorization")).empty());
+  EXPECT_FALSE(upstream_request_->headers()->get(Http::LowerCaseString("x-amz-date")).empty());
   EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-amz-security-token")).empty());
+      upstream_request_->headers()->get(Http::LowerCaseString("x-amz-security-token")).empty());
   EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
+      upstream_request_->headers()->get(Http::LowerCaseString("x-amz-content-sha256")).empty());
 }
 
 TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationUpstream) {
@@ -202,13 +203,14 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationUpstream) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   // check that our headers have been correctly added upstream
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("authorization")).empty());
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amz-date")).empty());
-  EXPECT_FALSE(upstream_request_->headers().get(Http::LowerCaseString("x-amz-region-set")).empty());
+  EXPECT_FALSE(upstream_request_->headers()->get(Http::LowerCaseString("authorization")).empty());
+  EXPECT_FALSE(upstream_request_->headers()->get(Http::LowerCaseString("x-amz-date")).empty());
   EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-amz-security-token")).empty());
+      upstream_request_->headers()->get(Http::LowerCaseString("x-amz-region-set")).empty());
   EXPECT_FALSE(
-      upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
+      upstream_request_->headers()->get(Http::LowerCaseString("x-amz-security-token")).empty());
+  EXPECT_FALSE(
+      upstream_request_->headers()->get(Http::LowerCaseString("x-amz-content-sha256")).empty());
 }
 class MockLogicalDnsClusterFactory : public Upstream::LogicalDnsClusterFactory {
 public:

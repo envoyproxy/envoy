@@ -51,7 +51,7 @@ public:
           absl::StrContains(additionally_allowed_characters, static_cast<char>(ascii))) {
         waitForNextUpstreamRequest();
         std::string expected_path = expected_path_builder(ascii);
-        EXPECT_EQ(upstream_request_->headers().getPathValue(), expected_path);
+        EXPECT_EQ(upstream_request_->headers()->getPathValue(), expected_path);
         // Send a headers only response.
         upstream_request_->encodeHeaders(default_response_headers_, true);
         ASSERT_TRUE(response->waitForEndStream());
@@ -134,7 +134,7 @@ TEST_P(DownstreamUhvIntegrationTest, BackslashInUriPathConversionWithUhvOverride
   } else {
     waitForNextUpstreamRequest();
 
-    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%5Cback%5Cslashes");
+    EXPECT_EQ(upstream_request_->headers()->getPathValue(), "/path/with%5Cback%5Cslashes");
 
     // Send a headers only response.
     upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -159,7 +159,7 @@ TEST_P(DownstreamUhvIntegrationTest, BackslashInUriPathConversion) {
                                      {":authority", "host"}});
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%5Cback%5Cslashes");
+  EXPECT_EQ(upstream_request_->headers()->getPathValue(), "/path/with%5Cback%5Cslashes");
 
   // Send a headers only response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -183,7 +183,7 @@ TEST_P(DownstreamUhvIntegrationTest, UrlEncodedTripletsCasePreserved) {
                                      {":authority", "host"}});
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3bmixed%5Ccase%Fesequences");
+  EXPECT_EQ(upstream_request_->headers()->getPathValue(), "/path/with%3bmixed%5Ccase%Fesequences");
 
   // Send a headers only response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -209,9 +209,11 @@ TEST_P(DownstreamUhvIntegrationTest, UrlEncodedTripletsCasePreservedWithUhvOverr
   waitForNextUpstreamRequest();
 
   if (use_universal_header_validator_) {
-    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3Bmixed%5Ccase%FEsequences");
+    EXPECT_EQ(upstream_request_->headers()->getPathValue(),
+              "/path/with%3Bmixed%5Ccase%FEsequences");
   } else {
-    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path/with%3bmixed%5Ccase%Fesequences");
+    EXPECT_EQ(upstream_request_->headers()->getPathValue(),
+              "/path/with%3bmixed%5Ccase%Fesequences");
   }
   // Send a headers only response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -383,7 +385,7 @@ TEST_P(DownstreamUhvIntegrationTest, MalformedUrlEncodedTripletsRejectedWithUhvO
   } else {
     waitForNextUpstreamRequest();
 
-    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%Z0with%XYbad%7Jencoding%A");
+    EXPECT_EQ(upstream_request_->headers()->getPathValue(), "/path%Z0with%XYbad%7Jencoding%A");
 
     // Send a headers only response.
     upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -408,7 +410,7 @@ TEST_P(DownstreamUhvIntegrationTest, MalformedUrlEncodedTripletsAllowed) {
                                      {":authority", "host"}});
   waitForNextUpstreamRequest();
 
-  EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%Z0with%XYbad%7Jencoding%");
+  EXPECT_EQ(upstream_request_->headers()->getPathValue(), "/path%Z0with%XYbad%7Jencoding%");
 
   // Send a headers only response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -453,7 +455,7 @@ TEST_P(DownstreamUhvIntegrationTest, UhvAllowsPercent00WithOverride) {
   if (use_universal_header_validator_) {
     waitForNextUpstreamRequest();
 
-    EXPECT_EQ(upstream_request_->headers().getPathValue(), "/path%00/to/something");
+    EXPECT_EQ(upstream_request_->headers()->getPathValue(), "/path%00/to/something");
 
     // Send a headers only response.
     upstream_request_->encodeHeaders(default_response_headers_, true);

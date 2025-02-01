@@ -1529,7 +1529,7 @@ TEST_P(MultiplexedIntegrationTest, RequestMirrorWithBody) {
   // Make sure both requests have a body. Also check the shadow for the shadow headers.
   EXPECT_EQ("hello", upstream_request_->body().toString());
   EXPECT_EQ("hello", upstream_request2->body().toString());
-  EXPECT_EQ("host-shadow", upstream_request2->headers().getHostValue());
+  EXPECT_EQ("host-shadow", upstream_request2->headers()->getHostValue());
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
@@ -2611,7 +2611,7 @@ TEST_P(Http2FrameIntegrationTest, HostDifferentFromAuthority) {
   sendFrame(request);
 
   waitForNextUpstreamRequest();
-  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com");
+  EXPECT_EQ(upstream_request_->headers()->getHostValue(), "one.example.com");
   upstream_request_->encodeHeaders(default_response_headers_, true);
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
@@ -2628,7 +2628,7 @@ TEST_P(Http2FrameIntegrationTest, HostSameAsAuthority) {
   sendFrame(request);
 
   waitForNextUpstreamRequest();
-  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com");
+  EXPECT_EQ(upstream_request_->headers()->getHostValue(), "one.example.com");
   upstream_request_->encodeHeaders(default_response_headers_, true);
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
@@ -2646,7 +2646,7 @@ TEST_P(Http2FrameIntegrationTest, HostConcatenatedWithAuthorityWithOverride) {
   sendFrame(request);
 
   waitForNextUpstreamRequest();
-  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com,two.example.com");
+  EXPECT_EQ(upstream_request_->headers()->getHostValue(), "one.example.com,two.example.com");
   upstream_request_->encodeHeaders(default_response_headers_, true);
   auto frame = readFrame();
   EXPECT_EQ(Http2Frame::Type::Headers, frame.type());

@@ -598,10 +598,10 @@ public:
     RELEASE_ASSERT(result, result.message());
 
     // gRPC request expectations.
-    EXPECT_EQ("POST", auth_request->headers().getMethodValue());
+    EXPECT_EQ("POST", auth_request->headers()->getMethodValue());
     EXPECT_EQ("/envoy.service.redis_auth.v3.RedisProxyExternalAuth/Authenticate",
-              auth_request->headers().getPathValue());
-    EXPECT_EQ("application/grpc", auth_request->headers().getContentTypeValue());
+              auth_request->headers()->getPathValue());
+    EXPECT_EQ("application/grpc", auth_request->headers()->getContentTypeValue());
 
     // Check that the received password matches the expected password.
     EXPECT_EQ(password, received_request.password());

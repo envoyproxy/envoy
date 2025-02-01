@@ -65,7 +65,7 @@ typed_config:
 
   EXPECT_EQ("Basic base64EncodedUsernamePassword",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("Authorization"))[0]
+                ->get(Http::LowerCaseString("Authorization"))[0]
                 ->value()
                 .getStringView());
 
@@ -104,7 +104,7 @@ typed_config:
 
   EXPECT_EQ("Basic base64EncodedUsernamePassword",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("Authorization"))[0]
+                ->get(Http::LowerCaseString("Authorization"))[0]
                 ->value()
                 .getStringView());
 
@@ -145,7 +145,7 @@ typed_config:
 
   EXPECT_EQ("Basic existingBase64EncodedUsernamePassword",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("Authorization"))[0]
+                ->get(Http::LowerCaseString("Authorization"))[0]
                 ->value()
                 .getStringView());
 
@@ -187,7 +187,7 @@ typed_config:
 
   EXPECT_EQ("Basic base64EncodedUsernamePassword",
             upstream_request_->headers()
-                .get(Http::LowerCaseString("Authorization"))[0]
+                ->get(Http::LowerCaseString("Authorization"))[0]
                 ->value()
                 .getStringView());
 

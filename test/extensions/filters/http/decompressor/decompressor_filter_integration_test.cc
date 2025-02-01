@@ -95,10 +95,10 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompression) {
   // sent.
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("gzip", upstream_request_->headers()
-                        .get(Http::LowerCaseString("accept-encoding"))[0]
+                        ->get(Http::LowerCaseString("accept-encoding"))[0]
                         ->value()
                         .getStringView());
-  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("content-encoding")).empty());
+  EXPECT_TRUE(upstream_request_->headers()->get(Http::LowerCaseString("content-encoding")).empty());
   EXPECT_EQ(uncompressed_request_length, upstream_request_->bodyLength());
   EXPECT_EQ(std::to_string(compressed_request_length),
             upstream_request_->trailers()
@@ -224,10 +224,10 @@ TEST_P(DecompressorIntegrationTest, BidirectionalDecompressionError) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("gzip", upstream_request_->headers()
-                        .get(Http::LowerCaseString("accept-encoding"))[0]
+                        ->get(Http::LowerCaseString("accept-encoding"))[0]
                         ->value()
                         .getStringView());
-  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("content-encoding")).empty());
+  EXPECT_TRUE(upstream_request_->headers()->get(Http::LowerCaseString("content-encoding")).empty());
   EXPECT_EQ(std::to_string(compressed_request_length),
             upstream_request_->trailers()
                 ->get(Http::LowerCaseString("x-envoy-decompressor-testlib-compressed-bytes"))[0]
@@ -393,10 +393,10 @@ TEST_P(DecompressorIntegrationTest, LimitMaxDecompressOutputSize) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("gzip", upstream_request_->headers()
-                        .get(Http::LowerCaseString("accept-encoding"))[0]
+                        ->get(Http::LowerCaseString("accept-encoding"))[0]
                         ->value()
                         .getStringView());
-  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("content-encoding")).empty());
+  EXPECT_TRUE(upstream_request_->headers()->get(Http::LowerCaseString("content-encoding")).empty());
 
   // Only 4096 bytes(one chunk) decompressed.
   EXPECT_EQ(4096, upstream_request_->bodyLength());

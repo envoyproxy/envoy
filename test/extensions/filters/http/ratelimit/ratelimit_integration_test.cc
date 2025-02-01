@@ -108,10 +108,10 @@ public:
       RELEASE_ASSERT(result, result.message());
       result = ratelimit_requests_[i]->waitForEndStream(*dispatcher_);
       RELEASE_ASSERT(result, result.message());
-      EXPECT_EQ("POST", ratelimit_requests_[i]->headers().getMethodValue());
+      EXPECT_EQ("POST", ratelimit_requests_[i]->headers()->getMethodValue());
       EXPECT_EQ("/envoy.service.ratelimit.v3.RateLimitService/ShouldRateLimit",
-                ratelimit_requests_[i]->headers().getPathValue());
-      EXPECT_EQ("application/grpc", ratelimit_requests_[i]->headers().getContentTypeValue());
+                ratelimit_requests_[i]->headers()->getPathValue());
+      EXPECT_EQ("application/grpc", ratelimit_requests_[i]->headers()->getContentTypeValue());
 
       envoy::service::ratelimit::v3::RateLimitRequest expected_request_msg;
       expected_request_msg.set_domain("some_domain");
