@@ -107,4 +107,41 @@ TEST_P(DynamicModulesIntegrationTest, HeaderCallbacks) {
       response->trailers().get()->get(Http::LowerCaseString("dog"))[0]->value().getStringView());
 }
 
+TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
+  initializeFilter("send_response", "on_request_headers");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  auto body = response->body();
+  EXPECT_EQ("local_response_body_from_on_request_headers", body);
+  EXPECT_EQ(
+      "some_value",
+      response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestBody) {
+  initializeFilter("send_response", "on_request_body");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder_decoder.first, 10, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  auto body = response->body();
+  EXPECT_EQ("local_response_body_from_on_request_body", body);
+  EXPECT_EQ(
+      "some_value",
+      response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
+}
+
 } // namespace Envoy
