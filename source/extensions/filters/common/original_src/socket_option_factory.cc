@@ -29,6 +29,11 @@ buildOriginalSrcOptions(Network::Address::InstanceConstSharedPtr source, uint32_
   const auto transparent_options = Network::SocketOptionFactory::buildIpTransparentOptions();
   options_to_add->insert(options_to_add->end(), transparent_options->begin(),
                          transparent_options->end());
+
+  const auto addr_bind_options = Network::SocketOptionFactory::buildBindAddressNoPort();
+  options_to_add->insert(options_to_add->end(), addr_bind_options->begin(),
+                         addr_bind_options->end());
+
   return options_to_add;
 }
 
