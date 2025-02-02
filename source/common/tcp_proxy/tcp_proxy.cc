@@ -32,12 +32,12 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
+#include "source/common/proxy_protocol/proxy_protocol.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
-#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -183,8 +183,7 @@ Config::SharedConfig::SharedConfig(
   }
 
   if (!config.proxy_protocol_tlvs().empty()) {
-    proxy_protocol_tlvs_ =
-        Extensions::Common::ProxyProtocol::parseTLVs(config.proxy_protocol_tlvs());
+    proxy_protocol_tlvs_ = Common::ProxyProtocol::parseTLVs(config.proxy_protocol_tlvs());
   }
 }
 

@@ -329,7 +329,7 @@ public:
   bool flushAccessLogOnConnected() const { return shared_config_->flushAccessLogOnConnected(); }
   Regex::Engine& regexEngine() const { return regex_engine_; }
   const BackOffStrategyPtr& backoffStrategy() const { return shared_config_->backoffStrategy(); };
-  Network::ProxyProtocolTLVVector proxyProtocolTLVs() const {
+  const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
     return shared_config_->proxyProtocolTLVs();
   }
 
