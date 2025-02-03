@@ -22,8 +22,7 @@ Future development may include support for other languages.
 
 Currently, the dynamic modules are only supported at the following extension points:
 
-* As an * :ref:`HTTP filter  <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`
-
+* As an :ref:`HTTP filter  <envoy_v3_api_msg_extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter>`
 
 There are a few design goals for the dynamic modules:
 
@@ -46,7 +45,6 @@ In other words, the dynamic modules must be built with the SDK of the same versi
 Since the SDK lives inside the Envoy repository, using the same commit hash or release tag of the Envoy version is the best way to ensure
 the compatibility.
 
-
 Module Discovery
 --------------------------
 
@@ -54,7 +52,7 @@ A dynamic module is referenced by its name as in the :ref:`configuration API  <e
 The name is used to search for the shared library file in the search path. The search path is configured by the environment variable
 ``ENVOY_DYNAMIC_MODULES_SEARCH_PATH``. The actual search path is ``${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so``.
 
-For example, when the name ``my_module`` is referenced in the configuration. and the search path is set to ``/path/to/modules``, Envoy will look for
+For example, when the name ``my_module`` is referenced in the configuration and the search path is set to ``/path/to/modules``, Envoy will look for
 ``/path/to/modules/libmy_module.so``.
 
 Safety
@@ -62,9 +60,7 @@ Safety
 The dynamic modules operate under the assumption that all modules are fully trusted and have the same privilege level as the main Envoy program.
 Since these modules run in the same process as Envoy, they can access all memory and resources available to the main process.
 This makes it unfeasible to enforce security boundaries between Envoy and the modules, as they share the same address space and permissions.
-
 It is essential that any dynamic module undergo thorough testing and validation before deployment just like any other application code.
-
 
 Getting Started
 --------------------------
