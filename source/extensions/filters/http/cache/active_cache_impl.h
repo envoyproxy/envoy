@@ -248,7 +248,7 @@ private:
   std::vector<BodySubscriber> body_subscribers_ ABSL_GUARDED_BY(mu_);
   std::vector<TrailerSubscriber> trailer_subscribers_ ABSL_GUARDED_BY(mu_);
   UpstreamRequestPtr upstream_request_ ABSL_GUARDED_BY(mu_);
-  CancelWrapper::CancelFunction cancel_action_in_flight_ ABSL_GUARDED_BY(mu_);
+  bool read_action_in_flight_ ABSL_GUARDED_BY(mu_) = false;
 
   // The following fields and functions are only used by ActiveCache.
   friend class ActiveCacheImpl;

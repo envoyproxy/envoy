@@ -413,7 +413,7 @@ void ActiveCacheEntry::abortBodyOutOfRangeSubscribers() {
 void ActiveCacheEntry::maybeTriggerBodyReadForWaitingSubscriber() {
   mu_.AssertHeld();
   ASSERT(entry_.cache_reader_);
-  if (cancel_action_in_flight_ != nullptr) {
+  if (read_action_in_flight_) {
     // There is already an action in flight so don't read more body yet.
     return;
   }
@@ -442,6 +442,7 @@ void ActiveCacheEntry::maybeTriggerBodyReadForWaitingSubscriber() {
   // Also, by ensuring the action occurs from a dispatcher queue, we guarantee that
   // the "trigger again" at the end of onBodyChunkFromCache can't build up to a stack overflow
   // of maybeTrigger->getBody->onBodyChunk->maybeTrigger->...
+  read_action_in_flight_ = true;
   it->dispatcher().post([&dispatcher = it->dispatcher(), p = shared_from_this(), range,
                          cache_reader = entry_.cache_reader_.get()]() mutable {
     cache_reader->getBody(
@@ -460,7 +461,7 @@ bool ActiveCacheEntry::canReadBodyRangeFromCacheEntry(BodySubscriber& subscriber
 void ActiveCacheEntry::onBodyChunkFromCache(AdjustedByteRange range, Buffer::InstancePtr buffer,
                                             EndStream end_stream) {
   absl::MutexLock lock(&mu_);
-  cancel_action_in_flight_ = nullptr;
+  read_action_in_flight_ = false;
   if (end_stream == EndStream::Reset) {
     ENVOY_LOG(error, "cache entry provoked reset");
     onCacheError();
@@ -474,23 +475,33 @@ void ActiveCacheEntry::onBodyChunkFromCache(AdjustedByteRange range, Buffer::Ins
   if (buffer->length() < range.length()) {
     range = AdjustedByteRange(range.begin(), range.begin() + buffer->length());
   }
-  uint8_t* bytes = static_cast<uint8_t*>(buffer->linearize(range.length()));
-  body_subscribers_.erase(
-      std::remove_if(body_subscribers_.begin(), body_subscribers_.end(),
-                     [this, &range, bytes](BodySubscriber& subscriber)
-                         ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
-                           if (subscriber.range_.begin() >= range.begin() &&
-                               subscriber.range_.begin() < range.end()) {
-                             AdjustedByteRange r(subscriber.range_.begin(),
-                                                 std::min(subscriber.range_.end(), range.end()));
-                             sendBodyChunkTo(subscriber, r,
-                                             std::make_unique<Buffer::OwnedImpl>(
-                                                 bytes + r.begin() - range.begin(), r.length()));
-                             return true;
-                           }
-                           return false;
-                         }),
-      body_subscribers_.end());
+  auto recipients_begin = std::partition(body_subscribers_.begin(), body_subscribers_.end(),
+                                         [&range](BodySubscriber& subscriber) {
+                                           return subscriber.range_.begin() < range.begin() ||
+                                                  subscriber.range_.begin() >= range.end();
+                                         });
+  ASSERT(recipients_begin != body_subscribers_.end(),
+         "reading body chunk from cache with no corresponding request shouldn't happen");
+  if (std::next(recipients_begin) == body_subscribers_.end()) {
+    BodySubscriber& subscriber = *recipients_begin;
+    ASSERT(subscriber.range_.begin() == range.begin(),
+           "if there's only one matching subscriber it should have requested this precise chunk");
+    // There is only one recipient of this chunk, send it the actual buffer,
+    // no need to copy.
+    sendBodyChunkTo(subscriber,
+                    AdjustedByteRange(subscriber.range_.begin(),
+                                      std::min(subscriber.range_.end(), range.end())),
+                    std::move(buffer));
+  } else {
+    uint8_t* bytes = static_cast<uint8_t*>(buffer->linearize(range.length()));
+    for (auto it = recipients_begin; it != body_subscribers_.end(); it++) {
+      AdjustedByteRange r(it->range_.begin(), std::min(it->range_.end(), range.end()));
+      sendBodyChunkTo(
+          *it, r,
+          std::make_unique<Buffer::OwnedImpl>(bytes + r.begin() - range.begin(), r.length()));
+    }
+  }
+  body_subscribers_.erase(recipients_begin, body_subscribers_.end());
   maybeTriggerBodyReadForWaitingSubscriber();
 }
 
