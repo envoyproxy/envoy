@@ -69,12 +69,7 @@ typed_config:
         Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, dns_query_timeout,
         disable_dns_refresh_on_failure, max_pending_requests, key_value_config_,
         typed_dns_resolver_config);
-    std::cerr << " HERE SETTING UP CONFIG "
-              << Runtime::runtimeFeatureEnabled(
-                     "envoy.reloadable_features.dfp_cluster_resolves_hosts")
-              << "\n";
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
-      std::cerr << "prepending filter\n";
       config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster : filter_use_dns_cache);
     } else if (use_sub_cluster) {
       config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
