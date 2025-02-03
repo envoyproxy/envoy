@@ -142,8 +142,7 @@ public:
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
       bool always_consume_default_token_bucket = true,
-      ShareProviderSharedPtr shared_provider = nullptr, const uint32_t lru_size = 20,
-      bool per_connection = false);
+      ShareProviderSharedPtr shared_provider = nullptr, const uint32_t lru_size = 20);
   ~LocalRateLimiterImpl();
 
   Result requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors);

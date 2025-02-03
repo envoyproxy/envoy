@@ -196,20 +196,6 @@ public:
   std::vector<RateLimit::Descriptor> no_match_descriptor_{{{{"no_match", "no_match"}}}};
 };
 
-// Make sure error raised in case values are omitted with per connection rate limiting.
-TEST_F(LocalRateLimiterImplTest, DynamicTokenBucketEnabledPerConnectionRateLimiting) {
-  TestUtility::loadFromYaml(
-      fmt::format(LocalRateLimiterDescriptorImplTest::wildcard_descriptor_config_yaml, 2, 1, "60s"),
-      *descriptors_.Add());
-
-  EXPECT_THROW_WITH_MESSAGE(
-      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_, true,
-                           nullptr, 1, true),
-
-      EnvoyException,
-      "local rate descriptor value cannot be empty in per connection rate limit mode");
-}
-
 // Make sure error raised in case duplicate/replicated descriptors are found.
 TEST_F(LocalRateLimiterImplTest, DuplicatedDynamicTokenBucketDescriptor) {
   TestUtility::loadFromYaml(

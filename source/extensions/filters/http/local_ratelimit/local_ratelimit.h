@@ -52,12 +52,12 @@ class PerConnectionRateLimiter : public StreamInfo::FilterState::Object {
 public:
   PerConnectionRateLimiter(
       const std::chrono::milliseconds& fill_interval, uint32_t max_tokens, uint32_t tokens_per_fill,
-      Envoy::Event::Dispatcher& dispatcher,
+      uint32_t max_dynamic_descriptors, Envoy::Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptor,
       bool always_consume_default_token_bucket)
       : rate_limiter_(fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptor,
-                      always_consume_default_token_bucket) {}
+                      always_consume_default_token_bucket, nullptr, max_dynamic_descriptors) {}
   static const std::string& key();
   const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& value() const {
     return rate_limiter_;
@@ -99,6 +99,7 @@ public:
   const std::chrono::milliseconds& fillInterval() const { return fill_interval_; }
   uint32_t maxTokens() const { return max_tokens_; }
   uint32_t tokensPerFill() const { return tokens_per_fill_; }
+  uint32_t maxDynamicDescriptors() const { return max_dynamic_descriptors_; }
   const Protobuf::RepeatedPtrField<
       envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>&
   descriptors() const {
@@ -145,6 +146,7 @@ private:
   const std::chrono::milliseconds fill_interval_;
   const uint32_t max_tokens_;
   const uint32_t tokens_per_fill_;
+  const uint32_t max_dynamic_descriptors_;
   const Protobuf::RepeatedPtrField<
       envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>
       descriptors_;

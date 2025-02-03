@@ -96,7 +96,7 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     const Protobuf::RepeatedPtrField<
         envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
     bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider,
-    uint32_t lru_size, bool per_connection)
+    uint32_t lru_size)
     : time_source_(dispatcher.timeSource()), share_provider_(std::move(shared_provider)),
       always_consume_default_token_bucket_(always_consume_default_token_bucket) {
   // Ignore the default token bucket if fill_interval is 0 because 0 fill_interval means nothing
@@ -115,10 +115,6 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     new_descriptor.entries_.reserve(descriptor.entries_size());
     for (const auto& entry : descriptor.entries()) {
       if (entry.value().empty()) {
-        if (per_connection) {
-          throw EnvoyException(
-              "local rate descriptor value cannot be empty in per connection rate limit mode");
-        }
         wildcard_found = true;
       }
       new_descriptor.entries_.push_back({entry.key(), entry.value()});
