@@ -1,7 +1,7 @@
 .. _arch_overview_dynamic_modules:
 
 Dynamic Modules
-====
+===============
 
 .. attention::
 
@@ -27,11 +27,9 @@ Currently, the dynamic modules are only supported at the following extension poi
 
 There are a few design goals for the dynamic modules:
 
-1. **Performance**: The dynamic modules should have minimal overhead compared to the built-in C++ extensions. For example, the
-  dynamic modules are able to access HTTP headers as well as body without copying them unlike any other extension mechanisms.
+1. **Performance**: The dynamic modules should have minimal overhead compared to the built-in C++ extensions. For example, the dynamic modules are able to access HTTP headers as well as body without copying them unlike any other extension mechanisms.
 2. **Ease of Use**: The SDK should provide a high-level API that abstracts the details of the Envoy internals.
-3. **Flexibility**: The dynamic modules should be able to implement any functionality that can be implemented by the built-in
-  C++ extensions without performance penalty. This is work in progress and many features are not yet available.
+3. **Flexibility**: The dynamic modules should be able to implement any functionality that can be implemented by the built-in C++ extensions without performance penalty. This is work in progress and many features are not yet available.
 
 Compatibility
 --------------------------
