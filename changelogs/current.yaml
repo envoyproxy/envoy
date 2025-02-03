@@ -127,5 +127,7 @@ new_features:
   change: |
     Reporting a locality_stats to LRS server when ``rq_issued > 0``, disable by setting runtime guard
     ``envoy.reloadable_features.report_load_with_rq_issued`` to ``false``.
-
+- area: local_rate_limit
+  change: |
+    Added support for dynamic token buckets in local rate limit filter for http requests.
 deprecated:

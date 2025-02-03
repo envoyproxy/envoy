@@ -378,9 +378,6 @@ INSTANTIATE_TEST_SUITE_P(
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DynamicDesciptorsBasicTest) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues(
-      {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
   initializeFilter(fmt::format(filter_config_with_blank_value_descriptor_, 20, "false"));
   // filter is adding dynamic descriptors based on the request header
   // 'x-envoy-downstream-service-cluster' and the token bucket is set to 1 token per fill interval
@@ -410,10 +407,6 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DynamicDesciptorsBasicTest) {
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DesciptorsBasicTestWithMinimumMaxDynamicDescriptors) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues(
-      {{"envoy.reloadable_features.local_rate_limiting_with_dynamic_buckets", "true"}});
-
   auto max_dynamic_descriptors = 1;
   initializeFilter(
       fmt::format(filter_config_with_blank_value_descriptor_, max_dynamic_descriptors, "false"));

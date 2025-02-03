@@ -27,18 +27,21 @@ using ProtoLocalClusterRateLimit = envoy::extensions::common::ratelimit::v3::Loc
 
 class DynamicDescriptor : public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
-  DynamicDescriptor(RateLimitTokenBucketSharedPtr token_bucket, uint32_t lru_size, TimeSource&);
+  DynamicDescriptor(uint64_t max_tokens, uint64_t tokens_per_fill,
+                    std::chrono::milliseconds fill_interval, uint32_t lru_size, TimeSource&);
   // add a new user configured descriptor to the set.
   RateLimitTokenBucketSharedPtr addOrGetDescriptor(const RateLimit::Descriptor& request_descriptor);
 
 private:
-  RateLimitTokenBucketSharedPtr parent_token_bucket_;
   using LruList = std::list<RateLimit::Descriptor>;
 
   mutable absl::Mutex dyn_desc_lock_;
   RateLimit::Descriptor::Map<std::pair<RateLimitTokenBucketSharedPtr, LruList::iterator>>
       dynamic_descriptors_ ABSL_GUARDED_BY(dyn_desc_lock_);
 
+  uint64_t max_tokens_;
+  uint64_t tokens_per_fill_;
+  const std::chrono::milliseconds fill_interval_;
   LruList lru_list_;
   uint32_t lru_size_;
   TimeSource& time_source_;
@@ -105,7 +108,7 @@ public:
 };
 
 class RateLimitTokenBucket : public TokenBucketContext,
-                             public Logger::Loggable<Logger::Id::rate_limit_quota> {
+                             public Logger::Loggable<Logger::Id::local_rate_limit> {
 public:
   RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                        std::chrono::milliseconds fill_interval, TimeSource& time_source);

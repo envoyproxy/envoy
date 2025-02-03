@@ -175,5 +175,5 @@ message LocalRateLimit {
   // Actual number of dynamic descriptors will depend on the cardinality of unique values received from the http request for the omitted
   // values.
   // Minimum is 1. Default is 20.
-  google.protobuf.UInt32Value max_dynamic_descriptors = 18;
+  google.protobuf.UInt32Value max_dynamic_descriptors = 18 [(validate.rules).uint32 = {gte: 1}];
 }

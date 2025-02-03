@@ -162,9 +162,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 // before downstream.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_close);
 
-// A flag to enable the usage of dynamic buckets for local rate limiting. For example, dynamically
-// created token buckets for each unique value of a request header.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_local_rate_limiting_with_dynamic_buckets);
 // TODO(renjietang): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_network_type_socket_option);
 // TODO(fredyw): Remove after prod testing.
