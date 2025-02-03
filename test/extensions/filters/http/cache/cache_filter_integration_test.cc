@@ -12,8 +12,6 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-using HttpFilterProto =
-    envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
 using Http::HeaderValueOf;
 using testing::_;
 using testing::AllOf;
@@ -42,39 +40,14 @@ public:
     HttpProtocolIntegrationTest::TearDown();
   }
 
-  static HttpFilterProto codecFilterConfig() {
-    HttpFilterProto filter_config;
-    filter_config.set_name("envoy.filters.http.upstream_codec");
-    auto configuration = envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec();
-    filter_config.mutable_typed_config()->PackFrom(configuration);
-    return filter_config;
-  }
-
-  void addFilter(const std::string& config) {
-    HttpFilterProto config_proto;
-    TestUtility::loadFromYaml(config, config_proto);
-    config_helper_.addConfigModifier(
-        [config_proto](
-            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-                hcm) -> void {
-          HttpFilterProto& router_filter = *hcm.mutable_http_filters()->rbegin();
-          ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
-          envoy::extensions::filters::http::router::v3::Router router;
-          router_filter.typed_config().UnpackTo(&router);
-          *router.add_upstream_http_filters() = config_proto;
-          *router.add_upstream_http_filters() = codecFilterConfig();
-          router_filter.mutable_typed_config()->PackFrom(router);
-        });
-  }
-
   void initializeFilter(const std::string& config) {
-    addFilter(config);
+    config_helper_.prependFilter(config);
     initialize();
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   }
 
   void initializeFilterWithTrailersEnabled(const std::string& config) {
-    addFilter(config);
+    config_helper_.addFilter(config);
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
     initialize();
