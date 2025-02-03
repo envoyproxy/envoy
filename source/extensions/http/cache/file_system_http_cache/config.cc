@@ -50,7 +50,7 @@ public:
 
   std::shared_ptr<ActiveCache> get(std::shared_ptr<CacheSingleton> singleton,
                                    const ConfigProto& non_normalized_config,
-                                   Server::Configuration::ServerFactoryContext& context) {
+                                   Server::Configuration::FactoryContext& context) {
     std::shared_ptr<ActiveCache> cache;
     ConfigProto config = normalizeConfig(non_normalized_config);
     auto key = config.cache_path();
@@ -65,7 +65,7 @@ public:
       std::unique_ptr<FileSystemHttpCache> fs_cache = std::make_unique<FileSystemHttpCache>(
           singleton, cache_eviction_thread_, std::move(config), std::move(async_file_manager),
           context.scope());
-      cache = ActiveCache::create(context.timeSource(), std::move(fs_cache));
+      cache = ActiveCache::create(context.serverFactoryContext().timeSource(), std::move(fs_cache));
       caches_[key] = cache;
     } else {
       // Check that the config of the cache found in the lookup table for the given path
@@ -104,16 +104,16 @@ public:
   // From HttpCacheFactory
   std::shared_ptr<ActiveCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& filter_config,
-           Server::Configuration::ServerFactoryContext& context) override {
+           Server::Configuration::FactoryContext& context) override {
     ConfigProto config;
     THROW_IF_NOT_OK(MessageUtil::unpackTo(filter_config.typed_config(), config));
     std::shared_ptr<CacheSingleton> caches =
-        context.singletonManager().getTyped<CacheSingleton>(
+        context.serverFactoryContext().singletonManager().getTyped<CacheSingleton>(
             SINGLETON_MANAGER_REGISTERED_NAME(file_system_http_cache_singleton), [&context] {
               return std::make_shared<CacheSingleton>(
                   Common::AsyncFiles::AsyncFileManagerFactory::singleton(
-                      &context.singletonManager()),
-                  context.api().threadFactory());
+                      &context.serverFactoryContext().singletonManager()),
+                  context.serverFactoryContext().api().threadFactory());
             });
     return caches->get(caches, config, context);
   }

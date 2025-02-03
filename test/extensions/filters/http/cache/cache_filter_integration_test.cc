@@ -470,7 +470,8 @@ TEST_P(CacheIntegrationTest, TemporarilyUncacheableEventuallyCaches) {
   {
     Http::TestResponseHeaderMapImpl response_headers{{":status", "500"}};
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
-        request_headers, simulateUpstreamResponse(response_headers, absl::nullopt, no_trailers_));
+        request_headers,
+        simulateUpstreamResponse(response_headers, absl::nullopt, no_trailers_));
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
   }
@@ -489,8 +490,7 @@ TEST_P(CacheIntegrationTest, TemporarilyUncacheableEventuallyCaches) {
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("via_upstream"));
   }
-  // Send third request, and get cacheable 200 response from upstream, it should be cached this
-  // time.
+  // Send third request, and get cacheable 200 response from upstream, it should be cached this time.
   {
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers,
