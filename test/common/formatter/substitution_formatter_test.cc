@@ -2697,6 +2697,34 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
   }
 }
 
+TEST(SubstitutionFormatterTest, QueryPraameterFormatter) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/path?x=xxxxxx"}};
+
+  HttpFormatterContext formatter_context(&request_header);
+
+  {
+    QueryParameterFormatter formatter("x", absl::optional<size_t>());
+    EXPECT_EQ("xxxxxx", formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("xxxxxx")));
+  }
+
+  {
+    QueryParameterFormatter formatter("y", absl::optional<size_t>());
+    EXPECT_EQ(absl::nullopt, formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    QueryParameterFormatter formatter("x", absl::optional<size_t>(2));
+    EXPECT_EQ("xx", formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("xx")));
+  }
+}
+
 TEST(SubstitutionFormatterTest, headersByteSizeFormatter) {
   StreamInfo::MockStreamInfo stream_info;
   Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/"}};

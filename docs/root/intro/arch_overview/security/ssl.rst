@@ -41,7 +41,7 @@ FIPS 140-2
 ----------
 
 BoringSSL can be built in a
-`FIPS-compliant mode <https://boringssl.googlesource.com/boringssl/+/master/crypto/fipsmodule/FIPS.md>`_,
+`FIPS-compliant mode <https://boringssl.googlesource.com/boringssl/+/main/crypto/fipsmodule/FIPS.md>`_,
 following the build instructions from the `Security Policy for BoringCrypto module
 <https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3678.pdf>`_,
 using ``--define boringssl=fips`` Bazel option. Currently, this option is only available on Linux-x86_64.
@@ -264,4 +264,4 @@ Common errors are:
 * ``TLSV1_ALERT_UNKNOWN_CA``: Peer certificate CA is not in trusted CA.
 
 More detailed list of error that can be raised by BoringSSL can be found
-`here <https://github.com/google/boringssl/blob/master/crypto/err/ssl.errordata>`_
+`here <https://github.com/google/boringssl/blob/main/crypto/err/ssl.errordata>`_

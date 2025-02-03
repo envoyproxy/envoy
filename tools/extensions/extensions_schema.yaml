@@ -92,6 +92,7 @@ categories:
 - envoy.matching.common_inputs
 - envoy.matching.input_matchers
 - envoy.tls.key_providers
+- envoy.upstream_options
 - envoy.quic.connection_debug_visitor
 - envoy.quic.connection_id_generator
 - envoy.quic.proof_source

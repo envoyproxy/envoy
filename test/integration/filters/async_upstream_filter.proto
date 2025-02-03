@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+// This filter intercepts the request from downstream and reissues the same
+// request via an AsyncClient, which should bypass the rest of the main
+// filter chain, and still pass through all relevant upstream filters.
+//
+// Currently supports only header-only requests.
+message AsyncUpstreamFilterConfig {
+}
