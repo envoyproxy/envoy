@@ -103,7 +103,6 @@ paths:
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
     - source/common/formatter/http_specific_formatter.cc
-    - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
     - source/common/stats/tag_extractor_impl.cc
@@ -143,11 +142,9 @@ paths:
     - source/common/event/file_event_impl.cc
     - source/common/http/async_client_impl.cc
     - source/common/grpc/google_async_client_impl.cc
-    - source/common/formatter/substitution_format_utility.cc
     # Extensions can exempt entire directories but new extensions
     # points should ideally use StatusOr
     - source/extensions/access_loggers
-    - source/extensions/bootstrap/wasm/config.cc
     - source/extensions/clusters/eds/
     - source/extensions/clusters/logical_dns
     - source/extensions/clusters/original_dst
