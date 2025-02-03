@@ -1,6 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_mock",
     "envoy_cc_test_library",
     "envoy_contrib_package",
 )
@@ -33,12 +34,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_library(
+envoy_cc_mock(
     name = "rev_conn_mocks",
     hdrs = ["mocks.h"],
     deps = [
         "//contrib/reverse_connection/bootstrap/source:reverse_conn_global_registry",
-        "//contrib/reverse_connection/bootstrap/source:conn_pool_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",

@@ -10,11 +10,21 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "reverse_connection_manager_interface",
+    srcs = [
+        "reverse_connection_manager.h",
+    ],
+    deps = [
+        "//envoy/network:connection_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "reverse_connection_lib",
     srcs = [
         "reverse_conn_thread_local_registry.cc",
         "reverse_connection_handler.cc",
-        "reverse_connection_manager.cc",
+        "reverse_connection_manager_impl.cc",
     ],
     deps = [
         ":reverse_connection_includes",
@@ -33,9 +43,10 @@ envoy_cc_library(
     hdrs = [
         "reverse_conn_thread_local_registry.h",
         "reverse_connection_handler.h",
-        "reverse_connection_manager.h",
+        "reverse_connection_manager_impl.h",
     ],
     deps = [
+        ":reverse_connection_manager_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/thread_local:thread_local_object",
     ],

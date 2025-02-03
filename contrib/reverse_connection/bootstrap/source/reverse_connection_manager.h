@@ -25,9 +25,9 @@ using RCInitiatorPtr = std::unique_ptr<ReverseConnectionInitiator>;
  * to the remote cluster. It reuses them if need be to re-create connections in cases of
  * socket closure.
  */
-class ReverseConnectionManager : Logger::Loggable<Logger::Id::main> {
+class ReverseConnectionManager {
 public:
-  ReverseConnectionManager(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cluster_manager);
+  virtual ~ReverseConnectionManager() = default;
 
   /**
    * Sets the stats scope for logging initiated reverse connections with the local
@@ -35,19 +35,19 @@ public:
    * @param scope the base scope to be used.
    * @return the parent scope for RCManager stats.
    */
-  void initializeStats(Stats::Scope& scope);
+  virtual void initializeStats(Stats::Scope& scope) PURE;
 
   // Returns a reference to the parent dispatcher of the current thread.
-  Event::Dispatcher& dispatcher() const;
+  virtual Event::Dispatcher& dispatcher() const PURE;
 
   // Returns a reference to the connection handler.
-  Network::ConnectionHandler* connectionHandler() const;
+  virtual Network::ConnectionHandler* connectionHandler() const PURE;
 
   // Sets the connection handler.
-  void setConnectionHandler(Network::ConnectionHandler& conn_handler);
+  virtual void setConnectionHandler(Network::ConnectionHandler& conn_handler) PURE;
 
   // Returns a reference to the cluster manager.
-  Upstream::ClusterManager& clusterManager() const;
+  virtual Upstream::ClusterManager& clusterManager() const PURE;
 
   /**
    * Checks whether an existing ReverseConnectionInitiator is present for the given listener.
@@ -61,42 +61,38 @@ public:
    * conns requested for that remote cluster.
    * @return A unique pointer to the ReverseConnectionInitiator.
    */
-  void findOrCreateRCInitiator(
+  virtual void findOrCreateRCInitiator(
       const Network::ListenerConfig& listener_ref, const std::string& src_node_id,
       const std::string& src_cluster_id, const std::string& src_tenant_id,
-      const absl::flat_hash_map<std::string, uint32_t>& remote_cluster_to_conns);
+      const absl::flat_hash_map<std::string, uint32_t>& remote_cluster_to_conns) PURE;
 
   /**
    * Register a reverse connection creation request with the reverse connection manager.
    * @param conn_handler The connection handler.
    * @param listener_ref Reference to the requesting listener.
    */
-  void registerRCInitiators(Network::ConnectionHandler& conn_handler,
-                            const Network::ListenerConfig& listener_ref);
+  virtual void registerRCInitiators(Network::ConnectionHandler& conn_handler,
+                            const Network::ListenerConfig& listener_ref) PURE;
 
   /**
    * Unregister a reverse connection creation request with the reverse connection manager.
    * @param listener_ref Reference to the requesting listener.
    */
-  void unregisterRCInitiator(const Network::ListenerConfig& listener_ref);
+  virtual void unregisterRCInitiator(const Network::ListenerConfig& listener_ref) PURE;
 
   /**
    * Add a connection -> RCInitiator mapping, this is used to pick an RCInitiator to
    * re-initiate a closed connection.
    * @param connectionKey the connection key of the closed connection.
    */
-  void registerConnection(const std::string& connectionKey,
-                          ReverseConnectionInitiator* rc_inititator) {
-    connection_to_rc_initiator_map_[connectionKey] = rc_inititator;
-  }
+  virtual void registerConnection(const std::string& connectionKey,
+                          ReverseConnectionInitiator* rc_inititator) PURE;
 
   /**
    * Unregister a connection and remove it from the connection -> RCInitiator mapping.
    * @param connectionKey the connection key of the closed connection.
    */
-  int unregisterConnection(const std::string& connectionKey) {
-    return connection_to_rc_initiator_map_.erase(connectionKey);
-  }
+  virtual int unregisterConnection(const std::string& connectionKey) PURE;
 
   /**
    * Notify all RCInitiatorss of connection closure, so that it can be removed from
@@ -104,62 +100,33 @@ public:
    * @param connectionKey the closed connection.
    * @param is_used true if a used connection gets closed, false if it is an idle one.
    */
-  void notifyConnectionClose(const std::string& connectionKey, bool is_used);
+  virtual void notifyConnectionClose(const std::string& connectionKey, bool is_used) PURE;
 
   /**
    * Mark connection as used, for stat logging purposes.
    * @param connectionKey the connection for which stats need to be updated.
    */
-  void markConnUsed(const std::string& connectionKey);
+  virtual void markConnUsed(const std::string& connectionKey) PURE;
 
   /**
    * @return the number of active reverse connections from the local envoy
    * to the remote cluster key.
    */
-  uint64_t getNumberOfSockets(const std::string& key);
+  virtual uint64_t getNumberOfSockets(const std::string& key) PURE;
 
   /**
    * Obtain a mapping of remote cluster to number of initiated reverse connections.
    * @param return the cluster -> count of reverse conns mapping.
    */
-  absl::flat_hash_map<std::string, size_t> getSocketCountMap();
-
-  ReverseConnectionInitiator* getRCInitiatorPtr(const Network::ListenerConfig& listener_ref) {
-    const auto& available_rc_initiators_iter =
-        available_rc_initiators_.find(listener_ref.listenerTag());
-    if (available_rc_initiators_iter == available_rc_initiators_.end()) {
-      return nullptr;
-    }
-    return available_rc_initiators_iter->second.get();
-  }
-
-  void createRCInitiatorDone(ReverseConnectionInitiator* initiator);
-
-private:
-  // The parent dispatcher of the current thread.
-  Event::Dispatcher& parent_dispatcher_;
-
-  // The connection handler to pass the reverse connection socket to the listener that initiated it.
-  Network::ConnectionHandler* conn_handler_;
-
-  // The cluster manager to get the thread local cluster. This is required
-  // to initiate reverse connections.
-  Upstream::ClusterManager& cluster_manager_;
+  virtual absl::flat_hash_map<std::string, size_t> getSocketCountMap() PURE;
 
   /**
-   * Map of connection key -> RCInitiator that created the connection.
-   * This allows the RCManager to identify to identify which RCInitiator should
-   * be called to re-initiate a closed connection.
+   * Returns the ReverseConnectionInitiator owning reverse connections for a given
+   * listener tag.
+   * @param listener_ref the listener for which the RCInitiator is requested.
+   * @return the RCInitiator for the listener.
    */
-  absl::flat_hash_map<std::string, ReverseConnectionInitiator*> connection_to_rc_initiator_map_;
-  /**
-   * Map of listener name and version to the RCInitiator created.
-   * This allows the ReverseConnectionManager to resuse a previously created
-   * ReverseConnectionInitiator to initiate more reverse connections if a socket closes.
-   */
-  absl::flat_hash_map<uint64_t, RCInitiatorPtr> available_rc_initiators_;
-
-  Stats::ScopeSharedPtr stats_root_scope_;
+  virtual ReverseConnectionInitiator* getRCInitiatorPtr(const Network::ListenerConfig& listener_ref) PURE;
 };
 
 } // namespace ReverseConnection

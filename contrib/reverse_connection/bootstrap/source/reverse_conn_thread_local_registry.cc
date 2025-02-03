@@ -1,7 +1,7 @@
 #include "contrib/reverse_connection/bootstrap/source/reverse_conn_thread_local_registry.h"
 #include "contrib/reverse_connection/reverse_connection_listener_config/source/active_reverse_connection_listener.h"
 #include "contrib/reverse_connection/bootstrap/source/reverse_connection_handler.h"
-#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
+#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager_impl.h"
 #include "contrib/reverse_connection/bootstrap/source/reverse_connection_initiator.h"
 
 namespace Envoy {
@@ -13,7 +13,7 @@ RCThreadLocalRegistry::RCThreadLocalRegistry(Event::Dispatcher& dispatcher, Stat
                                              std::string stat_prefix, Upstream::ClusterManager& cluster_manager) {
   ENVOY_LOG_MISC(debug, "RCThreadLocalRegistry: creating RCManager and RCHandler for worker: {}",
                  dispatcher.name());
-  rc_manager_ = std::make_shared<ReverseConnectionManager>(dispatcher, cluster_manager);
+  rc_manager_ = std::make_shared<ReverseConnectionManagerImpl>(dispatcher, cluster_manager);
   rc_handler_ = std::make_shared<ReverseConnectionHandler>(&dispatcher);
   // Pass a root scope, i.e., "reverse_connection" so that RCManager and RCHandler stats are
   // organized under the same scope.

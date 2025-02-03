@@ -1,4 +1,4 @@
-#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
+#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager_impl.h"
 #include "contrib/reverse_connection/bootstrap/source/reverse_connection_initiator.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -7,55 +7,55 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-ReverseConnectionManager::ReverseConnectionManager(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cluster_manager)
+ReverseConnectionManagerImpl::ReverseConnectionManagerImpl(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cluster_manager)
     : parent_dispatcher_(dispatcher), cluster_manager_(cluster_manager) {
   ASSERT(parent_dispatcher_.isThreadSafe());
 }
 
-void ReverseConnectionManager::initializeStats(Stats::Scope& scope) {
+void ReverseConnectionManagerImpl::initializeStats(Stats::Scope& scope) {
   const std::string stats_prefix = "reverse_conn_manager.";
   stats_root_scope_ = scope.createScope(stats_prefix);
   ENVOY_LOG(debug, "Initialized RCManager stats; scope: {}",
             stats_root_scope_->constSymbolTable().toString(stats_root_scope_->prefix()));
 }
 
-Event::Dispatcher& ReverseConnectionManager::dispatcher() const {
+Event::Dispatcher& ReverseConnectionManagerImpl::dispatcher() const {
   return parent_dispatcher_;
 }
 
-Network::ConnectionHandler* ReverseConnectionManager::connectionHandler() const {
+Network::ConnectionHandler* ReverseConnectionManagerImpl::connectionHandler() const {
   ASSERT(conn_handler_ != nullptr, "Connection Handler is not set");
   return conn_handler_;
 }
 
-void ReverseConnectionManager::setConnectionHandler(Network::ConnectionHandler& conn_handler) {
+void ReverseConnectionManagerImpl::setConnectionHandler(Network::ConnectionHandler& conn_handler) {
   conn_handler_ = &conn_handler;
 }
 
-Upstream::ClusterManager& ReverseConnectionManager::clusterManager() const {
+Upstream::ClusterManager& ReverseConnectionManagerImpl::clusterManager() const {
   return cluster_manager_;
 }
 
-void ReverseConnectionManager::findOrCreateRCInitiator(
+void ReverseConnectionManagerImpl::findOrCreateRCInitiator(
     const Network::ListenerConfig& listener_ref, const std::string& src_node_id,
     const std::string& src_cluster_id, const std::string& src_tenant_id,
     const absl::flat_hash_map<std::string, uint32_t>& remote_cluster_to_conns) {
 
   ENVOY_LOG(
-      debug,
+      error,
       "RCManager: Checking whether RC initiator is present for listener: name:{} tag:{} version:{}",
       listener_ref.name(), listener_ref.listenerTag(), listener_ref.versionInfo());
   const uint64_t rc_initiator_key = listener_ref.listenerTag();
 
   if (available_rc_initiators_.find(rc_initiator_key) == available_rc_initiators_.end()) {
-    ENVOY_LOG(debug,
+    ENVOY_LOG(error,
               "RCManager: No existing RC initiator for listener tag: {}, Creating new RC initiator",
               rc_initiator_key);
-    ENVOY_LOG(debug, "src_node_id: {}", src_node_id);       // remove
-    ENVOY_LOG(debug, "src_cluster_id: {}", src_cluster_id); // remove
-    ENVOY_LOG(debug, "src_tenant_id: {}", src_tenant_id);   // remove
+    ENVOY_LOG(error, "src_node_id: {}", src_node_id);       // remove
+    ENVOY_LOG(error, "src_cluster_id: {}", src_cluster_id); // remove
+    ENVOY_LOG(error, "src_tenant_id: {}", src_tenant_id);   // remove
     for (const auto& iter : remote_cluster_to_conns) {
-      ENVOY_LOG(trace, "remote_cluster_id: {} conn_count: {}", iter.first, iter.second); // remove
+      ENVOY_LOG(error, "remote_cluster_id: {} conn_count: {}", iter.first, iter.second); // remove
     }
     ReverseConnectionInitiator::ReverseConnectionOptions rc_options = {
         src_node_id,            // Source Node ID
@@ -63,9 +63,9 @@ void ReverseConnectionManager::findOrCreateRCInitiator(
         src_tenant_id,          // Source Tenant ID
         remote_cluster_to_conns // Remote cluster -> number of connections map
     };
-    ENVOY_LOG(debug, "RCManager: Creating new RC initiator for listener tag: {}", rc_initiator_key);
+    ENVOY_LOG(error, "RCManager: Creating new RC initiator for listener tag: {}", rc_initiator_key);
     ASSERT(stats_root_scope_ != nullptr);
-    ENVOY_LOG(trace, "Posting to dispatcher from parent_dispatcher_: {} dispatcher().name: {}",
+    ENVOY_LOG(error, "Posting to dispatcher from parent_dispatcher_: {} dispatcher().name: {}",
               parent_dispatcher_.name(), dispatcher().name()); // remove
     dispatcher().post(
         [this, rc_initiator_key, &listener_ref, rc_options = std::move(rc_options)]() {
@@ -78,24 +78,24 @@ void ReverseConnectionManager::findOrCreateRCInitiator(
           createRCInitiatorDone(available_rc_initiators_[rc_initiator_key].get());
         });
   } else {
-    ENVOY_LOG(debug, "RCManager: Using existing RC initiator");
+    ENVOY_LOG(error, "RCManager: Using existing RC initiator");
     createRCInitiatorDone(available_rc_initiators_[rc_initiator_key].get());
   }
   return;
 }
 
-void ReverseConnectionManager::createRCInitiatorDone(ReverseConnectionInitiator* initiator) {
+void ReverseConnectionManagerImpl::createRCInitiatorDone(ReverseConnectionInitiator* initiator) {
   ENVOY_LOG(debug, "RCManager: createRCInitiatorDone");
   const bool success = initiator->maintainConnCount();
   ENVOY_LOG(debug, "RCManager: reverse connection initiation finished with status: {}", success);
 }
 
-void ReverseConnectionManager::registerRCInitiators(
+void ReverseConnectionManagerImpl::registerRCInitiators(
     Network::ConnectionHandler& conn_handler,
     const Network::ListenerConfig& listener_ref) {
   // The conn handler needs to be set once for the thread local RCManager.
   if (conn_handler_ == nullptr) {
-    ENVOY_LOG(debug, "RCManager: Setting connection handler for the first time");
+    ENVOY_LOG(error, "RCManager: Setting connection handler for the first time");
     setConnectionHandler(conn_handler);
   }
   const std::string& src_node_id =
@@ -109,7 +109,7 @@ void ReverseConnectionManager::registerRCInitiators(
           ->getReverseConnParams()
           ->remote_cluster_to_conn_count_map_;
 
-  ENVOY_LOG(debug,
+  ENVOY_LOG(error,
             "RCManager: Received reverse connection initiation request for listener name: {} "
             "tag:{} version:{} on worker: {}",
             listener_ref.name(), listener_ref.listenerTag(), listener_ref.versionInfo(),
@@ -120,7 +120,7 @@ void ReverseConnectionManager::registerRCInitiators(
   // ENVOY_LOG(debug, "RCManager: reverse connection initiation finished with status: {}", success);
 }
 
-void ReverseConnectionManager::unregisterRCInitiator(
+void ReverseConnectionManagerImpl::unregisterRCInitiator(
     const Network::ListenerConfig& listener_ref) {
 
   ENVOY_LOG(
@@ -136,7 +136,7 @@ void ReverseConnectionManager::unregisterRCInitiator(
   }
 }
 
-void ReverseConnectionManager::notifyConnectionClose(const std::string& connectionKey,
+void ReverseConnectionManagerImpl::notifyConnectionClose(const std::string& connectionKey,
                                                          bool is_used) {
   ENVOY_LOG(debug, "RCManager: Connection closure reported for connection key: {}", connectionKey);
   ENVOY_LOG(debug, "RCManager: Searching for connection key {} in connection_to_rc_initiator_map_",
@@ -158,7 +158,7 @@ void ReverseConnectionManager::notifyConnectionClose(const std::string& connecti
   return;
 }
 
-void ReverseConnectionManager::markConnUsed(const std::string& connectionKey) {
+void ReverseConnectionManagerImpl::markConnUsed(const std::string& connectionKey) {
   ENVOY_LOG(debug, "RCManager: Marking connection with key: {} as used", connectionKey);
   const auto& iter = connection_to_rc_initiator_map_.find(connectionKey);
   if (iter == connection_to_rc_initiator_map_.end()) {
@@ -171,7 +171,7 @@ void ReverseConnectionManager::markConnUsed(const std::string& connectionKey) {
   rc_initiator->markConnUsed(connectionKey);
 }
 
-uint64_t ReverseConnectionManager::getNumberOfSockets(const std::string& key) {
+uint64_t ReverseConnectionManagerImpl::getNumberOfSockets(const std::string& key) {
   uint64_t number = 0;
   for (const auto& iter : available_rc_initiators_) {
     number += iter.second->getNumberOfSockets(key);
@@ -179,7 +179,7 @@ uint64_t ReverseConnectionManager::getNumberOfSockets(const std::string& key) {
   return number;
 }
 
-absl::flat_hash_map<std::string, size_t> ReverseConnectionManager::getSocketCountMap() {
+absl::flat_hash_map<std::string, size_t> ReverseConnectionManagerImpl::getSocketCountMap() {
   absl::flat_hash_map<std::string, size_t> response;
   for (const auto& iter : available_rc_initiators_) {
     iter.second->getSocketCountMap(response);
