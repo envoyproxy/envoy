@@ -469,6 +469,24 @@ protected:
   std::shared_ptr<DumbInternalListenerRegistry> internal_registry_{
       std::make_shared<DumbInternalListenerRegistry>()};
 
+  class DumbRevConnRegistry : public Singleton::Instance, 
+                              public Network::RevConnRegistry {
+  public:
+    MOCK_METHOD(Network::LocalRevConnRegistry*, getLocalRegistry, ());
+    MOCK_METHOD(absl::StatusOr<Network::ReverseConnectionListenerConfigPtr>, fromAnyConfig,
+                (const google::protobuf::Any& config));
+  };
+
+  class DummyReverseConnectionListenerConfig : public Network::ReverseConnectionListenerConfig {
+  public:
+    MOCK_METHOD(Network::ReverseConnParamsPtr&, getReverseConnParams, ());
+    MOCK_METHOD(Network::RevConnRegistry&, reverseConnRegistry, ());
+  };
+
+  std::shared_ptr<DumbRevConnRegistry> rev_conn_registry_{
+      std::make_shared<DumbRevConnRegistry>()};
+  std::unique_ptr<DummyReverseConnectionListenerConfig> reverse_connection_listener_config_{
+    std::make_unique<DummyReverseConnectionListenerConfig>()};
   std::unique_ptr<NiceMock<MockListenerComponentFactory>> listener_factory_ptr_;
   NiceMock<MockListenerComponentFactory>& listener_factory_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;

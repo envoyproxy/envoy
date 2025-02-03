@@ -612,8 +612,7 @@ ListenerImpl::buildReverseConnectionListener(const envoy::config::listener::v3::
   ENVOY_LOG(debug, "Building reverse connection config for listener: {} tag: {}", config.name(),
             listener_tag_);
   std::shared_ptr<Network::RevConnRegistry> reverse_conn_registry =
-      listener_factory_context_->serverFactoryContext()
-          .singletonManager()
+      parent_.server_.singletonManager()
           .getTyped<Network::RevConnRegistry>("reverse_conn_registry_singleton");
   if (reverse_conn_registry == nullptr) {
     ENVOY_LOG(error, "Cannot build reverse conn listener name: {} tag: {}. Reverse conn registry not found",

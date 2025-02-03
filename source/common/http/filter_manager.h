@@ -279,6 +279,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   // enabled only when the terminal filter is encoding the response.
   void stopDecodingIfNonTerminalFilterEncodedEndStream(bool encoded_end_stream);
 
+  void setReverseConnForceLocalReply(bool value) override;
+
   StreamDecoderFilterSharedPtr handle_;
   bool is_grpc_request_{};
 };
@@ -857,6 +859,10 @@ public:
 
   virtual bool shouldLoadShed() { return false; };
 
+  void setReverseConnForceLocalReply(bool value) {
+    reverse_conn_force_local_reply_ = value;
+  }
+
 protected:
   struct State {
     State() = default;
@@ -1037,6 +1043,7 @@ private:
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
+  bool reverse_conn_force_local_reply_{false};
 
   std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
   std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;

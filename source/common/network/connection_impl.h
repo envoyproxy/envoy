@@ -150,7 +150,12 @@ public:
   void setTransportSocketIsReadable() override;
   void flushWriteBuffer() override;
   TransportSocketPtr& transportSocket() { return transport_socket_; }
+  // Use on the initiator envoy to mark a reverse connection. The socket is not closed for such
+  // a connection and is passed on to a reverse connection listener.
   bool connection_reused_ = false;
+  // Used on the responder envoy to mark an active connection accepted by a listener which will
+  // be used as a reverse connection. The socket for such a connection is closed upon draining
+  // of the owning listener.
   bool reuse_active_connection_ = false;
 
   // Obtain global next connection ID. This should only be used in tests.

@@ -143,15 +143,8 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
-  if (connection_reused_ || !ioHandle().isOpen()) {
-    ENVOY_CONN_LOG_EVENT(
-        debug, "connection_closing",
-        "Not closing conn, conn is to be reused or IO handle is closed: connection_reused_:{}",
-        *this, connection_reused_);
-    return;
-  }
-
-  if (!socket_->isOpen()) {
+  if (socket_== nullptr || !socket_->isOpen()) {
+    ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "Not closing conn, socket object is null or socket is not open", *this);
     return;
   }
 

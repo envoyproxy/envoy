@@ -815,6 +815,11 @@ public:
    * @return true if the filter should shed load based on the system pressure, typically memory.
    */
   virtual bool shouldLoadShed() const PURE;
+
+  /**
+   * @return set a flag to send a local reply immediately for reverse connections. 
+   */
+  virtual void setReverseConnForceLocalReply(bool value) PURE;
 };
 
 /**

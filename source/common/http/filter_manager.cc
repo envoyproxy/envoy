@@ -446,6 +446,10 @@ void ActiveStreamDecoderFilter::modifyDecodingBuffer(
   callback(*parent_.buffered_request_data_.get());
 }
 
+void ActiveStreamDecoderFilter::setReverseConnForceLocalReply(bool value) {
+  parent_.setReverseConnForceLocalReply(value);
+}
+
 void ActiveStreamDecoderFilter::sendLocalReply(
     Code code, absl::string_view body,
     std::function<void(ResponseHeaderMap& headers)> modify_headers,
@@ -1000,12 +1004,10 @@ void DownstreamFilterManager::sendLocalReply(
       // route refreshment in the response filter chain.
       cb->route(nullptr);
     }
-  
-    bool reverse_conn_force_local_reply = 
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_conn_force_local_reply");
+
     // We only prepare a local reply to execute later if we're actively
     // invoking filters to avoid re-entrant in filters.
-    if (!reverse_conn_force_local_reply && state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+    if (!reverse_conn_force_local_reply_ && state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
       prepareLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                       grpc_status, details);
     } else {
