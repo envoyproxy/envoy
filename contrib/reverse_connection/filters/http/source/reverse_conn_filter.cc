@@ -85,6 +85,7 @@ void ReverseConnFilter::getClusterDetailsUsingProtobuf(std::string* node_uuid,
 Http::FilterDataStatus ReverseConnFilter::acceptReverseConnection() {
   std::string node_uuid, cluster_uuid, tenant_uuid;
 
+  decoder_callbacks_->setReverseConnForceLocalReply(true);
   envoy::extensions::filters::http::reverse_conn::v3alpha::ReverseConnHandshakeRet ret;
   if (expects_proxy_protocol_) {
     // This is an older remote side and is sending us params using HTTP query
@@ -144,7 +145,7 @@ Http::FilterDataStatus ReverseConnFilter::acceptReverseConnection() {
   connection->setActiveConnectionReused(true);
   connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn");
   saveDownstreamConnection(*connection, node_uuid, cluster_uuid);
-
+  decoder_callbacks_->setReverseConnForceLocalReply(false);
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
