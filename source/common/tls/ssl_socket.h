@@ -83,9 +83,9 @@ protected:
 
 private:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx,
-            const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options);
-  absl::Status initialize(InitialState state, Ssl::HandshakerFactoryCb handshaker_factory_cb,
-                          Upstream::HostDescriptionConstSharedPtr host);
+            const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+            Upstream::HostDescriptionConstSharedPtr host);
+  absl::Status initialize(InitialState state, Ssl::HandshakerFactoryCb handshaker_factory_cb);
 
   struct ReadResult {
     uint64_t bytes_read_{0};
@@ -102,6 +102,7 @@ private:
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;
+  Upstream::HostDescriptionConstSharedPtr host_;
   uint64_t bytes_to_retry_{};
   std::string failure_reason_;
 

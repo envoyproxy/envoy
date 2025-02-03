@@ -176,5 +176,9 @@ new_features:
   change: |
     Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
     work as an upstream filter.
-
+- area: tls
+  change: |
+    Added per-upstream host TLS session key caching via
+    :ref:`max_session_cache_upstream_hosts <envoy_api_field_auth.UpstreamTlsContext.max_session_cache_upstream_hosts>`
+    to optimize session resumption when upstreams use different session keys.
 deprecated:

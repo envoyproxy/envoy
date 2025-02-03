@@ -1207,7 +1207,7 @@ protected:
 
   void testClientSessionResumption(const std::string& server_ctx_yaml,
                                    const std::string& client_ctx_yaml, bool expect_reuse,
-                                   const Network::Address::IpVersion version);
+                                   const Network::Address::IpVersion version, const int servers);
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
                                       Network::TcpListenerCallbacks& cb, Runtime::Loader& runtime,
@@ -4967,7 +4967,8 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_yaml,
                                                 const std::string& client_ctx_yaml,
                                                 bool expect_reuse,
-                                                const Network::Address::IpVersion version) {
+                                                const Network::Address::IpVersion version,
+                                                const int servers = 1) {
   InSequence s;
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
@@ -4982,23 +4983,35 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext server_ctx_proto;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_ctx_proto);
-  auto server_cfg =
-      *ServerContextConfigImpl::create(server_ctx_proto, transport_socket_factory_context, false);
-  auto server_ssl_socket_factory = *ServerSslSocketFactory::create(
-      std::move(server_cfg), manager, *server_stats_store.rootScope(), std::vector<std::string>{});
 
-  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
-      Network::Test::getCanonicalLoopbackAddress(version));
-  NiceMock<Network::MockTcpListenerCallbacks> callbacks;
-  NiceMock<Network::MockListenerConfig> listener_config;
-  Api::ApiPtr api = Api::createApiForTest(server_stats_store, time_system_);
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
-  Server::ThreadLocalOverloadStateOptRef overload_state;
-  Network::ListenerPtr listener =
-      createListener(socket, callbacks, runtime_, listener_config, overload_state, *dispatcher);
 
-  Network::ConnectionPtr server_connection;
-  Network::MockConnectionCallbacks server_connection_callbacks;
+  std::vector<std::unique_ptr<ServerSslSocketFactory>> server_ssl_socket_factories;
+  std::vector<std::shared_ptr<Network::Test::TcpListenSocketImmediateListen>> sockets;
+  std::vector<std::shared_ptr<NiceMock<Network::MockTcpListenerCallbacks>>> callbacks;
+  std::vector<Network::ListenerPtr> listeners;
+  for (int i = 0; i < servers; i++) {
+    auto server_cfg =
+        *ServerContextConfigImpl::create(server_ctx_proto, transport_socket_factory_context, false);
+    auto server_ssl_socket_factory =
+        ServerSslSocketFactory::create(std::move(server_cfg), manager,
+                                       *server_stats_store.rootScope(), std::vector<std::string>{})
+            .value();
+    server_ssl_socket_factories.push_back(std::move(server_ssl_socket_factory));
+
+    auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(version));
+    sockets.push_back(socket);
+
+    auto callback = std::make_shared<NiceMock<Network::MockTcpListenerCallbacks>>();
+    callbacks.push_back(callback);
+
+    NiceMock<Network::MockListenerConfig> listener_config;
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    Network::ListenerPtr listener =
+        createListener(socket, *callback, runtime_, listener_config, overload_state, *dispatcher);
+    listeners.push_back(std::move(listener));
+  }
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client_ctx_proto;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_ctx_proto);
@@ -5012,37 +5025,6 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   auto client_cfg = *ClientContextConfigImpl::create(client_ctx_proto, client_factory_context);
   auto client_ssl_socket_factory = *ClientSslSocketFactory::create(std::move(client_cfg), manager,
                                                                    *client_stats_store.rootScope());
-  Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
-      socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
-      client_ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
-
-  Network::MockConnectionCallbacks client_connection_callbacks;
-  client_connection->addConnectionCallbacks(client_connection_callbacks);
-  client_connection->connect();
-
-  size_t connect_count = 0;
-  auto connect_second_time = [&connect_count, &server_connection]() {
-    if (++connect_count == 2) {
-      server_connection->close(Network::ConnectionCloseType::NoFlush);
-    }
-  };
-
-  size_t close_count = 0;
-  auto close_second_time = [&close_count, &dispatcher]() {
-    if (++close_count == 2) {
-      dispatcher->exit();
-    }
-  };
-
-  // WillRepeatedly doesn't work with InSequence.
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        server_connection = dispatcher->createServerConnection(
-            std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
-            stream_info_);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
-  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
   const bool expect_tls13 =
       client_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version() ==
@@ -5050,69 +5032,142 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
       server_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version() ==
           envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3;
 
-  // The order of "Connected" events depends on the version of the TLS protocol (1.3 or older).
-  if (expect_tls13) {
-    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
-    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
-  } else {
-    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
-    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
-  }
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+  for (int i = 0; i < servers; i++) {
+    Network::ConnectionPtr server_connection;
+    Network::MockConnectionCallbacks server_connection_callbacks;
 
-  dispatcher->run(Event::Dispatcher::RunType::Block);
+    std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host{
+        new NiceMock<Upstream::MockHostDescription>()};
+    ON_CALL(*host, address())
+        .WillByDefault(Return(sockets[i]->connectionInfoProvider().localAddress()));
+
+    Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
+        sockets[i]->connectionInfoProvider().localAddress(),
+        Network::Address::InstanceConstSharedPtr(),
+        client_ssl_socket_factory->createTransportSocket(nullptr, host), nullptr, nullptr);
+
+    Network::MockConnectionCallbacks client_connection_callbacks;
+    client_connection->addConnectionCallbacks(client_connection_callbacks);
+    client_connection->connect();
+
+    size_t connect_count = 0;
+    auto connect_second_time = [&connect_count, &server_connection]() {
+      if (++connect_count == 2) {
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+      }
+    };
+
+    size_t close_count = 0;
+    auto close_second_time = [&close_count, &dispatcher]() {
+      if (++close_count == 2) {
+        dispatcher->exit();
+      }
+    };
+
+    // WillRepeatedly doesn't work with InSequence.
+    EXPECT_CALL(*callbacks[i], onAccept_(_))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+          server_connection = dispatcher->createServerConnection(
+              std::move(socket), server_ssl_socket_factories[i]->createDownstreamTransportSocket(),
+              stream_info_);
+          server_connection->addConnectionCallbacks(server_connection_callbacks);
+        }));
+    EXPECT_CALL(*callbacks[i], recordConnectionsAcceptedOnSocketEvent(_));
+
+    const bool expect_tls13 =
+        client_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version() ==
+            envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3 &&
+        server_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version() ==
+            envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3;
+
+    // The order of "Connected" events depends on the version of the TLS protocol (1.3 or older).
+    if (expect_tls13) {
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+    } else {
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+    }
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+
+    dispatcher->run(Event::Dispatcher::RunType::Block);
+  }
 
   EXPECT_EQ(0UL, server_stats_store.counter("ssl.session_reused").value());
   EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
 
-  connect_count = 0;
-  close_count = 0;
+  for (int i = 0; i < servers; i++) {
+    Network::ConnectionPtr server_connection;
+    Network::MockConnectionCallbacks server_connection_callbacks;
 
-  client_connection = dispatcher->createClientConnection(
-      socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
-      client_ssl_socket_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
-  client_connection->addConnectionCallbacks(client_connection_callbacks);
-  client_connection->connect();
+    std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host{
+        new NiceMock<Upstream::MockHostDescription>()};
+    ON_CALL(*host, address())
+        .WillByDefault(Return(sockets[i]->connectionInfoProvider().localAddress()));
 
-  // WillRepeatedly doesn't work with InSequence.
-  EXPECT_CALL(callbacks, onAccept_(_))
-      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
-        server_connection = dispatcher->createServerConnection(
-            std::move(socket), server_ssl_socket_factory->createDownstreamTransportSocket(),
-            stream_info_);
-        server_connection->addConnectionCallbacks(server_connection_callbacks);
-      }));
-  EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
+    Network::ClientConnectionPtr client_connection = dispatcher->createClientConnection(
+        sockets[i]->connectionInfoProvider().localAddress(),
+        Network::Address::InstanceConstSharedPtr(),
+        client_ssl_socket_factory->createTransportSocket(nullptr, host), nullptr, nullptr);
 
-  // The order of "Connected" events depends on the version of the TLS protocol (1.3 or older),
-  // and whether or not the session was successfully resumed.
-  if (expect_tls13 || expect_reuse) {
-    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
-    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
-  } else {
-    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
-    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+    Network::MockConnectionCallbacks client_connection_callbacks;
+    client_connection->addConnectionCallbacks(client_connection_callbacks);
+    client_connection->connect();
+
+    size_t connect_count = 0;
+    auto connect_second_time = [&connect_count, &server_connection]() {
+      if (++connect_count == 2) {
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+      }
+    };
+
+    size_t close_count = 0;
+    auto close_second_time = [&close_count, &dispatcher]() {
+      if (++close_count == 2) {
+        dispatcher->exit();
+      }
+    };
+
+    // WillRepeatedly doesn't work with InSequence.
+    EXPECT_CALL(*callbacks[i], onAccept_(_))
+        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+          server_connection = dispatcher->createServerConnection(
+              std::move(socket), server_ssl_socket_factories[i]->createDownstreamTransportSocket(),
+              stream_info_);
+          server_connection->addConnectionCallbacks(server_connection_callbacks);
+        }));
+    EXPECT_CALL(*callbacks[i], recordConnectionsAcceptedOnSocketEvent(_));
+
+    // The order of "Connected" events depends on the version of the TLS protocol (1.3 or older),
+    // and whether or not the session was successfully resumed.
+    if (expect_tls13 || expect_reuse) {
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+    } else {
+      EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+      EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+    }
+    EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+    EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+
+    dispatcher->run(Event::Dispatcher::RunType::Block);
   }
-  EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
-  EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
 
-  dispatcher->run(Event::Dispatcher::RunType::Block);
-
-  EXPECT_EQ(expect_reuse ? 1UL : 0UL, server_stats_store.counter("ssl.session_reused").value());
-  EXPECT_EQ(expect_reuse ? 1UL : 0UL, client_stats_store.counter("ssl.session_reused").value());
+  EXPECT_EQ(expect_reuse ? servers : 0UL, server_stats_store.counter("ssl.session_reused").value());
+  EXPECT_EQ(expect_reuse ? servers : 0UL, client_stats_store.counter("ssl.session_reused").value());
 }
 
 // Test client session resumption using default settings (should be enabled).
@@ -7864,6 +7919,113 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOn) {
   // Server connection error was not populated in this case.
   test_options.setExpectedServerStats("");
   testUtilV2(test_options);
+}
+
+// Test client session resumption per upstream host with TLS 1.3.
+TEST_P(SslSocketTest, PerUpstreamResumptionEnabledTls13) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+  max_session_keys: 1
+  max_session_cache_upstream_hosts: 2
+)EOF";
+
+  testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, version_, 2);
+}
+
+// Test client session resumption per upstream host with TLS 1.2.
+TEST_P(SslSocketTest, PerUpstreamResumptionEnabledTls12) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+  max_session_keys: 1
+  max_session_cache_upstream_hosts: 2
+)EOF";
+
+  testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, version_, 2);
+}
+
+// Test client session resumption per upstream host with TLS 1.3 with cache
+// size of one upstream.
+TEST_P(SslSocketTest, PerUpstreamResumptionEnabledForOneUpstreamTls13) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+  max_session_keys: 1
+  max_session_cache_upstream_hosts: 1
+)EOF";
+
+  // Expect no session reuse as cache size is 1.
+  testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, false, version_, 2);
+}
+
+// Test client session resumption per upstream host with TLS 1.2 with cache
+// size of one upstream.
+TEST_P(SslSocketTest, PerUpstreamResumptionEnabledForOneUpstreamTls12) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+  max_session_keys: 1
+  max_session_cache_upstream_hosts: 1
+)EOF";
+
+  testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, false, version_, 2);
 }
 
 } // namespace Tls

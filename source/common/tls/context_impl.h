@@ -83,7 +83,7 @@ class ContextImpl : public virtual Envoy::Ssl::Context,
 public:
   virtual absl::StatusOr<bssl::UniquePtr<SSL>>
   newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
-         Upstream::HostDescriptionConstSharedPtr host);
+         const Upstream::HostDescriptionConstSharedPtr&);
 
   /**
    * Logs successful TLS handshake and updates stats.
