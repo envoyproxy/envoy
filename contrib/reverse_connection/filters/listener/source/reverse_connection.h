@@ -56,6 +56,10 @@ private:
   Event::FileEventPtr file_event_;
 
   Event::TimerPtr ping_wait_timer_;
+
+  // Tracks whether data has been received on the connection. If the connection
+  // is closed by the peer before data is received, the socket is marked dead.
+  bool connection_used_;
 };
 
 } // namespace ReverseConnection

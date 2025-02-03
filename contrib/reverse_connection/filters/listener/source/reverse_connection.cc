@@ -31,7 +31,12 @@ Filter::Filter(const Config& config, std::shared_ptr<ReverseConnection::ReverseC
 
 int Filter::fd() { return cb_->socket().ioHandle().fdDoNotUse(); }
 
-Filter::~Filter() {}
+Filter::~Filter() {
+  ENVOY_LOG(debug, "reverse_connection: filter destroyed socket().isOpen(): {}", cb_->socket().isOpen());
+  if (!connection_used_ && cb_->socket().isOpen()) {
+    cb_->socket().close();
+  }
+}
 
 void Filter::onClose() {
   ENVOY_LOG(debug, "reverse_connection: close");
@@ -43,11 +48,16 @@ void Filter::onClose() {
   // then an idle reverse connection has been closed.
   reverseConnectionManager().notifyConnectionClose(
       connectionKey, false /* is_used */);
-  // Marking the connection as used here to avoid marking the socket dead again in the destructor.
+  // If a connection is closed before data is received, mark the socket dead.
+  if (!connection_used_) {
+    ENVOY_LOG(debug, "reverse_connection: marking the socket dead, fd {}", fd());
+    cb_->socket().ioHandle().close();
+  }
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "reverse_connection: New connection accepted");
+  connection_used_ = false;
   cb_ = &cb;
   ping_wait_timer_ = cb.dispatcher().createTimer([this]() { onPingWaitTimeout(); });
   ping_wait_timer_->enableTimer(config_.pingWaitTimeout());
@@ -85,6 +95,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     const std::string& connectionKey =
         cb_->socket().connectionInfoProvider().localAddress()->asString();
     reverseConnectionManager().markConnUsed(connectionKey);
+    connection_used_ = true;
     return Network::FilterStatus::Continue;
   }
   return Network::FilterStatus::Continue;
