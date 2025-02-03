@@ -1657,5 +1657,35 @@ TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
+TEST_P(ProxyFilterIntegrationTest, ResetStreamDuringDnsLookup) {
+  // Set up the fake resolver which will block DNS resolution.
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+  std::string resolver_config = R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        hcm.mutable_stream_idle_timeout()->set_nanos(300 * TIMEOUT_FACTOR * 1000 * 1000);
+      });
+
+  upstream_tls_ = false;
+  autonomous_upstream_ = true;
+  initializeWithArgs(1024, 1024, "", resolver_config, false, 0);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("504", response->headers().getStatusValue());
+}
+
 } // namespace
 } // namespace Envoy
