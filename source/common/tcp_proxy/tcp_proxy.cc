@@ -36,6 +36,8 @@
 #include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/http/credential_injector/credential_injector_filter.h"
+#include "source/extensions/http/injected_credentials/common/factory.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -750,6 +752,29 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                                 substitution_format_config, context),
                             Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
+
+  if (config_message.tunneling_config().has_credential_injector()) {
+    if (config_message.tunneling_config().credential_injector().has_credential()) {
+      auto credential = config_message.tunneling_config().credential_injector().credential();
+
+      // Find the credential injector factory.
+      auto* config_factory = Envoy::Config::Utility::getFactory<Envoy::Extensions::Http::InjectedCredentials::Common::NamedCredentialInjectorConfigFactory>(
+          credential);
+      if (config_factory == nullptr) {
+        throw EnvoyException(fmt::format(
+            "Didn't find a registered implementation for '{}' with type URL: '{}'",
+            credential.name(),
+            Envoy::Config::Utility::getFactoryType(credential.typed_config())));
+      }
+
+      // create the credential injector
+      ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateAnyToFactoryConfig(
+          credential.typed_config(), context.messageValidationVisitor(),
+          *config_factory);
+      credential_injector_ = config_factory->createCredentialInjectorFromProto(
+              *message, config_message.stat_prefix() + "credential_injector.", context);
+    }
+  }
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
@@ -776,6 +801,12 @@ void TunnelingConfigHelperImpl::propagateResponseTrailers(
   filter_state->setData(
       TunnelResponseTrailers::key(), std::make_shared<TunnelResponseTrailers>(std::move(trailers)),
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+}
+
+void TunnelingConfigHelperImpl::injectCredentials(Http::RequestHeaderMapPtr& headers) const {
+  if (credential_injector_ != nullptr) {
+    static_cast<void>(credential_injector_->inject(*headers, true));
+  }
 }
 
 void Filter::onConnectTimeout() {

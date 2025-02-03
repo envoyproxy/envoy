@@ -101,13 +101,14 @@ bool HttpUpstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
 void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) {
   request_encoder_ = &request_encoder;
   request_encoder_->getStream().addCallbacks(*this);
-  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+  Http::RequestHeaderMapPtr headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
       {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
       {Http::Headers::get().Host, config_.host(downstream_info_)},
   });
   if (config_.usePost()) {
     headers->addReference(Http::Headers::get().Path, config_.postPath());
   }
+  config_.injectCredentials(headers);
 
   if (type_ == Http::CodecType::HTTP1) {
     request_encoder_->enableTcpTunneling();
@@ -423,6 +424,8 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
     downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
     downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
   }
+
+  config_.injectCredentials(downstream_headers_);
 
   config_.headerEvaluator().evaluateHeaders(
       *downstream_headers_, {downstream_info_.getRequestHeaders()}, downstream_info_);

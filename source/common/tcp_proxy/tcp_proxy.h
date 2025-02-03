@@ -35,6 +35,7 @@
 #include "source/common/tcp_proxy/upstream.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/od_cds_api_impl.h"
+#include "source/extensions/filters/http/credential_injector/credential_injector_filter.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -166,6 +167,7 @@ public:
   void
   propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
                             const StreamInfo::FilterStateSharedPtr& filter_state) const override;
+  void injectCredentials(Http::RequestHeaderMapPtr& headers) const override;
   Server::Configuration::ServerFactoryContext& serverFactoryContext() const override {
     return server_factory_context_;
   }
@@ -180,6 +182,7 @@ private:
   Stats::StatNameManagedStorage route_stat_name_storage_;
   const Router::FilterConfig router_config_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;
+  Extensions::HttpFilters::CredentialInjector::CredentialInjectorSharedPtr credential_injector_;
 };
 
 /**

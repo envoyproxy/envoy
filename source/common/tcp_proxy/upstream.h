@@ -349,7 +349,7 @@ protected:
   const TunnelingConfigHelper& config_;
   // The downstream info that is owned by the downstream connection.
   StreamInfo::StreamInfo& downstream_info_;
-  std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
+  std::unique_ptr<Http::RequestHeaderMap> downstream_headers_;
   HttpConnPool& parent_;
 
 private:

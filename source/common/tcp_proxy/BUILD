@@ -89,8 +89,12 @@ envoy_cc_library(
         "//source/common/stream_info:uint64_accessor_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:od_cds_api_lib",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/credential_injector:credential_injector_lib",
+        "//source/extensions/http/injected_credentials/common:credential_config_interface",
         "//source/extensions/upstreams/tcp/generic:config",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/credential_injector/v3:pkg_cc_proto",
     ],
 )
