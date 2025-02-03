@@ -450,7 +450,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Overflow:
     // In the case of overflow, return immediate failure.
     ENVOY_LOG(debug, "host {} lookup failed due to overflow", hostname);
-    break; // fallthrough
+    break; // fall through
   }
   return {nullptr, "dns_cache_overflow"};
 }
