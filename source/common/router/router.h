@@ -345,7 +345,8 @@ public:
   continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster, Http::RequestHeaderMap& headers,
                         bool end_stream,
                         std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                        bool* should_continue_decoding, Upstream::HostConstSharedPtr&& host);
+                        bool* should_continue_decoding, Upstream::HostConstSharedPtr&& host,
+                        absl::optional<std::string> host_selection_detailsi = {});
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
@@ -446,7 +447,7 @@ public:
     return callbacks_->upstreamOverrideHost();
   }
 
-  void onAsyncHostSelection(Upstream::HostConstSharedPtr&& host) override;
+  void onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::string&& details) override;
 
   /**
    * Set a computed cookie to be sent with the downstream headers.
@@ -569,7 +570,7 @@ private:
   // if a "good" response comes back and we return downstream, so there is no point in waiting
   // for the remaining upstream requests to return.
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
-  void sendNoHealthyUpstreamResponse();
+  void sendNoHealthyUpstreamResponse(absl::optional<std::string> details);
   bool setupRedirect(const Http::ResponseHeaderMap& headers);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
                                                 const Http::ResponseHeaderMap& upstream_headers,
@@ -579,7 +580,8 @@ private:
                               absl::optional<uint64_t> code);
   void doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry);
   void continueDoRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry is_timeout_retry,
-                       Upstream::HostConstSharedPtr&& host, Upstream::ThreadLocalCluster& cluster);
+                       Upstream::HostConstSharedPtr&& host, Upstream::ThreadLocalCluster& cluster,
+                       absl::optional<std::string> host_selection_details);
 
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
@@ -603,7 +605,7 @@ private:
   std::unique_ptr<Stats::StatNameDynamicStorage> alt_stat_prefix_;
   const VirtualCluster* request_vcluster_{};
   RouteStatsContextOptRef route_stats_context_;
-  std::function<void(Upstream::HostConstSharedPtr&& host)> on_host_selected_;
+  std::function<void(Upstream::HostConstSharedPtr&& host, std::string details)> on_host_selected_;
   std::unique_ptr<Upstream::AsyncHostSelectionHandle> host_selection_cancelable_;
   Event::TimerPtr response_timeout_;
   TimeoutData timeout_;
