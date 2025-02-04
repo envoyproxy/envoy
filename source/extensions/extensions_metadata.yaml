@@ -1873,6 +1873,6 @@ envoy.filters.http.dynamic_modules:
   categories:
   - envoy.filters.http
   security_posture: unknown
-  status: stable
+  status: alpha
   type_urls:
   - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
