@@ -112,8 +112,7 @@ FilterConfig::FilterConfig(
 
   rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
       fill_interval_, max_tokens_, tokens_per_fill_, dispatcher_, descriptors_,
-      always_consume_default_token_bucket_, std::move(share_provider), max_dynamic_descriptors_,
-      config.local_rate_limit_per_downstream_connection());
+      always_consume_default_token_bucket_, std::move(share_provider), max_dynamic_descriptors_);
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
