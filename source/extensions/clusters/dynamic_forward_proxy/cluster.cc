@@ -444,8 +444,8 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     // Here the DFP kicks off an async lookup. The DFPHostSelectionHandle will
     // call onLoadDnsCacheComplete and onAsyncHostSelection unless the
     // resolution is canceled by the stream.
-    cancelable->handle_ = std::move(result.handle_);
-    cancelable->auto_dec_ = std::move(handle);
+    cancelable->setHandle(std::move(result.handle_));
+    cancelable->setAutoDec(std::move(handle));
     return Upstream::HostSelectionResponse{nullptr, std::move(cancelable)};
   case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Overflow:
     // In the case of overflow, return immediate failure.

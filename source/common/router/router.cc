@@ -704,7 +704,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 // When asynchronous host selection is complete, call the pre-configured on_host_selected_function.
-void Filter::onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::string details) {
+void Filter::onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::string&& details) {
   ENVOY_STREAM_LOG(debug, "Completing asynchronous host selection [{}]\n", *callbacks_, details);
   std::unique_ptr<Upstream::AsyncHostSelectionHandle> local_scope =
       std::move(host_selection_cancelable_);

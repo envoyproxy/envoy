@@ -62,6 +62,7 @@ struct HostSelectionResponse {
   HostSelectionResponse(HostConstSharedPtr host, std::string details)
       : host(host), details(details) {}
   HostConstSharedPtr host;
+  // Optional details if host selection fails.
   std::string details;
   std::unique_ptr<AsyncHostSelectionHandle> cancelable;
 };
@@ -156,7 +157,7 @@ public:
    * @param host supplies the upstream host selected
    * @param details gives optional details about the resolution success/failure.
    */
-  virtual void onAsyncHostSelection(HostConstSharedPtr&& host, std::string details) PURE;
+  virtual void onAsyncHostSelection(HostConstSharedPtr&& host, std::string&& details) PURE;
 };
 
 /**

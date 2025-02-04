@@ -447,7 +447,7 @@ public:
     return callbacks_->upstreamOverrideHost();
   }
 
-  void onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::string details) override;
+  void onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::string&& details) override;
 
   /**
    * Set a computed cookie to be sent with the downstream headers.

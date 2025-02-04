@@ -146,10 +146,10 @@ private:
   // call unless the LoadDnsCacheEntryHandlePtr is destroyed. Destruction of the
   // LoadDnsCacheEntryHandlePtr ensures that no callback will occur, at which
   // point it is safe to delete the DFPHostSelectionHandle.
-  struct DFPHostSelectionHandle
+  class DFPHostSelectionHandle
       : public Upstream::AsyncHostSelectionHandle,
         public Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks {
-
+  public:
     DFPHostSelectionHandle(Upstream::LoadBalancerContext* context, const Cluster& cluster,
                            std::string hostname)
         : context_(context), cluster_(cluster), hostname_(hostname){};
@@ -163,9 +163,15 @@ private:
     onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) {
       Upstream::HostConstSharedPtr host = cluster_.findHostByName(hostname_);
       std::string details = info->details();
-      context_->onAsyncHostSelection(std::move(host), details);
+      context_->onAsyncHostSelection(std::move(host), std::move(details));
     }
 
+    void setHandle(Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr&& handle) {
+      handle_ = std::move(handle);
+    }
+    void setAutoDec(Upstream::ResourceAutoIncDecPtr&& dec) { auto_dec_ = std::move(dec); }
+
+  private:
     Upstream::LoadBalancerContext* context_;
     Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr handle_;
     Upstream::ResourceAutoIncDecPtr auto_dec_;
