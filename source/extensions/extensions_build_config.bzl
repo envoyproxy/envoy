@@ -539,7 +539,7 @@ EXTENSIONS = {
     "envoy.generic_proxy.codecs.http1":                         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
 
     # Dynamic mocules
-    "envoy.dynamic_modules.dynamic_modules":                    "//source/extensions/filters/http/dynamic_modules:factory_registration",
+    "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
