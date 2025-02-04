@@ -26,6 +26,19 @@ MATCHER_P(OptCounterHasValue, m, "") {
       arg, result_listener);
 }
 
+MATCHER_P(OptCounterHasName, m, "") {
+  return testing::ExplainMatchResult(
+      testing::Optional(testing::Property(
+          "get", &std::reference_wrapper<const Stats::Counter>::get,
+          testing::Property("tagExtractedName", &Envoy::Stats::Counter::tagExtractedName, m))),
+      arg, result_listener);
+}
+
+MATCHER_P2(OptCounterIs, name, value, "") {
+  return testing::ExplainMatchResult(
+      testing::AllOf(OptCounterHasName(name), OptCounterHasValue(value)), arg, result_listener);
+}
+
 TEST_F(CacheStatsTest, StatsAreConstructedCorrectly) {
   // 4 for hit
   stats_->incForStatus(CacheEntryStatus::Hit);
@@ -34,29 +47,33 @@ TEST_F(CacheStatsTest, StatsAreConstructedCorrectly) {
   stats_->incForStatus(CacheEntryStatus::ValidatedFree);
   Stats::CounterOptConstRef hits =
       context_.store_.findCounterByString("cache.event.cache_label.fake_cache.event_type.hit");
-  EXPECT_THAT(hits, OptCounterHasValue(4));
-  EXPECT_THAT(hits->get().tagExtractedName(), "cache.event");
+  EXPECT_THAT(hits, OptCounterIs("cache.event", 4));
   // 2 for miss
   stats_->incForStatus(CacheEntryStatus::Miss);
   stats_->incForStatus(CacheEntryStatus::FailedValidation);
   Stats::CounterOptConstRef misses =
       context_.store_.findCounterByString("cache.event.cache_label.fake_cache.event_type.miss");
-  EXPECT_THAT(misses, OptCounterHasValue(2));
-  EXPECT_THAT(misses->get().tagExtractedName(), "cache.event");
+  EXPECT_THAT(misses, OptCounterIs("cache.event", 2));
   // 1 for validated
   stats_->incForStatus(CacheEntryStatus::Validated);
   Stats::CounterOptConstRef validates =
       context_.store_.findCounterByString("cache.event.cache_label.fake_cache.event_type.validate");
-  EXPECT_THAT(validates, OptCounterHasValue(1));
-  EXPECT_THAT(validates->get().tagExtractedName(), "cache.event");
-  // 3 for skip
+  EXPECT_THAT(validates, OptCounterIs("cache.event", 1));
+
   stats_->incForStatus(CacheEntryStatus::Uncacheable);
+  Stats::CounterOptConstRef uncacheables = context_.store_.findCounterByString(
+      "cache.event.cache_label.fake_cache.event_type.uncacheable");
+  EXPECT_THAT(uncacheables, OptCounterIs("cache.event", 1));
+
   stats_->incForStatus(CacheEntryStatus::UpstreamReset);
+  Stats::CounterOptConstRef upstream_resets = context_.store_.findCounterByString(
+      "cache.event.cache_label.fake_cache.event_type.upstream_reset");
+  EXPECT_THAT(upstream_resets, OptCounterIs("cache.event", 1));
+
   stats_->incForStatus(CacheEntryStatus::LookupError);
-  Stats::CounterOptConstRef skips =
-      context_.store_.findCounterByString("cache.event.cache_label.fake_cache.event_type.skip");
-  EXPECT_THAT(skips, OptCounterHasValue(3));
-  EXPECT_THAT(skips->get().tagExtractedName(), "cache.event");
+  Stats::CounterOptConstRef lookup_errors = context_.store_.findCounterByString(
+      "cache.event.cache_label.fake_cache.event_type.lookup_error");
+  EXPECT_THAT(lookup_errors, OptCounterIs("cache.event", 1));
 }
 
 } // namespace

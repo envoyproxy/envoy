@@ -16,7 +16,9 @@ namespace Cache {
   STATNAME(event_type)                                                                             \
   STATNAME(hit)                                                                                    \
   STATNAME(miss)                                                                                   \
-  STATNAME(skip)                                                                                   \
+  STATNAME(uncacheable)                                                                            \
+  STATNAME(upstream_reset)                                                                         \
+  STATNAME(lookup_error)                                                                           \
   STATNAME(validate)
 
 MAKE_STAT_NAMES_STRUCT(CacheStatNames, CACHE_FILTER_STATS);
@@ -32,13 +34,22 @@ public:
             {{stat_names_.cache_label_, label_}, {stat_names_.event_type_, stat_names_.hit_}}),
         tags_miss_(
             {{stat_names_.cache_label_, label_}, {stat_names_.event_type_, stat_names_.miss_}}),
-        tags_skip_(
-            {{stat_names_.cache_label_, label_}, {stat_names_.event_type_, stat_names_.skip_}}),
+        tags_uncacheable_({{stat_names_.cache_label_, label_},
+                           {stat_names_.event_type_, stat_names_.uncacheable_}}),
+        tags_upstream_reset_({{stat_names_.cache_label_, label_},
+                              {stat_names_.event_type_, stat_names_.upstream_reset_}}),
+        tags_lookup_error_({{stat_names_.cache_label_, label_},
+                            {stat_names_.event_type_, stat_names_.lookup_error_}}),
         tags_validate_(
             {{stat_names_.cache_label_, label_}, {stat_names_.event_type_, stat_names_.validate_}}),
         counter_hit_(counterFromStatNames(scope, {prefix_, stat_names_.event_}, tags_hit_)),
         counter_miss_(counterFromStatNames(scope, {prefix_, stat_names_.event_}, tags_miss_)),
-        counter_skip_(counterFromStatNames(scope, {prefix_, stat_names_.event_}, tags_skip_)),
+        counter_uncacheable_(
+            counterFromStatNames(scope, {prefix_, stat_names_.event_}, tags_uncacheable_)),
+        counter_upstream_reset_(
+            counterFromStatNames(scope, {prefix_, stat_names_.event_}, tags_upstream_reset_)),
+        counter_lookup_error_(
+            counterFromStatNames(scope, {prefix_, stat_names_.event_}, tags_lookup_error_)),
         counter_validate_(
             counterFromStatNames(scope, {prefix_, stat_names_.event_}, tags_validate_)) {}
   void incForStatus(CacheEntryStatus status) override;
@@ -47,11 +58,15 @@ public:
   const Stats::StatName label_;
   const Stats::StatNameTagVector tags_hit_;
   const Stats::StatNameTagVector tags_miss_;
-  const Stats::StatNameTagVector tags_skip_;
+  const Stats::StatNameTagVector tags_uncacheable_;
+  const Stats::StatNameTagVector tags_upstream_reset_;
+  const Stats::StatNameTagVector tags_lookup_error_;
   const Stats::StatNameTagVector tags_validate_;
   Stats::Counter& counter_hit_;
   Stats::Counter& counter_miss_;
-  Stats::Counter& counter_skip_;
+  Stats::Counter& counter_uncacheable_;
+  Stats::Counter& counter_upstream_reset_;
+  Stats::Counter& counter_lookup_error_;
   Stats::Counter& counter_validate_;
 };
 
@@ -72,11 +87,12 @@ void CacheFilterStatsImpl::incForStatus(CacheEntryStatus status) {
   case CacheEntryStatus::Validated:
     return counter_validate_.inc();
   case CacheEntryStatus::UpstreamReset:
+    return counter_upstream_reset_.inc();
   case CacheEntryStatus::Uncacheable:
+    return counter_uncacheable_.inc();
   case CacheEntryStatus::LookupError:
-    break;
+    return counter_lookup_error_.inc();
   }
-  counter_skip_.inc();
 }
 
 } // namespace Cache
