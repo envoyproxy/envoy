@@ -40,6 +40,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final EnvoyEventTracker mEnvoyEventTracker = null;
   private int mConnectTimeoutSeconds = 10;
   private final int mDnsRefreshSeconds = 60;
+  private boolean mDisableDnsRefreshOnFailure = false;
   private final int mDnsFailureRefreshSecondsBase = 2;
   private final int mDnsFailureRefreshSecondsMax = 10;
   private int mDnsQueryTimeoutSeconds = 5;
@@ -130,6 +131,13 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setEnableProxying(boolean enable) {
     mEnableProxying = enable;
+    return this;
+  }
+
+  /** Disables the DNS refresh on failure. */
+  public NativeCronvoyEngineBuilderImpl
+  setDisableDnsRefreshOnFailure(boolean disableDnsRefreshOnFailure) {
+    mDisableDnsRefreshOnFailure = disableDnsRefreshOnFailure;
     return this;
   }
 
@@ -275,12 +283,12 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
 
     return new EnvoyConfiguration(
-        mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
-        mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
-        mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares,
-        quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
-        quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(),
+        mConnectTimeoutSeconds, mDisableDnsRefreshOnFailure, mDnsRefreshSeconds,
+        mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds,
+        mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache,
+        mDnsCacheSaveIntervalSeconds, mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh,
+        quicEnabled(), mUseCares, quicConnectionOptions(), quicClientConnectionOptions(),
+        quicHints(), quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(),
         numTimeoutsToTriggerPortMigration(), mEnableSocketTag, mEnableInterfaceBinding,
         mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
         mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,

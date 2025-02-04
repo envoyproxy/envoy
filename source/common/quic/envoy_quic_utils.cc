@@ -393,14 +393,6 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
                static_cast<quic::QuicByteCount>(session_flow_control_window_to_send)));
 }
 
-void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
-                                     const quic::QuicConnectionId& old_connection_id) {
-  char* new_connection_id_data = new_connection_id.mutable_data();
-  const char* old_connection_id_ptr = old_connection_id.data();
-  // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
-  memcpy(new_connection_id_data, old_connection_id_ptr, 4); // NOLINT(safe-memcpy)
-}
-
 quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte) {
   // Explicit Congestion Notification is encoded in the two least significant
   // bits of the TOS byte of the IP header.

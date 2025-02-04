@@ -3,7 +3,7 @@
 #include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/server_context_impl.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
-#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
+#include "source/extensions/quic/connection_id_generator/deterministic/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/udp_packet_writer/default/config.h"
@@ -71,7 +71,8 @@ public:
     Quic::forceRegisterQuicHttpServerConnectionFactoryImpl();
     Quic::forceRegisterQuicServerTransportSocketConfigFactory();
     Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
-    Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
+    Quic::Extensions::ConnectionIdGenerator::Deterministic::
+        forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
     // For H2 tests.
     Extensions::TransportSockets::Tls::forceRegisterDefaultCertValidatorFactory();
   }
@@ -258,6 +259,39 @@ TEST_P(ClientIntegrationTest, BasicWithCares) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
   }
+}
+#endif
+
+// TODO(fredyw): Disable this until we support treating no DNS record as a failure in the Apple
+// resolver.
+#if not defined(__APPLE__)
+TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
+  builder_.setLogLevel(Logger::Logger::debug);
+  std::atomic<bool> found_cache_miss{false};
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
+    if (msg.find("ignoring failed address cache hit for miss for host 'doesnotexist") !=
+        std::string::npos) {
+      found_cache_miss = true;
+    }
+  };
+  builder_.setLogger(std::move(logger));
+  builder_.addRuntimeGuard("dns_nodata_noname_is_success", false);
+  builder_.setDisableDnsRefreshOnFailure(true);
+  initialize();
+
+  default_request_headers_.setHost("doesnotexist");
+  stream_ = createNewStream(createDefaultStreamCallbacks());
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  terminal_callback_.waitReady();
+
+  stream_ = createNewStream(createDefaultStreamCallbacks());
+  stream_->sendHeaders(std::make_unique<Http::TestRequestHeaderMapImpl>(default_request_headers_),
+                       true);
+  terminal_callback_.waitReady();
+
+  EXPECT_TRUE(found_cache_miss);
 }
 #endif
 

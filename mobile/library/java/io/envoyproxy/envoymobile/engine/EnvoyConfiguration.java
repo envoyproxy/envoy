@@ -25,6 +25,7 @@ public class EnvoyConfiguration {
   }
 
   public final int connectTimeoutSeconds;
+  public final boolean disableDnsRefreshOnFailure;
   public final int dnsRefreshSeconds;
   public final int dnsFailureRefreshSecondsBase;
   public final int dnsFailureRefreshSecondsMax;
@@ -68,8 +69,9 @@ public class EnvoyConfiguration {
    * Create a new instance of the configuration.
    *
    * @param connectTimeoutSeconds                         timeout for new network connections to
-   *     hosts in
-   *                                                      the cluster.
+   *     hosts in the cluster.
+   * @param disableDnsRefreshOnFailure                    whether to disable the DNS refresh on
+   *     failure
    * @param dnsRefreshSeconds                             default rate in seconds at which to
    *     refresh DNS.
    * @param dnsFailureRefreshSecondsBase                  base rate in seconds to refresh DNS on
@@ -131,18 +133,18 @@ public class EnvoyConfiguration {
    * HTTP/3.
    */
   public EnvoyConfiguration(
-      int connectTimeoutSeconds, int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
-      int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds,
-      List<String> dnsPreresolveHostnames, boolean enableDNSCache, int dnsCacheSaveIntervalSeconds,
-      int dnsNumRetries, boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares,
-      String http3ConnectionOptions, String http3ClientConnectionOptions,
-      Map<String, Integer> quicHints, List<String> quicCanonicalSuffixes,
-      boolean enableGzipDecompression, boolean enableBrotliDecompression,
-      int numTimeoutsToTriggerPortMigration, boolean enableSocketTagging,
-      boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
-      int h2ConnectionKeepaliveTimeoutSeconds, int maxConnectionsPerHost,
-      int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
-      TrustChainVerification trustChainVerification,
+      int connectTimeoutSeconds, boolean disableDnsRefreshOnFailure, int dnsRefreshSeconds,
+      int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds,
+      int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames, boolean enableDNSCache,
+      int dnsCacheSaveIntervalSeconds, int dnsNumRetries, boolean enableDrainPostDnsRefresh,
+      boolean enableHttp3, boolean useCares, String http3ConnectionOptions,
+      String http3ClientConnectionOptions, Map<String, Integer> quicHints,
+      List<String> quicCanonicalSuffixes, boolean enableGzipDecompression,
+      boolean enableBrotliDecompression, int numTimeoutsToTriggerPortMigration,
+      boolean enableSocketTagging, boolean enableInterfaceBinding,
+      int h2ConnectionKeepaliveIdleIntervalMilliseconds, int h2ConnectionKeepaliveTimeoutSeconds,
+      int maxConnectionsPerHost, int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds,
+      String appVersion, String appId, TrustChainVerification trustChainVerification,
       List<EnvoyNativeFilterConfig> nativeFilterChain,
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
@@ -152,6 +154,7 @@ public class EnvoyConfiguration {
       int h3ConnectionKeepaliveInitialIntervalMilliseconds) {
     JniLibrary.load();
     this.connectTimeoutSeconds = connectTimeoutSeconds;
+    this.disableDnsRefreshOnFailure = disableDnsRefreshOnFailure;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
     this.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
     this.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
@@ -229,16 +232,16 @@ public class EnvoyConfiguration {
         JniBridgeUtility.listOfStringPairsToJniBytes(this.caresFallbackResolvers);
 
     return JniLibrary.createBootstrap(
-        connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
-        dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve,
-        enableDNSCache, dnsCacheSaveIntervalSeconds, dnsNumRetries, enableDrainPostDnsRefresh,
-        enableHttp3, useCares, http3ConnectionOptions, http3ClientConnectionOptions, quicHints,
-        quicSuffixes, enableGzipDecompression, enableBrotliDecompression,
-        numTimeoutsToTriggerPortMigration, enableSocketTagging, enableInterfaceBinding,
-        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-        maxConnectionsPerHost, streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion,
-        appId, enforceTrustChainVerification, filterChain, enablePlatformCertificatesValidation,
-        upstreamTlsSni, runtimeGuards, caresFallbackResolvers,
+        connectTimeoutSeconds, disableDnsRefreshOnFailure, dnsRefreshSeconds,
+        dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds,
+        dnsMinRefreshSeconds, dnsPreresolve, enableDNSCache, dnsCacheSaveIntervalSeconds,
+        dnsNumRetries, enableDrainPostDnsRefresh, enableHttp3, useCares, http3ConnectionOptions,
+        http3ClientConnectionOptions, quicHints, quicSuffixes, enableGzipDecompression,
+        enableBrotliDecompression, numTimeoutsToTriggerPortMigration, enableSocketTagging,
+        enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
+        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
+        enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards, caresFallbackResolvers,
         h3ConnectionKeepaliveInitialIntervalMilliseconds);
   }
 }
