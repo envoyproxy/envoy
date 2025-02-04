@@ -905,8 +905,7 @@ TunnelingConnectionPoolImpl::TunnelingConnectionPoolImpl(
     StreamInfo::StreamInfo& downstream_info)
     : upstream_callbacks_(upstream_callbacks), tunnel_config_(tunnel_config),
       downstream_info_(downstream_info) {
-  // TODO(ohadvano): support upstream HTTP/3.
-  absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
+  absl::optional<Http::Protocol> protocol = downstream_info_.protocol();
   auto host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
       thread_local_cluster.loadBalancer().chooseHost(context));
   conn_pool_data_ = thread_local_cluster.httpConnPool(host, Upstream::ResourcePriority::Default,
@@ -920,7 +919,7 @@ void TunnelingConnectionPoolImpl::newStream(HttpStreamCallbacks& callbacks) {
   Tcp::ConnectionPool::Cancellable* handle =
       conn_pool_data_.value().newStream(upstream_->responseDecoder(), *this,
                                         {/*can_send_early_data_=*/false,
-                                         /*can_use_http3_=*/false});
+                                         /*can_use_http3_=*/true});
 
   if (handle != nullptr) {
     upstream_handle_ = handle;
