@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
