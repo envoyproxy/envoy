@@ -426,13 +426,15 @@ bool envoy_dynamic_module_callback_http_append_request_body(
   return true;
 }
 
+uint64_t min(uint64_t a, uint64_t b) { return a < b ? a : b; }
+
 bool envoy_dynamic_module_callback_http_drain_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->decoder_callbacks_->decodingBuffer()) {
     if (filter->current_request_body_) { // See the comment on current_request_body_ for when we
                                          // enter this block.
-      auto size = std::min(filter->current_request_body_->length(), number_of_bytes);
+      auto size = min(filter->current_request_body_->length(), number_of_bytes);
       filter->current_request_body_->drain(size);
       return true;
     }
@@ -440,7 +442,7 @@ bool envoy_dynamic_module_callback_http_drain_request_body(
   }
 
   filter->decoder_callbacks_->modifyDecodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
-    auto size = std::min(buffer.length(), number_of_bytes);
+    auto size = min(buffer.length(), number_of_bytes);
     buffer.drain(size);
   });
   return true;
@@ -508,7 +510,7 @@ bool envoy_dynamic_module_callback_http_drain_response_body(
   if (!filter->encoder_callbacks_->encodingBuffer()) {
     if (filter->current_response_body_) { // See the comment on current_response_body_ for when we
                                           // enter this block.
-      auto size = std::min(filter->current_response_body_->length(), number_of_bytes);
+      auto size = min(filter->current_response_body_->length(), number_of_bytes);
       filter->current_response_body_->drain(size);
       return true;
     }
@@ -516,7 +518,7 @@ bool envoy_dynamic_module_callback_http_drain_response_body(
   }
 
   filter->encoder_callbacks_->modifyEncodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
-    auto size = std::min(buffer.length(), number_of_bytes);
+    auto size = min(buffer.length(), number_of_bytes);
     buffer.drain(size);
   });
   return true;
