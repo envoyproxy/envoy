@@ -472,6 +472,13 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_THAT(client_connection_->transportFailureReason(), StartsWith("immediate connect error"));
+  if (socket_->connectionInfoProvider().localAddress()->ip()->version() == Address::IpVersion::v4) {
+    EXPECT_THAT(client_connection_->transportFailureReason(),
+                HasSubstr("remote address family:v4|local address family:v4"));
+  } else {
+    EXPECT_THAT(client_connection_->transportFailureReason(),
+                HasSubstr("remote address family:v6|local address family:v6"));
+  }
 }
 
 TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
