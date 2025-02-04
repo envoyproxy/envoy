@@ -66,4 +66,4 @@ Getting Started
 --------------------------
 
 We have a dedicated repository for the dynamic module examples to help you get started.
-The repository is available at `envoyproxy/dynamic-modules-example <https://github.com/envoyproxy/envoyproxy/dynamic-modules-example>`_
+The repository is available at `envoyproxy/dynamic-modules-examples <https://github.com/envoyproxy/envoyproxy/dynamic-modules-examples>`_
