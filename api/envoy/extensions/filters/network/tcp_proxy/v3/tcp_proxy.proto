@@ -6,7 +6,7 @@ import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
-import "envoy/extensions/filters/http/credential_injector/v3/credential_injector.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/v3/hash_policy.proto";
 
 import "google/protobuf/duration.proto";
@@ -117,8 +117,9 @@ message TcpProxy {
     // by the network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_trailers``.
     bool propagate_response_trailers = 6;
 
-    // Credential injector allows injecting authorization header to upstream proxy.
-    http.credential_injector.v3.CredentialInjector credential_injector = 7;
+    // The credential to inject into the request to tunnel proxy.
+    // [#extension-category: envoy.http.injected_credentials]
+    config.core.v3.TypedExtensionConfig credential = 7;
   }
 
   message OnDemand {

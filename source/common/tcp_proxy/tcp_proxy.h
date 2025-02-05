@@ -35,7 +35,7 @@
 #include "source/common/tcp_proxy/upstream.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/od_cds_api_impl.h"
-#include "source/extensions/filters/http/credential_injector/credential_injector_filter.h"
+#include "source/extensions/http/injected_credentials/common/credential.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -182,7 +182,7 @@ private:
   Stats::StatNameManagedStorage route_stat_name_storage_;
   const Router::FilterConfig router_config_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;
-  Extensions::HttpFilters::CredentialInjector::CredentialInjectorSharedPtr credential_injector_;
+  Extensions::Http::InjectedCredentials::Common::CredentialInjectorSharedPtr credential_injector_;
 };
 
 /**

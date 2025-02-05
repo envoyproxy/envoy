@@ -13,7 +13,6 @@ envoy_cc_library(
     name = "credential_injector_lib",
     srcs = ["credential_injector_filter.cc"],
     hdrs = ["credential_injector_filter.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/server:filter_config_interface",
         "//source/common/http:header_map_lib",

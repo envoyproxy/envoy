@@ -11,7 +11,6 @@ envoy_extension_package()
 envoy_cc_library(
     name = "credential_interface",
     hdrs = ["credential.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/http:header_map_interface",
     ],
@@ -20,7 +19,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "secret_reader_lib",
     hdrs = ["secret_reader.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//source/common/secret:secret_provider_impl_lib",
     ],
@@ -40,7 +38,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "credential_factory_base_lib",
     hdrs = ["factory_base.h"],
-    visibility = ["//visibility:public"],
     deps = [
         ":credential_config_interface",
         ":credential_interface",

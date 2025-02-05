@@ -36,7 +36,6 @@
 #include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
-#include "source/extensions/filters/http/credential_injector/credential_injector_filter.h"
 #include "source/extensions/http/injected_credentials/common/factory.h"
 
 namespace Envoy {
@@ -753,26 +752,24 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
                                 substitution_format_config, context),
                             Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
 
-  if (config_message.tunneling_config().has_credential_injector()) {
-    if (config_message.tunneling_config().credential_injector().has_credential()) {
-      auto credential = config_message.tunneling_config().credential_injector().credential();
+  if (config_message.tunneling_config().has_credential()) {
+    auto credential = config_message.tunneling_config().credential();
 
-      // Find the credential injector factory.
-      auto* config_factory =
-          Envoy::Config::Utility::getFactory<Envoy::Extensions::Http::InjectedCredentials::Common::
-                                                 NamedCredentialInjectorConfigFactory>(credential);
-      if (config_factory == nullptr) {
-        throw EnvoyException(fmt::format(
-            "Didn't find a registered implementation for '{}' with type URL: '{}'",
-            credential.name(), Envoy::Config::Utility::getFactoryType(credential.typed_config())));
-      }
-
-      // create the credential injector
-      ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateAnyToFactoryConfig(
-          credential.typed_config(), context.messageValidationVisitor(), *config_factory);
-      credential_injector_ = config_factory->createCredentialInjectorFromProto(
-          *message, config_message.stat_prefix() + "credential_injector.", context);
+    // Find the credential injector factory.
+    auto* config_factory = Envoy::Config::Utility::getFactory<
+        Envoy::Extensions::Http::InjectedCredentials::Common::NamedCredentialInjectorConfigFactory>(
+        credential);
+    if (config_factory == nullptr) {
+      throw EnvoyException(fmt::format(
+          "Didn't find a registered implementation for '{}' with type URL: '{}'", credential.name(),
+          Envoy::Config::Utility::getFactoryType(credential.typed_config())));
     }
+
+    // Create the credential injector.
+    ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateAnyToFactoryConfig(
+        credential.typed_config(), context.messageValidationVisitor(), *config_factory);
+    credential_injector_ = config_factory->createCredentialInjectorFromProto(
+        *message, config_message.stat_prefix() + "credential_injector.", context);
   }
 }
 
