@@ -65,7 +65,6 @@ paths:
     - bazel/BUILD
     - bazel/external/
     - bazel/toolchains/
-    - tools/clang_tools
 
   # `build_urls`:
   #   We want all URL references to exist in repository_locations.bzl files and have
@@ -104,7 +103,6 @@ paths:
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
     - source/common/formatter/http_specific_formatter.cc
-    - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
     - source/common/stats/tag_extractor_impl.cc
@@ -144,11 +142,9 @@ paths:
     - source/common/event/file_event_impl.cc
     - source/common/http/async_client_impl.cc
     - source/common/grpc/google_async_client_impl.cc
-    - source/common/formatter/substitution_format_utility.cc
     # Extensions can exempt entire directories but new extensions
     # points should ideally use StatusOr
     - source/extensions/access_loggers
-    - source/extensions/bootstrap/wasm/config.cc
     - source/extensions/clusters/eds/
     - source/extensions/clusters/logical_dns
     - source/extensions/clusters/original_dst
@@ -253,7 +249,6 @@ paths:
   namespace_check:
     exclude:
     - tools/api_boost/testdata/
-    - tools/clang_tools/
 
   # Files that should not raise an error for using memcpy
   memcpy:
@@ -354,8 +349,6 @@ paths:
     - source/server/admin/stats_request.cc
     - source/server/admin/utils.h
     - source/server/admin/utils.cc
-    - tools/clang_tools/api_booster/main.cc
-    - tools/clang_tools/api_booster/proto_cxx_utils.cc
 
   # These are entire files that are allowed to use std::string_view vs. individual exclusions. Right
   # now this is just WASM which makes use of std::string_view heavily so we need to convert to
