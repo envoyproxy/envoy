@@ -32,7 +32,7 @@ There are a few design goals for the dynamic modules:
 Compatibility
 --------------------------
 
-Since the dynamic modules are loaded at runtime, it is important to ensure that the dynamic module is compatible with the
+Since a dynamic modules is loaded at runtime, it must be abi-compatible with the
 Envoy binary that loads it.
 
 The dynamic modules have stricker compatibility requirements than the other Envoy extension mechanisms, such as Lua, Wasm or External Processor.
