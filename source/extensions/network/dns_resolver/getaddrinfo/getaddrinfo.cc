@@ -194,8 +194,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
                   *num_retries);
         next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::DoneRetrying));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
-      } else if (treat_nodata_noname_as_success &&
-                 (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA)) {
+      } else if (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA) {
         // Treat NONAME and NODATA as DNS records with no results.
         // NODATA and NONAME are typically not transient failures, so we don't expect success if
         // the DNS query is retried.
@@ -204,7 +203,9 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         ENVOY_LOG(debug, "getaddrinfo for host={} has no results rc={}", next_query->dns_name_,
                   gai_strerror(rc.return_value_));
         next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NoResult));
-        response = std::make_pair(ResolutionStatus::Completed, std::list<DnsResponse>());
+        response = std::make_pair(treat_nodata_noname_as_success ? ResolutionStatus::Completed
+                                                                 : ResolutionStatus::Failure,
+                                  std::list<DnsResponse>());
       } else {
         ENVOY_LOG(debug, "getaddrinfo failed for host={} with rc={} errno={}",
                   next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));

@@ -751,6 +751,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
           serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
           thread_local_);
 
+  // Create the xDS-Manager that will be passed to the cluster manager when it
+  // is initialized below.
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(validation_context_);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
@@ -761,11 +765,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
   RETURN_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
-
-  // Create the xDS-Manager and pass the cluster manager that was created above.
-  ASSERT(config_.clusterManager());
-  xds_manager_ =
-      std::make_unique<Config::XdsManagerImpl>(*config_.clusterManager(), validation_context_);
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.

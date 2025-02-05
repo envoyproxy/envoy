@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/config/xds_manager.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -120,6 +121,11 @@ public:
    * @return Upstream::ClusterManager& singleton for use by the entire server.
    */
   virtual Upstream::ClusterManager& clusterManager() PURE;
+
+  /**
+   * @return Config::XdsManager& singleton for use by the entire server.
+   */
+  virtual Config::XdsManager& xdsManager() PURE;
 
   /**
    * @return const Http::HttpServerPropertiesCacheManager& instance for use by the entire server.

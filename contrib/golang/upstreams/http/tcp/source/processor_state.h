@@ -51,14 +51,14 @@ enum class HttpTcpBridgeStatus {
   /**
    *
    * Used when you want to leave the current func area and continue further func. (when streaming,
-   * go side get each_data_piece, may be called multipled times)
+   * go side get each_data_piece, may be called multiple times)
    *
    * Here is the specific explanation in different funcs:
    *
    * encodeHeaders: will go to encodeData, go side in encodeData will streaming get each_data_piece.
    *
    * encodeData: streaming send data to upstream, go side get each_data_piece, may be called
-   * multipled times.
+   * multiple times.
    *
    * onUpstreamData: go side in onUpstreamData will get each_data_piece, pass data
    * and headers to downstream streaming.
@@ -78,7 +78,7 @@ enum class HttpTcpBridgeStatus {
    * data one-off. (Be careful: cannot be used when end_stream=true)
    *
    * onUpstreamData: every data
-   * trigger will call go side, and go side get whloe buffered data ever since at every time.
+   * trigger will call go side, and go side get whole buffered data ever since at every time.
    */
   HttpTcpBridgeStopAndBuffer,
 

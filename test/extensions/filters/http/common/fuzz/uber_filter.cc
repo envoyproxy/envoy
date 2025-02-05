@@ -97,7 +97,8 @@ void UberFilterFuzzer::fuzz(
     for (const auto& header : downstream_data.headers().headers()) {
       headers.addCopy(header.key(), header.value());
     }
-    ON_CALL(decoder_callbacks_, requestHeaders()).WillByDefault(Return(makeOptRef(headers)));
+    ON_CALL(decoder_callbacks_, requestHeaders())
+        .WillByDefault(Return(makeOptRef<Http::RequestHeaderMap>(headers)));
     HttpFilterFuzzer::runData(decoder_filter_.get(), downstream_data);
   } else {
     decoding_finished_ = true;

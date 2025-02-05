@@ -1,0 +1,73 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: default
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                direct_response:
+                  status: 200
+                  body:
+                    inline_string: "OK"
+          http_filters:
+          - name: envoy.extensions.filters.http.jwt_authn
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+              providers:
+                provider_name2:
+                  issuer: https://example2.com
+                  local_jwks:
+                    inline_string: >-
+                      {"keys": [
+                        {"kty":"RSA",
+                         "n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86z
+                              wu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc
+                              5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8K
+                              JZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh
+                              6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKn
+                              qDKgw",
+                         "e":"AQAB",
+                         "alg":"RS256",
+                         "kid":"2011-04-29"}]}
+                  from_headers:
+                  - name: jwt-assertion
+                  forward: true
+                  forward_payload_header: x-jwt-payload
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: example_jwks_cluster
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: example_jwks_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: example_jwks_cluster.example.com
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: example_jwks_cluster.example.com

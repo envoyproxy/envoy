@@ -300,10 +300,11 @@ public class JniLibrary {
    *
    */
   public static native long createBootstrap(
-      long connectTimeoutSeconds, long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase,
-      long dnsFailureRefreshSecondsMax, long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds,
-      byte[][] dnsPreresolveHostnames, boolean enableDNSCache, long dnsCacheSaveIntervalSeconds,
-      int dnsNumRetries, boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares,
+      long connectTimeoutSeconds, boolean disableDnsRefreshOnFailure, long dnsRefreshSeconds,
+      long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
+      long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
+      boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, int dnsNumRetries,
+      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares,
       String http3ConnectionOptions, String http3ClientConnectionOptions, byte[][] quicHints,
       byte[][] quicCanonicalSuffixes, boolean enableGzipDecompression,
       boolean enableBrotliDecompression, int numTimeoutsToTriggerPortMigration,

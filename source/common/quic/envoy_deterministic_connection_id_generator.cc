@@ -1,4 +1,4 @@
-#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator.h"
+#include "source/common/quic/envoy_deterministic_connection_id_generator.h"
 
 #include <cstdint>
 
@@ -9,6 +9,19 @@
 
 namespace Envoy {
 namespace Quic {
+
+namespace {
+
+// Modify new_connection_id according to given old_connection_id to make sure packets with the new
+// one can be routed to the same listener.
+void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
+                                     const quic::QuicConnectionId& old_connection_id) {
+  char* new_connection_id_data = new_connection_id.mutable_data();
+  const char* old_connection_id_ptr = old_connection_id.data();
+  // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
+  memcpy(new_connection_id_data, old_connection_id_ptr, 4); // NOLINT(safe-memcpy)
+}
+} // namespace
 
 absl::optional<quic::QuicConnectionId>
 EnvoyDeterministicConnectionIdGenerator::GenerateNextConnectionId(
