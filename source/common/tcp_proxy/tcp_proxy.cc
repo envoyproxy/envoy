@@ -758,21 +758,20 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       auto credential = config_message.tunneling_config().credential_injector().credential();
 
       // Find the credential injector factory.
-      auto* config_factory = Envoy::Config::Utility::getFactory<Envoy::Extensions::Http::InjectedCredentials::Common::NamedCredentialInjectorConfigFactory>(
-          credential);
+      auto* config_factory =
+          Envoy::Config::Utility::getFactory<Envoy::Extensions::Http::InjectedCredentials::Common::
+                                                 NamedCredentialInjectorConfigFactory>(credential);
       if (config_factory == nullptr) {
         throw EnvoyException(fmt::format(
             "Didn't find a registered implementation for '{}' with type URL: '{}'",
-            credential.name(),
-            Envoy::Config::Utility::getFactoryType(credential.typed_config())));
+            credential.name(), Envoy::Config::Utility::getFactoryType(credential.typed_config())));
       }
 
       // create the credential injector
       ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateAnyToFactoryConfig(
-          credential.typed_config(), context.messageValidationVisitor(),
-          *config_factory);
+          credential.typed_config(), context.messageValidationVisitor(), *config_factory);
       credential_injector_ = config_factory->createCredentialInjectorFromProto(
-              *message, config_message.stat_prefix() + "credential_injector.", context);
+          *message, config_message.stat_prefix() + "credential_injector.", context);
     }
   }
 }
