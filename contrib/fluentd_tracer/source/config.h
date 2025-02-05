@@ -2,8 +2,8 @@
 
 #include "source/extensions/tracers/common/factory_base.h"
 
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.h"
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.validate.h"
+#include "contrib/envoy/extensions/tracers/fluentd/v3/fluentd.pb.h"
+#include "contrib/envoy/extensions/tracers/fluentd/v3/fluentd.pb.validate.h"
 #include "contrib/fluentd_tracer/source/fluentd_tracer_impl.h"
 
 namespace Envoy {

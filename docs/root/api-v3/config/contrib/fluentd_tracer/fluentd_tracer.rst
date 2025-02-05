@@ -5,4 +5,4 @@ Fluentd Tracer
   :glob:
   :maxdepth: 2
 
-  ../../../extensions/tracers/fluentd/v3alpha/*
+  ../../../extensions/tracers/fluentd/v3/*

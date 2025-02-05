@@ -18,7 +18,7 @@ envoy_cc_contrib_extension(
     deps = [
         ":fluentd_tracer_lib",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@envoy_api//contrib/envoy/extensions/tracers/fluentd/v3alpha:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/tracers/fluentd/v3:pkg_cc_proto",
     ],
 )
 
@@ -26,7 +26,6 @@ envoy_cc_library(
     name = "fluentd_tracer_lib",
     srcs = ["fluentd_tracer_impl.cc"],
     hdrs = ["fluentd_tracer_impl.h"],
-    copts = ["-Wno-unused-parameter -g"],
     tags = ["debug"],
     deps = [
         "//envoy/thread_local:thread_local_interface",
@@ -35,6 +34,6 @@ envoy_cc_library(
         "//source/common/tracing:trace_context_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "@com_github_msgpack_cpp//:msgpack",
-        "@envoy_api//contrib/envoy/extensions/tracers/fluentd/v3alpha:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/tracers/fluentd/v3:pkg_cc_proto",
     ],
 )

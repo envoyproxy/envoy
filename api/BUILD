@@ -98,7 +98,7 @@ proto_library(
         "//contrib/envoy/extensions/regex_engines/hyperscan/v3alpha:pkg",
         "//contrib/envoy/extensions/router/cluster_specifier/golang/v3alpha:pkg",
         "//contrib/envoy/extensions/tap_sinks/udp_sink/v3alpha:pkg",
-        "//contrib/envoy/extensions/tracers/fluentd/v3alpha:pkg",
+        "//contrib/envoy/extensions/tracers/fluentd/v3:pkg",
         "//contrib/envoy/extensions/upstreams/http/tcp/golang/v3alpha:pkg",
         "//contrib/envoy/extensions/vcl/v3alpha:pkg",
         "//envoy/admin/v3:pkg",

@@ -12,8 +12,8 @@
 #include "source/extensions/tracers/common/factory_base.h"
 
 #include "absl/strings/string_view.h"
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.h"
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.validate.h"
+#include "contrib/envoy/extensions/tracers/fluentd/v3/fluentd.pb.h"
+#include "contrib/envoy/extensions/tracers/fluentd/v3/fluentd.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

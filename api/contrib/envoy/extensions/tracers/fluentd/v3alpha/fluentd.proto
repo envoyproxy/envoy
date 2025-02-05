@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.tracers.fluentd.v3alpha;
+package envoy.extensions.tracers.fluentd.v3;
 
 import "envoy/config/core/v3/backoff.proto";
 
@@ -11,10 +11,10 @@ import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.tracers.fluentd.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.tracers.fluentd.v3";
 option java_outer_classname = "FluentdProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/tracers/fluentd/v3alpha";
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/tracers/fluentd/v3";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.tracers.fluentd.v4alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 

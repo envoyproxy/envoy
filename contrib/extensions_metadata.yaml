@@ -143,9 +143,9 @@ envoy.tracers.fluentd:
   categories:
   - envoy.tracers
   security_posture: unknown
-  status: wip
+  status: alpha
   type_urls:
-  - envoy.extensions.tracers.fluentd.v3alpha.FluentdConfig
+  - envoy.extensions.tracers.fluentd.v3.FluentdConfig
 envoy.upstreams.http.tcp.golang:
   categories:
   - envoy.upstreams

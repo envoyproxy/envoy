@@ -7,7 +7,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-#include "contrib/envoy/extensions/tracers/fluentd/v3alpha/fluentd.pb.h"
+#include "contrib/envoy/extensions/tracers/fluentd/v3/fluentd.pb.h"
 #include "contrib/fluentd_tracer/source/config.h"
 #include "contrib/fluentd_tracer/source/fluentd_tracer_impl.h"
 #include "gtest/gtest.h"
