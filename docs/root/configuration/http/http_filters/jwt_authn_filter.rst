@@ -111,7 +111,7 @@ Remote JWKS config example
 
 .. literalinclude:: _include/jwt-authn-filter.yaml
     :language: yaml
-    :lines: 38-50
+    :lines: 38-49
     :lineno-start: 38
     :linenos:
     :caption: :download:`jwt-authn-filter.yaml <_include/jwt-authn-filter.yaml>`
@@ -122,8 +122,8 @@ Following cluster **example_jwks_cluster** is needed to fetch JWKS.
 
 .. literalinclude:: _include/jwt-authn-filter.yaml
     :language: yaml
-    :lines: 55-72
-    :lineno-start: 55
+    :lines: 54-71
+    :lineno-start: 54
     :linenos:
     :caption: :download:`jwt-authn-filter.yaml <_include/jwt-authn-filter.yaml>`
 
@@ -169,8 +169,8 @@ Single requirement config example
 
 .. literalinclude:: _include/jwt-authn-single-filter.yaml
     :language: yaml
-    :lines: 68-99
-    :lineno-start: 68
+    :lines: 32-63
+    :lineno-start: 32
     :linenos:
     :caption: :download:`jwt-authn-single-filter.yaml <_include/jwt-authn-single-filter.yaml>`
 
@@ -181,8 +181,8 @@ Group requirement config example
 
 .. literalinclude:: _include/jwt-authn-group-filter.yaml
     :language: yaml
-    :lines: 68-113
-    :lineno-start: 68
+    :lines: 32-77
+    :lineno-start: 32
     :linenos:
     :caption: :download:`jwt-authn-group-filter.yaml <_include/jwt-authn-group-filter.yaml>`
 
@@ -204,8 +204,8 @@ The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt
 
 .. literalinclude:: _include/jwt-authn-claim-filter.yaml
     :language: yaml
-    :lines: 68-77
-    :lineno-start: 68
+    :lines: 32-41
+    :lineno-start: 32
     :linenos:
     :caption: :download:`jwt-authn-claim-filter.yaml <_include/jwt-authn-claim-filter.yaml>`
 

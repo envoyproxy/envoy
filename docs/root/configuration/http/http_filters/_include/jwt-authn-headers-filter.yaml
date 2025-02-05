@@ -49,8 +49,7 @@ static_resources:
                       uri: https://example.com/jwks.json
                       cluster: example_jwks_cluster
                       timeout: 1s
-                    cache_duration:
-                      seconds: 300
+                    cache_duration: 300s
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

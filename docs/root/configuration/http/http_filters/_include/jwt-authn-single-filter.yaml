@@ -30,46 +30,10 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
               providers:
-                provider_name2:
-                  issuer: https://example2.com
-                  local_jwks:
-                    inline_string: |
-                      {"keys": [static_resources:
-  listeners:
-  - name: listener_0
-    address:
-      socket_address:
-        protocol: TCP
-        address: 0.0.0.0
-        port_value: 10000
-    filter_chains:
-    - filters:
-      - name: envoy.filters.network.http_connection_manager
-        typed_config:
-          "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
-          stat_prefix: ingress_http
-          route_config:
-            name: local_route
-            virtual_hosts:
-            - name: default
-              domains:
-              - "*"
-              routes:
-              - match:
-                  prefix: "/"
-                direct_response:
-                  status: 200
-                  body:
-                    inline_string: "OK"
-          http_filters:
-          - name: envoy.extensions.filters.http.jwt_authn
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
-              providers:
                 jwt_provider1:
                   issuer: https://example.com
                   audiences:
-                    audience1
+                  - audience1
                   local_jwks:
                     inline_string: >-
                       {"keys": [
@@ -92,7 +56,7 @@ static_resources:
                   provider_and_audiences:
                     provider_name: jwt_provider1
                     audiences:
-                      api_audience
+                    - api_audience
               - match:
                   prefix: /
                 requires:
