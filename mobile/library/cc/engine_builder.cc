@@ -899,7 +899,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 EngineSharedPtr EngineBuilder::build() {
   InternalEngine* envoy_engine =
       new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-                         network_thread_priority_);
+                         network_thread_priority_, disable_dns_refresh_on_network_change_);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
