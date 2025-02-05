@@ -44,7 +44,7 @@ In other words, the dynamic modules must be built with the SDK of the same versi
 Since the SDK lives inside the Envoy repository, using the same commit hash or release tag of the Envoy version is the best way to ensure
 the compatibility.
 
-Module Discovery
+Module discovery
 --------------------------
 
 A dynamic module is referenced by its name as in the :ref:`configuration API  <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>`.
