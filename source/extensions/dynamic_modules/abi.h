@@ -257,7 +257,7 @@ typedef enum {
  * @return envoy_dynamic_module_type_abi_version_envoy_ptr is the ABI version of the dynamic
  * module. Null means the error and the module will be unloaded immediately.
  */
-envoy_dynamic_module_type_abi_version_envoy_ptr envoy_dynamic_module_on_program_init();
+envoy_dynamic_module_type_abi_version_envoy_ptr envoy_dynamic_module_on_program_init(void);
 
 /**
  * envoy_dynamic_module_on_http_filter_config_new is called by the main thread when the http
