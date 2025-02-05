@@ -886,7 +886,7 @@ std::string stsClusterName(absl::string_view region) {
   return absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
 }
 
-SINGLETON_MANAGER_REGISTRATION(aws_credentials_provider_cluster_manager);
+SINGLETON_MANAGER_REGISTRATION(aws_cluster_manager);
 
 CustomCredentialsProviderChain::CustomCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
@@ -895,7 +895,7 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
 
   aws_cluster_manager_ =
       context.singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(aws_credentials_provider_cluster_manager),
+          SINGLETON_MANAGER_REGISTERED_NAME(aws_cluster_manager),
           [&context] {
             return std::make_shared<Envoy::Extensions::Common::Aws::AwsClusterManager>(context);
           },
@@ -928,7 +928,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
   if (context) {
     aws_cluster_manager_ =
         context->singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManager>(
-            SINGLETON_MANAGER_REGISTERED_NAME(aws_credentials_provider_cluster_manager),
+            SINGLETON_MANAGER_REGISTERED_NAME(aws_cluster_manager),
             [&context] {
               return std::make_shared<Envoy::Extensions::Common::Aws::AwsClusterManager>(
                   context.value());

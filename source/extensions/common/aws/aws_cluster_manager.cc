@@ -1,4 +1,5 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
+
 #include <memory>
 
 namespace Envoy {
@@ -52,9 +53,10 @@ AwsClusterManager::addManagedClusterUpdateCallbacks(absl::string_view cluster_na
     cb.onClusterAddOrUpdate();
     return absl::AlreadyExistsError("Cluster already online");
   }
-  auto callback_handle = std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle, AwsManagedClusterUpdateCallbacksHandleDeleter>
-  (new AwsManagedClusterUpdateCallbacksHandle(context_, cb, managed_cluster->update_callbacks_),
-        AwsManagedClusterUpdateCallbacksHandleDeleter());
+  auto callback_handle = std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle,
+                                         AwsManagedClusterUpdateCallbacksHandleDeleter>(
+      new AwsManagedClusterUpdateCallbacksHandle(context_, cb, managed_cluster->update_callbacks_),
+      AwsManagedClusterUpdateCallbacksHandleDeleter());
   return callback_handle;
 }
 

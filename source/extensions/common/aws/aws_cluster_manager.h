@@ -26,27 +26,29 @@ public:
 class AwsManagedClusterUpdateCallbacksHandle
     : public RaiiListElement<AwsManagedClusterUpdateCallbacks*> {
 public:
-  AwsManagedClusterUpdateCallbacksHandle(Server::Configuration::ServerFactoryContext& context, AwsManagedClusterUpdateCallbacks& cb,
+  AwsManagedClusterUpdateCallbacksHandle(Server::Configuration::ServerFactoryContext& context,
+                                         AwsManagedClusterUpdateCallbacks& cb,
                                          std::list<AwsManagedClusterUpdateCallbacks*>& parent)
       : RaiiListElement<AwsManagedClusterUpdateCallbacks*>(parent, &cb), context_(context) {}
-      public:
-      Server::Configuration::ServerFactoryContext& context_;
+
+public:
+  Server::Configuration::ServerFactoryContext& context_;
 };
 
 class AwsManagedClusterUpdateCallbacksHandleDeleter {
- public:
+public:
   void operator()(AwsManagedClusterUpdateCallbacksHandle* handle) {
-    if(handle->context_.clusterManager().isShutdown())
-    {
+    if (handle->context_.clusterManager().isShutdown()) {
       if (handle != nullptr) {
         handle->cancel();
       }
     }
-    delete handle; 
+    delete handle;
   }
 };
 using AwsManagedClusterUpdateCallbacksHandlePtr =
-    std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle, AwsManagedClusterUpdateCallbacksHandleDeleter>;
+    std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle,
+                    AwsManagedClusterUpdateCallbacksHandleDeleter>;
 
 /**
  * Manages clusters for any number of credentials provider instances
