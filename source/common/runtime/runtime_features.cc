@@ -153,6 +153,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 // TODO(renjietang): Evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
+// TODO(fredyw): Remove after done with debugging.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_log_ip_families_on_network_error);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
