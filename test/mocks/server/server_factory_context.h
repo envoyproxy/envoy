@@ -75,6 +75,7 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
+  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   Http::Context& httpContext() override { return http_context_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Router::Context& routerContext() override { return router_context_; }
@@ -95,6 +96,7 @@ public:
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
+  TransportSocketFactoryContext* transport_socket_factory_context_;
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
@@ -165,6 +167,7 @@ public:
   MOCK_METHOD(Grpc::Context&, grpcContext, ());
   MOCK_METHOD(Router::Context&, routerContext, ());
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
+  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   MOCK_METHOD(envoy::config::bootstrap::v3::Bootstrap&, bootstrap, ());
   MOCK_METHOD(Server::DrainManager&, drainManager, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
