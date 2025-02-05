@@ -309,6 +309,7 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
   initialize();
 
   internalEngine()->onDefaultNetworkChanged(1);
+  basicTest();
 
   EXPECT_FALSE(found_force_dns_refresh);
 }
