@@ -33,6 +33,49 @@ static_resources:
                 provider_name2:
                   issuer: https://example2.com
                   local_jwks:
+                    inline_string: |
+                      {"keys": [static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: default
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/"
+                direct_response:
+                  status: 200
+                  body:
+                    inline_string: "OK"
+          http_filters:
+          - name: envoy.extensions.filters.http.jwt_authn
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+              providers:
+                provider_name2:
+                  issuer: https://example2.com
+                  claim_to_headers:
+                  - header_name: x-jwt-claim-sub
+                    claim_name: sub
+                  - header_name: x-jwt-claim-nested-key
+                    claim_name: nested.claim.key
+                  - header_name: x-jwt-tenants
+                    claim_name: tenants
+                  local_jwks:
                     inline_string: >-
                       {"keys": [
                         {"kty":"RSA",
@@ -45,10 +88,6 @@ static_resources:
                          "e":"AQAB",
                          "alg":"RS256",
                          "kid":"2011-04-29"}]}
-                  from_headers:
-                  - name: jwt-assertion
-                  forward: true
-                  forward_payload_header: x-jwt-payload
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

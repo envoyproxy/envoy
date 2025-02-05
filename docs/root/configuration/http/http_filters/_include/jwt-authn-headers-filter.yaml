@@ -38,6 +38,9 @@ static_resources:
               providers:
                 provider_name1:
                   issuer: https://example.com
+                  from_headers:
+                  - name: x-jwt-header
+                    value_prefix: jwt_value
                   audiences:
                   - bookstore_android.apps.googleusercontent.com
                   - bookstore_web.apps.googleusercontent.com
@@ -47,7 +50,7 @@ static_resources:
                       cluster: example_jwks_cluster
                       timeout: 1s
                     cache_duration:
-                      seconds: "300"
+                      seconds: 300
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

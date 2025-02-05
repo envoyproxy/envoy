@@ -134,8 +134,8 @@ Another config example using inline JWKS:
 
 .. literalinclude:: _include/jwt-authn-inline-filter.yaml
     :language: yaml
-    :lines: 68-87
-    :lineno-start: 68
+    :lines: 32-51
+    :lineno-start: 32
     :linenos:
     :caption: :download:`jwt-authn-inline-filter.yaml <_include/jwt-authn-inline-filter.yaml>`
 
