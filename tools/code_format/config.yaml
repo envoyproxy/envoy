@@ -161,7 +161,6 @@ paths:
     - source/extensions/config_subscription
     - source/extensions/compression/zstd/common/dictionary_manager.h
     - source/extensions/filters/http/adaptive_concurrency/controller
-    - source/extensions/filters/http/admission_control
     - source/extensions/filters/http/aws_lambda
     - source/extensions/filters/http/basic_auth
     - source/extensions/filters/http/cache

@@ -75,12 +75,12 @@ Token Extraction from Custom HTTP Headers
 If the JWT needs to be extracted in other HTTP header, use :ref:`from_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.from_headers>` to specify the header name.
 In addition to the :ref:`name <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.name>` field, which specifies the HTTP header name, the section can specify an optional :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>` value, as in:
 
-.. code-block:: yaml
-
-    from_headers:
-      - name: x-jwt-header
-        value_prefix: jwt_value
-
+.. literalinclude:: _include/jwt-authn-headers-filter.yaml
+    :language: yaml
+    :lines: 41-43
+    :lineno-start: 41
+    :linenos:
+    :caption: :download:`jwt-authn-headers-filter.yaml <_include/jwt-authn-headers-filter.yaml>`
 
 The above will cause the jwt_authn filter to look for the JWT in the ``x-jwt-header`` header, following the tag ``jwt_value``.
 Any non-JWT characters (i.e., anything other than alphanumerics, `_`, `-`, and `.`) will be skipped,
@@ -109,60 +109,35 @@ is taken to be the JWT token. This is unlikely to succeed; the error will report
 Remote JWKS config example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: yaml
-
-  providers:
-    provider_name1:
-      issuer: https://example.com
-      audiences:
-      - bookstore_android.apps.googleusercontent.com
-      - bookstore_web.apps.googleusercontent.com
-      remote_jwks:
-        http_uri:
-          uri: https://example.com/jwks.json
-          cluster: example_jwks_cluster
-          timeout: 1s
-        cache_duration:
-          seconds: 300
+.. literalinclude:: _include/jwt-authn-filter.yaml
+    :language: yaml
+    :lines: 38-49
+    :lineno-start: 38
+    :linenos:
+    :caption: :download:`jwt-authn-filter.yaml <_include/jwt-authn-filter.yaml>`
 
 Above example fetches JWKS from a remote server with URL https://example.com/jwks.json. The token will be extracted from the default extract locations. The token will not be forwarded to upstream. JWT payload will not be added to the request header.
 
 Following cluster **example_jwks_cluster** is needed to fetch JWKS.
 
-.. code-block:: yaml
-
-  cluster:
-    name: example_jwks_cluster
-    type: STRICT_DNS
-    load_assignment:
-      cluster_name: example_jwks_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: example.com
-                port_value: 443
-    transport_socket:
-      name: envoy.transport_sockets.tls
-
+.. literalinclude:: _include/jwt-authn-filter.yaml
+    :language: yaml
+    :lines: 54-71
+    :lineno-start: 54
+    :linenos:
+    :caption: :download:`jwt-authn-filter.yaml <_include/jwt-authn-filter.yaml>`
 
 Inline JWKS config example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Another config example using inline JWKS:
 
-.. code-block:: yaml
-
-  providers:
-    provider_name2:
-      issuer: https://example2.com
-      local_jwks:
-        inline_string: PUBLIC-KEY
-      from_headers:
-      - name: jwt-assertion
-      forward: true
-      forward_payload_header: x-jwt-payload
+.. literalinclude:: _include/jwt-authn-inline-filter.yaml
+    :language: yaml
+    :lines: 32-51
+    :lineno-start: 32
+    :linenos:
+    :caption: :download:`jwt-authn-inline-filter.yaml <_include/jwt-authn-inline-filter.yaml>`
 
 Above example uses config inline string to specify JWKS. The JWT token will be extracted from HTTP headers as:
 
@@ -192,61 +167,24 @@ RequirementRule
 Single requirement config example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: yaml
-
-  providers:
-    jwt_provider1:
-      issuer: https://example.com
-      audiences:
-        audience1
-      local_jwks:
-        inline_string: PUBLIC-KEY
-  rules:
-  - match:
-      prefix: /health
-  - match:
-      prefix: /api
-    requires:
-      provider_and_audiences:
-        provider_name: jwt_provider1
-        audiences:
-          api_audience
-  - match:
-      prefix: /
-    requires:
-      provider_name: jwt_provider1
+.. literalinclude:: _include/jwt-authn-single-filter.yaml
+    :language: yaml
+    :lines: 32-63
+    :lineno-start: 32
+    :linenos:
+    :caption: :download:`jwt-authn-single-filter.yaml <_include/jwt-authn-single-filter.yaml>`
 
 Above config uses single requirement rule, each rule may have either an empty requirement or a single requirement with one provider name.
 
 Group requirement config example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: yaml
-
-  providers:
-    provider1:
-      issuer: https://provider1.com
-      local_jwks:
-        inline_string: PUBLIC-KEY
-    provider2:
-      issuer: https://provider2.com
-      local_jwks:
-        inline_string: PUBLIC-KEY
-  rules:
-  - match:
-      prefix: /any
-    requires:
-      requires_any:
-        requirements:
-        - provider_name: provider1
-        - provider_name: provider2
-  - match:
-      prefix: /all
-    requires:
-      requires_all:
-        requirements:
-        - provider_name: provider1
-        - provider_name: provider2
+.. literalinclude:: _include/jwt-authn-group-filter.yaml
+    :language: yaml
+    :lines: 32-77
+    :lineno-start: 32
+    :linenos:
+    :caption: :download:`jwt-authn-group-filter.yaml <_include/jwt-authn-group-filter.yaml>`
 
 Above config uses more complex *group* requirements:
 
@@ -264,18 +202,12 @@ The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt
 * Field ``header_name`` specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn't exist then this header wouldn't be available for any other value.
 * Field ``claim_name`` specifies the claim from verified jwt token.
 
-.. code-block:: yaml
-
-  providers:
-    provider_name2:
-      issuer: https://example2.com
-      claim_to_headers:
-      - header_name: x-jwt-claim-sub
-        claim_name: sub
-      - header_name: x-jwt-claim-nested-key
-        claim_name: nested.claim.key
-      - header_name: x-jwt-tenants
-        claim_name: tenants
+.. literalinclude:: _include/jwt-authn-claim-filter.yaml
+    :language: yaml
+    :lines: 32-41
+    :lineno-start: 32
+    :linenos:
+    :caption: :download:`jwt-authn-claim-filter.yaml <_include/jwt-authn-claim-filter.yaml>`
 
 In this example the `tenants` claim is an object, therefore the JWT claim ("sub", "nested.claim.key" and "tenants") will be added to HTTP headers as following format:
 
