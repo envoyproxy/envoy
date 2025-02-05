@@ -1320,9 +1320,10 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_getNativeFilterConfig(JNIEnv* e
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
     JNIEnv* env, jclass, jlong connect_timeout_seconds, jboolean disable_dns_refresh_on_failure,
-    jlong dns_refresh_seconds, jlong dns_failure_refresh_seconds_base,
-    jlong dns_failure_refresh_seconds_max, jlong dns_query_timeout_seconds,
-    jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
+    jboolean disable_dns_refresh_on_network_change, jlong dns_refresh_seconds,
+    jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
+    jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
+    jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jint dns_num_retries,
     jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jboolean use_cares,
     jstring http3_connection_options, jstring http3_client_connection_options,
@@ -1340,12 +1341,13 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   Envoy::Platform::EngineBuilder builder;
 
   configureBuilder(
-      jni_helper, connect_timeout_seconds, disable_dns_refresh_on_failure, dns_refresh_seconds,
-      dns_failure_refresh_seconds_base, dns_failure_refresh_seconds_max, dns_query_timeout_seconds,
-      dns_min_refresh_seconds, dns_preresolve_hostnames, enable_dns_cache,
-      dns_cache_save_interval_seconds, dns_num_retries, enable_drain_post_dns_refresh, enable_http3,
-      use_cares, http3_connection_options, http3_client_connection_options, quic_hints,
-      quic_canonical_suffixes, enable_gzip_decompression, enable_brotli_decompression,
+      jni_helper, connect_timeout_seconds, disable_dns_refresh_on_failure,
+      disable_dns_refresh_on_network_change, dns_refresh_seconds, dns_failure_refresh_seconds_base,
+      dns_failure_refresh_seconds_max, dns_query_timeout_seconds, dns_min_refresh_seconds,
+      dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds, dns_num_retries,
+      enable_drain_post_dns_refresh, enable_http3, use_cares, http3_connection_options,
+      http3_client_connection_options, quic_hints, quic_canonical_suffixes,
+      enable_gzip_decompression, enable_brotli_decompression,
       num_timeouts_to_trigger_port_migration, enable_socket_tagging, enable_interface_binding,
       h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
       max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
