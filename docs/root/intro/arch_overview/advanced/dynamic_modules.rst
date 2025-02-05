@@ -9,8 +9,7 @@ Dynamic modules
    Capabilities will be expanded over time and it still lacks some features that are available in other extension mechanisms.
    We are looking for feedback from the community to improve the feature.
 
-Envoy has support for loading shared libraries at runtime to extend its functionality. We call the shared libraries that
-are loadable by Envoy as "dynamic modules." More specifically, dynamic modules are shared libraries that implement the
+Envoy has support for loading shared libraries at runtime to extend its functionality. In Envoy, these are known as "dynamic modules." More specifically, dynamic modules are shared libraries that implement the
 :repo:`ABI <source/extensions/dynamic_modules/abi.h>` written in a pure C header file. The ABI defines a set of functions
 that the dynamic module must implement to be loaded by Envoy. Also, it specifies the functions implemented by Envoy
 that the dynamic module can call to interact with Envoy.
