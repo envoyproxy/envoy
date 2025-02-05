@@ -24,7 +24,7 @@ public:
 private:
   Common::CredentialInjectorSharedPtr
   createCredentialInjectorFromProtoTyped(const Generic& config, const std::string& stats_prefix,
-                                         Server::Configuration::FactoryContext& context) override;
+                                         Server::Configuration::ServerFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(GenericCredentialInjectorFactory);
