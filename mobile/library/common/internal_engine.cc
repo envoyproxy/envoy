@@ -27,11 +27,13 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
                                absl::optional<int> thread_priority,
+                               bool disable_dns_refresh_on_network_change,
                                Thread::PosixThreadFactoryPtr thread_factory)
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
       logger_(std::move(logger)), event_tracker_(std::move(event_tracker)),
       thread_priority_(thread_priority),
-      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
+      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
+      disable_dns_refresh_on_network_change_(disable_dns_refresh_on_network_change) {
   ExtensionRegistry::registerFactories();
 
   Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker_);
@@ -40,9 +42,11 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
-                               absl::optional<int> thread_priority)
+                               absl::optional<int> thread_priority,
+                               bool disable_dns_refresh_on_network_change)
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
-                     thread_priority, Thread::PosixThreadFactory::create()) {}
+                     thread_priority, disable_dns_refresh_on_network_change,
+                     Thread::PosixThreadFactory::create()) {}
 
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
@@ -316,7 +320,9 @@ void InternalEngine::onDefaultNetworkChanged(int network) {
           [](Http::HttpServerPropertiesCache& cache) { cache.resetStatus(); };
       cache_manager.forEachThreadLocalCache(reset_status);
     }
-    connectivity_manager_->refreshDns(configuration, true);
+    if (!disable_dns_refresh_on_network_change_) {
+      connectivity_manager_->refreshDns(configuration, true);
+    }
   });
 }
 
