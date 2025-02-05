@@ -61,7 +61,7 @@ Since these modules run in the same process as Envoy, they can access all memory
 This makes it unfeasible to enforce security boundaries between Envoy and the modules, as they share the same address space and permissions.
 It is essential that any dynamic module undergo thorough testing and validation before deployment just like any other application code.
 
-Getting Started
+Getting started
 --------------------------
 
 We have a dedicated repository for the dynamic module examples to help you get started.
