@@ -23,9 +23,9 @@ TEST(ProxyProtocolHeaderTest, ParseTLVs) {
 
   EXPECT_EQ(2, tlv_vector.size());
   EXPECT_EQ(0x1, tlv_vector[0].type);
-  EXPECT_EQ(std::vector<unsigned char>({'t', 'l', 'v', '1'}), tlv_vector[0].value);
+  EXPECT_EQ("tlv1", std::string(tlv_vector[0].value.begin(), tlv_vector[0].value.end()));
   EXPECT_EQ(0xE1, tlv_vector[1].type);
-  EXPECT_EQ(std::vector<unsigned char>({'t', 'l', 'v', '2'}), tlv_vector[1].value);
+  EXPECT_EQ("tlv2", std::string(tlv_vector[1].value.begin(), tlv_vector[1].value.end()));
 }
 
 } // namespace
