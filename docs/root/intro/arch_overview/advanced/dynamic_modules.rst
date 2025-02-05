@@ -36,7 +36,7 @@ Since a dynamic modules is loaded at runtime, it must be abi-compatible with the
 Envoy binary that loads it.
 
 Envoy's dynamic modules have stricter compatibility requirements than Envoy's other extension mechanisms, such as Lua, Wasm or External Processor.
-This is partly because the ABI is tightly coupled with the Envoy internals that makes it a bit difficult to make a stable ABI. Even though
+Stabilizing the ABI is challenging due to the way the ABI needs to be tightly coupled to Envoy's internals. Even though
 our ultimate goal is to have a stable ABI that can be used across different versions of Envoy, we currently do not guarantee any compatibility
 between different versions.
 
