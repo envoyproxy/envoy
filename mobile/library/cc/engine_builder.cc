@@ -119,8 +119,14 @@ EngineBuilder& EngineBuilder::addDnsQueryTimeoutSeconds(int dns_query_timeout_se
   return *this;
 }
 
-EngineBuilder& EngineBuilder::setDisableDnsRefreshOnFailure(bool dns_refresh_on_failure) {
-  disable_dns_refresh_on_failure_ = dns_refresh_on_failure;
+EngineBuilder& EngineBuilder::setDisableDnsRefreshOnFailure(bool disable_dns_refresh_on_failure) {
+  disable_dns_refresh_on_failure_ = disable_dns_refresh_on_failure;
+  return *this;
+}
+
+EngineBuilder&
+EngineBuilder::setDisableDnsRefreshOnNetworkChange(bool disable_dns_refresh_on_network_change) {
+  disable_dns_refresh_on_network_change_ = disable_dns_refresh_on_network_change;
   return *this;
 }
 
