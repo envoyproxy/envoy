@@ -2155,17 +2155,17 @@ TEST_P(TcpProxyTest, SetTLV) {
           Envoy::Network::ProxyProtocolFilterState::key());
   ASSERT_TRUE(header != nullptr);
   auto& tlvs = header->value().tlv_vector_;
-  ASSERT_EQ(tlvs.size(), 1);
-  ASSERT_EQ(tlvs[0].type, 0xF1);
-  ASSERT_EQ(std::string(tlvs[0].value.begin(), tlvs[0].value.end()), "tst");
+  ASSERT_EQ(1, tlvs.size());
+  EXPECT_EQ(0xF1, tlvs[0].type);
+  EXPECT_EQ("tst", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
 
   // Verify the upstream TLV is set.
   auto upstreamHeader = filter_->upstreamTransportSocketOptions()->proxyProtocolOptions();
   ASSERT_TRUE(upstreamHeader.has_value());
   auto& upstreamTlvs = upstreamHeader->tlv_vector_;
-  ASSERT_EQ(upstreamTlvs.size(), 1);
-  ASSERT_EQ(upstreamTlvs[0].type, 0xF1);
-  ASSERT_EQ(std::string(upstreamTlvs[0].value.begin(), upstreamTlvs[0].value.end()), "tst");
+  ASSERT_EQ(1, upstreamTlvs.size());
+  EXPECT_EQ(0xF1, upstreamTlvs[0].type);
+  EXPECT_EQ("tst", std::string(upstreamTlvs[0].value.begin(), upstreamTlvs[0].value.end()));
 }
 
 INSTANTIATE_TEST_SUITE_P(WithOrWithoutUpstream, TcpProxyTest, ::testing::Bool());

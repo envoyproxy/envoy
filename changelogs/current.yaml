@@ -221,6 +221,7 @@ new_features:
   change: |
     Added :ref:`proxy_protocol_tlvs
     <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.proxy_protocol_tlvs>` to the TCP proxy filter.
-    This field allows specifying the list of Proxy Protocol TLVs to be sent in the Proxy Protocol header.
+    This field allows specifying PROXY protocol TLVs to be added in the PROXY protocol state created by the TCP proxy filter.
+    TLVs added in the PROXY protocol state will be added to the PROXY protocol v2 header sent upstream.
 
 deprecated:
