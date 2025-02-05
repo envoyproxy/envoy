@@ -1,6 +1,6 @@
 .. _arch_overview_dynamic_modules:
 
-Dynamic Modules
+Dynamic modules
 ===============
 
 .. attention::
