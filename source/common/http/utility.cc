@@ -1021,6 +1021,7 @@ void Utility::extractSchemeHostPathFromUri(const absl::string_view& uri, absl::s
    *  pos:         ^
    *  host_pos:       ^
    *  path_pos:                       ^
+   *  scheme = "https"
    *  host = "example.com:8443"
    *  path = "/certs"
    */
@@ -1063,7 +1064,7 @@ RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri
   extractSchemeHostPathFromUri(http_uri.uri(), scheme, host, path);
 
   RequestMessagePtr message(new RequestMessageImpl());
-  if (include_scheme) {
+  if (include_scheme && !scheme.empty()) {
     message->headers().setScheme(scheme);
   }
   message->headers().setPath(path);
