@@ -20,7 +20,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Fluentd {
 
-using FluentdConfig = envoy::extensions::tracers::fluentd::v3alpha::FluentdConfig;
+using FluentdConfig = envoy::extensions::tracers::fluentd::v3::FluentdConfig;
 using FluentdConfigSharedPtr = std::shared_ptr<FluentdConfig>;
 
 static constexpr uint64_t DefaultBaseBackoffIntervalMs = 500;

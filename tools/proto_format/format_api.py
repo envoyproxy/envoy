@@ -40,6 +40,7 @@ CONTRIB_V3_ALLOW_LIST = [
     'envoy.extensions.filters.network.kafka_broker.v3',
     'envoy.extensions.filters.network.mysql_proxy.v3',
     'envoy.extensions.filters.network.rocketmq_proxy.v3',
+    'envoy.extensions.tracers.fluentd.v3',
 ]
 
 BUILD_FILE_TEMPLATE = string.Template(
