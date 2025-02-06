@@ -300,7 +300,8 @@ public class JniLibrary {
    *
    */
   public static native long createBootstrap(
-      long connectTimeoutSeconds, boolean disableDnsRefreshOnFailure, long dnsRefreshSeconds,
+      long connectTimeoutSeconds, boolean disableDnsRefreshOnFailure,
+      boolean disableDnsRefreshOnNetworkChange, long dnsRefreshSeconds,
       long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, int dnsNumRetries,

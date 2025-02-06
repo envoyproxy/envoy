@@ -472,6 +472,46 @@ TEST_P(ConnectionImplTest, ImmediateConnectError) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_THAT(client_connection_->transportFailureReason(), StartsWith("immediate connect error"));
+  EXPECT_THAT(client_connection_->transportFailureReason(),
+              Not(HasSubstr("remote address family")));
+  EXPECT_THAT(client_connection_->transportFailureReason(), Not(HasSubstr("local address family")));
+}
+
+TEST_P(ConnectionImplTest, ImmediateConnectErrorLogIpFamilies) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.log_ip_families_on_network_error", "true"}});
+  dispatcher_ = api_->allocateDispatcher("test_thread");
+
+  // Using a broadcast/multicast address as the connection destinations address causes an
+  // immediate error return from connect().
+  Address::InstanceConstSharedPtr broadcast_address;
+  socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()));
+  if (socket_->connectionInfoProvider().localAddress()->ip()->version() == Address::IpVersion::v4) {
+    broadcast_address = std::make_shared<Address::Ipv4Instance>("224.0.0.1", 0);
+  } else {
+    broadcast_address = std::make_shared<Address::Ipv6Instance>("ff02::1", 0);
+  }
+
+  client_connection_ = dispatcher_->createClientConnection(
+      broadcast_address, source_address_, Network::Test::createRawBufferSocket(), nullptr, nullptr);
+  client_connection_->addConnectionCallbacks(client_callbacks_);
+  client_connection_->connect();
+
+  // Verify that also the immediate connect errors generate a remote close event.
+  EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(InvokeWithoutArgs([&]() -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_THAT(client_connection_->transportFailureReason(), StartsWith("immediate connect error"));
+  if (socket_->connectionInfoProvider().localAddress()->ip()->version() == Address::IpVersion::v4) {
+    EXPECT_THAT(client_connection_->transportFailureReason(),
+                HasSubstr("remote address family:v4|local address family:v4"));
+  } else {
+    EXPECT_THAT(client_connection_->transportFailureReason(),
+                HasSubstr("remote address family:v6|local address family:v6"));
+  }
 }
 
 TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {

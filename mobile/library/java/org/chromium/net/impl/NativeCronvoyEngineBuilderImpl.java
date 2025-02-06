@@ -41,6 +41,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private int mConnectTimeoutSeconds = 10;
   private final int mDnsRefreshSeconds = 60;
   private boolean mDisableDnsRefreshOnFailure = false;
+  private boolean mDisableDnsRefreshOnNetworkChange = false;
   private final int mDnsFailureRefreshSecondsBase = 2;
   private final int mDnsFailureRefreshSecondsMax = 10;
   private int mDnsQueryTimeoutSeconds = 5;
@@ -138,6 +139,12 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   public NativeCronvoyEngineBuilderImpl
   setDisableDnsRefreshOnFailure(boolean disableDnsRefreshOnFailure) {
     mDisableDnsRefreshOnFailure = disableDnsRefreshOnFailure;
+    return this;
+  }
+
+  public NativeCronvoyEngineBuilderImpl
+  setDisableDnsRefreshOnNetworkChange(boolean disableDnsRefreshOnNetworkChange) {
+    mDisableDnsRefreshOnNetworkChange = disableDnsRefreshOnNetworkChange;
     return this;
   }
 
@@ -283,9 +290,9 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
 
     return new EnvoyConfiguration(
-        mConnectTimeoutSeconds, mDisableDnsRefreshOnFailure, mDnsRefreshSeconds,
-        mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds,
-        mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache,
+        mConnectTimeoutSeconds, mDisableDnsRefreshOnFailure, mDisableDnsRefreshOnNetworkChange,
+        mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax,
+        mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache,
         mDnsCacheSaveIntervalSeconds, mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh,
         quicEnabled(), mUseCares, quicConnectionOptions(), quicClientConnectionOptions(),
         quicHints(), quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(),
