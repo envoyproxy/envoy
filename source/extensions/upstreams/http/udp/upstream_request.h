@@ -81,7 +81,7 @@ public:
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
-                     Buffer::RawSlice saved_cmsg) override;
+                     Buffer::OwnedImpl saved_cmsg) override;
   uint64_t maxDatagramSize() const override { return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE; }
   void onDatagramsDropped(uint32_t dropped) override {
     // TODO(https://github.com/envoyproxy/envoy/issues/23564): Add statistics for CONNECT-UDP
