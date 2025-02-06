@@ -144,10 +144,9 @@ public:
   Network::DrainDecision& drainDecision() override;
 
   // DrainDecision
-  bool drainClose(Network::DrainDirection scope) const override {
-    return drain_manager_->drainClose(scope) || server_.drainManager().drainClose(scope);
+  bool drainClose() const override {
+    return drain_manager_->drainClose() || server_.drainManager().drainClose();
   }
-
   Server::DrainManager& drainManager();
   friend class ListenerImpl;
 

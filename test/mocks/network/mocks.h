@@ -198,7 +198,7 @@ public:
   MockDrainDecision();
   ~MockDrainDecision() override;
 
-  MOCK_METHOD(bool, drainClose, (Network::DrainDirection direction), (const));
+  MOCK_METHOD(bool, drainClose, (), (const));
 };
 
 class MockListenerFilter : public ListenerFilter {
