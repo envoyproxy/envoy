@@ -78,7 +78,7 @@ public:
       handle->cancel();
     }
   };
-  
+
   /**
    * Add a managed cluster to the aws cluster manager
    * @return absl::Status based on whether the cluster could be added to the cluster manager
