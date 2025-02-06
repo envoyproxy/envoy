@@ -688,7 +688,7 @@ readFromSocketRecvMmsg(IoHandle& handle, const Address::Instance& local_address,
     }
     passPayloadToProcessor(msg_len, std::move(buffers[i].buffer_), output.msg_[i].peer_address_,
                            output.msg_[i].local_address_, udp_packet_processor, receive_time,
-                           output.msg_[i].tos_, output.msg_[i].saved_cmsg_);
+                           output.msg_[i].tos_, std::move(output.msg_[i].saved_cmsg_));
   }
   return result;
 }
