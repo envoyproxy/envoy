@@ -139,6 +139,7 @@ categories:
 - envoy.load_balancing_policies
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
+- envoy.http.ext_proc.on_processing_response
 - envoy.router.cluster_specifier_plugin
 - envoy.tracers.opentelemetry.resource_detectors
 - envoy.tracers.opentelemetry.samplers

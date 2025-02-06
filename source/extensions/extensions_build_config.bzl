@@ -411,6 +411,11 @@ EXTENSIONS = {
     "envoy.http.custom_response.local_response_policy":       "//source/extensions/http/custom_response/local_response_policy:local_response_policy_lib",
 
     #
+    # External Processing On Processing Response
+    #
+    "envoy.http.ext_proc.save_processing_response":         "//source/extensions/http/ext_proc/save_processing_response:save_processing_response_lib",
+
+    #
     # Injected credentials
     #
 

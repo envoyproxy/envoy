@@ -5,7 +5,7 @@ package envoy.extensions.http.ext_proc.save_processing_response.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 
-import "envoy/service/ext_proc/v3/external_processor.proto"
+import "envoy/service/ext_proc/v3/external_processor.proto";
 
 import "xds/annotations/v3/status.proto";
 
