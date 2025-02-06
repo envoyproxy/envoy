@@ -25,15 +25,6 @@ AwsClusterManager::AwsClusterManager(Server::Configuration::ServerFactoryContext
     });
     context_.initManager().add(*init_target_);
   }
-
-  // We're pinned, so ensure that we remove our RAII callback handles before cluster manager and
-  // server manager terminates
-
-  shutdown_handle_ = context.lifecycleNotifier().registerCallback(
-      Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this]() {
-        cm_handle_.reset();
-        shutdown_handle_.reset();
-      });
 };
 
 absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
@@ -53,11 +44,8 @@ AwsClusterManager::addManagedClusterUpdateCallbacks(absl::string_view cluster_na
     cb.onClusterAddOrUpdate();
     return absl::AlreadyExistsError("Cluster already online");
   }
-  auto callback_handle = std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle,
-                                         AwsManagedClusterUpdateCallbacksHandleDeleter>(
-      new AwsManagedClusterUpdateCallbacksHandle(context_, cb, managed_cluster->update_callbacks_),
-      AwsManagedClusterUpdateCallbacksHandleDeleter());
-  return callback_handle;
+  return std::make_unique<AwsManagedClusterUpdateCallbacksHandle>(
+      context_, cb, managed_cluster->update_callbacks_);
 }
 
 void AwsClusterManager::onClusterAddOrUpdate(absl::string_view cluster_name,
