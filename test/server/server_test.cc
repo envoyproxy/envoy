@@ -703,20 +703,18 @@ TEST_P(ServerInstanceImplWorkersTest, DrainCloseAfterWorkersStarted) {
   // infinite drainClose spin-loop (mimicing high traffic) is running before we
   // initiate the drain sequence.
   auto drain_thread = Thread::threadFactoryForTest().createThread([&] {
-    bool closed = drain_manager.drainClose(Network::DrainDirection::All);
+    bool closed = drain_manager.drainClose();
     drain_closes_started.Notify();
     while (!closed) {
-      closed = drain_manager.drainClose(Network::DrainDirection::All);
+      closed = drain_manager.drainClose();
     }
   });
   drain_closes_started.WaitForNotification();
 
   // Now that we are starting to try to call drainClose, we'll start the drain sequence, then
   // wait for that to complete.
-  server_->dispatcher().post([&] {
-    drain_manager.startDrainSequence(Network::DrainDirection::All,
-                                     [&drain_complete]() { drain_complete.Notify(); });
-  });
+  server_->dispatcher().post(
+      [&] { drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); }); });
 
   drain_complete.WaitForNotification();
   drain_thread->join();
