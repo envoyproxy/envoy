@@ -23,6 +23,7 @@ envoy_cc_extension(
         "//envoy/server:factory_context_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
+        "@envoy_api//envoy/extensions/http/ext_proc/save_processing_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
