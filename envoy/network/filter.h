@@ -12,8 +12,11 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+namespace quiche {
+class QuicheSocketAddress;
+} // namespace quiche
+
 namespace quic {
-class QuicSocketAddress;
 class QuicReceivedPacket;
 } // namespace quic
 
@@ -450,7 +453,7 @@ public:
    * if the connection socket's destination address were the preferred address.
    */
   virtual bool isCompatibleWithServerPreferredAddress(
-      const quic::QuicSocketAddress& server_preferred_address) const PURE;
+      const quiche::QuicheSocketAddress& server_preferred_address) const PURE;
 
   /**
    * Called after the peer has migrated to a different address. Check if the connection
@@ -464,7 +467,7 @@ public:
    * @param connection the connection just migrated.
    * @return status used by the filter manager to manage further filter iteration.
    */
-  virtual FilterStatus onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
+  virtual FilterStatus onPeerAddressChanged(const quiche::QuicheSocketAddress& new_address,
                                             Connection& connection) PURE;
 
   /**
@@ -494,9 +497,9 @@ public:
                          QuicListenerFilterPtr&& filter) PURE;
 
   virtual bool shouldAdvertiseServerPreferredAddress(
-      const quic::QuicSocketAddress& server_preferred_address) const PURE;
+      const quiche::QuicheSocketAddress& server_preferred_address) const PURE;
 
-  virtual void onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
+  virtual void onPeerAddressChanged(const quiche::QuicheSocketAddress& new_address,
                                     Connection& connection) PURE;
   virtual void onFirstPacketReceived(const quic::QuicReceivedPacket&) PURE;
 };
