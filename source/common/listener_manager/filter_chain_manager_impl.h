@@ -51,7 +51,7 @@ public:
                                             Init::Manager& init_manager);
 
   // DrainDecision
-  bool drainClose() const override;
+  bool drainClose(Network::DrainDirection scope) const override;
 
   // Configuration::FactoryContext
   Network::DrainDecision& drainDecision() override;
