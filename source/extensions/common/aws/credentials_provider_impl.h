@@ -85,6 +85,7 @@ protected:
 
   virtual bool needsRefresh() PURE;
   virtual void refresh() PURE;
+  virtual bool credentialsPending() PURE;
 };
 
 /**
@@ -109,6 +110,7 @@ private:
   bool needsRefresh() override;
   void refresh() override;
   void extractCredentials(absl::string_view credentials_string, absl::string_view profile);
+  bool credentialsPending() override { return false; };
 };
 
 #define ALL_METADATACREDENTIALSPROVIDER_STATS(COUNTER, GAUGE)                                      \
