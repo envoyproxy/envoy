@@ -44,7 +44,7 @@ JwtProvider
 * ``from_cookies``: extract JWT from HTTP request cookies.
 * ``forward_payload_header``: forward the JWT payload in the specified HTTP header.
 * ``claim_to_headers``: copy JWT claim to HTTP header.
-* ``jwt_cache_config``: Enables JWT cache, its size can be specified by ``jwt_cache_size``. Only valid JWT tokens are cached.
+* ``jwt_cache_config``: Enables JWT cache, its size can be specified by ``jwt_cache_size``. Only valid JWTs are cached.
 
 Default Extract Location
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -100,10 +100,10 @@ This means all of the following will return a JWT of ``eyJFbnZveSI6ICJyb2NrcyJ9.
 The header :ref:`name <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.name>` may be ``Authorization``.
 
 The :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>` must match exactly, i.e., case-sensitively.
-If the :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>` is not found, the header is skipped, not considered as a source for a JWT token.
+If the :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>` is not found, the header is skipped, not considered as a source for a JWT.
 
 If there are no JWT-legal characters after the :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>`, the entire string after it
-is taken to be the JWT token. This is unlikely to succeed; the error will reported by the JWT parser.
+is taken to be the JWT. This is unlikely to succeed; the error will reported by the JWT parser.
 
 
 Remote JWKS config example
@@ -139,7 +139,7 @@ Another config example using inline JWKS:
     :linenos:
     :caption: :download:`jwt-authn-inline-filter.yaml <_include/jwt-authn-inline-filter.yaml>`
 
-Above example uses config inline string to specify JWKS. The JWT token will be extracted from HTTP headers as:
+Above example uses config inline string to specify JWKS. The JWT will be extracted from HTTP headers as:
 
 .. code-block::
 
@@ -200,7 +200,7 @@ If a JWT is valid, you can add some of its claims of type (string, integer, bool
 The field :ref:`claim_to_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.claim_to_headers>` is a repeat of message :ref:`JWTClaimToHeader <envoy_v3_api_msg_extensions.filters.http.jwt_authn.v3.JWTClaimToHeader>` which has two fields:
 
 * Field ``header_name`` specifies the name of new http header reserved for jwt claim. If this header is already present with some other value then it will be replaced with the claim value. If the claim value doesn't exist then this header wouldn't be available for any other value.
-* Field ``claim_name`` specifies the claim from verified jwt token.
+* Field ``claim_name`` specifies the claim from the verified JWT.
 
 .. literalinclude:: _include/jwt-authn-claim-filter.yaml
     :language: yaml
