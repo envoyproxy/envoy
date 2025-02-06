@@ -300,7 +300,8 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       shared_from_this(), server_.drainManager(), server_.api().randomGenerator(),
       server_.httpContext(), server_.runtime(), server_.localInfo(), server_.clusterManager(),
-      server_.nullOverloadManager(), server_.timeSource())});
+      server_.nullOverloadManager(), server_.timeSource(),
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED)});
   return true;
 }
 

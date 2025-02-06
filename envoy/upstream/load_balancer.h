@@ -59,7 +59,11 @@ struct HostSelectionResponse {
   HostSelectionResponse(HostConstSharedPtr host,
                         std::unique_ptr<AsyncHostSelectionHandle> cancelable = nullptr)
       : host(host), cancelable(std::move(cancelable)) {}
+  HostSelectionResponse(HostConstSharedPtr host, std::string details)
+      : host(host), details(details) {}
   HostConstSharedPtr host;
+  // Optional details if host selection fails.
+  std::string details;
   std::unique_ptr<AsyncHostSelectionHandle> cancelable;
 };
 
@@ -151,8 +155,9 @@ public:
 
   /* Called by the load balancer when asynchronous host selection completes
    * @param host supplies the upstream host selected
+   * @param details gives optional details about the resolution success/failure.
    */
-  virtual void onAsyncHostSelection(HostConstSharedPtr&& host) PURE;
+  virtual void onAsyncHostSelection(HostConstSharedPtr&& host, std::string&& details) PURE;
 };
 
 /**

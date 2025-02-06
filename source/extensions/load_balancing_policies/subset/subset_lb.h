@@ -199,7 +199,7 @@ public:
     absl::optional<OverrideHost> overrideHostToSelect() const override {
       return wrapped_->overrideHostToSelect();
     }
-    void onAsyncHostSelection(Upstream::HostConstSharedPtr&&) override {}
+    void onAsyncHostSelection(Upstream::HostConstSharedPtr&&, std::string&&) override {}
 
   private:
     LoadBalancerContext* wrapped_;

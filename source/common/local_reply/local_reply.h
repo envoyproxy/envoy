@@ -38,7 +38,7 @@ public:
   /**
    * Create a LocalReply object from ProtoConfig
    */
-  static LocalReplyPtr
+  static absl::StatusOr<LocalReplyPtr>
   create(const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
              config,
          Server::Configuration::FactoryContext& context);

@@ -11,7 +11,8 @@ namespace Udp {
 Router::GenericConnPoolPtr UdpGenericConnPoolFactory::createGenericConnPool(
     Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster&,
     Router::GenericConnPoolFactory::UpstreamProtocol, Upstream::ResourcePriority,
-    absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext*) const {
+    absl::optional<Envoy::Http::Protocol>, Upstream::LoadBalancerContext*,
+    const Protobuf::Message&) const {
   auto ret = std::make_unique<UdpConnPool>(host);
   return (ret->valid() ? std::move(ret) : nullptr);
 }
