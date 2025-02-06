@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package envoy.extensions.http.ext_proc.save_processing_response.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
+
+import "envoy/service/ext_proc/v3/external_processor.proto"
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.ext_proc.save_processing_response.v3";
+option java_outer_classname = "SaveProcessingResponseProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/ext_proc/save_processing_response/v3;save_processing_responsev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Save Processing Response from external processor.]
+// [#extension: envoy.http.ext_proc.processing_response]
+
+// [#next-free-field: 9]
+message SaveProcessingResponse {
+  bool save_request_headers = 1;
+  bool save_response_headers = 2;
+  bool save_request_body = 3;
+  bool save_response_body = 4;
+  bool save_request_trailers = 5;
+  bool save_response_trailers = 6;
+  bool save_immedieate_response = 7;
+
+  bool save_on_error = 8;
+}
