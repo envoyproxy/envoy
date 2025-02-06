@@ -8,3 +8,4 @@ Advanced
   attributes
   matching/matching
   wasm
+  dynamic_modules

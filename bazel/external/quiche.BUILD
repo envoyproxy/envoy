@@ -1,3 +1,4 @@
+load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -216,6 +217,7 @@ envoy_cc_test(
         ":http2_adapter_mock_http2_visitor",
         ":http2_adapter_recording_http2_visitor",
         ":http2_adapter_test_frame_sequence",
+        ":http2_adapter_test_utils",
         ":quiche_common_platform_test",
     ],
 )
@@ -1682,8 +1684,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quiche_common_socket_address",
+    srcs = ["quiche/common/quiche_socket_address.cc"],
+    hdrs = ["quiche/common/quiche_socket_address.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_platform_export",
+        ":quic_platform_ip_address",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_platform_socket_address",
-    srcs = ["quiche/quic/platform/api/quic_socket_address.cc"],
     hdrs = ["quiche/quic/platform/api/quic_socket_address.h"],
     copts = quiche_copts,
     repository = "@envoy",
@@ -1691,6 +1705,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_export",
         ":quic_platform_ip_address",
+        ":quiche_common_socket_address",
     ],
 )
 
