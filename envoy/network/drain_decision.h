@@ -27,6 +27,8 @@ public:
   /**
    * @brief Register a callback to be called proactively when a drain decision enters into a
    *        'close' state.
+   *        NOTE: this API is used in prorietary builds of Envoy and can not be decommissioned.
+   *        TODO(yanavlasov): cleanup unused parts of this change without removing this API.
    *
    * @param cb Callback to be called once drain decision enters close state
    * @return handle to remove callback
