@@ -28,6 +28,7 @@ open class EngineBuilder() {
   private var logLevel = LogLevel.INFO
   private var connectTimeoutSeconds = 10
   private var disableDnsRefreshOnFailure = false
+  private var disableDnsRefreshOnNetworkChange = false
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
@@ -86,6 +87,20 @@ open class EngineBuilder() {
    */
   fun addConnectTimeoutSeconds(connectTimeoutSeconds: Int): EngineBuilder {
     this.connectTimeoutSeconds = connectTimeoutSeconds
+    return this
+  }
+
+  /** Disables DNS refresh on failure. */
+  fun setDisableDnsRefreshOnFailure(disableDnsRefreshOnFailure: Boolean): EngineBuilder {
+    this.disableDnsRefreshOnFailure = disableDnsRefreshOnFailure
+    return this
+  }
+
+  /** Disables DNS refresh on network change. */
+  fun setDisableDnsRefreshOnNetworkChange(
+    disableDnsRefreshOnNetworkChange: Boolean
+  ): EngineBuilder {
+    this.disableDnsRefreshOnNetworkChange = disableDnsRefreshOnNetworkChange
     return this
   }
 
@@ -542,6 +557,7 @@ open class EngineBuilder() {
       EnvoyConfiguration(
         connectTimeoutSeconds,
         disableDnsRefreshOnFailure,
+        disableDnsRefreshOnNetworkChange,
         dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax,

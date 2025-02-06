@@ -154,6 +154,7 @@ The following attributes are available once the upstream connection is establish
    upstream.transport_failure_reason, string, The upstream transport failure reason e.g. certificate validation failed
    upstream.request_attempt_count, uint, The count of upstream request attempts. A value of ‘0’ indicates that the request was never attempted upstream
    upstream.cx_pool_ready_duration, duration, Total duration from when the upstream request was created to when the upstream connection pool is ready
+   upstream.locality, :ref:`Locality<envoy_v3_api_msg_config.core.v3.locality>`, Locality information of upstream host
 
 Metadata and filter state
 -------------------------

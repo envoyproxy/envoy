@@ -17,7 +17,7 @@ minor_behavior_changes:
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: dfp
-  change:
+  change: |
     Fixes a bug when loading a DNS cache entry with an empty authority/host header. This fix can be reverted by setting
     runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` to ``false``.
 - area: router
@@ -28,7 +28,7 @@ bug_fixes:
     behavior can be temporarily reverted by setting runtime feature
     ``envoy_reloadable_features_enable_new_query_param_present_match_behavior`` to ``false``.
 - area: tcp_proxy
-  change:
+  change: |
     Fixes a bug when TCP is tunneled over HTTP and upstream connection closed before response headers received to the stream.
     The fix is to run the retry logic in a different event loop iteration to allow cleanup of the closed connection before retrying.
     This fix can be reverted by setting runtime guard ``envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop`` to ``false``.
@@ -65,6 +65,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.no_timer_based_rate_limit_token_bucket`` and legacy code paths.
 
 new_features:
+- area: dfp
+  change: |
+    The DFP cluster will now use the async lookup path to do DNS resolutions for null hosts. This behavioral change
+    can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.dfp_cluster_resolves_hosts``
+    to false.
 - area: oauth2
   change: |
     Add the option to specify SameSite cookie attribute values for oauth2 supported cookies.
@@ -94,6 +99,10 @@ new_features:
   change: |
     Added support for outlier detection in UDP proxy. This change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` to ``false``.
+- area: admin
+  change: |
+    Add support for the inbound_only and graceful query params of /drain_listeners to be used together by
+    implementing directional draining in DrainManager.
 - area: http
   change: |
     Added alpha support for asynchronous load balancing. See
@@ -127,5 +136,8 @@ new_features:
   change: |
     Reporting a locality_stats to LRS server when ``rq_issued > 0``, disable by setting runtime guard
     ``envoy.reloadable_features.report_load_with_rq_issued`` to ``false``.
+- area: attributes
+  change: |
+    Added :ref:`attribute <arch_overview_attributes>` ``upstream.locality`` to obtain upstream locality information.
 
 deprecated:

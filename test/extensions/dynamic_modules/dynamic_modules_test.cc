@@ -20,7 +20,7 @@ INSTANTIATE_TEST_SUITE_P(LanguageTests, DynamicModuleTestLanguages, testing::Val
 
 TEST_P(DynamicModuleTestLanguages, DoNotClose) {
   std::string language = GetParam();
-  using GetSomeVariableFuncType = int (*)();
+  using GetSomeVariableFuncType = int (*)(void);
   absl::StatusOr<DynamicModulePtr> module =
       newDynamicModule(testSharedObjectPath("no_op", language), false);
   EXPECT_TRUE(module.ok());
