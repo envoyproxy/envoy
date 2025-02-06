@@ -75,6 +75,11 @@ public:
    * This includes both success and failure details.
    */
   virtual std::string details() PURE;
+
+  /**
+   * Returns the resolution status.
+   */
+  virtual Network::DnsResolver::ResolutionStatus resolutionStatus() const PURE;
 };
 
 using DnsHostInfoSharedPtr = std::shared_ptr<DnsHostInfo>;

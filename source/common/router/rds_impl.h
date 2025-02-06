@@ -85,7 +85,7 @@ protected:
 private:
   absl::Status beforeProviderUpdate(std::unique_ptr<Init::ManagerImpl>& noop_init_manager,
                                     std::unique_ptr<Cleanup>& resume_rds) override;
-  void afterProviderUpdate() override;
+  absl::Status afterProviderUpdate() override;
 
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addUpdateCallback(std::function<absl::Status()> callback) {
@@ -147,7 +147,7 @@ using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProvid
 class RdsFactoryImpl : public RdsFactory {
 public:
   std::string name() const override { return "envoy.rds_factory.default"; }
-  virtual RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
+  RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager, ProtoTraitsImpl& proto_traits,

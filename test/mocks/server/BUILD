@@ -223,6 +223,7 @@ envoy_cc_mock(
         "//source/common/tls:context_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:http_server_properties_cache_mocks",
         "//test/mocks/init:init_mocks",

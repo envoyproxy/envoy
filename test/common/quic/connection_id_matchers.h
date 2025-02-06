@@ -15,6 +15,8 @@
 
 namespace Envoy {
 namespace Quic {
+namespace Extensions {
+namespace ConnectionIdGenerator {
 namespace Matcher {
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__) &&                                     \
@@ -95,5 +97,7 @@ private:
 #undef SUPPORTS_TESTING_BPF_PROG
 
 } // namespace Matcher
+} // namespace ConnectionIdGenerator
+} // namespace Extensions
 } // namespace Quic
 } // namespace Envoy

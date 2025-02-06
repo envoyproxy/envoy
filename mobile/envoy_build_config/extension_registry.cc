@@ -37,7 +37,7 @@
 
 #ifdef ENVOY_MOBILE_ENABLE_LISTENER
 #include "source/common/quic/server_codec_impl.h"
-#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
+#include "source/extensions/quic/connection_id_generator/deterministic/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/udp_packet_writer/default/config.h"

@@ -84,7 +84,7 @@ std::string DateFormatter::fromTime(SystemTime time) const {
   const auto epoch_time_ss =
       std::chrono::duration_cast<std::chrono::seconds>(time.time_since_epoch());
 
-  const auto iter = cached_times.find(raw_format_string_, raw_format_hash_);
+  const auto iter = cached_times.find(raw_format_string_);
 
   if (iter == cached_times.end() || iter->second.epoch_time_seconds != epoch_time_ss) {
     // No cached entry found for the given format string and time.
