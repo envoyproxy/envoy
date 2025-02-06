@@ -30,18 +30,11 @@ AwsClusterManagerImpl::AwsClusterManagerImpl(Server::Configuration::ServerFactor
       cm_handle_ = context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
       createQueuedClusters();
 
-    init_target_->ready();
-    init_target_.reset();
-  });
-  context_.initManager().add(*init_target_);
-  // We're pinned, so ensure that we remove our cluster update callbacks before cluster manager
-  // terminates
-
-  shutdown_handle_ = context.lifecycleNotifier().registerCallback(
-      Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this]() {
-        cm_handle_.reset();
-        shutdown_handle_.reset();
-      });
+      init_target_->ready();
+      init_target_.reset();
+    });
+    context_.initManager().add(*init_target_);
+  }
 };
 
 absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
@@ -59,7 +52,6 @@ AwsClusterManagerImpl::addManagedClusterUpdateCallbacks(absl::string_view cluste
     ENVOY_LOG_MISC(debug, "Managed cluster {} is ready immediately, calling callback",
                    cluster_name);
     cb.onClusterAddOrUpdate();
-    return absl::AlreadyExistsError("Cluster already online");
     return absl::AlreadyExistsError("Cluster already online");
   }
   return std::make_unique<AwsManagedClusterUpdateCallbacksHandle>(

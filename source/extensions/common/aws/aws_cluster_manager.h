@@ -47,8 +47,7 @@ public:
   }
 };
 using AwsManagedClusterUpdateCallbacksHandlePtr =
-    std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle,
-                    AwsManagedClusterUpdateCallbacksHandleDeleter>;
+    std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle>;
 
 class AwsClusterManager {
 
@@ -147,7 +146,6 @@ private:
   std::atomic<bool> queue_clusters_ = true;
   Server::Configuration::ServerFactoryContext& context_;
   Upstream::ClusterUpdateCallbacksHandlePtr cm_handle_;
-  Server::ServerLifecycleNotifier::HandlePtr shutdown_handle_;
   std::unique_ptr<Init::TargetImpl> init_target_;
 };
 
