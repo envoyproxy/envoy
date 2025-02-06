@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/extensions/common/aws/credentials_provider.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/message.h"
 
@@ -49,6 +50,9 @@ public:
    */
   virtual absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
                             const absl::string_view override_region = "") PURE;
+
+  virtual void addCredentialsPendingCallback(CredentialsPendingCallback&& cb) PURE;
+
 };
 
 using SignerPtr = std::unique_ptr<Signer>;

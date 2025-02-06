@@ -53,6 +53,8 @@ private:
   absl::optional<std::string> session_token_;
 };
 
+using CredentialsPendingCallback = std::function<void()>;
+
 /**
  * Interface for classes able to fetch AWS credentials from the execution environment.
  */
@@ -66,6 +68,18 @@ public:
    * @return AWS credentials
    */
   virtual Credentials getCredentials() PURE;
+  /**
+   * Are credentials pending?
+   *
+   * @return true if credentials are pending, false otherwise
+   */
+  virtual bool credentialsPending() PURE;
+  /**
+   * Add a callback to be called when credentials are pending.
+   *
+   * @param cb callback to be called when credentials are pending
+   */
+  virtual void addCredentialsPendingCallback(CredentialsPendingCallback&& cb) PURE;
 };
 
 using CredentialsConstSharedPtr = std::shared_ptr<const Credentials>;

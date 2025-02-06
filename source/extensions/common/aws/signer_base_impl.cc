@@ -61,6 +61,11 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   }
 
+  if(credentials_provider_->credentialsPending())
+  {
+    return absl::NotFoundError("Credentials are pending");
+  }
+  
   const auto& credentials = credentials_provider_->getCredentials();
   if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.

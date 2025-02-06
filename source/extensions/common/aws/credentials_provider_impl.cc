@@ -5,6 +5,7 @@
 #include <fstream>
 #include <memory>
 
+#include "credentials_provider.h"
 #include "envoy/common/exception.h"
 
 #include "source/common/common/lock_guard.h"
@@ -151,6 +152,28 @@ void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
     cache_duration_timer_->enableTimer(std::chrono::milliseconds(1));
   }
 }
+bool MetadataCredentialsProviderBase::credentialsPending()
+{
+  return credentials_pending_;
+}
+
+void MetadataCredentialsProviderBase::addCredentialsPendingCallback(CredentialsPendingCallback&& cb) {
+  if (cb) {
+    ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
+    Thread::LockGuard guard(mu_);
+    credential_pending_callbacks_.push_back(std::move(cb));
+    ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
+  }
+}
+
+void MetadataCredentialsProviderBase::credentialsRetrievalError() {
+  // Credential retrieval failed, so set blank (anonymous) credentials
+  if (context_) {
+    stats_->credential_refreshes_failed_.inc();
+    setCredentialsToAllThreads(std::make_unique<Credentials>());
+    handleFetchDone();
+  }
+}
 
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 Credentials MetadataCredentialsProviderBase::getCredentials() {
@@ -214,12 +237,38 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
 
 void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
     CredentialsConstUniquePtr&& creds) {
+
+  ENVOY_LOG_MISC(debug, "Setting credentials to all threads");
+
   CredentialsConstSharedPtr shared_credentials = std::move(creds);
-  if (tls_slot_) {
-    tls_slot_->runOnAllThreads([shared_credentials](OptRef<ThreadLocalCredentialsCache> obj) {
+  if (tls_slot_ && !tls_slot_->isShutdown()) {
+    tls_slot_->runOnAllThreads(
+      /* Set the credentials */ [shared_credentials](OptRef<ThreadLocalCredentialsCache> obj) {
       obj->credentials_ = shared_credentials;
-    });
+    },
+    /* Notify waiting signers on completion */ [this](){
+
+  credentials_pending_.store(false);
+
+  std::vector<CredentialsPendingCallback> callbacks_copy;
+
+  {
+    Thread::LockGuard guard(mu_);
+    callbacks_copy = credential_pending_callbacks_;
+    credential_pending_callbacks_.clear();
+    ENVOY_LOG_MISC(debug, "We have {} pending callbacks", callbacks_copy.size());
   }
+
+  // Call all of our callbacks to unblock pending requests
+  for (const auto& cb : callbacks_copy) {
+    cb();
+  }
+
+    }
+    );
+  }
+
+  // We are now no longer waiting for credentials
 }
 
 CredentialsFileCredentialsProvider::CredentialsFileCredentialsProvider(
@@ -368,6 +417,10 @@ void InstanceProfileCredentialsProvider::refresh() {
     };
     continue_on_async_fetch_failure_ = true;
     continue_on_async_fetch_failure_reason_ = "Token fetch failed, falling back to IMDSv1";
+
+    // mark credentials as pending while async completes
+    credentials_pending_.store(true);
+
     metadata_fetcher_->fetch(token_req_message, Tracing::NullSpan::instance(), *this);
   }
 }
@@ -400,6 +453,10 @@ void InstanceProfileCredentialsProvider::fetchInstanceRole(const std::string&& t
     on_async_fetch_cb_ = [this, token_string = std::move(token_string)](const std::string&& arg) {
       return this->fetchCredentialFromInstanceRoleAsync(std::move(arg), std::move(token_string));
     };
+
+    // mark credentials as pending while async completes
+    credentials_pending_.store(true);
+
     metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
   }
 }
@@ -411,7 +468,7 @@ void InstanceProfileCredentialsProvider::fetchCredentialFromInstanceRole(
   if (instance_role.empty()) {
     ENVOY_LOG(error, "No roles found to fetch AWS credentials from the EC2MetadataService");
     if (async) {
-      handleFetchDone();
+      credentialsRetrievalError();
     }
     return;
   }
@@ -419,7 +476,7 @@ void InstanceProfileCredentialsProvider::fetchCredentialFromInstanceRole(
   if (instance_role_list.empty()) {
     ENVOY_LOG(error, "No roles found to fetch AWS credentials from the EC2MetadataService");
     if (async) {
-      handleFetchDone();
+      credentialsRetrievalError();
     }
     return;
   }
@@ -456,6 +513,10 @@ void InstanceProfileCredentialsProvider::fetchCredentialFromInstanceRole(
     on_async_fetch_cb_ = [this](const std::string&& arg) {
       return this->extractCredentialsAsync(std::move(arg));
     };
+
+    // mark credentials as pending while async completes
+    credentials_pending_.store(true);
+
     metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
   }
 }
@@ -464,7 +525,8 @@ void InstanceProfileCredentialsProvider::extractCredentials(
     const std::string&& credential_document_value, bool async /*default = false*/) {
   if (credential_document_value.empty()) {
     if (async) {
-      handleFetchDone();
+      ENVOY_LOG(error, "Empty AWS credentials document");
+      credentialsRetrievalError();
     }
     return;
   }
@@ -475,7 +537,7 @@ void InstanceProfileCredentialsProvider::extractCredentials(
     ENVOY_LOG(error, "Could not parse AWS credentials document: {}",
               document_json_or_error.status().message());
     if (async) {
-      handleFetchDone();
+      credentialsRetrievalError();
     }
     return;
   }
@@ -514,7 +576,8 @@ void InstanceProfileCredentialsProvider::onMetadataSuccess(const std::string&& b
 }
 
 void InstanceProfileCredentialsProvider::onMetadataError(Failure reason) {
-  stats_->credential_refreshes_failed_.inc();
+  // Credential retrieval failed, so set blank (anonymous) credentials
+  credentialsRetrievalError();
   if (continue_on_async_fetch_failure_) {
     ENVOY_LOG(warn, "{}. Reason: {}", continue_on_async_fetch_failure_reason_,
               metadata_fetcher_->failureToString(reason));
@@ -610,6 +673,10 @@ void ContainerCredentialsProvider::refresh() {
     on_async_fetch_cb_ = [this](const std::string&& arg) {
       return this->extractCredentials(std::move(arg));
     };
+
+    // mark credentials as pending while async completes
+    credentials_pending_.store(true);
+
     metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
   }
 }
@@ -617,7 +684,7 @@ void ContainerCredentialsProvider::refresh() {
 void ContainerCredentialsProvider::extractCredentials(
     const std::string&& credential_document_value) {
   if (credential_document_value.empty()) {
-    handleFetchDone();
+    credentialsRetrievalError();
     return;
   }
   absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
@@ -626,7 +693,7 @@ void ContainerCredentialsProvider::extractCredentials(
   if (!document_json_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from the container role: {}",
               document_json_or_error.status().message());
-    handleFetchDone();
+    credentialsRetrievalError();
     return;
   }
 
@@ -657,6 +724,8 @@ void ContainerCredentialsProvider::extractCredentials(
   if (context_) {
     setCredentialsToAllThreads(
         std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
+    stats_->credential_refreshes_succeeded_.inc();
+
     ENVOY_LOG(debug, "Metadata receiver {} moving to Ready state", cluster_name_);
     refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
     // Set receiver state in statistics
@@ -668,15 +737,14 @@ void ContainerCredentialsProvider::extractCredentials(
 }
 
 void ContainerCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  stats_->credential_refreshes_succeeded_.inc();
   ENVOY_LOG(debug, "AWS Task metadata fetch success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
 void ContainerCredentialsProvider::onMetadataError(Failure reason) {
-  stats_->credential_refreshes_failed_.inc();
+  // Credential retrieval failed, so set blank (anonymous) credentials
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
-  handleFetchDone();
+  credentialsRetrievalError();
 }
 
 WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
@@ -760,14 +828,18 @@ void WebIdentityCredentialsProvider::refresh() {
   on_async_fetch_cb_ = [this](const std::string&& arg) {
     return this->extractCredentials(std::move(arg));
   };
+
+  // mark credentials as pending while async completes
+  credentials_pending_.store(true);
+
   metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
 }
 
 void WebIdentityCredentialsProvider::extractCredentials(
     const std::string&& credential_document_value) {
   if (credential_document_value.empty()) {
-    handleFetchDone();
     ENVOY_LOG(error, "Could not load AWS credentials document from STS");
+    credentialsRetrievalError();
     return;
   }
 
@@ -776,7 +848,7 @@ void WebIdentityCredentialsProvider::extractCredentials(
   if (!document_json_or_error.ok()) {
     ENVOY_LOG(error, "Could not parse AWS credentials document from STS: {}",
               document_json_or_error.status().message());
-    handleFetchDone();
+    credentialsRetrievalError();
     return;
   }
 
@@ -784,20 +856,20 @@ void WebIdentityCredentialsProvider::extractCredentials(
       document_json_or_error.value()->getObject(WEB_IDENTITY_RESPONSE_ELEMENT);
   if (!root_node.ok()) {
     ENVOY_LOG(error, "AWS STS credentials document is empty");
-    handleFetchDone();
+    credentialsRetrievalError();
     return;
   }
   absl::StatusOr<Json::ObjectSharedPtr> result_node =
       root_node.value()->getObject(WEB_IDENTITY_RESULT_ELEMENT);
   if (!result_node.ok()) {
     ENVOY_LOG(error, "AWS STS returned an unexpected result");
-    handleFetchDone();
+    credentialsRetrievalError();
     return;
   }
   absl::StatusOr<Json::ObjectSharedPtr> credentials = result_node.value()->getObject(CREDENTIALS);
   if (!credentials.ok()) {
     ENVOY_LOG(error, "AWS STS credentials document does not contain any credentials");
-    handleFetchDone();
+    credentialsRetrievalError();
     return;
   }
 
@@ -811,7 +883,7 @@ void WebIdentityCredentialsProvider::extractCredentials(
   // Mandatory response fields
   if (access_key_id.empty() || secret_access_key.empty() || session_token.empty()) {
     ENVOY_LOG(error, "Bad format, could not parse AWS credentials document from STS");
-    handleFetchDone();
+    credentialsRetrievalError();
     return;
   }
 
@@ -821,6 +893,8 @@ void WebIdentityCredentialsProvider::extractCredentials(
             session_token.empty() ? "" : "*****");
   setCredentialsToAllThreads(
       std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
+  stats_->credential_refreshes_succeeded_.inc();
+
   ENVOY_LOG(debug, "Metadata receiver {} moving to Ready state", cluster_name_);
   refresh_state_ = MetadataFetcher::MetadataReceiver::RefreshState::Ready;
   // Set receiver state in statistics
@@ -842,15 +916,37 @@ void WebIdentityCredentialsProvider::extractCredentials(
 }
 
 void WebIdentityCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  stats_->credential_refreshes_succeeded_.inc();
   ENVOY_LOG(debug, "AWS metadata fetch from STS success, calling callback func");
   on_async_fetch_cb_(std::move(body));
 }
 
 void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
-  stats_->credential_refreshes_failed_.inc();
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
-  handleFetchDone();
+  credentialsRetrievalError();
+}
+
+
+bool CredentialsProviderChain::credentialsPending() {
+  for (auto& provider : providers_) {
+    if (provider->credentialsPending()) {
+      ENVOY_LOG_MISC(debug, "Credentials are pending");
+      return true;
+    }
+  }
+  ENVOY_LOG_MISC(debug, "Credentials are not pending");
+  return false;
+}
+
+void CredentialsProviderChain::addCredentialsPendingCallback(CredentialsPendingCallback&& cb) {
+  if (cb) {
+    for (auto& provider : providers_) {
+      if (provider->credentialsPending()) {
+        provider->addCredentialsPendingCallback(std::move(cb));
+        ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
+        return;
+      }
+    }
+  }
 }
 
 Credentials CredentialsProviderChain::getCredentials() {

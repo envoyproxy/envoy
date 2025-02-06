@@ -43,8 +43,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     headers.setHost(host_rewrite);
   }
 
+  request_headers_ = &headers;
+
   if (!use_unsigned_payload && !end_stream) {
-    request_headers_ = &headers;
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -55,6 +56,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   } else {
     status = config.signer().signEmptyPayload(headers);
   }
+  
+  if (status.code() == absl::StatusCode::kNotFound)
+  {
+      // If we are pending credentials, leave a callback for when
+    // they become available, and stop iteration.
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this]() {
+        continueHeaderSigning();
+      },
+      &cancel_callback_);
+
+    config.signer().addCredentialsPendingCallback(completion_cb);
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  }
+
   if (status.ok()) {
     config.stats().signing_added_.inc();
   } else {
@@ -64,6 +80,31 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   return Http::FilterHeadersStatus::Continue;
 }
+
+Http::FilterHeadersStatus Filter::continueHeaderSigning()
+{
+  auto& config = getConfig();
+  const bool use_unsigned_payload = config.useUnsignedPayload();
+
+  ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
+            use_unsigned_payload);
+
+  absl::Status status;
+  if (use_unsigned_payload) {
+    status = config.signer().signUnsignedPayload(*request_headers_);
+  } else {
+    status = config.signer().signEmptyPayload(*request_headers_);
+  }
+  if (status.ok()) {
+    config.stats().signing_added_.inc();
+  } else {
+    ENVOY_LOG(debug, "signing failed: {}", status.message());
+    config.stats().signing_failed_.inc();
+  }
+
+  return Http::FilterHeadersStatus::Continue;
+}
+
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   auto& config = getConfig();
@@ -86,6 +127,22 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   ENVOY_LOG(debug, "aws request signing from decodeData");
   ASSERT(request_headers_ != nullptr);
   auto status = config.signer().sign(*request_headers_, hash);
+
+
+  if (status.code() == absl::StatusCode::kNotFound)
+  {
+      // If we are pending credentials, leave a callback for when
+    // they become available, and stop iteration.
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this]() {
+        continueDataSigning();
+      },
+      &cancel_callback_);
+
+    config.signer().addCredentialsPendingCallback(completion_cb);
+    return Http::FilterDataStatus::StopIterationAndWatermark;
+  }
+
   if (status.ok()) {
     config.stats().signing_added_.inc();
     config.stats().payload_signing_added_.inc();
@@ -97,6 +154,38 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   return Http::FilterDataStatus::Continue;
 }
+
+
+Http::FilterDataStatus Filter::continueDataSigning()
+{
+  auto& config = getConfig();
+  const bool use_unsigned_payload = config.useUnsignedPayload();
+
+  const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
+
+  auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  const std::string hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
+
+  ENVOY_LOG(debug, "aws request signing from decodeData use_unsigned_payload: {}",
+            use_unsigned_payload);
+
+  absl::Status status;
+  ENVOY_LOG(debug, "aws request signing from decodeData");
+  ASSERT(request_headers_ != nullptr);
+  status = config.signer().sign(*request_headers_, hash);
+  if (status.ok()) {
+    config.stats().signing_added_.inc();
+    config.stats().payload_signing_added_.inc();
+  } else {
+    ENVOY_LOG(debug, "signing failed: {}", status.message());
+    config.stats().signing_failed_.inc();
+    config.stats().payload_signing_failed_.inc();
+  }
+
+
+  return Http::FilterDataStatus::Continue;
+}
+
 
 FilterConfig& Filter::getConfig() const {
   auto* config = const_cast<FilterConfig*>(

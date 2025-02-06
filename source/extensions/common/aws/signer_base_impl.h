@@ -88,6 +88,7 @@ public:
                                 const absl::string_view override_region = "") override;
   absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
                                    const absl::string_view override_region = "") override;
+  void addCredentialsPendingCallback(CredentialsPendingCallback&& cb) override;
 
 protected:
   std::string getRegion() const;

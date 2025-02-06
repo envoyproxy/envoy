@@ -101,8 +101,8 @@ class AwsClusterManagerImpl : public AwsClusterManager,
   friend class AwsClusterManagerFriend;
 
 public:
-  AwsClusterManager(Server::Configuration::ServerFactoryContext& context);
-  ~AwsClusterManager() override {
+  AwsClusterManagerImpl(Server::Configuration::ServerFactoryContext& context);
+  ~AwsClusterManagerImpl() override {
     if (cm_handle_) {
       // We exit last due to being pinned, so we must call cancel on the callbacks handle as it will
       // already be invalid by this time
@@ -119,7 +119,7 @@ public:
   absl::Status
   addManagedCluster(absl::string_view cluster_name,
                     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
-                    absl::string_view uri);
+                    absl::string_view uri) override;
 
   /**
    * Add a callback to be signaled when a managed cluster comes online. This is used to kick off

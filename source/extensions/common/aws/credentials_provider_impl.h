@@ -83,9 +83,11 @@ protected:
 
   void refreshIfNeeded();
 
+  bool credentialsPending() override { return false; };
+  void addCredentialsPendingCallback(ABSL_ATTRIBUTE_UNUSED CredentialsPendingCallback&& cb) override {};
+
   virtual bool needsRefresh() PURE;
   virtual void refresh() PURE;
-  virtual bool credentialsPending() PURE;
 };
 
 /**
@@ -110,7 +112,6 @@ private:
   bool needsRefresh() override;
   void refresh() override;
   void extractCredentials(absl::string_view credentials_string, absl::string_view profile);
-  bool credentialsPending() override { return false; };
 };
 
 #define ALL_METADATACREDENTIALSPROVIDER_STATS(COUNTER, GAUGE)                                      \
@@ -148,6 +149,10 @@ public:
     callback_handle_ = std::move(handle);
   }
 
+  bool credentialsPending() override;
+
+  void addCredentialsPendingCallback(CredentialsPendingCallback&& cb) override;
+
 protected:
   struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject {
     ThreadLocalCredentialsCache() : credentials_(std::make_shared<Credentials>()){};
@@ -157,6 +162,9 @@ protected:
     // Lock guard.
     Thread::MutexBasicLockable lock_;
   };
+
+  // Set anonymous credentials to all threads, update stats and close async
+  void credentialsRetrievalError();
 
   const std::string& clusterName() const { return cluster_name_; }
 
@@ -168,6 +176,8 @@ protected:
 
   // Set Credentials shared_ptr on all threads.
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds);
+
+  // bool credentialsPending(CredentialsPendingCallback&& cb) override;
 
   Api::Api& api_;
   // The optional server factory context.
@@ -211,6 +221,10 @@ protected:
   AwsClusterManagerOptRef aws_cluster_manager_;
   // RAII handle for callbacks from AWS cluster manager
   AwsManagedClusterUpdateCallbacksHandlePtr callback_handle_;
+  Thread::MutexBasicLockable mu_;
+  std::vector<CredentialsPendingCallback> credential_pending_callbacks_ ABSL_GUARDED_BY(mu_) = {};
+  // Are credentials pending?
+  std::atomic<bool> credentials_pending_ = true;
 };
 
 /**
@@ -331,7 +345,8 @@ public:
   }
 
   Credentials getCredentials() override;
-
+  void addCredentialsPendingCallback(CredentialsPendingCallback&& cb) override;
+  bool credentialsPending() override;
 protected:
   std::list<CredentialsProviderSharedPtr> providers_;
 };
