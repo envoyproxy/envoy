@@ -135,5 +135,9 @@ new_features:
 - area: attributes
   change: |
     Added :ref:`attribute <arch_overview_attributes>` ``upstream.locality`` to obtain upstream locality information.
+- area: dynamic_modules
+  change: |
+    Added the initial support for shared libraries to be loaded by Envoy at runtime. Please refer to the overview documentation for the
+    feature :ref:`here <arch_overview_dynamic_modules>`.
 
 deprecated:
