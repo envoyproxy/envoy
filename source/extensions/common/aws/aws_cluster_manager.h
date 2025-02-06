@@ -71,11 +71,14 @@ class AwsClusterManager : public Envoy::Singleton::Instance,
 public:
   AwsClusterManager(Server::Configuration::ServerFactoryContext& context);
   ~AwsClusterManager() override {
-    // We exit last due to being pinned, so we must call cancel on the callbacks handle as it will
-    // already be invalid by this time
-    auto* handle = dynamic_cast<RaiiListElement<ClusterUpdateCallbacks*>*>(cm_handle_.get());
-    handle->cancel();
+    if (cm_handle_) {
+      // We exit last due to being pinned, so we must call cancel on the callbacks handle as it will
+      // already be invalid by this time
+      auto* handle = dynamic_cast<RaiiListElement<ClusterUpdateCallbacks*>*>(cm_handle_.get());
+      handle->cancel();
+    }
   };
+  
   /**
    * Add a managed cluster to the aws cluster manager
    * @return absl::Status based on whether the cluster could be added to the cluster manager
