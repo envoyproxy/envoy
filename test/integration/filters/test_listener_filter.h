@@ -154,6 +154,8 @@ public:
     test_first_packet_received_filter_state_->incrementPacketCount();
     test_first_packet_received_filter_state_->setPacketLength(packet.length());
     test_first_packet_received_filter_state_->setPacketHeadersLength(packet.headers_length());
+    char* headers_buffer = new char[packet.headers_length()];
+    memcpy(headers_buffer, packet.packet_headers(), packet.headers_length());
     return Network::FilterStatus::Continue;
   }
 
