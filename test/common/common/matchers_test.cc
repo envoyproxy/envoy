@@ -471,8 +471,10 @@ TEST_F(StringMatcher, Memory) {
     const size_t prefix_consumed_bytes = memory_test.consumedBytes();
     // The memory constraints were added to ensure that the amount of memory
     // used by matchers is carefully analyzed. These constraints can be relaxed
-    // when additional features are added, but it should be done in a thoughtful  manner.
-    EXPECT_MEMORY_EQ(prefix_consumed_bytes, 530176);
+    // when additional features are added, but it should be done in a thoughtful manner.
+    // Adding 3*8192 bytes because tcmalloc consumption estimation may return
+    // different values depending on memory alignment.
+    EXPECT_MEMORY_LE(prefix_consumed_bytes, 530176 + 3 * 8192);
   }
   // Regex matcher.
   {
@@ -490,7 +492,9 @@ TEST_F(StringMatcher, Memory) {
     // The memory constraints were added to ensure that the amount of memory
     // used by matchers is carefully analyzed. These constraints can be relaxed
     // when additional features are added, but it should be done in a thoughtful  manner.
-    EXPECT_MEMORY_EQ(regex_consumed_bytes, 15038016);
+    // Adding 10*8192 bytes because tcmalloc consumption estimation may return
+    // different values depending on memory alignment.
+    EXPECT_MEMORY_LE(regex_consumed_bytes, 15038016 + 10 * 8192);
   }
 }
 
