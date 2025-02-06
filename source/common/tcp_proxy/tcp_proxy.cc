@@ -753,7 +753,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
                             Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
 
   if (config_message.tunneling_config().has_credential()) {
-    auto credential = config_message.tunneling_config().credential();
+    auto& credential = config_message.tunneling_config().credential();
 
     // Find the credential injector factory.
     auto* config_factory = Envoy::Config::Utility::getFactory<
@@ -799,10 +799,15 @@ void TunnelingConfigHelperImpl::propagateResponseTrailers(
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 }
 
-void TunnelingConfigHelperImpl::injectCredentials(Http::RequestHeaderMapPtr& headers) const {
+absl::Status TunnelingConfigHelperImpl::injectCredentials(Http::RequestHeaderMapPtr& headers) const {
   if (credential_injector_ != nullptr) {
-    static_cast<void>(credential_injector_->inject(*headers, true));
+    const auto status = credential_injector_->inject(*headers, true);
+    if (!status.ok()) {
+      ENVOY_LOG(error, "Failed to inject credentials: {}", status.message());
+    }
+    return status;
   }
+  return absl::OkStatus();
 }
 
 void Filter::onConnectTimeout() {

@@ -53,7 +53,7 @@ public:
                             const StreamInfo::FilterStateSharedPtr& filter_state) const PURE;
 
   // Inject credentials to the request headers.
-  virtual void injectCredentials(Http::RequestHeaderMapPtr& headers) const PURE;
+  virtual absl::Status injectCredentials(Http::RequestHeaderMapPtr& headers) const PURE;
   virtual const Envoy::Router::FilterConfig& routerFilterConfig() const PURE;
   virtual Server::Configuration::ServerFactoryContext& serverFactoryContext() const PURE;
 };

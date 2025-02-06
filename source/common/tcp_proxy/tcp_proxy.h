@@ -167,7 +167,7 @@ public:
   void
   propagateResponseTrailers(Http::ResponseTrailerMapPtr&& trailers,
                             const StreamInfo::FilterStateSharedPtr& filter_state) const override;
-  void injectCredentials(Http::RequestHeaderMapPtr& headers) const override;
+  absl::Status injectCredentials(Http::RequestHeaderMapPtr& headers) const override;
   Server::Configuration::ServerFactoryContext& serverFactoryContext() const override {
     return server_factory_context_;
   }

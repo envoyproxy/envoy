@@ -108,7 +108,8 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
   if (config_.usePost()) {
     headers->addReference(Http::Headers::get().Path, config_.postPath());
   }
-  config_.injectCredentials(headers);
+  const auto injection_status = config_.injectCredentials(headers);
+  ASSERT(injection_status.ok());
 
   if (type_ == Http::CodecType::HTTP1) {
     request_encoder_->enableTcpTunneling();
@@ -425,7 +426,8 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
     downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
   }
 
-  config_.injectCredentials(downstream_headers_);
+  const auto status = config_.injectCredentials(downstream_headers_);
+  ASSERT(status.ok());
 
   config_.headerEvaluator().evaluateHeaders(
       *downstream_headers_, {downstream_info_.getRequestHeaders()}, downstream_info_);
