@@ -106,7 +106,9 @@ envoy_cc_library(
     name = "drain_decision_interface",
     hdrs = ["drain_decision.h"],
     deps = [
-        "//envoy/common:pure_lib",
+        "//envoy/common:callback",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/status",
     ],
 )
 
