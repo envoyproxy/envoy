@@ -453,6 +453,47 @@ TEST_F(StringMatcher, NoMatcherRejected) {
       fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
 }
 
+// Validates the amount of memory that is being used by the different string
+// matchers. Requested as part of https://github.com/envoyproxy/envoy/pull/37782.
+TEST_F(StringMatcher, Memory) {
+  const uint32_t matchers_num = 1000;
+  // Prefix matcher.
+  {
+    // Add 1000 Prefix-String Matchers of varying string lengths (1 to 1000).
+    std::vector<Matchers::StringMatcherImpl> all_matchers;
+    all_matchers.reserve(matchers_num);
+    Memory::TestUtil::MemoryTest memory_test;
+    for (uint32_t i = 0; i < matchers_num; ++i) {
+      envoy::type::matcher::v3::StringMatcher matcher;
+      matcher.set_prefix(std::string(i + 1, 'a'));
+      all_matchers.emplace_back(Matchers::StringMatcherImpl(matcher, context_));
+    }
+    const size_t prefix_consumed_bytes = memory_test.consumedBytes();
+    // The memory constraints were added to ensure that the amount of memory
+    // used by matchers is carefully analyzed. These constraints can be relaxed
+    // when additional features are added, but it should be done in a thoughtful  manner.
+    EXPECT_MEMORY_EQ(prefix_consumed_bytes, 530176);
+  }
+  // Regex matcher.
+  {
+    // Add 1000 Regex-String Matchers of varying string lengths (1 to 1000).
+    std::vector<Matchers::StringMatcherImpl> all_matchers;
+    all_matchers.reserve(matchers_num);
+    Memory::TestUtil::MemoryTest memory_test;
+    for (uint32_t i = 0; i < matchers_num; ++i) {
+      envoy::type::matcher::v3::StringMatcher matcher;
+      matcher.mutable_safe_regex()->mutable_google_re2();
+      matcher.mutable_safe_regex()->set_regex(std::string(i + 1, 'a'));
+      all_matchers.emplace_back(Matchers::StringMatcherImpl(matcher, context_));
+    }
+    const size_t regex_consumed_bytes = memory_test.consumedBytes();
+    // The memory constraints were added to ensure that the amount of memory
+    // used by matchers is carefully analyzed. These constraints can be relaxed
+    // when additional features are added, but it should be done in a thoughtful  manner.
+    EXPECT_MEMORY_EQ(regex_consumed_bytes, 15038016);
+  }
+}
+
 class PathMatcher : public BaseTest {};
 
 TEST_F(PathMatcher, MatchExactPath) {
