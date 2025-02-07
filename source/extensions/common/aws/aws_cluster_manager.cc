@@ -1,5 +1,7 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 
+#include <memory>
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -23,11 +25,6 @@ AwsClusterManager::AwsClusterManager(Server::Configuration::ServerFactoryContext
     });
     context_.initManager().add(*init_target_);
   }
-  // We're pinned, so ensure that we remove our cluster update callbacks before cluster manager
-  // terminates
-  shutdown_handle_ = context.lifecycleNotifier().registerCallback(
-      Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-      [&](Event::PostCb) { cm_handle_.reset(); });
 };
 
 absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
@@ -48,7 +45,7 @@ AwsClusterManager::addManagedClusterUpdateCallbacks(absl::string_view cluster_na
     return absl::AlreadyExistsError("Cluster already online");
   }
   return std::make_unique<AwsManagedClusterUpdateCallbacksHandle>(
-      cb, managed_cluster->update_callbacks_);
+      context_, cb, managed_cluster->update_callbacks_);
 }
 
 void AwsClusterManager::onClusterAddOrUpdate(absl::string_view cluster_name,

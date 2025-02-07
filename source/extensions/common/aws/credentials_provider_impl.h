@@ -20,6 +20,7 @@
 #include "source/common/init/target_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
@@ -110,83 +111,55 @@ private:
   void extractCredentials(absl::string_view credentials_string, absl::string_view profile);
 };
 
-class LoadClusterEntryHandle {
-public:
-  virtual ~LoadClusterEntryHandle() = default;
-};
-
 #define ALL_METADATACREDENTIALSPROVIDER_STATS(COUNTER, GAUGE)                                      \
   COUNTER(credential_refreshes_performed)                                                          \
   COUNTER(credential_refreshes_failed)                                                             \
   COUNTER(credential_refreshes_succeeded)                                                          \
-  COUNTER(clusters_removed_by_cds)                                                                 \
-  COUNTER(clusters_readded_after_cds)                                                              \
   GAUGE(metadata_refresh_state, Accumulate)
 
 struct MetadataCredentialsProviderStats {
   ALL_METADATACREDENTIALSPROVIDER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-using LoadClusterEntryHandlePtr = std::unique_ptr<LoadClusterEntryHandle>;
-
-class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase {
+class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase,
+                                        public AwsManagedClusterUpdateCallbacks {
 public:
+  friend class MetadataCredentialsProviderBaseFriend;
   using CurlMetadataFetcher = std::function<absl::optional<std::string>(Http::RequestMessage&)>;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
 
-  MetadataCredentialsProviderBase(
-      Api::Api& api, ServerFactoryContextOptRef context,
-      const CurlMetadataFetcher& fetch_metadata_using_curl,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
-      const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer);
+  MetadataCredentialsProviderBase(Api::Api& api, ServerFactoryContextOptRef context,
+                                  AwsClusterManagerOptRef aws_cluster_manager,
+                                  absl::string_view cluster_name,
+                                  const CurlMetadataFetcher& fetch_metadata_using_curl,
+                                  CreateMetadataFetcherCb create_metadata_fetcher_cb,
+                                  MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+                                  std::chrono::seconds initialization_timer);
 
   Credentials getCredentials() override;
 
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
 
-private:
-  void createCluster(bool new_timer);
+  // Store the RAII cluster callback handle following registration call with AWS cluster manager
+  void setClusterReadyCallbackHandle(AwsManagedClusterUpdateCallbacksHandlePtr handle) {
+    callback_handle_ = std::move(handle);
+  }
 
 protected:
-  struct LoadClusterEntryHandleImpl
-      : public LoadClusterEntryHandle,
-        RaiiMapOfListElement<std::string, LoadClusterEntryHandleImpl*> {
-    LoadClusterEntryHandleImpl(
-        absl::flat_hash_map<std::string, std::list<LoadClusterEntryHandleImpl*>>& parent,
-        absl::string_view host, Envoy::Event::TimerPtr& timer)
-        : RaiiMapOfListElement<std::string, LoadClusterEntryHandleImpl*>(parent, host, this),
-          timer_(timer) {}
+  struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject {
+    ThreadLocalCredentialsCache() : credentials_(std::make_shared<Credentials>()){};
 
-    Envoy::Event::TimerPtr& timer_;
-  };
-
-  struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject,
-                                       public Upstream::ClusterUpdateCallbacks {
-    ThreadLocalCredentialsCache(MetadataCredentialsProviderBase& parent)
-        : handle_(parent.context_->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)),
-          parent_(parent), credentials_(std::make_shared<Credentials>()){};
-
-    ~ThreadLocalCredentialsCache() override;
-
-    Upstream::ClusterUpdateCallbacksHandlePtr handle_;
-    // Parent credentials provider object
-    MetadataCredentialsProviderBase& parent_;
     // The credentials object.
     CredentialsConstSharedPtr credentials_;
-    absl::flat_hash_map<std::string, std::list<LoadClusterEntryHandleImpl*>> pending_clusters_;
     // Lock guard.
     Thread::MutexBasicLockable lock_;
-
-  private:
-    void onClusterAddOrUpdate(absl::string_view cluster_name,
-                              Upstream::ThreadLocalClusterCommand&) override;
-    void onClusterRemoval(const std::string&) override;
   };
 
   const std::string& clusterName() const { return cluster_name_; }
+
+  // Callback from AWS cluster manager, triggered when our cluster comes online
+  void onClusterAddOrUpdate() override;
 
   // Handle fetch done.
   void handleFetchDone();
@@ -203,10 +176,6 @@ protected:
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;
   // The cluster name to use for internal static cluster pointing towards the credentials provider.
   std::string cluster_name_;
-  // The cluster type to use for internal static cluster pointing towards the credentials provider.
-  const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type_;
-  // The uri of internal static cluster credentials provider.
-  const std::string uri_;
   // The cache duration of the fetched credentials.
   std::chrono::seconds cache_duration_;
   // Metadata receiver state, describing where we are along the initial credential refresh process
@@ -228,22 +197,18 @@ protected:
   SystemTime last_updated_;
   // Cache credentials when using libcurl.
   Credentials cached_credentials_;
-  // The init target.
-  std::unique_ptr<Init::TargetImpl> init_target_;
-  // Used in logs.
-  const std::string debug_name_;
   // The expiration time received in any returned token
   absl::optional<SystemTime> expiration_time_;
   // Tls slot
   ThreadLocal::TypedSlotPtr<ThreadLocalCredentialsCache> tls_slot_ = nullptr;
-  // Storage for our per cluster credential timers
-  LoadClusterEntryHandlePtr cluster_load_handle_;
   // Stats scope
   Stats::ScopeSharedPtr scope_ = nullptr;
   // Pointer to our stats structure
   std::shared_ptr<MetadataCredentialsProviderStats> stats_;
-  // Atomic flag for cluster recreate
-  std::atomic<bool> is_creating_ = false;
+  // AWS Cluster Manager for creating clusters and retrieving URIs when async fetch is needed
+  AwsClusterManagerOptRef aws_cluster_manager_;
+  // RAII handle for callbacks from AWS cluster manager
+  AwsManagedClusterUpdateCallbacksHandlePtr callback_handle_;
 };
 
 /**
@@ -256,6 +221,7 @@ class InstanceProfileCredentialsProvider : public MetadataCredentialsProviderBas
                                            public MetadataFetcher::MetadataReceiver {
 public:
   InstanceProfileCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                                     AwsClusterManagerOptRef aws_cluster_manager,
                                      const CurlMetadataFetcher& fetch_metadata_using_curl,
                                      CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -295,6 +261,7 @@ class ContainerCredentialsProvider : public MetadataCredentialsProviderBase,
                                      public MetadataFetcher::MetadataReceiver {
 public:
   ContainerCredentialsProvider(Api::Api& api, ServerFactoryContextOptRef context,
+                               AwsClusterManagerOptRef aws_cluster_manager,
                                const CurlMetadataFetcher& fetch_metadata_using_curl,
                                CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                absl::string_view credential_uri,
@@ -327,12 +294,12 @@ public:
   // not used, and vice versa.
   WebIdentityCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
+      CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config,
-      absl::string_view cluster_name);
+          web_identity_config);
 
   // Following functions are for MetadataFetcher::MetadataReceiver interface
   void onMetadataSuccess(const std::string&& body) override;
@@ -380,15 +347,13 @@ public:
 
   virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config,
-      absl::string_view cluster_name) const PURE;
+          web_identity_config) const PURE;
 
   virtual CredentialsProviderSharedPtr createContainerCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+      Api::Api& api, ServerFactoryContextOptRef context,
+      AwsClusterManagerOptRef aws_cluster_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
@@ -397,7 +362,8 @@ public:
       absl::string_view authorization_token = {}) const PURE;
 
   virtual CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+      Api::Api& api, ServerFactoryContextOptRef context,
+      AwsClusterManagerOptRef aws_cluster_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -415,12 +381,9 @@ public:
 
   virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config,
-      absl::string_view cluster_name) const PURE;
+          web_identity_config) const PURE;
 };
 
 // TODO(nbaws) Add additional providers to the custom chain.
@@ -449,16 +412,11 @@ public:
 
   CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config,
-      absl::string_view cluster_name) const override {
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
-        web_identity_config, cluster_name);
-  };
+          web_identity_config) const override;
+
+  AwsClusterManagerPtr aws_cluster_manager_;
 };
 
 /**
@@ -518,7 +476,8 @@ private:
   };
 
   CredentialsProviderSharedPtr createContainerCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+      Api::Api& api, ServerFactoryContextOptRef context,
+      AwsClusterManagerOptRef aws_cluster_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
       absl::string_view credential_uri,
@@ -527,7 +486,8 @@ private:
       absl::string_view authorization_token) const override;
 
   CredentialsProviderSharedPtr createInstanceProfileCredentialsProvider(
-      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
+      Api::Api& api, ServerFactoryContextOptRef context,
+      AwsClusterManagerOptRef aws_cluster_manager,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -535,16 +495,11 @@ private:
 
   CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view sts_endpoint,
-      MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config,
-      absl::string_view cluster_name) const override {
-    return std::make_shared<WebIdentityCredentialsProvider>(
-        context, create_metadata_fetcher_cb, sts_endpoint, refresh_state, initialization_timer,
-        web_identity_config, cluster_name);
-  }
+          web_identity_config) const override;
+
+  AwsClusterManagerPtr aws_cluster_manager_;
 };
 
 using InstanceProfileCredentialsProviderPtr = std::shared_ptr<InstanceProfileCredentialsProvider>;

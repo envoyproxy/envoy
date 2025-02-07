@@ -26,11 +26,14 @@ public:
 class AwsManagedClusterUpdateCallbacksHandle
     : public RaiiListElement<AwsManagedClusterUpdateCallbacks*> {
 public:
-  AwsManagedClusterUpdateCallbacksHandle(AwsManagedClusterUpdateCallbacks& cb,
+  AwsManagedClusterUpdateCallbacksHandle(Server::Configuration::ServerFactoryContext& context,
+                                         AwsManagedClusterUpdateCallbacks& cb,
                                          std::list<AwsManagedClusterUpdateCallbacks*>& parent)
-      : RaiiListElement<AwsManagedClusterUpdateCallbacks*>(parent, &cb) {}
-};
+      : RaiiListElement<AwsManagedClusterUpdateCallbacks*>(parent, &cb), context_(context) {}
 
+public:
+  Server::Configuration::ServerFactoryContext& context_;
+};
 using AwsManagedClusterUpdateCallbacksHandlePtr =
     std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle>;
 
@@ -67,6 +70,14 @@ class AwsClusterManager : public Envoy::Singleton::Instance,
 
 public:
   AwsClusterManager(Server::Configuration::ServerFactoryContext& context);
+  ~AwsClusterManager() override {
+    if (cm_handle_) {
+      // We exit last due to being pinned, so we must call cancel on the callbacks handle as it will
+      // already be invalid by this time
+      auto* handle = dynamic_cast<RaiiListElement<ClusterUpdateCallbacks*>*>(cm_handle_.get());
+      handle->cancel();
+    }
+  };
 
   /**
    * Add a managed cluster to the aws cluster manager
@@ -116,7 +127,6 @@ private:
   std::atomic<bool> queue_clusters_ = true;
   Server::Configuration::ServerFactoryContext& context_;
   Upstream::ClusterUpdateCallbacksHandlePtr cm_handle_;
-  Server::ServerLifecycleNotifier::HandlePtr shutdown_handle_;
   std::unique_ptr<Init::TargetImpl> init_target_;
 };
 
