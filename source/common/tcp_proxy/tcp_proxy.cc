@@ -799,7 +799,8 @@ void TunnelingConfigHelperImpl::propagateResponseTrailers(
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 }
 
-absl::Status TunnelingConfigHelperImpl::injectCredentials(Http::RequestHeaderMapPtr& headers) const {
+absl::Status
+TunnelingConfigHelperImpl::injectCredentials(Http::RequestHeaderMapPtr& headers) const {
   if (credential_injector_ != nullptr) {
     const auto status = credential_injector_->inject(*headers, true);
     if (!status.ok()) {

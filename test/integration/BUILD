@@ -1956,6 +1956,7 @@ envoy_cc_test(
         ":http_protocol_integration_lib",
         ":tcp_tunneling_integration_lib",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/http/injected_credentials/generic:config",
         "//source/extensions/upstreams/http/tcp:config",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",

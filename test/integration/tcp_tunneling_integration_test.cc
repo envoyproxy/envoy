@@ -2325,6 +2325,53 @@ TEST_P(TcpTunnelingIntegrationTest,
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
 }
 
+TEST_P(TcpTunnelingIntegrationTest, InjectProxyAuthorizationBasic) {
+  auto credential_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  TestUtility::loadFromYaml(R"EOF(
+name: envoy.http.injected_credentials.generic
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic
+  credential:
+    name: proxy_authorization
+  header: Proxy-Authorization
+)EOF",
+                            *credential_config.get());
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+    proxy_config.mutable_tunneling_config()->set_allocated_credential(credential_config.release());
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("proxy_authorization");
+    auto* generic = secret->mutable_generic_secret();
+    generic->mutable_secret()->set_inline_string("Basic base64EncodedUsernamePassword");
+  });
+  initialize();
+
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_);
+  EXPECT_EQ("Basic base64EncodedUsernamePassword",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("Proxy-Authorization"))[0]
+                ->value()
+                .getStringView());
+  closeConnection(fake_upstream_connection_);
+}
+
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
     testing::ValuesIn(BaseTcpTunnelingIntegrationTest::getProtocolTestParams(
