@@ -345,6 +345,15 @@ TEST_F(StringMatcher, ExactMatchIgnoreCase) {
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("other"));
 }
 
+TEST_F(StringMatcher, ExactMatchIgnoreCaseStringRepresentation) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("eXaCt");
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "eXaCt");
+
+  matcher.set_ignore_case(true);
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "eXaCt");
+}
+
 TEST_F(StringMatcher, PrefixMatchIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_prefix("prefix");
@@ -360,6 +369,15 @@ TEST_F(StringMatcher, PrefixMatchIgnoreCase) {
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("other"));
 }
 
+TEST_F(StringMatcher, PrefixMatchIgnoreCaseStringRepresentation) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_prefix("pReFix");
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "pReFix");
+
+  matcher.set_ignore_case(true);
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "pReFix");
+}
+
 TEST_F(StringMatcher, SuffixMatchIgnoreCase) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_suffix("suffix");
@@ -373,6 +391,15 @@ TEST_F(StringMatcher, SuffixMatchIgnoreCase) {
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, context_).match("ABC-SUFFIX"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("abc-suffiz"));
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("other"));
+}
+
+TEST_F(StringMatcher, SuffixMatchIgnoreCaseStringRepresentation) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_suffix("sUfFix");
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "sUfFix");
+
+  matcher.set_ignore_case(true);
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "sUfFix");
 }
 
 TEST_F(StringMatcher, ContainsMatchIgnoreCase) {
@@ -391,6 +418,15 @@ TEST_F(StringMatcher, ContainsMatchIgnoreCase) {
   EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, context_).match("other"));
 }
 
+TEST_F(StringMatcher, ContainsMatchIgnoreCaseStringRepresentation) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_contains("ConTained-STR");
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "ConTained-STR");
+
+  matcher.set_ignore_case(true);
+  EXPECT_EQ(Matchers::StringMatcherImpl(matcher, context_).stringRepresentation(), "contained-str");
+}
+
 TEST_F(StringMatcher, SafeRegexValue) {
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.mutable_safe_regex()->mutable_google_re2();
@@ -407,6 +443,59 @@ TEST_F(StringMatcher, SafeRegexValueIgnoreCase) {
   matcher.mutable_safe_regex()->set_regex("foo");
   EXPECT_THROW_WITH_MESSAGE(Matchers::StringMatcherImpl(matcher, context_).match("foo"),
                             EnvoyException, "ignore_case has no effect for safe_regex.");
+}
+
+TEST_F(StringMatcher, NoMatcherRejected) {
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_ignore_case(true);
+  EXPECT_THROW_WITH_MESSAGE(
+      Matchers::StringMatcherImpl(matcher, context_).match("foo"), EnvoyException,
+      fmt::format("Configuration must define a matcher: {}", matcher.DebugString()));
+}
+
+// Validates the amount of memory that is being used by the different string
+// matchers. Requested as part of https://github.com/envoyproxy/envoy/pull/37782.
+TEST_F(StringMatcher, Memory) {
+  const uint32_t matchers_num = 1000;
+  // Prefix matcher.
+  {
+    // Add 1000 Prefix-String Matchers of varying string lengths (1 to 1000).
+    std::vector<Matchers::StringMatcherImpl> all_matchers;
+    all_matchers.reserve(matchers_num);
+    Memory::TestUtil::MemoryTest memory_test;
+    for (uint32_t i = 0; i < matchers_num; ++i) {
+      envoy::type::matcher::v3::StringMatcher matcher;
+      matcher.set_prefix(std::string(i + 1, 'a'));
+      all_matchers.emplace_back(Matchers::StringMatcherImpl(matcher, context_));
+    }
+    const size_t prefix_consumed_bytes = memory_test.consumedBytes();
+    // The memory constraints were added to ensure that the amount of memory
+    // used by matchers is carefully analyzed. These constraints can be relaxed
+    // when additional features are added, but it should be done in a thoughtful manner.
+    // Adding 3*8192 bytes because tcmalloc consumption estimation may return
+    // different values depending on memory alignment.
+    EXPECT_MEMORY_LE(prefix_consumed_bytes, 530176 + 3 * 8192);
+  }
+  // Regex matcher.
+  {
+    // Add 1000 Regex-String Matchers of varying string lengths (1 to 1000).
+    std::vector<Matchers::StringMatcherImpl> all_matchers;
+    all_matchers.reserve(matchers_num);
+    Memory::TestUtil::MemoryTest memory_test;
+    for (uint32_t i = 0; i < matchers_num; ++i) {
+      envoy::type::matcher::v3::StringMatcher matcher;
+      matcher.mutable_safe_regex()->mutable_google_re2();
+      matcher.mutable_safe_regex()->set_regex(std::string(i + 1, 'a'));
+      all_matchers.emplace_back(Matchers::StringMatcherImpl(matcher, context_));
+    }
+    const size_t regex_consumed_bytes = memory_test.consumedBytes();
+    // The memory constraints were added to ensure that the amount of memory
+    // used by matchers is carefully analyzed. These constraints can be relaxed
+    // when additional features are added, but it should be done in a thoughtful  manner.
+    // Adding 10*8192 bytes because tcmalloc consumption estimation may return
+    // different values depending on memory alignment.
+    EXPECT_MEMORY_LE(regex_consumed_bytes, 15038016 + 10 * 8192);
+  }
 }
 
 class PathMatcher : public BaseTest {};
