@@ -22,6 +22,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#protodoc-title: Save Processing Response from external processor.]
 // [#extension: envoy.http.ext_proc.save_processing_response]
 
+// Extension to save the response from the external processor as filter state.
 // [#next-free-field: 9]
 message SaveProcessingResponse {
   bool save_request_headers = 1;

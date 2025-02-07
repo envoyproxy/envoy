@@ -381,6 +381,9 @@ new_features:
 - area: ext_proc
   change: |
     Added HTTP support in ext_proc filter to perform external processing with HTTP messages.
+- area: ext_proc
+  change: |
+    Added an extension to save the response from the external processor as filter state.
 - area: ext_authz
   change: |
     Added filter state field ``latency_us``, ``bytesSent`` and ``bytesReceived`` access for CEL and logging.
