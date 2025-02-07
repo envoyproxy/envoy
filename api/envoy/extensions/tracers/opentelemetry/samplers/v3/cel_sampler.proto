@@ -18,5 +18,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message CELSamplerConfig {
   // Expression that, when evaluated, will be used to make sample decision.
-  string expression = 1 [(validate.rules).message = {required: true}];
+  string expression = 1 [(validate.rules).string = {min_len: 1}];
 }

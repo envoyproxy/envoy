@@ -51,7 +51,7 @@ TEST(CELSamplerFactoryTest, TestEmptyExpr) {
   TestUtility::loadFromYaml(yaml, typed_config);
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   EXPECT_THROW_WITH_REGEX(factory->createSampler(typed_config.typed_config(), context),
-                          EnvoyException, "Not able to parse cel expression: .*");
+                          EnvoyException, "Proto constraint validation failed .*");
 }
 #endif
 
