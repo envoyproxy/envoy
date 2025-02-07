@@ -99,12 +99,13 @@ public:
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
+
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
-  
+
 private:
   FilterConfig& getConfig() const;
-  Http::FilterHeadersStatus continueHeaderSigning();
-  Http::FilterDataStatus continueDataSigning();
+  Http::FilterHeadersStatus continueHeaderSigning(absl::Status status) const;
+  Http::FilterDataStatus continueDataSigning(absl::Status status) const;
   std::shared_ptr<FilterConfig> config_;
   Http::RequestHeaderMap* request_headers_{};
   Envoy::CancelWrapper::CancelFunction cancel_callback_;

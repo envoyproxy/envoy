@@ -69,12 +69,12 @@ constexpr char STS_TOKEN_CLUSTER[] = "sts_token_service_internal";
 
 } // namespace
 
-Credentials ConfigCredentialsProvider::getCredentials() {
+absl::StatusOr<Credentials> ConfigCredentialsProvider::getCredentials(CredentialsPendingCallback&&) {
   ENVOY_LOG(debug, "Getting AWS credentials from static configuration");
   return credentials_;
 }
 
-Credentials EnvironmentCredentialsProvider::getCredentials() {
+absl::StatusOr<Credentials> EnvironmentCredentialsProvider::getCredentials(CredentialsPendingCallback&&) {
   ENVOY_LOG(debug, "Getting AWS credentials from the environment");
 
   const auto access_key_id = absl::NullSafeStringView(std::getenv(AWS_ACCESS_KEY_ID));
@@ -152,19 +152,21 @@ void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
     cache_duration_timer_->enableTimer(std::chrono::milliseconds(1));
   }
 }
-bool MetadataCredentialsProviderBase::credentialsPending()
-{
-  return credentials_pending_;
-}
 
-void MetadataCredentialsProviderBase::addCredentialsPendingCallback(CredentialsPendingCallback&& cb) {
-  if (cb) {
-    ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
-    Thread::LockGuard guard(mu_);
-    credential_pending_callbacks_.push_back(std::move(cb));
-    ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
-  }
-}
+// bool MetadataCredentialsProviderBase::credentialsPending(CredentialsPendingCallback&& cb)
+// {
+//     if (cb) {
+//     ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
+//     Thread::LockGuard guard(mu_);
+//     credential_pending_callbacks_.push_back(std::move(cb));
+//     ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
+//   }
+
+//   return credentials_pending_;
+// }
+
+// void MetadataCredentialsProviderBase::addCredentialsPendingCallback(CredentialsPendingCallback&& cb) {
+// }
 
 void MetadataCredentialsProviderBase::credentialsRetrievalError() {
   // Credential retrieval failed, so set blank (anonymous) credentials
@@ -176,7 +178,18 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
 }
 
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
-Credentials MetadataCredentialsProviderBase::getCredentials() {
+absl::StatusOr<Credentials> MetadataCredentialsProviderBase::getCredentials(CredentialsPendingCallback&& cb) {
+  if(credentials_pending_)
+  {
+    if (cb) {
+      ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
+      Thread::LockGuard guard(mu_);
+      credential_pending_callbacks_.push_back(std::move(cb));
+      ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
+    }
+    return absl::NotFoundError("Credentials are pending");
+  }
+
   if (context_) {
     if (tls_slot_) {
       return *(*tls_slot_)->credentials_.get();
@@ -926,34 +939,39 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
 }
 
 
-bool CredentialsProviderChain::credentialsPending() {
-  for (auto& provider : providers_) {
-    if (provider->credentialsPending()) {
-      ENVOY_LOG_MISC(debug, "Credentials are pending");
-      return true;
-    }
-  }
-  ENVOY_LOG_MISC(debug, "Credentials are not pending");
-  return false;
-}
+// bool CredentialsProviderChain::credentialsPending() {
+//   for (auto& provider : providers_) {
+//     if (provider->credentialsPending()) {
+//       ENVOY_LOG_MISC(debug, "Credentials are pending");
+//       return true;
+//     }
+//   }
+//   ENVOY_LOG_MISC(debug, "Credentials are not pending");
+//   return false;
+// }
 
-void CredentialsProviderChain::addCredentialsPendingCallback(CredentialsPendingCallback&& cb) {
-  if (cb) {
-    for (auto& provider : providers_) {
-      if (provider->credentialsPending()) {
-        provider->addCredentialsPendingCallback(std::move(cb));
-        ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
-        return;
-      }
-    }
-  }
-}
+// void CredentialsProviderChain::addCredentialsPendingCallback(CredentialsPendingCallback&& cb) {
+//   if (cb) {
+//     for (auto& provider : providers_) {
+//       if (provider->credentialsPending()) {
+//         provider->addCredentialsPendingCallback(std::move(cb));
+//         ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
+//         return;
+//       }
+//     }
+//   }
+// }
 
-Credentials CredentialsProviderChain::getCredentials() {
+absl::StatusOr<Credentials> CredentialsProviderChain::getCredentials(CredentialsPendingCallback&& cb) {
   for (auto& provider : providers_) {
-    const auto credentials = provider->getCredentials();
-    if (credentials.accessKeyId() && credentials.secretAccessKey()) {
-      return credentials;
+    auto callback_copy = cb;
+    const auto credentialsOr = provider->getCredentials(std::move(callback_copy));
+    if(credentialsOr.ok())
+    {
+    if (credentialsOr->accessKeyId() && credentialsOr->secretAccessKey()) {
+      return credentialsOr;
+    }
+
     }
   }
 

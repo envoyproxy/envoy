@@ -37,8 +37,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const auto& host_rewrite = config.hostRewrite();
   const bool use_unsigned_payload = config.useUnsignedPayload();
 
-  absl::Status status;
-
   if (!host_rewrite.empty()) {
     headers.setHost(host_rewrite);
   }
@@ -51,60 +49,65 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
             use_unsigned_payload);
+
+  absl::Status status;
+
   if (use_unsigned_payload) {
-    status = config.signer().signUnsignedPayload(headers);
+      auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this, &config]() {
+        absl::Status status = config.signer().signUnsignedPayload(*request_headers_);
+        // return continueHeaderSigning(status);
+      },
+      &cancel_callback_);
+
+    status = config.signer().signUnsignedPayload(headers, "", completion_cb);
   } else {
-    status = config.signer().signEmptyPayload(headers);
+          auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this, &config]() {
+        auto status = config.signer().signEmptyPayload(*request_headers_);
+        // return continueHeaderSigning(status);
+      },
+      &cancel_callback_);
+    status = config.signer().signEmptyPayload(headers, "", completion_cb);
   }
   
   if (status.code() == absl::StatusCode::kNotFound)
   {
-      // If we are pending credentials, leave a callback for when
-    // they become available, and stop iteration.
-  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
-      [this]() {
-        continueHeaderSigning();
-      },
-      &cancel_callback_);
-
-    config.signer().addCredentialsPendingCallback(completion_cb);
     return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
   }
-
-  if (status.ok()) {
-    config.stats().signing_added_.inc();
-  } else {
-    ENVOY_LOG(debug, "signing failed: {}", status.message());
-    config.stats().signing_failed_.inc();
-  }
-
-  return Http::FilterHeadersStatus::Continue;
+  return continueHeaderSigning(status);
 }
 
-Http::FilterHeadersStatus Filter::continueHeaderSigning()
+Http::FilterHeadersStatus Filter::continueHeaderSigning(absl::Status status) const
 {
-  auto& config = getConfig();
-  const bool use_unsigned_payload = config.useUnsignedPayload();
-
-  ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
-            use_unsigned_payload);
-
-  absl::Status status;
-  if (use_unsigned_payload) {
-    status = config.signer().signUnsignedPayload(*request_headers_);
-  } else {
-    status = config.signer().signEmptyPayload(*request_headers_);
-  }
   if (status.ok()) {
     config.stats().signing_added_.inc();
   } else {
     ENVOY_LOG(debug, "signing failed: {}", status.message());
     config.stats().signing_failed_.inc();
   }
-
   return Http::FilterHeadersStatus::Continue;
+
 }
 
+void Filter::updateStats(Envoy::Extensions::HttpFilters::AwsRequestSigningFilter::FilterConfig &config, absl::Status status) const
+{
+  if (status.ok()) {
+    config.stats().signing_added_.inc();
+  } else {
+    ENVOY_LOG(debug, "signing failed: {}", status.message());
+    config.stats().signing_failed_.inc();
+  }
+}
+
+void Filter::updatePayloadSigningStats(Envoy::Extensions::HttpFilters::AwsRequestSigningFilter::FilterConfig &config, absl::Status status) const{
+    updateStats(config, status);
+  if (status.ok()) {
+    config.stats().payload_signing_added_.inc();
+  } else {
+    config.stats().payload_signing_failed_.inc();
+  }
+}
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   auto& config = getConfig();
@@ -142,15 +145,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     config.signer().addCredentialsPendingCallback(completion_cb);
     return Http::FilterDataStatus::StopIterationAndWatermark;
   }
-
-  if (status.ok()) {
-    config.stats().signing_added_.inc();
-    config.stats().payload_signing_added_.inc();
-  } else {
-    ENVOY_LOG(debug, "signing failed: {}", status.message());
-    config.stats().signing_failed_.inc();
-    config.stats().payload_signing_failed_.inc();
-  }
+  updatePayloadSigningStats(config, status)
 
   return Http::FilterDataStatus::Continue;
 }

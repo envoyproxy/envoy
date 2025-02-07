@@ -7,6 +7,7 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -67,19 +68,8 @@ public:
    *
    * @return AWS credentials
    */
-  virtual Credentials getCredentials() PURE;
-  /**
-   * Are credentials pending?
-   *
-   * @return true if credentials are pending, false otherwise
-   */
-  virtual bool credentialsPending() PURE;
-  /**
-   * Add a callback to be called when credentials are pending.
-   *
-   * @param cb callback to be called when credentials are pending
-   */
-  virtual void addCredentialsPendingCallback(CredentialsPendingCallback&& cb) PURE;
+  virtual absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) PURE;
+
 };
 
 using CredentialsConstSharedPtr = std::shared_ptr<const Credentials>;

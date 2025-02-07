@@ -47,7 +47,7 @@ using ServerFactoryContextOptRef = OptRef<Server::Configuration::ServerFactoryCo
 class EnvironmentCredentialsProvider : public CredentialsProvider,
                                        public Logger::Loggable<Logger::Id::aws> {
 public:
-  Credentials getCredentials() override;
+  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) override;
 };
 
 /**
@@ -63,7 +63,7 @@ public:
                             absl::string_view secret_access_key = absl::string_view(),
                             absl::string_view session_token = absl::string_view())
       : credentials_(access_key_id, secret_access_key, session_token) {}
-  Credentials getCredentials() override;
+  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) override;
 
 private:
   const Credentials credentials_;
@@ -72,7 +72,7 @@ private:
 class CachedCredentialsProviderBase : public CredentialsProvider,
                                       public Logger::Loggable<Logger::Id::aws> {
 public:
-  Credentials getCredentials() override {
+  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& = {}) override {
     refreshIfNeeded();
     return cached_credentials_;
   }
@@ -83,8 +83,6 @@ protected:
 
   void refreshIfNeeded();
 
-  bool credentialsPending() override { return false; };
-  void addCredentialsPendingCallback(ABSL_ATTRIBUTE_UNUSED CredentialsPendingCallback&& cb) override {};
 
   virtual bool needsRefresh() PURE;
   virtual void refresh() PURE;
@@ -139,7 +137,7 @@ public:
                                   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                   std::chrono::seconds initialization_timer);
 
-  Credentials getCredentials() override;
+  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) override;
 
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
@@ -148,10 +146,6 @@ public:
   void setClusterReadyCallbackHandle(AwsManagedClusterUpdateCallbacksHandlePtr handle) {
     callback_handle_ = std::move(handle);
   }
-
-  bool credentialsPending() override;
-
-  void addCredentialsPendingCallback(CredentialsPendingCallback&& cb) override;
 
 protected:
   struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject {
@@ -176,8 +170,6 @@ protected:
 
   // Set Credentials shared_ptr on all threads.
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds);
-
-  // bool credentialsPending(CredentialsPendingCallback&& cb) override;
 
   Api::Api& api_;
   // The optional server factory context.
@@ -344,9 +336,7 @@ public:
     providers_.emplace_back(credentials_provider);
   }
 
-  Credentials getCredentials() override;
-  void addCredentialsPendingCallback(CredentialsPendingCallback&& cb) override;
-  bool credentialsPending() override;
+  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) override;
 protected:
   std::list<CredentialsProviderSharedPtr> providers_;
 };
@@ -446,7 +436,7 @@ public:
                                     absl::string_view session_token)
       : credentials_(access_key_id, secret_access_key, session_token) {}
 
-  Credentials getCredentials() override { return credentials_; }
+  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& = {}) override { return credentials_; }
 
 private:
   const Credentials credentials_;
