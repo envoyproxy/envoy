@@ -5,7 +5,6 @@
 #include <fstream>
 #include <memory>
 
-#include "credentials_provider.h"
 #include "envoy/common/exception.h"
 
 #include "source/common/common/lock_guard.h"
@@ -69,12 +68,14 @@ constexpr char STS_TOKEN_CLUSTER[] = "sts_token_service_internal";
 
 } // namespace
 
-absl::StatusOr<Credentials> ConfigCredentialsProvider::getCredentials(CredentialsPendingCallback&&) {
+absl::StatusOr<Credentials>
+ConfigCredentialsProvider::getCredentials(CredentialsPendingCallback&&) {
   ENVOY_LOG(debug, "Getting AWS credentials from static configuration");
   return credentials_;
 }
 
-absl::StatusOr<Credentials> EnvironmentCredentialsProvider::getCredentials(CredentialsPendingCallback&&) {
+absl::StatusOr<Credentials>
+EnvironmentCredentialsProvider::getCredentials(CredentialsPendingCallback&&) {
   ENVOY_LOG(debug, "Getting AWS credentials from the environment");
 
   const auto access_key_id = absl::NullSafeStringView(std::getenv(AWS_ACCESS_KEY_ID));
@@ -165,7 +166,8 @@ void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
 //   return credentials_pending_;
 // }
 
-// void MetadataCredentialsProviderBase::addCredentialsPendingCallback(CredentialsPendingCallback&& cb) {
+// void MetadataCredentialsProviderBase::addCredentialsPendingCallback(CredentialsPendingCallback&&
+// cb) {
 // }
 
 void MetadataCredentialsProviderBase::credentialsRetrievalError() {
@@ -178,9 +180,9 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
 }
 
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
-absl::StatusOr<Credentials> MetadataCredentialsProviderBase::getCredentials(CredentialsPendingCallback&& cb) {
-  if(credentials_pending_)
-  {
+absl::StatusOr<Credentials>
+MetadataCredentialsProviderBase::getCredentials(CredentialsPendingCallback&& cb) {
+  if (credentials_pending_) {
     if (cb) {
       ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
       Thread::LockGuard guard(mu_);
@@ -256,29 +258,27 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
   CredentialsConstSharedPtr shared_credentials = std::move(creds);
   if (tls_slot_ && !tls_slot_->isShutdown()) {
     tls_slot_->runOnAllThreads(
-      /* Set the credentials */ [shared_credentials](OptRef<ThreadLocalCredentialsCache> obj) {
-      obj->credentials_ = shared_credentials;
-    },
-    /* Notify waiting signers on completion */ [this](){
+        /* Set the credentials */ [shared_credentials](
+                                      OptRef<ThreadLocalCredentialsCache>
+                                          obj) { obj->credentials_ = shared_credentials; },
+        /* Notify waiting signers on completion */
+        [this]() {
+          credentials_pending_.store(false);
 
-  credentials_pending_.store(false);
+          std::vector<CredentialsPendingCallback> callbacks_copy;
 
-  std::vector<CredentialsPendingCallback> callbacks_copy;
+          {
+            Thread::LockGuard guard(mu_);
+            callbacks_copy = credential_pending_callbacks_;
+            credential_pending_callbacks_.clear();
+            ENVOY_LOG_MISC(debug, "We have {} pending callbacks", callbacks_copy.size());
+          }
 
-  {
-    Thread::LockGuard guard(mu_);
-    callbacks_copy = credential_pending_callbacks_;
-    credential_pending_callbacks_.clear();
-    ENVOY_LOG_MISC(debug, "We have {} pending callbacks", callbacks_copy.size());
-  }
-
-  // Call all of our callbacks to unblock pending requests
-  for (const auto& cb : callbacks_copy) {
-    cb();
-  }
-
-    }
-    );
+          // Call all of our callbacks to unblock pending requests
+          for (const auto& cb : callbacks_copy) {
+            cb();
+          }
+        });
   }
 
   // We are now no longer waiting for credentials
@@ -938,7 +938,6 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
   credentialsRetrievalError();
 }
 
-
 // bool CredentialsProviderChain::credentialsPending() {
 //   for (auto& provider : providers_) {
 //     if (provider->credentialsPending()) {
@@ -962,16 +961,15 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
 //   }
 // }
 
-absl::StatusOr<Credentials> CredentialsProviderChain::getCredentials(CredentialsPendingCallback&& cb) {
+absl::StatusOr<Credentials>
+CredentialsProviderChain::getCredentials(CredentialsPendingCallback&& cb) {
   for (auto& provider : providers_) {
     auto callback_copy = cb;
     const auto credentialsOr = provider->getCredentials(std::move(callback_copy));
-    if(credentialsOr.ok())
-    {
-    if (credentialsOr->accessKeyId() && credentialsOr->secretAccessKey()) {
-      return credentialsOr;
-    }
-
+    if (credentialsOr.ok()) {
+      if (credentialsOr->accessKeyId() && credentialsOr->secretAccessKey()) {
+        return credentialsOr;
+      }
     }
   }
 

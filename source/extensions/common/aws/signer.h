@@ -1,8 +1,9 @@
 #pragma once
 
-#include "source/extensions/common/aws/credentials_provider.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/message.h"
+
+#include "source/extensions/common/aws/credentials_provider.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +22,8 @@ public:
    * @throws EnvoyException if the request cannot be signed.
    */
   virtual absl::Status sign(Http::RequestMessage& message, bool sign_body,
-                            const absl::string_view override_region = "", CredentialsPendingCallback&& cb = {}) PURE;
+                            const absl::string_view override_region = "",
+                            CredentialsPendingCallback&& cb = {}) PURE;
 
   /**
    * Sign an AWS request without a payload (empty string used as content hash).
@@ -30,7 +32,8 @@ public:
    * @throws EnvoyException if the request cannot be signed.
    */
   virtual absl::Status signEmptyPayload(Http::RequestHeaderMap& headers,
-                                        const absl::string_view override_region = "", CredentialsPendingCallback&& cb = {}) PURE;
+                                        const absl::string_view override_region = "",
+                                        CredentialsPendingCallback&& cb = {}) PURE;
 
   /**
    * Sign an AWS request using the literal string UNSIGNED-PAYLOAD in the canonical request.
@@ -39,7 +42,8 @@ public:
    * @throws EnvoyException if the request cannot be signed.
    */
   virtual absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
-                                           const absl::string_view override_region = "", CredentialsPendingCallback&& cb = {}) PURE;
+                                           const absl::string_view override_region = "",
+                                           CredentialsPendingCallback&& cb = {}) PURE;
 
   /**
    * Sign an AWS request.
@@ -49,8 +53,8 @@ public:
    * @throws EnvoyException if the request cannot be signed.
    */
   virtual absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
-                            const absl::string_view override_region = "", CredentialsPendingCallback&& cb = {}) PURE;
-
+                            const absl::string_view override_region = "",
+                            CredentialsPendingCallback&& cb = {}) PURE;
 };
 
 using SignerPtr = std::unique_ptr<Signer>;

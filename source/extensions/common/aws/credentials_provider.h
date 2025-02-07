@@ -5,9 +5,9 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -69,7 +69,6 @@ public:
    * @return AWS credentials
    */
   virtual absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) PURE;
-
 };
 
 using CredentialsConstSharedPtr = std::shared_ptr<const Credentials>;

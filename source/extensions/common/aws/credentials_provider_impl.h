@@ -83,7 +83,6 @@ protected:
 
   void refreshIfNeeded();
 
-
   virtual bool needsRefresh() PURE;
   virtual void refresh() PURE;
 };
@@ -337,6 +336,7 @@ public:
   }
 
   absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) override;
+
 protected:
   std::list<CredentialsProviderSharedPtr> providers_;
 };
@@ -436,7 +436,9 @@ public:
                                     absl::string_view session_token)
       : credentials_(access_key_id, secret_access_key, session_token) {}
 
-  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& = {}) override { return credentials_; }
+  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& = {}) override {
+    return credentials_;
+  }
 
 private:
   const Credentials credentials_;
