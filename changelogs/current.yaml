@@ -13,6 +13,11 @@ minor_behavior_changes:
     Setting :ref:`dns_query_timeout
     <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>`
     to 0 will disable the the Envoy DNS query timeout and use the underlying DNS implementation timeout.
+- area: ext_proc
+  change: |
+    When :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+    headers/trailers modes have the value ``DEFAULT`` (unset), no change will be made to the processing
+    mode set in the filter configuration.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
