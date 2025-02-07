@@ -324,6 +324,17 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
   return AssertionSuccess();
 }
 
+AssertionResult FakeStream::waitForReset(Event::Dispatcher& client_dispatcher,
+                                         std::chrono::milliseconds timeout) {
+  absl::MutexLock lock(&lock_);
+  if (!waitForWithDispatcherRun(
+          time_system_, lock_, [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return saw_reset_; },
+          client_dispatcher, timeout)) {
+    return AssertionFailure() << "Timed out waiting for reset of stream.";
+  }
+  return AssertionSuccess();
+}
+
 void FakeStream::startGrpcStream(bool send_headers) {
   ASSERT(!grpc_stream_started_, "gRPC stream should not be started more than once");
   grpc_stream_started_ = true;
