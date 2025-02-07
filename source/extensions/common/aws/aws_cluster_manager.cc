@@ -20,16 +20,6 @@ AwsClusterManagerImpl::AwsClusterManagerImpl(Server::Configuration::ServerFactor
       cm_handle_ = context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
       createQueuedClusters();
 
-  // If we are still initializing, defer cluster creation using an init target
-  if (context_.initManager().state() == Envoy::Init::Manager::State::Initialized) {
-    queue_clusters_.exchange(false);
-    cm_handle_ = context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
-  } else {
-    init_target_ = std::make_unique<Init::TargetImpl>("aws_cluster_manager", [this]() -> void {
-      queue_clusters_.exchange(false);
-      cm_handle_ = context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
-      createQueuedClusters();
-
       init_target_->ready();
       init_target_.reset();
     });
