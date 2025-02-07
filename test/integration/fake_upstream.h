@@ -165,6 +165,11 @@ public:
   testing::AssertionResult
   waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForReset(Event::Dispatcher& client_dispatcher,
+               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   // gRPC convenience methods.
   void startGrpcStream(bool send_headers = true);
   void finishGrpcStream(Grpc::Status::GrpcStatus status);
