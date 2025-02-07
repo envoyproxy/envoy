@@ -159,7 +159,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 }
 
 void Filter::addSigningPayloadStats(FilterConfig& config, absl::Status status) const {
-  addSigningStats(config, status);
   if (status.ok()) {
     config.stats().payload_signing_added_.inc();
   } else {
