@@ -19,7 +19,11 @@ void RedisHttpCacheLookupContext::getBody(const AdjustedByteRange& range, Lookup
 
     
   tls_slot_->send(fmt::format("getrange cache-{}-body {} {}", stableHashKey(lookup_.key()), range.begin(), range.begin() + range.length() - 1),
-    [this] (bool success, std::string redis_value) mutable {
+    [this] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
+    if (!connected) {
+        ASSERT(false);
+    }
+
     if (!success) {
         // TODO: make sure that this path is tested.
         ASSERT(false);
@@ -32,12 +36,12 @@ void RedisHttpCacheLookupContext::getBody(const AdjustedByteRange& range, Lookup
 
     // We need to strip quotes on both sides of the string.
     // TODO: maybe move to redis async client.
-    redis_value = redis_value.substr(1, redis_value.length() - 2);
+    redis_value = redis_value.value().substr(1, redis_value.value().length() - 2);
 
   // TODO: this is not very efficient.
   std::unique_ptr<Buffer::OwnedImpl> buf;
     buf = std::make_unique<Buffer::OwnedImpl>();
-    buf->add(redis_value);
+    buf->add(redis_value.value());
         /*std::move(cb1_)*/cb1_(std::move(buf), !has_trailers_);
     });
 }

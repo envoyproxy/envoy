@@ -23,7 +23,11 @@ void RedisHttpCacheInsertContext::insertHeaders(const Http::ResponseHeaderMap& r
     // allocate thread local tcp async client and wrap it with redis protocol 
     tls_slot_->redis_client_.client_ = cluster->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
     tls_slot_->redis_client_.client_->setAsyncTcpClientCallbacks(tls_slot_->redis_client_);
-    tls_slot_->redis_client_.callback_ = [this, end_stream] (bool success, std::string /*redis_value*/) {
+    tls_slot_->redis_client_.callback_ = [this, end_stream] (bool connected, bool success, absl::optional<std::string> /*redis_value*/) {
+
+    if (!connected) {
+        ASSERT(false); 
+    }
 
     if (!success) {
         // Error writing to Redis. This may happen in the following situations:
@@ -115,8 +119,10 @@ void RedisHttpCacheInsertContext::insertBody(const Buffer::Instance& chunk,
     
     cb_ = std::move(ready_for_next_chunk);
     // TODO: the client should be already connectedt to redis. We should check it here. 
-    tls_slot_->redis_client_.callback_ = [this, end_stream] (bool success, std::string /*redis_value*/) {
-    //ASSERT(false);
+    tls_slot_->redis_client_.callback_ = [this, end_stream] (bool connected, bool success, absl::optional<std::string> /*redis_value*/) {
+    if(!connected) {
+    ASSERT(false);
+    }
 
     if (!success) {
         // How to simulate this situation? When redis client reports that writing was not successful?
@@ -190,7 +196,7 @@ void RedisHttpCacheInsertContext::onStreamEnd() {
   std::string cache_for = "3000000";
 NetworkFilters::Common::Redis::RespValue request;
   Buffer::OwnedImpl buf;
-  tls_slot_->redis_client_.callback_ = [/*this, cache_for*/] (bool /*success*/, std::string /*redis_value*/) {
+  tls_slot_->redis_client_.callback_ = [/*this, cache_for*/] (bool /* connected */, bool /*success*/, absl::optional<std::string> /*redis_value*/) {
   // If redis client can handle queueing, this can be invoked immediatelky after sending
   // expire for body and this callback can be {}
 #if 0
@@ -273,7 +279,10 @@ NetworkFilters::Common::Redis::RespValue request;
     // maybe connect it when the first request comes and it is not connected.
 
   tls_slot_->send(fmt::format(RedisInsertTrailersCmd, stableHashKey(lookup_->key()), trailers_proto.SerializeAsString()),
-    [this ] (bool success, std::string /*redis_value*/) mutable {
+    [this ] (bool connected, bool success, absl::optional<std::string> /*redis_value*/) mutable {
+    if(!connected) {
+        ASSERT(false);
+    }
 
     // This is the end of the stream.
     if(success) {

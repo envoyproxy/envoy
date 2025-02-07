@@ -13,7 +13,7 @@ namespace Redis {
 class RedisAsyncClient : public Tcp::AsyncTcpClientCallbacks,
                          public NetworkFilters::Common::Redis::DecoderCallbacks {
 public:
-  using ResultCallback = std::function<void(bool, std::string)>;
+  using ResultCallback = std::function<void(bool, bool, absl::optional<std::string>)>;
   RedisAsyncClient(Upstream::ClusterManager&);
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}

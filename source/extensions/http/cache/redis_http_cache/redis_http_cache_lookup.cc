@@ -19,8 +19,16 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     // Convert to string and add to redis command.
 
   tls_slot_->send(fmt::format(RedisGetHeadersCmd, stableHashKey(lookup_.key())),
-    [this ] (bool success, std::string redis_value) mutable {
+    [this ] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
 
+    if (!connected) {
+        // Failure to connect to Redis. Proceed without additional attempts
+        // to connect.
+        LookupResult lookup_result;
+        lookup_result.cache_entry_status_ = CacheEntryStatus::LookupError;
+        (cb_)(std::move(lookup_result), /* end_stream (ignored) = */ false);
+        return;
+    }
     if (!success) {
         std::cout << "Nothing found in the database.\n";
         // TODO: end_stream should be taken based on info from cache.
@@ -31,16 +39,16 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
 
     // We need to strip quotes on both sides of the string.
     // TODO: maybe move to redis async client.
-    if (redis_value.length() == 4)  {
-        redis_value.clear();
+    if (redis_value.value().length() == 4)  {
+        redis_value.value().clear();
     } else {
-        redis_value = redis_value.substr(1, redis_value.length() - 2);
+        redis_value = redis_value.value().substr(1, redis_value.value().length() - 2);
     }
 
 
     // Entry is in redis, but is empty. It means that some other entity
     // is filling the cache.
-    if (redis_value.length() == 0) {
+    if (redis_value.value().length() == 0) {
         // Entry exists but is empty. It means that some other entity is filling the cache.
         // Continue as if the cache entry was not found.
         LookupResult lookup_result;
@@ -50,7 +58,7 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     }
 
   CacheFileHeader header;
-  header.ParseFromString(redis_value);
+  header.ParseFromString(redis_value.value());
 
     if (header.headers().size() == 0) {
         std::cout << "Nothing found in the database.\n";
@@ -75,7 +83,11 @@ void RedisHttpCacheLookupContext::getTrailers(LookupTrailersCallback&& cb) {
     cb2_ = std::move(cb);
 
   tls_slot_->send(fmt::format(RedisGetTrailersCmd, stableHashKey(lookup_.key())),
-    [this ] (bool success, std::string redis_value) mutable {
+    [this ] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
+    if(!connected) {
+        ASSERT(false);
+    }
+    
 
     if (!success) {
         // TODO: make sure that this path is tested.
@@ -89,10 +101,10 @@ void RedisHttpCacheLookupContext::getTrailers(LookupTrailersCallback&& cb) {
 
     // We need to strip quotes on both sides of the string.
     // TODO: maybe move to redis async client.
-    redis_value = redis_value.substr(1, redis_value.length() - 2);
+    redis_value = redis_value.value().substr(1, redis_value.value().length() - 2);
 
     CacheFileTrailer trailers;
-    trailers.ParseFromString(redis_value);
+    trailers.ParseFromString(redis_value.value());
     cb2_(trailersFromTrailerProto(trailers));
     }
 );

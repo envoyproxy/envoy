@@ -16,7 +16,21 @@ RedisAsyncClient::RedisAsyncClient(Upstream::ClusterManager& cluster_manager) : 
     }
 }
 
-void RedisAsyncClient::onEvent(Network::ConnectionEvent /*event*/) {}
+void RedisAsyncClient::onEvent(Network::ConnectionEvent event) {
+    if (event == Network::ConnectionEvent::RemoteClose || 
+    event == Network::ConnectionEvent::LocalClose) {
+    callback_(false, false /*ignored*/, absl::nullopt/*ignored*/);
+
+    // Iterate over all queued requests and call a callback 
+    // indicating that connection failed. They would ost likely fail as well.
+    // A subsequent request
+    // will trigger the connection process again.
+  for (; !queue_.empty(); queue_.pop()){
+        std::get<2>(queue_.front())(false, false, absl::nullopt);
+    }
+  waiting_for_response_ = false;
+    } 
+}
 
 void RedisAsyncClient::onData(Buffer::Instance& buf, bool) {
   NetworkFilters::Common::Redis::RespValue response;
@@ -32,9 +46,9 @@ void RedisAsyncClient::onData(Buffer::Instance& buf, bool) {
 
 void RedisAsyncClient::onRespValue(NetworkFilters::Common::Redis::RespValuePtr&& value) {
   if (value->type() == NetworkFilters::Common::Redis::RespType::Null) {
-    callback_(false, "");
+    callback_(true, false, absl::nullopt);
   } else {
-    callback_(true, value->toString());
+    callback_(true, true, value->toString());
   }
 
   value.reset();
@@ -44,6 +58,8 @@ void RedisAsyncClient::onRespValue(NetworkFilters::Common::Redis::RespValuePtr&&
     if (client_ == nullptr) {
     client_ = cluster_->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
     client_->setAsyncTcpClientCallbacks(*this);
+    }
+    if (!client_->connected()) {
     client_->connect();
     }
 
