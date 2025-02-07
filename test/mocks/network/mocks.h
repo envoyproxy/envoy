@@ -198,7 +198,7 @@ public:
   MockDrainDecision();
   ~MockDrainDecision() override;
 
-  MOCK_METHOD(bool, drainClose, (Network::DrainDirection direction), (const));
+  MOCK_METHOD(bool, drainClose, (), (const));
 };
 
 class MockListenerFilter : public ListenerFilter {
@@ -720,7 +720,7 @@ public:
   MOCK_METHOD(void, processPacket,
               (Address::InstanceConstSharedPtr local_address,
                Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-               MonotonicTime receive_time, uint8_t tos, Buffer::RawSlice saved_cmsg));
+               MonotonicTime receive_time, uint8_t tos, Buffer::OwnedImpl saved_cmsg));
   MOCK_METHOD(void, onDatagramsDropped, (uint32_t dropped));
   MOCK_METHOD(uint64_t, maxDatagramSize, (), (const));
   MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));

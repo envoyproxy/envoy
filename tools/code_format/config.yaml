@@ -115,7 +115,6 @@ paths:
     - source/common/upstream/cds_api_impl.cc
     - source/common/rds/common/route_config_provider_manager_impl.h
     - source/common/rds/route_config_provider_manager.h
-    - source/common/filter/config_discovery_impl.cc
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
@@ -161,7 +160,6 @@ paths:
     - source/extensions/config_subscription
     - source/extensions/compression/zstd/common/dictionary_manager.h
     - source/extensions/filters/http/adaptive_concurrency/controller
-    - source/extensions/filters/http/aws_lambda
     - source/extensions/filters/http/basic_auth
     - source/extensions/filters/http/cache
     - source/extensions/filters/http/common

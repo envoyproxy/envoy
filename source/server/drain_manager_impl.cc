@@ -16,7 +16,7 @@ DrainManagerImpl::DrainManagerImpl(Instance& server,
                                    envoy::config::listener::v3::Listener::DrainType drain_type)
     : server_(server), drain_type_(drain_type) {}
 
-bool DrainManagerImpl::drainClose(Network::DrainDirection direction) const {
+bool DrainManagerImpl::drainClose() const {
   // If we are actively health check failed and the drain type is default, always drain close.
   //
   // TODO(mattklein123): In relation to x-envoy-immediate-health-check-fail, it would be better
@@ -28,15 +28,7 @@ bool DrainManagerImpl::drainClose(Network::DrainDirection direction) const {
     return true;
   }
 
-  if (!draining_.load().first) {
-    return false;
-  }
-
-  // If the direction passed in is greater than the current draining direction
-  // (e.g. direction = ALL, but draining_.second == INBOUND_ONLY), then don't
-  // drain. We also don't want to drain if the direction is None (which doesn't really
-  // make sense, but it's the correct behavior).
-  if (direction == Network::DrainDirection::None || direction > draining_.load().second) {
+  if (!draining_) {
     return false;
   }
 
@@ -48,14 +40,12 @@ bool DrainManagerImpl::drainClose(Network::DrainDirection direction) const {
   // P(return true) = elapsed time / drain timeout
   // If the drain deadline is exceeded, skip the probability calculation.
   const MonotonicTime current_time = server_.dispatcher().timeSource().monotonicTime();
-  auto deadline = drain_deadlines_.find(direction);
-  ASSERT(deadline != drain_deadlines_.end());
-  if (current_time >= deadline->second) {
+  if (current_time >= drain_deadline_) {
     return true;
   }
 
   const auto remaining_time =
-      std::chrono::duration_cast<std::chrono::seconds>(deadline->second - current_time);
+      std::chrono::duration_cast<std::chrono::seconds>(drain_deadline_ - current_time);
   const auto drain_time = server_.options().drainTime();
   ASSERT(server_.options().drainTime() >= remaining_time);
   const auto drain_time_count = drain_time.count();
@@ -71,30 +61,26 @@ bool DrainManagerImpl::drainClose(Network::DrainDirection direction) const {
          (server_.api().randomGenerator().random() % drain_time_count);
 }
 
-void DrainManagerImpl::startDrainSequence(Network::DrainDirection direction,
-                                          std::function<void()> drain_complete_cb) {
-  ASSERT(direction != Network::DrainDirection::None, "a valid direction must be specified.");
-  ASSERT(drain_tick_timers_.count(direction) == 0,
-         "cannot run two drain sequences for the same direction.");
-  auto new_timer = server_.dispatcher().createTimer(drain_complete_cb);
+void DrainManagerImpl::startDrainSequence(std::function<void()> drain_complete_cb) {
+  ASSERT(!drain_tick_timer_);
+  drain_tick_timer_ = server_.dispatcher().createTimer(drain_complete_cb);
+
   const std::chrono::seconds drain_delay(server_.options().drainTime());
-  new_timer->enableTimer(drain_delay);
-  drain_tick_timers_[direction] = std::move(new_timer);
+  drain_tick_timer_->enableTimer(drain_delay);
   // Note https://github.com/envoyproxy/envoy/issues/31457, previous to which,
   // drain_deadline_ was set *after* draining_ resulting in a read/write race between
   // the main thread running this function from admin, and the worker thread calling
   // drainClose. Note that drain_deadline_ is default-constructed which guarantees
   // to set the time-since epoch to a count of 0
   // (https://en.cppreference.com/w/cpp/chrono/time_point/time_point).
-  ASSERT(drain_deadlines_[direction].time_since_epoch().count() == 0,
-         "drain_deadline_ cannot be set twice for the same direction");
+  ASSERT(drain_deadline_.time_since_epoch().count() == 0, "drain_deadline_ cannot be set twice.");
   // Since draining_ is atomic, it is safe to set drain_deadline_ without a mutex
   // as drain_close() only reads from drain_deadline_ if draining_ is true, and
   // C++ will not re-order an assign to an atomic. See
   // https://stackoverflow.com/questions/40320254/reordering-atomic-operations-in-c .
-  drain_deadlines_[direction] = server_.dispatcher().timeSource().monotonicTime() + drain_delay;
+  drain_deadline_ = server_.dispatcher().timeSource().monotonicTime() + drain_delay;
   // Atomic assign must come after the assign to drain_deadline_.
-  draining_.store(DrainPair{true, direction}, std::memory_order_seq_cst);
+  draining_.store(true, std::memory_order_seq_cst);
 }
 
 void DrainManagerImpl::startParentShutdownSequence() {

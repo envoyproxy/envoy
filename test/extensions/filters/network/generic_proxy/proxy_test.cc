@@ -1059,8 +1059,7 @@ TEST_F(FilterTest, UpstreamResponseAfterPreviousUpstreamResponse) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   // Response filter chain is stopped by the first filter.
@@ -1101,8 +1100,7 @@ TEST_F(FilterTest, UpstreamResponseAfterPreviousLocalReply) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   // Response filter chain of local reply is stopped by the first filter.
@@ -1144,8 +1142,7 @@ TEST_F(FilterTest, SendLocalReplyAfterPreviousLocalReply) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   // Response filter chain of local reply is stopped by the first filter.
@@ -1201,8 +1198,7 @@ TEST_F(FilterTest, SendLocalReplyAfterPreviousUpstreamResponseHeaderIsSent) {
 
   auto active_stream = filter_->activeStreamsForTest().begin()->get();
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   testing::Sequence s;
@@ -1309,8 +1305,7 @@ TEST_F(FilterTest, ActiveStreamSendLocalReply) {
                     "response-value - 2 test_detail"));
 
   // Check the drain manager.
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
 
   filter_->onDecodingSuccess(std::move(request));
 
@@ -1396,8 +1391,7 @@ TEST_F(FilterTest, ActiveStreamSendLocalReplyWhenProcessingBody) {
                     "response-value - 2 test_detail"));
 
   // Check the drain manager.
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
 
   auto request_frame = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   filter_->onDecodingSuccess(std::move(request_frame));
@@ -1494,8 +1488,7 @@ TEST_F(FilterTest, ActiveStreamSendLocalReplyWhenTransferringBody) {
                     "response-value - 2 test_detail"));
 
   // Check the drain manager.
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
 
   auto request_frame = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   filter_->onDecodingSuccess(std::move(request_frame));
@@ -1597,8 +1590,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormally) {
               write("host-value /path-value method-value protocol-value request-value "
                     "response-value - 0 via_upstream"));
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
@@ -1669,8 +1661,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
               write("host-value /path-value method-value protocol-value request-value "
                     "response-value - 123 via_upstream"));
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferStringEqual("test"), false)).Times(2);
@@ -1736,8 +1727,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
         return EncodingResult{4};
       }));
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(true));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(true));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
@@ -1785,8 +1775,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithStreamDrainClose) {
 
   // The drain close of factory_context_.drain_manager_ is false, but the drain close of
   // active_stream is true.
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
@@ -1846,8 +1835,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
         return EncodingResult{4};
       }));
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
@@ -1907,8 +1895,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracingAndSamplingToTrue) {
         return EncodingResult{4};
       }));
 
-  EXPECT_CALL(factory_context_.drain_manager_, drainClose(Network::DrainDirection::All))
-      .WillOnce(Return(false));
+  EXPECT_CALL(factory_context_.drain_manager_, drainClose()).WillOnce(Return(false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
