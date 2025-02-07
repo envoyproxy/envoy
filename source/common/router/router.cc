@@ -809,7 +809,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
               .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_)
               .setDiscardResponseBody(true)
               .setFilterConfig(config_)
-              .setParentContext(Http::AsyncClient::ParentContext{ &callbacks_->streamInfo() });
+              .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
       if (end_stream) {
         // This is a header-only request, and can be dispatched immediately to the shadow
         // without waiting.
@@ -1065,15 +1065,16 @@ void Filter::maybeDoShadowing() {
     if (shadow_trailers_) {
       request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
     }
-    const auto options = Http::AsyncClient::RequestOptions()
-                       .setTimeout(timeout_.global_timeout_)
-                       .setParentSpan(callbacks_->activeSpan())
-                       .setChildSpanName("mirror")
-                       .setSampled(shadow_policy.traceSampled())
-                       .setIsShadow(true)
-                       .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
-                       .setFilterConfig(config_)
-                       .setParentContext(Http::AsyncClient::ParentContext{ &callbacks_->streamInfo() });
+    const auto options =
+        Http::AsyncClient::RequestOptions()
+            .setTimeout(timeout_.global_timeout_)
+            .setParentSpan(callbacks_->activeSpan())
+            .setChildSpanName("mirror")
+            .setSampled(shadow_policy.traceSampled())
+            .setIsShadow(true)
+            .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
+            .setFilterConfig(config_)
+            .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
     config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
                                    options);
   }

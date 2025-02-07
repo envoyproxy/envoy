@@ -135,9 +135,10 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   const Router::MetadataMatchCriteria* metadata_matching_criteria;
   if (options.parent_context.stream_info != nullptr) {
     stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
-    metadata_matching_criteria = options.parent_context.stream_info->route()
-          ? options.parent_context.stream_info->route()->routeEntry()->metadataMatchCriteria()
-          : nullptr;
+    metadata_matching_criteria =
+        options.parent_context.stream_info->route()
+            ? options.parent_context.stream_info->route()->routeEntry()->metadataMatchCriteria()
+            : nullptr;
   }
 
   auto route_or_error = NullRouteImpl::create(
