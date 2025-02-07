@@ -4958,7 +4958,7 @@ TEST_P(RouterShadowingTest, ShadowCallbacksNotCalledInDestructor) {
   EXPECT_CALL(foo_request, cancel()).Times(0);
 }
 
-TEST_P(RouterShadowingTest, ShadowRequestCarriesMatchingRoute) {
+TEST_P(RouterShadowingTest, ShadowRequestCarriesParentContext) {
   ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
   callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
@@ -4981,14 +4981,16 @@ TEST_P(RouterShadowingTest, ShadowRequestCarriesMatchingRoute) {
     EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
         .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
                              const Http::AsyncClient::RequestOptions& options) {
-          EXPECT_EQ(callbacks_.route(), options.matching_route);
+          EXPECT_NE(options.parent_context.stream_info, nullptr);
+          EXPECT_EQ(callbacks_.streamInfo().route(), options.parent_context.stream_info->route());
           return &foo_request;
         }));
   } else {
     EXPECT_CALL(*shadow_writer_, shadow_("foo", _, _))
         .WillOnce(Invoke([&](const std::string&, Http::RequestMessagePtr&,
                              const Http::AsyncClient::RequestOptions& options) {
-          EXPECT_EQ(callbacks_.route(), options.matching_route);
+          EXPECT_NE(options.parent_context.stream_info, nullptr);
+          EXPECT_EQ(callbacks_.streamInfo().route(), options.parent_context.stream_info->route());
           return &foo_request;
         }));
   }

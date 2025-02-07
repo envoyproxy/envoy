@@ -383,10 +383,6 @@ public:
       sidestream_watermark_callbacks = callbacks;
       return *this;
     }
-    StreamOptions& setMatchingRoute(Envoy::Router::RouteConstSharedPtr route) {
-      matching_route = route;
-      return *this;
-    }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
@@ -447,8 +443,6 @@ public:
     absl::optional<bool> sampled_{true};
     // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
     Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
-    // Matching route to be associated with new stream
-    Envoy::Router::RouteConstSharedPtr matching_route;
   };
 
   /**
