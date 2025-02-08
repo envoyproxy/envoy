@@ -171,7 +171,7 @@ bool ReverseConnectionInitiator::maintainConnCount() {
       ENVOY_LOG(debug,
                 "RCInitiator ID: {} Initiating {} reverse connections to host {} of remote "
                 "cluster '{}' from source node '{}'",
-                getID(), host, req_no_of_conns, remote_cluster_id, rc_options_.src_node_id_);
+                getID(), req_no_of_conns, host, remote_cluster_id, rc_options_.src_node_id_);
 
       for (uint32_t conn = 0; conn < req_no_of_conns; conn++) {
         ENVOY_LOG(debug, "Initiating reverse connection number {} to host {} of {}", conn + 1, host,
@@ -282,7 +282,6 @@ void ReverseConnectionInitiator::reverseConnectionDone(const std::string& error,
               rc_conn_to_host_map_[connectionKey]);
     rc_conn_to_host_map_.erase(connectionKey);
   } else {
-    rc_connection_manager->getConnection()->setConnectionReused(true);
     client_socket->ioHandle().resetFileEvents();
 
     rc_stats_map_[remote_cluster_id]->reverse_conn_cx_total_.inc();

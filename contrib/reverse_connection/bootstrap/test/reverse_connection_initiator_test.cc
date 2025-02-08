@@ -91,7 +91,6 @@ public:
     // EXPECT_CALL(*setup.socket, ioHandle()).WillRepeatedly(ReturnRef(*setup.io_handle));
     // EXPECT_CALL(*setup.io_handle, resetFileEvents());
     // EXPECT_CALL(*setup.socket, isOpen()).WillRepeatedly(Return(true));
-    // EXPECT_CALL(*setup.connection, setConnectionReused(_));
 
     // Tie the mock connection to the provider and socket
     EXPECT_CALL(*setup.connection, connectionInfoProvider()).WillRepeatedly(ReturnRef(*setup.provider));
@@ -321,7 +320,6 @@ TEST_F(ReverseConnectionInitiatorTest, ReverseConnCloseAfterInitiation) {
 //   rc_manager_->setConnectionHandler(connection_handler_);
 //   EXPECT_CALL(connection_handler_, saveUpstreamConnection(_, _));
 
-//   EXPECT_CALL(*setup.connection, setConnectionReused(_));
 //   EXPECT_NE(setup.io_handle, nullptr);
 //   EXPECT_CALL(*setup.socket, ioHandle()).WillRepeatedly(ReturnRef(*setup.io_handle));
 //   EXPECT_CALL(*setup.io_handle, resetFileEvents()).WillOnce(Invoke([]() {
