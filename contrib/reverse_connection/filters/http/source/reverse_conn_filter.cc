@@ -142,7 +142,7 @@ Http::FilterDataStatus ReverseConnFilter::acceptReverseConnection() {
     decoder_callbacks_->sendLocalReply(Http::Code::OK, ret.SerializeAsString(), nullptr,
                                        absl::nullopt, "");
   }
-  connection->setActiveConnectionReused(true);
+  connection->setConnectionReused(true);
   connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn");
   saveDownstreamConnection(*connection, node_uuid, cluster_uuid);
   decoder_callbacks_->setReverseConnForceLocalReply(false);
