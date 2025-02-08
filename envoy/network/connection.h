@@ -324,20 +324,15 @@ public:
   virtual const ConnectionSocketPtr& getSocket() const PURE;
 
   /**
-   * Set the flag connection_reused_ to value. The flag connection_reused_
-   * indicates whether the client connection is reused.
+   *  Mark a connection as a reverse connection. The socket
+   *  is cached and re-used for serving downstream requests.
    */
   virtual void setConnectionReused(bool value) PURE;
 
   /**
-   *  Set flag to convey active connection (listener) is reused.
+   *  return true if active connection (listener) is reused.
    */
-  virtual void setActiveConnectionReused(bool value) PURE;
-
-  /**
-   *  return boolean telling if active connection (listener) is reused.
-   */
-  virtual bool isActiveConnectionReused() PURE;
+  virtual bool isConnectionReused() PURE;
 
   /**
    * Get the socket options set on this connection.

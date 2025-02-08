@@ -97,8 +97,7 @@ public:
                                     happy_eyeballs_config)) {}
   const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
   void setConnectionReused(bool) override { PANIC("not implemented"); }
-  void setActiveConnectionReused(bool) override { PANIC("not implemented"); }
-  bool isActiveConnectionReused() override { PANIC("not implemented"); }
+  bool isConnectionReused() override { PANIC("not implemented"); }
 };
 
 } // namespace Network

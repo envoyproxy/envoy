@@ -144,8 +144,7 @@ public:
   absl::optional<uint64_t> congestionWindowInBytes() const override;
   const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
   void setConnectionReused(bool) override { PANIC("not implemented"); }
-  void setActiveConnectionReused(bool) override { PANIC("not implemented"); }
-  bool isActiveConnectionReused() override { PANIC("not implemented"); }
+  bool isConnectionReused() override { PANIC("not implemented"); }
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;

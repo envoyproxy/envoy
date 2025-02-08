@@ -135,8 +135,7 @@ public:
 
   const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
   void setConnectionReused(bool) override { PANIC("not implemented"); }
-  void setActiveConnectionReused(bool) override { PANIC("not implemented"); }
-  bool isActiveConnectionReused() override { PANIC("not implemented"); }
+  bool isConnectionReused() override { PANIC("not implemented"); }
 
 private:
   // ConnectionCallbacks which will be set on an ClientConnection which

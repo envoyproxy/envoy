@@ -66,9 +66,8 @@ public:
   // so that, new connection can be created with existing connection socket.
   // This is required for reverse connections.
   const ConnectionSocketPtr& getSocket() const override { return socket_; }
-  void setConnectionReused(bool value) override { connection_reused_ = value; }
-  void setActiveConnectionReused(bool value) override { reuse_active_connection_ = value; }
-  bool isActiveConnectionReused() override { return reuse_active_connection_; }
+  void setConnectionReused(bool value) override { reuse_connection_ = value; }
+  bool isConnectionReused() override { return reuse_connection_; }
 
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
@@ -150,13 +149,11 @@ public:
   void setTransportSocketIsReadable() override;
   void flushWriteBuffer() override;
   TransportSocketPtr& transportSocket() { return transport_socket_; }
-  // Use on the initiator envoy to mark a reverse connection. The socket is not closed for such
-  // a connection and is passed on to a reverse connection listener.
-  bool connection_reused_ = false;
+
   // Used on the responder envoy to mark an active connection accepted by a listener which will
   // be used as a reverse connection. The socket for such a connection is closed upon draining
   // of the owning listener.
-  bool reuse_active_connection_ = false;
+  bool reuse_connection_ = false;
 
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }

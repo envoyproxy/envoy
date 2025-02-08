@@ -116,8 +116,7 @@ protected:
       }
       const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
       void setConnectionReused(bool) override { PANIC("not implemented"); }
-      void setActiveConnectionReused(bool) override { PANIC("not implemented"); }
-      bool isActiveConnectionReused() override { PANIC("not implemented"); }
+      bool isConnectionReused() override { PANIC("not implemented"); }
       void addBytesSentCallback(Network::Connection::BytesSentCb) override {
         IS_ENVOY_BUG("Unexpected function call");
       }

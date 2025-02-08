@@ -114,10 +114,6 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  if (!connection_reused_ && !reuse_active_connection_) {
-    ASSERT(!ioHandle().isOpen() && delayed_close_timer_ == nullptr,
-           "ConnectionImpl was unexpectedly torn down without being closed.");
-  }
 
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
@@ -168,7 +164,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     if (data_to_write > 0 && type != ConnectionCloseType::Abort) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
-      if (reuse_active_connection_) {
+      if (reuse_connection_) {
         // Don't close connection socket in case of reversed connection.
         transport_socket_->doWrite(*write_buffer_, false);
       } else {
@@ -271,11 +267,8 @@ void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  if (connection_reused_ || !ConnectionImpl::ioHandle().isOpen()) {
-    return;
-  }
 
-  if (!socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
     return;
   }
 
@@ -286,7 +279,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
-  if (!connection_reused_ && !reuse_active_connection_) {
+  if (!reuse_connection_) {
     ENVOY_CONN_LOG(debug, "closing socket transport_socket_", *this);
     transport_socket_->closeSocket(close_type);
   }
@@ -315,7 +308,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 #endif
   }
 
-  if (!connection_reused_ && !reuse_active_connection_) {
+  if (!reuse_connection_) {
     ENVOY_LOG(debug, "closeSocket:");
     socket_->close();
   }
