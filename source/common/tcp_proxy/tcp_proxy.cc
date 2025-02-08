@@ -819,13 +819,18 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   } else if (receive_before_connect_) {
     ENVOY_CONN_LOG(debug, "Early data received. Length: {}", read_callbacks_->connection(),
                    data.length());
+
     // Buffer data received before upstream connection exists.
-    // We read disable the downstream connection when we see the first data chunk to protect the early data buffer from overflow.
-    // Preceding filters in the filter chain should read whatever data they need before allowing the filter chain
-    // to proceed as after this step, the downstream connection will be read disabled until the upstream
-    // connection has been established and the early data buffer has been flushed.
     early_data_buffer_.move(data);
+    
+    // TCP_PROXY cannot correctly make a decision on the amount of data 
+    // the preceding filters need to read before the upstream connection is established. 
+    // Hence, to protect the early data buffer, TCP_PROXY read disables the downstream on s
+    // receiving the first chunk of data. The filter setting the receive_before_connect state should have a limit on the
+    // amount of data it needs to read before the upstream connection is established and pause the filter chain (by returning `StopIteration`)
+    // till it has read the data it needs or a max limit has been reached.
     read_callbacks_->connection().readDisable(true);
+
     config_->stats().early_data_received_count_total_.inc();
     if (!early_data_end_stream_) {
       early_data_end_stream_ = end_stream;
@@ -845,7 +850,7 @@ Network::FilterStatus Filter::onNewConnection() {
     connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
   }
 
-  if (config_->n().has_value()) {
+  if (config_->accessLogFlushInterval().has_value()) {
     access_log_flush_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onAccessLogFlushInterval(); });
     resetAccessLogFlushTimer();
