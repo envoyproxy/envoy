@@ -182,22 +182,24 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 absl::StatusOr<Credentials>
 MetadataCredentialsProviderBase::getCredentials(CredentialsPendingCallback&& cb) {
-  if (credentials_pending_) {
-    if (cb) {
-      ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
-      Thread::LockGuard guard(mu_);
-      credential_pending_callbacks_.push_back(std::move(cb));
-      ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
-    }
-    return absl::NotFoundError("Credentials are pending");
-  }
 
   if (context_) {
+    if (credentials_pending_) {
+      if (cb) {
+        ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
+        Thread::LockGuard guard(mu_);
+        credential_pending_callbacks_.push_back(std::move(cb));
+        ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
+      }
+      return absl::NotFoundError("Credentials are pending");
+    }
+
     if (tls_slot_) {
       return *(*tls_slot_)->credentials_.get();
     } else {
       return Credentials();
     }
+
   } else {
     // Refresh for non async case
     refreshIfNeeded();
@@ -634,6 +636,7 @@ void ContainerCredentialsProvider::refresh() {
   } else {
     ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}",
               aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value());
+    auto a = aws_cluster_manager_.ref()->getUriFromClusterName("test");
     Http::Utility::extractHostPathFromUri(
         aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value(), host, path);
   }

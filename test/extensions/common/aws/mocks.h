@@ -7,7 +7,7 @@
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
-#include "source/extensions/common/aws/aws_cluster_manager.h"
+
 #include "test/mocks/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
@@ -45,10 +45,15 @@ public:
   MockSigner();
   ~MockSigner() override;
 
-  MOCK_METHOD(absl::Status, sign, (Http::RequestMessage&, bool, absl::string_view, CredentialsPendingCallback &&));
-  MOCK_METHOD(absl::Status, sign, (Http::RequestHeaderMap&, const std::string&, absl::string_view, CredentialsPendingCallback &&));
-  MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, absl::string_view, CredentialsPendingCallback &&));
-  MOCK_METHOD(absl::Status, signUnsignedPayload, (Http::RequestHeaderMap&, absl::string_view, CredentialsPendingCallback &&));
+  MOCK_METHOD(absl::Status, sign,
+              (Http::RequestMessage&, bool, absl::string_view, CredentialsPendingCallback&&));
+  MOCK_METHOD(absl::Status, sign,
+              (Http::RequestHeaderMap&, const std::string&, absl::string_view,
+               CredentialsPendingCallback&&));
+  MOCK_METHOD(absl::Status, signEmptyPayload,
+              (Http::RequestHeaderMap&, absl::string_view, CredentialsPendingCallback&&));
+  MOCK_METHOD(absl::Status, signUnsignedPayload,
+              (Http::RequestHeaderMap&, absl::string_view, CredentialsPendingCallback&&));
 };
 
 class MockFetchMetadata {
