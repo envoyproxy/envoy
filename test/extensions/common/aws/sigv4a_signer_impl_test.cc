@@ -76,7 +76,7 @@ public:
     SigV4AKeyDerivation::derivePublicKey(ec_key);
     absl::Status status;
 
-    EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+    EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
     // Sign the message using our signing algorithm
     auto signer_ = getTestSigner(query_string, expiration_time);
 
@@ -147,7 +147,7 @@ public:
 
 // No authorization header should be present when the credentials are empty
 TEST_F(SigV4ASignerImplTest, AnonymousCredentials) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(Credentials()));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(Credentials()));
 
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_);
@@ -157,7 +157,7 @@ TEST_F(SigV4ASignerImplTest, AnonymousCredentials) {
 
 // HTTP :method header is required
 TEST_F(SigV4ASignerImplTest, MissingMethod) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_);
   EXPECT_EQ(status.message(), "Message is missing :method header");
@@ -166,7 +166,7 @@ TEST_F(SigV4ASignerImplTest, MissingMethod) {
 
 // HTTP :path header is required
 TEST_F(SigV4ASignerImplTest, MissingPath) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
   addMethod("GET");
   auto signer_ = getTestSigner(false);
   auto status = signer_.sign(*message_);
@@ -176,7 +176,7 @@ TEST_F(SigV4ASignerImplTest, MissingPath) {
 
 // Verify that we replace, not duplicate or append to existing headers
 TEST_F(SigV4ASignerImplTest, DontDuplicateHeaders) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(token_credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(token_credentials_));
   addMethod("GET");
   addPath("/");
   auto signer_ = getTestSigner(false);
@@ -213,7 +213,7 @@ TEST_F(SigV4ASignerImplTest, DontDuplicateHeaders) {
 }
 
 TEST_F(SigV4ASignerImplTest, QueryStringDoesntModifyAuthorization) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
   addHeader("Authorization", "testValue");
@@ -226,7 +226,7 @@ TEST_F(SigV4ASignerImplTest, QueryStringDoesntModifyAuthorization) {
 
 // Verify we sign the date header
 TEST_F(SigV4ASignerImplTest, SignDateHeader) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
   auto signer_ = getTestSigner(false);
@@ -245,7 +245,7 @@ TEST_F(SigV4ASignerImplTest, SignDateHeader) {
 
 // Verify we sign the security token header if the token is present in the credentials
 TEST_F(SigV4ASignerImplTest, SignSecurityTokenHeader) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(token_credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(token_credentials_));
   addMethod("GET");
   addPath("/");
   auto signer_ = getTestSigner(false);
@@ -265,7 +265,7 @@ TEST_F(SigV4ASignerImplTest, SignSecurityTokenHeader) {
 
 // Verify we sign the content header as the hashed empty string if the body is empty
 TEST_F(SigV4ASignerImplTest, SignEmptyContentHeader) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
   auto signer_ = getTestSigner(false);
@@ -285,7 +285,7 @@ TEST_F(SigV4ASignerImplTest, SignEmptyContentHeader) {
 
 // Verify we sign the content header correctly when we have a body
 TEST_F(SigV4ASignerImplTest, SignContentHeader) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
   addMethod("POST");
   addPath("/");
   setBody("test1234");
@@ -306,7 +306,7 @@ TEST_F(SigV4ASignerImplTest, SignContentHeader) {
 
 // Verify we sign the content header correctly when we have a body with region override
 TEST_F(SigV4ASignerImplTest, SignContentHeaderOverrideRegion) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
   addMethod("POST");
   addPath("/");
   setBody("test1234");
@@ -327,7 +327,7 @@ TEST_F(SigV4ASignerImplTest, SignContentHeaderOverrideRegion) {
 
 // Verify we sign some extra headers
 TEST_F(SigV4ASignerImplTest, SignExtraHeaders) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
   addHeader("a", "a_value");
@@ -345,7 +345,7 @@ TEST_F(SigV4ASignerImplTest, SignExtraHeaders) {
 
 // Verify signing a host header
 TEST_F(SigV4ASignerImplTest, SignHostHeader) {
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
   addHeader("host", "www.example.com");
@@ -524,7 +524,7 @@ TEST_F(SigV4ASignerImplTest, QueryStringDefault5s) {
 
   Http::TestRequestHeaderMapImpl headers{};
 
-  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
 
   headers.setMethod("GET");
   // Simple path, 1 extra header

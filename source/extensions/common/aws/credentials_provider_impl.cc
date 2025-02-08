@@ -261,7 +261,7 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
         /* Set the credentials */ [shared_credentials](
                                       OptRef<ThreadLocalCredentialsCache>
                                           obj) { obj->credentials_ = shared_credentials; },
-        /* Notify waiting signers on completion */
+        /* Notify waiting signers on completion of credential setting above */
         [this]() {
           credentials_pending_.store(false);
 
@@ -271,7 +271,6 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
             Thread::LockGuard guard(mu_);
             callbacks_copy = credential_pending_callbacks_;
             credential_pending_callbacks_.clear();
-            ENVOY_LOG_MISC(debug, "We have {} pending callbacks", callbacks_copy.size());
           }
 
           // Call all of our callbacks to unblock pending requests
@@ -280,8 +279,6 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
           }
         });
   }
-
-  // We are now no longer waiting for credentials
 }
 
 CredentialsFileCredentialsProvider::CredentialsFileCredentialsProvider(

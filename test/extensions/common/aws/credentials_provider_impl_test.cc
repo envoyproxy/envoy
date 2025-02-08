@@ -9,6 +9,8 @@
 
 #include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
+#include "source/extensions/common/aws/sigv4_signer_impl.h"
+#include "source/extensions/common/aws/signer_base_impl.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -2913,8 +2915,9 @@ TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {
   CredentialsProviderChain chain;
   chain.add(mock_provider1);
   chain.add(mock_provider2);
-  const Credentials creds = chain.getCredentials();
-  EXPECT_EQ(Credentials(), creds);
+  CredentialsPendingCallback cb = {};
+  const absl::StatusOr<Credentials> creds = chain.getCredentials(std::move(cb));
+  EXPECT_EQ(Credentials(), creds.value());
 }
 
 TEST(CredentialsProviderChainTest, getCredentials_firstProviderReturns) {
@@ -2930,8 +2933,10 @@ TEST(CredentialsProviderChainTest, getCredentials_firstProviderReturns) {
   chain.add(mock_provider1);
   chain.add(mock_provider2);
 
-  const Credentials ret_creds = chain.getCredentials();
-  EXPECT_EQ(creds, ret_creds);
+  CredentialsPendingCallback cb = {};
+  const absl::StatusOr<Credentials> ret_creds = chain.getCredentials(std::move(cb));
+
+  EXPECT_EQ(creds, ret_creds.value());
 }
 
 TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
@@ -2947,8 +2952,9 @@ TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
   chain.add(mock_provider1);
   chain.add(mock_provider2);
 
-  const Credentials ret_creds = chain.getCredentials();
-  EXPECT_EQ(creds, ret_creds);
+  CredentialsPendingCallback cb = {};
+  const absl::StatusOr<Credentials> ret_creds = chain.getCredentials(std::move(cb));
+  EXPECT_EQ(creds, ret_creds.value());
 }
 
 class CustomCredentialsProviderChainTest : public testing::Test {};
@@ -3057,12 +3063,13 @@ TEST_F(AsyncCredentialHandlingTest, ReceivePendingTrueWhenPending) {
   cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
   cred_provider.set_role_session_name("role-session-name");
 
-  std::shared_ptr<MockAwsClusterManager> mock_manager = std::make_shared<MockAwsClusterManager>();
-  std::shared_ptr<AwsClusterManager> shared_manager =
-      std::static_pointer_cast<AwsClusterManager>(mock_manager);
-  auto manager_optref = OptRef<std::shared_ptr<AwsClusterManager>>{shared_manager};
 
-  EXPECT_CALL(*mock_manager, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
+auto mock_manager = std::make_shared<MockAwsClusterManager>();
+std::shared_ptr<AwsClusterManager> base_manager = mock_manager;
+OptRef<std::shared_ptr<AwsClusterManager>> manager_optref{base_manager};
+EXPECT_CALL(*mock_manager, 
+            getUriFromClusterName(_))
+    .WillRepeatedly(Return("uri_2"));
 
   provider_ = std::make_shared<WebIdentityCredentialsProvider>(
       context_, manager_optref, "cluster_2",
@@ -3073,14 +3080,18 @@ TEST_F(AsyncCredentialHandlingTest, ReceivePendingTrueWhenPending) {
       refresh_state, initialization_timer, cred_provider);
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
 
+  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+        "vpc-lattice-svcs", "ap-southeast-2", provider_, context_, Common::Aws::AwsSigningHeaderExclusionVector{});
+  
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).WillRepeatedly(Invoke([&provider_friend]() {
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).WillRepeatedly(Invoke([&signer]() {
     // This will check that we see true from credentialsPending by the time we call fetch
     auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
-    auto result = provider_friend.credentialsPending(std::move(cb));
-    EXPECT_EQ(result, true);
+    Http::RequestMessagePtr message;
+    auto result = signer->sign(*message, false, "", std::move(cb));
+    EXPECT_TRUE(absl::IsNotFound(result));
   }));
 
   provider_friend.onClusterAddOrUpdate();
@@ -3099,12 +3110,13 @@ TEST_F(AsyncCredentialHandlingTest, CallbacksCalledWhenCredentialsReturned) {
   cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
   cred_provider.set_role_session_name("role-session-name");
 
-  std::shared_ptr<MockAwsClusterManager> mock_manager = std::make_shared<MockAwsClusterManager>();
-  std::shared_ptr<AwsClusterManager> shared_manager =
-      std::static_pointer_cast<AwsClusterManager>(mock_manager);
-  auto manager_optref = OptRef<std::shared_ptr<AwsClusterManager>>{shared_manager};
 
-  EXPECT_CALL(*mock_manager, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
+auto mock_manager = std::make_shared<MockAwsClusterManager>();
+std::shared_ptr<AwsClusterManager> base_manager = mock_manager;
+OptRef<std::shared_ptr<AwsClusterManager>> manager_optref{base_manager};
+EXPECT_CALL(*mock_manager, 
+            getUriFromClusterName(_))
+    .WillRepeatedly(Return("uri_2"));
 
   provider_ = std::make_shared<WebIdentityCredentialsProvider>(
       context_, manager_optref, "cluster_2",
@@ -3119,11 +3131,11 @@ TEST_F(AsyncCredentialHandlingTest, CallbacksCalledWhenCredentialsReturned) {
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   bool cb1call = false;
-  CredentialsPendingCallback cb1([&cb1call](Credentials) { cb1call = true; });
+  CredentialsPendingCallback cb1([&cb1call]() { cb1call = true; });
   bool cb2call = false;
-  CredentialsPendingCallback cb2([&cb2call](Credentials) { cb2call = true; });
+  CredentialsPendingCallback cb2([&cb2call]() { cb2call = true; });
   bool cb3call = false;
-  CredentialsPendingCallback cb3([&cb3call](Credentials) { cb3call = true; });
+  CredentialsPendingCallback cb3([&cb3call]() { cb3call = true; });
 
   auto document = R"EOF(
 {
@@ -3139,15 +3151,19 @@ TEST_F(AsyncCredentialHandlingTest, CallbacksCalledWhenCredentialsReturned) {
   }
 }
 )EOF";
+  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+        "vpc-lattice-svcs", "ap-southeast-2", provider_, context_, Common::Aws::AwsSigningHeaderExclusionVector{});
+    Http::RequestMessagePtr message;
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
       .WillRepeatedly(Invoke(
-          [&provider_friend, &cb1, &cb2, &cb3, document = std::move(document)](
+          [&signer, &cb1, &cb2, &cb3, &message, document = std::move(document)](
               Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
             // Register 3 pending callbacks
-            provider_friend.credentialsPending(std::move(cb1));
-            provider_friend.credentialsPending(std::move(cb2));
-            provider_friend.credentialsPending(std::move(cb3));
+    auto result = signer->sign(*message, false, "", std::move(cb1));
+     result = signer->sign(*message, false, "", std::move(cb2));
+     result = signer->sign(*message, false, "", std::move(cb3));
+
             receiver.onMetadataSuccess(std::move(document));
           }));
 
@@ -3157,9 +3173,9 @@ TEST_F(AsyncCredentialHandlingTest, CallbacksCalledWhenCredentialsReturned) {
   ASSERT_TRUE(cb2call);
   ASSERT_TRUE(cb3call);
   auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
-  // We now have credentials so we should have false from pending credentials
-  auto result = provider_friend.credentialsPending(std::move(cb));
-  ASSERT_FALSE(result);
+  // We now have credentials so sign should complete immediately
+  auto result = signer->sign(*message, false, "", std::move(cb));
+  ASSERT_TRUE(result.ok());
 }
 
 TEST_F(AsyncCredentialHandlingTest, AnonymousCredsWhenRetrivalFails) {
@@ -3174,12 +3190,12 @@ TEST_F(AsyncCredentialHandlingTest, AnonymousCredsWhenRetrivalFails) {
   cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
   cred_provider.set_role_session_name("role-session-name");
 
-  std::shared_ptr<MockAwsClusterManager> mock_manager = std::make_shared<MockAwsClusterManager>();
-  std::shared_ptr<AwsClusterManager> shared_manager =
-      std::static_pointer_cast<AwsClusterManager>(mock_manager);
-  auto manager_optref = OptRef<std::shared_ptr<AwsClusterManager>>{shared_manager};
-
-  EXPECT_CALL(*mock_manager, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
+auto mock_manager = std::make_shared<MockAwsClusterManager>();
+std::shared_ptr<AwsClusterManager> base_manager = mock_manager;
+OptRef<std::shared_ptr<AwsClusterManager>> manager_optref{base_manager};
+EXPECT_CALL(*mock_manager, 
+            getUriFromClusterName(_))
+    .WillRepeatedly(Return("uri_2"));
 
   provider_ = std::make_shared<WebIdentityCredentialsProvider>(
       context_, manager_optref, "cluster_2",
@@ -3194,11 +3210,11 @@ TEST_F(AsyncCredentialHandlingTest, AnonymousCredsWhenRetrivalFails) {
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
   bool cb1call = false;
-  CredentialsPendingCallback cb1([&cb1call](Credentials) { cb1call = true; });
+  CredentialsPendingCallback cb1([&cb1call]() { cb1call = true; });
   bool cb2call = false;
-  CredentialsPendingCallback cb2([&cb2call](Credentials) { cb2call = true; });
+  CredentialsPendingCallback cb2([&cb2call]() { cb2call = true; });
   bool cb3call = false;
-  CredentialsPendingCallback cb3([&cb3call](Credentials) { cb3call = true; });
+  CredentialsPendingCallback cb3([&cb3call]() { cb3call = true; });
 
   auto document = R"EOF(
 {
@@ -3206,14 +3222,19 @@ TEST_F(AsyncCredentialHandlingTest, AnonymousCredsWhenRetrivalFails) {
 }
 )EOF";
 
+  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+        "vpc-lattice-svcs", "ap-southeast-2", provider_, context_, Common::Aws::AwsSigningHeaderExclusionVector{});
+    Http::RequestMessagePtr message;
+
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
       .WillRepeatedly(Invoke(
-          [&provider_friend, &cb1, &cb2, &cb3, document = std::move(document)](
+          [&cb1, &cb2, &cb3, &signer, &message, document = std::move(document)](
               Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
             // Register 3 pending callbacks
-            provider_friend.credentialsPending(std::move(cb1));
-            provider_friend.credentialsPending(std::move(cb2));
-            provider_friend.credentialsPending(std::move(cb3));
+                auto result = signer->sign(*message, false, "", std::move(cb1));
+     result = signer->sign(*message, false, "", std::move(cb2));
+     result = signer->sign(*message, false, "", std::move(cb3));
+
             receiver.onMetadataSuccess(std::move(document));
           }));
 
@@ -3223,9 +3244,8 @@ TEST_F(AsyncCredentialHandlingTest, AnonymousCredsWhenRetrivalFails) {
   ASSERT_TRUE(cb2call);
   ASSERT_TRUE(cb3call);
   auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
-  // We now have credentials so we should have false from pending credentials
-  auto result = provider_friend.credentialsPending(std::move(cb));
-  ASSERT_FALSE(result);
+  auto result = signer->sign(*message, false, "", std::move(cb));
+  ASSERT_TRUE(result.ok());
   // We returned an error from credentials retrieval, so we should have blank credentials here
   auto creds = provider_->getCredentials();
   ASSERT_FALSE(creds->accessKeyId().has_value());
