@@ -154,22 +154,6 @@ void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
   }
 }
 
-// bool MetadataCredentialsProviderBase::credentialsPending(CredentialsPendingCallback&& cb)
-// {
-//     if (cb) {
-//     ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
-//     Thread::LockGuard guard(mu_);
-//     credential_pending_callbacks_.push_back(std::move(cb));
-//     ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
-//   }
-
-//   return credentials_pending_;
-// }
-
-// void MetadataCredentialsProviderBase::addCredentialsPendingCallback(CredentialsPendingCallback&&
-// cb) {
-// }
-
 void MetadataCredentialsProviderBase::credentialsRetrievalError() {
   // Credential retrieval failed, so set blank (anonymous) credentials
   if (context_) {
