@@ -2640,9 +2640,8 @@ TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
@@ -2652,9 +2651,8 @@ TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
       .Times(0);
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
@@ -2664,9 +2662,8 @@ TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
@@ -2677,9 +2674,8 @@ TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
                                                  "169.254.170.2:80/path/to/creds", _, _, ""));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
@@ -2689,9 +2685,8 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
                               Ref(*api_), _, _, _, _, _, "http://host/path/to/creds", _, _, ""));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
@@ -2703,9 +2698,8 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
                                                  "http://host/path/to/creds", _, _, "auth_token"));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
@@ -2715,9 +2709,8 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
@@ -2730,9 +2723,8 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
@@ -2746,9 +2738,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityWithBlankConfig) {
@@ -2761,9 +2752,8 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityWithBlankConfig) {
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 // These tests validate override of default credential provider with custom credential provider
 // settings
@@ -2791,9 +2781,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomSessionName) {
   credential_provider_config.mutable_assume_role_with_web_identity_provider()
       ->set_role_session_name("custom-role-session-name");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
   EXPECT_EQ(role_session_name, "custom-role-session-name");
 }
 
@@ -2820,9 +2809,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomRoleArn) {
   credential_provider_config.mutable_assume_role_with_web_identity_provider()->set_role_arn(
       "custom-role-arn");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
   EXPECT_EQ(role_arn, "custom-role-arn");
 }
 
@@ -2850,9 +2838,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomDataSource) {
       ->mutable_web_identity_token_data_source()
       ->set_inline_string("custom_token_string");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
   EXPECT_EQ(inline_string, "custom_token_string");
 }
 
@@ -2882,9 +2869,8 @@ TEST_F(DefaultCredentialsProviderChainTest, CredentialsFileWithCustomDataSource)
       ->mutable_credentials_data_source()
       ->set_inline_string("custom_inline_string");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
   EXPECT_EQ(inline_string, "custom_inline_string");
 }
 

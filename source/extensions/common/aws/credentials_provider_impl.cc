@@ -894,10 +894,10 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
     const CustomCredentialsProviderChainFactories& factories) {
 
   aws_cluster_manager_ =
-      context.singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManager>(
+      context.singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(aws_cluster_manager),
           [&context] {
-            return std::make_shared<Envoy::Extensions::Common::Aws::AwsClusterManager>(context);
+            return std::make_shared<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(context);
           },
           true);
 
@@ -919,18 +919,17 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
 }
 
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
-    Api::Api& api, ServerFactoryContextOptRef context,
-    ABSL_ATTRIBUTE_UNUSED Singleton::Manager& singleton_manager, absl::string_view region,
+    Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
     const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
     const CredentialsProviderChainFactories& factories) {
 
   if (context) {
     aws_cluster_manager_ =
-        context->singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManager>(
+        context->singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(
             SINGLETON_MANAGER_REGISTERED_NAME(aws_cluster_manager),
             [&context] {
-              return std::make_shared<Envoy::Extensions::Common::Aws::AwsClusterManager>(
+              return std::make_shared<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(
                   context.value());
             },
             true);
