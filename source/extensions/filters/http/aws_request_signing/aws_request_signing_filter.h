@@ -99,6 +99,7 @@ public:
 
 private:
   FilterConfig& getConfig() const;
+  // Wrapper functions for async handling of aws request signing
   absl::Status wrapSignUnsignedPayload(FilterConfig& config, Http::RequestHeaderMap& headers);
   absl::Status wrapSignEmptyPayload(FilterConfig& config, Http::RequestHeaderMap& headers);
   absl::Status wrapSign(FilterConfig& config, Http::RequestHeaderMap& headers,

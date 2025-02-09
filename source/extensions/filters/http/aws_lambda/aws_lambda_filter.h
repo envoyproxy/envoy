@@ -117,6 +117,7 @@ class Filter : public Http::PassThroughFilter, Logger::Loggable<Logger::Id::filt
 
 public:
   Filter(const FilterSettingsSharedPtr& settings, const FilterStats& stats, bool is_upstream);
+  ~Filter() override { cancel_callback_(); }
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
