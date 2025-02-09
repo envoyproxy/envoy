@@ -37,7 +37,8 @@ public:
   MockCredentialsProvider();
   ~MockCredentialsProvider() override;
 
-  MOCK_METHOD(absl::StatusOr<Credentials>, getCredentials, (CredentialsPendingCallback &&));
+  MOCK_METHOD(Credentials, getCredentials, ());
+  MOCK_METHOD(bool, credentialsPending, (CredentialsPendingCallback &&));
 };
 
 class MockSigner : public Signer {
@@ -46,14 +47,14 @@ public:
   ~MockSigner() override;
 
   MOCK_METHOD(absl::Status, sign,
-              (Http::RequestMessage&, bool, absl::string_view, CredentialsPendingCallback&&));
+              (Http::RequestMessage&, bool, absl::string_view));
   MOCK_METHOD(absl::Status, sign,
-              (Http::RequestHeaderMap&, const std::string&, absl::string_view,
-               CredentialsPendingCallback&&));
+              (Http::RequestHeaderMap&, const std::string&, absl::string_view
+               ));
   MOCK_METHOD(absl::Status, signEmptyPayload,
-              (Http::RequestHeaderMap&, absl::string_view, CredentialsPendingCallback&&));
+              (Http::RequestHeaderMap&, absl::string_view));
   MOCK_METHOD(absl::Status, signUnsignedPayload,
-              (Http::RequestHeaderMap&, absl::string_view, CredentialsPendingCallback&&));
+              (Http::RequestHeaderMap&, absl::string_view));
 };
 
 class MockFetchMetadata {

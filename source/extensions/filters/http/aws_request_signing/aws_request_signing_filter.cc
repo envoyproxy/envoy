@@ -52,71 +52,40 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   absl::Status status;
 
-  if (use_unsigned_payload) {
-    status = wrapSignUnsignedPayload(config, headers);
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this, &config]() {
+        continueDecodeHeaders(config);
+        decoder_callbacks_->continueDecoding();
+      },
+      &cancel_callback_);
+
+    if(config.signer().signCredentialsPending(completion_cb) == false)
+    {
+      // We're not pending credentials, so sign immediately
+      continueDecodeHeaders(config);
+      return Http::FilterHeadersStatus::Continue;
+    }
+    else
+    {
+      // Leave and let our callback handle the rest of the processing
+      return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+    }
+}
+
+void Filter::continueDecodeHeaders(FilterConfig& config)
+{
+  absl::Status status;
+  if (config.useUnsignedPayload()) {
+    // status = wrapSignUnsignedPayload(config, headers);
+    absl::Status status = config.signer().signUnsignedPayload(*request_headers_);
+
   } else {
-    status = wrapSignEmptyPayload(config, headers);
+    absl::Status status = config.signer().signEmptyPayload(*request_headers_);
+    // status = wrapSignEmptyPayload(config, headers);
   }
 
-  if (status.code() == absl::StatusCode::kNotFound) {
-    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
-  }
   addSigningStats(config, status);
-  return Http::FilterHeadersStatus::Continue;
-}
 
-absl::Status Filter::wrapSignUnsignedPayload(FilterConfig& config,
-                                             Http::RequestHeaderMap& headers) {
-  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
-      [this, &config]() {
-        absl::Status status = config.signer().signUnsignedPayload(*request_headers_);
-        addSigningStats(config, status);
-        decoder_callbacks_->continueDecoding();
-      },
-      &cancel_callback_);
-
-  auto status = config.signer().signUnsignedPayload(
-      headers, "",
-      [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
-        dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
-      });
-  return status;
-}
-
-absl::Status Filter::wrapSignEmptyPayload(FilterConfig& config, Http::RequestHeaderMap& headers) {
-  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
-      [this, &config]() {
-        absl::Status status = config.signer().signEmptyPayload(*request_headers_);
-        addSigningStats(config, status);
-        decoder_callbacks_->continueDecoding();
-      },
-      &cancel_callback_);
-
-  auto status = config.signer().signEmptyPayload(
-      headers, "",
-      [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
-        dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
-      });
-  return status;
-}
-
-absl::Status Filter::wrapSign(FilterConfig& config, Http::RequestHeaderMap& headers,
-                              const std::string& hash) {
-  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
-      [this, &config, &hash]() {
-        absl::Status status = config.signer().sign(*request_headers_, hash);
-        addSigningStats(config, status);
-        addSigningPayloadStats(config, status);
-        decoder_callbacks_->continueDecoding();
-      },
-      &cancel_callback_);
-
-  auto status = config.signer().sign(
-      headers, hash, "",
-      [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
-        dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
-      });
-  return status;
 }
 
 void Filter::addSigningStats(FilterConfig& config, absl::Status status) const {
@@ -148,14 +117,34 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   ENVOY_LOG(debug, "aws request signing from decodeData");
   ASSERT(request_headers_ != nullptr);
-  auto status = wrapSign(config, *request_headers_, hash);
 
-  if (status.code() == absl::StatusCode::kNotFound) {
-    return Http::FilterDataStatus::StopIterationAndWatermark;
-  }
+
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this, &config, hash]() {
+        continueDecodeData(config, hash);
+        decoder_callbacks_->continueDecoding();
+      },
+      &cancel_callback_);
+
+    if(config.signer().signCredentialsPending(completion_cb) == false)
+    {
+      // We're not pending credentials, so sign immediately
+      continueDecodeData(config, hash);
+      return Http::FilterDataStatus::Continue;
+    }
+    else
+    {
+      // Leave and let our callback handle the rest of the processing
+      return Http::FilterDataStatus::StopIterationAndWatermark;
+    }
+}
+
+void Filter::continueDecodeData(FilterConfig& config, const std::string hash){
+  auto status = config.signer().sign(*request_headers_, hash);
+
   addSigningStats(config, status);
   addSigningPayloadStats(config, status);
-  return Http::FilterDataStatus::Continue;
+
 }
 
 void Filter::addSigningPayloadStats(FilterConfig& config, absl::Status status) const {

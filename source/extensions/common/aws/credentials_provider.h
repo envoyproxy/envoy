@@ -68,7 +68,8 @@ public:
    *
    * @return AWS credentials
    */
-  virtual absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) PURE;
+  virtual Credentials getCredentials() PURE;
+  virtual bool credentialsPending(CredentialsPendingCallback&& cb = {}) PURE;
 };
 
 using CredentialsConstSharedPtr = std::shared_ptr<const Credentials>;

@@ -118,25 +118,25 @@ public:
 TEST_F(ConfigCredentialsProviderTest, ConfigShouldBeHonored) {
   auto provider = ConfigCredentialsProvider("akid", "secret", "session_token");
   const auto credentials = provider.getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("session_token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("session_token", credentials.sessionToken().value());
 }
 
 TEST_F(ConfigCredentialsProviderTest, SessionTokenIsOptional) {
   auto provider = ConfigCredentialsProvider("akid", "secret", "");
   const auto credentials = provider.getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(ConfigCredentialsProviderTest, AssessKeyIdIsRequired) {
   auto provider = ConfigCredentialsProvider("", "secret", "");
   const auto credentials = provider.getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 class EvironmentCredentialsProviderTest : public testing::Test {
@@ -155,33 +155,33 @@ TEST_F(EvironmentCredentialsProviderTest, AllEnvironmentVars) {
   TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
   TestEnvironment::setEnvVar("AWS_SESSION_TOKEN", "token", 1);
   const auto credentials = provider_.getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
 }
 
 TEST_F(EvironmentCredentialsProviderTest, NoEnvironmentVars) {
   const auto credentials = provider_.getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(EvironmentCredentialsProviderTest, MissingAccessKeyId) {
   TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
   const auto credentials = provider_.getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(EvironmentCredentialsProviderTest, NoSessionToken) {
   TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "akid", 1);
   TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
   const auto credentials = provider_.getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 class CredentialsFileCredentialsProviderTest : public testing::Test {
@@ -219,9 +219,9 @@ TEST_F(CredentialsFileCredentialsProviderTest, CustomProfileFromConfigShouldBeHo
   config.set_profile("profile4");
   auto provider = CredentialsFileCredentialsProvider(context_, config);
   const auto credentials = provider.getCredentials();
-  EXPECT_EQ("profile4_access_key", credentials->accessKeyId().value());
-  EXPECT_EQ("profile4_secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("profile4_token", credentials->sessionToken().value());
+  EXPECT_EQ("profile4_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile4_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile4_token", credentials.sessionToken().value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, CustomFilePathFromConfig) {
@@ -232,9 +232,9 @@ TEST_F(CredentialsFileCredentialsProviderTest, CustomFilePathFromConfig) {
   config.mutable_credentials_data_source()->set_filename(file_path);
   auto provider = CredentialsFileCredentialsProvider(context_, config);
   const auto credentials = provider.getCredentials();
-  EXPECT_EQ("default_access_key", credentials->accessKeyId().value());
-  EXPECT_EQ("default_secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("default_token", credentials->sessionToken().value());
+  EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("default_token", credentials.sessionToken().value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, CustomFilePathAndProfileFromConfig) {
@@ -247,9 +247,9 @@ TEST_F(CredentialsFileCredentialsProviderTest, CustomFilePathAndProfileFromConfi
 
   auto provider = CredentialsFileCredentialsProvider(context_, config);
   const auto credentials = provider.getCredentials();
-  EXPECT_EQ("profile4_access_key", credentials->accessKeyId().value());
-  EXPECT_EQ("profile4_secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("profile4_token", credentials->sessionToken().value());
+  EXPECT_EQ("profile4_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile4_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile4_token", credentials.sessionToken().value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, UnexistingCustomProfileFomConfig) {
@@ -262,17 +262,17 @@ TEST_F(CredentialsFileCredentialsProviderTest, UnexistingCustomProfileFomConfig)
 
   auto provider = CredentialsFileCredentialsProvider(context_, config);
   const auto credentials = provider.getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, FileDoesNotExist) {
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", "/file/does/not/exist", 1);
   const auto credentials = provider_.getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, DefaultCredentialsFile) {
@@ -288,63 +288,63 @@ TEST_F(CredentialsFileCredentialsProviderTest, DefaultCredentialsFile) {
   TestEnvironment::setEnvVar("AWS_PROFILE", "profile1", 1);
 
   const auto credentials = provider_.getCredentials();
-  EXPECT_EQ("profile1_acc=ess_key", credentials->accessKeyId().value());
-  EXPECT_EQ("profile1_secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("profile1_token", credentials->sessionToken().value());
+  EXPECT_EQ("profile1_acc=ess_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile1_token", credentials.sessionToken().value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, ProfileDoesNotExist) {
   setUpTest(CREDENTIALS_FILE_CONTENTS, "invalid_profile");
 
   const auto credentials = provider_.getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, IncompleteProfile) {
   setUpTest(CREDENTIALS_FILE_CONTENTS, "profile2");
 
   const auto credentials = provider_.getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, DefaultProfile) {
   setUpTest(CREDENTIALS_FILE_CONTENTS, "");
 
   const auto credentials = provider_.getCredentials();
-  EXPECT_EQ("default_access_key", credentials->accessKeyId().value());
-  EXPECT_EQ("default_secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("default_token", credentials->sessionToken().value());
+  EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("default_token", credentials.sessionToken().value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, CompleteProfile) {
   setUpTest(CREDENTIALS_FILE_CONTENTS, "profile1");
 
   const auto credentials = provider_.getCredentials();
-  EXPECT_EQ("profile1_acc=ess_key", credentials->accessKeyId().value());
-  EXPECT_EQ("profile1_secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("profile1_token", credentials->sessionToken().value());
+  EXPECT_EQ("profile1_acc=ess_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile1_token", credentials.sessionToken().value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, EmptySecret) {
   setUpTest(CREDENTIALS_FILE_CONTENTS, "profile3");
 
   const auto credentials = provider_.getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, SpacesBetweenParts) {
   setUpTest(CREDENTIALS_FILE_CONTENTS, "profile4");
 
   const auto credentials = provider_.getCredentials();
-  EXPECT_EQ("profile4_access_key", credentials->accessKeyId().value());
-  EXPECT_EQ("profile4_secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("profile4_token", credentials->sessionToken().value());
+  EXPECT_EQ("profile4_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile4_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile4_token", credentials.sessionToken().value());
 }
 
 TEST_F(CredentialsFileCredentialsProviderTest, RefreshInterval) {
@@ -352,38 +352,38 @@ TEST_F(CredentialsFileCredentialsProviderTest, RefreshInterval) {
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", "/file/does/not/exist", 1);
 
   auto credentials = provider_.getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 
   // Credentials won't be extracted even after we switch to a legitimate profile
   // with valid credentials.
   setUpTest(CREDENTIALS_FILE_CONTENTS, "profile1");
   credentials = provider_.getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 
   // Credentials will be extracted again after the REFRESH_INTERVAL.
   time_system_.advanceTimeWait(std::chrono::hours(2));
   credentials = provider_.getCredentials();
-  EXPECT_EQ("profile1_acc=ess_key", credentials->accessKeyId().value());
-  EXPECT_EQ("profile1_secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("profile1_token", credentials->sessionToken().value());
+  EXPECT_EQ("profile1_acc=ess_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile1_token", credentials.sessionToken().value());
 
   // Previously cached credentials will be used.
   setUpTest(CREDENTIALS_FILE_CONTENTS, "default");
   credentials = provider_.getCredentials();
-  EXPECT_EQ("profile1_acc=ess_key", credentials->accessKeyId().value());
-  EXPECT_EQ("profile1_secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("profile1_token", credentials->sessionToken().value());
+  EXPECT_EQ("profile1_acc=ess_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile1_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile1_token", credentials.sessionToken().value());
 
   // Credentials will be extracted again after the REFRESH_INTERVAL.
   time_system_.advanceTimeWait(std::chrono::hours(2));
   credentials = provider_.getCredentials();
-  EXPECT_EQ("default_access_key", credentials->accessKeyId().value());
-  EXPECT_EQ("default_secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("default_token", credentials->sessionToken().value());
+  EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("default_token", credentials.sessionToken().value());
 }
 
 class MessageMatcher : public testing::MatcherInterface<Http::RequestMessage&> {
@@ -633,9 +633,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv2) {
@@ -659,9 +659,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv2) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingIMDSv1) {
@@ -683,9 +683,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingIMDSv1) {
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingIMDSv2) {
@@ -708,9 +708,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyCredentialListingIMDSv2) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingIMDSv1) {
@@ -733,9 +733,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingIMDSv1)
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingIMDSv2) {
@@ -758,9 +758,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyListCredentialListingIMDSv2)
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentIMDSv1) {
@@ -785,9 +785,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentIMDSv1) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentIMDSv2) {
@@ -812,9 +812,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedDocumentIMDSv2) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentIMDSv1) {
@@ -838,9 +838,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentIMDSv1) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentIMDSv2) {
@@ -864,9 +864,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MissingDocumentIMDSv2) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentIMDSv1) {
@@ -892,9 +892,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentIMDSv1) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentIMDSv2) {
@@ -920,9 +920,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, MalformedDocumentIMDSv2) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesIMDSv1) {
@@ -952,9 +952,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesIMDSv1) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesIMDSv2) {
@@ -984,9 +984,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, EmptyValuesIMDSv2) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationIMDSv1) {
@@ -1016,9 +1016,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationIMDS
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationIMDSv2) {
@@ -1048,9 +1048,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, RefreshOnCredentialExpirationIMDS
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
 
   expectSessionToken(200, std::move("TOKEN"));
   expectCredentialListingIMDSv2(200, std::move(std::string("doc1")));
@@ -1082,9 +1082,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1Duri
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv2DuringStartup) {
@@ -1107,9 +1107,9 @@ TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv2Duri
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderTest,
@@ -1146,9 +1146,9 @@ TEST_F(InstanceProfileCredentialsProviderTest,
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 // End unit test for new option via Http Async client.
@@ -1228,9 +1228,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListi
   expectSessionToken(absl::optional<std::string>());
   expectCredentialListing(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListingIMDSv2) {
@@ -1238,9 +1238,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListi
   expectSessionToken("TOKEN");
   expectCredentialListingIMDSv2(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListingIMDSv1) {
@@ -1248,9 +1248,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListin
   expectSessionToken(absl::optional<std::string>());
   expectCredentialListing("");
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListingIMDSv2) {
@@ -1258,9 +1258,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListin
   expectSessionToken("TOKEN");
   expectCredentialListingIMDSv2("\n");
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialListingIMDSv1) {
@@ -1268,9 +1268,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialLi
   expectSessionToken(absl::optional<std::string>());
   expectCredentialListing("\n");
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialListingIMDSv2) {
@@ -1278,9 +1278,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialLi
   expectSessionToken("TOKEN");
   expectCredentialListingIMDSv2("");
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentIMDSv1) {
@@ -1289,9 +1289,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentIMDSv1
   expectCredentialListing("doc1\ndoc2\ndoc3");
   expectDocument(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentIMDSv2) {
@@ -1300,9 +1300,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentIMDSv2
   expectCredentialListingIMDSv2("doc1\ndoc2\ndoc3");
   expectDocumentIMDSv2(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentIMDSv1) {
@@ -1313,9 +1313,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentIMDS
 not json
  )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentIMDSv2) {
@@ -1326,9 +1326,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentIMDS
 not json
 )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesIMDSv1) {
@@ -1343,9 +1343,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesIMDSv1) {
 }
  )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesIMDSv2) {
@@ -1360,9 +1360,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesIMDSv2) {
 }
 )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentialsIMDSv1) {
@@ -1377,13 +1377,13 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentials
 }
  )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
   const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", cached_credentials->accessKeyId().value());
-  EXPECT_EQ("secret", cached_credentials->secretAccessKey().value());
-  EXPECT_EQ("token", cached_credentials->sessionToken().value());
+  EXPECT_EQ("akid", cached_credentials.accessKeyId().value());
+  EXPECT_EQ("secret", cached_credentials.secretAccessKey().value());
+  EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentialsIMDSv2) {
@@ -1398,13 +1398,13 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentials
 }
 )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
   const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", cached_credentials->accessKeyId().value());
-  EXPECT_EQ("secret", cached_credentials->secretAccessKey().value());
-  EXPECT_EQ("token", cached_credentials->sessionToken().value());
+  EXPECT_EQ("akid", cached_credentials.accessKeyId().value());
+  EXPECT_EQ("secret", cached_credentials.secretAccessKey().value());
+  EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationIMDSv1) {
@@ -1420,9 +1420,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationI
 }
  )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
   time_system_.advanceTimeWait(std::chrono::hours(2));
   expectSessionToken(absl::optional<std::string>());
   expectCredentialListing("doc1");
@@ -1434,9 +1434,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationI
 }
  )EOF");
   const auto new_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", new_credentials->accessKeyId().value());
-  EXPECT_EQ("new_secret", new_credentials->secretAccessKey().value());
-  EXPECT_EQ("new_token", new_credentials->sessionToken().value());
+  EXPECT_EQ("new_akid", new_credentials.accessKeyId().value());
+  EXPECT_EQ("new_secret", new_credentials.secretAccessKey().value());
+  EXPECT_EQ("new_token", new_credentials.sessionToken().value());
 }
 
 TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationIMDSv2) {
@@ -1452,9 +1452,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationI
 }
 )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
   time_system_.advanceTimeWait(std::chrono::hours(2));
   expectSessionToken("TOKEN");
   expectCredentialListingIMDSv2("doc1");
@@ -1466,9 +1466,9 @@ TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationI
 }
 )EOF");
   const auto new_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", new_credentials->accessKeyId().value());
-  EXPECT_EQ("new_secret", new_credentials->secretAccessKey().value());
-  EXPECT_EQ("new_token", new_credentials->sessionToken().value());
+  EXPECT_EQ("new_akid", new_credentials.accessKeyId().value());
+  EXPECT_EQ("new_secret", new_credentials.secretAccessKey().value());
+  EXPECT_EQ("new_token", new_credentials.sessionToken().value());
 }
 // End unit test for deprecated option using Libcurl client.
 // Begin unit test for new option via Http Async client.
@@ -1569,9 +1569,9 @@ TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(ContainerCredentialsProviderTest, EmptyDocument) {
@@ -1592,9 +1592,9 @@ TEST_F(ContainerCredentialsProviderTest, EmptyDocument) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(ContainerCredentialsProviderTest, MalformedDocument) {
@@ -1618,9 +1618,9 @@ not json
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(ContainerCredentialsProviderTest, EmptyValues) {
@@ -1649,9 +1649,9 @@ TEST_F(ContainerCredentialsProviderTest, EmptyValues) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
@@ -1679,9 +1679,9 @@ TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
 }
 
 TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpirationNoExpirationProvided) {
@@ -1710,9 +1710,9 @@ TEST_F(ContainerCredentialsProviderTest, RefreshOnNormalCredentialExpirationNoEx
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
 }
 
 TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocumentDuringStartup) {
@@ -1734,9 +1734,9 @@ TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocumentDuringStartup) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 // End unit test for new option via Http Async client.
@@ -1785,18 +1785,18 @@ TEST_F(ContainerCredentialsProviderUsingLibcurlTest, FailedFetchingDocument) {
   setupProvider();
   expectDocument(absl::optional<std::string>());
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(ContainerCredentialsProviderUsingLibcurlTest, EmptyDocument) {
   setupProvider();
   expectDocument("");
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(ContainerCredentialsProviderUsingLibcurlTest, MalformedDocument) {
@@ -1805,9 +1805,9 @@ TEST_F(ContainerCredentialsProviderUsingLibcurlTest, MalformedDocument) {
 not json
 )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(ContainerCredentialsProviderUsingLibcurlTest, EmptyValues) {
@@ -1821,9 +1821,9 @@ TEST_F(ContainerCredentialsProviderUsingLibcurlTest, EmptyValues) {
 }
 )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(ContainerCredentialsProviderUsingLibcurlTest, FullCachedCredentials) {
@@ -1837,13 +1837,13 @@ TEST_F(ContainerCredentialsProviderUsingLibcurlTest, FullCachedCredentials) {
 }
 )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
   const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", cached_credentials->accessKeyId().value());
-  EXPECT_EQ("secret", cached_credentials->secretAccessKey().value());
-  EXPECT_EQ("token", cached_credentials->sessionToken().value());
+  EXPECT_EQ("akid", cached_credentials.accessKeyId().value());
+  EXPECT_EQ("secret", cached_credentials.secretAccessKey().value());
+  EXPECT_EQ("token", cached_credentials.sessionToken().value());
 }
 
 TEST_F(ContainerCredentialsProviderUsingLibcurlTest, NormalCredentialExpiration) {
@@ -1858,9 +1858,9 @@ TEST_F(ContainerCredentialsProviderUsingLibcurlTest, NormalCredentialExpiration)
 }
 )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
   time_system_.advanceTimeWait(std::chrono::hours(2));
   expectDocument(R"EOF(
 {
@@ -1871,9 +1871,9 @@ TEST_F(ContainerCredentialsProviderUsingLibcurlTest, NormalCredentialExpiration)
 }
 )EOF");
   const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", cached_credentials->accessKeyId().value());
-  EXPECT_EQ("new_secret", cached_credentials->secretAccessKey().value());
-  EXPECT_EQ("new_token", cached_credentials->sessionToken().value());
+  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
+  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
+  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
 }
 
 TEST_F(ContainerCredentialsProviderUsingLibcurlTest, TimestampCredentialExpiration) {
@@ -1888,9 +1888,9 @@ TEST_F(ContainerCredentialsProviderUsingLibcurlTest, TimestampCredentialExpirati
 }
 )EOF");
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
   expectDocument(R"EOF(
 {
   "AccessKeyId": "new_akid",
@@ -1900,9 +1900,9 @@ TEST_F(ContainerCredentialsProviderUsingLibcurlTest, TimestampCredentialExpirati
 }
 )EOF");
   const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", cached_credentials->accessKeyId().value());
-  EXPECT_EQ("new_secret", cached_credentials->secretAccessKey().value());
-  EXPECT_EQ("new_token", cached_credentials->sessionToken().value());
+  EXPECT_EQ("new_akid", cached_credentials.accessKeyId().value());
+  EXPECT_EQ("new_secret", cached_credentials.secretAccessKey().value());
+  EXPECT_EQ("new_token", cached_credentials.sessionToken().value());
 }
 // End unit test for deprecated option using Libcurl client.
 
@@ -2024,9 +2024,9 @@ TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ(credentials->accessKeyId().value(), "akid");
-  EXPECT_EQ(credentials->secretAccessKey().value(), "secret");
-  EXPECT_EQ(credentials->sessionToken().value(), "token");
+  EXPECT_EQ(credentials.accessKeyId().value(), "akid");
+  EXPECT_EQ(credentials.secretAccessKey().value(), "secret");
+  EXPECT_EQ(credentials.sessionToken().value(), "token");
 }
 
 class WebIdentityCredentialsProviderTest : public testing::Test {
@@ -2176,9 +2176,9 @@ TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocument) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, EmptyDocument) {
@@ -2202,9 +2202,9 @@ TEST_F(WebIdentityCredentialsProviderTest, EmptyDocument) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, MalformedDocument) {
@@ -2228,9 +2228,9 @@ not json
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponse) {
@@ -2257,9 +2257,9 @@ TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponse) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, NoCredentials) {
@@ -2286,9 +2286,9 @@ TEST_F(WebIdentityCredentialsProviderTest, NoCredentials) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, EmptyCredentials) {
@@ -2317,9 +2317,9 @@ TEST_F(WebIdentityCredentialsProviderTest, EmptyCredentials) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, CredentialsWithWrongFormat) {
@@ -2352,9 +2352,9 @@ TEST_F(WebIdentityCredentialsProviderTest, CredentialsWithWrongFormat) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, BadExpirationFormat) {
@@ -2396,9 +2396,9 @@ TEST_F(WebIdentityCredentialsProviderTest, BadExpirationFormat) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentialsWithMissingExpiration) {
@@ -2433,9 +2433,9 @@ TEST_F(WebIdentityCredentialsProviderTest, FullCachedCredentialsWithMissingExpir
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) {
@@ -2467,9 +2467,9 @@ TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpiration) 
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpirationIntegerFormat) {
@@ -2501,9 +2501,9 @@ TEST_F(WebIdentityCredentialsProviderTest, RefreshOnNormalCredentialExpirationIn
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials->accessKeyId().value());
-  EXPECT_EQ("secret", credentials->secretAccessKey().value());
-  EXPECT_EQ("token", credentials->sessionToken().value());
+  EXPECT_EQ("akid", credentials.accessKeyId().value());
+  EXPECT_EQ("secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("token", credentials.sessionToken().value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocumentDuringStartup) {
@@ -2525,9 +2525,9 @@ TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocumentDuringStartup) 
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponseDuringStartup) {
@@ -2554,9 +2554,9 @@ TEST_F(WebIdentityCredentialsProviderTest, UnexpectedResponseDuringStartup) {
   timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials->accessKeyId().has_value());
-  EXPECT_FALSE(credentials->secretAccessKey().has_value());
-  EXPECT_FALSE(credentials->sessionToken().has_value());
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
 class MockCredentialsProviderChainFactories : public CredentialsProviderChainFactories {
@@ -2891,14 +2891,14 @@ TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {
   auto mock_provider1 = std::make_shared<MockCredentialsProvider>();
   auto mock_provider2 = std::make_shared<MockCredentialsProvider>();
 
-  EXPECT_CALL(*mock_provider1, getCredentials(_));
-  EXPECT_CALL(*mock_provider2, getCredentials(_));
+  EXPECT_CALL(*mock_provider1, getCredentials());
+  EXPECT_CALL(*mock_provider2, getCredentials());
 
   CredentialsProviderChain chain;
   chain.add(mock_provider1);
   chain.add(mock_provider2);
   CredentialsPendingCallback cb = {};
-  const absl::StatusOr<Credentials> creds = chain.getCredentials(std::move(cb));
+  const absl::StatusOr<Credentials> creds = chain.getCredentials();
   EXPECT_EQ(Credentials(), creds.value());
 }
 
@@ -2908,15 +2908,15 @@ TEST(CredentialsProviderChainTest, getCredentials_firstProviderReturns) {
 
   const Credentials creds("access_key", "secret_key");
 
-  EXPECT_CALL(*mock_provider1, getCredentials(_)).WillOnce(Return(creds));
-  EXPECT_CALL(*mock_provider2, getCredentials(_)).Times(0);
+  EXPECT_CALL(*mock_provider1, getCredentials()).WillOnce(Return(creds));
+  EXPECT_CALL(*mock_provider2, getCredentials()).Times(0);
 
   CredentialsProviderChain chain;
   chain.add(mock_provider1);
   chain.add(mock_provider2);
 
   CredentialsPendingCallback cb = {};
-  const absl::StatusOr<Credentials> ret_creds = chain.getCredentials(std::move(cb));
+  const absl::StatusOr<Credentials> ret_creds = chain.getCredentials();
 
   EXPECT_EQ(creds, ret_creds.value());
 }
@@ -2927,15 +2927,15 @@ TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
 
   const Credentials creds("access_key", "secret_key");
 
-  EXPECT_CALL(*mock_provider1, getCredentials(_));
-  EXPECT_CALL(*mock_provider2, getCredentials(_)).WillOnce(Return(creds));
+  EXPECT_CALL(*mock_provider1, getCredentials());
+  EXPECT_CALL(*mock_provider2, getCredentials()).WillOnce(Return(creds));
 
   CredentialsProviderChain chain;
   chain.add(mock_provider1);
   chain.add(mock_provider2);
 
   CredentialsPendingCallback cb = {};
-  const absl::StatusOr<Credentials> ret_creds = chain.getCredentials(std::move(cb));
+  const absl::StatusOr<Credentials> ret_creds = chain.getCredentials();
   EXPECT_EQ(creds, ret_creds.value());
 }
 
@@ -3084,7 +3084,7 @@ TEST_F(AsyncCredentialHandlingTest, ReceivePendingTrueWhenPending) {
     auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
     Http::RequestMessagePtr message(new Http::RequestMessageImpl());
 
-    auto result = signer->sign(*message, false, "", std::move(cb));
+    auto result = signer->sign(*message, false, "");
     EXPECT_TRUE(absl::IsNotFound(result));
   }));
 
@@ -3168,7 +3168,7 @@ TEST_F(AsyncCredentialHandlingTest, CallbacksCalledWhenCredentialsReturned) {
   ASSERT_TRUE(cb3call);
   auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
   // We now have credentials so sign should complete immediately
-  auto result = signer->sign(*message_, false, "", std::move(cb));
+  auto result = signer->sign(*message_, false, "");
   ASSERT_TRUE(result.ok());
 }
 
@@ -3239,12 +3239,12 @@ TEST_F(AsyncCredentialHandlingTest, AnonymousCredsWhenRetrievalFails) {
   ASSERT_TRUE(cb2call);
   ASSERT_TRUE(cb3call);
   auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
-  auto result = signer->sign(*message_, false, "", std::move(cb));
+  auto result = signer->sign(*message_, false, "");
   ASSERT_TRUE(result.ok());
   // We returned an error from credentials retrieval, so we should have blank credentials here
   auto creds = provider_->getCredentials();
-  ASSERT_FALSE(creds->accessKeyId().has_value());
-  ASSERT_FALSE(creds->secretAccessKey().has_value());
+  ASSERT_FALSE(creds.accessKeyId().has_value());
+  ASSERT_FALSE(creds.secretAccessKey().has_value());
 }
 
 } // namespace Aws

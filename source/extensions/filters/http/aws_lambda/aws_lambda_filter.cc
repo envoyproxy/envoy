@@ -173,25 +173,25 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::Continue;
 }
 
-absl::Status Filter::wrapSignEmptyPayload(FilterSettings& config, Http::RequestHeaderMap& headers) {
-  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
-      [this, &config]() {
-        absl::Status status =
-            config.signer().signEmptyPayload(*request_headers_, config.arn().region());
-        if (!status.ok()) {
-          ENVOY_LOG(debug, "signing failed: {}", status.message());
-        }
-        decoder_callbacks_->continueDecoding();
-      },
-      &cancel_callback_);
+// absl::Status Filter::wrapSignEmptyPayload(FilterSettings& config, Http::RequestHeaderMap& headers) {
+//   auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+//       [this, &config]() {
+//         absl::Status status =
+//             config.signer().signEmptyPayload(*request_headers_, config.arn().region());
+//         if (!status.ok()) {
+//           ENVOY_LOG(debug, "signing failed: {}", status.message());
+//         }
+//         decoder_callbacks_->continueDecoding();
+//       },
+//       &cancel_callback_);
 
-  auto status = config.signer().signEmptyPayload(
-      headers, config.arn().region(),
-      [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
-        dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
-      });
-  return status;
-}
+//   auto status = config.signer().signEmptyPayload(
+//       headers, config.arn().region(),
+//       [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
+//         dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
+//       });
+//   return status;
+// }
 
 absl::Status Filter::decodeHeadersWrapSign(FilterSettings& config, Buffer::OwnedImpl& json_buf,
                                            Http::RequestHeaderMap& headers,

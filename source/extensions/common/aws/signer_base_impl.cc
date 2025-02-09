@@ -24,29 +24,31 @@ namespace Common {
 namespace Aws {
 
 absl::Status SignerBaseImpl::sign(Http::RequestMessage& message, bool sign_body,
-                                  const absl::string_view override_region,
-                                  CredentialsPendingCallback&& cb) {
+                                  const absl::string_view override_region
+                                  ) {
 
   const auto content_hash = createContentHash(message, sign_body);
   auto& headers = message.headers();
-  return sign(headers, content_hash, override_region, std::move(cb));
+  return sign(headers, content_hash, override_region);
 }
 
 absl::Status SignerBaseImpl::signEmptyPayload(Http::RequestHeaderMap& headers,
-                                              const absl::string_view override_region,
-                                              CredentialsPendingCallback&& cb) {
+                                              const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::HashedEmptyString);
-  return sign(headers, std::string(SignatureConstants::HashedEmptyString), override_region,
-              std::move(cb));
+  return sign(headers, std::string(SignatureConstants::HashedEmptyString), override_region
+              );
 }
 
 absl::Status SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers,
-                                                 const absl::string_view override_region,
-                                                 CredentialsPendingCallback&& cb) {
+                                                 const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256, SignatureConstants::UnsignedPayload);
-  return sign(headers, std::string(SignatureConstants::UnsignedPayload), override_region,
-              std::move(cb));
+  return sign(headers, std::string(SignatureConstants::UnsignedPayload), override_region);
+}
+
+bool SignerBaseImpl::signCredentialsPending(CredentialsPendingCallback&& cb)
+{
+  return credentials_provider_->credentialsPending(std::move(cb));
 }
 
 // Region support utilities for sigv4a
@@ -60,19 +62,15 @@ void SignerBaseImpl::addRegionQueryParam(
 std::string SignerBaseImpl::getRegion() const { return region_; }
 
 absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
-                                  const absl::string_view override_region,
-                                  CredentialsPendingCallback&& cb) {
+                                  const absl::string_view override_region) {
 
   if (!query_string_ && !content_hash.empty()) {
     headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   }
 
-  const auto credentialsOr = credentials_provider_->getCredentials(std::move(cb));
-  if (!credentialsOr.ok()) {
-    return absl::NotFoundError("Credentials are pending");
-  }
+  const auto credentials = credentials_provider_->getCredentials();
 
-  if (!credentialsOr->accessKeyId() || !credentialsOr->secretAccessKey()) {
+  if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
     // This behavior matches what the AWS SDK would do.
     ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");
@@ -90,7 +88,7 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
   const auto short_date = short_date_formatter_.now(time_source_);
 
   if (!query_string_) {
-    addRequiredHeaders(headers, long_date, credentialsOr->sessionToken(), override_region);
+    addRequiredHeaders(headers, long_date, credentials.sessionToken(), override_region);
   }
 
   const auto canonical_headers = Utility::canonicalizeHeaders(headers, excluded_header_matchers_);
@@ -106,8 +104,8 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     addRegionQueryParam(query_params, override_region);
     createQueryParams(
         query_params,
-        createAuthorizationCredential(credentialsOr->accessKeyId().value(), credential_scope),
-        long_date, credentialsOr->sessionToken(), canonical_headers, expiration_time_);
+        createAuthorizationCredential(credentials.accessKeyId().value(), credential_scope),
+        long_date, credentials.sessionToken(), canonical_headers, expiration_time_);
 
     headers.setPath(query_params.replaceQueryString(headers.Path()->value()));
   }
@@ -124,8 +122,8 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
   ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
 
   // Phase 3: Create a signature
-  const auto signature = createSignature(credentialsOr->accessKeyId().value(),
-                                         credentialsOr->secretAccessKey().value(), short_date,
+  const auto signature = createSignature(credentials.accessKeyId().value(),
+                                         credentials.secretAccessKey().value(), short_date,
                                          string_to_sign, override_region);
   // Phase 4: Sign request
   if (query_string_) {
@@ -143,7 +141,7 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
 
   } else {
     const auto authorization_header = createAuthorizationHeader(
-        credentialsOr->accessKeyId().value(), credential_scope, canonical_headers, signature);
+        credentials.accessKeyId().value(), credential_scope, canonical_headers, signature);
 
     headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 

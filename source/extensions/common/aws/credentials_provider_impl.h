@@ -47,7 +47,8 @@ using ServerFactoryContextOptRef = OptRef<Server::Configuration::ServerFactoryCo
 class EnvironmentCredentialsProvider : public CredentialsProvider,
                                        public Logger::Loggable<Logger::Id::aws> {
 public:
-  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) override;
+  Credentials getCredentials() override;
+  bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
 };
 
 /**
@@ -63,7 +64,8 @@ public:
                             absl::string_view secret_access_key = absl::string_view(),
                             absl::string_view session_token = absl::string_view())
       : credentials_(access_key_id, secret_access_key, session_token) {}
-  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) override;
+  Credentials getCredentials() override;
+  bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
 
 private:
   const Credentials credentials_;
@@ -72,10 +74,11 @@ private:
 class CachedCredentialsProviderBase : public CredentialsProvider,
                                       public Logger::Loggable<Logger::Id::aws> {
 public:
-  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& = {}) override {
+  Credentials getCredentials() override {
     refreshIfNeeded();
     return cached_credentials_;
   }
+  bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
 
 protected:
   SystemTime last_updated_;
@@ -136,7 +139,8 @@ public:
                                   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                   std::chrono::seconds initialization_timer);
 
-  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) override;
+  Credentials getCredentials() override;
+  bool credentialsPending(CredentialsPendingCallback&&cb) override;
 
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
@@ -335,7 +339,9 @@ public:
     providers_.emplace_back(credentials_provider);
   }
 
-  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& cb = {}) override;
+  Credentials getCredentials() override;
+  bool credentialsPending(CredentialsPendingCallback&&) override;
+
 
 protected:
   std::list<CredentialsProviderSharedPtr> providers_;
@@ -436,9 +442,10 @@ public:
                                     absl::string_view session_token)
       : credentials_(access_key_id, secret_access_key, session_token) {}
 
-  absl::StatusOr<Credentials> getCredentials(CredentialsPendingCallback&& = {}) override {
+  Credentials getCredentials() override {
     return credentials_;
   }
+  bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
 
 private:
   const Credentials credentials_;

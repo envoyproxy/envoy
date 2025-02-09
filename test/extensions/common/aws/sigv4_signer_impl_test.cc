@@ -45,7 +45,7 @@ public:
                          absl::string_view payload, bool use_unsigned_payload,
                          const absl::string_view override_region = "") {
     auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
-    EXPECT_CALL(*credentials_provider, getCredentials(_)).WillOnce(Return(credentials_));
+    EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
     Http::TestRequestHeaderMapImpl headers{};
     absl::Status status;
     headers.setMethod("GET");
@@ -78,9 +78,9 @@ public:
                          const absl::string_view override_region = "") {
     auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
     if (token_credentials) {
-      EXPECT_CALL(*credentials_provider, getCredentials(_)).WillOnce(Return(token_credentials_));
+      EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(token_credentials_));
     } else {
-      EXPECT_CALL(*credentials_provider, getCredentials(_)).WillOnce(Return(credentials_));
+      EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
     }
 
     SigV4SignerImpl signer(service_name, "region",
@@ -106,7 +106,7 @@ public:
 
 // No authorization header should be present when the credentials are empty
 TEST_F(SigV4SignerImplTest, AnonymousCredentials) {
-  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(Credentials()));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(Credentials()));
   auto status = signer_.sign(*message_);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
@@ -114,7 +114,7 @@ TEST_F(SigV4SignerImplTest, AnonymousCredentials) {
 
 // HTTP :method header is required
 TEST_F(SigV4SignerImplTest, MissingMethod) {
-  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   auto status = signer_.sign(*message_);
   EXPECT_EQ(status.message(), "Message is missing :method header");
   EXPECT_TRUE(message_->headers().get(Http::CustomHeaders::get().Authorization).empty());
@@ -122,7 +122,7 @@ TEST_F(SigV4SignerImplTest, MissingMethod) {
 
 // HTTP :path header is required
 TEST_F(SigV4SignerImplTest, MissingPath) {
-  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("GET");
   auto status = signer_.sign(*message_);
   EXPECT_EQ(status.message(), "Message is missing :path header");
@@ -131,7 +131,7 @@ TEST_F(SigV4SignerImplTest, MissingPath) {
 
 // Verify that we replace, not duplicate or append to existing headers
 TEST_F(SigV4SignerImplTest, DontDuplicateHeaders) {
-  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(token_credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(token_credentials_));
   addMethod("GET");
   addPath("/");
 
@@ -173,7 +173,7 @@ TEST_F(SigV4SignerImplTest, DontDuplicateHeaders) {
 TEST_F(SigV4SignerImplTest, SignDateHeader) {
   // These original tests used 2018-01-02 03:04:00 rather than 03:04:05
   time_system_.setSystemTime(std::chrono::milliseconds(1514862240000));
-  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
   auto status = signer_.sign(*message_);
@@ -195,7 +195,7 @@ TEST_F(SigV4SignerImplTest, SignSecurityTokenHeader) {
   // These original tests used 2018-01-02 03:04:00 rather than 03:04:05
   time_system_.setSystemTime(std::chrono::milliseconds(1514862240000));
 
-  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(token_credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(token_credentials_));
   addMethod("GET");
   addPath("/");
   auto status = signer_.sign(*message_);
@@ -217,7 +217,7 @@ TEST_F(SigV4SignerImplTest, SignSecurityTokenHeader) {
 TEST_F(SigV4SignerImplTest, SignEmptyContentHeader) {
   // These original tests used 2018-01-02 03:04:00 rather than 03:04:05
   time_system_.setSystemTime(std::chrono::milliseconds(1514862240000));
-  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
   auto status = signer_.sign(*message_, true);
@@ -240,7 +240,7 @@ TEST_F(SigV4SignerImplTest, SignEmptyContentHeader) {
 TEST_F(SigV4SignerImplTest, SignContentHeader) {
   // These original tests used 2018-01-02 03:04:00 rather than 03:04:05
   time_system_.setSystemTime(std::chrono::milliseconds(1514862240000));
-  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("POST");
   addPath("/");
   setBody("test1234");
@@ -264,7 +264,7 @@ TEST_F(SigV4SignerImplTest, SignContentHeader) {
 TEST_F(SigV4SignerImplTest, SignContentHeaderOverrideRegion) {
   // These original tests used 2018-01-02 03:04:00 rather than 03:04:05
   time_system_.setSystemTime(std::chrono::milliseconds(1514862240000));
-  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("POST");
   addPath("/");
   setBody("test1234");
@@ -289,7 +289,7 @@ TEST_F(SigV4SignerImplTest, SignExtraHeaders) {
   // These original tests used 2018-01-02 03:04:00 rather than 03:04:05
   time_system_.setSystemTime(std::chrono::milliseconds(1514862240000));
 
-  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
   addHeader("a", "a_value");
@@ -310,7 +310,7 @@ TEST_F(SigV4SignerImplTest, SignExtraHeaders) {
 TEST_F(SigV4SignerImplTest, SignHostHeader) {
   // These original tests used 2018-01-02 03:04:00 rather than 03:04:05
   time_system_.setSystemTime(std::chrono::milliseconds(1514862240000));
-  EXPECT_CALL(*credentials_provider_, getCredentials(_)).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider_, getCredentials()).WillOnce(Return(credentials_));
   addMethod("GET");
   addPath("/");
   addHeader("host", "www.example.com");
@@ -331,7 +331,7 @@ TEST_F(SigV4SignerImplTest, QueryStringDefault5s) {
   auto* credentials_provider = new NiceMock<MockCredentialsProvider>();
   Http::TestRequestHeaderMapImpl headers{};
 
-  EXPECT_CALL(*credentials_provider, getCredentials(_)).WillOnce(Return(credentials_));
+  EXPECT_CALL(*credentials_provider, getCredentials()).WillOnce(Return(credentials_));
 
   headers.setMethod("GET");
   // Simple path, 1 extra header

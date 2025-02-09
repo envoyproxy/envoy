@@ -81,17 +81,15 @@ public:
   }
 
   absl::Status sign(Http::RequestMessage& message, bool sign_body = false,
-                    const absl::string_view override_region = "",
-                    CredentialsPendingCallback&& cb = {}) override;
+                    const absl::string_view override_region = "") override;
   absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
-                    const absl::string_view override_region = "",
-                    CredentialsPendingCallback&& cb = {}) override;
+                    const absl::string_view override_region = "") override;
   absl::Status signEmptyPayload(Http::RequestHeaderMap& headers,
-                                const absl::string_view override_region = "",
-                                CredentialsPendingCallback&& cb = {}) override;
+                                const absl::string_view override_region = "") override;
   absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
-                                   const absl::string_view override_region = "",
-                                   CredentialsPendingCallback&& cb = {}) override;
+                                   const absl::string_view override_region = "") override;
+
+  bool signCredentialsPending(CredentialsPendingCallback&& cb) override;
 
 protected:
   std::string getRegion() const;

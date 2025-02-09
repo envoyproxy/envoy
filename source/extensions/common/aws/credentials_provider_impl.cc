@@ -68,14 +68,14 @@ constexpr char STS_TOKEN_CLUSTER[] = "sts_token_service_internal";
 
 } // namespace
 
-absl::StatusOr<Credentials>
-ConfigCredentialsProvider::getCredentials(CredentialsPendingCallback&&) {
+Credentials
+ConfigCredentialsProvider::getCredentials() {
   ENVOY_LOG(debug, "Getting AWS credentials from static configuration");
   return credentials_;
 }
 
-absl::StatusOr<Credentials>
-EnvironmentCredentialsProvider::getCredentials(CredentialsPendingCallback&&) {
+Credentials
+EnvironmentCredentialsProvider::getCredentials() {
   ENVOY_LOG(debug, "Getting AWS credentials from the environment");
 
   const auto access_key_id = absl::NullSafeStringView(std::getenv(AWS_ACCESS_KEY_ID));
@@ -163,9 +163,10 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
   }
 }
 
+
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
-absl::StatusOr<Credentials>
-MetadataCredentialsProviderBase::getCredentials(CredentialsPendingCallback&& cb) {
+bool
+MetadataCredentialsProviderBase::credentialsPending(CredentialsPendingCallback&& cb) {
 
   if (context_) {
     if (credentials_pending_) {
@@ -175,9 +176,18 @@ MetadataCredentialsProviderBase::getCredentials(CredentialsPendingCallback&& cb)
         credential_pending_callbacks_.push_back(std::move(cb));
         ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
       }
-      return absl::NotFoundError("Credentials are pending");
+      return true;
     }
+    return false;
+  }
+  return false;
+}
 
+// Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
+Credentials
+MetadataCredentialsProviderBase::getCredentials() {
+
+  if (context_) {
     if (tls_slot_) {
       return *(*tls_slot_)->credentials_.get();
     } else {
@@ -921,14 +931,27 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
   credentialsRetrievalError();
 }
 
-absl::StatusOr<Credentials>
-CredentialsProviderChain::getCredentials(CredentialsPendingCallback&& cb) {
+bool CredentialsProviderChain::credentialsPending(CredentialsPendingCallback&& cb)
+{
   for (auto& provider : providers_) {
     auto callback_copy = cb;
-    const auto credentialsOr = provider->getCredentials(std::move(callback_copy));
-    if (credentialsOr.ok()) {
-      if (credentialsOr->accessKeyId() && credentialsOr->secretAccessKey()) {
-        return credentialsOr;
+    const auto pending = provider->credentialsPending(std::move(callback_copy));
+    if(pending)
+    {
+      return pending;
+    }
+  }
+  return false;
+}
+
+
+Credentials
+CredentialsProviderChain::getCredentials() {
+  for (auto& provider : providers_) {
+    const auto credentials = provider->getCredentials();
+    if (credentials.ok()) {
+      if (credentials.accessKeyId() && credentials.secretAccessKey()) {
+        return credentials;
       }
     }
   }
@@ -936,6 +959,22 @@ CredentialsProviderChain::getCredentials(CredentialsPendingCallback&& cb) {
   ENVOY_LOG(debug, "No AWS credentials found, using anonymous credentials");
   return Credentials();
 }
+
+// absl::StatusOr<Credentials>
+// CredentialsProviderChain::getCredentials(CredentialsPendingCallback&& cb) {
+//   for (auto& provider : providers_) {
+//     auto callback_copy = cb;
+//     const auto credentialsOr = provider->getCredentials(std::move(callback_copy));
+//     if (credentialsOr.ok()) {
+//       if (credentialsOr->accessKeyId() && credentialsOr->secretAccessKey()) {
+//         return credentialsOr;
+//       }
+//     }
+//   }
+
+//   ENVOY_LOG(debug, "No AWS credentials found, using anonymous credentials");
+//   return Credentials();
+// }
 
 std::string sessionName(Api::Api& api) {
   const auto role_session_name = absl::NullSafeStringView(std::getenv(AWS_ROLE_SESSION_NAME));
