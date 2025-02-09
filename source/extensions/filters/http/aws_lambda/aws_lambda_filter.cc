@@ -147,7 +147,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   if (settings.payloadPassthrough()) {
     setLambdaHeaders(headers, settings.arn(), settings.invocationMode(), settings.hostRewrite());
-    auto status = settings.signer().signEmptyPayload(headers, settings.arn().region());
+    auto status = wrapSignEmptyPayload(settings, headers);
     if (!status.ok()) {
       ENVOY_LOG(debug, "signing failed: {}", status.message());
     }
@@ -165,12 +165,70 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hash = Hex::encode(hashing_util.getSha256Digest(json_buf));
 
-  auto status = settings.signer().sign(headers, hash, settings.arn().region());
+  auto status = decodeHeadersWrapSign(settings, json_buf, headers, hash);
   if (!status.ok()) {
     ENVOY_LOG(debug, "signing failed: {}", status.message());
   }
   decoder_callbacks_->addDecodedData(json_buf, false);
   return Http::FilterHeadersStatus::Continue;
+}
+
+absl::Status Filter::wrapSignEmptyPayload(FilterSettings& config, Http::RequestHeaderMap& headers) {
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this, &config]() {
+        absl::Status status = config.signer().signEmptyPayload(*request_headers_, config.arn().region());
+        if (!status.ok()) {
+          ENVOY_LOG(debug, "signing failed: {}", status.message());
+        }
+        decoder_callbacks_->continueDecoding();
+      },
+      &cancel_callback_);
+
+  auto status = config.signer().signEmptyPayload(
+      headers, config.arn().region(),
+      [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
+        dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
+      });
+  return status;
+}
+
+absl::Status Filter::decodeHeadersWrapSign(FilterSettings& config, Buffer::OwnedImpl& json_buf, Http::RequestHeaderMap& headers,
+                              const std::string& hash) {
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [&, this]() {
+        absl::Status status = config.signer().sign(*request_headers_, hash);
+        decoder_callbacks_->addDecodedData(json_buf, false);
+        decoder_callbacks_->continueDecoding();
+      },
+      &cancel_callback_);
+
+  auto status = config.signer().sign(
+      headers, hash, "",
+      [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
+        dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
+      });
+  return status;
+}
+
+absl::Status Filter::decodeDataWrapSign(FilterSettings& config, const Buffer::Instance& decoding_buffer, Http::RequestHeaderMap& headers,
+                              const std::string& hash) {
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [&, this]() {
+        absl::Status status = config.signer().sign(*request_headers_, hash);
+        if (!status.ok()) {
+          ENVOY_LOG(debug, "signing failed: {}", status.message());
+        }
+        stats().upstream_rq_payload_size_.recordValue(decoding_buffer.length());
+        decoder_callbacks_->continueDecoding();
+      },
+      &cancel_callback_);
+
+  auto status = config.signer().sign(
+      headers, hash, "",
+      [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
+        dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
+      });
+  return status;
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
@@ -229,7 +287,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
                    settings.hostRewrite());
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
 
-  auto status = settings.signer().sign(*request_headers_, hash, settings.arn().region());
+  auto status = decodeDataWrapSign(settings, decoding_buffer, *request_headers_, hash);
   if (!status.ok()) {
     ENVOY_LOG(debug, "signing failed: {}", status.message());
   }
