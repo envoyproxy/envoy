@@ -261,11 +261,15 @@ message TcpProxy {
   // Additional access log options for TCP Proxy.
   TcpAccessLogOptions access_log_options = 17;
 
-  // If set, the specified PROXY protocol TLVs (Type-Length-Value) will be added in PROXY protocol
-  // state created by the TCP proxy filter. TLVs added to the PROXY protocol state will be added
-  // to the PROXY protocol v2 header sent upstream.
+  // If set, the specified PROXY protocol TLVs (Type-Length-Value) will be added to the PROXY protocol
+  // state created by the TCP proxy filter. These TLVs will be sent in the PROXY protocol v2 header
+  // to upstream. If PROXY protocol state already exists from the downstream, this field has no effect.
   //
-  // Note that this field is only used when the TCP proxy creates new PROXY protocol state.
-  // It is ignored if filter state already has PROXY protocol state from downstream.
-  repeated config.core.v3.ProxyProtocolTLV proxy_protocol_tlvs = 19;
+  // .. note::
+  //
+  //   To ensure specified TLVs are allowed in the upstream PROXY protocol header, configure the upstream
+  //   proxy protocol transport to passthrough these TLVs. See
+  //   :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`
+  //   for details.
+  repeated config.core.v3.TlvEntry proxy_protocol_tlvs = 19;
 }
