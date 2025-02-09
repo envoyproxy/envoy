@@ -196,14 +196,14 @@ absl::Status Filter::decodeHeadersWrapSign(FilterSettings& config, Buffer::Owned
                               const std::string& hash) {
   auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
       [&, this]() {
-        absl::Status status = config.signer().sign(*request_headers_, hash);
+        absl::Status status = config.signer().sign(*request_headers_, hash, config.arn().region());
         decoder_callbacks_->addDecodedData(json_buf, false);
         decoder_callbacks_->continueDecoding();
       },
       &cancel_callback_);
 
   auto status = config.signer().sign(
-      headers, hash, "",
+      headers, hash, config.arn().region(),
       [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
         dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
       });
@@ -214,7 +214,7 @@ absl::Status Filter::decodeDataWrapSign(FilterSettings& config, const Buffer::In
                               const std::string& hash) {
   auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
       [&, this]() {
-        absl::Status status = config.signer().sign(*request_headers_, hash);
+        absl::Status status = config.signer().sign(*request_headers_, hash, config.arn().region());
         if (!status.ok()) {
           ENVOY_LOG(debug, "signing failed: {}", status.message());
         }
@@ -224,7 +224,7 @@ absl::Status Filter::decodeDataWrapSign(FilterSettings& config, const Buffer::In
       &cancel_callback_);
 
   auto status = config.signer().sign(
-      headers, hash, "",
+      headers, hash, config.arn().region(),
       [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
         dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
       });
