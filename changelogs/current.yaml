@@ -113,6 +113,13 @@ new_features:
   change: |
     Adding support for a new body mode: ``FULL_DUPLEX_STREAMED`` in the ``ext_proc`` filter
     :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
+- area: proxy_protocol
+  change: |
+    Added support for injecting custom Type-Length-Value (TLV) entries into the Proxy Protocol v2 header for upstream
+    transport sockets. Custom TLVs can be defined both in the endpoint host's typed metadata under the
+    ``envoy.transport_sockets.proxy_protocol`` namespace and at the configuration level via the ``ProxyProtocolConfig``'s
+    ``added_tlvs`` field. Host-level TLV definitions override config-level entries when the same type is specified, allowing
+    default TLVs to be set globally, while enabling further per-endpoint customizations.
 - area: formatter
   change: |
     Added ``QUERY_PARAM`` support for substitution formatter. See :ref:`access log formatter <config_access_log_format>`
