@@ -258,9 +258,9 @@ bool DynamicDescriptorMap::matchDescriptorEntries(
   return true;
 }
 
-void DynamicDescriptorMap::addDescriptor(const RateLimit::LocalDescriptor& user_descriptor,
+void DynamicDescriptorMap::addDescriptor(const RateLimit::LocalDescriptor& config_descriptor,
                                          DynamicDescriptorSharedPtr dynamic_descriptor) {
-  auto result = user_descriptors_.emplace(user_descriptor, std::move(dynamic_descriptor));
+  auto result = config_descriptors_.emplace(config_descriptor, std::move(dynamic_descriptor));
   if (!result.second) {
     throw EnvoyException(absl::StrCat("duplicate descriptor in the local rate descriptor: ",
                                       result.first->first.toString()));
@@ -269,13 +269,13 @@ void DynamicDescriptorMap::addDescriptor(const RateLimit::LocalDescriptor& user_
 
 RateLimitTokenBucketSharedPtr
 DynamicDescriptorMap::getBucket(const RateLimit::Descriptor request_descriptor) {
-  for (const auto& pair : user_descriptors_) {
-    auto user_descriptor = pair.first;
-    if (!matchDescriptorEntries(request_descriptor.entries_, user_descriptor.entries_)) {
+  for (const auto& pair : config_descriptors_) {
+    auto config_descriptor = pair.first;
+    if (!matchDescriptorEntries(request_descriptor.entries_, config_descriptor.entries_)) {
       continue;
     }
 
-    // we found a user configured wildcard descriptor that matches the request descriptor.
+    // here is when a user configured wildcard descriptor matches the request descriptor.
     return pair.second->addOrGetDescriptor(request_descriptor);
   }
   return nullptr;
