@@ -2160,12 +2160,12 @@ TEST_P(TcpProxyTest, SetTLV) {
   EXPECT_EQ("tst", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
 
   // Verify the upstream TLV is set.
-  auto upstreamHeader = filter_->upstreamTransportSocketOptions()->proxyProtocolOptions();
-  ASSERT_TRUE(upstreamHeader.has_value());
-  auto& upstreamTlvs = upstreamHeader->tlv_vector_;
-  ASSERT_EQ(1, upstreamTlvs.size());
-  EXPECT_EQ(0xF1, upstreamTlvs[0].type);
-  EXPECT_EQ("tst", std::string(upstreamTlvs[0].value.begin(), upstreamTlvs[0].value.end()));
+  const auto upstream_header = filter_->upstreamTransportSocketOptions()->proxyProtocolOptions();
+  ASSERT_TRUE(upstream_header.has_value());
+  const auto& upstream_tlvs = upstream_header->tlv_vector_;
+  ASSERT_EQ(1, upstream_tlvs.size());
+  EXPECT_EQ(0xF1, upstream_tlvs[0].type);
+  EXPECT_EQ("tst", std::string(upstream_tlvs[0].value.begin(), upstream_tlvs[0].value.end()));
 }
 
 INSTANTIATE_TEST_SUITE_P(WithOrWithoutUpstream, TcpProxyTest, ::testing::Bool());

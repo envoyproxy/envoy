@@ -11,7 +11,7 @@ namespace ProxyProtocol {
 
 // Parses proxy protocol TLVs from the given configuration.
 Network::ProxyProtocolTLVVector
-parseTLVs(absl::Span<const envoy::config::core::v3::ProxyProtocolTLV* const> tlvs);
+parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs);
 
 } // namespace ProxyProtocol
 } // namespace Common

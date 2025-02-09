@@ -5,7 +5,7 @@ namespace Common {
 namespace ProxyProtocol {
 
 Network::ProxyProtocolTLVVector
-parseTLVs(absl::Span<const envoy::config::core::v3::ProxyProtocolTLV* const> tlvs) {
+parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs) {
   Network::ProxyProtocolTLVVector tlv_vector;
   for (const auto& tlv : tlvs) {
     const std::vector<unsigned char> value(tlv->value().begin(), tlv->value().end());
