@@ -176,7 +176,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 absl::Status Filter::wrapSignEmptyPayload(FilterSettings& config, Http::RequestHeaderMap& headers) {
   auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
       [this, &config]() {
-        absl::Status status = config.signer().signEmptyPayload(*request_headers_, config.arn().region());
+        absl::Status status =
+            config.signer().signEmptyPayload(*request_headers_, config.arn().region());
         if (!status.ok()) {
           ENVOY_LOG(debug, "signing failed: {}", status.message());
         }
@@ -192,8 +193,9 @@ absl::Status Filter::wrapSignEmptyPayload(FilterSettings& config, Http::RequestH
   return status;
 }
 
-absl::Status Filter::decodeHeadersWrapSign(FilterSettings& config, Buffer::OwnedImpl& json_buf, Http::RequestHeaderMap& headers,
-                              const std::string& hash) {
+absl::Status Filter::decodeHeadersWrapSign(FilterSettings& config, Buffer::OwnedImpl& json_buf,
+                                           Http::RequestHeaderMap& headers,
+                                           const std::string& hash) {
   auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
       [&, this]() {
         absl::Status status = config.signer().sign(*request_headers_, hash, config.arn().region());
@@ -210,8 +212,9 @@ absl::Status Filter::decodeHeadersWrapSign(FilterSettings& config, Buffer::Owned
   return status;
 }
 
-absl::Status Filter::decodeDataWrapSign(FilterSettings& config, const Buffer::Instance& decoding_buffer, Http::RequestHeaderMap& headers,
-                              const std::string& hash) {
+absl::Status Filter::decodeDataWrapSign(FilterSettings& config,
+                                        const Buffer::Instance& decoding_buffer,
+                                        Http::RequestHeaderMap& headers, const std::string& hash) {
   auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
       [&, this]() {
         absl::Status status = config.signer().sign(*request_headers_, hash, config.arn().region());

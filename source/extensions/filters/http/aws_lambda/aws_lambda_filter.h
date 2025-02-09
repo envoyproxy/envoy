@@ -6,9 +6,9 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/cancel_wrapper.h"
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
-#include "source/common/common/cancel_wrapper.h"
 
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
@@ -146,10 +146,10 @@ private:
 
   // Wrapper functions for async handling of aws request signing
   absl::Status wrapSignEmptyPayload(FilterSettings& config, Http::RequestHeaderMap& headers);
-absl::Status decodeHeadersWrapSign(FilterSettings& config, Buffer::OwnedImpl& json_buf, Http::RequestHeaderMap& headers,
-                              const std::string& hash);
-               absl::Status decodeDataWrapSign(FilterSettings& config, const Buffer::Instance& decoding_buffer, Http::RequestHeaderMap& headers,
-                              const std::string& hash);            
+  absl::Status decodeHeadersWrapSign(FilterSettings& config, Buffer::OwnedImpl& json_buf,
+                                     Http::RequestHeaderMap& headers, const std::string& hash);
+  absl::Status decodeDataWrapSign(FilterSettings& config, const Buffer::Instance& decoding_buffer,
+                                  Http::RequestHeaderMap& headers, const std::string& hash);
   FilterSettingsSharedPtr settings_;
   FilterStats stats_;
   Http::RequestHeaderMap* request_headers_ = nullptr;

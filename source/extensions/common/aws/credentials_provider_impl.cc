@@ -620,7 +620,6 @@ void ContainerCredentialsProvider::refresh() {
   } else {
     ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}",
               aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value());
-    auto a = aws_cluster_manager_.ref()->getUriFromClusterName("test");
     Http::Utility::extractHostPathFromUri(
         aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value(), host, path);
   }
@@ -921,29 +920,6 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
   ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
   credentialsRetrievalError();
 }
-
-// bool CredentialsProviderChain::credentialsPending() {
-//   for (auto& provider : providers_) {
-//     if (provider->credentialsPending()) {
-//       ENVOY_LOG_MISC(debug, "Credentials are pending");
-//       return true;
-//     }
-//   }
-//   ENVOY_LOG_MISC(debug, "Credentials are not pending");
-//   return false;
-// }
-
-// void CredentialsProviderChain::addCredentialsPendingCallback(CredentialsPendingCallback&& cb) {
-//   if (cb) {
-//     for (auto& provider : providers_) {
-//       if (provider->credentialsPending()) {
-//         provider->addCredentialsPendingCallback(std::move(cb));
-//         ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
-//         return;
-//       }
-//     }
-//   }
-// }
 
 absl::StatusOr<Credentials>
 CredentialsProviderChain::getCredentials(CredentialsPendingCallback&& cb) {
