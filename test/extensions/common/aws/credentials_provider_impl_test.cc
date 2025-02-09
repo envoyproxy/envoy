@@ -428,7 +428,7 @@ public:
                          MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-mock_manager_ = std::make_shared<MockAwsClusterManager>();
+    mock_manager_ = std::make_shared<MockAwsClusterManager>();
     base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
 
     manager_optref_.emplace(base_manager_);
@@ -607,7 +607,8 @@ mock_manager_ = std::make_shared<MockAwsClusterManager>();
   std::chrono::milliseconds expected_duration_;
   OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;};
+  std::shared_ptr<AwsClusterManager> base_manager_;
+};
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1) {
   // Setup timer.
@@ -1546,7 +1547,8 @@ public:
   MetadataFetcher::MetadataReceiver::RefreshState refresh_state_;
   OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;};
+  std::shared_ptr<AwsClusterManager> base_manager_;
+};
 
 TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
 
@@ -1984,7 +1986,8 @@ public:
   std::chrono::milliseconds expected_duration_;
   OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;};
+  std::shared_ptr<AwsClusterManager> base_manager_;
+};
 
 TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
   // Setup timer.
@@ -2052,7 +2055,7 @@ public:
     cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
     cred_provider.set_role_session_name("role-session-name");
 
- mock_manager_ = std::make_shared<MockAwsClusterManager>();
+    mock_manager_ = std::make_shared<MockAwsClusterManager>();
     base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
 
     manager_optref_.emplace(base_manager_);

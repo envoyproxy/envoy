@@ -17,8 +17,8 @@ envoy_cc_mock(
     rbe_pool = "6gig",
     deps = [
         "//source/common/http:message_lib",
-        "//source/extensions/common/aws:credentials_provider_interface",
         "//source/extensions/common/aws:aws_cluster_manager_lib",
+        "//source/extensions/common/aws:credentials_provider_interface",
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:signer_interface",
         "//test/mocks/upstream:cluster_manager_mocks",
@@ -148,9 +148,9 @@ envoy_cc_test(
     srcs = ["credentials_provider_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/common/aws:aws_cluster_manager_lib",
         "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
-        "//source/extensions/common/aws:aws_cluster_manager_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
