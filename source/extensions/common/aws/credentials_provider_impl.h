@@ -445,18 +445,15 @@ class DefaultCredentialsProviderChain : public CredentialsProviderChain,
                                         public CredentialsProviderChainFactories {
 public:
   DefaultCredentialsProviderChain(
-      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
-      absl::string_view region,
+      Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config =
           {})
-      : DefaultCredentialsProviderChain(api, context, singleton_manager, region,
-                                        fetch_metadata_using_curl, credential_provider_config,
-                                        *this) {}
+      : DefaultCredentialsProviderChain(api, context, region, fetch_metadata_using_curl,
+                                        credential_provider_config, *this) {}
 
   DefaultCredentialsProviderChain(
-      Api::Api& api, ServerFactoryContextOptRef context, Singleton::Manager& singleton_manager,
-      absl::string_view region,
+      Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
       const CredentialsProviderChainFactories& factories);
