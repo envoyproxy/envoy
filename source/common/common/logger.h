@@ -71,6 +71,7 @@ const static bool should_log = true;
   FUNCTION(kafka)                                                                                  \
   FUNCTION(key_value_store)                                                                        \
   FUNCTION(lua)                                                                                    \
+  FUNCTION(local_rate_limit)                                                                       \
   FUNCTION(main)                                                                                   \
   FUNCTION(matcher)                                                                                \
   FUNCTION(misc)                                                                                   \

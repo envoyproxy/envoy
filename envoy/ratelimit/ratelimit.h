@@ -58,6 +58,25 @@ struct Descriptor {
       absl::StrAppend(out, e.key_, "=", e.value_);
     });
   }
+
+  struct Hash {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    template <class DescriptorType> size_t operator()(const DescriptorType& d) const {
+      return absl::Hash<DescriptorEntries>()(d.entries_);
+    }
+  };
+  struct Equal {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    template <class DescriptorTypeA, class DescriptorTypeB>
+    size_t operator()(const DescriptorTypeA& lhs, const DescriptorTypeB& rhs) const {
+      return lhs.entries_ == rhs.entries_;
+    }
+  };
+
+  /**
+   * Descriptor map.
+   */
+  template <class V> using Map = absl::flat_hash_map<Descriptor, V, Hash, Equal>;
 };
 
 /**

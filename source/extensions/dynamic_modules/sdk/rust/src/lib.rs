@@ -109,7 +109,7 @@ pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<
 /// imlementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
 pub trait HttpFilterConfig<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> {
   /// This is called when a HTTP filter chain is created for a new stream.
-  fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
     panic!("not implemented");
   }
 }
@@ -1047,14 +1047,14 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_new(
   let filter_config = {
     let raw = filter_config_ptr
       as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>;
-    &**raw
+    &mut **raw
   };
   envoy_dynamic_module_on_http_filter_new_impl(&mut envoy_filter_config, filter_config)
 }
 
 fn envoy_dynamic_module_on_http_filter_new_impl(
   envoy_filter_config: &mut EnvoyHttpFilterConfigImpl,
-  filter_config: &dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
+  filter_config: &mut dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
 ) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
   let filter = filter_config.new_http_filter(envoy_filter_config);
   wrap_into_c_void_ptr!(filter)
