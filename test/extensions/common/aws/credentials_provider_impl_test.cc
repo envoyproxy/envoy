@@ -3084,8 +3084,8 @@ TEST_F(AsyncCredentialHandlingTest, ReceivePendingTrueWhenPending) {
     auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
     Http::RequestMessagePtr message(new Http::RequestMessageImpl());
 
-    auto result = signer->sign(*message, false, "");
-    EXPECT_TRUE(absl::IsNotFound(result));
+    auto result = signer->addCallbackIfCredentialsPending(std::move(cb));
+    EXPECT_TRUE(result);
   }));
 
   provider_friend.onClusterAddOrUpdate();

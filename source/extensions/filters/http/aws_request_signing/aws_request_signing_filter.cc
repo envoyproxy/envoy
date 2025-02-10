@@ -50,8 +50,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
             use_unsigned_payload);
 
-  absl::Status status;
-
   auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
       [this, &config]() {
         continueDecodeHeaders(config);
@@ -76,14 +74,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 void Filter::continueDecodeHeaders(FilterConfig& config) {
   absl::Status status;
   if (config.useUnsignedPayload()) {
-    // status = wrapSignUnsignedPayload(config, headers);
-    absl::Status status = config.signer().signUnsignedPayload(*request_headers_);
+    status = config.signer().signUnsignedPayload(*request_headers_);
 
   } else {
-    absl::Status status = config.signer().signEmptyPayload(*request_headers_);
-    // status = wrapSignEmptyPayload(config, headers);
+    status = config.signer().signEmptyPayload(*request_headers_);
   }
-
   addSigningStats(config, status);
 }
 
@@ -149,7 +144,7 @@ void Filter::addSigningPayloadStats(FilterConfig& config, absl::Status status) c
   if (status.ok()) {
     config.stats().payload_signing_added_.inc();
   } else {
-    ENVOY_LOG(debug, "signing failed: {}", status.message());
+    ENVOY_LOG(debug, "payload signing failed: {}", status.message());
     config.stats().payload_signing_failed_.inc();
   }
 }
