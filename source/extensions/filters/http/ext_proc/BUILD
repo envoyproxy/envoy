@@ -150,6 +150,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",
+        "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )

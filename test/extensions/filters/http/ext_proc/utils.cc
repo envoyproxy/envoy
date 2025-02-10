@@ -108,6 +108,15 @@ void TestOnProcessingResponse::afterProcessingResponseTrailers(
       "envoy.test.ext_proc.response_trailers_response",
       getHeaderMutations(response.response_trailers().header_mutation()));
 }
+
+void TestOnProcessingResponse::afterReceivingImmediateResponse(
+    const envoy::service::ext_proc::v3::ProcessingResponse& response, absl::Status,
+    Envoy::StreamInfo::StreamInfo& stream_info) {
+  ASSERT(response.has_immediate_response());
+  ASSERT(response.immediate_response().has_headers());
+  stream_info.setDynamicMetadata("envoy.test.ext_proc.response_immediate_response",
+                                 getHeaderMutations(response.immediate_response().headers()));
+}
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

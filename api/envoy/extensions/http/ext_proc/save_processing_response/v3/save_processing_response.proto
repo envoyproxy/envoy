@@ -32,7 +32,7 @@ message SaveProcessingResponse {
 
   bool save_response_trailers = 6;
 
-  bool save_immedieate_response = 7;
+  bool save_immediate_response = 7;
 
   bool save_on_error = 8;
 }

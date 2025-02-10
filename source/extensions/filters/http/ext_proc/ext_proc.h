@@ -291,7 +291,7 @@ private:
   }
   static std::function<std::unique_ptr<OnProcessingResponse>()> createOnProcessingResponseCb(
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
-      Envoy::Server::Configuration::CommonFactoryContext& context);
+      Envoy::Server::Configuration::CommonFactoryContext& context, const std::string& stats_prefix);
   const bool failure_mode_allow_;
   const bool observability_mode_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction

@@ -229,7 +229,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
-      on_processing_response_factory_cb_(createOnProcessingResponseCb(config, context)),
+      on_processing_response_factory_cb_(
+          createOnProcessingResponseCb(config, context, stats_prefix)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()) {
 
   if (config.disable_clear_route_cache()) {
@@ -1293,6 +1294,11 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
                        "Treat the immediate response message as spurious response.");
       processing_status =
           absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
+
+      if (on_processing_response_ != nullptr) {
+        on_processing_response_->afterReceivingImmediateResponse(*response, processing_status,
+                                                                 decoder_callbacks_->streamInfo());
+      }
     } else {
       setDecoderDynamicMetadata(*response);
       // We won't be sending anything more to the stream after we
@@ -1301,6 +1307,10 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       processing_complete_ = true;
       onFinishProcessorCalls(Grpc::Status::Ok);
       closeStream();
+      if (on_processing_response_ != nullptr) {
+        on_processing_response_->afterReceivingImmediateResponse(*response, processing_status,
+                                                                 decoder_callbacks_->streamInfo());
+      }
       sendImmediateResponse(response->immediate_response());
       processing_status = absl::OkStatus();
     }
@@ -1581,7 +1591,8 @@ std::string responseCaseToString(const ProcessingResponse::ResponseCase response
 }
 
 std::function<std::unique_ptr<OnProcessingResponse>()> FilterConfig::createOnProcessingResponseCb(
-    const ExternalProcessor& config, Envoy::Server::Configuration::CommonFactoryContext& context) {
+    const ExternalProcessor& config, Envoy::Server::Configuration::CommonFactoryContext& context,
+    const std::string& stats_prefix) {
   if (!config.has_on_processing_response()) {
     return nullptr;
   }
@@ -1594,9 +1605,10 @@ std::function<std::unique_ptr<OnProcessingResponse>()> FilterConfig::createOnPro
   }
   std::shared_ptr<const Protobuf::Message> shared_on_processing_response_config =
       std::move(on_processing_response_config);
-  return [&factory, shared_on_processing_response_config,
-          &context]() -> std::unique_ptr<OnProcessingResponse> {
-    return factory.createOnProcessingResponse(*shared_on_processing_response_config, context);
+  return [&factory, shared_on_processing_response_config, &context,
+          stats_prefix]() -> std::unique_ptr<OnProcessingResponse> {
+    return factory.createOnProcessingResponse(*shared_on_processing_response_config, context,
+                                              stats_prefix);
   };
 }
 

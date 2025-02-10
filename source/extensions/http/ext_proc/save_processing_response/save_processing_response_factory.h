@@ -1,24 +1,30 @@
 #pragma once
 
 #include "envoy/server/factory_context.h"
+#include "envoy/extensions/http/ext_proc/save_processing_response/v3/save_processing_response.pb.h"
+#include "envoy/extensions/http/ext_proc/save_processing_response/v3/save_processing_response.pb.validate.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
-#include "source/extnsions/http/ext_proc/save_processing_response/save_processing_response.h"
+#include "source/extensions/http/ext_proc/save_processing_response/save_processing_response.h"
 
+namespace Envoy {
 namespace Http {
 namespace ExternalProcessing {
 
-class SaveProcessingResponseFactory : public OnProcessingResponseFactory {
+class SaveProcessingResponseFactory
+    : public Envoy::Extensions::HttpFilters::ExternalProcessing::OnProcessingResponseFactory {
 public:
+  using SaveProcessingResponseProto =
+      envoy::extensions::http::ext_proc::save_processing_response::v3::SaveProcessingResponse;
   ~SaveProcessingResponseFactory() override = default;
-  std::unique_ptr<OnProcessingResponse> createOnProcessingResponse(
-      const Protobuf::Message&,
-      const Envoy::Server::Configuration::CommonFactoryContext&) const override {
-    return std::make_unique<SaveProcessingResponse>();
-  }
+
+  std::unique_ptr<Envoy::Extensions::HttpFilters::ExternalProcessing::OnProcessingResponse>
+  createOnProcessingResponse(const Protobuf::Message& config,
+                             Envoy::Server::Configuration::CommonFactoryContext& context,
+                             const std::string&) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    // Using Struct instead of a custom filter config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new envoy::extensions::http::ext_proc::
+                                         save_processing_response::v3::SaveProcessingResponse()};
   }
 
   std::string name() const override;
@@ -26,3 +32,4 @@ public:
 
 } // namespace ExternalProcessing
 } // namespace Http
+} // namespace Envoy

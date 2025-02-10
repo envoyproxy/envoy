@@ -80,6 +80,10 @@ public:
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
   void afterProcessingResponseTrailers(const envoy::service::ext_proc::v3::ProcessingResponse&,
                                        absl::Status, Envoy::StreamInfo::StreamInfo&) override;
+  void
+  afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ProcessingResponse& response,
+                                  absl::Status processing_status,
+                                  Envoy::StreamInfo::StreamInfo&) override;
 
 private:
   Envoy::ProtobufWkt::Struct
@@ -116,9 +120,10 @@ private:
 class TestOnProcessingResponseFactory : public OnProcessingResponseFactory {
 public:
   ~TestOnProcessingResponseFactory() override = default;
-  std::unique_ptr<OnProcessingResponse> createOnProcessingResponse(
-      const Protobuf::Message&,
-      const Envoy::Server::Configuration::CommonFactoryContext&) const override {
+  std::unique_ptr<OnProcessingResponse>
+  createOnProcessingResponse(const Protobuf::Message&,
+                             Envoy::Server::Configuration::CommonFactoryContext&,
+                             const std::string&) const override {
     return std::make_unique<TestOnProcessingResponse>();
   }
 
