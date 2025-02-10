@@ -24,8 +24,7 @@ namespace Common {
 namespace Aws {
 
 absl::Status SignerBaseImpl::sign(Http::RequestMessage& message, bool sign_body,
-                                  const absl::string_view override_region
-                                  ) {
+                                  const absl::string_view override_region) {
 
   const auto content_hash = createContentHash(message, sign_body);
   auto& headers = message.headers();
@@ -36,8 +35,7 @@ absl::Status SignerBaseImpl::signEmptyPayload(Http::RequestHeaderMap& headers,
                                               const absl::string_view override_region) {
   headers.setReference(SignatureHeaders::get().ContentSha256,
                        SignatureConstants::HashedEmptyString);
-  return sign(headers, std::string(SignatureConstants::HashedEmptyString), override_region
-              );
+  return sign(headers, std::string(SignatureConstants::HashedEmptyString), override_region);
 }
 
 absl::Status SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers,
@@ -46,8 +44,7 @@ absl::Status SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers
   return sign(headers, std::string(SignatureConstants::UnsignedPayload), override_region);
 }
 
-bool SignerBaseImpl::addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb)
-{
+bool SignerBaseImpl::addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb) {
   return credentials_provider_->credentialsPending(std::move(cb));
 }
 
@@ -122,9 +119,9 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
   ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
 
   // Phase 3: Create a signature
-  const auto signature = createSignature(credentials.accessKeyId().value(),
-                                         credentials.secretAccessKey().value(), short_date,
-                                         string_to_sign, override_region);
+  const auto signature =
+      createSignature(credentials.accessKeyId().value(), credentials.secretAccessKey().value(),
+                      short_date, string_to_sign, override_region);
   // Phase 4: Sign request
   if (query_string_) {
     // Append signature to existing query string

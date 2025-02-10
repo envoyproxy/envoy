@@ -25,8 +25,7 @@ public:
    * @return absl::NotFoundError if credentials are pending.
    */
   virtual absl::Status sign(Http::RequestMessage& message, bool sign_body,
-                            const absl::string_view override_region = ""
-                            ) PURE;
+                            const absl::string_view override_region = "") PURE;
 
   /**
    * Sign an AWS request without a payload (empty string used as content hash).
@@ -38,8 +37,7 @@ public:
    * @return absl::NotFoundError if credentials are pending.
    */
   virtual absl::Status signEmptyPayload(Http::RequestHeaderMap& headers,
-                                        const absl::string_view override_region = ""
-                                        ) PURE;
+                                        const absl::string_view override_region = "") PURE;
 
   /**
    * Sign an AWS request using the literal string UNSIGNED-PAYLOAD in the canonical request.
@@ -51,8 +49,7 @@ public:
    * @return absl::NotFoundError if credentials are pending.
    */
   virtual absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
-                                           const absl::string_view override_region = ""
-                                           ) PURE;
+                                           const absl::string_view override_region = "") PURE;
 
   /**
    * Sign an AWS request.
@@ -65,11 +62,11 @@ public:
    * @return absl::NotFoundError if credentials are pending.
    */
   virtual absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
-                            const absl::string_view override_region = ""
-                            ) PURE;
+                            const absl::string_view override_region = "") PURE;
 
   /**
-   * @param cb A callback that will be called when credentials (from async providers) are no longer pending.
+   * @param cb A callback that will be called when credentials (from async providers) are no longer
+   * pending.
    * @return true if credentials are pending and the callback has been added to the queue.
    * @return false if credentials are not pending and it is safe to continue signing immediately.
    */

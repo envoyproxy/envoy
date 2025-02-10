@@ -3150,9 +3150,9 @@ TEST_F(AsyncCredentialHandlingTest, CallbacksCalledWhenCredentialsReturned) {
   addPath("/");
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
-      .WillRepeatedly(Invoke(
-          [&, document = std::move(document)](
-              Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
+      .WillRepeatedly(
+          Invoke([&, document = std::move(document)](Http::RequestMessage&, Tracing::Span&,
+                                                     MetadataFetcher::MetadataReceiver& receiver) {
             // Register 3 pending callbacks
             auto result = signer->addCallbackIfCredentialsPending(std::move(cb1));
             EXPECT_EQ(result, true);
@@ -3225,9 +3225,9 @@ TEST_F(AsyncCredentialHandlingTest, AnonymousCredsWhenRetrievalFails) {
   addPath("/");
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
-      .WillRepeatedly(Invoke(
-          [&, document = std::move(document)](
-              Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
+      .WillRepeatedly(
+          Invoke([&, document = std::move(document)](Http::RequestMessage&, Tracing::Span&,
+                                                     MetadataFetcher::MetadataReceiver& receiver) {
             // Register 3 pending callbacks
             auto result = signer->addCallbackIfCredentialsPending(std::move(cb1));
             EXPECT_EQ(result, true);

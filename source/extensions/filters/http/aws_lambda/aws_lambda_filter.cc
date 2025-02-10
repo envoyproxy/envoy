@@ -152,23 +152,24 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       },
       &cancel_callback_);
 
-    if(settings.signer().addCallbackIfCredentialsPending(completion_cb) == false)
-    {
-      // We're not pending credentials, so sign immediately
-      continueDecodeHeaders(settings);
-      return Http::FilterHeadersStatus::Continue;
-    }
-    else
-    {
-      // Leave and let our callback handle the rest of the processing
-      return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
-    }
+  if (settings.signer().addCallbackIfCredentialsPending(
+          [&dispatcher = decoder_callbacks_->dispatcher(),
+           completion_cb = std::move(completion_cb)]() {
+            dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
+          }) == false) {
+    // We're not pending credentials, so sign immediately
+    continueDecodeHeaders(settings);
+    return Http::FilterHeadersStatus::Continue;
+  } else {
+    // Leave and let our callback handle the rest of the processing
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  }
 }
 
-void Filter::continueDecodeHeaders(FilterSettings& settings)
-{
+void Filter::continueDecodeHeaders(FilterSettings& settings) {
   if (settings.payloadPassthrough()) {
-    setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(), settings.hostRewrite());
+    setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(),
+                     settings.hostRewrite());
     auto status = settings.signer().signEmptyPayload(*request_headers_, settings.arn().region());
     if (!status.ok()) {
       ENVOY_LOG(debug, "signing failed: {}", status.message());
@@ -180,7 +181,8 @@ void Filter::continueDecodeHeaders(FilterSettings& settings)
   jsonizeRequest(*request_headers_, nullptr, json_buf);
   // We must call setLambdaHeaders *after* the JSON transformation of the request. That way we
   // reflect the actual incoming request headers instead of the overwritten ones.
-  setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(), settings.hostRewrite());
+  setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(),
+                   settings.hostRewrite());
   request_headers_->setContentLength(json_buf.length());
   request_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
@@ -237,20 +239,21 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       },
       &cancel_callback_);
 
-    if(settings.signer().addCallbackIfCredentialsPending(completion_cb) == false)
-    {
-      // We're not pending credentials, so sign immediately
-      continueDecodeData(settings);
-      return Http::FilterDataStatus::Continue;
-    }
-    else
-    {
-      // Leave and let our callback handle the rest of the processing
-      return Http::FilterDataStatus::StopIterationAndWatermark;
-    }
+  if (settings.signer().addCallbackIfCredentialsPending(
+          [&dispatcher = decoder_callbacks_->dispatcher(),
+           completion_cb = std::move(completion_cb)]() {
+            dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
+          }) == false) {
+    // We're not pending credentials, so sign immediately
+    continueDecodeData(settings);
+    return Http::FilterDataStatus::Continue;
+  } else {
+    // Leave and let our callback handle the rest of the processing
+    return Http::FilterDataStatus::StopIterationAndWatermark;
+  }
 }
 
-void Filter::continueDecodeData(FilterSettings& settings){
+void Filter::continueDecodeData(FilterSettings& settings) {
 
   const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
 

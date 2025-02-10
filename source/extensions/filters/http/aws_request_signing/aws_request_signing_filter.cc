@@ -59,21 +59,21 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       },
       &cancel_callback_);
 
-    if(config.signer().addCallbackIfCredentialsPending(completion_cb) == false)
-    {
-      // We're not pending credentials, so sign immediately
-      continueDecodeHeaders(config);
-      return Http::FilterHeadersStatus::Continue;
-    }
-    else
-    {
-      // Leave and let our callback handle the rest of the processing
-      return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
-    }
+  if (config.signer().addCallbackIfCredentialsPending(
+          [&dispatcher = decoder_callbacks_->dispatcher(),
+           completion_cb = std::move(completion_cb)]() {
+            dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
+          }) == false) {
+    // We're not pending credentials, so sign immediately
+    continueDecodeHeaders(config);
+    return Http::FilterHeadersStatus::Continue;
+  } else {
+    // Leave and let our callback handle the rest of the processing
+    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+  }
 }
 
-void Filter::continueDecodeHeaders(FilterConfig& config)
-{
+void Filter::continueDecodeHeaders(FilterConfig& config) {
   absl::Status status;
   if (config.useUnsignedPayload()) {
     // status = wrapSignUnsignedPayload(config, headers);
@@ -85,7 +85,6 @@ void Filter::continueDecodeHeaders(FilterConfig& config)
   }
 
   addSigningStats(config, status);
-
 }
 
 void Filter::addSigningStats(FilterConfig& config, absl::Status status) const {
@@ -118,7 +117,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   ENVOY_LOG(debug, "aws request signing from decodeData");
   ASSERT(request_headers_ != nullptr);
 
-
   auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
       [this, &config, hash]() {
         continueDecodeData(config, hash);
@@ -126,25 +124,25 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       },
       &cancel_callback_);
 
-    if(config.signer().addCallbackIfCredentialsPending(completion_cb) == false)
-    {
-      // We're not pending credentials, so sign immediately
-      continueDecodeData(config, hash);
-      return Http::FilterDataStatus::Continue;
-    }
-    else
-    {
-      // Leave and let our callback handle the rest of the processing
-      return Http::FilterDataStatus::StopIterationAndWatermark;
-    }
+  if (config.signer().addCallbackIfCredentialsPending(
+          [&dispatcher = decoder_callbacks_->dispatcher(),
+           completion_cb = std::move(completion_cb)]() {
+            dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
+          }) == false) {
+    // We're not pending credentials, so sign immediately
+    continueDecodeData(config, hash);
+    return Http::FilterDataStatus::Continue;
+  } else {
+    // Leave and let our callback handle the rest of the processing
+    return Http::FilterDataStatus::StopIterationAndWatermark;
+  }
 }
 
-void Filter::continueDecodeData(FilterConfig& config, const std::string hash){
+void Filter::continueDecodeData(FilterConfig& config, const std::string hash) {
   auto status = config.signer().sign(*request_headers_, hash);
 
   addSigningStats(config, status);
   addSigningPayloadStats(config, status);
-
 }
 
 void Filter::addSigningPayloadStats(FilterConfig& config, absl::Status status) const {

@@ -68,14 +68,12 @@ constexpr char STS_TOKEN_CLUSTER[] = "sts_token_service_internal";
 
 } // namespace
 
-Credentials
-ConfigCredentialsProvider::getCredentials() {
+Credentials ConfigCredentialsProvider::getCredentials() {
   ENVOY_LOG(debug, "Getting AWS credentials from static configuration");
   return credentials_;
 }
 
-Credentials
-EnvironmentCredentialsProvider::getCredentials() {
+Credentials EnvironmentCredentialsProvider::getCredentials() {
   ENVOY_LOG(debug, "Getting AWS credentials from the environment");
 
   const auto access_key_id = absl::NullSafeStringView(std::getenv(AWS_ACCESS_KEY_ID));
@@ -163,10 +161,8 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
   }
 }
 
-
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
-bool
-MetadataCredentialsProviderBase::credentialsPending(CredentialsPendingCallback&& cb) {
+bool MetadataCredentialsProviderBase::credentialsPending(CredentialsPendingCallback&& cb) {
 
   if (context_) {
     if (credentials_pending_) {
@@ -184,8 +180,7 @@ MetadataCredentialsProviderBase::credentialsPending(CredentialsPendingCallback&&
 }
 
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
-Credentials
-MetadataCredentialsProviderBase::getCredentials() {
+Credentials MetadataCredentialsProviderBase::getCredentials() {
 
   if (context_) {
     if (tls_slot_) {
@@ -931,27 +926,22 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
   credentialsRetrievalError();
 }
 
-bool CredentialsProviderChain::credentialsPending(CredentialsPendingCallback&& cb)
-{
+bool CredentialsProviderChain::credentialsPending(CredentialsPendingCallback&& cb) {
   for (auto& provider : providers_) {
     auto callback_copy = cb;
     const auto pending = provider->credentialsPending(std::move(callback_copy));
-    if(pending)
-    {
+    if (pending) {
       return pending;
     }
   }
   return false;
 }
 
-
-Credentials
-CredentialsProviderChain::getCredentials() {
+Credentials CredentialsProviderChain::getCredentials() {
   for (auto& provider : providers_) {
     const auto credentials = provider->getCredentials();
-      if (credentials.accessKeyId() && credentials.secretAccessKey()) {
-        return credentials;
-      
+    if (credentials.accessKeyId() && credentials.secretAccessKey()) {
+      return credentials;
     }
   }
 

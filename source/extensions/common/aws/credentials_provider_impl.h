@@ -140,7 +140,7 @@ public:
                                   std::chrono::seconds initialization_timer);
 
   Credentials getCredentials() override;
-  bool credentialsPending(CredentialsPendingCallback&&cb) override;
+  bool credentialsPending(CredentialsPendingCallback&& cb) override;
 
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
@@ -342,7 +342,6 @@ public:
   Credentials getCredentials() override;
   bool credentialsPending(CredentialsPendingCallback&&) override;
 
-
 protected:
   std::list<CredentialsProviderSharedPtr> providers_;
 };
@@ -442,9 +441,7 @@ public:
                                     absl::string_view session_token)
       : credentials_(access_key_id, secret_access_key, session_token) {}
 
-  Credentials getCredentials() override {
-    return credentials_;
-  }
+  Credentials getCredentials() override { return credentials_; }
   bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
 
 private:

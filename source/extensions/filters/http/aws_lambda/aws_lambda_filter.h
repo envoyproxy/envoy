@@ -154,7 +154,6 @@ private:
   bool skip_ = false;
   bool is_upstream_ = false;
   Envoy::CancelWrapper::CancelFunction cancel_callback_ = []() {};
-
 };
 
 } // namespace AwsLambdaFilter

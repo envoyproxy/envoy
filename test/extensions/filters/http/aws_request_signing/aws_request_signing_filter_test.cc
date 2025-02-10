@@ -174,9 +174,10 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignFails) {
   Buffer::OwnedImpl buffer;
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*(filter_config_->signer_),
-              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&, const absl::string_view) -> absl::Status {
+  EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(),
+                                               An<const std::string&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
+                          const absl::string_view) -> absl::Status {
         return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
       }));
 
