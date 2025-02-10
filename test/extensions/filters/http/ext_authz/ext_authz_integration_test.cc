@@ -29,6 +29,7 @@ using Headers = std::vector<std::pair<const std::string, const std::string>>;
 constexpr char ExtAuthzFilterName[] = "envoy.filters.http.ext_authz";
 
 struct GrpcInitializeConfigOpts {
+  bool filter_disabled_by_default = false;
   bool disable_with_metadata = false;
   bool failure_mode_allow = false;
   bool encode_raw_headers = false;
