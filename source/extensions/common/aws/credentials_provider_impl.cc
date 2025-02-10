@@ -949,10 +949,9 @@ Credentials
 CredentialsProviderChain::getCredentials() {
   for (auto& provider : providers_) {
     const auto credentials = provider->getCredentials();
-    if (credentials.ok()) {
       if (credentials.accessKeyId() && credentials.secretAccessKey()) {
         return credentials;
-      }
+      
     }
   }
 

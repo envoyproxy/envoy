@@ -144,12 +144,9 @@ private:
   void dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::Instance& body,
                          Buffer::Instance& out);
 
-  // Wrapper functions for async handling of aws request signing
-  absl::Status wrapSignEmptyPayload(FilterSettings& config, Http::RequestHeaderMap& headers);
-  absl::Status decodeHeadersWrapSign(FilterSettings& config, Buffer::OwnedImpl& json_buf,
-                                     Http::RequestHeaderMap& headers, const std::string& hash);
-  absl::Status decodeDataWrapSign(FilterSettings& config, const Buffer::Instance& decoding_buffer,
-                                  Http::RequestHeaderMap& headers, const std::string& hash);
+  void continueDecodeHeaders(FilterSettings& settings);
+  void continueDecodeData(FilterSettings& settings);
+
   FilterSettingsSharedPtr settings_;
   FilterStats stats_;
   Http::RequestHeaderMap* request_headers_ = nullptr;
@@ -157,6 +154,7 @@ private:
   bool skip_ = false;
   bool is_upstream_ = false;
   Envoy::CancelWrapper::CancelFunction cancel_callback_ = []() {};
+
 };
 
 } // namespace AwsLambdaFilter

@@ -3151,12 +3151,15 @@ TEST_F(AsyncCredentialHandlingTest, CallbacksCalledWhenCredentialsReturned) {
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
       .WillRepeatedly(Invoke(
-          [this, &signer, &cb1, &cb2, &cb3, document = std::move(document)](
+          [&, document = std::move(document)](
               Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
             // Register 3 pending callbacks
-            auto result = signer->sign(*message_, false, "", std::move(cb1));
-            result = signer->sign(*message_, false, "", std::move(cb2));
-            result = signer->sign(*message_, false, "", std::move(cb3));
+            auto result = signer->addCallbackIfCredentialsPending(std::move(cb1));
+            EXPECT_EQ(result, true);
+            result = signer->addCallbackIfCredentialsPending(std::move(cb2));
+            EXPECT_EQ(result, true);
+            result = signer->addCallbackIfCredentialsPending(std::move(cb3));
+            EXPECT_EQ(result, true);
 
             receiver.onMetadataSuccess(std::move(document));
           }));
@@ -3223,12 +3226,15 @@ TEST_F(AsyncCredentialHandlingTest, AnonymousCredsWhenRetrievalFails) {
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
       .WillRepeatedly(Invoke(
-          [this, &cb1, &cb2, &cb3, &signer, document = std::move(document)](
+          [&, document = std::move(document)](
               Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
             // Register 3 pending callbacks
-            auto result = signer->sign(*message_, false, "", std::move(cb1));
-            result = signer->sign(*message_, false, "", std::move(cb2));
-            result = signer->sign(*message_, false, "", std::move(cb3));
+            auto result = signer->addCallbackIfCredentialsPending(std::move(cb1));
+            EXPECT_EQ(result, true);
+            result = signer->addCallbackIfCredentialsPending(std::move(cb2));
+            EXPECT_EQ(result, true);
+            result = signer->addCallbackIfCredentialsPending(std::move(cb3));
+            EXPECT_EQ(result, true);
 
             receiver.onMetadataSuccess(std::move(document));
           }));
@@ -3239,6 +3245,9 @@ TEST_F(AsyncCredentialHandlingTest, AnonymousCredsWhenRetrievalFails) {
   ASSERT_TRUE(cb2call);
   ASSERT_TRUE(cb3call);
   auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
+  auto pending = signer->addCallbackIfCredentialsPending(std::move(cb));
+  EXPECT_EQ(pending, false);
+
   auto result = signer->sign(*message_, false, "");
   ASSERT_TRUE(result.ok());
   // We returned an error from credentials retrieval, so we should have blank credentials here

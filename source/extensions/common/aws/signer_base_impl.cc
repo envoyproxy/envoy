@@ -46,7 +46,7 @@ absl::Status SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers
   return sign(headers, std::string(SignatureConstants::UnsignedPayload), override_region);
 }
 
-bool SignerBaseImpl::signCredentialsPending(CredentialsPendingCallback&& cb)
+bool SignerBaseImpl::addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb)
 {
   return credentials_provider_->credentialsPending(std::move(cb));
 }

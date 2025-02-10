@@ -140,98 +140,57 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   auto& settings = getSettings();
 
+  request_headers_ = &headers;
+
   if (!end_stream) {
-    request_headers_ = &headers;
     return Http::FilterHeadersStatus::StopIteration;
   }
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this, &settings]() {
+        continueDecodeHeaders(settings);
+        decoder_callbacks_->continueDecoding();
+      },
+      &cancel_callback_);
 
+    if(settings.signer().addCallbackIfCredentialsPending(completion_cb) == false)
+    {
+      // We're not pending credentials, so sign immediately
+      continueDecodeHeaders(settings);
+      return Http::FilterHeadersStatus::Continue;
+    }
+    else
+    {
+      // Leave and let our callback handle the rest of the processing
+      return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+    }
+}
+
+void Filter::continueDecodeHeaders(FilterSettings& settings)
+{
   if (settings.payloadPassthrough()) {
-    setLambdaHeaders(headers, settings.arn(), settings.invocationMode(), settings.hostRewrite());
-    auto status = wrapSignEmptyPayload(settings, headers);
+    setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(), settings.hostRewrite());
+    auto status = settings.signer().signEmptyPayload(*request_headers_, settings.arn().region());
     if (!status.ok()) {
       ENVOY_LOG(debug, "signing failed: {}", status.message());
     }
-
-    return Http::FilterHeadersStatus::Continue;
+    return;
   }
 
   Buffer::OwnedImpl json_buf;
-  jsonizeRequest(headers, nullptr, json_buf);
+  jsonizeRequest(*request_headers_, nullptr, json_buf);
   // We must call setLambdaHeaders *after* the JSON transformation of the request. That way we
   // reflect the actual incoming request headers instead of the overwritten ones.
-  setLambdaHeaders(headers, settings.arn(), settings.invocationMode(), settings.hostRewrite());
-  headers.setContentLength(json_buf.length());
-  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(), settings.hostRewrite());
+  request_headers_->setContentLength(json_buf.length());
+  request_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
   const auto hash = Hex::encode(hashing_util.getSha256Digest(json_buf));
 
-  auto status = decodeHeadersWrapSign(settings, json_buf, headers, hash);
+  auto status = settings.signer().sign(*request_headers_, hash, settings.arn().region());
   if (!status.ok()) {
     ENVOY_LOG(debug, "signing failed: {}", status.message());
   }
   decoder_callbacks_->addDecodedData(json_buf, false);
-  return Http::FilterHeadersStatus::Continue;
-}
-
-// absl::Status Filter::wrapSignEmptyPayload(FilterSettings& config, Http::RequestHeaderMap& headers) {
-//   auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
-//       [this, &config]() {
-//         absl::Status status =
-//             config.signer().signEmptyPayload(*request_headers_, config.arn().region());
-//         if (!status.ok()) {
-//           ENVOY_LOG(debug, "signing failed: {}", status.message());
-//         }
-//         decoder_callbacks_->continueDecoding();
-//       },
-//       &cancel_callback_);
-
-//   auto status = config.signer().signEmptyPayload(
-//       headers, config.arn().region(),
-//       [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
-//         dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
-//       });
-//   return status;
-// }
-
-absl::Status Filter::decodeHeadersWrapSign(FilterSettings& config, Buffer::OwnedImpl& json_buf,
-                                           Http::RequestHeaderMap& headers,
-                                           const std::string& hash) {
-  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
-      [&, this]() {
-        absl::Status status = config.signer().sign(*request_headers_, hash, config.arn().region());
-        decoder_callbacks_->addDecodedData(json_buf, false);
-        decoder_callbacks_->continueDecoding();
-      },
-      &cancel_callback_);
-
-  auto status = config.signer().sign(
-      headers, hash, config.arn().region(),
-      [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
-        dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
-      });
-  return status;
-}
-
-absl::Status Filter::decodeDataWrapSign(FilterSettings& config,
-                                        const Buffer::Instance& decoding_buffer,
-                                        Http::RequestHeaderMap& headers, const std::string& hash) {
-  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
-      [&, this]() {
-        absl::Status status = config.signer().sign(*request_headers_, hash, config.arn().region());
-        if (!status.ok()) {
-          ENVOY_LOG(debug, "signing failed: {}", status.message());
-        }
-        stats().upstream_rq_payload_size_.recordValue(decoding_buffer.length());
-        decoder_callbacks_->continueDecoding();
-      },
-      &cancel_callback_);
-
-  auto status = config.signer().sign(
-      headers, hash, config.arn().region(),
-      [&dispatcher = decoder_callbacks_->dispatcher(), completion_cb = std::move(completion_cb)]() {
-        dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
-      });
-  return status;
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool end_stream) {
@@ -267,12 +226,33 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
 
-  auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
   decoder_callbacks_->addDecodedData(data, false);
 
-  const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
-
   auto& settings = getSettings();
+
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this, &settings]() {
+        continueDecodeData(settings);
+        decoder_callbacks_->continueDecoding();
+      },
+      &cancel_callback_);
+
+    if(settings.signer().addCallbackIfCredentialsPending(completion_cb) == false)
+    {
+      // We're not pending credentials, so sign immediately
+      continueDecodeData(settings);
+      return Http::FilterDataStatus::Continue;
+    }
+    else
+    {
+      // Leave and let our callback handle the rest of the processing
+      return Http::FilterDataStatus::StopIterationAndWatermark;
+    }
+}
+
+void Filter::continueDecodeData(FilterSettings& settings){
+
+  const Buffer::Instance& decoding_buffer = *decoder_callbacks_->decodingBuffer();
 
   if (!settings.payloadPassthrough()) {
     decoder_callbacks_->modifyDecodingBuffer([this](Buffer::Instance& dec_buf) {
@@ -288,14 +268,15 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(),
                    settings.hostRewrite());
+  auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
+
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));
 
-  auto status = decodeDataWrapSign(settings, decoding_buffer, *request_headers_, hash);
+  auto status = settings.signer().sign(*request_headers_, hash, settings.arn().region());
   if (!status.ok()) {
     ENVOY_LOG(debug, "signing failed: {}", status.message());
   }
   stats().upstream_rq_payload_size_.recordValue(decoding_buffer.length());
-  return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_stream) {

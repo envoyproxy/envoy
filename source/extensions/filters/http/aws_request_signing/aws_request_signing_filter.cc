@@ -59,7 +59,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       },
       &cancel_callback_);
 
-    if(config.signer().signCredentialsPending(completion_cb) == false)
+    if(config.signer().addCallbackIfCredentialsPending(completion_cb) == false)
     {
       // We're not pending credentials, so sign immediately
       continueDecodeHeaders(config);
@@ -126,7 +126,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       },
       &cancel_callback_);
 
-    if(config.signer().signCredentialsPending(completion_cb) == false)
+    if(config.signer().addCallbackIfCredentialsPending(completion_cb) == false)
     {
       // We're not pending credentials, so sign immediately
       continueDecodeData(config, hash);

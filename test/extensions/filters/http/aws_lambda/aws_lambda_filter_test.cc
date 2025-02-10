@@ -99,10 +99,8 @@ TEST_F(AwsLambdaFilterTest, SigningFailureDecodeHeadersPassthrough) {
   auto filter_settings_ =
       setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "");
   EXPECT_CALL(*(filter_settings_->signer_),
-              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>(),
-                               An<Common::Aws::CredentialsPendingCallback&&>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view,
-                          Common::Aws::CredentialsPendingCallback&&) -> absl::Status {
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
         return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
       }));
 
@@ -118,10 +116,8 @@ TEST_F(AwsLambdaFilterTest, SigningFailureDecodeHeadersNoPassthrough) {
   auto filter_settings_ =
       setupDownstreamFilter(InvocationMode::Synchronous, false /*passthrough*/, "");
   EXPECT_CALL(*(filter_settings_->signer_),
-              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), An<absl::string_view>(),
-                   An<Common::Aws::CredentialsPendingCallback&&>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&, const absl::string_view,
-                          Common::Aws::CredentialsPendingCallback&&) -> absl::Status {
+              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&, const absl::string_view) -> absl::Status {
         return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
       }));
   Http::TestRequestHeaderMapImpl headers;
@@ -146,10 +142,8 @@ TEST_F(AwsLambdaFilterTest, SigningFailureDecodeData) {
 
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
   EXPECT_CALL(*(filter_settings->signer_),
-              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), An<absl::string_view>(),
-                   An<Common::Aws::CredentialsPendingCallback&&>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&, const absl::string_view,
-                          Common::Aws::CredentialsPendingCallback&&) -> absl::Status {
+              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&, const absl::string_view) -> absl::Status {
         return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
       }));
 
@@ -164,8 +158,7 @@ TEST_F(AwsLambdaFilterTest, HeaderOnlyShouldContinue) {
   auto filter_settings =
       setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "");
   EXPECT_CALL(*filter_settings->signer_,
-              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>(),
-                               An<Common::Aws::CredentialsPendingCallback&&>()));
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
   Http::TestRequestHeaderMapImpl input_headers;
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
   EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
@@ -186,8 +179,7 @@ TEST_F(AwsLambdaFilterTest, ClusterMetadataIsNotNeededInUpstreamMode) {
   setupFilter(filter_settings, true);
 
   EXPECT_CALL(*filter_settings->signer_,
-              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>(),
-                               An<Common::Aws::CredentialsPendingCallback&&>()));
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
   Http::TestRequestHeaderMapImpl input_headers;
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
   EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
@@ -261,8 +253,7 @@ TEST_F(AwsLambdaFilterTest, PerRouteConfigCorrectRegionForSigning) {
       .WillByDefault(Return(&route_settings));
 
   EXPECT_CALL(*route_settings.signer_,
-              signEmptyPayload(An<Http::RequestHeaderMap&>(), override_region,
-                               An<Common::Aws::CredentialsPendingCallback&&>()));
+              signEmptyPayload(An<Http::RequestHeaderMap&>(), override_region));
   Http::TestRequestHeaderMapImpl headers;
   const auto result = filter_->decodeHeaders(headers, true /*end_stream*/);
   EXPECT_EQ(fmt::format("/2015-03-31/functions/arn:aws:lambda:{}:1337:function:fun/invocations",
@@ -321,8 +312,7 @@ TEST_F(AwsLambdaFilterTest, DecodeDataShouldSign) {
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
   EXPECT_CALL(*filter_settings->signer_,
-              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), An<absl::string_view>(),
-                   An<Common::Aws::CredentialsPendingCallback&&>()));
+              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), An<absl::string_view>()));
 
   const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
   EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
@@ -349,8 +339,7 @@ TEST_F(AwsLambdaFilterTest, DecodeDataSigningWithPerRouteConfig) {
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
   EXPECT_CALL(*route_settings.signer_,
-              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), override_region,
-                   An<Common::Aws::CredentialsPendingCallback&&>()));
+              sign(An<Http::RequestHeaderMap&>(), An<const std::string&>(), override_region));
 
   const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
   EXPECT_EQ(fmt::format("/2015-03-31/functions/arn:aws:lambda:{}:1337:function:fun/invocations",

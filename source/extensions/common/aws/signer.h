@@ -68,7 +68,12 @@ public:
                             const absl::string_view override_region = ""
                             ) PURE;
 
-  virtual bool signCredentialsPending(CredentialsPendingCallback&& cb) PURE;
+  /**
+   * @param cb A callback that will be called when credentials (from async providers) are no longer pending.
+   * @return true if credentials are pending and the callback has been added to the queue.
+   * @return false if credentials are not pending and it is safe to continue signing immediately.
+   */
+  virtual bool addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb) PURE;
 };
 
 using SignerPtr = std::unique_ptr<Signer>;

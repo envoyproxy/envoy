@@ -55,6 +55,7 @@ public:
               (Http::RequestHeaderMap&, absl::string_view));
   MOCK_METHOD(absl::Status, signUnsignedPayload,
               (Http::RequestHeaderMap&, absl::string_view));
+  MOCK_METHOD(bool, addCallbackIfCredentialsPending, (CredentialsPendingCallback&&));
 };
 
 class MockFetchMetadata {
