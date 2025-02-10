@@ -430,7 +430,7 @@ bool envoy_dynamic_module_callback_http_drain_request_body(
   if (!filter->decoder_callbacks_->decodingBuffer()) {
     if (filter->current_request_body_) { // See the comment on current_request_body_ for when we
                                          // enter this block.
-      auto size = std::min(filter->current_request_body_->length(), number_of_bytes);
+      auto size = std::min<uint64_t>(filter->current_request_body_->length(), number_of_bytes);
       filter->current_request_body_->drain(size);
       return true;
     }
@@ -438,7 +438,7 @@ bool envoy_dynamic_module_callback_http_drain_request_body(
   }
 
   filter->decoder_callbacks_->modifyDecodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
-    auto size = std::min(buffer.length(), number_of_bytes);
+    auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
     buffer.drain(size);
   });
   return true;
@@ -506,7 +506,7 @@ bool envoy_dynamic_module_callback_http_drain_response_body(
   if (!filter->encoder_callbacks_->encodingBuffer()) {
     if (filter->current_response_body_) { // See the comment on current_response_body_ for when we
                                           // enter this block.
-      auto size = std::min(filter->current_response_body_->length(), number_of_bytes);
+      auto size = std::min<uint64_t>(filter->current_response_body_->length(), number_of_bytes);
       filter->current_response_body_->drain(size);
       return true;
     }
@@ -514,7 +514,7 @@ bool envoy_dynamic_module_callback_http_drain_response_body(
   }
 
   filter->encoder_callbacks_->modifyEncodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
-    auto size = std::min(buffer.length(), number_of_bytes);
+    auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
     buffer.drain(size);
   });
   return true;
