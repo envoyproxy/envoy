@@ -34,7 +34,6 @@ public:
 public:
   Server::Configuration::ServerFactoryContext& context_;
 };
-
 using AwsManagedClusterUpdateCallbacksHandlePtr =
     std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle>;
 
