@@ -156,6 +156,7 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
   // Credential retrieval failed, so set blank (anonymous) credentials
   if (context_) {
     stats_->credential_refreshes_failed_.inc();
+    ENVOY_LOG_MISC(debug, "Error retrieving credentials, settings anonymous credentials");
     setCredentialsToAllThreads(std::make_unique<Credentials>());
     handleFetchDone();
   }
@@ -167,10 +168,10 @@ bool MetadataCredentialsProviderBase::credentialsPending(CredentialsPendingCallb
   if (context_) {
     if (credentials_pending_) {
       if (cb) {
-        ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
+        ENVOY_LOG_MISC(debug, "Adding credentials pending callback to {} queue", this->providerName());
         Thread::LockGuard guard(mu_);
         credential_pending_callbacks_.push_back(std::move(cb));
-        ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
+        ENVOY_LOG_MISC(debug, "{} has {} pending callbacks", this->providerName(), credential_pending_callbacks_.size());
       }
       return true;
     }
@@ -244,7 +245,7 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
 void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
     CredentialsConstUniquePtr&& creds) {
 
-  ENVOY_LOG_MISC(debug, "Setting credentials to all threads");
+  ENVOY_LOG_MISC(debug, "{}: Setting credentials to all threads", this->providerName());
 
   CredentialsConstSharedPtr shared_credentials = std::move(creds);
   if (tls_slot_ && !tls_slot_->isShutdown()) {
@@ -254,15 +255,22 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
                                           obj) { obj->credentials_ = shared_credentials; },
         /* Notify waiting signers on completion of credential setting above */
         [this]() {
+
           credentials_pending_.store(false);
 
           std::vector<CredentialsPendingCallback> callbacks_copy;
 
           {
             Thread::LockGuard guard(mu_);
+            ENVOY_LOG_MISC(debug, "{}: Notifying {} credential callbacks original", this->providerName(), credential_pending_callbacks_.size());
+
             callbacks_copy = credential_pending_callbacks_;
+            ENVOY_LOG_MISC(debug, "{}: Notifying {} credential callbacks copy", this->providerName(), callbacks_copy.size());
+
             credential_pending_callbacks_.clear();
           }
+
+          ENVOY_LOG_MISC(debug, "{}: Notifying {} credential callbacks copy", this->providerName(), callbacks_copy.size());
 
           // Call all of our callbacks to unblock pending requests
           for (const auto& cb : callbacks_copy) {
@@ -930,6 +938,7 @@ bool CredentialsProviderChain::credentialsPending(CredentialsPendingCallback&& c
   for (auto& provider : providers_) {
     auto callback_copy = cb;
     const auto pending = provider->credentialsPending(std::move(callback_copy));
+    ENVOY_LOG(debug, "Provider {} returning pending {}", provider->providerName(),pending);
     if (pending) {
       return pending;
     }
@@ -948,22 +957,6 @@ Credentials CredentialsProviderChain::getCredentials() {
   ENVOY_LOG(debug, "No AWS credentials found, using anonymous credentials");
   return Credentials();
 }
-
-// absl::StatusOr<Credentials>
-// CredentialsProviderChain::getCredentials(CredentialsPendingCallback&& cb) {
-//   for (auto& provider : providers_) {
-//     auto callback_copy = cb;
-//     const auto credentialsOr = provider->getCredentials(std::move(callback_copy));
-//     if (credentialsOr.ok()) {
-//       if (credentialsOr->accessKeyId() && credentialsOr->secretAccessKey()) {
-//         return credentialsOr;
-//       }
-//     }
-//   }
-
-//   ENVOY_LOG(debug, "No AWS credentials found, using anonymous credentials");
-//   return Credentials();
-// }
 
 std::string sessionName(Api::Api& api) {
   const auto role_session_name = absl::NullSafeStringView(std::getenv(AWS_ROLE_SESSION_NAME));

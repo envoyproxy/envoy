@@ -49,6 +49,8 @@ class EnvironmentCredentialsProvider : public CredentialsProvider,
 public:
   Credentials getCredentials() override;
   bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
+    std::string providerName() override { return "EnvironmentCredentialsProvider"; };
+
 };
 
 /**
@@ -66,7 +68,7 @@ public:
       : credentials_(access_key_id, secret_access_key, session_token) {}
   Credentials getCredentials() override;
   bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
-
+  std::string providerName() override { return "ConfigCredentialsProvider"; };
 private:
   const Credentials credentials_;
 };
@@ -102,6 +104,7 @@ public:
       Server::Configuration::ServerFactoryContext& context,
       const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
           credential_file_config = {});
+  std::string providerName() override { return "CredentialsFileCredentialsProvider"; };
 
 private:
   Server::Configuration::ServerFactoryContext& context_;
@@ -242,6 +245,7 @@ public:
   // Following functions are for MetadataFetcher::MetadataReceiver interface
   void onMetadataSuccess(const std::string&& body) override;
   void onMetadataError(Failure reason) override;
+  std::string providerName() override { return "InstanceProfileCredentialsProvider"; };
 
 private:
   bool needsRefresh() override;
@@ -284,6 +288,7 @@ public:
   // Following functions are for MetadataFetcher::MetadataReceiver interface
   void onMetadataSuccess(const std::string&& body) override;
   void onMetadataError(Failure reason) override;
+  std::string providerName() override { return "ContainerCredentialsProvider"; };
 
 private:
   const std::string credential_uri_;
@@ -315,6 +320,7 @@ public:
   // Following functions are for MetadataFetcher::MetadataReceiver interface
   void onMetadataSuccess(const std::string&& body) override;
   void onMetadataError(Failure reason) override;
+  std::string providerName() override { return "WebIdentityCredentialsProvider"; };
 
 private:
   const std::string sts_endpoint_;
@@ -341,6 +347,7 @@ public:
 
   Credentials getCredentials() override;
   bool credentialsPending(CredentialsPendingCallback&&) override;
+  std::string providerName() override { return "CredentialsProviderChain"; };
 
 protected:
   std::list<CredentialsProviderSharedPtr> providers_;
@@ -443,6 +450,7 @@ public:
 
   Credentials getCredentials() override { return credentials_; }
   bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
+  std::string providerName() override { return "InlineCredentialProvider"; };
 
 private:
   const Credentials credentials_;

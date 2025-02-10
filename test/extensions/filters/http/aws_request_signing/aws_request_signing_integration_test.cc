@@ -137,6 +137,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AwsRequestSigningIntegrationTest,
                          testing::ValuesIn({Network::Address::IpVersion::v4}));
 
 TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationDownstream) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4, true);
   HttpIntegrationTest::initialize();
@@ -160,7 +161,6 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationDownstream) {
 }
 
 TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationDownstream) {
-
   config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4A, true);
   HttpIntegrationTest::initialize();
 

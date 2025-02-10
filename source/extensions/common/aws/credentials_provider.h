@@ -68,6 +68,7 @@ public:
    *
    * @return AWS credentials
    */
+  virtual std::string providerName() PURE;
   virtual Credentials getCredentials() PURE;
   virtual bool credentialsPending(CredentialsPendingCallback&& cb = {}) PURE;
 };
