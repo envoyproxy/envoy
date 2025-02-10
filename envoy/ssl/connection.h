@@ -12,6 +12,15 @@
 #include "absl/types/span.h"
 
 namespace Envoy {
+
+namespace Extensions {
+namespace TransportSockets {
+namespace Tls {
+// This is forward declared to avoid needing to forward declare `GENERAL_NAME` from BoringSSL.
+class SanMatcher;
+} // namespace Tls
+} // namespace TransportSockets
+} // namespace Extensions
 namespace Ssl {
 
 /**
@@ -120,6 +129,12 @@ public:
    *         encoding fails.
    **/
   virtual const std::string& urlEncodedPemEncodedPeerCertificateChain() const PURE;
+
+  /**
+   * @return bool whether the provided matcher matches a SAN in the peer certificate.
+   */
+  virtual bool peerCertificateSanMatches(
+      const Extensions::TransportSockets::Tls::SanMatcher& matcher) const PURE;
 
   /**
    * @return absl::Span<const std::string> the DNS entries in the SAN field of the peer certificate.

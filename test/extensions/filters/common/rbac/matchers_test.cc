@@ -411,6 +411,97 @@ TEST(AuthenticatedMatcher, NoSSL) {
   checkMatcher(AuthenticatedMatcher({}, factory_context), false, conn);
 }
 
+// This matcher will not match in any configuration if the connection is not ssl.
+TEST(MtlsAuthenticatedMatcher, NoSSL) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  Envoy::Network::MockConnection conn;
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(nullptr));
+
+  envoy::config::rbac::v3::Principal::MTlsAuthenticated auth;
+  auth.set_any_validated_client_certificate(true);
+  checkMatcher(MtlsAuthenticatedMatcher(auth, factory_context), false, conn);
+
+  auto* matcher = auth.mutable_san_matcher();
+  matcher->set_san_type(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+  matcher->mutable_matcher()->MergeFrom(TestUtility::createRegexMatcher(".*"));
+  checkMatcher(MtlsAuthenticatedMatcher(auth, factory_context), false, conn);
+}
+
+// This matcher will not match in any configuration if the peer certificate is not validated.
+TEST(MtlsAuthenticatedMatcher, UnvalidatedPeerCertificate) {
+  Envoy::Network::MockConnection conn;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
+  const std::vector<std::string> sans{"foo", "baz"};
+  EXPECT_CALL(*ssl, peerCertificateValidated()).WillRepeatedly(Return(false));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
+
+  envoy::config::rbac::v3::Principal::MTlsAuthenticated auth;
+  auth.set_any_validated_client_certificate(true);
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  checkMatcher(MtlsAuthenticatedMatcher(auth, factory_context), false, conn);
+
+  auto* matcher = auth.mutable_san_matcher();
+  matcher->set_san_type(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+  matcher->mutable_matcher()->MergeFrom(TestUtility::createRegexMatcher(".*"));
+  checkMatcher(MtlsAuthenticatedMatcher(auth, factory_context), false, conn);
+}
+
+TEST(MtlsAuthenticatedMatcher, AnyValidatedClientCertificate) {
+  Envoy::Network::MockConnection conn;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
+  const std::vector<std::string> sans{"foo", "baz"};
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
+
+  envoy::config::rbac::v3::Principal::MTlsAuthenticated auth;
+  auth.set_any_validated_client_certificate(true);
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  EXPECT_CALL(*ssl, peerCertificateValidated()).WillRepeatedly(Return(true));
+  checkMatcher(MtlsAuthenticatedMatcher(auth, factory_context), true, conn);
+
+  EXPECT_CALL(*ssl, peerCertificateValidated()).WillRepeatedly(Return(false));
+  checkMatcher(MtlsAuthenticatedMatcher(auth, factory_context), false, conn);
+}
+
+TEST(MtlsAuthenticatedMatcher, SanMatcher) {
+  Envoy::Network::MockConnection conn;
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
+  const std::vector<std::string> sans{"foo", "baz"};
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
+  EXPECT_CALL(*ssl, peerCertificateValidated()).WillRepeatedly(Return(true));
+  GENERAL_NAME san{};
+  CSmartPtr<ASN1_IA5STRING, ASN1_IA5STRING_free> free_str = ASN1_IA5STRING_new();
+  san.d.dNSName = free_str.get();
+
+  // Use this invoke to validate that the passed in matcher is correct, instead of just returning
+  // true or false directly in an expectation on this mock function.
+  EXPECT_CALL(*ssl, peerCertificateSanMatches(_))
+      .WillRepeatedly(
+          Invoke([&](const Extensions::TransportSockets::Tls::SanMatcher& matcher) -> bool {
+            return matcher.match(&san);
+          }));
+
+  envoy::config::rbac::v3::Principal::MTlsAuthenticated auth;
+  auto* matcher = auth.mutable_san_matcher();
+  matcher->set_san_type(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+  matcher->mutable_matcher()->MergeFrom(TestUtility::createExactMatcher("my_san"));
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  // Correct name but wrong type.
+  san.type = GEN_DNS;
+  absl::string_view name("my_san");
+  ASN1_STRING_set(san.d.dNSName, name.data(), name.length());
+  checkMatcher(MtlsAuthenticatedMatcher(auth, factory_context), false, conn);
+
+  // Correct name and type.
+  san.type = GEN_URI;
+  checkMatcher(MtlsAuthenticatedMatcher(auth, factory_context), true, conn);
+
+  // Correct type but wrong name.
+  name = "wrong";
+  ASN1_STRING_set(san.d.dNSName, name.data(), name.length());
+  checkMatcher(MtlsAuthenticatedMatcher(auth, factory_context), false, conn);
+}
+
 TEST(MetadataMatcher, MetadataMatcher) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Envoy::Network::MockConnection conn;

@@ -3,6 +3,7 @@
 #include <openssl/stack.h>
 
 #include "source/common/common/hex.h"
+#include "source/common/tls/cert_validator/san_matcher.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -208,6 +209,31 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateCh
         }
         return result;
       });
+}
+
+bool ConnectionInfoImplBase::peerCertificateSanMatches(
+    const Extensions::TransportSockets::Tls::SanMatcher& matcher) const {
+  const bssl::UniquePtr<GENERAL_NAMES>& sans =
+      getCachedValueOrCreate<bssl::UniquePtr<GENERAL_NAMES>>(
+          CachedValueTag::PeerCertificateSanMatches,
+          [](SSL* ssl) -> bssl::UniquePtr<GENERAL_NAMES> {
+            bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+            if (!cert) {
+              return nullptr;
+            }
+            return bssl::UniquePtr<GENERAL_NAMES>(static_cast<GENERAL_NAMES*>(
+                X509_get_ext_d2i(cert.get(), NID_subject_alt_name, nullptr, nullptr)));
+          });
+
+  if (sans != nullptr) {
+    for (const GENERAL_NAME* san : sans.get()) {
+      if (matcher.match(san)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::uriSanPeerCertificate() const {
