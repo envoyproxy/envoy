@@ -35,17 +35,6 @@ public:
   Server::Configuration::ServerFactoryContext& context_;
 };
 
-class AwsManagedClusterUpdateCallbacksHandleDeleter {
-public:
-  void operator()(AwsManagedClusterUpdateCallbacksHandle* handle) {
-    if (handle->context_.clusterManager().isShutdown()) {
-      if (handle != nullptr) {
-        handle->cancel();
-      }
-    }
-    delete handle;
-  }
-};
 using AwsManagedClusterUpdateCallbacksHandlePtr =
     std::unique_ptr<AwsManagedClusterUpdateCallbacksHandle>;
 
