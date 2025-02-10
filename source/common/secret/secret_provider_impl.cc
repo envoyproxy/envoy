@@ -56,7 +56,7 @@ ThreadLocalGenericSecretProvider::ThreadLocalGenericSecretProvider(
   if (const auto* secret = provider_->secret(); secret != nullptr) {
     auto value_or_error = Config::DataSource::read(secret->secret(), true, api_);
     SET_AND_RETURN_IF_NOT_OK(value_or_error.status(), creation_status);
-    value = *value_or_error;
+    value = std::move(value_or_error.value());
   }
   tls_->set([value = std::move(value)](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalSecret>(value);
@@ -71,7 +71,7 @@ absl::Status ThreadLocalGenericSecretProvider::update() {
   if (const auto* secret = provider_->secret(); secret != nullptr) {
     auto value_or_error = Config::DataSource::read(secret->secret(), true, api_);
     RETURN_IF_NOT_OK_REF(value_or_error.status());
-    value = *value_or_error;
+    value = std::move(value_or_error.value());
   }
   tls_->runOnAllThreads(
       [value = std::move(value)](OptRef<ThreadLocalSecret> tls) { tls->value_ = value; });
