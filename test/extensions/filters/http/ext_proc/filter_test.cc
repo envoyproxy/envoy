@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/http/ext_proc/save_processing_response/v3/save_processing_response.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -14,10 +15,9 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
+#include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 #include "source/extensions/http/ext_proc/save_processing_response/save_processing_response.h"
 #include "source/extensions/http/ext_proc/save_processing_response/save_processing_response_factory.h"
-#include "envoy/extensions/http/ext_proc/save_processing_response/v3/save_processing_response.pb.h"
-#include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/conn_manager_impl_test_base.h"

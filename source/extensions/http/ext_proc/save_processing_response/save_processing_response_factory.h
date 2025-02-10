@@ -1,8 +1,9 @@
 #pragma once
 
-#include "envoy/server/factory_context.h"
 #include "envoy/extensions/http/ext_proc/save_processing_response/v3/save_processing_response.pb.h"
 #include "envoy/extensions/http/ext_proc/save_processing_response/v3/save_processing_response.pb.validate.h"
+#include "envoy/server/factory_context.h"
+
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 #include "source/extensions/http/ext_proc/save_processing_response/save_processing_response.h"
 

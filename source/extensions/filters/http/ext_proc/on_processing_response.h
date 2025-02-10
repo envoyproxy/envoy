@@ -7,6 +7,7 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stream_info/stream_info.h"
+
 #include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
