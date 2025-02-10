@@ -2,6 +2,7 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/network/socket.h"
+#include "envoy/server/factory_context.h"
 
 #include "quiche/quic/core/connection_id_generator.h"
 #include "quiche/quic/load_balancer/load_balancer_encoder.h"
@@ -57,7 +58,8 @@ public:
    * Returns a connection ID factory based on the given config.
    */
   virtual EnvoyQuicConnectionIdGeneratorFactoryPtr
-  createQuicConnectionIdGeneratorFactory(const Protobuf::Message& config) PURE;
+  createQuicConnectionIdGeneratorFactory(const Protobuf::Message& config,
+                                         Server::Configuration::FactoryContext& context) PURE;
 };
 
 } // namespace Quic
