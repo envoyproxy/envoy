@@ -2,6 +2,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
@@ -58,8 +59,12 @@ public:
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
-    const std::string dns_start = "envoy.dynamic_forward_proxy.dns_start_ms";
-    const std::string dns_end = "envoy.dynamic_forward_proxy.dns_end_ms";
+    std::string dns_start = "envoy.dynamic_forward_proxy.dns_start_ms";
+    std::string dns_end = "envoy.dynamic_forward_proxy.dns_end_ms";
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+      dns_start = "envoy.router.host_selection_start_ms";
+      dns_end = "envoy.router.host_selection_end_ms";
+    }
     StreamInfo::StreamInfo& stream_info = decoder_callbacks_->streamInfo();
     const StreamInfo::StreamInfo& conn_stream_info = decoder_callbacks_->connection()->streamInfo();
 

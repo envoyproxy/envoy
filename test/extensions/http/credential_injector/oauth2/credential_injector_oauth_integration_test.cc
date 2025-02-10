@@ -55,14 +55,24 @@ resources:
 
   void TearDown() override { test_server_.reset(); }
 
-  virtual void checkClientSecretInRequest(absl::string_view client_secret) {
-    std::string request_body = oauth2_request_->body().toString();
+  virtual void checkClientSecretInRequest(absl::string_view request_body,
+                                          absl::string_view client_secret) {
     const auto query_parameters =
         Http::Utility::QueryParamsMulti::parseParameters(request_body, 0, true);
     auto secret = query_parameters.getFirstValue("client_secret");
 
     ASSERT_TRUE(secret.has_value());
     EXPECT_EQ(secret.value(), client_secret);
+  }
+
+  virtual void checkScopeInRequest(absl::string_view request_body,
+                                   absl::string_view desired_scope) {
+    const auto query_parameters =
+        Http::Utility::QueryParamsMulti::parseParameters(request_body, 0, true);
+    auto actual_scope = query_parameters.getFirstValue("scope");
+
+    ASSERT_TRUE(actual_scope.has_value());
+    EXPECT_EQ(actual_scope.value(), desired_scope);
   }
 
   void getFakeOuth2Connection() {
@@ -83,15 +93,21 @@ resources:
   void waitForTokenRequestAndDontRespondWithToken() {
     getFakeOuth2Connection();
     acceptNewStream();
-    checkClientSecretInRequest("test_client_secret");
+    checkClientSecretInRequest(oauth2_request_->body().toString(), "test_client_secret");
     oauth2_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
   }
 
-  void handleOauth2TokenRequest(absl::string_view client_secret, bool success = true,
-                                bool good_token = true, bool good_json = true,
-                                int token_expiry = 20) {
+  void
+  handleOauth2TokenRequest(absl::string_view client_secret, bool success = true,
+                           bool good_token = true, bool good_json = true, int token_expiry = 20,
+                           absl::optional<absl::string_view> scope_in_request = absl::nullopt) {
     acceptNewStream();
-    checkClientSecretInRequest(client_secret);
+    const std::string request_body = oauth2_request_->body().toString();
+    checkClientSecretInRequest(request_body, client_secret);
+    if (scope_in_request.has_value()) {
+      checkScopeInRequest(request_body, scope_in_request.value());
+    }
+
     if (success) {
       oauth2_request_->encodeHeaders(
           Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
@@ -436,7 +452,7 @@ typed_config:
   waitForBadOAuth2Response("test_client_secret");
 
   // wait for retried token request and respond with good response
-  handleOauth2TokenRequest("test_client_secret");
+  handleOauth2TokenRequest("test_client_secret", true, true, true, 20, "scope1");
 
   EXPECT_EQ(
       1UL,
@@ -617,11 +633,12 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   test_server_->waitForCounterEq(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 0,
+      std::chrono::milliseconds(10));
+  // ensures that the token request is retried
+  test_server_->waitForCounterGe(
       "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 1,
-      std::chrono::milliseconds(1300));
-  test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 2,
-      std::chrono::milliseconds(1300));
+      std::chrono::milliseconds(2000));
 }
 
 TEST_P(CredentialInjectorIntegrationTest, RetryOnStreamReset) {

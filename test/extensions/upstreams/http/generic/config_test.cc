@@ -24,24 +24,26 @@ protected:
   Upstream::ResourcePriority priority_ = Upstream::ResourcePriority::Default;
   Upstream::HostConstSharedPtr host_;
   GenericGenericConnPoolFactory factory_;
+  ProtobufTypes::MessagePtr message_{new Envoy::ProtobufWkt::Struct()};
 };
 
 TEST_F(GenericGenericConnPoolFactoryTest, CreateValidHttpConnPool) {
-  EXPECT_TRUE(factory_.createGenericConnPool(nullptr, thread_local_cluster_,
-                                             Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
-                                             priority_, Envoy::Http::Protocol::Http2, nullptr));
+  EXPECT_TRUE(factory_.createGenericConnPool(
+      nullptr, thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::HTTP,
+      priority_, Envoy::Http::Protocol::Http2, nullptr, *message_));
 }
 
 TEST_F(GenericGenericConnPoolFactoryTest, CreateValidTcpConnPool) {
-  EXPECT_TRUE(factory_.createGenericConnPool(nullptr, thread_local_cluster_,
-                                             Router::GenericConnPoolFactory::UpstreamProtocol::TCP,
-                                             priority_, Envoy::Http::Protocol::Http2, nullptr));
+  EXPECT_TRUE(factory_.createGenericConnPool(
+      nullptr, thread_local_cluster_, Router::GenericConnPoolFactory::UpstreamProtocol::TCP,
+      priority_, Envoy::Http::Protocol::Http2, nullptr, *message_));
 }
 
 TEST_F(GenericGenericConnPoolFactoryTest, CreateValidUdpConnPool) {
   EXPECT_TRUE(factory_.createGenericConnPool(thread_local_cluster_.lb_.host_, thread_local_cluster_,
                                              Router::GenericConnPoolFactory::UpstreamProtocol::UDP,
-                                             priority_, Envoy::Http::Protocol::Http2, nullptr));
+                                             priority_, Envoy::Http::Protocol::Http2, nullptr,
+                                             *message_));
 }
 
 TEST_F(GenericGenericConnPoolFactoryTest, InvalidConnPool) {
@@ -49,7 +51,7 @@ TEST_F(GenericGenericConnPoolFactoryTest, InvalidConnPool) {
   EXPECT_FALSE(factory_.createGenericConnPool(
       nullptr, thread_local_cluster_,
       static_cast<Router::GenericConnPoolFactory::UpstreamProtocol>(0xff), priority_,
-      Envoy::Http::Protocol::Http2, nullptr));
+      Envoy::Http::Protocol::Http2, nullptr, *message_));
 }
 
 } // namespace Generic

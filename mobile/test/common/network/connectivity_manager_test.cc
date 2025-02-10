@@ -242,5 +242,23 @@ TEST_F(ConnectivityManagerTest, IgnoresDuplicatedProxySettingsUpdates) {
   EXPECT_EQ(proxy_settings1, connectivity_manager_->getProxySettings());
 }
 
+TEST_F(ConnectivityManagerTest, NetworkChangeResultsInDifferentSocketOptionsHash) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_network_type_socket_option", true);
+  auto options1 = std::make_shared<Socket::Options>();
+  connectivity_manager_->addUpstreamSocketOptions(options1);
+  std::vector<uint8_t> hash1;
+  for (const auto& option : *options1) {
+    option->hashKey(hash1);
+  }
+  ConnectivityManagerImpl::setPreferredNetwork(64);
+  auto options2 = std::make_shared<Socket::Options>();
+  connectivity_manager_->addUpstreamSocketOptions(options2);
+  std::vector<uint8_t> hash2;
+  for (const auto& option : *options2) {
+    option->hashKey(hash2);
+  }
+  EXPECT_NE(hash1, hash2);
+}
+
 } // namespace Network
 } // namespace Envoy

@@ -75,9 +75,14 @@ public:
     absl::MutexLock lock(&lock_);
     return body_.length();
   }
-  Buffer::Instance& body() {
+  // Returns a buffer containing the data that was received since the last
+  // invocation of `body()` or since the stream first received data.
+  Buffer::OwnedImpl body() {
     absl::MutexLock lock(&lock_);
-    return body_;
+    Buffer::OwnedImpl body_ret;
+    body_ret.move(body_);
+    ASSERT(body_.length() == 0);
+    return body_ret;
   }
   bool complete() {
     absl::MutexLock lock(&lock_);
@@ -159,6 +164,11 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForReset(Event::Dispatcher& client_dispatcher,
+               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // gRPC convenience methods.
   void startGrpcStream(bool send_headers = true);

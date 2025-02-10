@@ -78,6 +78,7 @@ public:
 
   Upstream::MockHost& mockHost() { return static_cast<Upstream::MockHost&>(*host_); }
 
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Quic::PersistentQuicInfoImpl quic_info_{dispatcher_, 45};
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
@@ -99,7 +100,6 @@ public:
   std::unique_ptr<Http3ConnPoolImpl> pool_;
   MockPoolConnectResultCallback connect_result_callback_;
   std::shared_ptr<Network::MockSocketOption> socket_option_{new Network::MockSocketOption()};
-  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   absl::Status creation_status_;
   bool happy_eyeballs_ = false;
 };

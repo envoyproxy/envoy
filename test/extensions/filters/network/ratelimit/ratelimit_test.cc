@@ -560,8 +560,11 @@ stat_prefix: name
 
   EXPECT_CALL(factory_context.server_factory_context_.cluster_manager_.thread_local_cluster_,
               chooseHost(_))
-      .WillRepeatedly(Return(factory_context.server_factory_context_.cluster_manager_
-                                 .thread_local_cluster_.lb_.host_));
+      .WillRepeatedly(Invoke([&] {
+        return Upstream::HostSelectionResponse{
+            factory_context.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_
+                .host_};
+      }));
   EXPECT_CALL(factory_context.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool)));

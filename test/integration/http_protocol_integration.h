@@ -86,11 +86,19 @@ public:
     setUpstreamProtocol(GetParam().upstream_protocol);
   }
 
+  void initialize() override {
+    if (async_lb_) {
+      config_helper_.setAsyncLb();
+    }
+    HttpIntegrationTest::initialize();
+  }
+
   void setDownstreamOverrideStreamErrorOnInvalidHttpMessage();
   void setUpstreamOverrideStreamErrorOnInvalidHttpMessage();
 
 protected:
   const bool use_universal_header_validator_{false};
+  bool async_lb_ = true;
 };
 
 class UpstreamDownstreamIntegrationTest
@@ -149,7 +157,15 @@ public:
     testing_downstream_filter_ = std::get<1>(GetParam());
   }
 
+  void initialize() override {
+    if (async_lb_) {
+      config_helper_.setAsyncLb();
+    }
+    HttpIntegrationTest::initialize();
+  }
+
   bool testing_downstream_filter_;
+  bool async_lb_ = true;
 };
 
 } // namespace Envoy

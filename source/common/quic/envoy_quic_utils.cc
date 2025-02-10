@@ -217,9 +217,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   }
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_receive_ecn")) {
-    connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
-  }
+  connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
   if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
   }
@@ -393,14 +391,6 @@ void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProto
   quic_config.SetInitialSessionFlowControlWindowToSend(
       std::max(quic::kMinimumFlowControlSendWindow,
                static_cast<quic::QuicByteCount>(session_flow_control_window_to_send)));
-}
-
-void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
-                                     const quic::QuicConnectionId& old_connection_id) {
-  char* new_connection_id_data = new_connection_id.mutable_data();
-  const char* old_connection_id_ptr = old_connection_id.data();
-  // Override the first 4 bytes of the new CID to the original CID's first 4 bytes.
-  memcpy(new_connection_id_data, old_connection_id_ptr, 4); // NOLINT(safe-memcpy)
 }
 
 quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte) {

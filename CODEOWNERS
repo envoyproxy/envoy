@@ -60,7 +60,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @ggreenway
 # sni_dynamic_forward_proxy extension
-/*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @soulxu
+/*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @UNOWNED
 # tracers.datadog extension
 /*/extensions/tracers/datadog @dmehala @mattklein123
 # tracers.xray extension
@@ -143,7 +143,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/resource_monitors/common @eziskind @yanavlasov @nezdolik
 /*/extensions/resource_monitors/fixed_heap @eziskind @yanavlasov @nezdolik
 /*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
-/*/extensions/resource_monitors/cpu_utilization @cancecen @kbaichoo
+/*/extensions/resource_monitors/cpu_utilization @cancecen @kbaichoo @nix1n
 /*/extensions/retry/priority @alyssawilk @mattklein123
 /*/extensions/retry/priority/previous_priorities @alyssawilk @mattklein123
 /*/extensions/retry/host @alyssawilk @mattklein123
@@ -192,7 +192,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # dynamic metadata input
 /*/extensions/matching/http/metadata_input @vikaschoudhary16 @kyessenov
 # user space socket pair, event, connection and listener
-/*/extensions/io_socket/user_space @kyessenov @lambdai @soulxu
+/*/extensions/io_socket/user_space @kyessenov @lambdai
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
 # Default UUID4 request ID extension
 /*/extensions/request_id/uuid @mattklein123 @alyssawilk
@@ -266,7 +266,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/network/local_ratelimit @mattklein123 @wbpcode
 /*/extensions/filters/listener/local_ratelimit @mattklein123 @JuniorHsu
 # proxy protocol
-/*/extensions/filters/listener/proxy_protocol @ggreenway @soulxu
+/*/extensions/filters/listener/proxy_protocol @ggreenway @UNOWNED
 # access loggers
 /*/extensions/access_loggers/fluentd @ohadvano @wbpcode
 /*/extensions/access_loggers/grpc @wbpcode @cpakulski @giantcroc @gyohuangxin
@@ -339,7 +339,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # String matching extensions
 /*/extensions/string_matcher/ @ggreenway @cpakulski
 # Header mutation
-/*/extensions/filters/http/header_mutation @wbpcode @yanavlasov @soulxu
+/*/extensions/filters/http/header_mutation @wbpcode @yanavlasov
 # Health checkers
 /*/extensions/health_checkers/grpc @zuercher @botengyao
 /*/extensions/health_checkers/http @zuercher @botengyao
@@ -355,7 +355,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Match delegate extension
 /*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
 # Generic proxy and related extensions
-/*/extensions/filters/network/generic_proxy/ @wbpcode @soulxu
+/*/extensions/filters/network/generic_proxy/ @wbpcode @UNOWNED
 # Dynamic Modules
 /*/extensions/dynamic_modules @mattklein123 @mathetake @marc-barry
 /*/extensions/filters/http/dynamic_modules @mattklein123 @mathetake @marc-barry
@@ -413,3 +413,4 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /contrib/dlb @mattklein123 @daixiang0
 /contrib/qat/ @giantcroc @soulxu
 /contrib/generic_proxy/ @wbpcode @UNOWNED
+/contrib/tap_sinks/ @coolg92003 @yiyibaoguo

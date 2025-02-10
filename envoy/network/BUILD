@@ -148,6 +148,7 @@ envoy_cc_library(
         "//envoy/api:os_sys_calls_interface",
         "//envoy/buffer:buffer_interface",
         "//envoy/event:file_event_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "@com_google_absl//absl/types:optional",
     ],

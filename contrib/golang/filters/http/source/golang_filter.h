@@ -234,7 +234,7 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoding_state_.setDecoderFilterCallbacks(callbacks);
-    // We initilizes dispatcher as soon as it is available.
+    // We initializes dispatcher as soon as it is available.
     dispatcher_ = &callbacks.dispatcher();
   }
 
