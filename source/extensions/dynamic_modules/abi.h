@@ -836,6 +836,16 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
 
+// ------------------- Misc Callbacks for HTTP Filters -------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_clear_route_cache is called by the module to clear the route
+ * cache for the HTTP filter. This is useful when the module wants to make their own routing
+ * decision. This will be a no-op when it's called in the wrong phase.
+ */
+void envoy_dynamic_module_callback_http_clear_route_cache(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
 #ifdef __cplusplus
 }
 #endif
