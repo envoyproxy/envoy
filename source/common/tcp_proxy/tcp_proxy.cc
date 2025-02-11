@@ -822,13 +822,14 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
 
     // Buffer data received before upstream connection exists.
     early_data_buffer_.move(data);
-    
-    // TCP_PROXY cannot correctly make a decision on the amount of data 
-    // the preceding filters need to read before the upstream connection is established. 
+
+    // TCP_PROXY cannot correctly make a decision on the amount of data
+    // the preceding filters need to read before the upstream connection is established.
     // Hence, to protect the early data buffer, TCP_PROXY read disables the downstream on
-    // receiving the first chunk of data. The filter setting the receive_before_connect state should have a limit on the
-    // amount of data it needs to read before the upstream connection is established and pause the filter chain (by returning `StopIteration`)
-    // till it has read the data it needs or a max limit has been reached.
+    // receiving the first chunk of data. The filter setting the receive_before_connect state should
+    // have a limit on the amount of data it needs to read before the upstream connection is
+    // established and pause the filter chain (by returning `StopIteration`) till it has read the
+    // data it needs or a max limit has been reached.
     read_callbacks_->connection().readDisable(true);
 
     config_->stats().early_data_received_count_total_.inc();
