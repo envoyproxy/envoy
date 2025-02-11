@@ -1,4 +1,6 @@
 #include "envoy/http/header_map.h"
+#include "envoy/http/protocol.h"
+#include "envoy/router/router.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
@@ -29,7 +31,10 @@ namespace Upstreams {
 namespace Http {
 namespace Udp {
 
+using ::testing::Eq;
+using ::testing::Invoke;
 using ::testing::NiceMock;
+using ::testing::NotNull;
 using ::testing::Return;
 
 class UdpUpstreamTest : public ::testing::Test {
@@ -248,6 +253,36 @@ TEST_F(UdpConnPoolTest, BindFailure) {
       &mock_os_sys_calls);
   EXPECT_CALL(mock_os_sys_calls, bind).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   udp_conn_pool_->newStream(&mock_callback_);
+}
+
+TEST_F(UdpConnPoolTest, ConnectionInfoProviderHasRemoteAddress) {
+  EXPECT_CALL(mock_callback_, upstreamToDownstream);
+  NiceMock<Network::MockConnection> downstream_connection_;
+  EXPECT_CALL(mock_callback_.upstream_to_downstream_, connection)
+      .WillRepeatedly(
+          Return(Envoy::OptRef<const Envoy::Network::Connection>(downstream_connection_)));
+
+  Network::ConnectionInfoProvider* connection_info_provider = nullptr;
+  auto capture_connection_info_provider =
+      [&connection_info_provider](
+          std::unique_ptr<Envoy::Router::GenericUpstream>&&,
+          Upstream::HostDescriptionConstSharedPtr,
+          const Network::ConnectionInfoProvider& connection_info_provider_ref,
+          StreamInfo::StreamInfo&, absl::optional<Envoy::Http::Protocol>) {
+        connection_info_provider =
+            &(const_cast<Network::ConnectionInfoProvider&>(connection_info_provider_ref));
+      };
+  EXPECT_CALL(mock_callback_, onPoolReady).WillOnce(Invoke(capture_connection_info_provider));
+  // Mock syscall to make the bind call succeed.
+  NiceMock<Envoy::Api::MockOsSysCalls> mock_os_sys_calls;
+  Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_sys_calls(
+      &mock_os_sys_calls);
+  EXPECT_CALL(mock_os_sys_calls, bind).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  udp_conn_pool_->newStream(&mock_callback_);
+
+  ASSERT_THAT(connection_info_provider, NotNull());
+  ASSERT_THAT(connection_info_provider->remoteAddress(), NotNull());
+  EXPECT_THAT(connection_info_provider->remoteAddress()->asStringView(), Eq("127.0.0.1:80"));
 }
 
 } // namespace Udp
