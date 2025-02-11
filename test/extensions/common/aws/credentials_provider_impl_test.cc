@@ -2578,23 +2578,23 @@ public:
   MOCK_METHOD(
       CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
       (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
-       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&),
-      (const));
+       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&)
+      );
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
               (Api::Api&, ServerFactoryContextOptRef, AwsClusterManagerOptRef,
                const MetadataCredentialsProviderBase::CurlMetadataFetcher&, CreateMetadataFetcherCb,
                absl::string_view, absl::string_view,
                MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
-               absl::string_view),
-              (const));
+               absl::string_view)
+              );
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
               (Api::Api&, ServerFactoryContextOptRef, AwsClusterManagerOptRef,
                const MetadataCredentialsProviderBase::CurlMetadataFetcher&, CreateMetadataFetcherCb,
                MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
-               absl::string_view),
-              (const));
+               absl::string_view)
+              );
 };
 
 class MockCustomCredentialsProviderChainFactories : public CustomCredentialsProviderChainFactories {
@@ -2615,8 +2615,8 @@ public:
   MOCK_METHOD(
       CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
       (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
-       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&),
-      (const));
+       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&)
+      );
 };
 
 class DefaultCredentialsProviderChainTest : public testing::Test {
@@ -3096,6 +3096,7 @@ TEST_F(AsyncCredentialHandlingTest, CallbacksCalledWhenCredentialsReturned) {
   MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
       MetadataFetcher::MetadataReceiver::RefreshState::Ready;
   std::chrono::seconds initialization_timer = std::chrono::seconds(2);
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
       {};

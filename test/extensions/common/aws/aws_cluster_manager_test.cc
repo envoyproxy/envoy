@@ -219,53 +219,6 @@ TEST_F(AwsClusterManagerTest, OnClusterRemovalCoverage) {
   manager_friend.onClusterRemoval("cluster_1");
 }
 
-// Cluster callbacks should not be added for non-existent clusters
-TEST_F(AwsClusterManagerTest, CantAddCallbacksForNonExistentCluster) {
-
-  auto aws_cluster_manager = std::make_shared<AwsClusterManagerImpl>(context_);
-  auto callbacks1 = std::make_unique<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
-  auto status = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks1);
-  EXPECT_EQ(absl::StatusCode::kInvalidArgument, status.status().code());
-}
-
-// If the cluster is online, then adding a callback should trigger the callback immediately
-TEST_F(AwsClusterManagerTest, CallbacksTriggeredImmediatelyWhenClusterIsLive) {
-  auto aws_cluster_manager = std::make_shared<AwsClusterManagerImpl>(context_);
-  auto status = aws_cluster_manager->addManagedCluster(
-      "cluster_1",
-      envoy::config::cluster::v3::Cluster::DiscoveryType::Cluster_DiscoveryType_STRICT_DNS,
-      "new_url");
-  auto manager_friend = AwsClusterManagerFriend(aws_cluster_manager);
-  auto command = Upstream::ThreadLocalClusterCommand();
-  manager_friend.onClusterAddOrUpdate("cluster_1", command);
-  auto callbacks1 = std::make_unique<NiceMock<MockAwsManagedClusterUpdateCallbacks>>();
-  EXPECT_CALL(*callbacks1, onClusterAddOrUpdate);
-  auto status1 = aws_cluster_manager->addManagedClusterUpdateCallbacks("cluster_1", *callbacks1);
-}
-
-// Cluster manager cannot add a cluster
-TEST_F(AwsClusterManagerTest, ClusterManagerCannotAdd) {
-  EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cm_));
-  EXPECT_CALL(cm_, addOrUpdateCluster(_, _, _)).WillOnce(Return(absl::InternalError("")));
-  EXPECT_CALL(context_.init_manager_, state())
-      .WillRepeatedly(Return(Envoy::Init::Manager::State::Initialized));
-
-  auto aws_cluster_manager = std::make_shared<AwsClusterManagerImpl>(context_);
-  auto status = aws_cluster_manager->addManagedCluster(
-      "cluster_1",
-      envoy::config::cluster::v3::Cluster::DiscoveryType::Cluster_DiscoveryType_STRICT_DNS,
-      "new_url");
-  EXPECT_EQ(absl::StatusCode::kInternal, status.code());
-  EXPECT_FALSE(aws_cluster_manager->getUriFromClusterName("cluster_1").ok());
-}
-
-// Noop test for coverage
-TEST_F(AwsClusterManagerTest, OnClusterRemovalCoverage) {
-  auto aws_cluster_manager = std::make_shared<AwsClusterManagerImpl>(context_);
-  auto manager_friend = AwsClusterManagerFriend(aws_cluster_manager);
-  manager_friend.onClusterRemoval("cluster_1");
-}
-
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

@@ -39,6 +39,7 @@ public:
 
   MOCK_METHOD(Credentials, getCredentials, ());
   MOCK_METHOD(bool, credentialsPending, (CredentialsPendingCallback &&));
+  MOCK_METHOD(std::string, providerName, ());
 };
 
 class MockSigner : public Signer {
