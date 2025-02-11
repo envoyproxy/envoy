@@ -5,4 +5,4 @@ External Processing Extensions
    :glob:
    :maxdepth: 2
 
-   ../../extensions/http/ext_proc/*/v3/*
+   ../../extensions/http/ext_proc/*/*/v3/*

@@ -1,6 +1,6 @@
-#include "source/extensions/http/ext_proc/save_processing_response/save_processing_response.h"
+#include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response.h"
 
-#include "envoy/extensions/http/ext_proc/save_processing_response/v3/save_processing_response.pb.h"
+#include "envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3/save_processing_response.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
@@ -8,7 +8,11 @@ namespace Http {
 namespace ExternalProcessing {
 
 SaveProcessingResponse::SaveProcessingResponse(const SaveProcessingResponseProto& config)
-    : save_request_headers_(config.save_request_headers()),
+    : filter_state_name_(config.filter_state_name_suffix().empty()
+                             ? SaveProcessingResponseFilterState::kFilterStateName
+                             : absl::StrCat(SaveProcessingResponseFilterState::kFilterStateName,
+                                            ".", config.filter_state_name_suffix())),
+      save_request_headers_(config.save_request_headers()),
       save_response_headers_(config.save_response_headers()),
       save_request_body_(config.save_request_body()),
       save_response_body_(config.save_response_body()),
@@ -23,12 +27,11 @@ void SaveProcessingResponse::addToFilterState(
   if (status.ok() || save_on_error_) {
     SaveProcessingResponseFilterState* filter_state =
         stream_info.filterState()->getDataMutable<SaveProcessingResponseFilterState>(
-            SaveProcessingResponseFilterState::kFilterStateName);
+            filter_state_name_);
     if (filter_state == nullptr) {
       auto shared_filter_state = std::make_shared<SaveProcessingResponseFilterState>();
       filter_state = shared_filter_state.get();
-      stream_info.filterState()->setData(SaveProcessingResponseFilterState::kFilterStateName,
-                                         shared_filter_state,
+      stream_info.filterState()->setData(filter_state_name_, shared_filter_state,
                                          Envoy::StreamInfo::FilterState::StateType::Mutable);
     }
 

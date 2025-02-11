@@ -14,8 +14,8 @@ namespace ExternalProcessing {
 class SaveProcessingResponseFactory
     : public Envoy::Extensions::HttpFilters::ExternalProcessing::OnProcessingResponseFactory {
 public:
-  using SaveProcessingResponseProto =
-      envoy::extensions::http::ext_proc::save_processing_response::v3::SaveProcessingResponse;
+  using SaveProcessingResponseProto = envoy::extensions::http::ext_proc::response_processors::
+      save_processing_response::v3::SaveProcessingResponse;
   ~SaveProcessingResponseFactory() override = default;
 
   std::unique_ptr<Envoy::Extensions::HttpFilters::ExternalProcessing::OnProcessingResponse>
@@ -24,7 +24,7 @@ public:
                              const std::string&) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::extensions::http::ext_proc::
+    return ProtobufTypes::MessagePtr{new envoy::extensions::http::ext_proc::response_processors::
                                          save_processing_response::v3::SaveProcessingResponse()};
   }
 

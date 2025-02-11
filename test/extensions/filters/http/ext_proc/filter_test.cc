@@ -2,7 +2,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "envoy/extensions/http/ext_proc/save_processing_response/v3/save_processing_response.pb.h"
+#include "envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3/save_processing_response.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -16,8 +16,8 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
-#include "source/extensions/http/ext_proc/save_processing_response/save_processing_response.h"
-#include "source/extensions/http/ext_proc/save_processing_response/save_processing_response_factory.h"
+#include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response.h"
+#include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response_factory.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/conn_manager_impl_test_base.h"
@@ -5395,7 +5395,6 @@ TEST_F(HttpFilterTest, OnProcessingResponseHeaders) {
 })EOF",
                             expected_response_headers);
 
-  std::cout << response_headers_struct_metadata.DebugString();
   EXPECT_TRUE(
       TestUtility::protoEqual(response_headers_struct_metadata, expected_response_headers, true));
 
@@ -5422,7 +5421,7 @@ TEST_F(HttpFilterTest, SaveProcessingResponseHeaders) {
   on_processing_response:
     name: "abc"
     typed_config:
-      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.save_processing_response.v3.SaveProcessingResponse
+      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
       save_request_headers: true
       save_response_headers: true
   )EOF");
@@ -5642,7 +5641,6 @@ TEST_F(HttpFilterTest, OnProcessingResponseBodies) {
   const auto& response_body_struct_metadata =
       dynamic_metadata_.filter_metadata().at("envoy.test.ext_proc.response_body_response");
   ProtobufWkt::Struct expected_response_body;
-  std::cout << response_body_struct_metadata.DebugString();
   TestUtility::loadFromJson(R"EOF(
 {
   "body": "Hello, World!"
@@ -5676,7 +5674,7 @@ TEST_F(HttpFilterTest, SaveProcessingResponseBodies) {
   on_processing_response:
     name: "abc"
     typed_config:
-      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.save_processing_response.v3.SaveProcessingResponse
+      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
       save_request_body: true
       save_response_body: true
   )EOF");
@@ -5788,7 +5786,7 @@ TEST_F(HttpFilterTest, SaveImmediateResponse) {
   on_processing_response:
     name: "abc"
     typed_config:
-      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.save_processing_response.v3.SaveProcessingResponse
+      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
       save_immediate_response: true
   )EOF");
 
@@ -5888,6 +5886,133 @@ TEST_F(HttpFilterTest, SaveImmediateResponse) {
   expectFilterState(Envoy::ProtobufWkt::Struct());
 }
 
+TEST_F(HttpFilterTest, SaveResponseTrailers) {
+  SaveProcessingResponseFactory factory;
+  Envoy::Registry::InjectFactory<OnProcessingResponseFactory> registration(factory);
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  on_processing_response:
+    name: "abc"
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
+      filter_state_name_suffix: "test"
+      save_request_trailers: true
+      save_response_trailers: true
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+
+  const uint32_t chunk_number = 20;
+  sendChunkRequestData(chunk_number, true);
+  const std::string filter_state_name =
+      absl::StrCat(SaveProcessingResponseFilterState::kFilterStateName, ".test");
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+  processRequestTrailers(
+      [](const HttpTrailers&, ProcessingResponse&, TrailersResponse& trailers_resp) {
+        auto headers_mut = trailers_resp.mutable_header_mutation();
+        auto add1 = headers_mut->add_set_headers();
+        add1->mutable_header()->set_key("x-new-header1");
+        add1->mutable_header()->set_raw_value("new");
+        add1->mutable_append()->set_value(false);
+        auto add2 = headers_mut->add_set_headers();
+        add2->mutable_header()->set_key("x-some-other-header1");
+        add2->mutable_header()->set_raw_value("no");
+        add2->mutable_append()->set_value(true);
+        *headers_mut->add_remove_headers() = "x-do-we-want-this";
+      },
+      true);
+  // processRequestTrailers(absl::nullopt, true);
+  auto filter_state = stream_info_.filterState()->getDataMutable<SaveProcessingResponseFilterState>(
+      filter_state_name);
+  ASSERT_EQ(filter_state->responses.size(), 1);
+  envoy::service::ext_proc::v3::ProcessingResponse expected_response;
+  TestUtility::loadFromJson(
+      R"EOF(
+  {
+  "requestTrailers": {
+    "headerMutation": {
+      "setHeaders": [{
+        "header": {
+          "key": "x-new-header1",
+          "rawValue": "bmV3"
+        },
+        "append": false
+      }, {
+        "header": {
+          "key": "x-some-other-header1",
+          "rawValue": "bm8="
+        },
+        "append": true
+      }],
+      "removeHeaders": ["x-do-we-want-this"]
+    }
+  }
+})EOF",
+      expected_response);
+  EXPECT_TRUE(
+      TestUtility::protoEqual(filter_state->responses[0].processing_response, expected_response));
+
+  filter_state->responses.clear();
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+  sendChunkResponseData(chunk_number * 2, true);
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
+  processResponseTrailers(
+      [](const HttpTrailers&, ProcessingResponse&, TrailersResponse& trailers_resp) {
+        auto headers_mut = trailers_resp.mutable_header_mutation();
+        auto* resp_add1 = headers_mut->add_set_headers();
+        resp_add1->mutable_header()->set_key("x-new-header1");
+        resp_add1->mutable_header()->set_raw_value("new");
+      },
+      true);
+  processResponseTrailers(absl::nullopt, false);
+  envoy::service::ext_proc::v3::ProcessingResponse expected_response_trailers;
+  TestUtility::loadFromJson(
+      R"EOF(
+  {
+  "responseTrailers": {
+    "headerMutation": {
+      "setHeaders": [{
+        "header": {
+          "key": "x-new-header1",
+          "rawValue": "bmV3"
+        },
+        "append": false
+      }]
+    }
+  }
+})EOF",
+      expected_response_trailers);
+  EXPECT_TRUE(TestUtility::protoEqual(filter_state->responses[0].processing_response,
+                                      expected_response_trailers));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  // Total gRPC messages include two headers and two trailers on top of the req/resp chunk data.
+  uint32_t total_msg = 3 * chunk_number + 4;
+  EXPECT_EQ(total_msg, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(total_msg, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+
+  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::INBOUND, chunk_number);
+  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::OUTBOUND, 2 * chunk_number);
+}
+
 TEST_F(HttpFilterTest, DontSaveProcessingResponse) {
   SaveProcessingResponseFactory factory;
   Envoy::Registry::InjectFactory<OnProcessingResponseFactory> registration(factory);
@@ -5905,7 +6030,7 @@ TEST_F(HttpFilterTest, DontSaveProcessingResponse) {
   on_processing_response:
     name: "abc"
     typed_config:
-      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.save_processing_response.v3.SaveProcessingResponse
+      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
   )EOF");
 
   HttpTestUtility::addDefaultHeaders(request_headers_);

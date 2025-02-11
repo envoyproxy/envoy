@@ -3,7 +3,7 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/extensions/http/ext_proc/save_processing_response/v3/save_processing_response.pb.h"
+#include "envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3/save_processing_response.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stream_info/filter_state.h"
@@ -21,7 +21,7 @@ struct SaveProcessingResponseFilterState
     : public std::enable_shared_from_this<SaveProcessingResponseFilterState>,
       public Envoy::StreamInfo::FilterState::Object {
   static constexpr absl::string_view kFilterStateName =
-      "envoy.http.ext_proc.save_processing_response.filter_state";
+      "envoy.http.ext_proc.response_processors.save_processing_response";
   struct Response {
     absl::Status processing_status;
     envoy::service::ext_proc::v3::ProcessingResponse processing_response;
@@ -32,8 +32,8 @@ struct SaveProcessingResponseFilterState
 class SaveProcessingResponse
     : public Envoy::Extensions::HttpFilters::ExternalProcessing::OnProcessingResponse {
 public:
-  using SaveProcessingResponseProto =
-      envoy::extensions::http::ext_proc::save_processing_response::v3::SaveProcessingResponse;
+  using SaveProcessingResponseProto = envoy::extensions::http::ext_proc::response_processors::
+      save_processing_response::v3::SaveProcessingResponse;
 
   SaveProcessingResponse(const SaveProcessingResponseProto&);
 
@@ -57,6 +57,8 @@ public:
 private:
   void addToFilterState(const envoy::service::ext_proc::v3::ProcessingResponse& processing_response,
                         absl::Status status, Envoy::StreamInfo::StreamInfo& stream_info);
+
+  const std::string filter_state_name_;
 
   bool save_request_headers_ = false;
   bool save_response_headers_ = false;

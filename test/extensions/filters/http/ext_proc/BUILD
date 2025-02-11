@@ -54,7 +54,7 @@ envoy_extension_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/ext_proc",
         "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
-        "//source/extensions/http/ext_proc/save_processing_response:save_processing_response_lib",
+        "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
         "//test/common/http:common_lib",
         "//test/common/http:conn_manager_impl_test_base_lib",
         "//test/mocks/event:event_mocks",
@@ -67,7 +67,7 @@ envoy_extension_cc_test(
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/http/ext_proc/save_processing_response/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )

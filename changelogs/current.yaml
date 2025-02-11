@@ -161,6 +161,6 @@ new_features:
     feature :ref:`here <arch_overview_dynamic_modules>`.
 - area: ext_proc
   change: |
-    Added an extension to save the response from the external processor to filter state.
+    Added an :ref:`extension <envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse>` to save the :ref:`response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse>` from the external processor to filter state.
 
 deprecated:
