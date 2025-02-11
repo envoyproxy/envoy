@@ -112,7 +112,7 @@ message ProcessingMode {
   }
 
   // How to handle the request header. Default is "SEND". 
-  // Not this field is ignored in :ref:`mode_override
+  // Note this field is ignored in :ref:`mode_override
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`, since mode
   // overrides can only affect messages exchanged after the request header is processed.
   HeaderSendMode request_header_mode = 1 [(validate.rules).enum = {defined_only: true}];
