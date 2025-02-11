@@ -10,7 +10,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3";
 option java_outer_classname = "SaveProcessingResponseProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/ext_proc/response_processor/save_processing_response/v3;save_processing_responsev3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3;save_processing_responsev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
@@ -25,6 +25,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#next-free-field: 11]
 message SaveProcessingResponse {
   string filter_state_name_suffix = 1;
+
   // Save the response to filter state when :ref:`request_headers
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_headers>` is set.
   bool save_request_headers = 2;
