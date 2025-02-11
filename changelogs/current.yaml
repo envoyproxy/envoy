@@ -18,6 +18,10 @@ minor_behavior_changes:
     When :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
     headers/trailers modes have the value ``DEFAULT`` (unset), no change will be made to the processing
     mode set in the filter configuration.
+- area: ext_proc
+  change: |
+    Ignore request_header_mode field of :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+    when comparing the mode_override against allowed_override_modes as request_header mode override is not applicable.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
