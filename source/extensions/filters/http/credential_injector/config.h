@@ -14,8 +14,7 @@ class CredentialInjectorFilterFactory
     : public Common::DualFactoryBase<
           envoy::extensions::filters::http::credential_injector::v3::CredentialInjector> {
 public:
-  CredentialInjectorFilterFactory()
-      : DualFactoryBase("envoy.filters.http.credential_injector") {}
+  CredentialInjectorFilterFactory() : DualFactoryBase("envoy.filters.http.credential_injector") {}
 
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
