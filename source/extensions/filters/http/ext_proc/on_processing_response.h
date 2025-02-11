@@ -18,28 +18,49 @@ namespace ExternalProcessing {
 class OnProcessingResponse {
 public:
   virtual ~OnProcessingResponse() = default;
+
+  // Called after processing the response from the external processor with :ref:`request_headers
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_headers>` set.
   virtual void
   afterProcessingRequestHeaders(const envoy::service::ext_proc::v3::ProcessingResponse& response,
                                 absl::Status processing_status,
                                 Envoy::StreamInfo::StreamInfo&) PURE;
+
+  // Called after processing the response from the external processor with :ref:`response_headers
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_headers>` set.
   virtual void
   afterProcessingResponseHeaders(const envoy::service::ext_proc::v3::ProcessingResponse& response,
                                  absl::Status processing_status,
                                  Envoy::StreamInfo::StreamInfo&) PURE;
+
+  // Called after processing the response from the external processor with :ref:`request_body
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_body>` set.
   virtual void
   afterProcessingRequestBody(const envoy::service::ext_proc::v3::ProcessingResponse& response,
                              absl::Status processing_status, Envoy::StreamInfo::StreamInfo&) PURE;
+
+  // Called after processing the response from the external processor with :ref:`response_body
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_body>` set.
   virtual void
   afterProcessingResponseBody(const envoy::service::ext_proc::v3::ProcessingResponse& response,
                               absl::Status processing_status, Envoy::StreamInfo::StreamInfo&) PURE;
+
+  // Called after processing the response from the external processor with :ref:`request_trailers
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_trailers>` set.
   virtual void
   afterProcessingRequestTrailers(const envoy::service::ext_proc::v3::ProcessingResponse& response,
                                  absl::Status processing_status,
                                  Envoy::StreamInfo::StreamInfo&) PURE;
+
+  // Called after processing the response from the external processor with :ref:`response_trailers
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_trailers>` set.
   virtual void
   afterProcessingResponseTrailers(const envoy::service::ext_proc::v3::ProcessingResponse& response,
                                   absl::Status processing_status,
                                   Envoy::StreamInfo::StreamInfo&) PURE;
+
+  // Called after processing the response from the external processor with :ref:`immediate_response
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>` set.
   virtual void
   afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ProcessingResponse& response,
                                   absl::Status processing_status,
