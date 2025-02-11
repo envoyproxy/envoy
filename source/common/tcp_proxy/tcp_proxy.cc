@@ -817,7 +817,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     upstream_->encodeData(data, end_stream);
     resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   } else if (receive_before_connect_) {
-    ENVOY_CONN_LOG(debug, "Early data received. Length: {}", read_callbacks_->connection(),
+    ENVOY_CONN_LOG(trace, "Early data received. Length: {}", read_callbacks_->connection(),
                    data.length());
 
     // Buffer data received before upstream connection exists.
@@ -825,7 +825,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
     
     // TCP_PROXY cannot correctly make a decision on the amount of data 
     // the preceding filters need to read before the upstream connection is established. 
-    // Hence, to protect the early data buffer, TCP_PROXY read disables the downstream on s
+    // Hence, to protect the early data buffer, TCP_PROXY read disables the downstream on
     // receiving the first chunk of data. The filter setting the receive_before_connect state should have a limit on the
     // amount of data it needs to read before the upstream connection is established and pause the filter chain (by returning `StopIteration`)
     // till it has read the data it needs or a max limit has been reached.
@@ -991,9 +991,9 @@ void Filter::onUpstreamConnection() {
   // the upstream connection.
   if (early_data_buffer_.length() > 0) {
     // Early data should only happen when receive_before_connect is enabled.
-    ASSERT(receive_before_connect_ == true);
+    ASSERT(receive_before_connect_);
 
-    ENVOY_CONN_LOG(debug, "TCP:onUpstreamEvent() Flushing early data buffer to upstream",
+    ENVOY_CONN_LOG(trace, "TCP:onUpstreamEvent() Flushing early data buffer to upstream",
                    read_callbacks_->connection());
     getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(early_data_buffer_.length());
     upstream_->encodeData(early_data_buffer_, early_data_end_stream_);

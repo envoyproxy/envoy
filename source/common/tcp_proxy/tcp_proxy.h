@@ -46,9 +46,9 @@ constexpr absl::string_view PerConnectionIdleTimeoutMs =
     "envoy.tcp_proxy.per_connection_idle_timeout_ms";
 /**
   * ReceiveBeforeConnectKey is the key for the receive_before_connect filter state. The
-  * filter state value is a boolean indicating whether the receive_before_connect functionionality
-  * should be enabled. Network filters setting this filter state should return `StopIteration` in 
-  * their `onNewConnection` and `onData` methods until they have read the data they need before the upstream
+  * filter state value is a ``StreamInfo::BoolAccessor`` indicating whether the receive_before_connect 
+  * functionionality should be enabled. Network filters setting this filter state should return `StopIteration` 
+  * in their `onNewConnection` and `onData` methods until they have read the data they need before the upstream
   * connection establishment, and only then allow the filter chain to proceed upto the TCP_PROXY filter.
 */
 constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_before_connect";
@@ -675,10 +675,11 @@ protected:
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
-  // receive_before_connect stores the ReceiveBeforeConnect filter state value which can be set by preceding
-  // filters in the filter chain. When the filter state is set, TCP_PROXY doesn't disable downstream read 
-  // during initialization. This feature can hence be used by preceding filters in the filter chain to
-  // read data from the downstream connection (for eg: to parse SNI) before the upstream connection is established.
+  // Stores the ReceiveBeforeConnect filter state value which can be set by preceding
+  // filters in the filter chain. When the filter state is set, TCP_PROXY doesn't disable 
+  // downstream read during initialization. This feature can hence be used by preceding filters 
+  // in the filter chain to read data from the downstream connection (for eg: to parse SNI) before 
+  // the upstream connection is established.
   bool receive_before_connect_{false};
   bool early_data_end_stream_{false};
   Buffer::OwnedImpl early_data_buffer_{};
