@@ -127,8 +127,8 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
   auto ext_register_status =
       cel::extensions::RegisterRegexFunctions(builder->GetRegistry(), options);
   if (!ext_register_status.ok()) {
-    throw CelException(
-        absl::StrCat("failed to register extension regex functions: ", ext_register_status.message()));
+    throw CelException(absl::StrCat("failed to register extension regex functions: ",
+                                    ext_register_status.message()));
   }
   return builder;
 }
