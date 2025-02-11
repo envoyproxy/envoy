@@ -519,6 +519,12 @@ bool envoy_dynamic_module_callback_http_drain_response_body(
   });
   return true;
 }
+
+void envoy_dynamic_module_callback_http_clear_route_cache(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  filter->decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
+}
 }
 } // namespace HttpFilters
 } // namespace DynamicModules

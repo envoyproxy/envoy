@@ -475,6 +475,12 @@ pub trait EnvoyHttpFilter {
   /// Note that after changing the response body, it is caller's responsibility to modify the
   /// content-length header if necessary.
   fn append_response_body(&mut self, data: &[u8]) -> bool;
+
+  /// Clear the route cache calculated during a previous phase of the filter chain.
+  ///
+  /// This is useful when the filter wants to force a re-evaluation of the route selection after
+  /// modifying the request headers, etc that affect the routing decision.
+  fn clear_route_cache(&mut self);
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -820,6 +826,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         data.len(),
       )
     }
+  }
+
+  fn clear_route_cache(&mut self) {
+    unsafe { abi::envoy_dynamic_module_callback_http_clear_route_cache(self.raw_ptr) }
   }
 }
 

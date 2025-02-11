@@ -614,6 +614,19 @@ TEST(ABIImpl, ResponseBody) {
   EXPECT_EQ(bufferVectorToString(result_buffer_vector3), "rbaz");
 }
 
+TEST(ABIImpl, ClearRouteCache) {
+  DynamicModuleHttpFilter filter{nullptr};
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter.setDecoderFilterCallbacks(callbacks);
+  Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
+  EXPECT_CALL(downstream_callbacks, clearRouteCache());
+  EXPECT_CALL(callbacks, downstreamCallbacks())
+      .WillOnce(testing::Return(OptRef(downstream_callbacks)));
+  envoy_dynamic_module_callback_http_clear_route_cache(&filter);
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions

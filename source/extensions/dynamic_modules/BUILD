@@ -51,6 +51,7 @@ envoy_cc_library(
             "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_get_response_body_vector_size",
             "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_append_response_body",
             "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_drain_response_body",
+            "-Wl,--export-dynamic-symbol=envoy_dynamic_module_callback_http_clear_route_cache",
         ],
     }),
     deps = [

@@ -7,6 +7,11 @@ fn test_header_callbacks_filter_on_request_headers() {
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
   envoy_filter
+    .expect_clear_route_cache()
+    .return_const(())
+    .once();
+
+  envoy_filter
     .expect_get_request_header_value()
     .withf(|name| name == "single")
     .returning(|_| Some(EnvoyBuffer::new("value")))
