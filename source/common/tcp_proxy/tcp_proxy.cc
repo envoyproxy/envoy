@@ -301,7 +301,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
   ASSERT(getStreamInfo().getDownstreamBytesMeter() == nullptr);
   ASSERT(getStreamInfo().getUpstreamBytesMeter() != nullptr);
 
-  StreamInfo::BoolAccessor* receive_before_connect =
+  const StreamInfo::BoolAccessor* receive_before_connect =
       read_callbacks_->connection()
           .streamInfo()
           .filterState()
