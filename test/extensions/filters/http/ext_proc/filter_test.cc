@@ -5887,6 +5887,59 @@ TEST_F(HttpFilterTest, SaveImmediateResponse) {
 
   expectFilterState(Envoy::ProtobufWkt::Struct());
 }
+
+TEST_F(HttpFilterTest, DontSaveProcessingResponse) {
+  SaveProcessingResponseFactory factory;
+  Envoy::Registry::InjectFactory<OnProcessingResponseFactory> registration(factory);
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  on_processing_response:
+    name: "abc"
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.save_processing_response.v3.SaveProcessingResponse
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(nullptr));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+
+  const uint32_t chunk_number = 20;
+  sendChunkRequestData(chunk_number, true);
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+  processRequestTrailers(absl::nullopt, true);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(true, absl::nullopt);
+  sendChunkResponseData(chunk_number * 2, true);
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->encodeTrailers(response_trailers_));
+  processResponseTrailers(absl::nullopt, false);
+  EXPECT_EQ(stream_info_.filterState()->getDataMutable<SaveProcessingResponseFilterState>(
+                SaveProcessingResponseFilterState::kFilterStateName),
+            nullptr);
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  // Total gRPC messages include two headers and two trailers on top of the req/resp chunk data.
+  uint32_t total_msg = 3 * chunk_number + 4;
+  EXPECT_EQ(total_msg, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(total_msg, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+
+  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::INBOUND, chunk_number);
+  checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::OUTBOUND, 2 * chunk_number);
+}
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters
