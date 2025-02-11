@@ -813,12 +813,12 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectNoEarlyData) {
   upstream_callbacks_->onUpstreamData(response, false);
 }
 
-TEST_P(TcpProxyTest, ReceiveBeforeConnectNotSet) {
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
-  setup(1, config);
+TEST_P(TcpProxyTest, ReceiveBeforeConnectSetToFalse) {
+  setup(1, /*set_redirect_records=*/false, /*receive_before_connect=*/false);
 
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  ASSERT_FALSE(filter_->receive_before_connect_);
 
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
   raiseEventUpstreamConnected(/*conn_index=*/0);
