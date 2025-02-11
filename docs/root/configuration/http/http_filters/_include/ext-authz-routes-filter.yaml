@@ -44,8 +44,8 @@ static_resources:
   clusters:
   - name: ext-authz
     connect_timeout: 0.25s
-    type: logical_dns
-    lb_policy: round_robin
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: ext-authz
       endpoints:

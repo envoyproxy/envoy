@@ -40,7 +40,7 @@ static_resources:
 
   clusters:
   - name: ext-authz
-    type: static
+    type: STATIC
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
