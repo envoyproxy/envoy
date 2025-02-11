@@ -1220,10 +1220,6 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
     return false;
   }
 
-  if (lhs.additional_addresses_size() != rhs.additional_addresses_size()) {
-    return false;
-  }
-
   for (auto i = 0; i < lhs.additional_addresses_size(); i++) {
     auto lhs_addr = lhs.additional_addresses(i);
     auto iter = std::find_if(
@@ -1231,8 +1227,9 @@ bool ListenerMessageUtil::socketOptionsEqual(const envoy::config::listener::v3::
         [&lhs_addr](const envoy::config::listener::v3::AdditionalAddress& addr) {
           return Protobuf::util::MessageDifferencer::Equals(lhs_addr.address(), addr.address());
         });
+    // The address was removed, so we don't consider it a change in the socket options
     if (iter == rhs.additional_addresses().end()) {
-      return false;
+      continue;
     }
 
     if (lhs.additional_addresses(i).has_socket_options() != iter->has_socket_options()) {
