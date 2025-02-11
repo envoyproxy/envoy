@@ -84,7 +84,7 @@ std::string DateFormatter::fromTime(SystemTime time) const {
   const auto epoch_time_ss =
       std::chrono::duration_cast<std::chrono::seconds>(time.time_since_epoch());
 
-  const auto iter = cached_times.find(raw_format_string_, raw_format_hash_);
+  const auto iter = cached_times.find(raw_format_string_);
 
   if (iter == cached_times.end() || iter->second.epoch_time_seconds != epoch_time_ss) {
     // No cached entry found for the given format string and time.
@@ -589,13 +589,12 @@ void StringUtil::escapeToOstream(std::ostream& os, absl::string_view view) {
 std::string StringUtil::sanitizeInvalidHostname(const absl::string_view source) {
   std::string ret_str = std::string(source);
   bool sanitized = false;
-  for (size_t i = 0; i < ret_str.size(); ++i) {
-    if (absl::ascii_isalnum(ret_str[i]) || ret_str[i] == '.' || ret_str[i] == '-' ||
-        ret_str[i] == '_') {
+  for (char& c : ret_str) {
+    if (absl::ascii_isalnum(c) || c == '.' || c == '-' || c == '_') {
       continue;
     }
     sanitized = true;
-    ret_str[i] = '_';
+    c = '_';
   }
 
   if (sanitized) {

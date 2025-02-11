@@ -86,7 +86,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
     : init_manager_(init_manager), live_(false), options_(options),
       validation_context_(options_.allowUnknownStaticFields(),
                           !options.rejectUnknownDynamicFields(),
-                          options.ignoreUnknownDynamicFields()),
+                          options.ignoreUnknownDynamicFields(), options.skipDeprecatedLogs()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),
@@ -125,6 +125,7 @@ InstanceBase::~InstanceBase() {
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
   dispatcher_->shutdown();
+  ENVOY_LOG(debug, "shut down dispatcher");
 
 #ifdef ENVOY_PERFETTO
   if (tracing_session_ != nullptr) {
@@ -751,6 +752,10 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
           serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
           thread_local_);
 
+  // Create the xDS-Manager that will be passed to the cluster manager when it
+  // is initialized below.
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(validation_context_);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
@@ -761,11 +766,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // is constructed as part of the InstanceBase and then populated once
   // cluster_manager_factory_ is available.
   RETURN_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
-
-  // Create the xDS-Manager and pass the cluster manager that was created above.
-  ASSERT(config_.clusterManager());
-  xds_manager_ =
-      std::make_unique<Config::XdsManagerImpl>(*config_.clusterManager(), validation_context_);
 
   // Instruct the listener manager to create the LDS provider if needed. This must be done later
   // because various items do not yet exist when the listener manager is created.
@@ -840,10 +840,11 @@ void InstanceBase::onRuntimeReady() {
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
           *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
       THROW_IF_NOT_OK_REF(factory_or_error.status());
-      hds_delegate_ =
-          maybeCreateHdsDelegate(serverFactoryContext(), *stats_store_.rootScope(),
-                                 factory_or_error.value()->createUncachedRawAsyncClient(),
-                                 stats_store_, *ssl_context_manager_);
+      hds_delegate_ = maybeCreateHdsDelegate(
+          serverFactoryContext(), *stats_store_.rootScope(),
+          THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),
+                                Grpc::RawAsyncClientPtr),
+          stats_store_, *ssl_context_manager_);
     }
     END_TRY
     CATCH(const EnvoyException& e,
@@ -892,7 +893,7 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
       server.messageValidationContext().dynamicValidationVisitor(), server.api());
-  THROW_IF_NOT_OK(loader.status());
+  THROW_IF_NOT_OK_REF(loader.status());
   return std::move(loader.value());
 }
 

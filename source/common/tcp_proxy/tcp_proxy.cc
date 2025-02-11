@@ -93,6 +93,18 @@ Config::WeightedClusterEntry::WeightedClusterEntry(
   }
 }
 
+OnDemandConfig::OnDemandConfig(
+    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand& on_demand_message,
+    Server::Configuration::FactoryContext& context, Stats::Scope& scope)
+    : odcds_(THROW_OR_RETURN_VALUE(
+          context.serverFactoryContext().clusterManager().allocateOdCdsApi(
+              &Upstream::OdCdsApiImpl::create, on_demand_message.odcds_config(),
+              OptRef<xds::core::v3::ResourceLocator>(), context.messageValidationVisitor()),
+          Upstream::OdCdsApiHandlePtr)),
+      lookup_timeout_(
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
+      stats_(generateStats(scope)) {}
+
 OnDemandStats OnDemandConfig::generateStats(Stats::Scope& scope) {
   return {ON_DEMAND_TCP_PROXY_STATS(POOL_COUNTER(scope))};
 }
@@ -151,6 +163,21 @@ Config::SharedConfig::SharedConfig(
   if (config.has_on_demand() && config.on_demand().has_odcds_config()) {
     on_demand_config_ =
         std::make_unique<OnDemandConfig>(config.on_demand(), context, *stats_scope_);
+  }
+
+  if (config.has_backoff_options()) {
+    const uint64_t base_interval_ms =
+        PROTOBUF_GET_MS_REQUIRED(config.backoff_options(), base_interval);
+    const uint64_t max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(config.backoff_options(), max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException(
+          "max_backoff_interval must be greater or equal to base_backoff_interval");
+    }
+
+    backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
+        base_interval_ms, max_interval_ms, context.serverFactoryContext().api().randomGenerator());
   }
 }
 
@@ -243,6 +270,8 @@ Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager
 Filter::~Filter() {
   // Disable access log flush timer if it is enabled.
   disableAccessLogFlushTimer();
+
+  disableRetryTimer();
 
   // Flush the final end stream access log entry.
   flushAccessLog(AccessLog::AccessLogType::TcpConnectionEnd);
@@ -474,12 +503,16 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  const uint32_t max_connect_attempts = config_->maxConnectAttempts();
-  if (connect_attempts_ >= max_connect_attempts) {
-    getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
-    cluster->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
-    onInitFailure(UpstreamFailureReason::ConnectFailed);
-    return Network::FilterStatus::StopIteration;
+  if (!config_->backoffStrategy() &&
+      !Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop")) {
+    const uint32_t max_connect_attempts = config_->maxConnectAttempts();
+    if (connect_attempts_ >= max_connect_attempts) {
+      getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
+      cluster->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
+      onInitFailure(UpstreamFailureReason::ConnectFailed);
+      return Network::FilterStatus::StopIteration;
+    }
   }
 
   auto& downstream_connection = read_callbacks_->connection();
@@ -569,9 +602,13 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
             config_->regexEngine()),
         std::unique_ptr<Http::NullRouteImpl>);
   }
-  generic_conn_pool_ = factory->createGenericConnPool(
-      cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
-      upstream_decoder_filter_callbacks_, getStreamInfo());
+  Upstream::HostConstSharedPtr host =
+      Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(cluster.chooseHost(this));
+  if (host) {
+    generic_conn_pool_ = factory->createGenericConnPool(
+        host, cluster, config_->tunnelingConfigHelper(), this, *upstream_callbacks_,
+        upstream_decoder_filter_callbacks_, getStreamInfo());
+  }
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;
@@ -873,8 +910,19 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         }
       }
       if (!downstream_closed_) {
-        route_ = pickRoute();
-        establishUpstreamConnection();
+        if (!config_->backoffStrategy() &&
+            !Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop")) {
+          onRetryTimer();
+          return;
+        }
+
+        if (connect_attempts_ >= config_->maxConnectAttempts()) {
+          onConnectMaxAttempts();
+          return;
+        }
+
+        enableRetryTimer();
       }
     } else {
       // TODO(botengyao): propagate RST back to downstream connection if RST is received.
@@ -883,6 +931,18 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
       }
     }
   }
+}
+
+void Filter::onConnectMaxAttempts() {
+  getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
+  const std::string& cluster_name = route_ ? route_->clusterName() : EMPTY_STRING;
+  Upstream::ThreadLocalCluster* thread_local_cluster =
+      cluster_manager_.getThreadLocalCluster(cluster_name);
+  if (thread_local_cluster) {
+    thread_local_cluster->info()->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
+  }
+
+  onInitFailure(UpstreamFailureReason::ConnectFailed);
 }
 
 void Filter::onUpstreamConnection() {
@@ -991,6 +1051,37 @@ void Filter::disableIdleTimer() {
   if (idle_timer_ != nullptr) {
     idle_timer_->disableTimer();
     idle_timer_.reset();
+  }
+}
+
+void Filter::onRetryTimer() {
+  route_ = pickRoute();
+  establishUpstreamConnection();
+}
+
+void Filter::enableRetryTimer() {
+  // Create the retry timer on the first retry.
+  if (!retry_timer_) {
+    retry_timer_ =
+        read_callbacks_->connection().dispatcher().createTimer([this] { onRetryTimer(); });
+  }
+
+  // If the backoff strategy is not configured, the next backoff time will be 0.
+  // This will allow the retry to happen on different event loop iteration, which
+  // will allow the connection pool to be cleaned up from the previous closed connection.
+  uint64_t next_backoff_ms = 0;
+
+  if (config_->backoffStrategy()) {
+    next_backoff_ms = config_->backoffStrategy()->nextBackOffMs();
+  }
+
+  retry_timer_->enableTimer(std::chrono::milliseconds(next_backoff_ms));
+}
+
+void Filter::disableRetryTimer() {
+  if (retry_timer_ != nullptr) {
+    retry_timer_->disableTimer();
+    retry_timer_.reset();
   }
 }
 

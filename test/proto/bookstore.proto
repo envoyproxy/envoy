@@ -53,10 +53,23 @@ service Bookstore {
       get: "/shelves/{shelf}/books"
     };
   }
+
+  rpc ListBooksNonStreaming(ListBooksRequest) returns (ListBooksResponse) {
+    option (google.api.http) = {
+      get: "/shelves/{shelf}/books:unary"
+    };
+  }
   // Creates a new book.
   rpc CreateBook(CreateBookRequest) returns (Book) {
     option (google.api.http) = {
       put: "/shelves/{shelf}/books"
+      body: "book"
+    };
+  }
+  // Create a new book with HttpBody payload
+  rpc CreateBookHttpBody(CreateBookHttpBodyRequest) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      post: "/{$api_version}/shelves/{shelf}/books"
       body: "book"
     };
   }
@@ -205,6 +218,14 @@ service ServiceWithInvalidResponseBodyPath {
   }
 }
 
+service ServiceWithPathPlaceholderHttpBody {
+  rpc EchoRawBodyError(google.api.HttpBody) returns (google.api.HttpBody) {
+    option (google.api.http) = {
+      get: "/{placeholder}/echoRawBody"
+    };
+  }
+}
+
 // A shelf resource.
 message Shelf {
   // A unique shelf id.
@@ -273,6 +294,14 @@ message DeleteShelfRequest {
 message ListBooksRequest {
   // ID of the shelf which books to list.
   int64 shelf = 1;
+  // ID of the author of the books to list.
+  int64 author = 2;
+  // Theme of the books to list.
+  string theme = 3;
+}
+
+message ListBooksResponse {
+  repeated Book books = 1;
 }
 
 // Request message for CreateBook method.
@@ -281,6 +310,14 @@ message CreateBookRequest {
   int64 shelf = 1;
   // A book resource to create on the shelf.
   Book book = 2;
+}
+
+// Request message for CreateBookHttpBody method.
+message CreateBookHttpBodyRequest {
+  // The ID of the shelf on which to create a book.
+  int64 shelf = 1;
+  // A book resource to create on the shelf.
+  google.api.HttpBody book = 2;
 }
 
 // Request message for GetBook method.

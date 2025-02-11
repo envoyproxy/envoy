@@ -106,8 +106,10 @@ public:
   create(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
          const AsyncClient::StreamOptions& options) {
     absl::Status creation_status = absl::OkStatus();
-    return std::unique_ptr<AsyncStreamImpl>(
+    std::unique_ptr<AsyncStreamImpl> stream = std::unique_ptr<AsyncStreamImpl>(
         new AsyncStreamImpl(parent, callbacks, options, creation_status));
+    RETURN_IF_NOT_OK(creation_status);
+    return stream;
   }
 
   ~AsyncStreamImpl() override {
@@ -229,16 +231,9 @@ private:
       watermark_callbacks_->get().onSidestreamBelowLowWatermark();
     }
   }
-  void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) override {
-    if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().addDownstreamWatermarkCallbacks(callbacks);
-    }
-  }
-  void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) override {
-    if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().removeDownstreamWatermarkCallbacks(callbacks);
-    }
-  }
+  void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
+  void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
+  void sendGoAwayAndClose() override {}
 
   void setDecoderBufferLimit(uint32_t) override {
     IS_ENVOY_BUG("decoder buffer limits should not be overridden on async streams.");

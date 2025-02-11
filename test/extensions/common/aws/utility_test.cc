@@ -66,10 +66,10 @@ TEST(UtilityTest, TestProfileResolver) {
   auto file_path = TestEnvironment::writeStringToFileForTest(
       credential_file, CREDENTIALS_FILE_CONTENTS, true, false);
 
-  Utility::resolveProfileElements(file_path, "default", elements);
+  Utility::resolveProfileElementsFromFile(file_path, "default", elements);
   it = elements.find("AWS_ACCESS_KEY_ID");
   EXPECT_EQ(it->second, "default_access_key");
-  Utility::resolveProfileElements(file_path, "profile4", elements);
+  Utility::resolveProfileElementsFromFile(file_path, "profile4", elements);
   it = elements.find("AWS_ACCESS_KEY_ID");
   EXPECT_EQ(it->second, "profile4_access_key");
 }
@@ -165,17 +165,13 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
   for (auto& str : exact_matches) {
     envoy::type::matcher::v3::StringMatcher config;
     config.set_exact(str);
-    exclusion_list.emplace_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config, context));
+    exclusion_list.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config, context));
   }
   std::vector<std::string> prefixes = {"x-envoy"};
   for (auto& match_str : prefixes) {
     envoy::type::matcher::v3::StringMatcher config;
     config.set_prefix(match_str);
-    exclusion_list.emplace_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config, context));
+    exclusion_list.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config, context));
   }
   const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map,

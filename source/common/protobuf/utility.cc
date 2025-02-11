@@ -209,8 +209,8 @@ void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_nam
 
 void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
                                                        const Protobuf::Message& message) {
-  std::string error = fmt::format("Proto constraint validation failed ({}): {}", validation_error,
-                                  message.DebugString());
+  std::string error = fmt::format("{}: Proto constraint validation failed ({})",
+                                  message.DebugString(), validation_error);
   throwEnvoyExceptionOrPanic(error);
 }
 
@@ -429,8 +429,8 @@ public:
     // at which PGV would have stopped because it does not itself check within Any messages.
     if (was_any_or_top_level &&
         !pgv::BaseValidator::AbstractCheckMessage(*reflectable_message, &err)) {
-      std::string error = fmt::format("Proto constraint validation failed ({}): {}", err,
-                                      reflectable_message->DebugString());
+      std::string error = fmt::format("{}: Proto constraint validation failed ({})",
+                                      reflectable_message->DebugString(), err);
       return absl::InvalidArgumentError(error);
     }
     return absl::OkStatus();
@@ -789,7 +789,7 @@ const ProtobufWkt::Value& ValueUtil::nullValue() {
   return *v;
 }
 
-ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
+ProtobufWkt::Value ValueUtil::stringValue(absl::string_view str) {
   ProtobufWkt::Value val;
   val.set_string_value(str);
   return val;
@@ -943,8 +943,8 @@ absl::Status MessageUtil::loadFromFile(const std::string& path, Protobuf::Messag
     loadFromJson(contents, message, validation_visitor);
   }
 #else
-  return absl::InvalidArgumentError("Unable to parse file \"" + path + "\" (type " +
-                                    message.GetTypeName() + ")");
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unable to parse file \"", path, "\" (type ", message.GetTypeName(), ")"));
 #endif
   return absl::OkStatus();
 }

@@ -1,4 +1,4 @@
-package main
+package metric
 
 import (
 	"net/url"

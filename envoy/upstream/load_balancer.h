@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/router/router.h"
 #include "envoy/stream_info/stream_info.h"
@@ -24,6 +25,47 @@ class ConnectionLifetimeCallbacks;
 } // namespace ConnectionPool
 } // namespace Http
 namespace Upstream {
+
+using ClusterProto = envoy::config::cluster::v3::Cluster;
+
+/*
+ * A handle to allow cancelation of asynchronous host selection.
+ * If chooseHost returns a HostSelectionResponse with an AsyncHostSelectionHandle
+ * handle, and the endpoint does not wish to receive onAsyncHostSelction call,
+ * it must call cancel() on the provided handle.
+ *
+ * Please note that the AsyncHostSelectionHandle may be deleted after the
+ * cancel() call. It is up to the implemention of the asynchronous load balancer
+ * to ensure the cancelation state persists until the load balancer checks it.
+ */
+class AsyncHostSelectionHandle {
+public:
+  AsyncHostSelectionHandle& operator=(const AsyncHostSelectionHandle&) = delete;
+  virtual ~AsyncHostSelectionHandle() = default;
+  virtual void cancel() PURE;
+};
+
+/*
+ * The response to a LoadBalancer::chooseHost call.
+ *
+ * chooseHost either returns a host directly or, in the case of asynchronous
+ * load balancing, returns an AsyncHostSelectionHandle handle.
+ *
+ * If it returns a AsyncHostSelectionHandle handle, the load balancer guarantees an
+ * eventual call to LoadBalancerContext::onAsyncHostSelction unless
+ * AsyncHostSelectionHandle::cancel is called.
+ */
+struct HostSelectionResponse {
+  HostSelectionResponse(HostConstSharedPtr host,
+                        std::unique_ptr<AsyncHostSelectionHandle> cancelable = nullptr)
+      : host(host), cancelable(std::move(cancelable)) {}
+  HostSelectionResponse(HostConstSharedPtr host, std::string details)
+      : host(host), details(details) {}
+  HostConstSharedPtr host;
+  // Optional details if host selection fails.
+  std::string details;
+  std::unique_ptr<AsyncHostSelectionHandle> cancelable;
+};
 
 /**
  * Context information passed to a load balancer to use when choosing a host. Not all load
@@ -111,28 +153,11 @@ public:
    */
   virtual absl::optional<OverrideHost> overrideHostToSelect() const PURE;
 
-  // Interface for callbacks when ORCA load reports are received from upstream.
-  class OrcaLoadReportCallbacks {
-  public:
-    virtual ~OrcaLoadReportCallbacks() = default;
-    /**
-     * Invoked when a new orca report is received for this LB context.
-     * @param orca_load_report supplies the ORCA load report.
-     * @param host supplies the upstream host, which provided the load report.
-     * @return absl::Status the result of ORCA load report processing by the load balancer.
-     */
-    virtual absl::Status
-    onOrcaLoadReport(const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
-                     const HostDescription& host) PURE;
-  };
-
-  /**
-   * Install a callback to be invoked when ORCA Load report is received for this
-   * LB context.
-   * Note: LB Context keeps a weak pointer to `callbacks` and doesn't invoke the callback
-   * if it is `expired()`.
+  /* Called by the load balancer when asynchronous host selection completes
+   * @param host supplies the upstream host selected
+   * @param details gives optional details about the resolution success/failure.
    */
-  virtual void setOrcaLoadReportCallbacks(std::weak_ptr<OrcaLoadReportCallbacks> callbacks) PURE;
+  virtual void onAsyncHostSelection(HostConstSharedPtr&& host, std::string&& details) PURE;
 };
 
 /**
@@ -150,13 +175,34 @@ class LoadBalancer {
 public:
   virtual ~LoadBalancer() = default;
 
+  /*
+   * This is a convenience wrapper function for code which does not yet support
+   * asynchronous host selection. It cancels any asynchronous lookup and treats
+   * it as host selection failure.
+   */
+  static HostConstSharedPtr
+  onlyAllowSynchronousHostSelection(HostSelectionResponse host_selection) {
+    if (host_selection.cancelable) {
+      // Async host selection not handled yet. Treat this as host selection
+      // failure.
+      host_selection.cancelable->cancel();
+    }
+    return std::move(host_selection.host);
+  }
+
   /**
    * Ask the load balancer for the next host to use depending on the underlying LB algorithm.
    * @param context supplies the load balancer context. Not all load balancers make use of all
    *        context information. Load balancers should be written to assume that context information
    *        is missing and use sensible defaults.
+   * @return a HostSelectionResponse either containing a host, or AsyncHostSelectionHandle handle.
+   *
+   * Please note that asynchronous host selection is not yet fully supported in
+   * Envoy. It works for HTTP load balancing (with the notable exclusion of the
+   * subset load balancer) but not for TCP proxy or other load balancers.
+   * Updates to functionality should be reflected in load_balancing_policies.rst
    */
-  virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) PURE;
+  virtual HostSelectionResponse chooseHost(LoadBalancerContext* context) PURE;
 
   /**
    * Returns a best effort prediction of the next host to be picked, or nullptr if not predictable.
@@ -301,15 +347,32 @@ public:
   /**
    * This method is used to validate and create load balancer config from typed proto config.
    *
-   * @return LoadBalancerConfigPtr a new load balancer config.
+   * @return LoadBalancerConfigPtr a new load balancer config or error.
    *
    * @param factory_context supplies the load balancer factory context.
    * @param config supplies the typed proto config of the load balancer. A dynamic_cast could
    *        be performed on the config to the expected proto type.
    */
-  virtual LoadBalancerConfigPtr
+  virtual absl::StatusOr<LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext& factory_context,
              const Protobuf::Message& config) PURE;
+
+  /**
+   * This method is used to validate and create load balancer config from legacy proto config.
+   * This method is only used for backwards compatibility with the legacy cluster config.
+   *
+   * @return LoadBalancerConfigPtr a new load balancer config or error.
+   *
+   * @param factory_context supplies the load balancer factory context.
+   * @param cluster supplies the legacy proto config of the cluster.
+   */
+  virtual absl::StatusOr<LoadBalancerConfigPtr>
+  loadLegacy(Server::Configuration::ServerFactoryContext& factory_context,
+             const ClusterProto& cluster) {
+    UNREFERENCED_PARAMETER(cluster);
+    UNREFERENCED_PARAMETER(factory_context);
+    return nullptr;
+  }
 
   std::string category() const override { return "envoy.load_balancing_policies"; }
 };

@@ -65,7 +65,7 @@ public:
         server_(server) {}
 
   // Upstream::ClusterManagerFactory
-  ClusterManagerPtr
+  absl::StatusOr<ClusterManagerPtr>
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
   Http::ConnectionPool::InstancePtr allocateConnPool(
       Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
@@ -87,9 +87,9 @@ public:
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
-  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-                      const xds::core::v3::ResourceLocator* cds_resources_locator,
-                      ClusterManager& cm) override;
+  absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                                      const xds::core::v3::ResourceLocator* cds_resources_locator,
+                                      ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
   Singleton::Manager& singletonManager() override { return context_.singletonManager(); }
 
@@ -147,7 +147,7 @@ public:
    */
   ClusterManagerInitHelper(
       ClusterManager& cm,
-      const std::function<void(ClusterManagerCluster&)>& per_cluster_init_callback)
+      const std::function<absl::Status(ClusterManagerCluster&)>& per_cluster_init_callback)
       : cm_(cm), per_cluster_init_callback_(per_cluster_init_callback) {}
 
   enum class State {
@@ -190,10 +190,10 @@ private:
 
   void initializeSecondaryClusters();
   void maybeFinishInitialize();
-  void onClusterInit(ClusterManagerCluster& cluster);
+  absl::Status onClusterInit(ClusterManagerCluster& cluster);
 
   ClusterManager& cm_;
-  std::function<void(ClusterManagerCluster& cluster)> per_cluster_init_callback_;
+  std::function<absl::Status(ClusterManagerCluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
   ClusterManager::PrimaryClustersReadyCallback primary_clusters_initialized_callback_;
   ClusterManager::InitializationCompleteCallback initialized_callback_;
@@ -251,9 +251,9 @@ public:
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
   // Upstream::ClusterManager
-  bool addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
-                          const std::string& version_info,
-                          const bool avoid_cds_removal = false) override;
+  absl::StatusOr<bool> addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
+                                          const std::string& version_info,
+                                          const bool avoid_cds_removal = false) override;
 
   void setPrimaryClustersInitializedCb(PrimaryClustersReadyCallback callback) override {
     init_helper_.setPrimaryClustersInitializedCb(callback);
@@ -296,6 +296,7 @@ public:
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     ads_mux_.reset();
+    xds_manager_.shutdown();
     active_clusters_.clear();
     warming_clusters_.clear();
     updateClusterCounts();
@@ -318,7 +319,7 @@ public:
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
-  OdCdsApiHandlePtr
+  absl::StatusOr<OdCdsApiHandlePtr>
   allocateOdCdsApi(OdCdsCreationFunction creation_function,
                    const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
@@ -390,7 +391,8 @@ protected:
                      Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
                      ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
                      Http::Context& http_context, Grpc::Context& grpc_context,
-                     Router::Context& router_context, Server::Instance& server);
+                     Router::Context& router_context, Server::Instance& server,
+                     Config::XdsManager& xds_manager, absl::Status& creation_status);
 
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -584,9 +586,12 @@ private:
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
       LoadBalancer& loadBalancer() override { return *lb_; }
-      absl::optional<HttpPoolData> httpConnPool(ResourcePriority priority,
+      HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
+      absl::optional<HttpPoolData> httpConnPool(HostConstSharedPtr host, ResourcePriority priority,
                                                 absl::optional<Http::Protocol> downstream_protocol,
                                                 LoadBalancerContext* context) override;
+      absl::optional<TcpPoolData> tcpConnPool(HostConstSharedPtr host, ResourcePriority priority,
+                                              LoadBalancerContext* context) override;
       absl::optional<TcpPoolData> tcpConnPool(ResourcePriority priority,
                                               LoadBalancerContext* context) override;
       Host::CreateConnectionData tcpConn(LoadBalancerContext* context) override;
@@ -622,14 +627,14 @@ private:
 
     private:
       Http::ConnectionPool::Instance*
-      httpConnPoolImpl(ResourcePriority priority,
+      httpConnPoolImpl(HostConstSharedPtr host, ResourcePriority priority,
                        absl::optional<Http::Protocol> downstream_protocol,
-                       LoadBalancerContext* context, bool peek);
+                       LoadBalancerContext* context);
 
-      Tcp::ConnectionPool::Instance* tcpConnPoolImpl(ResourcePriority priority,
-                                                     LoadBalancerContext* context, bool peek);
+      Tcp::ConnectionPool::Instance* tcpConnPoolImpl(HostConstSharedPtr host,
+                                                     ResourcePriority priority,
+                                                     LoadBalancerContext* context);
 
-      HostConstSharedPtr chooseHost(LoadBalancerContext* context);
       HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context);
 
       ThreadLocalClusterManagerImpl& parent_;
@@ -872,7 +877,7 @@ private:
                                              const std::string& version_info, bool added_via_api,
                                              bool required_for_ads, ClusterMap& cluster_map,
                                              bool avoid_cds_removal = false);
-  void onClusterInit(ClusterManagerCluster& cluster);
+  absl::Status onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
   void clusterWarmingToActive(const std::string& cluster_name);
@@ -888,7 +893,6 @@ private:
   void notifyClusterDiscoveryStatus(absl::string_view name, ClusterDiscoveryStatus status);
 
 protected:
-  ClusterMap active_clusters_;
   ClusterInitializationMap cluster_initialization_map_;
 
 private:
@@ -912,8 +916,8 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
   // Contains information about ongoing on-demand cluster discoveries.
   ClusterCreationsMap pending_cluster_creations_;
+  Config::XdsManager& xds_manager_;
   Random::RandomGenerator& random_;
-  ClusterMap warming_clusters_;
   const bool deferred_cluster_creation_;
   absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
@@ -956,6 +960,17 @@ private:
   bool initialized_{};
   bool ads_mux_initialized_{};
   std::atomic<bool> shutdown_{};
+
+  // Keep all the ClusterMaps at the end, so that they get destroyed first.
+  // Clusters may keep references to the cluster manager and in destructor can call
+  // cluster manager methods.
+  //
+  // This might make MSAN unhappy because it thinks that we are accessing uninitialized
+  // memory when those methods access fields of the cluster manager class.
+  ClusterMap warming_clusters_;
+
+protected:
+  ClusterMap active_clusters_;
 };
 
 } // namespace Upstream

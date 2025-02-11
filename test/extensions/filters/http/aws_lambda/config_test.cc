@@ -96,8 +96,11 @@ TEST(AwsLambdaFilterConfigTest, ValidPerRouteConfigCreatesFilter) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
-  auto route_specific_config_ptr = factory.createRouteSpecificFilterConfig(
-      proto_config, context, ProtobufMessage::getStrictValidationVisitor());
+  auto route_specific_config_ptr =
+      factory
+          .createRouteSpecificFilterConfig(proto_config, context,
+                                           ProtobufMessage::getStrictValidationVisitor())
+          .value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   ASSERT_NE(route_specific_config_ptr, nullptr);
   auto filter_settings_ptr =
@@ -106,7 +109,7 @@ TEST(AwsLambdaFilterConfigTest, ValidPerRouteConfigCreatesFilter) {
   EXPECT_EQ(InvocationMode::Synchronous, filter_settings_ptr->invocationMode());
 }
 
-TEST(AwsLambdaFilterConfigTest, InvalidARNThrows) {
+TEST(AwsLambdaFilterConfigTest, InvalidARN) {
   const std::string yaml = R"EOF(
 arn: "arn:aws:lambda:region:424242:fun"
   )EOF";
@@ -117,12 +120,13 @@ arn: "arn:aws:lambda:region:424242:fun"
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
-  EXPECT_THROW(
-      factory.createFilterFactoryFromProto(proto_config, "stats", context).status().IgnoreError(),
-      EnvoyException);
+  auto status_or = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_EQ(status_or.status().message(),
+            "aws_lambda_filter: Invalid ARN: arn:aws:lambda:region:424242:fun");
 }
 
-TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithInvalidARNThrows) {
+TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithInvalidARN) {
   const std::string yaml = R"EOF(
   invoke_config:
     arn: "arn:aws:lambda:region:424242:fun"
@@ -135,9 +139,11 @@ TEST(AwsLambdaFilterConfigTest, PerRouteConfigWithInvalidARNThrows) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
-  EXPECT_THROW(factory.createRouteSpecificFilterConfig(
-                   proto_config, context, ProtobufMessage::getStrictValidationVisitor()),
-               EnvoyException);
+  auto status_or = factory.createRouteSpecificFilterConfig(
+      proto_config, context, ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_FALSE(status_or.ok());
+  EXPECT_EQ(status_or.status().message(),
+            "aws_lambda_filter: Invalid ARN: arn:aws:lambda:region:424242:fun");
 }
 
 TEST(AwsLambdaFilterConfigTest, AsynchrnousPerRouteConfig) {
@@ -154,8 +160,11 @@ TEST(AwsLambdaFilterConfigTest, AsynchrnousPerRouteConfig) {
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   AwsLambdaFilterFactory factory;
 
-  auto route_specific_config_ptr = factory.createRouteSpecificFilterConfig(
-      proto_config, context, ProtobufMessage::getStrictValidationVisitor());
+  auto route_specific_config_ptr =
+      factory
+          .createRouteSpecificFilterConfig(proto_config, context,
+                                           ProtobufMessage::getStrictValidationVisitor())
+          .value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   ASSERT_NE(route_specific_config_ptr, nullptr);
   auto filter_settings_ptr =

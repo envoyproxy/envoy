@@ -33,7 +33,6 @@
 #include "quiche/common/platform/api/quiche_flags.h"
 #endif
 ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_boolean_to_string_fix);
-ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_reject_invalid_yaml);
 
 using testing::_;
 using testing::Invoke;
@@ -551,7 +550,6 @@ protected:
     THROW_IF_NOT_OK(loader.status());
     loader_ = std::move(loader.value());
   }
-  void testAllTheThings(bool allow_invalid_yaml);
 
   ProtobufWkt::Struct base_;
 };
@@ -608,7 +606,7 @@ TEST_F(StaticLoaderImplTest, ProtoParsingInvalidField) {
   EXPECT_THROW_WITH_MESSAGE(setup(), EnvoyException, "Invalid runtime entry value for file0");
 }
 
-void StaticLoaderImplTest::testAllTheThings(bool allow_invalid_yaml) {
+TEST_F(StaticLoaderImplTest, ProtoParsing) {
   // Validate proto parsing sanity.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
     file1: hello override
@@ -757,62 +755,10 @@ void StaticLoaderImplTest::testAllTheThings(bool allow_invalid_yaml) {
   EXPECT_EQ(22, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
 
-  const char* error = nullptr;
   // While null values are generally filtered out by walkProtoValue, test manually.
   ProtobufWkt::Value empty_value;
   const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-      .createEntry(empty_value, "", error);
-  if (allow_invalid_yaml) {
-    // Make sure the hacky fractional percent function works.
-    ProtobufWkt::Value fractional_value;
-    fractional_value.set_string_value(" numerator:  11 ");
-    auto entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-                     .createEntry(fractional_value, "", error);
-    ASSERT_TRUE(entry.fractional_percent_value_.has_value());
-    EXPECT_EQ(entry.fractional_percent_value_->denominator(),
-              envoy::type::v3::FractionalPercent::HUNDRED);
-    EXPECT_EQ(entry.fractional_percent_value_->numerator(), 11);
-
-    // Make sure the hacky percent function works with numerator and denominator
-    fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}");
-    entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-                .createEntry(fractional_value, "", error);
-    ASSERT_TRUE(entry.fractional_percent_value_.has_value());
-    EXPECT_EQ(entry.fractional_percent_value_->denominator(),
-              envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-    EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
-
-    // Make sure the hacky fractional percent function works with million
-    fractional_value.set_string_value("{\"numerator\": 10000, \"denominator\": \"MILLION\"}");
-    entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-                .createEntry(fractional_value, "", error);
-    ASSERT_TRUE(entry.fractional_percent_value_.has_value());
-    EXPECT_EQ(entry.fractional_percent_value_->denominator(),
-              envoy::type::v3::FractionalPercent::MILLION);
-    EXPECT_EQ(entry.fractional_percent_value_->numerator(), 10000);
-
-    // Test atoi failure for the hacky fractional percent value function.
-    fractional_value.set_string_value(" numerator:  1.1 ");
-    entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-                .createEntry(fractional_value, "", error);
-    ASSERT_FALSE(entry.fractional_percent_value_.has_value());
-
-    // Test legacy malformed boolean support
-    ProtobufWkt::Value boolean_value;
-    boolean_value.set_string_value("FaLsE");
-    entry = const_cast<SnapshotImpl&>(dynamic_cast<const SnapshotImpl&>(loader_->snapshot()))
-                .createEntry(boolean_value, "", error);
-    ASSERT_TRUE(entry.bool_value_.has_value());
-    ASSERT_FALSE(entry.bool_value_.value());
-  }
-}
-
-TEST_F(StaticLoaderImplTest, ProtoParsing) { testAllTheThings(false); }
-
-TEST_F(StaticLoaderImplTest, ProtoParsingLegacy) {
-  absl::SetFlag(&FLAGS_envoy_reloadable_features_reject_invalid_yaml, false);
-
-  testAllTheThings(true);
+      .createEntry(empty_value, "");
 }
 
 TEST_F(StaticLoaderImplTest, InvalidNumerator) {

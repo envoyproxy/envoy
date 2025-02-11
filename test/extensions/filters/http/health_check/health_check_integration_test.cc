@@ -179,6 +179,37 @@ TEST_P(HealthCheckIntegrationTest, HealthCheckWithBufferFilter) {
   EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
 }
 
+TEST_P(HealthCheckIntegrationTest, HealthCheckStats) {
+  DISABLE_IF_ADMIN_DISABLED;
+  initialize();
+
+  // Initial stats should be zero
+  EXPECT_EQ(0, test_server_->counter("http.config_test.health_check.request_total")->value());
+  EXPECT_EQ(0, test_server_->counter("http.config_test.health_check.ok")->value());
+  EXPECT_EQ(0, test_server_->counter("http.config_test.health_check.failed")->value());
+
+  // Make a health check request - should result in OK response and increment request/ok counters
+  BufferingStreamDecoderPtr response;
+  EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
+  EXPECT_EQ(1, test_server_->counter("http.config_test.health_check.request_total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.health_check.ok")->value());
+  EXPECT_EQ(0, test_server_->counter("http.config_test.health_check.failed")->value());
+
+  // Fail the health check and verify failed counter increments
+  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/fail", response));
+  EXPECT_EQ("503", request("http", "GET", "/healthcheck", response));
+  EXPECT_EQ(2, test_server_->counter("http.config_test.health_check.request_total")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.health_check.ok")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.health_check.failed")->value());
+
+  // Restore health check and verify ok counter increments
+  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/ok", response));
+  EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
+  EXPECT_EQ(3, test_server_->counter("http.config_test.health_check.request_total")->value());
+  EXPECT_EQ(2, test_server_->counter("http.config_test.health_check.ok")->value());
+  EXPECT_EQ(1, test_server_->counter("http.config_test.health_check.failed")->value());
+}
+
 INSTANTIATE_TEST_SUITE_P(Protocols, HealthCheckIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP1, Http::CodecType::HTTP2},

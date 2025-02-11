@@ -189,13 +189,7 @@ class OnDemandConfig {
 public:
   OnDemandConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand&
                      on_demand_message,
-                 Server::Configuration::FactoryContext& context, Stats::Scope& scope)
-      : odcds_(context.serverFactoryContext().clusterManager().allocateOdCdsApi(
-            &Upstream::OdCdsApiImpl::create, on_demand_message.odcds_config(),
-            OptRef<xds::core::v3::ResourceLocator>(), context.messageValidationVisitor())),
-        lookup_timeout_(std::chrono::milliseconds(
-            PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
-        stats_(generateStats(scope)) {}
+                 Server::Configuration::FactoryContext& context, Stats::Scope& scope);
   Upstream::OdCdsApiHandle& onDemandCds() const { return *odcds_; }
   std::chrono::milliseconds timeout() const { return lookup_timeout_; }
   const OnDemandStats& stats() const { return stats_; }
@@ -248,6 +242,7 @@ public:
         return {};
       }
     }
+    const BackOffStrategyPtr& backoffStrategy() const { return backoff_strategy_; };
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
@@ -263,6 +258,7 @@ public:
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
+    BackOffStrategyPtr backoff_strategy_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -317,6 +313,7 @@ public:
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
   bool flushAccessLogOnConnected() const { return shared_config_->flushAccessLogOnConnected(); }
   Regex::Engine& regexEngine() const { return regex_engine_; }
+  const BackOffStrategyPtr& backoffStrategy() const { return shared_config_->backoffStrategy(); };
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -520,6 +517,7 @@ public:
                         std::function<void(Http::ResponseHeaderMap& headers)>,
                         const absl::optional<Grpc::Status::GrpcStatus>,
                         absl::string_view) override {}
+    void sendGoAwayAndClose() override {}
     void encode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     Http::ResponseHeaderMapOptRef informationalHeaders() override { return {}; }
     void encodeHeaders(Http::ResponseHeaderMapPtr&&, bool, absl::string_view) override {}
@@ -619,6 +617,7 @@ protected:
   void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
 
   bool maybeTunnel(Upstream::ThreadLocalCluster& cluster);
+  void onConnectMaxAttempts();
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
@@ -632,6 +631,9 @@ protected:
   void resetAccessLogFlushTimer();
   void flushAccessLog(AccessLog::AccessLogType access_log_type);
   void disableAccessLogFlushTimer();
+  void onRetryTimer();
+  void enableRetryTimer();
+  void disableRetryTimer();
 
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
@@ -641,6 +643,7 @@ protected:
   Event::TimerPtr idle_timer_;
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr access_log_flush_timer_;
+  Event::TimerPtr retry_timer_;
 
   // A pointer to the on demand cluster lookup when lookup is in flight.
   Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;

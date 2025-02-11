@@ -53,10 +53,12 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
 }
 
 void ThreadLocalStoreImpl::setHistogramSettings(HistogramSettingsConstPtr&& histogram_settings) {
-  iterateScopes([](const ScopeImplSharedPtr& scope) -> bool {
-    ASSERT(scope->centralCacheLockHeld()->histograms_.empty());
-    return true;
-  });
+  iterateScopes([this](const ScopeImplSharedPtr& scope)
+                    ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
+                      assertLocked(*scope);
+                      ASSERT(scope->centralCacheLockHeld()->histograms_.empty());
+                      return true;
+                    });
   histogram_settings_ = std::move(histogram_settings);
 }
 
@@ -74,6 +76,7 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   const uint32_t first_histogram_index = deleted_histograms_.size();
   iterateScopesLockHeld([this](const ScopeImplSharedPtr& scope) ABSL_EXCLUSIVE_LOCKS_REQUIRED(
                             lock_) -> bool {
+    assertLocked(*scope);
     const CentralCacheEntrySharedPtr& central_cache = scope->centralCacheLockHeld();
     removeRejectedStats<CounterSharedPtr>(central_cache->counters_,
                                           [this](const CounterSharedPtr& counter) mutable {
@@ -293,6 +296,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
     // VirtualHosts.
     bool need_post = scopes_to_cleanup_.empty();
     scopes_to_cleanup_.push_back(scope->scope_id_);
+    assertLocked(*scope);
     central_cache_entries_to_cleanup_.push_back(scope->centralCacheLockHeld());
     lock.release();
 

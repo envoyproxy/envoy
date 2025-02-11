@@ -114,12 +114,14 @@ Transactions
 ------------
 
 Transactions (MULTI) are supported. Their use is no different from regular Redis: you start a transaction with MULTI,
-and you execute it with EXEC. Within the transaction only commands that are supported by Envoy (see below) and are single-key
-commands are supported, i.e. MGET and MSET are not supported. The DISCARD command is supported.
+and you execute it with EXEC. Within the transaction, from the list of commands supported by Envoy (see below), only single-key
+commands (e.g. GET, SET), multi-key commands (e.g. DEL, MSET) and transaction commands (e.g. WATCH, UNWATCH, DISCARD, EXEC) are supported.
+
 
 When working in Redis Cluster mode, Envoy will relay all the commands in the transaction to the node handling the first
-key-based command in the transaction. It is the user's responsibility to ensure that all keys in the transaction are mapped
-to the same hashslot, as commands will not be redirected.
+key-based command in the transaction. If this command is multi-key, it will send it to the server corresponding to the first key
+in the command. It is the user's responsibility to ensure that all keys in the transaction are mapped to the same hashslot, as
+commands will not be redirected.
 
 Supported commands
 ------------------
@@ -157,11 +159,13 @@ For details on each command's usage see the official
   EXISTS, Generic
   EXPIRE, Generic
   EXPIREAT, Generic
+  KEYS, String
   PERSIST, Generic
   PEXPIRE, Generic
   PEXPIREAT, Generic
   PTTL, Generic
   RESTORE, Generic
+  SELECT, Generic
   TOUCH, Generic
   TTL, Generic
   TYPE, Generic
@@ -215,6 +219,7 @@ For details on each command's usage see the official
   SREM, Set
   SSCAN, Set
   WATCH, String
+  UNWATCH, String
   ZADD, Sorted Set
   ZCARD, Sorted Set
   ZCOUNT, Sorted Set
@@ -299,7 +304,7 @@ Envoy can also generate its own errors in response to the client.
   the connection."
   invalid request, "Command was rejected by the first stage of the command splitter due to
   datatype or length."
-  unsupported command, "The command was not recognized by Envoy and therefore cannot be serviced
+  ERR unknown command, "The command was not recognized by Envoy and therefore cannot be serviced
   because it cannot be hashed to a backend server."
   finished with n errors, "Fragmented commands which sum the response (e.g. DEL) will return the
   total number of errors received if any were received."

@@ -5,7 +5,6 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
-import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
@@ -141,9 +140,9 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void onDefaultNetworkChanged(EnvoyNetworkType network) {
+  public void onDefaultNetworkChanged(int network) {
     checkIsTerminated();
-    JniLibrary.onDefaultNetworkChanged(engineHandle, network.getValue());
+    JniLibrary.onDefaultNetworkChanged(engineHandle, network);
   }
 
   @Override

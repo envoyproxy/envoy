@@ -55,12 +55,13 @@ AwsLambdaFilterFactory::getCredentialsProvider(
               "credentials profile is set to \"{}\" in config, default credentials providers chain "
               "will be ignored and only credentials file provider will be used",
               proto_config.credentials_profile());
+    envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config;
+    credential_file_config.set_profile(proto_config.credentials_profile());
     return std::make_shared<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
-        server_context.api(), proto_config.credentials_profile());
+        server_context, credential_file_config);
   }
   return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-      server_context.api(), makeOptRef(server_context), server_context.singletonManager(), region,
-      Extensions::Common::Aws::Utility::fetchMetadata);
+      server_context.api(), makeOptRef(server_context), region, nullptr);
 }
 
 absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
@@ -70,7 +71,8 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
 
   const auto arn = parseArn(proto_config.arn());
   if (!arn) {
-    throw EnvoyException(fmt::format("aws_lambda_filter: Invalid ARN: {}", proto_config.arn()));
+    return absl::InvalidArgumentError(
+        fmt::format("aws_lambda_filter: Invalid ARN: {}", proto_config.arn()));
   }
   const std::string region = arn->region();
 
@@ -93,7 +95,7 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig& per_route_config,
     Server::Configuration::ServerFactoryContext& server_context,
@@ -101,7 +103,7 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
 
   const auto arn = parseArn(per_route_config.invoke_config().arn());
   if (!arn) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("aws_lambda_filter: Invalid ARN: {}", per_route_config.invoke_config().arn()));
   }
   const std::string region = arn->region();
