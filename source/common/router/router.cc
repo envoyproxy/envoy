@@ -582,11 +582,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Support DROP_OVERLOAD config from control plane to drop certain percentage of traffic.
-  if (checkDropOverload(*cluster, modify_headers)) {
-    return Http::FilterHeadersStatus::StopIteration;
-  }
-
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
@@ -758,6 +753,11 @@ Http::FilterHeadersStatus Filter::continueDecodeHeaders(
     callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "envoy overloaded", nullptr,
                                absl::nullopt, StreamInfo::ResponseCodeDetails::get().Overload);
     stats_.rq_overload_local_reply_.inc();
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  // Support DROP_OVERLOAD config from control plane to drop certain percentage of traffic.
+  if (checkDropOverload(*cluster, modify_headers)) {
     return Http::FilterHeadersStatus::StopIteration;
   }
 
