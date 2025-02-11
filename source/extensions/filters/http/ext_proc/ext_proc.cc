@@ -1270,7 +1270,12 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
           config_->allowedOverrideModes(),
           [&mode_override](
               const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& other) {
-            return Protobuf::util::MessageDifferencer::Equals(mode_override, other);
+            // Ignore matching on request_header_mode as it's not applicable.
+            return mode_override.request_body_mode() == other.request_body_mode() &&
+                   mode_override.request_trailer_mode() == other.request_trailer_mode() &&
+                   mode_override.response_header_mode() == other.response_header_mode() &&
+                   mode_override.response_body_mode() == other.response_body_mode() &&
+                   mode_override.response_trailer_mode() == other.response_trailer_mode();
           });
     }
 
