@@ -87,7 +87,6 @@ public:
   MOCK_METHOD(void, sendGoAwayAndClose, ());
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
-  MOCK_METHOD(void, upgradeFilterChainCreated, ());
   MOCK_METHOD(void, disarmRequestTimeout, ());
   MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(void, recreateStream, (StreamInfo::FilterStateSharedPtr filter_state));
@@ -137,6 +136,15 @@ public:
   MOCK_METHOD(void, onResetStream, (StreamResetReason reason, absl::string_view));
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+};
+
+class MockCodecEventCallbacks : public CodecEventCallbacks {
+public:
+  MockCodecEventCallbacks();
+  ~MockCodecEventCallbacks();
+
+  MOCK_METHOD(void, onCodecEncodeComplete, ());
+  MOCK_METHOD(void, onCodecLowLevelReset, ());
 };
 
 class MockServerConnection : public ServerConnection {
@@ -203,8 +211,7 @@ public:
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(FilterChainManager& manager, bool,
-                         const FilterChainOptions&) const override {
+  bool createFilterChain(FilterChainManager& manager, const FilterChainOptions&) const override {
     return createFilterChain(manager);
   }
   MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));

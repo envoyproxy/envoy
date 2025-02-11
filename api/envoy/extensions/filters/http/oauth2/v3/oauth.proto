@@ -25,6 +25,41 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.oauth2]
 //
 
+// OAuth cookie configuration attributes.
+//
+message CookieConfig {
+  enum SameSite {
+    DISABLED = 0;
+    STRICT = 1;
+    LAX = 2;
+    NONE = 3;
+  }
+
+  // The value used for the SameSite cookie attribute.
+  SameSite same_site = 1 [(validate.rules).enum = {defined_only: true}];
+}
+
+// [#next-free-field: 7]
+message CookieConfigs {
+  // Configuration for the bearer token cookie.
+  CookieConfig bearer_token_cookie_config = 1;
+
+  // Configuration for the OAuth HMAC cookie.
+  CookieConfig oauth_hmac_cookie_config = 2;
+
+  // Configuration for the OAuth expires cookie.
+  CookieConfig oauth_expires_cookie_config = 3;
+
+  // Configuration for the ID token cookie.
+  CookieConfig id_token_cookie_config = 4;
+
+  // Configuration for the refresh token cookie.
+  CookieConfig refresh_token_cookie_config = 5;
+
+  // Configuration for the OAuth nonce cookie.
+  CookieConfig oauth_nonce_cookie_config = 6;
+}
+
 // [#next-free-field: 6]
 message OAuth2Credentials {
   // [#next-free-field: 7]
@@ -84,7 +119,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -186,6 +221,9 @@ message OAuth2Config {
   // will still process incoming Refresh Tokens as part of the HMAC if they are there. This is to ensure compatibility while switching this setting on. Future
   // sessions would not set the Refresh Token cookie header.
   bool disable_refresh_token_set_cookie = 20;
+
+  // Controls for attributes that can be set on the cookies.
+  CookieConfigs cookie_configs = 21;
 }
 
 // Filter config.

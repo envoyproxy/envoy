@@ -337,15 +337,24 @@ typed_config:
       {":authority", "host"},   {"x-forwarded-for", "10.0.0.1"}, {"x-test-header", "foo"},
       {"x-test-header", "bar"}, {"set-cookie", "foo;bar;"},      {"set-cookie", "1,3;2,5;"}};
 
-  auto encoder_decoder = codec_client_->startRequest(request_headers);
-  Http::StreamEncoder& encoder = encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-  Buffer::OwnedImpl request_data1("hello");
-  encoder.encodeData(request_data1, false);
-  Buffer::OwnedImpl request_data2("world");
-  encoder.encodeData(request_data2, true);
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"trace", "log test"},
+                                                         {"debug", "log test"},
+                                                         {"info", "log test"},
+                                                         {"warn", "log test"},
+                                                         {"error", "log test"},
+                                                         {"critical", "log test"}}),
+                             {
+                               auto encoder_decoder = codec_client_->startRequest(request_headers);
+                               Http::StreamEncoder& encoder = encoder_decoder.first;
+                               response = std::move(encoder_decoder.second);
+                               Buffer::OwnedImpl request_data1("hello");
+                               encoder.encodeData(request_data1, false);
+                               Buffer::OwnedImpl request_data2("world");
+                               encoder.encodeData(request_data2, true);
 
-  waitForNextUpstreamRequest();
+                               waitForNextUpstreamRequest();
+                             });
   EXPECT_EQ("foo", upstream_request_->headers()
                        .get(Http::LowerCaseString("test_header_value_0"))[0]
                        ->value()

@@ -146,7 +146,9 @@ public:
   void encodeBodyAndTrailers();
 
   // Getters and setters
-  Upstream::HostDescriptionConstSharedPtr& upstreamHost() { return upstream_host_; }
+  Upstream::HostDescriptionOptConstRef upstreamHost() {
+    return makeOptRefFromPtr(upstream_host_.get());
+  }
   void outlierDetectionTimeoutRecorded(bool recorded) {
     outlier_detection_timeout_recorded_ = recorded;
   }
@@ -345,9 +347,6 @@ public:
   // Unsupported functions.
   void recreateStream(StreamInfo::FilterStateSharedPtr) override {
     IS_ENVOY_BUG("recreateStream called from upstream HTTP filter");
-  }
-  void upgradeFilterChainCreated() override {
-    IS_ENVOY_BUG("upgradeFilterChainCreated called from upstream HTTP filter");
   }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {*this}; }
 

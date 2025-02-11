@@ -23,7 +23,7 @@ AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
     const std::string& stats_prefix, DualInfo dual_info,
     Server::Configuration::ServerFactoryContext& context) {
   if (config.has_sr_threshold() && config.sr_threshold().default_value().value() < 1.0) {
-    throw EnvoyException("Success rate threshold cannot be less than 1.0%.");
+    return absl::InvalidArgumentError("Success rate threshold cannot be less than 1.0%.");
   }
 
   const std::string prefix = stats_prefix + "admission_control.";
@@ -39,11 +39,15 @@ AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
 
   std::unique_ptr<ResponseEvaluator> response_evaluator;
   switch (config.evaluation_criteria_case()) {
-  case AdmissionControlProto::EvaluationCriteriaCase::kSuccessCriteria:
-    response_evaluator = std::make_unique<SuccessCriteriaEvaluator>(config.success_criteria());
+  case AdmissionControlProto::EvaluationCriteriaCase::kSuccessCriteria: {
+    absl::StatusOr<std::unique_ptr<SuccessCriteriaEvaluator>> response_evaluator_or =
+        SuccessCriteriaEvaluator::create(config.success_criteria());
+    RETURN_IF_NOT_OK(response_evaluator_or.status());
+    response_evaluator = std::move(response_evaluator_or.value());
     break;
+  }
   case AdmissionControlProto::EvaluationCriteriaCase::EVALUATION_CRITERIA_NOT_SET:
-    throw EnvoyException("Evaluation criteria not set");
+    return absl::InvalidArgumentError("Evaluation criteria not set");
   }
 
   AdmissionControlFilterConfigSharedPtr filter_config =

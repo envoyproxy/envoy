@@ -30,7 +30,7 @@ public:
     }
     const Http::FilterContext* old_filter_context = current_filter_context;
     current_filter_context = filter_context;
-    return Envoy::Cleanup([old_filter_context]() { current_filter_context = old_filter_context; });
+    return {[old_filter_context]() { current_filter_context = old_filter_context; }};
   }
 
   int activationDepth() const { return activation_depth_; }

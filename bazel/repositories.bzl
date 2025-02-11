@@ -1,7 +1,6 @@
 load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_language")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
-load(":dev_binding.bzl", "envoy_dev_binding")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
 
 PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
@@ -13,7 +12,6 @@ WINDOWS_SKIP_TARGETS = [
     "envoy.filters.http.sxg",
     "envoy.tracers.dynamic_ot",
     "envoy.tracers.datadog",
-    "envoy.tracers.opencensus",
     # Extensions that require CEL.
     "envoy.access_loggers.extension_filters.cel",
     "envoy.rate_limit_descriptors.expr",
@@ -117,13 +115,16 @@ def _rust_deps():
     )
 
 def envoy_dependencies(skip_targets = []):
-    # Setup Envoy developer tools.
-    envoy_dev_binding()
-
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
         _default_envoy_build_config(name = "envoy_build_config")
+
+    # Setup Bazel shell rules
+    external_http_archive(name = "rules_shell")
+
+    # Setup Bazel C++ rules
+    external_http_archive("rules_cc")
 
     # Setup external Bazel rules
     _foreign_cc_dependencies()
@@ -178,13 +179,11 @@ def envoy_dependencies(skip_targets = []):
     _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
     _com_github_alibaba_hessian2_codec()
-    _com_github_tencent_rapidjson()
     _com_github_nlohmann_json()
     _com_github_ncopa_suexec()
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
-    _io_opencensus_cpp()
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _v8()
@@ -212,15 +211,11 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_perfetto()
     _utf8_range()
     _rules_ruby()
-    external_http_archive(
-        "com_github_google_flatbuffers",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:flatbuffers.patch"],
-    )
+    external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_features")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive(name = "envoy_examples")
+    external_http_archive("envoy_examples")
 
     _com_github_maxmind_libmaxminddb()
 
@@ -245,7 +240,6 @@ def envoy_dependencies(skip_targets = []):
 
     _com_github_wamr()
     _com_github_wasmtime()
-    _com_github_wasm_c_api()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -449,6 +443,12 @@ def _net_zlib():
         actual = "@envoy//bazel/foreign_cc:zlib",
     )
 
+    # Bind for protobuf.
+    native.bind(
+        name = "zlib",
+        actual = "@envoy//bazel/foreign_cc:zlib",
+    )
+
 def _com_github_zlib_ng_zlib_ng():
     external_http_archive(
         name = "com_github_zlib_ng_zlib_ng",
@@ -554,15 +554,13 @@ def _com_github_datadog_dd_trace_cpp():
 def _com_github_skyapm_cpp2sky():
     external_http_archive(
         name = "com_github_skyapm_cpp2sky",
+        patches = ["@envoy//bazel:com_github_skyapm_cpp2sky.patch"],
+        patch_args = ["-p1"],
     )
     external_http_archive(
         name = "skywalking_data_collect_protocol",
-    )
-
-def _com_github_tencent_rapidjson():
-    external_http_archive(
-        name = "com_github_tencent_rapidjson",
-        build_file = "@envoy//bazel/external:rapidjson.BUILD",
+        patches = ["@envoy//bazel:skywalking_data_collect_protocol.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_nlohmann_json():
@@ -618,6 +616,11 @@ def _com_google_absl():
 def _com_google_protobuf():
     external_http_archive(
         name = "rules_python",
+    )
+    external_http_archive(
+        name = "rules_java",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_java.patch"],
     )
 
     for platform in PROTOC_VERSIONS:
@@ -681,11 +684,6 @@ def _com_google_protobuf():
     native.bind(
         name = "upb_reflection",
         actual = "@com_google_protobuf//upb:reflection",
-    )
-
-def _io_opencensus_cpp():
-    external_http_archive(
-        name = "io_opencensus_cpp",
     )
 
 def _com_github_curl():
@@ -864,6 +862,8 @@ def _com_github_luajit_luajit():
 def _com_github_google_tcmalloc():
     external_http_archive(
         name = "com_github_google_tcmalloc",
+        patches = ["@envoy//bazel:tcmalloc.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_gperftools_gperftools():
@@ -885,24 +885,12 @@ def _com_github_wamr():
 def _com_github_wasmtime():
     external_http_archive(
         name = "com_github_wasmtime",
-        build_file = "@envoy//bazel/external:wasmtime.BUILD",
+        build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
     )
 
-def _com_github_wasm_c_api():
-    external_http_archive(
-        name = "com_github_wasm_c_api",
-        build_file = "@envoy//bazel/external:wasm-c-api.BUILD",
-    )
     native.bind(
         name = "wasmtime",
-        actual = "@com_github_wasm_c_api//:wasmtime_lib",
-    )
-
-    # This isn't needed in builds with a single Wasm engine, but "bazel query"
-    # complains about a missing dependency, so point it at the regular target.
-    native.bind(
-        name = "prefixed_wasmtime",
-        actual = "@com_github_wasm_c_api//:wasmtime_lib",
+        actual = "@com_github_wasmtime//:wasmtime_lib",
     )
 
 def _intel_dlb():
@@ -983,7 +971,11 @@ def _rules_ruby():
     external_http_archive("rules_ruby")
 
 def _foreign_cc_dependencies():
-    external_http_archive(name = "rules_foreign_cc")
+    external_http_archive(
+        name = "rules_foreign_cc",
+        patches = ["@envoy//bazel:rules_foreign_cc.patch"],
+        patch_args = ["-p1"],
+    )
 
 def _com_github_maxmind_libmaxminddb():
     external_http_archive(

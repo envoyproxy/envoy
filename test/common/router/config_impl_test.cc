@@ -344,6 +344,16 @@ most_specific_header_mutations_wins: {0}
   absl::Status creation_status_ = absl::OkStatus();
 };
 
+void checkPathMatchCriterion(const Route* route, const std::string& expected_matcher,
+                             PathMatchType expected_type) {
+  ASSERT_NE(nullptr, route);
+  const auto route_entry = route->routeEntry();
+  ASSERT_NE(nullptr, route_entry);
+  const auto& match_criterion = route_entry->pathMatchCriterion();
+  EXPECT_EQ(expected_matcher, match_criterion.matcher());
+  EXPECT_EQ(expected_type, match_criterion.matchType());
+}
+
 class RouteMatcherTest : public testing::Test,
                          public ConfigImplTestBase,
                          public TestScopedRuntime {};
@@ -476,6 +486,12 @@ virtual_hosts:
   // Header matching (for HTTP/2)
   EXPECT_EQ("connect_header_match",
             config.route(genHeaders("bat5.com", " ", "CONNECT"), 0)->routeEntry()->clusterName());
+
+  // Increase line coverage for the ConnectRouteEntryImpl class.
+  {
+    checkPathMatchCriterion(config.route(genHeaders("bat3.com", " ", "CONNECT"), 0).get(),
+                            EMPTY_STRING, PathMatchType::None);
+  }
 }
 
 TEST_F(RouteMatcherTest, TestRoutes) {
@@ -7795,16 +7811,6 @@ virtual_hosts:
   EXPECT_EQ(creation_status_.message(), "response body size is 4097 bytes; maximum is 4096");
 }
 
-void checkPathMatchCriterion(const Route* route, const std::string& expected_matcher,
-                             PathMatchType expected_type) {
-  ASSERT_NE(nullptr, route);
-  const auto route_entry = route->routeEntry();
-  ASSERT_NE(nullptr, route_entry);
-  const auto& match_criterion = route_entry->pathMatchCriterion();
-  EXPECT_EQ(expected_matcher, match_criterion.matcher());
-  EXPECT_EQ(expected_type, match_criterion.matchType());
-}
-
 // Test loading broken config throws EnvoyException.
 TEST_F(RouteConfigurationV2, BrokenTypedMetadata) {
   const std::string yaml = R"EOF(
@@ -9504,6 +9510,9 @@ virtual_hosts:
   const auto& pattern_rewrite_policy = config.route(headers, 0)->routeEntry()->pathRewriter();
   EXPECT_TRUE(pattern_rewrite_policy != nullptr);
   EXPECT_EQ(pattern_rewrite_policy->uriTemplate(), "/bar/{lang}/{country}");
+
+  checkPathMatchCriterion(config.route(headers, 0).get(), "/bar/{country}/{lang}",
+                          PathMatchType::Template);
 }
 
 TEST_F(RouteMatcherTest, SimplePathPatternMatchOnly) {
@@ -10576,7 +10585,7 @@ public:
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
     }
     std::set<std::string> configTypes() override { return {"google.protobuf.Timestamp"}; }
-    Router::RouteSpecificFilterConfigConstSharedPtr
+    absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
     createRouteSpecificFilterConfig(const Protobuf::Message& message,
                                     Server::Configuration::ServerFactoryContext&,
                                     ProtobufMessage::ValidationVisitor&) override {
@@ -11540,6 +11549,80 @@ virtual_hosts:
   EXPECT_EQ(&config.shadowPolicies(), &shared_config.shadowPolicies());
   EXPECT_EQ(config.ignorePathParametersInPathMatching(),
             shared_config.ignorePathParametersInPathMatching());
+}
+
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithTraceSampled) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains: ["*"]
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+      # Policy with explicit trace_sampled set to false
+      - cluster: some_cluster
+        trace_sampled: false
+      # Policy with explicit trace_sampled set to true
+      - cluster: some_cluster2
+        trace_sampled: true
+      # Policy with no trace_sampled specified
+      - cluster: some_cluster3
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www2", "some_cluster", "some_cluster2", "some_cluster3"}, {});
+
+  // Test with runtime flag disabled (old behavior)
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.shadow_policy_inherit_trace_sampling", "false"}});
+
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                          creation_status_);
+
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.databricks.com", "/foo", "GET");
+    const auto& shadow_policies = config.route(headers, 0)->routeEntry()->shadowPolicies();
+
+    // First policy should have trace sampled = false
+    EXPECT_TRUE(shadow_policies[0]->traceSampled().has_value());
+    EXPECT_FALSE(shadow_policies[0]->traceSampled().value());
+
+    // Second policy should have trace sampled = true
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().has_value());
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().value());
+
+    // With flag disabled, unspecified should default to true
+    EXPECT_TRUE(shadow_policies[2]->traceSampled().has_value());
+    EXPECT_TRUE(shadow_policies[2]->traceSampled().value());
+  }
+
+  // Test with runtime flag enabled (new behavior)
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.shadow_policy_inherit_trace_sampling", "true"}});
+
+    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                          creation_status_);
+
+    Http::TestRequestHeaderMapImpl headers = genHeaders("www.databricks.com", "/foo", "GET");
+    const auto& shadow_policies = config.route(headers, 0)->routeEntry()->shadowPolicies();
+
+    // First policy should have trace sampled = false
+    EXPECT_TRUE(shadow_policies[0]->traceSampled().has_value());
+    EXPECT_FALSE(shadow_policies[0]->traceSampled().value());
+
+    // Second policy should have trace sampled = true
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().has_value());
+    EXPECT_TRUE(shadow_policies[1]->traceSampled().value());
+
+    // With flag enabled, unspecified should be nullopt
+    EXPECT_FALSE(shadow_policies[2]->traceSampled().has_value());
+  }
 }
 
 } // namespace

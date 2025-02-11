@@ -28,9 +28,7 @@ namespace Udp {
 // UpstreamRequest of Router, creates a UDPUpstream object and hands over the created socket to it.
 class UdpConnPool : public Router::GenericConnPool {
 public:
-  UdpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-              Upstream::LoadBalancerContext* ctx)
-      : host_(thread_local_cluster.loadBalancer().chooseHost(ctx)) {}
+  UdpConnPool(Upstream::HostConstSharedPtr host) : host_(host) {}
 
   // Creates a UDPUpstream object for a new stream.
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
@@ -83,7 +81,7 @@ public:
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
-                     Buffer::RawSlice saved_cmsg) override;
+                     Buffer::OwnedImpl saved_cmsg) override;
   uint64_t maxDatagramSize() const override { return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE; }
   void onDatagramsDropped(uint32_t dropped) override {
     // TODO(https://github.com/envoyproxy/envoy/issues/23564): Add statistics for CONNECT-UDP

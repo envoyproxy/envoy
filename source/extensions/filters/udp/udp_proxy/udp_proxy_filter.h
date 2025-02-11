@@ -98,6 +98,7 @@ public:
   virtual const std::string& postPath() const PURE;
   virtual Http::HeaderEvaluator& headerEvaluator() const PURE;
   virtual uint32_t maxConnectAttempts() const PURE;
+  virtual const BackOffStrategyPtr& backoffStrategy() const PURE;
   virtual bool bufferEnabled() const PURE;
   virtual uint32_t maxBufferedDatagrams() const PURE;
   virtual uint64_t maxBufferedBytes() const PURE;
@@ -202,7 +203,7 @@ public:
    * @param ssl_info supplies the ssl information of the upstream connection.
    */
   virtual void onStreamReady(StreamInfo::StreamInfo* info, std::unique_ptr<HttpUpstream>&& upstream,
-                             Upstream::HostDescriptionConstSharedPtr& host,
+                             const Upstream::HostDescription& host,
                              const Network::ConnectionInfoProvider& address_provider,
                              Ssl::ConnectionInfoConstSharedPtr ssl_info) PURE;
 
@@ -215,7 +216,7 @@ public:
    */
   virtual void onStreamFailure(ConnectionPool::PoolFailureReason reason,
                                absl::string_view failure_reason,
-                               Upstream::HostDescriptionConstSharedPtr host) PURE;
+                               const Upstream::HostDescription& host) PURE;
 
   /**
    * Called to reset the idle timer.
@@ -417,13 +418,13 @@ public:
 
   // TunnelCreationCallbacks
   void onStreamSuccess(Http::RequestEncoder& request_encoder) override {
-    callbacks_->onStreamReady(upstream_info_, std::move(upstream_), upstream_host_,
+    callbacks_->onStreamReady(upstream_info_, std::move(upstream_), *upstream_host_,
                               request_encoder.getStream().connectionInfoProvider(), ssl_info_);
   }
 
   void onStreamFailure() override {
     callbacks_->onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "",
-                                upstream_host_);
+                                *upstream_host_);
   }
 
   // Http::ConnectionPool::Callbacks
@@ -602,7 +603,7 @@ protected:
     bool onContinueFilterChain(ActiveReadFilter* filter);
     void onInjectReadDatagramToFilterChain(ActiveReadFilter* filter, Network::UdpRecvData& data);
     void onInjectWriteDatagramToFilterChain(ActiveWriteFilter* filter, Network::UdpRecvData& data);
-    void onSessionComplete();
+    virtual void onSessionComplete();
 
     // SessionFilters::FilterChainFactoryCallbacks
     void addReadFilter(ReadFilterSharedPtr filter) override {
@@ -673,7 +674,7 @@ protected:
     bool on_session_complete_called_{false};
   };
 
-  using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
+  using ActiveSessionSharedPtr = std::shared_ptr<ActiveSession>;
 
   class UdpActiveSession : public Network::UdpPacketProcessor, public ActiveSession {
   public:
@@ -690,7 +691,7 @@ protected:
     void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                        Network::Address::InstanceConstSharedPtr peer_address,
                        Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
-                       Buffer::RawSlice saved_csmg) override;
+                       Buffer::OwnedImpl saved_csmg) override;
 
     uint64_t maxDatagramSize() const override {
       return filter_.config_->upstreamSocketConfig().max_rx_datagram_size_;
@@ -732,7 +733,8 @@ protected:
    */
   class TunnelingActiveSession : public ActiveSession,
                                  public UpstreamTunnelCallbacks,
-                                 public HttpStreamCallbacks {
+                                 public HttpStreamCallbacks,
+                                 public std::enable_shared_from_this<TunnelingActiveSession> {
   public:
     TunnelingActiveSession(UdpProxyFilter& filter,
                            Network::UdpRecvData::LocalPeerAddresses&& addresses);
@@ -742,6 +744,7 @@ protected:
     bool createUpstream() override;
     void writeUpstream(Network::UdpRecvData& data) override;
     void onIdleTimer() override;
+    void onSessionComplete() override;
 
     // UpstreamTunnelCallbacks
     void onUpstreamEvent(Network::ConnectionEvent event) override;
@@ -751,12 +754,11 @@ protected:
 
     // HttpStreamCallbacks
     void onStreamReady(StreamInfo::StreamInfo*, std::unique_ptr<HttpUpstream>&&,
-                       Upstream::HostDescriptionConstSharedPtr&,
-                       const Network::ConnectionInfoProvider&,
+                       const Upstream::HostDescription&, const Network::ConnectionInfoProvider&,
                        Ssl::ConnectionInfoConstSharedPtr) override;
 
     void onStreamFailure(ConnectionPool::PoolFailureReason, absl::string_view,
-                         Upstream::HostDescriptionConstSharedPtr) override;
+                         const Upstream::HostDescription&) override;
 
     void resetIdleTimer() override { ActiveSession::resetIdleTimer(); }
 
@@ -767,7 +769,11 @@ protected:
     bool createConnectionPool();
     void maybeBufferDatagram(Network::UdpRecvData& data);
     void flushBuffer();
+    void onRetryTimer();
+    void resetRetryTimer();
+    void disableRetryTimer();
 
+    Event::TimerPtr retry_timer_;
     TunnelingConnectionPoolFactoryPtr conn_pool_factory_;
     std::unique_ptr<UdpLoadBalancerContext> load_balancer_context_;
     TunnelingConnectionPoolPtr conn_pool_;
@@ -810,7 +816,9 @@ protected:
       LocalPeerHostAddresses key{value->addresses(), value->host()};
       return this->operator()(key);
     }
-    size_t operator()(const ActiveSessionPtr& value) const { return this->operator()(value.get()); }
+    size_t operator()(const ActiveSessionSharedPtr& value) const {
+      return this->operator()(value.get());
+    }
 
   private:
     const bool consider_host_;
@@ -822,19 +830,19 @@ protected:
 
     HeterogeneousActiveSessionEqual(const bool consider_host) : consider_host_(consider_host) {}
 
-    bool operator()(const ActiveSessionPtr& lhs,
+    bool operator()(const ActiveSessionSharedPtr& lhs,
                     const Network::UdpRecvData::LocalPeerAddresses& rhs) const {
       return lhs->addresses() == rhs;
     }
-    bool operator()(const ActiveSessionPtr& lhs, const LocalPeerHostAddresses& rhs) const {
+    bool operator()(const ActiveSessionSharedPtr& lhs, const LocalPeerHostAddresses& rhs) const {
       return this->operator()(lhs, rhs.local_peer_addresses_) &&
              (consider_host_ ? &lhs->host().value().get() == &rhs.host_.value().get() : true);
     }
-    bool operator()(const ActiveSessionPtr& lhs, const ActiveSession* rhs) const {
+    bool operator()(const ActiveSessionSharedPtr& lhs, const ActiveSession* rhs) const {
       LocalPeerHostAddresses key{rhs->addresses(), rhs->host()};
       return this->operator()(lhs, key);
     }
-    bool operator()(const ActiveSessionPtr& lhs, const ActiveSessionPtr& rhs) const {
+    bool operator()(const ActiveSessionSharedPtr& lhs, const ActiveSessionSharedPtr& rhs) const {
       return this->operator()(lhs, rhs.get());
     }
 
@@ -856,12 +864,13 @@ protected:
       host_to_sessions_[host].emplace(session);
     }
 
-    Upstream::HostConstSharedPtr
+    Upstream::HostSelectionResponse
     chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address,
                StreamInfo::StreamInfo* stream_info) const;
 
     UdpProxyFilter& filter_;
     Upstream::ThreadLocalCluster& cluster_;
+    Upstream::ClusterInfoConstSharedPtr cluster_info_;
     UdpProxyUpstreamStats cluster_stats_;
     absl::flat_hash_set<ActiveSession*> sessions_;
 
@@ -877,8 +886,9 @@ protected:
   };
 
   using ClusterInfoPtr = std::unique_ptr<ClusterInfo>;
-  using SessionStorageType = absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
-                                                 HeterogeneousActiveSessionEqual>;
+  using SessionStorageType =
+      absl::flat_hash_set<ActiveSessionSharedPtr, HeterogeneousActiveSessionHash,
+                          HeterogeneousActiveSessionEqual>;
 
   const UdpProxyFilterConfigSharedPtr config_;
   SessionStorageType sessions_;

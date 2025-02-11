@@ -96,6 +96,8 @@ function cp_binary_for_image_build() {
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
   strip bazel-bin/test/tools/router_check/router_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/router_check_tool
+  strip bazel-bin/test/tools/config_load_check/config_load_check_tool \
+    -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
   cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
@@ -163,6 +165,8 @@ function bazel_binary_build() {
     //test/tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
     //test/tools/router_check:router_check_tool "${CONFIG_ARGS[@]}"
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
+    //test/tools/config_load_check:config_load_check_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @com_github_ncopa_suexec//:su-exec
@@ -329,7 +333,7 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
         ;;
 
-    clang_tidy)
+    clang-tidy)
         # clang-tidy will warn on standard library issues with libc++
         ENVOY_STDLIB="libstdc++"
         setup_clang_toolchain
@@ -337,14 +341,19 @@ case $CI_TARGET in
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
         export CLANG_TIDY_APPLY_FIXES=1
         mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
-        CLANG_TIDY_TARGETS=(
-            //contrib/...
-            //source/...
-            //test/...
-            @envoy_api//...)
+        if [[ -n "$CLANG_TIDY_TARGETS" ]]; then
+            read -ra CLANG_TIDY_TARGETS <<< "${CLANG_TIDY_TARGETS}"
+        else
+            CLANG_TIDY_TARGETS=(
+                //contrib/...
+                //source/...
+                //test/...
+                @envoy_api//...)
+        fi
+        echo "Running clang-tidy on ${CLANG_TIDY_TARGETS[*]}"
         bazel build \
               "${BAZEL_BUILD_OPTIONS[@]}" \
-              --config clang-tidy \
+              --config=clang-tidy \
               "${CLANG_TIDY_TARGETS[@]}"
         ;;
 
@@ -774,6 +783,12 @@ case $CI_TARGET in
         cp -a \
            bazel-bin/test/tools/router_check/router_check_tool.stripped \
            "${ENVOY_BINARY_DIR}/router_check_tool"
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+              --remote_download_toplevel \
+              //test/tools/config_load_check:config_load_check_tool.stripped
+        cp -a \
+           bazel-bin/test/tools/config_load_check/config_load_check_tool.stripped \
+           "${ENVOY_BINARY_DIR}/config_load_check_tool"
         echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
 

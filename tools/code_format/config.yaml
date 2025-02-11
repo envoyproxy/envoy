@@ -65,7 +65,6 @@ paths:
     - bazel/BUILD
     - bazel/external/
     - bazel/toolchains/
-    - tools/clang_tools
 
   # `build_urls`:
   #   We want all URL references to exist in repository_locations.bzl files and have
@@ -93,21 +92,17 @@ paths:
     - source/common/matcher/matcher.h
     - source/extensions/common/matcher/trie_matcher.h
     - envoy/common/exception.h
-    - source/common/upstream/upstream_impl.h
-    - source/common/config/context_provider_impl.h
     - source/common/protobuf/utility.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
     # StausOr where possible.
     - source/common/watchdog/abort_action_config.cc
     - source/extensions/watchdog/profile_action/config.cc
     - source/common/router/route_config_update_receiver_impl.cc
-    - source/common/upstream/cluster_manager_impl.cc
     - source/common/upstream/upstream_impl.cc
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
     - source/common/formatter/http_specific_formatter.cc
-    - source/common/formatter/stream_info_formatter.h
     - source/common/formatter/stream_info_formatter.cc
     - source/common/formatter/substitution_formatter.h
     - source/common/stats/tag_extractor_impl.cc
@@ -116,11 +111,8 @@ paths:
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
     - source/common/listener_manager/lds_api.cc
-    - source/common/upstream/od_cds_api_impl.cc
-    - source/common/upstream/cds_api_impl.cc
-    - source/common/router/vhds.cc
-    - source/common/rds/rds_route_config_subscription.cc
-    - source/common/filter/config_discovery_impl.cc
+    - source/common/rds/common/route_config_provider_manager_impl.h
+    - source/common/rds/route_config_provider_manager.h
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
@@ -138,44 +130,36 @@ paths:
     - source/server/hot_restart_impl.cc
     - source/common/upstream/health_discovery_service.cc
     - source/common/upstream/prod_cluster_info_factory.cc
-    - source/common/secret/sds_api.h
     - source/common/secret/sds_api.cc
-    - source/common/router/router.cc
     - source/common/config/config_provider_impl.h
-    - source/common/grpc/async_client_impl.cc
     - source/common/grpc/google_grpc_creds_impl.cc
-    - source/common/local_reply/local_reply.cc
-    - source/common/config/watched_directory.cc
-    - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
     - source/server/hot_restarting_parent.cc
     - source/common/io/io_uring_worker_impl.cc
     - source/common/event/file_event_impl.cc
     - source/common/http/async_client_impl.cc
     - source/common/grpc/google_async_client_impl.cc
-    - source/common/formatter/substitution_format_utility.cc
     # Extensions can exempt entire directories but new extensions
     # points should ideally use StatusOr
     - source/extensions/access_loggers
-    - source/extensions/bootstrap/wasm/config.cc
     - source/extensions/clusters/eds/
     - source/extensions/clusters/logical_dns
     - source/extensions/clusters/original_dst
     - source/extensions/clusters/redis
     - source/extensions/clusters/static
     - source/extensions/clusters/strict_dns
-    - source/extensions/common
+    - source/extensions/common/async_files
+    - source/extensions/common/aws
+    - source/extensions/common/dubbo
+    - source/extensions/common/matcher
+    - source/extensions/common/tap
+    - source/extensions/common/wasm
     - source/extensions/config/validators/minimum_clusters/minimum_clusters_validator.cc
     - source/extensions/config_subscription
     - source/extensions/compression/zstd/common/dictionary_manager.h
     - source/extensions/filters/http/adaptive_concurrency/controller
-    - source/extensions/filters/http/admission_control
-    - source/extensions/filters/http/aws_lambda
-    - source/extensions/filters/http/aws_request_signing
-    - source/extensions/filters/http/bandwidth_limit
     - source/extensions/filters/http/basic_auth
     - source/extensions/filters/http/cache
-    - source/extensions/filters/http/cdn_loop
     - source/extensions/filters/http/common
     - source/extensions/filters/http/composite
     - source/extensions/filters/http/ext_authz
@@ -183,18 +167,15 @@ paths:
     - source/extensions/filters/http/file_system_buffer
     - source/extensions/filters/http/gcp_authn
     - source/extensions/filters/http/grpc_field_extraction
+    - source/extensions/filters/http/grpc_json_reverse_transcoder
     - source/extensions/filters/http/grpc_json_transcoder
     - source/extensions/filters/http/grpc_stats
-    - source/extensions/filters/http/header_mutation
-    - source/extensions/filters/http/header_to_metadata
     - source/extensions/filters/http/health_check
     - source/extensions/filters/http/ip_tagging
     - source/extensions/filters/http/json_to_metadata
     - source/extensions/filters/http/jwt_authn
     - source/extensions/filters/http/local_ratelimit
-    - source/extensions/filters/http/oauth2
     - source/extensions/filters/http/file_system_buffer
-    - source/extensions/filters/http/header_to_metadata
     - source/extensions/filters/http/on_demand
     - source/extensions/filters/http/json_to_metadata
     - source/extensions/filters/http/json_to_metadata
@@ -205,7 +186,17 @@ paths:
     - source/extensions/filters/http/ratelimit
     - source/extensions/filters/http/oauth2
     - source/extensions/filters/http/wasm
-    - source/extensions/filters/network
+    - source/extensions/filters/network/dubbo_proxy
+    - source/extensions/filters/network/rbac
+    - source/extensions/filters/network/sni_dynamic_forward_proxy
+    - source/extensions/filters/network/common
+    - source/extensions/filters/network/redis_proxy
+    - source/extensions/filters/network/zookeeper_proxy
+    - source/extensions/filters/network/ext_authz
+    - source/extensions/filters/network/mongo_proxy
+    - source/extensions/filters/network/thrift_proxy
+    - source/extensions/filters/network/generic_proxy
+    - source/extensions/filters/network/ratelimit
     - source/extensions/filters/common
     - source/extensions/filters/udp
     - source/extensions/filters/listener
@@ -230,7 +221,6 @@ paths:
     - source/extensions/rate_limit_descriptors
     - source/extensions/resource_monitors
     - source/extensions/router/cluster_specifiers/lua/lua_cluster_specifier.cc
-    - source/extensions/stat_sinks
     - source/extensions/string_matcher/lua/match.cc
     - source/extensions/tracers
     - source/extensions/transport_sockets/internal_upstream
@@ -254,7 +244,6 @@ paths:
   namespace_check:
     exclude:
     - tools/api_boost/testdata/
-    - tools/clang_tools/
 
   # Files that should not raise an error for using memcpy
   memcpy:
@@ -355,8 +344,6 @@ paths:
     - source/server/admin/stats_request.cc
     - source/server/admin/utils.h
     - source/server/admin/utils.cc
-    - tools/clang_tools/api_booster/main.cc
-    - tools/clang_tools/api_booster/proto_cxx_utils.cc
 
   # These are entire files that are allowed to use std::string_view vs. individual exclusions. Right
   # now this is just WASM which makes use of std::string_view heavily so we need to convert to
@@ -455,6 +442,7 @@ visibility_excludes:
 - source/extensions/clusters/static/
 - source/extensions/clusters/original_dst/
 - source/extensions/clusters/logical_dns/
+- source/extensions/clusters/dns/
 - source/extensions/early_data/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD

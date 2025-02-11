@@ -105,7 +105,8 @@ Network::FilterStatus StickySessionUdpProxyFilter::onDataInternal(Network::UdpRe
       ClusterInfo* cluster = active_session->cluster();
       ASSERT(cluster);
 
-      auto host = cluster->chooseHost(data.addresses_.peer_, nullptr);
+      auto host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+          cluster->chooseHost(data.addresses_.peer_, nullptr));
       if (host != nullptr && host->coarseHealth() != Upstream::Host::Health::Unhealthy &&
           host.get() != &active_session->host().value().get()) {
         ENVOY_LOG(debug, "upstream session unhealthy, recreating the session");
@@ -130,10 +131,11 @@ PerPacketLoadBalancingUdpProxyFilter::onDataInternal(Network::UdpRecvData& data)
     return Network::FilterStatus::StopIteration;
   }
 
-  auto host = cluster->chooseHost(data.addresses_.peer_, nullptr);
+  auto host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      cluster->chooseHost(data.addresses_.peer_, nullptr));
   if (host == nullptr) {
     ENVOY_LOG(debug, "cannot find any valid host.");
-    cluster->cluster_.info()->trafficStats()->upstream_cx_none_healthy_.inc();
+    cluster->cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
     return Network::FilterStatus::StopIteration;
   }
 
@@ -204,7 +206,7 @@ void UdpProxyFilter::removeSession(ActiveSession* session) {
 UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
                                          Upstream::ThreadLocalCluster& cluster,
                                          absl::flat_hash_set<ActiveSession*>&& sessions)
-    : filter_(filter), cluster_(cluster),
+    : filter_(filter), cluster_(cluster), cluster_info_(cluster.info()),
       cluster_stats_(generateStats(cluster.info()->statsScope())), sessions_(std::move(sessions)),
       member_update_cb_handle_(cluster.prioritySet().addMemberUpdateCb(
           [this](const Upstream::HostVector&, const Upstream::HostVector& hosts_removed) {
@@ -266,10 +268,11 @@ UdpProxyFilter::createSession(Network::UdpRecvData::LocalPeerAddresses&& address
     return nullptr;
   }
 
-  auto host = cluster->chooseHost(addresses.peer_, nullptr);
+  auto host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      cluster->chooseHost(addresses.peer_, nullptr));
   if (host == nullptr) {
     ENVOY_LOG(debug, "cannot find any valid host.");
-    cluster->cluster_.info()->trafficStats()->upstream_cx_none_healthy_.inc();
+    cluster->cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
     return nullptr;
   }
 
@@ -279,12 +282,12 @@ UdpProxyFilter::createSession(Network::UdpRecvData::LocalPeerAddresses&& address
 UdpProxyFilter::ActiveSession*
 UdpProxyFilter::createSessionWithOptionalHost(Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                               const Upstream::HostConstSharedPtr& host) {
-  ActiveSessionPtr new_session;
+  ActiveSessionSharedPtr new_session;
   if (config_->tunnelingConfig()) {
     ASSERT(!host);
-    new_session = std::make_unique<TunnelingActiveSession>(*this, std::move(addresses));
+    new_session = std::make_shared<TunnelingActiveSession>(*this, std::move(addresses));
   } else {
-    new_session = std::make_unique<UdpActiveSession>(*this, std::move(addresses), host);
+    new_session = std::make_shared<UdpActiveSession>(*this, std::move(addresses), host);
   }
 
   if (!new_session->createFilterChain()) {
@@ -303,11 +306,12 @@ UdpProxyFilter::createSessionWithOptionalHost(Network::UdpRecvData::LocalPeerAdd
   return nullptr;
 }
 
-Upstream::HostConstSharedPtr UdpProxyFilter::ClusterInfo::chooseHost(
+Upstream::HostSelectionResponse UdpProxyFilter::ClusterInfo::chooseHost(
     const Network::Address::InstanceConstSharedPtr& peer_address,
     StreamInfo::StreamInfo* stream_info) const {
   UdpLoadBalancerContext context(filter_.config_->hashPolicy(), peer_address, stream_info);
-  Upstream::HostConstSharedPtr host = cluster_.loadBalancer().chooseHost(&context);
+  Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      cluster_.loadBalancer().chooseHost(&context));
   return host;
 }
 
@@ -345,8 +349,7 @@ void UdpProxyFilter::ActiveSession::onSessionComplete() {
 
   filter_.config_->stats().downstream_sess_active_.dec();
   if (cluster_connections_inc_) {
-    cluster_->cluster_.info()
-        ->resourceManager(Upstream::ResourcePriority::Default)
+    cluster_->cluster_info_->resourceManager(Upstream::ResourcePriority::Default)
         .connections()
         .dec();
   }
@@ -385,7 +388,7 @@ void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
   ProtobufWkt::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   if (cluster_ != nullptr) {
-    fields_map["cluster_name"] = ValueUtil::stringValue(cluster_->cluster_.info()->name());
+    fields_map["cluster_name"] = ValueUtil::stringValue(cluster_->cluster_info_->name());
   }
   fields_map["bytes_sent"] = ValueUtil::numberValue(session_stats_.downstream_sess_tx_bytes_);
   fields_map["bytes_received"] = ValueUtil::numberValue(session_stats_.downstream_sess_rx_bytes_);
@@ -551,7 +554,7 @@ void UdpProxyFilter::UdpActiveSession::writeUpstream(Network::UdpRecvData& data)
     cluster_->cluster_stats_.sess_tx_errors_.inc();
   } else {
     cluster_->cluster_stats_.sess_tx_datagrams_.inc();
-    cluster_->cluster_.info()->trafficStats()->upstream_cx_tx_bytes_total_.add(tx_buffer_length);
+    cluster_->cluster_info_->trafficStats()->upstream_cx_tx_bytes_total_.add(tx_buffer_length);
   }
 }
 
@@ -589,10 +592,11 @@ bool UdpProxyFilter::UdpActiveSession::createUpstream() {
   }
 
   if (!host_) {
-    host_ = cluster_->chooseHost(addresses_.peer_, &udp_session_info_);
+    host_ = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+        cluster_->chooseHost(addresses_.peer_, &udp_session_info_));
     if (host_ == nullptr) {
       ENVOY_LOG(debug, "cannot find any valid host.");
-      cluster_->cluster_.info()->trafficStats()->upstream_cx_none_healthy_.inc();
+      cluster_->cluster_info_->trafficStats()->upstream_cx_none_healthy_.inc();
       return false;
     }
   }
@@ -679,7 +683,7 @@ void UdpProxyFilter::ActiveSession::onInjectWriteDatagramToFilterChain(ActiveWri
 void UdpProxyFilter::UdpActiveSession::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-    MonotonicTime receive_time, uint8_t tos, Buffer::RawSlice saved_cmsg) {
+    MonotonicTime receive_time, uint8_t tos, Buffer::OwnedImpl saved_cmsg) {
   ASSERT(cluster_);
   const uint64_t rx_buffer_length = buffer->length();
   ENVOY_LOG(trace, "received {} byte datagram from upstream: downstream={} local={} upstream={}",
@@ -687,13 +691,13 @@ void UdpProxyFilter::UdpActiveSession::processPacket(
             host_ != nullptr ? host_->address()->asStringView() : "unknown");
 
   cluster_->cluster_stats_.sess_rx_datagrams_.inc();
-  cluster_->cluster_.info()->trafficStats()->upstream_cx_rx_bytes_total_.add(rx_buffer_length);
+  cluster_->cluster_info_->trafficStats()->upstream_cx_rx_bytes_total_.add(rx_buffer_length);
 
   Network::UdpRecvData recv_data{{std::move(local_address), std::move(peer_address)},
                                  std::move(buffer),
                                  receive_time,
                                  tos,
-                                 saved_cmsg};
+                                 std::move(saved_cmsg)};
   processUpstreamDatagram(recv_data);
 }
 
@@ -784,20 +788,16 @@ bool UdpProxyFilter::ActiveSession::setClusterInfo() {
     return false;
   }
 
-  if (!cluster_->cluster_.info()
-           ->resourceManager(Upstream::ResourcePriority::Default)
+  if (!cluster_->cluster_info_->resourceManager(Upstream::ResourcePriority::Default)
            .connections()
            .canCreate()) {
     ENVOY_LOG(debug, "cannot create new connection.");
     udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
-    cluster_->cluster_.info()->trafficStats()->upstream_cx_overflow_.inc();
+    cluster_->cluster_info_->trafficStats()->upstream_cx_overflow_.inc();
     return false;
   }
 
-  cluster_->cluster_.info()
-      ->resourceManager(Upstream::ResourcePriority::Default)
-      .connections()
-      .inc();
+  cluster_->cluster_info_->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
 
   cluster_connections_inc_ = true;
   return true;
@@ -907,8 +907,10 @@ TunnelingConnectionPoolImpl::TunnelingConnectionPoolImpl(
       downstream_info_(downstream_info) {
   // TODO(ohadvano): support upstream HTTP/3.
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http2;
-  conn_pool_data_ =
-      thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, protocol, context);
+  auto host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      thread_local_cluster.loadBalancer().chooseHost(context));
+  conn_pool_data_ = thread_local_cluster.httpConnPool(host, Upstream::ResourcePriority::Default,
+                                                      protocol, context);
 }
 
 void TunnelingConnectionPoolImpl::newStream(HttpStreamCallbacks& callbacks) {
@@ -933,7 +935,7 @@ void TunnelingConnectionPoolImpl::onPoolFailure(Http::ConnectionPool::PoolFailur
   // removed by onStreamFailure, which will cause downstream_info_ to be freed.
   downstream_info_.upstreamInfo()->setUpstreamHost(host);
   downstream_info_.upstreamInfo()->setUpstreamTransportFailureReason(failure_reason);
-  callbacks_->onStreamFailure(reason, failure_reason, host);
+  callbacks_->onStreamFailure(reason, failure_reason, *host);
 }
 
 void TunnelingConnectionPoolImpl::onPoolReady(Http::RequestEncoder& request_encoder,
@@ -1002,21 +1004,20 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
 
   // Check this here because the TCP conn pool will queue our request waiting for a connection that
   // will never be released.
-  if (!cluster_->cluster_.info()
-           ->resourceManager(Upstream::ResourcePriority::Default)
+  if (!cluster_->cluster_info_->resourceManager(Upstream::ResourcePriority::Default)
            .connections()
            .canCreate()) {
     udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow);
-    cluster_->cluster_.info()->trafficStats()->upstream_cx_overflow_.inc();
+    cluster_->cluster_info_->trafficStats()->upstream_cx_overflow_.inc();
     return false;
   }
 
   if (connect_attempts_ >= filter_.config_->tunnelingConfig()->maxConnectAttempts()) {
     udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
-    cluster_->cluster_.info()->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
+    cluster_->cluster_info_->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
     return false;
   } else if (connect_attempts_ >= 1) {
-    cluster_->cluster_.info()->trafficStats()->upstream_rq_retry_.inc();
+    cluster_->cluster_info_->trafficStats()->upstream_rq_retry_.inc();
   }
 
   conn_pool_ = conn_pool_factory_->createConnPool(cluster_->cluster_, load_balancer_context_.get(),
@@ -1037,7 +1038,7 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
 
 void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
-    Upstream::HostDescriptionConstSharedPtr) {
+    const Upstream::HostDescription& host) {
   ENVOY_LOG(debug, "Failed to create upstream stream: {}", failure_reason);
 
   conn_pool_.reset();
@@ -1050,11 +1051,19 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
     udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
+      host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
+    }
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     if (connecting_) {
       udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
+    }
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
+      host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
     }
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
@@ -1063,7 +1072,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
 
 void UdpProxyFilter::TunnelingActiveSession::onStreamReady(StreamInfo::StreamInfo* upstream_info,
                                                            std::unique_ptr<HttpUpstream>&& upstream,
-                                                           Upstream::HostDescriptionConstSharedPtr&,
+                                                           const Upstream::HostDescription& host,
                                                            const Network::ConnectionInfoProvider&,
                                                            Ssl::ConnectionInfoConstSharedPtr) {
   // TODO(ohadvano): save the host description to host_ field. This requires refactoring because
@@ -1077,6 +1086,10 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamReady(StreamInfo::StreamInf
   connecting_ = false;
   can_send_upstream_ = true;
   cluster_->cluster_stats_.sess_tunnel_success_.inc();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
+    host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
+  }
 
   if (filter_.config_->flushAccessLogOnTunnelConnected()) {
     fillSessionStreamInfo();
@@ -1103,9 +1116,12 @@ void UdpProxyFilter::TunnelingActiveSession::onUpstreamEvent(Network::Connection
       event == Network::ConnectionEvent::LocalClose) {
     upstream_.reset();
 
-    if (!connecting || !establishUpstreamConnection()) {
+    if (!connecting) {
       filter_.removeSession(this);
+      return;
     }
+
+    resetRetryTimer();
   }
 }
 
@@ -1114,17 +1130,29 @@ void UdpProxyFilter::TunnelingActiveSession::onAboveWriteBufferHighWatermark() {
 }
 
 void UdpProxyFilter::TunnelingActiveSession::onBelowWriteBufferLowWatermark() {
-  can_send_upstream_ = true;
-  flushBuffer();
+  // In cases where onBelowWriteBufferLowWatermark is called during an active
+  // write process to the upstream, flushBuffer will cause another write operation
+  // on the upstream connection, which causes nghttp2 based codec to segmentation fault,
+  // and oghttp2 based codec to drop the new written data. To avoid this, posting the
+  // flush operation on the dispatcher, so it can be done after current write operation
+  // had finished.
+  filter_.read_callbacks_->udpListener().dispatcher().post(
+      [session = shared_from_this()]() { session->flushBuffer(); });
 }
 
 void UdpProxyFilter::TunnelingActiveSession::flushBuffer() {
+  if (!upstream_) {
+    return;
+  }
+
   while (!datagrams_buffer_.empty()) {
     BufferedDatagramPtr buffered_datagram = std::move(datagrams_buffer_.front());
     datagrams_buffer_.pop();
     buffered_bytes_ -= buffered_datagram->buffer_->length();
     upstream_->encodeData(*buffered_datagram->buffer_);
   }
+
+  can_send_upstream_ = true;
 }
 
 void UdpProxyFilter::TunnelingActiveSession::maybeBufferDatagram(Network::UdpRecvData& data) {
@@ -1169,7 +1197,7 @@ void UdpProxyFilter::TunnelingActiveSession::onUpstreamData(Buffer::Instance& da
 
   ASSERT(cluster_);
   cluster_->cluster_stats_.sess_rx_datagrams_.inc();
-  cluster_->cluster_.info()->trafficStats()->upstream_cx_rx_bytes_total_.add(rx_buffer_length);
+  cluster_->cluster_info_->trafficStats()->upstream_cx_rx_bytes_total_.add(rx_buffer_length);
   resetIdleTimer();
 
   Network::UdpRecvData recv_data{{addresses_.local_, addresses_.peer_},
@@ -1193,6 +1221,43 @@ void UdpProxyFilter::TunnelingActiveSession::onIdleTimer() {
   }
 
   filter_.removeSession(this);
+}
+
+void UdpProxyFilter::TunnelingActiveSession::onRetryTimer() {
+  if (!establishUpstreamConnection()) {
+    filter_.removeSession(this);
+  }
+}
+
+void UdpProxyFilter::TunnelingActiveSession::resetRetryTimer() {
+  // Create the retry timer on the first retry.
+  if (!retry_timer_) {
+    retry_timer_ =
+        filter_.read_callbacks_->udpListener().dispatcher().createTimer([this] { onRetryTimer(); });
+  }
+
+  // If the backoff strategy is not configured, the next backoff time will be 0.
+  // This will allow the retry to happen on different event loop iteration, which
+  // will allow the connection pool to be cleaned up from the previous closed connection.
+  uint64_t next_backoff_ms = 0;
+
+  if (filter_.config_->tunnelingConfig()->backoffStrategy()) {
+    next_backoff_ms = filter_.config_->tunnelingConfig()->backoffStrategy()->nextBackOffMs();
+  }
+
+  retry_timer_->enableTimer(std::chrono::milliseconds(next_backoff_ms));
+}
+
+void UdpProxyFilter::TunnelingActiveSession::disableRetryTimer() {
+  if (retry_timer_ != nullptr) {
+    retry_timer_->disableTimer();
+    retry_timer_.reset();
+  }
+}
+
+void UdpProxyFilter::TunnelingActiveSession::onSessionComplete() {
+  disableRetryTimer();
+  ActiveSession::onSessionComplete();
 }
 
 } // namespace UdpProxy

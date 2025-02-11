@@ -278,7 +278,7 @@ Or, through ``bodyChunks()`` API, which let Envoy to skip buffering the upstream
 Complete example
 ----------------
 
-A complete example using Docker is available in :repo:`/examples/lua`.
+A complete example using Docker is available in `here <https://github.com/envoyproxy/examples/tree/main/lua>`__.
 
 Stream handle API
 -----------------
@@ -372,19 +372,7 @@ to the next filter.
 
 Returns a :ref:`header object <config_http_filters_lua_header_wrapper>`.
 
-``log*()``
-^^^^^^^^^^
-
-.. code-block:: lua
-
-  handle:logTrace(message)
-  handle:logDebug(message)
-  handle:logInfo(message)
-  handle:logWarn(message)
-  handle:logErr(message)
-  handle:logCritical(message)
-
-Logs a message using Envoy's application logging. *message* is a string to log.
+.. include:: ../../../_include/lua_common.rst
 
 ``httpCall()``
 ^^^^^^^^^^^^^^
@@ -657,6 +645,8 @@ Default resolution is millisecond if *resolution* is not set.
 Header object API
 -----------------
 
+.. include:: ../../../_include/lua_common.rst
+
 ``add()``
 ^^^^^^^^^
 
@@ -753,6 +743,8 @@ effects HTTP/1 connections. It will have no effect if the client is HTTP/2 or HT
 Buffer API
 ----------
 
+.. include:: ../../../_include/lua_common.rst
+
 ``length()``
 ^^^^^^^^^^^^
 
@@ -790,6 +782,8 @@ Set the content of wrapped buffer with the input string.
 Metadata object API
 -------------------
 
+.. include:: ../../../_include/lua_common.rst
+
 ``get()``
 ^^^^^^^^^
 
@@ -817,6 +811,8 @@ key. *value* is a *metadata* entry value.
 Stream info object API
 -----------------------
 
+.. include:: ../../../_include/lua_common.rst
+
 ``protocol()``
 ^^^^^^^^^^^^^^
 
@@ -826,6 +822,47 @@ Stream info object API
 
 Returns the string representation of :repo:`HTTP protocol <envoy/http/protocol.h>`
 used by the current request. The possible values are: ``HTTP/1.0``, ``HTTP/1.1``, ``HTTP/2`` and ``HTTP/3*``.
+
+.. _config_http_filters_lua_stream_info_route_name:
+
+``routeName()``
+^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:routeName()
+
+Returns the name of the route matched by the filter chain. Returns an empty string if no route was matched.
+
+Example usage:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local route_name = request_handle:streamInfo():routeName()
+    request_handle:logInfo("Matched route: " .. route_name)
+  end
+
+.. _config_http_filters_lua_stream_info_virtual_cluster_name:
+
+``virtualClusterName()``
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:virtualClusterName()
+
+Returns the name of the virtual cluster matched for the current request. Returns an empty string if no virtual cluster
+was matched.
+
+Example usage:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local virtual_cluster = request_handle:streamInfo():virtualClusterName()
+    request_handle:logInfo("Matched virtual cluster: " .. virtual_cluster)
+  end
 
 .. _config_http_filters_lua_stream_info_downstream_direct_local_address:
 
@@ -911,6 +948,8 @@ Returns the string representation of :repo:`requested server name <envoy/stream_
 Connection stream info object API
 ---------------------------------
 
+.. include:: ../../../_include/lua_common.rst
+
 ``dynamicMetadata()``
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -922,6 +961,8 @@ Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dyn
 
 Dynamic metadata object API
 ---------------------------
+
+.. include:: ../../../_include/lua_common.rst
 
 ``get()``
 ^^^^^^^^^
@@ -980,6 +1021,8 @@ key. *value* is a *dynamicMetadata* entry value.
 Connection object API
 ---------------------
 
+.. include:: ../../../_include/lua_common.rst
+
 ``ssl()``
 ^^^^^^^^^
 
@@ -1000,6 +1043,8 @@ Returns an :ref:`SSL connection info object <config_http_filters_lua_ssl_socket_
 
 SSL connection object API
 -------------------------
+
+.. include:: ../../../_include/lua_common.rst
 
 ``peerCertificatePresented()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1251,6 +1296,8 @@ Returns the TLS version (e.g., TLSv1.2, TLSv1.3) used in the established TLS con
 
 Parsed name object API
 ----------------------
+
+.. include:: ../../../_include/lua_common.rst
 
 ``commonName()``
 ^^^^^^^^^^^^^^^^

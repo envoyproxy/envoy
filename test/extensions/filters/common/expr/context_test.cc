@@ -1,7 +1,10 @@
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "source/common/network/address_impl.h"
 #include "source/common/network/filter_state_dst_address.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/common/expr/cel_state.h"
@@ -44,17 +47,6 @@ TEST(Context, EmptyHeadersAttributes) {
 }
 
 TEST(Context, InvalidRequest) {
-  Http::TestRequestHeaderMapImpl header_map{{"referer", "dogs.com"}};
-  Protobuf::Arena arena;
-  HeadersWrapper<Http::RequestHeaderMap> headers(arena, &header_map);
-  auto header = headers[CelValue::CreateStringView("referer\n")];
-  EXPECT_FALSE(header.has_value());
-}
-
-TEST(Context, InvalidRequestLegacy) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.consistent_header_validation", "false"}});
-
   Http::TestRequestHeaderMapImpl header_map{{"referer", "dogs.com"}};
   Protobuf::Arena arena;
   HeadersWrapper<Http::RequestHeaderMap> headers(arena, &header_map);
@@ -334,10 +326,16 @@ TEST(Context, ResponseAttributes) {
   Protobuf::Arena arena;
   ResponseWrapper response(arena, &header_map, &trailer_map, info);
   ResponseWrapper empty_response(arena, nullptr, nullptr, empty_info);
+  UpstreamWrapper upstream(arena, info);
 
   EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
   EXPECT_CALL(info, legacyResponseFlags()).WillRepeatedly(Return(0x1));
+
+  auto cx_pool_start_time = MonotonicTime(std::chrono::nanoseconds(10000000));
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
 
   const absl::optional<std::string> code_details = "unauthorized";
   EXPECT_CALL(info, responseCodeDetails()).WillRepeatedly(ReturnRef(code_details));
@@ -456,6 +454,16 @@ TEST(Context, ResponseAttributes) {
   }
 
   {
+    info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+    StreamInfo::UpstreamTiming& upstream_timing = info.upstreamInfo()->upstreamTiming();
+    upstream_timing.recordConnectionPoolCallbackLatency(cx_pool_start_time, time_system);
+    auto value = upstream[CelValue::CreateStringView(UpstreamConnectionPoolReadyDuration)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsDuration());
+    EXPECT_EQ("15ms", absl::FormatDuration(value.value().DurationOrDie()));
+  }
+
+  {
     Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}, {grpc_status, "7"}};
     Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}};
     Protobuf::Arena arena;
@@ -532,6 +540,10 @@ TEST(Context, ConnectionAttributes) {
       Network::Utility::parseInternetAddressNoThrow("10.1.2.3", 679, false);
   Network::Address::InstanceConstSharedPtr upstream_local_address =
       Network::Utility::parseInternetAddressNoThrow("10.1.2.3", 1000, false);
+  ::envoy::config::core::v3::Locality upstream_locality;
+  upstream_locality.set_region("upstream_locality_region");
+  upstream_locality.set_zone("upstream_locality_zone");
+  upstream_locality.set_sub_zone("upstream_locality_sub_zone");
   const std::string sni_name = "kittens.com";
   info.downstream_connection_info_provider_->setLocalAddress(local);
   info.downstream_connection_info_provider_->setRemoteAddress(remote);
@@ -554,6 +566,7 @@ TEST(Context, ConnectionAttributes) {
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
+  EXPECT_CALL(*upstream_host, locality()).WillRepeatedly(ReturnRef(upstream_locality));
 
   const std::string tls_version = "TLSv1";
   EXPECT_CALL(*downstream_ssl_info, tlsVersion()).WillRepeatedly(ReturnRef(tls_version));
@@ -816,6 +829,14 @@ TEST(Context, ConnectionAttributes) {
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(upstream_transport_failure_reason, value.value().StringOrDie().value());
   }
+
+  {
+    auto value = upstream[CelValue::CreateStringView(UpstreamLocality)];
+    ASSERT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMessage());
+    EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(*value.value().MessageOrDie(),
+                                                           upstream_locality));
+  }
 }
 
 TEST(Context, FilterStateAttributes) {
@@ -950,6 +971,18 @@ TEST(Context, XDSAttributes) {
     EXPECT_EQ(&route->metadata_, value.value().MessageOrDie());
   }
   {
+    const auto value = wrapper[CelValue::CreateStringView(VirtualHostName)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsString());
+    EXPECT_EQ("fake_vhost", value.value().StringOrDie().value());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(VirtualHostMetadata)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMessage());
+    EXPECT_EQ(&route->virtual_host_.metadata_, value.value().MessageOrDie());
+  }
+  {
     const auto value = wrapper[CelValue::CreateStringView(UpstreamHostMetadata)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
@@ -1041,6 +1074,16 @@ TEST(Context, EmptyXdsWrapper) {
 
   {
     const auto value = wrapper[CelValue::CreateStringView(RouteMetadata)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(VirtualHostName)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = wrapper[CelValue::CreateStringView(VirtualHostMetadata)];
     EXPECT_FALSE(value.has_value());
   }
 
@@ -1142,6 +1185,16 @@ TEST(Context, UpstreamEdgeCases) {
 
   {
     const auto value = upstream[CelValue::CreateStringView(UpstreamTransportFailureReason)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = upstream[CelValue::CreateStringView(UpstreamConnectionPoolReadyDuration)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = upstream[CelValue::CreateStringView(UpstreamLocality)];
     EXPECT_FALSE(value.has_value());
   }
 }

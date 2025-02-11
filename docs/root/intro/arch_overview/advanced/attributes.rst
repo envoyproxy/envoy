@@ -153,6 +153,8 @@ The following attributes are available once the upstream connection is establish
    upstream.local_address, string, The local address of the upstream connection
    upstream.transport_failure_reason, string, The upstream transport failure reason e.g. certificate validation failed
    upstream.request_attempt_count, uint, The count of upstream request attempts. A value of ‘0’ indicates that the request was never attempted upstream
+   upstream.cx_pool_ready_duration, duration, Total duration from when the upstream request was created to when the upstream connection pool is ready
+   upstream.locality, :ref:`Locality<envoy_v3_api_msg_config.core.v3.locality>`, Locality information of upstream host
 
 Metadata and filter state
 -------------------------
@@ -196,6 +198,8 @@ following attributes:
    xds.listener_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Listener metadata
    xds.route_name, string, Route name
    xds.route_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Route metadata
+   xds.virtual_host_name, string, Virtual host name.
+   xds.virtual_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Virtual host metadata
    xds.upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata
    xds.filter_chain_name, string, Listener filter chain name
 

@@ -92,6 +92,7 @@ categories:
 - envoy.matching.common_inputs
 - envoy.matching.input_matchers
 - envoy.tls.key_providers
+- envoy.upstream_options
 - envoy.quic.connection_debug_visitor
 - envoy.quic.connection_id_generator
 - envoy.quic.proof_source
@@ -140,6 +141,7 @@ categories:
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
 - envoy.router.cluster_specifier_plugin
+- envoy.tap_sinks.udp_sink
 - envoy.tracers.opentelemetry.resource_detectors
 - envoy.tracers.opentelemetry.samplers
 

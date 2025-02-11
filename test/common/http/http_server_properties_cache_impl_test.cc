@@ -242,8 +242,9 @@ TEST_P(HttpServerPropertiesCacheImplTest, ToAndFromOriginString) {
 }
 TEST_P(HttpServerPropertiesCacheImplTest, MaxEntries) {
   // This test requires store. Do not execute it when store is not present.
-  if (store_ == nullptr)
+  if (store_ == nullptr) {
     return;
+  }
   initialize();
   EXPECT_EQ(0, protocols_->size());
   const std::string hostname = "hostname";
@@ -330,8 +331,9 @@ TEST_P(HttpServerPropertiesCacheImplTest, InvalidString) {
 
 TEST_P(HttpServerPropertiesCacheImplTest, CacheLoad) {
   // This test requires store. Do not execute it when store is not present.
-  if (store_ == nullptr)
+  if (store_ == nullptr) {
     return;
+  }
   EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
     fn("foo", "bar");
     fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|2|3");
@@ -353,8 +355,9 @@ TEST_P(HttpServerPropertiesCacheImplTest, CacheLoad) {
 
 TEST_P(HttpServerPropertiesCacheImplTest, CacheLoadSrttOnly) {
   // This test requires store. Do not execute it when store is not present.
-  if (store_ == nullptr)
+  if (store_ == nullptr) {
     return;
+  }
   EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
     fn("https://hostname1:1", "clear|5|0");
   }));

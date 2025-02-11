@@ -730,7 +730,7 @@ void HostSetImpl::updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_para
                            hosts_per_locality_, excluded_hosts_per_locality_, locality_weights_,
                            overprovisioning_factor_, seed);
 
-  runUpdateCallbacks(hosts_added, hosts_removed);
+  THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
 }
 
 void HostSetImpl::rebuildLocalityScheduler(
@@ -874,8 +874,7 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
       host_sets_priority_update_cbs_.push_back(
           host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
                                                const HostVector& hosts_removed) {
-            runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
-            return absl::OkStatus();
+            return runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
           }));
       host_sets_.push_back(std::move(host_set));
     }
@@ -902,7 +901,7 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
                     hosts_removed, seed, weighted_priority_health, overprovisioning_factor);
 
   if (!batch_update_) {
-    runUpdateCallbacks(hosts_added, hosts_removed);
+    THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
   }
 }
 
@@ -916,7 +915,7 @@ void PrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
   HostVector net_hosts_added = filterHosts(scope.all_hosts_added_, scope.all_hosts_removed_);
   HostVector net_hosts_removed = filterHosts(scope.all_hosts_removed_, scope.all_hosts_added_);
 
-  runUpdateCallbacks(net_hosts_added, net_hosts_removed);
+  THROW_IF_NOT_OK(runUpdateCallbacks(net_hosts_added, net_hosts_removed));
 }
 
 void PrioritySetImpl::BatchUpdateScope::updateHosts(
@@ -1057,7 +1056,6 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
     Server::Configuration::ServerFactoryContext& factory_context, const ClusterProto& cluster) {
-  LoadBalancerConfigPtr lb_config;
   TypedLoadBalancerFactory* lb_factory = nullptr;
 
   switch (cluster.lb_policy()) {
@@ -1099,25 +1097,30 @@ LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
                     ClusterProto::LbPolicy_Name(cluster.lb_policy())));
   }
 
-  return Result{lb_factory, lb_factory->loadConfig(factory_context, cluster)};
+  auto lb_config_or_error = lb_factory->loadLegacy(factory_context, cluster);
+  RETURN_IF_NOT_OK_REF(lb_config_or_error.status());
+  return Result{lb_factory, std::move(lb_config_or_error.value())};
 }
 
 absl::StatusOr<LegacyLbPolicyConfigHelper::Result>
 LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProto(
     Server::Configuration::ServerFactoryContext& factory_context, const ClusterProto& cluster) {
-  // Handle the lb subset config case first.
-  // Note it is possible to have a lb_subset_config without actually having any subset selectors.
-  // In this case the subset load balancer should not be used.
-  if (cluster.has_lb_subset_config() && !cluster.lb_subset_config().subset_selectors().empty()) {
-    auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
-        "envoy.load_balancing_policies.subset");
-    if (lb_factory != nullptr) {
-      return Result{lb_factory, lb_factory->loadConfig(factory_context, cluster)};
-    }
+  if (!cluster.has_lb_subset_config() ||
+      // Note it is possible to have a lb_subset_config without actually having any
+      // subset selectors. In this case the subset load balancer should not be used.
+      cluster.lb_subset_config().subset_selectors().empty()) {
+    return getTypedLbConfigFromLegacyProtoWithoutSubset(factory_context, cluster);
+  }
+
+  auto* lb_factory = Config::Utility::getFactoryByName<TypedLoadBalancerFactory>(
+      "envoy.load_balancing_policies.subset");
+  if (lb_factory == nullptr) {
     return absl::InvalidArgumentError("No subset load balancer factory found");
   }
 
-  return getTypedLbConfigFromLegacyProtoWithoutSubset(factory_context, cluster);
+  auto subset_lb_config_or_error = lb_factory->loadLegacy(factory_context, cluster);
+  RETURN_IF_NOT_OK_REF(subset_lb_config_or_error.status());
+  return Result{lb_factory, std::move(subset_lb_config_or_error.value())};
 }
 
 using ProtocolOptionsHashMap =
@@ -1256,7 +1259,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                   common_lb_config_->ignore_new_hosts_until_first_hc()),
       set_local_interface_name_on_upstream_connections_(
           config.upstream_connection_options().set_local_interface_name_on_upstream_connections()),
-      added_via_api_(added_via_api), has_configured_http_filters_(false),
+      added_via_api_(added_via_api),
       per_endpoint_stats_(config.has_track_cluster_stats() &&
                           config.track_cluster_stats().per_endpoint_stats()) {
 #ifdef WIN32
@@ -1406,35 +1409,23 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   if (http_protocol_options_) {
-    Http::FilterChainUtility::FiltersList http_filters = http_protocol_options_->http_filters_;
-    has_configured_http_filters_ = !http_filters.empty();
-    static const std::string upstream_codec_type_url(
-        envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance()
-            .GetTypeName());
-    if (http_filters.empty()) {
-      auto* codec_filter = http_filters.Add();
-      codec_filter->set_name("envoy.filters.http.upstream_codec");
-      codec_filter->mutable_typed_config()->set_type_url(
-          absl::StrCat("type.googleapis.com/", upstream_codec_type_url));
-    } else {
-      const auto last_type_url =
-          Config::Utility::getFactoryType(http_filters[http_filters.size() - 1].typed_config());
-      if (last_type_url != upstream_codec_type_url) {
-        creation_status = absl::InvalidArgumentError(fmt::format(
-            "The codec filter is the only valid terminal upstream HTTP filter, use '{}'",
-            upstream_codec_type_url));
+    if (!http_protocol_options_->http_filters_.empty()) {
+      creation_status = Http::FilterChainUtility::checkUpstreamHttpFiltersList(
+          http_protocol_options_->http_filters_);
+      if (!creation_status.ok()) {
         return;
       }
-    }
 
-    std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
-    Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
-                            Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
-               factory_context.clusterManager(), upstream_context_, prefix);
-    SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_filters, "upstream http", "upstream http",
-                                                   http_filter_factories_),
-                             creation_status);
+      std::string prefix = stats_scope_->symbolTable().toString(stats_scope_->prefix());
+      Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
+                              Server::Configuration::UpstreamHttpFilterConfigFactory>
+          helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
+                 factory_context.clusterManager(), upstream_context_, prefix);
+      SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
+                                                     "upstream http", "upstream http",
+                                                     http_filter_factories_),
+                               creation_status);
+    }
   }
 }
 
@@ -1476,8 +1467,9 @@ ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& 
           *proto_message));
 
       load_balancer_factory_ = factory;
-      load_balancer_config_ = factory->loadConfig(context, *proto_message);
-
+      auto lb_config_or_error = factory->loadConfig(context, *proto_message);
+      RETURN_IF_NOT_OK_REF(lb_config_or_error.status());
+      load_balancer_config_ = std::move(lb_config_or_error.value());
       break;
     }
     missing_policies.push_back(policy.typed_extension_config().name());
@@ -1737,7 +1729,7 @@ ResourceManager& ClusterInfoImpl::resourceManager(ResourcePriority priority) con
   return *resource_managers_.managers_[enumToInt(priority)];
 }
 
-void ClusterImplBase::initialize(std::function<void()> callback) {
+void ClusterImplBase::initialize(std::function<absl::Status()> callback) {
   ASSERT(!initialization_started_);
   ASSERT(initialization_complete_callback_ == nullptr);
   initialization_complete_callback_ = callback;
@@ -1799,7 +1791,7 @@ void ClusterImplBase::finishInitialization() {
   }
 
   if (snapped_callback != nullptr) {
-    snapped_callback();
+    THROW_IF_NOT_OK(snapped_callback());
   }
 }
 
