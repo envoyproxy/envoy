@@ -207,12 +207,12 @@ struct SyncPacketProcessor : public Network::UdpPacketProcessor {
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
-                     Buffer::RawSlice saved_cmsg) override {
+                     Buffer::OwnedImpl saved_cmsg) override {
     Network::UdpRecvData datagram{{std::move(local_address), std::move(peer_address)},
                                   std::move(buffer),
                                   receive_time,
                                   tos,
-                                  saved_cmsg};
+                                  std::move(saved_cmsg)};
     data_.push_back(std::move(datagram));
   }
   uint64_t maxDatagramSize() const override { return max_rx_datagram_size_; }

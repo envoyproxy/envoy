@@ -234,7 +234,16 @@ public:
 
   void closeStream() {
     grpc_stream_->closeStream();
+    waitForEndStream();
+  }
+
+  void waitForEndStream() {
     AssertionResult result = fake_stream_->waitForEndStream(dispatcher_helper_.dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+  }
+
+  void waitForReset() {
+    AssertionResult result = fake_stream_->waitForReset(dispatcher_helper_.dispatcher_);
     RELEASE_ASSERT(result, result.message());
   }
 

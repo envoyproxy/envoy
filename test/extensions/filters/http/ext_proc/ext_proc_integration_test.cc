@@ -1088,6 +1088,45 @@ TEST_P(ExtProcIntegrationTest, GetAndFailStreamOnResponse) {
   verifyDownstreamResponse(*response, 500);
 }
 
+TEST_P(ExtProcIntegrationTest, OnlyRequestHeaders) {
+  // Skip the header processing on response path.
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // The response does not really matter, it just needs to be non-empty.
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        return true;
+      });
+  // ext_proc is configured to only send request headers. In this case, server indicates that it is
+  // not expecting any more messages from ext_proc filter and half-closes the stream.
+  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
+
+  // ext_proc will immediately close side stream in this case, because by default Envoy gRPC client
+  // will reset the stream if the server half-closes before the client. Note that the ext_proc
+  // filter has not yet half-closed the sidestream, since it is doing it during its destruction.
+  // TODO(yanavlasov): Enable independent half-close for Envoy gRPC client and remove this check.
+  // TODO(yanavlasov): Reset in Google gRPC case is unexpected. Diagnose and fix.
+  EXPECT_TRUE(processor_stream_->waitForReset());
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  verifyDownstreamResponse(*response, 200);
+}
+
 // Test the filter using the default configuration by connecting to
 // an ext_proc server that responds to the request_headers message
 // by requesting to modify the request headers.
@@ -2105,6 +2144,11 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
     hdr2->mutable_header()->set_key("content-type");
     hdr2->mutable_header()->set_raw_value("application/json");
   });
+
+  // ext_proc will immediately close side stream in this case, which causes it to be reset,
+  // since side stream codec had not yet observed server trailers.
+  // TODO(yanavlasov): Separate lifetimes of ext_proc and sidestream.
+  EXPECT_TRUE(processor_stream_->waitForReset());
 
   verifyDownstreamResponse(*response, 401);
   EXPECT_THAT(response->headers(), SingleHeaderValueIs("x-failure-reason", "testing"));
