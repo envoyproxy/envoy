@@ -51,7 +51,6 @@ envoy_cc_extension(
         "//source/common/network:cidr_range_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:route_provider_manager_lib",
-        "//source/common/runtime:runtime_lib",
         "//source/common/tracing:custom_tag_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:tracer_config_lib",
