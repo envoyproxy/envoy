@@ -2897,7 +2897,6 @@ TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {
   CredentialsProviderChain chain;
   chain.add(mock_provider1);
   chain.add(mock_provider2);
-  CredentialsPendingCallback cb = {};
   const absl::StatusOr<Credentials> creds = chain.getCredentials();
   EXPECT_EQ(Credentials(), creds.value());
 }
@@ -2915,7 +2914,6 @@ TEST(CredentialsProviderChainTest, getCredentials_firstProviderReturns) {
   chain.add(mock_provider1);
   chain.add(mock_provider2);
 
-  CredentialsPendingCallback cb = {};
   const absl::StatusOr<Credentials> ret_creds = chain.getCredentials();
 
   EXPECT_EQ(creds, ret_creds.value());
@@ -2934,7 +2932,6 @@ TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
   chain.add(mock_provider1);
   chain.add(mock_provider2);
 
-  CredentialsPendingCallback cb = {};
   const absl::StatusOr<Credentials> ret_creds = chain.getCredentials();
   EXPECT_EQ(creds, ret_creds.value());
 }
