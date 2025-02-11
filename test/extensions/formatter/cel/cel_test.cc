@@ -178,7 +178,7 @@ TEST_F(CELFormatterTest, TestInvalidExpression) {
       EnvoyException, "Not able to parse filter expression: .*");
 }
 
-TEST_F(CELFormatterTest, TestRegexCapture) {
+TEST_F(CELFormatterTest, TestRegexExtFunctions) {
   const std::string yaml = R"EOF(
   text_format_source:
     inline_string: "%CEL(request.url_path.contains('request'))% %CEL(re.extract('', '', ''))%"
