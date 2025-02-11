@@ -252,7 +252,7 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
               subscribers_copy = credentials_subscribers_;
           }
           for (auto& cb : subscribers_copy) {
-                ENVOY_LOG_MISC(debug, "Calling callback");
+                ENVOY_LOG_MISC(debug, "Notifying subscriber of credential update");
                 cb->onCredentialUpdate();
               }
         });

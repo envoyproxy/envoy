@@ -136,6 +136,14 @@ public:
   virtual void onCredentialUpdate() PURE;
 };
 
+// Subscription model allowing CredentialsProviderChains to be notified of credential provider updates
+// A credential provider chain will call credential_provider->subscribeToCredentialUpdates to register itself for updates
+// via onCredentialUpdate callback.
+// When a credential provider has successfully updated all threads with new credentials, via the setCredentialsToAllThreads method
+// it will notify all subscribers that credentials have been retrieved.
+// RAII is used, as credential providers may be instantiated as singletons, as such they may outlive the credential provider chain.
+// Subscription is only relevant for metadata credentials providers, as these are the only credential providers that implement async
+// credential retrieval functionality.
 class CredentialSubscriberCallbacksHandle
     : public RaiiListElement<CredentialSubscriberCallbacks*> {
 public:
@@ -374,8 +382,9 @@ public:
   Credentials getCredentials() override;
   bool credentialsPending(CredentialsPendingCallback&&) override;
   std::string providerName() override { return "CredentialsProviderChain"; };
-  void onCredentialUpdate() override;
   void addSubscription(CredentialSubscriberCallbacksHandlePtr);
+  // Callback to notify on credential updates occurring from a chain member
+  void onCredentialUpdate() override;
 protected:
   std::list<CredentialsProviderSharedPtr> providers_;
   Thread::MutexBasicLockable mu_;

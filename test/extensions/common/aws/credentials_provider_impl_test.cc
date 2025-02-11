@@ -3092,6 +3092,29 @@ TEST_F(AsyncCredentialHandlingTest, ReceivePendingTrueWhenPending) {
   timer_->invokeCallback();
 }
 
+class TestSubscriber: public CredentialsProviderChain
+{
+  public:
+  bool credentialsPending(CredentialsPendingCallback&& cb) override {
+      credential_pending_callbacks_.push_back(std::move(cb));
+      return true;
+  };
+
+  void onCredentialUpdate() override {
+    for (const auto& cb : credential_pending_callbacks_) {
+    cb();
+  }
+
+  };
+  void addSubscription(CredentialSubscriberCallbacksHandlePtr subscription) 
+  {
+    subscriber_handles_.push_back(std::move(subscription));
+  }
+
+  std::list<CredentialSubscriberCallbacksHandlePtr> subscriber_handles_;
+  std::vector<CredentialsPendingCallback> credential_pending_callbacks_ = {};
+};
+
 TEST_F(AsyncCredentialHandlingTest, CallbacksCalledWhenCredentialsReturned) {
   MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
       MetadataFetcher::MetadataReceiver::RefreshState::Ready;
@@ -3144,8 +3167,12 @@ TEST_F(AsyncCredentialHandlingTest, CallbacksCalledWhenCredentialsReturned) {
   }
 }
 )EOF";
+
+  auto subscriber = std::make_shared<TestSubscriber>();
+  subscriber->addSubscription(provider_->subscribeToCredentialUpdates(*subscriber));
+
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-      "vpc-lattice-svcs", "ap-southeast-2", provider_, context_,
+      "vpc-lattice-svcs", "ap-southeast-2", subscriber, context_,
       Common::Aws::AwsSigningHeaderExclusionVector{});
   addMethod("GET");
   addPath("/");
@@ -3164,6 +3191,7 @@ TEST_F(AsyncCredentialHandlingTest, CallbacksCalledWhenCredentialsReturned) {
 
             receiver.onMetadataSuccess(std::move(document));
           }));
+
 
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
@@ -3219,8 +3247,11 @@ TEST_F(AsyncCredentialHandlingTest, AnonymousCredsWhenRetrievalFails) {
 }
 )EOF";
 
+  auto subscriber = std::make_shared<TestSubscriber>();
+  subscriber->addSubscription(provider_->subscribeToCredentialUpdates(*subscriber));
+
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-      "vpc-lattice-svcs", "ap-southeast-2", provider_, context_,
+      "vpc-lattice-svcs", "ap-southeast-2", subscriber, context_,
       Common::Aws::AwsSigningHeaderExclusionVector{});
   addMethod("GET");
   addPath("/");
