@@ -47,10 +47,10 @@ constexpr absl::string_view PerConnectionIdleTimeoutMs =
 /**
  * ReceiveBeforeConnectKey is the key for the receive_before_connect filter state. The
  * filter state value is a ``StreamInfo::BoolAccessor`` indicating whether the
- * receive_before_connect functionionality should be enabled. Network filters setting this filter
+ * receive_before_connect functionality should be enabled. Network filters setting this filter
  * state should return `StopIteration` in their `onNewConnection` and `onData` methods until they
  * have read the data they need before the upstream connection establishment, and only then allow
- * the filter chain to proceed upto the TCP_PROXY filter.
+ * the filter chain to proceed to the TCP_PROXY filter.
  */
 constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_before_connect";
 

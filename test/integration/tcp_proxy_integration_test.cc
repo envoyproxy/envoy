@@ -1720,7 +1720,8 @@ INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, MysqlIntegrationTest,
 
 class PauseIterationFilter : public Network::ReadFilter {
 public:
-  explicit PauseIterationFilter(int data_size_before_continue) : data_size_before_continue_(data_size_before_continue) {}
+  explicit PauseIterationFilter(int data_size_before_continue)
+      : data_size_before_continue_(data_size_before_continue) {}
 
   Network::FilterStatus onData(Buffer::Instance& buffer, bool) override {
     if (buffer.length() >= data_size_before_continue_) {
@@ -1749,18 +1750,21 @@ public:
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
-class PauseIterationFilterFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
+class PauseIterationFilterFactory : public Extensions::NetworkFilters::Common::FactoryBase<
+                                        test::integration::tcp_proxy::PauseIterationFilter> {
 public:
-  absl::StatusOr<Network::FilterFactoryCb>
+  PauseIterationFilterFactory() : FactoryBase("test.pause_iteration") {}
+
+private:
+  Network::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const test::integration::tcp_proxy::PauseIterationFilter& cfg,
-                               Server::Configuration::FactoryContext&) override {
+                                    Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
-      data_size_before_continue = cfg.data_size_before_continue();
-      filter_manager.addReadFilter(std::make_shared<PauseIterationFilter>(data_size_before_continue));
+      int data_size_before_continue = cfg.data_size_before_continue();
+      filter_manager.addReadFilter(
+          std::make_shared<PauseIterationFilter>(data_size_before_continue));
     };
   }
-
-  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "test.pause_iteration"); }
 };
 
 class TcpProxyReceiveBeforeConnectIntegrationTest : public TcpProxyIntegrationTest {
