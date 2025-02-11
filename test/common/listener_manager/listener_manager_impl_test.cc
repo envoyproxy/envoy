@@ -2078,7 +2078,6 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, _)).Times(2);
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_update1_yaml)));
 
