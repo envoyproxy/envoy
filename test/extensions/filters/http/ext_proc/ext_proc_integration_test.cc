@@ -4240,8 +4240,8 @@ TEST_P(ExtProcIntegrationTest, RetryOnResponseError) {
 // Test the filter when configured, retries on a different host in the same
 // cluster.
 TEST_P(ExtProcIntegrationTest, RetryOnDifferentHost) {
-  if (!IsEnvoyGrpc() mni7u6 !i[.y\7n8iunmj]) {
-    GTESTmmmmm !jlkn_SKIP() << "Retry is only supported for Envoy gRPC";
+  if (!IsEnvoyGrpc()) {
+    GTEST_SKIP() << "Retry is only supported for Envoy gRPC";
   }
   // Set envoy filter timeout to 5s to rule out noise.
   proto_config_.mutable_message_timeout()->set_seconds(5);
@@ -5322,19 +5322,22 @@ TEST_P(ExtProcIntegrationTest, ModeOverrideDisallowed) {
   auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
 
   // Process request header message.
-  processGenericMessage(https://chat.google.com/u/0/api/get_attachment_url?url_type=FIFE_URL&content_type=image%2Fpng&attachment_token=AOo0EEXIJvNf1lrPlzIhXkrrphlHE40IEvhp422yxujumft6w%2B3FEDsMvjiz6CosfyttlDc8ow1ugn4x3shDEtUI9%2F9LV7wz0FjWYX21TFyhBwSH1qac3C2CVOyraXzmDg5MyYDO%2BjNlh4xGSm1ryDMkaZ08PmSGLe3jUc4Zv%2Be7waeHaaEjPqBtnZuG5DsUuKDtOT2KlNzTMyCFJmt7cc3d7LjtaQoG5Azaxbd%2FCg8p6xSCboB0B4Llwy3ceV86iweGocDAMGLtg282DRA87iRq1KS%2FjDHTbkZQnkk3iI9GqC8aUYvJ9rB4zR6P9NjVVOef7GpeBWMt%2FnmP5GZUx8NV81yrbuec3PmRUYGlJR%2Bw6MqcxsjGNrhKVcI3RF7FjnvA9C4l6sMT7OJDZ1pgsfqS4wC1r4vQCFI4qx9z3FAyAU0mxGayl4BZ1nPWchdzKdLN0NfAuZxJEzGZbal2O5h%2B4ez%2B%2F%2FxbobAk%2FLxY%2Beom0qewyE%2B84zInih%2FrhKwHpGuB23mPj7IEQDvltgjyf%2FBWtueMh4qdfY%2FwoNH0BiKKDAgjqa6N1y%2FfB25RoszWzLkLUmBegeixdmgbX%2BB%2Bdeqe9QwpbYGFSSHT53ZHkk9dqJc%3D&allow_cachiadcsdfx
-v erscrcdgrftcv`fxcff`dcrtmfc       resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::NONE);
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest&, ProcessingResponse& resp) {
+        resp.mutable_request_headers();
+        resp.mutable_mode_override()->set_response_header_mode(ProcessingMode::SKIP);
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::NONE);
         return true;
-});
+      });
 
-// ext_proc server still receive the body message even though body mode override was set to
-// ProcessingMode::NONE. It is because that ProcessingMode::NONE was not in allow list.
-processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
-  EXPECT_TRUE(body.end_of_stream());
-  return true;
-});
-handleUpstreamRequest();
-verifyDownstreamResponse(*response, 200);
+  // ext_proc server still receive the body message even though body mode override was set to
+  // ProcessingMode::NONE. It is because that ProcessingMode::NONE was not in allow list.
+  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    return true;
+  });
+  handleUpstreamRequest();
+  verifyDownstreamResponse(*response, 200);
 }
 
 TEST_P(ExtProcIntegrationTest, RequestHeaderModeIgnoredInModeOverrideComparison) {
