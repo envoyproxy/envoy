@@ -30,7 +30,7 @@ public:
 
   // Network::DrainDecision
 bool drainClose(Network::DrainDirection scope) const override;
-Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const override;
+Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection direction, DrainCloseCb cb) const override;
 
 
   // Server::DrainManager
@@ -46,7 +46,7 @@ Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb cb) const override;
   DrainManagerPtr createChildManager(Event::Dispatcher& dispatcher) override;
 
 private:
-  void addDrainCompleteCallback(std::function<void()> cb);
+  void addDrainCompleteCallback(Network::DrainDirection direction, std::function<void()> cb);
 
   Instance& server_;
   Event::Dispatcher& dispatcher_;
@@ -62,7 +62,7 @@ private:
       {Network::DrainDirection::InboundOnly, MonotonicTime()},
       {Network::DrainDirection::All, MonotonicTime()}};
   mutable Common::CallbackManager<std::chrono::milliseconds> cbs_{};
-  std::vector<std::function<void()>> drain_complete_cbs_{};
+  std::vector<std::function<void()>> drain_complete_cbs_;
 
   // Callbacks called by startDrainSequence to cascade/proxy to children
   std::shared_ptr<Common::ThreadSafeCallbackManager> children_;
