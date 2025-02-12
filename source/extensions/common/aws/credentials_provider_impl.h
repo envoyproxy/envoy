@@ -370,11 +370,9 @@ class CredentialsProviderChain : public CredentialsProvider,
                                  public CredentialSubscriberCallbacks,
                                  public Logger::Loggable<Logger::Id::aws> {
 public:
-
   ~CredentialsProviderChain() override {
     for (auto& subscriber_handle : subscriber_handles_) {
-      if(subscriber_handle)
-      {
+      if (subscriber_handle) {
         subscriber_handle->cancel();
       }
     }
