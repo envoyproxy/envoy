@@ -184,6 +184,11 @@ public:
   virtual ProcessContextOptRef processContext() PURE;
 
   /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
+
+  /**
    * @return the init manager of the cluster. This can be used for extensions that need
    *         to initialize after cluster manager init but before the server starts listening.
    *         All extensions should register themselves during configuration load. initialize()
