@@ -2932,6 +2932,33 @@ TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
   EXPECT_EQ(creds, ret_creds.value());
 }
 
+TEST(CredentialsProviderChainTest, CheckChainReturnsPendingInCorrectOrder) {
+  auto mock_provider1 = std::make_shared<MockCredentialsProvider>();
+  auto mock_provider2 = std::make_shared<MockCredentialsProvider>();
+
+  EXPECT_CALL(*mock_provider1, getCredentials())
+      .WillRepeatedly(Return(Credentials("provider1", "1")));
+  EXPECT_CALL(*mock_provider2, getCredentials())
+      .WillRepeatedly(Return(Credentials("provider2", "2")));
+
+  CredentialsProviderChain chain;
+  chain.add(mock_provider1);
+  chain.add(mock_provider2);
+
+  auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
+  // We want to ensure that if mock_provider1 returns credentialsPending false, then the credentials
+  // from provider1 are used Mock provider 2 credentialsPending will never be called as provider 1
+  // will trigger early exit
+  EXPECT_CALL(*mock_provider1, credentialsPending(_)).WillOnce(Return(false));
+  EXPECT_CALL(*mock_provider2, credentialsPending(_)).Times(0);
+
+  bool pending = chain.credentialsPending(std::move(cb));
+  EXPECT_EQ(pending, false);
+  auto creds = chain.getCredentials();
+  EXPECT_EQ(creds.accessKeyId(), "provider1");
+  EXPECT_EQ(creds.secretAccessKey(), "1");
+}
+
 class CustomCredentialsProviderChainTest : public testing::Test {};
 
 TEST_F(CustomCredentialsProviderChainTest, CreateFileCredentialProviderOnly) {
@@ -3157,7 +3184,6 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
   MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
       MetadataFetcher::MetadataReceiver::RefreshState::Ready;
   std::chrono::seconds initialization_timer = std::chrono::seconds(2);
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
       {};

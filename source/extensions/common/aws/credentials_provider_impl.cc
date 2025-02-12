@@ -932,6 +932,15 @@ bool CredentialsProviderChain::credentialsPending(CredentialsPendingCallback&& c
         ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
       }
       return pending;
+    } else {
+      if (provider->getCredentials().hasCredentials()) {
+        ENVOY_LOG(debug, "Provider {} has credentials, returning credentialsPending false",
+                  provider->providerName());
+        return false;
+      } else {
+        ENVOY_LOG(debug, "Provider {} has blank credentials, continuing through chain",
+                  provider->providerName());
+      }
     }
   }
   return false;
