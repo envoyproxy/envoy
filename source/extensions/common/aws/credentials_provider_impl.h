@@ -137,7 +137,7 @@ public:
 };
 
 // Subscription model allowing CredentialsProviderChains to be notified of credential provider
-// updates A credential provider chain will call credential_provider->subscribeToCredentialUpdates
+// updates. A credential provider chain will call credential_provider->subscribeToCredentialUpdates
 // to register itself for updates via onCredentialUpdate callback. When a credential provider has
 // successfully updated all threads with new credentials, via the setCredentialsToAllThreads method
 // it will notify all subscribers that credentials have been retrieved.

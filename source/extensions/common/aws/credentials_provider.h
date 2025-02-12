@@ -73,6 +73,14 @@ public:
    */
   virtual std::string providerName() PURE;
   virtual Credentials getCredentials() PURE;
+  /**
+   * If credentials are pending, then add the passed callback for notification when credentials
+   * are available.
+   * Used by our signers to delay signing until credentials are available.
+   * @param cb callback to be called when credentials are available
+   * @return true if credentials are pending (and the callback has been added), false if credentials
+   * are available
+   */
   virtual bool credentialsPending(CredentialsPendingCallback&& cb = {}) PURE;
 };
 

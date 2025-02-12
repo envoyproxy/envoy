@@ -19,8 +19,6 @@ public:
    * @param message an AWS API request message.
    * @param sign_body include the message body in the signature. The body must be fully buffered.
    * @param override_region override the default region that has to be used to sign the request
-   * @param cb If credentials are pending, a callback that will be called when credentials are
-   * available.
    * @return absl::Status::OK if the request was signed successfully.
    * @return absl::NotFoundError if credentials are pending.
    */
@@ -31,8 +29,6 @@ public:
    * Sign an AWS request without a payload (empty string used as content hash).
    * @param headers AWS API request headers.
    * @param override_region override the default region that has to be used to sign the request
-   * @param cb If credentials are pending, a callback that will be called when credentials are
-   * available.
    * @return absl::Status::OK if the request was signed successfully.
    * @return absl::NotFoundError if credentials are pending.
    */
@@ -43,8 +39,6 @@ public:
    * Sign an AWS request using the literal string UNSIGNED-PAYLOAD in the canonical request.
    * @param headers AWS API request headers.
    * @param override_region override the default region that has to be used to sign the request
-   * @param cb If credentials are pending, a callback that will be called when credentials are
-   * available.
    * @return absl::Status::OK if the request was signed successfully.
    * @return absl::NotFoundError if credentials are pending.
    */
@@ -56,8 +50,6 @@ public:
    * @param headers AWS API request headers.
    * @param content_hash The Hex encoded SHA-256 of the body of the AWS API request.
    * @param override_region override the default region that has to be used to sign the request
-   * @param cb If credentials are pending, a callback that will be called when credentials are
-   * available.
    * @return absl::Status::OK if the request was signed successfully.
    * @return absl::NotFoundError if credentials are pending.
    */
