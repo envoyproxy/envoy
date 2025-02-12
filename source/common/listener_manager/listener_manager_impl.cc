@@ -1033,8 +1033,9 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
       // This prevents us from double incrementing if listeners are stopped twice.
       // This can happen if the admin endpoint is triggered for inbound_only and then
       // all.
-      if (stopped_listener_tags_.find(listener_tag) == stopped_listener_tags_.end()) {
-        stopListener(listener, options, [this, listener_tag]() {
+      stopListener(listener, options, [this, listener_tag]() {
+        // Perform the check in the callback to ensure it's done on the main thread
+        if (stopped_listener_tags_.find(listener_tag) == stopped_listener_tags_.end()) {
           stats_.listener_stopped_.inc();
           stopped_listener_tags_.insert(listener_tag);
           for (auto& listener : active_listeners_) {
@@ -1042,8 +1043,8 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
               maybeCloseSocketsForListener(*listener);
             }
           }
-        });
-      }
+        }
+      });
     }
   }
 }

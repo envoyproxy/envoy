@@ -52,7 +52,8 @@ public:
    * @return handle to remove callback
    */
   ABSL_MUST_USE_RESULT
-  virtual Common::CallbackHandlePtr addOnDrainCloseCb(DrainDirection scope, DrainCloseCb cb) const PURE;
+  virtual Common::CallbackHandlePtr addOnDrainCloseCb(DrainDirection scope,
+                                                      DrainCloseCb cb) const PURE;
 };
 
 } // namespace Network

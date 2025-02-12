@@ -52,7 +52,8 @@ public:
 
   // DrainDecision
   bool drainClose(Network::DrainDirection) const override;
-  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection, DrainCloseCb) const override {
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
+                                              DrainCloseCb) const override {
     IS_ENVOY_BUG("Unexpected function call");
     return nullptr;
   }

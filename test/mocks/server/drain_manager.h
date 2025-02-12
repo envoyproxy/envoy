@@ -26,11 +26,12 @@ public:
   MOCK_METHOD(bool, draining, (Network::DrainDirection direction), (const));
   MOCK_METHOD(void, startParentShutdownSequence, ());
   MOCK_METHOD(void, startDrainSequence,
-    (Network::DrainDirection direction, std::function<void()> completion));
+              (Network::DrainDirection direction, std::function<void()> completion));
 
   // Network::DrainDecision
   MOCK_METHOD(bool, drainClose, (Network::DrainDirection direction), (const));
-  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (Network::DrainDirection direction, DrainCloseCb cb), (const, override));
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb,
+              (Network::DrainDirection direction, DrainCloseCb cb), (const, override));
 
   std::function<void()> drain_sequence_completion_;
   Network::DrainDirection drain_direction_;

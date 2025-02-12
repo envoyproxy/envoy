@@ -29,9 +29,9 @@ public:
                    Event::Dispatcher& dispatcher);
 
   // Network::DrainDecision
-bool drainClose(Network::DrainDirection scope) const override;
-Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection direction, DrainCloseCb cb) const override;
-
+  bool drainClose(Network::DrainDirection scope) const override;
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection direction,
+                                              DrainCloseCb cb) const override;
 
   // Server::DrainManager
   void startDrainSequence(Network::DrainDirection direction,

@@ -147,7 +147,8 @@ public:
   bool drainClose(Network::DrainDirection scope) const override {
     return drain_manager_->drainClose(scope) || server_.drainManager().drainClose(scope);
   }
-  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection, DrainCloseCb) const override {
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
+                                              DrainCloseCb) const override {
     IS_ENVOY_BUG("Unexpected function call");
     return nullptr;
   }

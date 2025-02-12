@@ -199,7 +199,8 @@ public:
   ~MockDrainDecision() override;
 
   MOCK_METHOD(bool, drainClose, (Network::DrainDirection direction), (const));
-  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (Network::DrainDirection direction, DrainCloseCb cb), (const, override));
+  MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb,
+              (Network::DrainDirection direction, DrainCloseCb cb), (const, override));
 };
 
 class MockListenerFilter : public ListenerFilter {
