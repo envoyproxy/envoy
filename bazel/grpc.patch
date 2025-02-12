@@ -1,8 +1,8 @@
 diff --git a/BUILD b/BUILD
-index 06b69411a8..05cd878ae8 100644
+index 6a23c6c354..80ddecf0bf 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -29,7 +29,7 @@ licenses(["reciprocal"])
+@@ -33,7 +33,7 @@ package(
      default_visibility = ["//visibility:public"],
      features = [
          "-parse_headers",
@@ -12,10 +12,10 @@ index 06b69411a8..05cd878ae8 100644
  )
  
 diff --git a/src/core/BUILD b/src/core/BUILD
-index 1bb970e049..81265483e9 100644
+index f65a41fbe3..0a1e3dc631 100644
 --- a/src/core/BUILD
 +++ b/src/core/BUILD
-@@ -24,7 +24,7 @@ licenses(["reciprocal"])
+@@ -27,7 +27,7 @@ licenses(["reciprocal"])
  package(
      default_visibility = ["//:__subpackages__"],
      features = [
@@ -24,16 +24,70 @@ index 1bb970e049..81265483e9 100644
      ],
  )
  
-diff --git a/bazel/generate_cc.bzl b/bazel/generate_cc.bzl
-index a2c7f3a1bb..cd023ebb06 100644
---- a/bazel/generate_cc.bzl
-+++ b/bazel/generate_cc.bzl
-@@ -134,7 +134,7 @@ def generate_cc_impl(ctx):
+diff --git a/src/core/lib/promise/detail/promise_factory.h b/src/core/lib/promise/detail/promise_factory.h
+index a4cd1bacc8..86eea6594c 100644
+--- a/src/core/lib/promise/detail/promise_factory.h
++++ b/src/core/lib/promise/detail/promise_factory.h
+@@ -159,7 +159,7 @@ PromiseFactoryImpl(F& f, A&& arg) {
+ // Given a callable() -> Promise<T>, promote it to a
+ // PromiseFactory(A) -> Promise<T> by dropping the first argument.
+ template <typename A, typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION
++GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline
+     absl::enable_if_t<IsVoidCallable<ResultOf<F()>>::value,
+                       PromiseLike<decltype(std::declval<F>()())>>
+     PromiseFactoryImpl(F&& f, A&&) {
+@@ -168,7 +168,7 @@ GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION
  
-     # Include the output directory so that protoc puts the generated code in the
-     # right directory.
--    arguments.append("--proto_path={0}{1}".format(dir_out, proto_root))
-+    arguments.append("--proto_path={0}".format(dir_out))
-     arguments += [_get_srcs_file_path(proto) for proto in protos]
+ // Given a callable() -> Promise<T>, name it a PromiseFactory and use it.
+ template <typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION
++GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline
+     absl::enable_if_t<IsVoidCallable<ResultOf<F()>>::value,
+                       PromiseLike<decltype(std::declval<F>()())>>
+     PromiseFactoryImpl(F&& f) {
+@@ -188,7 +188,7 @@ class OncePromiseFactory {
+   GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit OncePromiseFactory(F f)
+       : f_(std::move(f)) {}
  
-     # create a list of well known proto files if the argument is non-None
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Promise Make(Arg&& a) {
++  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline Promise Make(Arg&& a) {
+     return PromiseFactoryImpl(std::move(f_), std::forward<Arg>(a));
+   }
+ };
+diff --git a/third_party/BUILD b/third_party/BUILD
+index 77cb52d0fc..596b348ccd 100644
+--- a/third_party/BUILD
++++ b/third_party/BUILD
+@@ -18,19 +18,19 @@ package(default_visibility = ["//:__subpackages__"])
+ 
+ alias(
+     name = "libssl",
+-    actual = "@boringssl//:ssl",
++    actual = "@envoy//bazel:boringssl",
+     tags = ["manual"],
+ )
+ 
+ alias(
+     name = "libcrypto",
+-    actual = "@boringssl//:crypto",
++    actual = "@envoy//bazel:boringcrypto",
+     tags = ["manual"],
+ )
+ 
+ alias(
+     name = "madler_zlib",
+-    actual = "@zlib//:zlib",
++    actual = "@envoy//bazel/foreign_cc:zlib",
+     tags = ["manual"],
+ )
+ 
+@@ -61,7 +61,7 @@ alias(
+ 
+ alias(
+     name = "cares",
+-    actual = "@com_github_cares_cares//:ares",
++    actual = "@envoy//bazel/foreign_cc:ares",
+     tags = ["manual"],
+ )
+ 
