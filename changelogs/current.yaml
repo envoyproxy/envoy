@@ -176,5 +176,11 @@ new_features:
   change: |
     Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
     work as an upstream filter.
+- area: listener
+  change: |
+    Added support for configuring TCP keepalive settings on both primary and additional listener addresses
+    by setting :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.Listener.tcp_keepalive>` on the primary
+    address and :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.AdditionalAddress.tcp_keepalive>`
+    on additional addresses.
 
 deprecated:

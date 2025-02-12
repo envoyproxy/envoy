@@ -45,6 +45,9 @@ message AdditionalAddress {
   // or an empty list of :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`,
   // it means no socket option will apply.
   core.v3.SocketOptionsOverride socket_options = 2;
+
+  // If set, enables TCP keepalive and configures keepalive parameters on the additional listener socket.
+  core.v3.TcpKeepalive tcp_keepalive = 3;
 }
 
 // Listener list collections. Entries are ``Listener`` resources or references.
@@ -53,7 +56,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -390,6 +393,9 @@ message Listener {
 
   // Whether the listener bypasses configured overload manager actions.
   bool bypass_overload_manager = 35;
+
+  // If set, enables TCP keepalive and configures keepalive parameters on the listener socket.
+  core.v3.TcpKeepalive tcp_keepalive = 36;
 }
 
 // A placeholder proto so that users can explicitly configure the standard
