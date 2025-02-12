@@ -77,7 +77,7 @@ bool setHeaderValueImpl(Http::HeaderMap* map, envoy_dynamic_module_type_buffer_m
     return false;
   }
   absl::string_view key_view(key, key_length);
-  if (value == nullptr || value_length == 0) {
+  if (value == nullptr) {
     map->remove(Envoy::Http::LowerCaseString(key_view));
     return true;
   }
