@@ -262,17 +262,17 @@ TEST_F(UdpConnPoolTest, ConnectionInfoProviderHasRemoteAddress) {
       .WillRepeatedly(
           Return(Envoy::OptRef<const Envoy::Network::Connection>(downstream_connection_)));
 
-  Network::ConnectionInfoProvider* connection_info_provider = nullptr;
-  auto capture_connection_info_provider =
-      [&connection_info_provider](
-          std::unique_ptr<Envoy::Router::GenericUpstream>&&,
-          Upstream::HostDescriptionConstSharedPtr,
-          const Network::ConnectionInfoProvider& connection_info_provider_ref,
-          StreamInfo::StreamInfo&, absl::optional<Envoy::Http::Protocol>) {
-        connection_info_provider =
-            &(const_cast<Network::ConnectionInfoProvider&>(connection_info_provider_ref));
+  std::string remote_address;
+  auto capture_remote_address =
+      [&remote_address](std::unique_ptr<Envoy::Router::GenericUpstream>&&,
+                        Upstream::HostDescriptionConstSharedPtr,
+                        const Network::ConnectionInfoProvider& connection_info_provider,
+                        StreamInfo::StreamInfo&, absl::optional<Envoy::Http::Protocol>) {
+        if (connection_info_provider.remoteAddress() != nullptr) {
+          remote_address = connection_info_provider.remoteAddress()->asStringView();
+        }
       };
-  EXPECT_CALL(mock_callback_, onPoolReady).WillOnce(Invoke(capture_connection_info_provider));
+  EXPECT_CALL(mock_callback_, onPoolReady).WillOnce(Invoke(capture_remote_address));
   // Mock syscall to make the bind call succeed.
   NiceMock<Envoy::Api::MockOsSysCalls> mock_os_sys_calls;
   Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_sys_calls(
@@ -280,9 +280,7 @@ TEST_F(UdpConnPoolTest, ConnectionInfoProviderHasRemoteAddress) {
   EXPECT_CALL(mock_os_sys_calls, bind).WillOnce(Return(Api::SysCallIntResult{0, 0}));
   udp_conn_pool_->newStream(&mock_callback_);
 
-  ASSERT_THAT(connection_info_provider, NotNull());
-  ASSERT_THAT(connection_info_provider->remoteAddress(), NotNull());
-  EXPECT_THAT(connection_info_provider->remoteAddress()->asStringView(), Eq("127.0.0.1:80"));
+  EXPECT_THAT(remote_address, Eq("127.0.0.1:80"));
 }
 
 } // namespace Udp
