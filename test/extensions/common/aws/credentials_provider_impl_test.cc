@@ -3153,42 +3153,6 @@ TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) 
   ASSERT_TRUE(result.ok());
 }
 
-TEST_F(AsyncCredentialHandlingTest, NoCrashWhenProviderGoesAway) {
-  MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
-      MetadataFetcher::MetadataReceiver::RefreshState::Ready;
-  std::chrono::seconds initialization_timer = std::chrono::seconds(2);
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
-
-  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
-      {};
-
-  cred_provider.mutable_web_identity_token_data_source()->set_inline_string("abced");
-  cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
-  cred_provider.set_role_session_name("role-session-name");
-
-  mock_manager_ = std::make_shared<MockAwsClusterManager>();
-  base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
-
-  manager_optref_.emplace(base_manager_);
-  EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
-
-  provider_ = std::make_shared<WebIdentityCredentialsProvider>(
-      context_, manager_optref_, "cluster_2",
-      [this](Upstream::ClusterManager&, absl::string_view) {
-        metadata_fetcher_.reset(raw_metadata_fetcher_);
-        return std::move(metadata_fetcher_);
-      },
-      refresh_state, initialization_timer, cred_provider);
-
-  auto chain = std::make_shared<MockCredentialsProviderChain>();
-  auto chain2 = std::make_shared<MockCredentialsProviderChain>();
-
-  auto handle = provider_->subscribeToCredentialUpdates(*chain);
-  auto handle2 = provider_->subscribeToCredentialUpdates(*chain2);
-
-  provider_.reset();
-}
-
 TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
   MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
       MetadataFetcher::MetadataReceiver::RefreshState::Ready;

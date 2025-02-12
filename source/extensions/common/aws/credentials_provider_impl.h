@@ -370,7 +370,15 @@ class CredentialsProviderChain : public CredentialsProvider,
                                  public CredentialSubscriberCallbacks,
                                  public Logger::Loggable<Logger::Id::aws> {
 public:
-  ~CredentialsProviderChain() override = default;
+
+  ~CredentialsProviderChain() override {
+    for (auto& subscriber_handle : subscriber_handles_) {
+      if(subscriber_handle)
+      {
+        subscriber_handle->cancel();
+      }
+    }
+  }
 
   void add(const CredentialsProviderSharedPtr& credentials_provider) {
     providers_.emplace_back(credentials_provider);
