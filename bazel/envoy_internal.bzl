@@ -220,7 +220,7 @@ def _envoy_default_exported_symbols():
             "-Wl,--dynamic-list=$(location @envoy//bazel:exported_symbols.txt)",
         ],
         "@envoy//bazel:apple": [
-            "-Wl,-exported_symbols_list,$(location @envoy//bazel:exported_symbols.txt)",
+            "-Wl,-exported_symbols_list,$(location @envoy//bazel:exported_symbols_apple.txt)",
         ],
         "//conditions:default": [],
     })
