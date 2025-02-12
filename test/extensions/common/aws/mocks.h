@@ -88,6 +88,15 @@ public:
   MOCK_METHOD(void, onClusterAddOrUpdate, ());
 };
 
+class MockCredentialsProviderChain : public CredentialsProvider,
+                                     public CredentialSubscriberCallbacks {
+public:
+  MOCK_METHOD(Credentials, getCredentials, ());
+  MOCK_METHOD(bool, credentialsPending, (CredentialsPendingCallback &&));
+  MOCK_METHOD(std::string, providerName, ());
+  MOCK_METHOD(void, onCredentialUpdate, ());
+};
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

@@ -67,7 +67,7 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
 
   const auto credentials = credentials_provider_->getCredentials();
 
-  if (!credentials.accessKeyId() || !credentials.secretAccessKey()) {
+  if (!credentials.hasCredentials()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.
     // This behavior matches what the AWS SDK would do.
     ENVOY_LOG_MISC(debug, "Sign exiting early - no credentials found");

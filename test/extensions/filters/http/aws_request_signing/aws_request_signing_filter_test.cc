@@ -55,8 +55,9 @@ public:
 // Verify filter functionality when signing works for header only request.
 TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
-  
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+
   EXPECT_CALL(*(filter_config_->signer_),
               signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
 
@@ -68,8 +69,9 @@ TEST_F(AwsRequestSigningFilterTest, SignSucceeds) {
 // Verify decodeHeaders signs when use_unsigned_payload is true and end_stream is false.
 TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayload) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
-  
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+
   filter_config_->use_unsigned_payload_ = true;
   EXPECT_CALL(*(filter_config_->signer_),
               signUnsignedPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
@@ -81,8 +83,9 @@ TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayload) {
 // Verify decodeHeaders signs when use_unsigned_payload is true and end_stream is true.
 TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayloadHeaderOnly) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
-  
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+
   filter_config_->use_unsigned_payload_ = true;
   EXPECT_CALL(*(filter_config_->signer_),
               signUnsignedPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
@@ -94,8 +97,9 @@ TEST_F(AwsRequestSigningFilterTest, DecodeHeadersSignsUnsignedPayloadHeaderOnly)
 // Verify decodeHeaders does not sign when use_unsigned_payload is false and end_stream is false.
 TEST_F(AwsRequestSigningFilterTest, DecodeHeadersStopsIterationWithoutSigning) {
   setup();
-EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
-  
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
@@ -120,9 +124,9 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsEmptyPayloadAndContinues) {
   Buffer::OwnedImpl buffer;
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
 
-  
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
   EXPECT_CALL(*(filter_config_->signer_),
               sign(HeaderMapEqualRef(&headers), hash, An<absl::string_view>()));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
@@ -134,7 +138,7 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsEmptyPayloadAndContinues) {
 TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsPayloadAndContinues) {
   InSequence seq;
   setup();
-  
+
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 
@@ -143,8 +147,9 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsPayloadAndContinues) {
   Buffer::OwnedImpl buffer("Action=SignThis");
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
-    EXPECT_CALL(*(filter_config_->signer_),
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(*(filter_config_->signer_),
               sign(HeaderMapEqualRef(&headers), hash, An<absl::string_view>()));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
@@ -152,8 +157,9 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignsPayloadAndContinues) {
 // Verify filter functionality when a host rewrite happens for header only request.
 TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
-  
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+
   filter_config_->host_rewrite_ = "foo";
   EXPECT_CALL(*(filter_config_->signer_),
               signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
@@ -168,8 +174,9 @@ TEST_F(AwsRequestSigningFilterTest, SignWithHostRewrite) {
 TEST_F(AwsRequestSigningFilterTest, SignFails) {
   setup();
 
-  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
-  
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+
   EXPECT_CALL(*(filter_config_->signer_),
               signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
       .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
@@ -191,8 +198,9 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataSignFails) {
   Buffer::OwnedImpl buffer;
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
-  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
-    EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(),
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(),
                                                An<const std::string&>(), An<absl::string_view>()))
       .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
                           const absl::string_view) -> absl::Status {
@@ -226,7 +234,7 @@ TEST_F(AwsRequestSigningFilterTest, PerRouteConfigSignWithHostRewrite) {
   auto signer = std::make_unique<Common::Aws::MockSigner>();
   EXPECT_CALL(*(signer), signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
   EXPECT_CALL(*(signer), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
-  
+
   FilterConfigImpl per_route_config(std::move(signer), "prefix", *stats.rootScope(),
                                     "overridden-host", false);
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
@@ -237,28 +245,29 @@ TEST_F(AwsRequestSigningFilterTest, PerRouteConfigSignWithHostRewrite) {
   EXPECT_EQ("overridden-host", headers.getHostValue());
 }
 
-
 // Verify filter decodeData functionality when credentials are pending.
 TEST_F(AwsRequestSigningFilterTest, DecodeHeadersCredentialsPending) {
   setup();
-  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
-  
+  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(_))
+      .WillRepeatedly(Return(false));
+
   filter_config_->use_unsigned_payload_ = true;
   EXPECT_CALL(*(filter_config_->signer_),
               signUnsignedPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()));
   Common::Aws::CredentialsPendingCallback capture;
-  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(An<Common::Aws::CredentialsPendingCallback&&>()))
-  .WillOnce(testing::DoAll(testing::SaveArg<0>(&capture), testing::Return(true)));
+  EXPECT_CALL(*(filter_config_->signer_),
+              addCallbackIfCredentialsPending(An<Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<0>(&capture), testing::Return(true)));
 
   Http::TestRequestHeaderMapImpl headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(headers, false));
   // We should see continueDecoding called when the captured callback is triggered
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   capture();
-
 }
 
-// Verify filter decodeHeadders functionality when credentials are pending.
+// Verify filter decodeHeaders functionality when credentials are pending.
 TEST_F(AwsRequestSigningFilterTest, DecodeDataCredentialsPending) {
   setup();
 
@@ -269,21 +278,19 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataCredentialsPending) {
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false));
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
   Common::Aws::CredentialsPendingCallback capture;
-  EXPECT_CALL(*(filter_config_->signer_), addCallbackIfCredentialsPending(An<Common::Aws::CredentialsPendingCallback&&>()))
-  .WillOnce(testing::DoAll(testing::SaveArg<0>(&capture), testing::Return(true)));
+  EXPECT_CALL(*(filter_config_->signer_),
+              addCallbackIfCredentialsPending(An<Common::Aws::CredentialsPendingCallback&&>()))
+      .WillOnce(testing::DoAll(testing::SaveArg<0>(&capture), testing::Return(true)));
 
   EXPECT_CALL(*(filter_config_->signer_), sign(An<Http::RequestHeaderMap&>(),
-                                              An<const std::string&>(), An<absl::string_view>()))
-    .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
-                        const absl::string_view) -> absl::Status {
-      return absl::OkStatus();
-    }));
+                                               An<const std::string&>(), An<absl::string_view>()))
+      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
+                          const absl::string_view) -> absl::Status { return absl::OkStatus(); }));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(buffer, true));
   // We should see continueDecoding called when the captured callback is triggered
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   capture();
-
 }
 
 } // namespace

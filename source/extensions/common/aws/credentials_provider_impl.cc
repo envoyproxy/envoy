@@ -248,23 +248,22 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
           credentials_pending_.store(false);
           std::list<CredentialSubscriberCallbacks*> subscribers_copy;
           {
-              Thread::LockGuard guard(mu_);
-              subscribers_copy = credentials_subscribers_;
+            Thread::LockGuard guard(mu_);
+            subscribers_copy = credentials_subscribers_;
           }
           for (auto& cb : subscribers_copy) {
-                ENVOY_LOG_MISC(debug, "Notifying subscriber of credential update");
-                cb->onCredentialUpdate();
-              }
+            ENVOY_LOG_MISC(debug, "Notifying subscriber of credential update");
+            cb->onCredentialUpdate();
+          }
         });
   }
 }
 
-  CredentialSubscriberCallbacksHandlePtr MetadataCredentialsProviderBase::subscribeToCredentialUpdates(CredentialSubscriberCallbacks& cs) {
-      Thread::LockGuard guard(mu_);
-        return std::make_unique<CredentialSubscriberCallbacksHandle>(
-      cs, credentials_subscribers_);
-
-  }
+CredentialSubscriberCallbacksHandlePtr
+MetadataCredentialsProviderBase::subscribeToCredentialUpdates(CredentialSubscriberCallbacks& cs) {
+  Thread::LockGuard guard(mu_);
+  return std::make_unique<CredentialSubscriberCallbacksHandle>(cs, credentials_subscribers_);
+}
 
 CredentialsFileCredentialsProvider::CredentialsFileCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
@@ -744,8 +743,7 @@ void ContainerCredentialsProvider::onMetadataError(Failure reason) {
 
 WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager,                             
-    absl::string_view cluster_name,
+    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
     CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
@@ -925,7 +923,7 @@ bool CredentialsProviderChain::credentialsPending(CredentialsPendingCallback&& c
   for (auto& provider : providers_) {
     auto callback_copy = cb;
     const auto pending = provider->credentialsPending(std::move(callback_copy));
-    ENVOY_LOG(debug, "Provider {} returning pending {}", provider->providerName(),pending);
+    ENVOY_LOG(debug, "Provider {} returning pending {}", provider->providerName(), pending);
     if (pending) {
       if (cb) {
         ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
@@ -939,25 +937,21 @@ bool CredentialsProviderChain::credentialsPending(CredentialsPendingCallback&& c
   return false;
 }
 
-void CredentialsProviderChain::onCredentialUpdate()
-{
+void CredentialsProviderChain::onCredentialUpdate() {
   // Loop through all providers
   // If no providers are pending then unblock
   // If a provider is not pending and has credentials, then unblock
   for (auto& provider : providers_) {
-    if(provider->credentialsPending())
-    {
+    if (provider->credentialsPending()) {
       ENVOY_LOG(debug, "Provider {} is still pending", provider->providerName());
       return;
     }
-    auto credentials = provider->getCredentials();
-    if(credentials.accessKeyId() && credentials.secretAccessKey())
-    {
+    if (provider->getCredentials().hasCredentials()) {
       ENVOY_LOG(debug, "Provider {} has credentials", provider->providerName());
       break;
-    }
-    else {
-      ENVOY_LOG(debug, "Provider {} has blank credentials, continuing through chain", provider->providerName());
+    } else {
+      ENVOY_LOG(debug, "Provider {} has blank credentials, continuing through chain",
+                provider->providerName());
     }
   }
 
@@ -969,13 +963,12 @@ void CredentialsProviderChain::onCredentialUpdate()
     credential_pending_callbacks_.clear();
   }
 
-  ENVOY_LOG_MISC(debug, "Notifying {} credential callbacks" ,callbacks_copy.size());
+  ENVOY_LOG_MISC(debug, "Notifying {} credential callbacks", callbacks_copy.size());
 
   // Call all of our callbacks to unblock pending requests
   for (const auto& cb : callbacks_copy) {
     cb();
   }
-  
 }
 
 Credentials CredentialsProviderChain::getCredentials() {
@@ -1015,7 +1008,7 @@ SINGLETON_MANAGER_REGISTRATION(aws_cluster_manager);
 CustomCredentialsProviderChain::CustomCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
-     CustomCredentialsProviderChainFactories& factories) {
+    CustomCredentialsProviderChainFactories& factories) {
 
   aws_cluster_manager_ =
       context.singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(
@@ -1046,7 +1039,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     Api::Api& api, ServerFactoryContextOptRef context, absl::string_view region,
     const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config,
-     CredentialsProviderChainFactories& factories) {
+    CredentialsProviderChainFactories& factories) {
 
   if (context) {
     aws_cluster_manager_ =
@@ -1156,7 +1149,7 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCre
     const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
     CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view cluster_name,
     absl::string_view credential_uri, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-    std::chrono::seconds initialization_timer, absl::string_view authorization_token = {})  {
+    std::chrono::seconds initialization_timer, absl::string_view authorization_token = {}) {
 
   // TODO: @nbaws Remove curl path post deprecation
   if (!context) {
@@ -1189,7 +1182,7 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createContainerCre
       credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
     }
 
-    addSubscription(credential_provider->subscribeToCredentialUpdates(*this));
+    storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
 
     return credential_provider;
   }
@@ -1232,7 +1225,7 @@ DefaultCredentialsProviderChain::createInstanceProfileCredentialsProvider(
       credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
     }
 
-    addSubscription(credential_provider->subscribeToCredentialUpdates(*this));
+    storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
 
     return credential_provider;
   }
@@ -1265,21 +1258,21 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createWebIdentityC
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  addSubscription(credential_provider->subscribeToCredentialUpdates(*this));
+  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
 
   return credential_provider;
 };
 
-  void CredentialsProviderChain::addSubscription(CredentialSubscriberCallbacksHandlePtr subscription) 
-  {
-    subscriber_handles_.push_back(std::move(subscription));
-  }
+void CredentialsProviderChain::storeSubscription(
+    CredentialSubscriberCallbacksHandlePtr subscription) {
+  subscriber_handles_.push_back(std::move(subscription));
+}
 
 CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
     AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
     const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-        web_identity_config)  {
+        web_identity_config) {
 
   const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
   const auto initialization_timer = std::chrono::seconds(2);
