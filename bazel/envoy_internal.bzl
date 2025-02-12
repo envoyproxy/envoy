@@ -211,7 +211,10 @@ def _envoy_select_perfetto(xs):
     })
 
 def envoy_exported_symbols_input():
-    return ["@envoy//bazel:exported_symbols.txt"]
+    return [
+        "@envoy//bazel:exported_symbols.txt",
+        "@envoy//bazel:exported_symbols_apple.txt",
+    ]
 
 # Default symbols to be exported.
 def _envoy_default_exported_symbols():
