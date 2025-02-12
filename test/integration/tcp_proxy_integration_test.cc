@@ -1724,10 +1724,9 @@ public:
       : data_size_before_continue_(data_size_before_continue) {}
 
   Network::FilterStatus onData(Buffer::Instance& buffer, bool) override {
-    if (buffer.length() >= data_size_before_continue_) {
-      return Network::FilterStatus::Continue;
-    }
-    return Network::FilterStatus::StopIteration;
+    // Once the initial buffer size is reached, the filter chain will be continued.
+    should_continue_ = should_continue_ || buffer.length() >= data_size_before_continue_;
+    return should_continue_ ? Network::FilterStatus::Continue : Network::FilterStatus::StopIteration;
   }
 
   Network::FilterStatus onNewConnection() override {
@@ -1745,22 +1744,24 @@ public:
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
-
-  int data_size_before_continue_{};
+  
+  bool should_continue_{false};
+  uint64_t data_size_before_continue_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
 class PauseIterationFilterFactory : public Extensions::NetworkFilters::Common::FactoryBase<
-                                        test::integration::tcp_proxy::PauseIterationFilter> {
+                                        test::integration::tcp_proxy::PauseIterationFilterConfig> {
 public:
   PauseIterationFilterFactory() : FactoryBase("test.pause_iteration") {}
 
 private:
-  Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const test::integration::tcp_proxy::PauseIterationFilter& cfg,
-                                    Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      int data_size_before_continue = cfg.data_size_before_continue();
+  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const test::integration::tcp_proxy::PauseIterationFilterConfig& cfg,
+      Server::Configuration::FactoryContext&) override {
+    int data_size_before_continue = cfg.data_size_before_continue();
+    return [data_size_before_continue = std::move(data_size_before_continue)](
+               Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(
           std::make_shared<PauseIterationFilter>(data_size_before_continue));
     };
@@ -1769,13 +1770,13 @@ private:
 
 class TcpProxyReceiveBeforeConnectIntegrationTest : public TcpProxyIntegrationTest {
 public:
-  TcpProxyReceiveBeforeConnectIntegrationTest() : TcpProxyIntegrationTest() {
-    config_helper_.addNetworkFilter(R"EOF(
+  void addFilter(uint32_t data_size_before_continue) {
+    config_helper_.addNetworkFilter(std::format(R"EOF(
       name: test.pause_iteration
       typed_config:
-        "@type": type.googleapis.com/test.integration.tcp_proxy.PauseIterationFilter
-        data_size_before_continue: 5
-)EOF");
+        "@type": type.googleapis.com/test.integration.tcp_proxy.PauseIterationFilterConfig
+        data_size_before_continue: {0}
+)EOF", data_size_before_continue));
   }
 
   PauseIterationFilterFactory factory_;
@@ -1788,11 +1789,14 @@ INSTANTIATE_TEST_SUITE_P(TcpProxyIntegrationTestParams, TcpProxyReceiveBeforeCon
                          TestUtility::ipTestParamsToString);
 
 TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, ReceiveBeforeConnectEarlyData) {
+  uint32_t data_size_before_continue = 6;
+  addFilter(data_size_before_continue);
+
   initialize();
   FakeRawConnectionPtr fake_upstream_connection;
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
 
-  // First time data is sent, the PauseFilter stops the iteration. Downstream counter is
+  // Until total data size > 6 is received, the PauseFilter stops the iteration. Downstream counter is
   // incremented, but no connection attempt to upstream is made.
   ASSERT_TRUE(tcp_client->write("hello"));
   test_server_->waitForCounterEq("tcp.tcpproxy_stats.downstream_cx_total", 1);
@@ -1801,6 +1805,8 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, ReceiveBeforeConnectEarlyDat
   ASSERT_TRUE(tcp_client->write("world"));
   test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  
   // Once the connection is established, the early data will be flushed to the upstream.
   ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch("helloworld")));
   ASSERT_TRUE(fake_upstream_connection->write("response"));
@@ -1814,6 +1820,8 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
   const uint32_t upstream_buffer_limit = 512;
   const uint32_t downstream_buffer_limit = 1024;
   const uint32_t data_size = 16 * downstream_buffer_limit;
+  addFilter(upstream_buffer_limit);
+  
   config_helper_.setBufferLimits(upstream_buffer_limit, downstream_buffer_limit);
   std::string data;
   for (uint32_t i = 0; i < data_size / 4; i++)
@@ -1824,14 +1832,16 @@ TEST_P(TcpProxyReceiveBeforeConnectIntegrationTest, UpstreamBufferHighWatermark)
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
 
   // First time data is sent, the PauseFilter stops the iteration.
-  ASSERT_TRUE(tcp_client->write(data.substr(0, upstream_buffer_limit + 1)));
+  ASSERT_TRUE(tcp_client->write(data.substr(0, upstream_buffer_limit - 1)));
   test_server_->waitForCounterEq("tcp.tcpproxy_stats.downstream_cx_total", 1);
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
 
   // Send the remaining data. Filter chain iteration should continue.
-  ASSERT_TRUE(tcp_client->write(data.substr(upstream_buffer_limit + 1)));
+  ASSERT_TRUE(tcp_client->write(data.substr(upstream_buffer_limit - 1)));
   test_server_->waitForCounterEq("tcp.tcpproxy_stats.early_data_received_count_total", 1);
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+
   // Once the connection is established, the early data will be flushed to the upstream.
   ASSERT_TRUE(fake_upstream_connection->waitForData(FakeRawConnection::waitForMatch(data.c_str())));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data_size));

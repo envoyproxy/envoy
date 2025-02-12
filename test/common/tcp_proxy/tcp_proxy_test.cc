@@ -144,12 +144,11 @@ public:
                 Network::SocketOptionFactory::buildWFPRedirectRecordsOptions(*redirect_records));
       }
 
-      if (receive_before_connect) {
-        filter_callbacks_.connection().streamInfo().filterState()->setData(
-            TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
-            StreamInfo::FilterState::StateType::ReadOnly,
-            StreamInfo::FilterState::LifeSpan::Connection);
-      }
+      filter_callbacks_.connection().streamInfo().filterState()->setData(
+          TcpProxy::ReceiveBeforeConnectKey,
+          std::make_unique<StreamInfo::BoolAccessorImpl>(receive_before_connect),
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::Connection);
 
       filter_ = std::make_unique<Filter>(config_,
                                          factory_context_.server_factory_context_.cluster_manager_);
@@ -815,13 +814,7 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectNoEarlyData) {
 
 TEST_P(TcpProxyTest, ReceiveBeforeConnectSetToFalse) {
   setup(1, /*set_redirect_records=*/false, /*receive_before_connect=*/false);
-
-  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
-  filter_->initializeReadFilterCallbacks(filter_callbacks_);
-  ASSERT_FALSE(filter_->receive_before_connect_);
-
-  EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
-  raiseEventUpstreamConnected(/*conn_index=*/0);
+  raiseEventUpstreamConnected(/*conn_index=*/0, /*expect_read_enable=*/true);
 
   // Any further communications between client and server can resume normally.
   Buffer::OwnedImpl buffer("hello");
