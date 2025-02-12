@@ -50,6 +50,12 @@ bug_fixes:
     Set IP_BIND_ADDRESS_NO_PORT socket option in the original_src filter to prevent port exhaustion caused by the
     kernel prematurely reserving ephemeral ports. This behavior change can be reverted by setting runtime guard
     ``envoy.reloadable_features.original_src_fix_port_exhaustion`` to ``false``.
+- area: listener
+  change: |
+    Fixed a bug where socket options specified only on an additional address were not applied unless
+    :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` on the listener is set.
+    Now additional address :ref:`socket_options <envoy_v3_api_field_config.listener.v3.AdditionalAddress.socket_options>` are correctly
+    applied even if the listener has no socket options configured.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
