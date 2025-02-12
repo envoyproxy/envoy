@@ -214,7 +214,6 @@ def envoy_exported_symbols_input():
     return ["@envoy//bazel:exported_symbols.txt"]
 
 # Default symbols to be exported.
-# TODO(wbpcode): make this work correctly for apple/darwin.
 def _envoy_default_exported_symbols():
     return select({
         "@envoy//bazel:linux": [
