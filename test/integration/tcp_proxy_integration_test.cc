@@ -1771,11 +1771,11 @@ private:
 class TcpProxyReceiveBeforeConnectIntegrationTest : public TcpProxyIntegrationTest {
 public:
   void addFilter(uint32_t data_size_before_continue) {
-    config_helper_.addNetworkFilter(std::format(R"EOF(
+    config_helper_.addNetworkFilter(fmt::format(R"EOF(
       name: test.pause_iteration
       typed_config:
         "@type": type.googleapis.com/test.integration.tcp_proxy.PauseIterationFilterConfig
-        data_size_before_continue: {0}
+        data_size_before_continue: {}
 )EOF", data_size_before_continue));
   }
 
