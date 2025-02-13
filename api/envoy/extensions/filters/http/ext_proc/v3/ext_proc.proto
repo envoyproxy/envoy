@@ -332,7 +332,7 @@ message ExternalProcessor {
 
   // Decorator to introduce custom logic that runs after a message received from
   // the External Processor is processed.
-  // [#extension-category: envoy.http.ext_proc.on_processing_response]
+  // [#extension-category: envoy.http.ext_proc.response_processors]
   config.core.v3.TypedExtensionConfig on_processing_response = 23;
 }
 

@@ -24,37 +24,45 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // <envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.filter_state_name>`].
 // [#next-free-field: 11]
 message SaveProcessingResponse {
+  // The default filter state name is
+  // "envoy.http.ext_proc.response_processors.save_processing_response". If
+  // defined, `filter_state_name_suffix` is appended to this with a dot in the
+  // middle.
   string filter_state_name_suffix = 1;
+
+  message SaveOptions {
+    // Whether or not to save the response for the response type.
+    bool save_response = 1;
+    // When true, saves the response if there was an error when processing
+    // the response from the external processor.
+    bool save_on_error = 10;
+  }
 
   // Save the response to filter state when :ref:`request_headers
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_headers>` is set.
-  bool save_request_headers = 2;
+  SaveOptions save_request_headers = 2;
 
   // Save the response to filter state when :ref:`response_headers
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_headers>` is set.
-  bool save_response_headers = 3;
+  SaveOptions save_response_headers = 3;
 
   // Save the response to filter state when :ref:`request_body
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_body>` is set.
-  bool save_request_body = 4;
+  SaveOptions save_request_body = 4;
 
   // Save the response to filter state when :ref:`response_body
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_body>` is set.
-  bool save_response_body = 5;
+  SaveOptions save_response_body = 5;
 
   // Save the response to filter state when :ref:`request_trailers
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_trailers>` is set.
-  bool save_request_trailers = 6;
+  SaveOptions save_request_trailers = 6;
 
   // Save the response to filter state when :ref:`response_trailers
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_trailers>` is set.
-  bool save_response_trailers = 8;
+  SaveOptions save_response_trailers = 8;
 
   // Save the response to filter state when :ref:`immediate_response
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>` is set.
-  bool save_immediate_response = 9;
-
-  // When false, skips saving the response if there was an error when processing
-  // the response from the external processor.
-  bool save_on_error = 10;
+  SaveOptions save_immediate_response = 9;
 }

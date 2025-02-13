@@ -15,6 +15,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+// Interface to inject custom decorators that are called after receiving a response from the
+// external processor.
 class OnProcessingResponse {
 public:
   virtual ~OnProcessingResponse() = default;
@@ -75,7 +77,7 @@ public:
                              Envoy::Server::Configuration::CommonFactoryContext& context,
                              const std::string& stats_prefix) const PURE;
 
-  std::string category() const override { return "envoy.http.ext_proc.on_processing_response"; }
+  std::string category() const override { return "envoy.http.ext_proc.response_processors"; }
 };
 
 } // namespace ExternalProcessing

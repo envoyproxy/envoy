@@ -26,7 +26,7 @@ struct SaveProcessingResponseFilterState
     absl::Status processing_status;
     envoy::service::ext_proc::v3::ProcessingResponse processing_response;
   };
-  std::vector<Response> responses;
+  absl::optional<Response> response;
 };
 
 class SaveProcessingResponse
@@ -55,19 +55,27 @@ public:
                                        absl::Status, Envoy::StreamInfo::StreamInfo&) override;
 
 private:
-  void addToFilterState(const envoy::service::ext_proc::v3::ProcessingResponse& processing_response,
+  struct SaveOptions {
+    SaveOptions(const SaveProcessingResponseProto::SaveOptions& save_options)
+        : save_response{save_options.save_response()}, save_on_error{save_options.save_on_error()} {
+    }
+    const bool save_response = false;
+    const bool save_on_error = false;
+  };
+
+  void addToFilterState(const SaveOptions& save_options,
+                        const envoy::service::ext_proc::v3::ProcessingResponse& processing_response,
                         absl::Status status, Envoy::StreamInfo::StreamInfo& stream_info);
 
   const std::string filter_state_name_;
 
-  bool save_request_headers_ = false;
-  bool save_response_headers_ = false;
-  bool save_request_body_ = false;
-  bool save_response_body_ = false;
-  bool save_request_trailers_ = false;
-  bool save_response_trailers_ = false;
-  bool save_immediate_response_ = false;
-  bool save_on_error_ = false;
+  SaveOptions save_request_headers_;
+  SaveOptions save_response_headers_;
+  SaveOptions save_request_body_;
+  SaveOptions save_response_body_;
+  SaveOptions save_request_trailers_;
+  SaveOptions save_response_trailers_;
+  SaveOptions save_immediate_response_;
 };
 
 } // namespace ExternalProcessing

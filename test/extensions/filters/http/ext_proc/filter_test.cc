@@ -5422,8 +5422,10 @@ TEST_F(HttpFilterTest, SaveProcessingResponseHeaders) {
     name: "abc"
     typed_config:
       '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
-      save_request_headers: true
-      save_response_headers: true
+      save_request_headers:
+        save_response: true
+      save_response_headers:
+        save_response: true
   )EOF");
 
   request_headers_.addCopy(LowerCaseString("x-some-other-header"), "yes");
@@ -5455,7 +5457,7 @@ TEST_F(HttpFilterTest, SaveProcessingResponseHeaders) {
   EXPECT_THAT(&request_headers_, HeaderMapEqualIgnoreOrder(&expected));
   auto filter_state = stream_info_.filterState()->getDataMutable<SaveProcessingResponseFilterState>(
       SaveProcessingResponseFilterState::kFilterStateName);
-  ASSERT_EQ(filter_state->responses.size(), 1);
+  ASSERT_TRUE(filter_state->response.has_value());
 
   envoy::service::ext_proc::v3::ProcessingResponse expected_response;
   TestUtility::loadFromJson(
@@ -5484,10 +5486,10 @@ TEST_F(HttpFilterTest, SaveProcessingResponseHeaders) {
 })EOF",
       expected_response);
 
-  EXPECT_TRUE(
-      TestUtility::protoEqual(filter_state->responses[0].processing_response, expected_response));
+  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
+                                      expected_response));
 
-  filter_state->responses.clear();
+  filter_state->response.reset();
 
   Buffer::OwnedImpl req_data("foo");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
@@ -5519,7 +5521,7 @@ TEST_F(HttpFilterTest, SaveProcessingResponseHeaders) {
                                                    {"x-new-header", "new"}};
   EXPECT_THAT(&response_headers_, HeaderMapEqualIgnoreOrder(&final_expected_response));
 
-  ASSERT_EQ(filter_state->responses.size(), 1);
+  ASSERT_TRUE(filter_state->response.has_value());
 
   envoy::service::ext_proc::v3::ProcessingResponse expected_response_headers;
   TestUtility::loadFromJson(
@@ -5541,9 +5543,9 @@ TEST_F(HttpFilterTest, SaveProcessingResponseHeaders) {
 })EOF",
       expected_response_headers);
 
-  EXPECT_TRUE(TestUtility::protoEqual(filter_state->responses[0].processing_response,
+  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
                                       expected_response_headers));
-  filter_state->responses.clear();
+  filter_state->response.reset();
 
   Buffer::OwnedImpl resp_data("bar");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, false));
@@ -5675,8 +5677,10 @@ TEST_F(HttpFilterTest, SaveProcessingResponseBodies) {
     name: "abc"
     typed_config:
       '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
-      save_request_body: true
-      save_response_body: true
+      save_request_body:
+        save_response: true
+      save_response_body:
+        save_response: true
   )EOF");
 
   // Create synthetic HTTP request
@@ -5705,7 +5709,7 @@ TEST_F(HttpFilterTest, SaveProcessingResponseBodies) {
 
   auto filter_state = stream_info_.filterState()->getDataMutable<SaveProcessingResponseFilterState>(
       SaveProcessingResponseFilterState::kFilterStateName);
-  ASSERT_EQ(filter_state->responses.size(), 1);
+  ASSERT_TRUE(filter_state->response.has_value());
   envoy::service::ext_proc::v3::ProcessingResponse expected_response;
   TestUtility::loadFromJson(
       R"EOF(
@@ -5720,10 +5724,10 @@ TEST_F(HttpFilterTest, SaveProcessingResponseBodies) {
 })EOF",
       expected_response);
 
-  EXPECT_TRUE(
-      TestUtility::protoEqual(filter_state->responses[0].processing_response, expected_response));
+  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
+                                      expected_response));
 
-  filter_state->responses.clear();
+  filter_state->response.reset();
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -5747,7 +5751,7 @@ TEST_F(HttpFilterTest, SaveProcessingResponseBodies) {
   });
   EXPECT_EQ("Hello, World!", buffered_response_data.toString());
 
-  ASSERT_EQ(filter_state->responses.size(), 1);
+  ASSERT_TRUE(filter_state->response.has_value());
   envoy::service::ext_proc::v3::ProcessingResponse expected_response_body;
   TestUtility::loadFromJson(
       R"EOF(
@@ -5762,10 +5766,10 @@ TEST_F(HttpFilterTest, SaveProcessingResponseBodies) {
 })EOF",
       expected_response_body);
 
-  EXPECT_TRUE(TestUtility::protoEqual(filter_state->responses[0].processing_response,
+  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
                                       expected_response_body));
 
-  filter_state->responses.clear();
+  filter_state->response.reset();
 
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
@@ -5787,7 +5791,8 @@ TEST_F(HttpFilterTest, SaveImmediateResponse) {
     name: "abc"
     typed_config:
       '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
-      save_immediate_response: true
+      save_immediate_response:
+        save_response: true
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -5833,7 +5838,7 @@ TEST_F(HttpFilterTest, SaveImmediateResponse) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   auto filter_state = stream_info_.filterState()->getDataMutable<SaveProcessingResponseFilterState>(
       SaveProcessingResponseFilterState::kFilterStateName);
-  ASSERT_EQ(filter_state->responses.size(), 1);
+  ASSERT_TRUE(filter_state->response.has_value());
   envoy::service::ext_proc::v3::ProcessingResponse expected_response;
   TestUtility::loadFromJson(
       R"EOF(
@@ -5868,10 +5873,10 @@ TEST_F(HttpFilterTest, SaveImmediateResponse) {
 })EOF",
       expected_response);
 
-  EXPECT_TRUE(
-      TestUtility::protoEqual(filter_state->responses[0].processing_response, expected_response));
+  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
+                                      expected_response));
 
-  filter_state->responses.clear();
+  filter_state->response.reset();
 
   filter_->onDestroy();
 
@@ -5898,8 +5903,9 @@ TEST_F(HttpFilterTest, SaveImmediateResponseOnError) {
     name: "abc"
     typed_config:
       '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
-      save_immediate_response: true
-      save_on_error: true
+      save_immediate_response:
+        save_response: true
+        save_on_error: true
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -5935,7 +5941,7 @@ TEST_F(HttpFilterTest, SaveImmediateResponseOnError) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   auto filter_state = stream_info_.filterState()->getDataMutable<SaveProcessingResponseFilterState>(
       SaveProcessingResponseFilterState::kFilterStateName);
-  ASSERT_EQ(filter_state->responses.size(), 1);
+  ASSERT_TRUE(filter_state->response.has_value());
   envoy::service::ext_proc::v3::ProcessingResponse expected_response;
   TestUtility::loadFromJson(
       R"EOF(
@@ -5970,10 +5976,10 @@ TEST_F(HttpFilterTest, SaveImmediateResponseOnError) {
 })EOF",
       expected_response);
 
-  EXPECT_TRUE(
-      TestUtility::protoEqual(filter_state->responses[0].processing_response, expected_response));
+  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
+                                      expected_response));
 
-  filter_state->responses.clear();
+  filter_state->response.reset();
 
   filter_->onDestroy();
 
@@ -5998,7 +6004,8 @@ TEST_F(HttpFilterTest, DontSaveImmediateResponse) {
     name: "abc"
     typed_config:
       '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
-      save_immediate_response: false
+      save_immediate_response:
+        save_response: false
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -6062,7 +6069,8 @@ TEST_F(HttpFilterTest, DontSaveImmediateResponseOnError) {
     name: "abc"
     typed_config:
       '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
-      save_immediate_response: true
+      save_immediate_response:
+        save_response: true
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -6124,8 +6132,10 @@ TEST_F(HttpFilterTest, SaveResponseTrailers) {
     typed_config:
       '@type': type.googleapis.com/envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse
       filter_state_name_suffix: "test"
-      save_request_trailers: true
-      save_response_trailers: true
+      save_request_trailers:
+        save_response: true
+      save_response_trailers:
+        save_response: true
   )EOF");
 
   HttpTestUtility::addDefaultHeaders(request_headers_);
@@ -6155,7 +6165,7 @@ TEST_F(HttpFilterTest, SaveResponseTrailers) {
       true);
   auto filter_state = stream_info_.filterState()->getDataMutable<SaveProcessingResponseFilterState>(
       filter_state_name);
-  ASSERT_EQ(filter_state->responses.size(), 1);
+  ASSERT_TRUE(filter_state->response.has_value());
   envoy::service::ext_proc::v3::ProcessingResponse expected_response;
   TestUtility::loadFromJson(
       R"EOF(
@@ -6180,10 +6190,10 @@ TEST_F(HttpFilterTest, SaveResponseTrailers) {
   }
 })EOF",
       expected_response);
-  EXPECT_TRUE(
-      TestUtility::protoEqual(filter_state->responses[0].processing_response, expected_response));
+  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
+                                      expected_response));
 
-  filter_state->responses.clear();
+  filter_state->response.reset();
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
@@ -6216,7 +6226,7 @@ TEST_F(HttpFilterTest, SaveResponseTrailers) {
   }
 })EOF",
       expected_response_trailers);
-  EXPECT_TRUE(TestUtility::protoEqual(filter_state->responses[0].processing_response,
+  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
                                       expected_response_trailers));
   filter_->onDestroy();
 
