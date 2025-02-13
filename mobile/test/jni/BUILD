@@ -63,10 +63,12 @@ cc_library(
 
 cc_binary(
     name = "libenvoy_jni_http_test_server_factory.so",
+    linkoopts = [
+        "-latomic",
+    ]
     testonly = True,
     linkshared = True,
     deps = [
-        "-latomic",
         ":jni_http_test_server_factory_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
