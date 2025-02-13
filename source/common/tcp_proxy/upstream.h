@@ -404,6 +404,7 @@ private:
   // upstream_request_ has to be destroyed first as they may use CombinedUpstream parent
   // during destruction.
   UpstreamRequestPtr upstream_request_;
+  Http::CodecType type_;
   bool is_ssl_;
 };
 
