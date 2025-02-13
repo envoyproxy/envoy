@@ -36,7 +36,7 @@ message SaveProcessingResponse {
 
   // The default filter state name is
   // "envoy.http.ext_proc.response_processors.save_processing_response". If
-  // defined, `filter_state_name_suffix` is appended to this with a dot in the
+  // defined, ``filter_state_name_suffix`` is appended to this with a dot in the
   // middle.
   string filter_state_name_suffix = 1;
 
