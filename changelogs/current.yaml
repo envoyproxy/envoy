@@ -172,7 +172,7 @@ new_features:
 - area: ext_proc
   change: |
     Added an :ref:`extension
-    <envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse>` to save the
-    :ref:`response <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse>` from the external processor to filter state.
+    <envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse>` to save the
+    :ref:`response <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` from the external processor to filter state.
 
 deprecated:

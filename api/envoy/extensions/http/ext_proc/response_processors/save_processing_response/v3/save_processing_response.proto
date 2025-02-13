@@ -18,7 +18,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension: envoy.http.ext_proc.response_processors.save_processing_response]
 
 // Extension to save the :ref:`response
-// <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse>` from the external processor as
+// <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` from the external processor as
 // filter state with name
 // "envoy.http.ext_proc.response_processors.save_processing_response[.:ref:`filter_state_name_suffix
 // <envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.filter_state_name>`].
