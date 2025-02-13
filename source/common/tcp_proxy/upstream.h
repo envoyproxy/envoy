@@ -301,6 +301,8 @@ public:
   bool readDisable(bool disable) override;
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
     conn_pool_callbacks_ = std::move(callbacks);
+    auto is_ssl = upstream_request_->streamInfo().upstreamInfo()->upstreamSslConnection();
+    is_ssl_ = is_ssl ? true : false;
   }
   void addBytesSentCallback(Network::Connection::BytesSentCb) override{};
   // HTTP upstream must not implement converting upstream transport
@@ -402,6 +404,7 @@ private:
   // upstream_request_ has to be destroyed first as they may use CombinedUpstream parent
   // during destruction.
   UpstreamRequestPtr upstream_request_;
+  bool is_ssl_;
 };
 
 } // namespace TcpProxy

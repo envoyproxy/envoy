@@ -418,10 +418,7 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
   });
 
   if (config_.usePost()) {
-    const std::string& scheme =
-        is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
     downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
-    downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
   }
 
   config_.headerEvaluator().evaluateHeaders(
@@ -526,7 +523,24 @@ void CombinedUpstream::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers
   responseDecoder().decodeTrailers(std::move(trailers));
 }
 
-Http::RequestHeaderMap* CombinedUpstream::downstreamHeaders() { return downstream_headers_.get(); }
+Http::RequestHeaderMap* CombinedUpstream::downstreamHeaders() {
+  if (!downstream_headers_) {
+    downstream_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+        {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
+        {Http::Headers::get().Host, config_.host(downstream_info_)},
+    });
+    downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
+  }
+  if ((parent_.codecType() != Http::CodecType::HTTP1) && (config_.usePost())) {
+    const std::string& scheme =
+        is_ssl_ ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
+    if (downstream_headers_->Scheme()) {
+      downstream_headers_->removeScheme();
+    }
+    downstream_headers_->addReference(Http::Headers::get().Scheme, scheme);
+  }
+  return downstream_headers_.get();
+}
 
 void CombinedUpstream::doneReading() {
   read_half_closed_ = true;
