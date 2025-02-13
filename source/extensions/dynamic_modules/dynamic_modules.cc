@@ -64,15 +64,8 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
                                                    " : ", DYNAMIC_MODULES_SEARCH_PATH,
                                                    " is not set"));
   }
-
-  // TODO: document the expected extension for the module on Apple platforms.
-#if defined(__APPLE__)
-  constexpr absl::string_view module_path_template = "{}/lib{}.dylib";
-#else
-  constexpr absl::string_view module_path_template = "{}/lib{}.so";
-#endif
   const std::filesystem::path file_path_absolute = std::filesystem::absolute(
-      fmt::format(module_path_template, std::string(module_search_path), std::string(module_name)));
+      fmt::format("{}/lib{}.so", std::string(module_search_path), std::string(module_name)));
   return newDynamicModule(file_path_absolute.string(), do_not_close);
 }
 
