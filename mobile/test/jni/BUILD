@@ -145,6 +145,9 @@ cc_library(
 
 cc_binary(
     name = "libenvoy_jni_with_test_and_listener_extensions.so",
+    linkopts = [
+        "-latomic",
+    ],
     testonly = True,
     linkshared = True,
     deps = [
