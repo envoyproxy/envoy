@@ -65,7 +65,7 @@ cc_binary(
     name = "libenvoy_jni_http_test_server_factory.so",
     linkopts = [
         "-latomic",
-    ]
+    ],
     testonly = True,
     linkshared = True,
     deps = [
