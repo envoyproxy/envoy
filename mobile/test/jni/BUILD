@@ -101,6 +101,9 @@ cc_library(
 cc_binary(
     name = "libenvoy_jni_http_proxy_test_server_factory.so",
     testonly = True,
+    linkopts = [
+        "-latomic",
+    ],
     linkshared = True,
     deps = [
         ":jni_http_proxy_test_server_factory_lib",
