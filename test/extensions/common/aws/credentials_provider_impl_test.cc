@@ -2940,6 +2940,8 @@ TEST(CredentialsProviderChainTest, CheckChainReturnsPendingInCorrectOrder) {
       .WillRepeatedly(Return(Credentials("provider1", "1")));
   EXPECT_CALL(*mock_provider2, getCredentials())
       .WillRepeatedly(Return(Credentials("provider2", "2")));
+  EXPECT_CALL(*mock_provider1, providerName()).WillRepeatedly(Return("provider1"));
+  EXPECT_CALL(*mock_provider2, providerName()).WillRepeatedly(Return("provider2"));
 
   CredentialsProviderChain chain;
   chain.add(mock_provider1);
