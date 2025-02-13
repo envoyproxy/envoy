@@ -1042,12 +1042,6 @@ TEST_P(TcpTunnelingIntegrationTest, SchemeHeader) {
                 .get(Http::LowerCaseString(Http::Headers::get().Scheme))[0]
                 ->value()
                 .getStringView());
-  upstream_request_->headers().iterate(
-      [](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-        ENVOY_LOG(trace, "vikas in the test:  req header : {}:{}", header.key().getStringView(),
-                  header.value().getStringView());
-        return Http::HeaderMap::Iterate::Continue;
-      });
   closeConnection(fake_upstream_connection_);
 }
 
