@@ -63,7 +63,7 @@ cc_library(
 
 cc_binary(
     name = "libenvoy_jni_http_test_server_factory.so",
-    linkoopts = [
+    linkopts = [
         "-latomic",
     ]
     testonly = True,
