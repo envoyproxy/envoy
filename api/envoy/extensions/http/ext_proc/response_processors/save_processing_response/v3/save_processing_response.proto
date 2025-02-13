@@ -24,14 +24,14 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // <envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.filter_state_name>`].
 // [#next-free-field: 10]
 message SaveProcessingResponse {
-  // [#next-free-field: 11]
+  // [#next-free-field: 3]
   message SaveOptions {
     // Whether or not to save the response for the response type.
     bool save_response = 1;
 
     // When true, saves the response if there was an error when processing
     // the response from the external processor.
-    bool save_on_error = 10;
+    bool save_on_error = 2;
   }
 
   // The default filter state name is
