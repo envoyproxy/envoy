@@ -45,7 +45,7 @@ absl::Status SignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& headers
 }
 
 bool SignerBaseImpl::addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb) {
-  return credentials_provider_->credentialsPending(std::move(cb));
+  return credentials_provider_->addCallbackIfChainCredentialsPending(std::move(cb));
 }
 
 // Region support utilities for sigv4a
