@@ -61,11 +61,13 @@ service ExternalProcessor {
 message FilterConfigToSend {
   // Specify the request body processing mode. This ``request_body_mode`` helps the server
   // to take appropriate actions after receiving a ``ProcessingRequest`` from the request direction.
-  envoy.extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode request_body_mode = 1 [(validate.rules).enum = {defined_only: true}];
+  envoy.extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode request_body_mode = 1
+      [(validate.rules).enum = {defined_only: true}];
 
   // Specify the response body processing mode. This ``response_body_mode`` helps the server
   // to take appropriate actions after receiving a ``ProcessingRequest`` from the response direction.
-  envoy.extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode response_body_mode = 2 [(validate.rules).enum = {defined_only: true}];
+  envoy.extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode response_body_mode = 2
+      [(validate.rules).enum = {defined_only: true}];
 }
 
 // This represents the different types of messages that Envoy can send
