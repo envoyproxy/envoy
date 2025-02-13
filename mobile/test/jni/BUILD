@@ -66,6 +66,7 @@ cc_binary(
     testonly = True,
     linkshared = True,
     deps = [
+        "-latomic",
         ":jni_http_test_server_factory_lib",
         "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
@@ -108,10 +109,10 @@ cc_binary(
 # Base binary (.so) for testing
 cc_binary(
     name = "libenvoy_jni_with_test_extensions.so",
+    testonly = True,
     linkopts = [
         "-latomic",
     ],
-    testonly = True,
     linkshared = True,
     deps = [
         ":envoy_jni_with_test_extensions_lib",

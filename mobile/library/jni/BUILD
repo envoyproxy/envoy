@@ -171,7 +171,6 @@ cc_import(
     static_library = ":pthread",
 )
 
-
 envoy_cc_library(
     name = "pthread",
     srcs = ["//bazel:objc_dummy"],
