@@ -20,6 +20,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/cert_validator/utility.h"
+#include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
@@ -265,15 +266,9 @@ absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
     X509_NAME* name = X509_get_subject_name(ca.get());
 
     // Check for duplicates.
-    #ifdef OPENSSL_IS_AWSLC
-    if (sk_X509_NAME_find_awslc(list.get(), nullptr, name)) {
-      continue;
-    }
-    #else
     if (sk_X509_NAME_find(list.get(), nullptr, name)) {
       continue;
     }
-    #endif
 
     bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {

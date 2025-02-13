@@ -30,6 +30,7 @@
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/cert_validator/utility.h"
+#include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
@@ -534,15 +535,10 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
           "Failed to load trusted client CA certificates from ", config_->caCertPath()));
     }
     // Check for duplicates.
-    #ifdef OPENSSL_IS_AWSLC
-    if (sk_X509_NAME_find_awslc(list.get(), nullptr, name)) {
-      continue;
-    }
-    #else
     if (sk_X509_NAME_find(list.get(), nullptr, name)) {
       continue;
     }
-    #endif
+
     bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
       return absl::InvalidArgumentError(absl::StrCat(
