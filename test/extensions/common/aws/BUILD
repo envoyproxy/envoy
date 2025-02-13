@@ -37,6 +37,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib"
     ],
 )
 
@@ -64,6 +65,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib"    
     ],
 )
 
@@ -80,6 +82,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib"    
     ],
 )
 
@@ -96,7 +99,8 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-    ],
+        "//source/extensions/common/aws:credentials_provider_impl_lib"    
+        ],
 )
 
 envoy_cc_test(
