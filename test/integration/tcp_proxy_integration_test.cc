@@ -1756,8 +1756,7 @@ public:
 class PauseFilterFactory : public Extensions::NetworkFilters::Common::FactoryBase<
                                test::integration::tcp_proxy::PauseFilterConfig> {
 public:
-  const std::string filter_name_{"test.pause_iteration"};
-  PauseFilterFactory() : FactoryBase(filter_name_) {}
+  PauseFilterFactory() : FactoryBase("test.pause_iteration") {}
 
 private:
   Network::FilterFactoryCb
@@ -1775,12 +1774,12 @@ class TcpProxyReceiveBeforeConnectIntegrationTest : public TcpProxyIntegrationTe
 public:
   void addPauseFilter(uint32_t data_size_before_continue) {
     config_helper_.addNetworkFilter(fmt::format(R"EOF(
-      name: {}
+      name: test.pause_iteration
       typed_config:
         "@type": type.googleapis.com/test.integration.tcp_proxy.PauseFilterConfig
         data_size_before_continue: {}
 )EOF",
-                                                factory_.filter_name_, data_size_before_continue));
+                                                data_size_before_continue));
   }
 
   PauseFilterFactory factory_;
