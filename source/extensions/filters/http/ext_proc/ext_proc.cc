@@ -1375,7 +1375,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   }
 }
 
-void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
+void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& message) {
   ENVOY_STREAM_LOG(debug, "Received gRPC error on stream: {}", *decoder_callbacks_, status);
   stats_.streams_failed_.inc();
 
@@ -1396,7 +1396,8 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     closeStream();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
-    errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
+    errorResponse.set_details(
+        absl::StrFormat("%s_gRPC_error_%i{%s}", ErrorPrefix, status, message));
     sendImmediateResponse(errorResponse);
   }
 }

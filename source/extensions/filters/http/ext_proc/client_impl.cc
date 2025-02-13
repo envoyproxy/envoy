@@ -106,7 +106,7 @@ void ExternalProcessorStreamImpl::onRemoteClose(Grpc::Status::GrpcStatus status,
   if (status == Grpc::Status::Ok) {
     callbacks_->onGrpcClose();
   } else {
-    callbacks_->onGrpcError(status);
+    callbacks_->onGrpcError(status, message);
   }
 }
 
