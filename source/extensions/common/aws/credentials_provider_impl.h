@@ -48,7 +48,7 @@ class EnvironmentCredentialsProvider : public CredentialsProvider,
                                        public Logger::Loggable<Logger::Id::aws> {
 public:
   Credentials getCredentials() override;
-  bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
+  bool credentialsPending() override { return false; };
   std::string providerName() override { return "EnvironmentCredentialsProvider"; };
 };
 
@@ -66,7 +66,7 @@ public:
                             absl::string_view session_token = absl::string_view())
       : credentials_(access_key_id, secret_access_key, session_token) {}
   Credentials getCredentials() override;
-  bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
+  bool credentialsPending() override { return false; };
   std::string providerName() override { return "ConfigCredentialsProvider"; };
 
 private:
@@ -80,7 +80,7 @@ public:
     refreshIfNeeded();
     return cached_credentials_;
   }
-  bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
+  bool credentialsPending() override { return false; };
 
 protected:
   SystemTime last_updated_;
@@ -170,7 +170,7 @@ public:
                                   std::chrono::seconds initialization_timer);
 
   Credentials getCredentials() override;
-  bool credentialsPending(CredentialsPendingCallback&& cb) override;
+  bool credentialsPending() override;
 
   // Get the Metadata credentials cache duration.
   static std::chrono::seconds getCacheDuration();
@@ -383,12 +383,20 @@ public:
   }
 
   Credentials getCredentials() override;
-  bool credentialsPending(CredentialsPendingCallback&&) override;
+
+  // TODO: @nbaws refactor this to remove class inheritance of CredentialsProvider
+  bool credentialsPending() override { return false; };
   std::string providerName() override { return "CredentialsProviderChain"; };
+
+  bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
+
   // Store the RAII handle for a subscription to credential provider notification
   void storeSubscription(CredentialSubscriberCallbacksHandlePtr);
   // Callback to notify on credential updates occurring from a chain member
   void onCredentialUpdate() override;
+
+private:
+  bool chainProvidersPending();
 
 protected:
   std::list<CredentialsProviderSharedPtr> providers_;
@@ -492,7 +500,7 @@ public:
       : credentials_(access_key_id, secret_access_key, session_token) {}
 
   Credentials getCredentials() override { return credentials_; }
-  bool credentialsPending(CredentialsPendingCallback&&) override { return false; };
+  bool credentialsPending() override { return false; };
   std::string providerName() override { return "InlineCredentialProvider"; };
 
 private:

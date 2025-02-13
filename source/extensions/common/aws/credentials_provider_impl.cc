@@ -163,7 +163,7 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
 }
 
 // Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
-bool MetadataCredentialsProviderBase::credentialsPending(CredentialsPendingCallback&&) {
+bool MetadataCredentialsProviderBase::credentialsPending() {
   if (context_) {
     return credentials_pending_;
   }
@@ -919,41 +919,12 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
   credentialsRetrievalError();
 }
 
-bool CredentialsProviderChain::credentialsPending(CredentialsPendingCallback&& cb) {
-  for (auto& provider : providers_) {
-    auto callback_copy = cb;
-    const auto pending = provider->credentialsPending(std::move(callback_copy));
-    ENVOY_LOG(debug, "Provider {} returning pending {}", provider->providerName(), pending);
-    if (pending) {
-      if (cb) {
-        ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
-        Thread::LockGuard guard(mu_);
-        credential_pending_callbacks_.push_back(std::move(cb));
-        ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
-      }
-      return pending;
-    } else {
-      if (provider->getCredentials().hasCredentials()) {
-        ENVOY_LOG(debug, "Provider {} has credentials, returning credentialsPending false",
-                  provider->providerName());
-        return false;
-      } else {
-        ENVOY_LOG(debug, "Provider {} has blank credentials, continuing through chain",
-                  provider->providerName());
-      }
-    }
-  }
-  return false;
-}
-
-void CredentialsProviderChain::onCredentialUpdate() {
-  // Loop through all providers
-  // If no providers are pending then unblock
-  // If a provider is not pending and has credentials, then unblock
+bool CredentialsProviderChain::chainProvidersPending()
+{
   for (auto& provider : providers_) {
     if (provider->credentialsPending()) {
       ENVOY_LOG(debug, "Provider {} is still pending", provider->providerName());
-      return;
+      return true;
     }
     if (provider->getCredentials().hasCredentials()) {
       ENVOY_LOG(debug, "Provider {} has credentials", provider->providerName());
@@ -962,6 +933,29 @@ void CredentialsProviderChain::onCredentialUpdate() {
       ENVOY_LOG(debug, "Provider {} has blank credentials, continuing through chain",
                 provider->providerName());
     }
+  }
+  return false;
+}
+
+bool CredentialsProviderChain::addCallbackIfChainCredentialsPending(CredentialsPendingCallback&& cb) {
+  if(!chainProvidersPending())
+  {
+    return false;
+  }
+  if (cb) {
+    ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
+    Thread::LockGuard guard(mu_);
+    credential_pending_callbacks_.push_back(std::move(cb));
+    ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
+  }
+  return true;
+
+}
+
+void CredentialsProviderChain::onCredentialUpdate() {
+  if(chainProvidersPending())
+  {
+    return;
   }
 
   std::vector<CredentialsPendingCallback> callbacks_copy;
