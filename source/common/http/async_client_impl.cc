@@ -132,7 +132,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
     return;
   }
 
-  const Router::MetadataMatchCriteria* metadata_matching_criteria;
+  const Router::MetadataMatchCriteria* metadata_matching_criteria = nullptr;
   if (options.parent_context.stream_info != nullptr) {
     stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
     metadata_matching_criteria =
