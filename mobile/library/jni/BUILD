@@ -124,6 +124,7 @@ cc_binary(
         "-lm",
         # See libpthread below.
         "-L$(GENDIR)/{}".format(package_name()),
+        "-latomic",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": [],
@@ -169,6 +170,7 @@ cc_import(
     name = "libpthread",
     static_library = ":pthread",
 )
+
 
 envoy_cc_library(
     name = "pthread",
