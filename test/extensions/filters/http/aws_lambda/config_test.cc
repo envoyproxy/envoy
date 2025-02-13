@@ -292,6 +292,7 @@ credentials:
 
   auto provider =
       factory.getCredentialsProvider(proto_config, context.serverFactoryContext(), "region");
+  // hardwired credentials are set in provider configuration
   auto credentials = provider->getCredentials();
   EXPECT_EQ(credentials.accessKeyId().value(), "config_kid");
   EXPECT_EQ(credentials.secretAccessKey().value(), "config_Key");
@@ -334,6 +335,7 @@ aws_session_token = profile4_token
   EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(file_path))
       .WillRepeatedly(Return(CREDENTIALS_FILE_CONTENTS));
 
+  // test_profile is set in provider configuration
   const auto credentials = provider->getCredentials();
   EXPECT_EQ("profile4_access_key", credentials.accessKeyId().value());
   EXPECT_EQ("profile4_secret", credentials.secretAccessKey().value());
@@ -374,6 +376,8 @@ aws_session_token = profile4_token
   TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", file_path, 1);
   EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(file_path))
       .WillRepeatedly(Return(CREDENTIALS_FILE_CONTENTS));
+
+  // Default Credentials Provider chain will always return credentials from default profile
   const auto credentials = provider->getCredentials();
   EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
   EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
