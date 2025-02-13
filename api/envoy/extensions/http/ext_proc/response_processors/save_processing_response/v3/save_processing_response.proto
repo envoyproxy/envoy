@@ -35,9 +35,10 @@ message SaveProcessingResponse {
   }
 
   // The default filter state name is
-  // "envoy.http.ext_proc.response_processors.save_processing_response". If
-  // defined, ``filter_state_name_suffix`` is appended to this with a dot in the
-  // middle.
+  // "envoy.http.ext_proc.response_processors.save_processing_response".
+  // If defined, ``filter_state_name_suffix`` is appended to this.
+  // For example, setting ``filter_state_name_suffix`` to "xyz" will set the
+  // filter state name to "envoy.http.ext_proc.response_processors.save_processing_response.xyz"
   string filter_state_name_suffix = 1;
 
   // Save the response to filter state when :ref:`request_headers
