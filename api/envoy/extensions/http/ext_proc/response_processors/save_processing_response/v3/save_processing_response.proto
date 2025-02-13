@@ -22,21 +22,23 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // filter state with name
 // "envoy.http.ext_proc.response_processors.save_processing_response[.:ref:`filter_state_name_suffix
 // <envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.filter_state_name>`].
-// [#next-free-field: 11]
+// [#next-free-field: 10]
 message SaveProcessingResponse {
+  // [#next-free-field: 11]
+  message SaveOptions {
+    // Whether or not to save the response for the response type.
+    bool save_response = 1;
+
+    // When true, saves the response if there was an error when processing
+    // the response from the external processor.
+    bool save_on_error = 10;
+  }
+
   // The default filter state name is
   // "envoy.http.ext_proc.response_processors.save_processing_response". If
   // defined, `filter_state_name_suffix` is appended to this with a dot in the
   // middle.
   string filter_state_name_suffix = 1;
-
-  message SaveOptions {
-    // Whether or not to save the response for the response type.
-    bool save_response = 1;
-    // When true, saves the response if there was an error when processing
-    // the response from the external processor.
-    bool save_on_error = 10;
-  }
 
   // Save the response to filter state when :ref:`request_headers
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_headers>` is set.
