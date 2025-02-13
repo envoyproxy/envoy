@@ -12,6 +12,7 @@ def test_program(name):
         deps = [
             "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
         ],
+        rustc_flags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"],
     )
 
     # As per the discussion in https://github.com/envoyproxy/envoy/pull/35627,
