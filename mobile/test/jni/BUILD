@@ -108,6 +108,9 @@ cc_binary(
 # Base binary (.so) for testing
 cc_binary(
     name = "libenvoy_jni_with_test_extensions.so",
+    linkopts = [
+        "-latomic",
+    ],
     testonly = True,
     linkshared = True,
     deps = [
