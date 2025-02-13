@@ -49,7 +49,7 @@ else
   COVERAGE_TARGETS=(//test/...)
 fi
 
-BAZEL_COVERAGE_OPTIONS=(--heap_dump_on_oom)
+BAZEL_COVERAGE_OPTIONS=(--heap_dump_on_oom -s)
 
 if [[ -n "${BAZEL_GRPC_LOG}" ]]; then
     BAZEL_COVERAGE_OPTIONS+=(--remote_grpc_log="${BAZEL_GRPC_LOG}")
