@@ -405,7 +405,7 @@ private:
   // during destruction.
   UpstreamRequestPtr upstream_request_;
   Http::CodecType type_;
-  bool is_ssl_;
+  bool is_ssl_ = false;
 };
 
 } // namespace TcpProxy
