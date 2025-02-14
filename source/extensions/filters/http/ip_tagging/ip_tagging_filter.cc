@@ -20,7 +20,7 @@ absl::StatusOr<IpTaggingFilterConfigSharedPtr> IpTaggingFilterConfig::create(
   auto config_ptr = std::shared_ptr<IpTaggingFilterConfig>(
       new IpTaggingFilterConfig(config, stat_prefix, scope, runtime, creation_status));
   RETURN_IF_NOT_OK(creation_status);
-  return std::move(config_ptr);
+  return config_ptr;
 }
 
 IpTaggingFilterConfig::IpTaggingFilterConfig(
