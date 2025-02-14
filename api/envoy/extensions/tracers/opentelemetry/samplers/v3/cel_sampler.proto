@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.tracers.opentelemetry.samplers.v3;
 
-import "xds/type/v3/cel.proto";
 import "xds/annotations/v3/status.proto";
+import "xds/type/v3/cel.proto";
 
 import "udpa/annotations/status.proto";
 
