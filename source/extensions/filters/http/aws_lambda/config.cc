@@ -37,7 +37,7 @@ getInvocationMode(const envoy::extensions::filters::http::aws_lambda::v3::Config
 // In case credentials from config or credentials_profile are set in the configuration, instead of
 // using the default providers chain, it will use the credentials from config (if provided), then
 // credentials file provider with the configured profile. All other providers will be ignored.
-Extensions::Common::Aws::CredentialsProviderSharedPtr
+Extensions::Common::Aws::CredentialsProviderChainSharedPtr
 AwsLambdaFilterFactory::getCredentialsProvider(
     const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
     Server::Configuration::ServerFactoryContext& server_context, const std::string& region) const {
@@ -46,9 +46,11 @@ AwsLambdaFilterFactory::getCredentialsProvider(
               "credentials are set from filter configuration, default credentials providers chain "
               "will be ignored and only this credentials will be used");
     const auto& config_credentials = proto_config.credentials();
-    return std::make_shared<Extensions::Common::Aws::ConfigCredentialsProvider>(
+    auto chain = std::make_shared<Extensions::Common::Aws::CredentialsProviderChain>();
+    chain->add(std::make_shared<Extensions::Common::Aws::ConfigCredentialsProvider>(
         config_credentials.access_key_id(), config_credentials.secret_access_key(),
-        config_credentials.session_token());
+        config_credentials.session_token()));
+    return chain;
   }
   if (!proto_config.credentials_profile().empty()) {
     ENVOY_LOG(debug,
@@ -57,8 +59,10 @@ AwsLambdaFilterFactory::getCredentialsProvider(
               proto_config.credentials_profile());
     envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider credential_file_config;
     credential_file_config.set_profile(proto_config.credentials_profile());
-    return std::make_shared<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
-        server_context, credential_file_config);
+    auto chain = std::make_shared<Extensions::Common::Aws::CredentialsProviderChain>();
+    chain->add(std::make_shared<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
+        server_context, credential_file_config));
+    return chain;
   }
   return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
       server_context.api(), makeOptRef(server_context), region, nullptr);

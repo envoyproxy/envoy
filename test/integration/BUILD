@@ -602,6 +602,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":integration_lib",
         ":socket_interface_swap_lib",
+        "//source/extensions/load_balancing_policies/subset:config",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
