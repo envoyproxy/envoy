@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.tracers.opentelemetry.samplers.v3;
 
 import "xds/type/v3/cel.proto";
+import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
 
@@ -19,5 +20,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message CELSamplerConfig {
   // Expression that, when evaluated, will be used to make sample decision.
-  xds.type.v3.CelExpression expression = 1;
+  xds.type.v3.CelExpression expression = 1
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }
