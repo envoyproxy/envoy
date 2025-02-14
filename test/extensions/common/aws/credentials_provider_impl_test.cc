@@ -2893,7 +2893,7 @@ TEST(CredentialsProviderChainTest, getCredentials_noCredentials) {
   CredentialsProviderChain chain;
   chain.add(mock_provider1);
   chain.add(mock_provider2);
-  const absl::StatusOr<Credentials> creds = chain.getCredentials();
+  const absl::StatusOr<Credentials> creds = chain.chainGetCredentials();
   EXPECT_EQ(Credentials(), creds.value());
 }
 
@@ -2910,7 +2910,7 @@ TEST(CredentialsProviderChainTest, getCredentials_firstProviderReturns) {
   chain.add(mock_provider1);
   chain.add(mock_provider2);
 
-  const absl::StatusOr<Credentials> ret_creds = chain.getCredentials();
+  const absl::StatusOr<Credentials> ret_creds = chain.chainGetCredentials();
 
   EXPECT_EQ(creds, ret_creds.value());
 }
@@ -2928,7 +2928,7 @@ TEST(CredentialsProviderChainTest, getCredentials_secondProviderReturns) {
   chain.add(mock_provider1);
   chain.add(mock_provider2);
 
-  const absl::StatusOr<Credentials> ret_creds = chain.getCredentials();
+  const absl::StatusOr<Credentials> ret_creds = chain.chainGetCredentials();
   EXPECT_EQ(creds, ret_creds.value());
 }
 
@@ -2951,12 +2951,12 @@ TEST(CredentialsProviderChainTest, CheckChainReturnsPendingInCorrectOrder) {
   // We want to ensure that if mock_provider1 returns credentialsPending false, then the credentials
   // from provider1 are used Mock provider 2 credentialsPending will never be called as provider 1
   // will trigger early exit
-  EXPECT_CALL(*mock_provider1, credentialsPending(_)).WillOnce(Return(false));
-  EXPECT_CALL(*mock_provider2, credentialsPending(_)).Times(0);
+  EXPECT_CALL(*mock_provider1, credentialsPending()).WillOnce(Return(false));
+  EXPECT_CALL(*mock_provider2, credentialsPending()).Times(0);
 
-  bool pending = chain.credentialsPending(std::move(cb));
+  bool pending = chain.addCallbackIfChainCredentialsPending(std::move(cb));
   EXPECT_EQ(pending, false);
-  auto creds = chain.getCredentials();
+  auto creds = chain.chainGetCredentials();
   EXPECT_EQ(creds.accessKeyId(), "provider1");
   EXPECT_EQ(creds.secretAccessKey(), "1");
 }
@@ -3090,9 +3090,10 @@ TEST_F(AsyncCredentialHandlingTest, ReceivePendingTrueWhenPending) {
       },
       refresh_state, initialization_timer, cred_provider);
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
-
+  auto chain = std::make_shared<CredentialsProviderChain>();
+  chain->add(provider_);
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-      "vpc-lattice-svcs", "ap-southeast-2", provider_, context_,
+      "vpc-lattice-svcs", "ap-southeast-2", chain, context_,
       Common::Aws::AwsSigningHeaderExclusionVector{});
 
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
@@ -3143,7 +3144,7 @@ TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) 
 
   auto chain = std::make_shared<MockCredentialsProviderChain>();
   EXPECT_CALL(*chain, onCredentialUpdate());
-  EXPECT_CALL(*chain, getCredentials()).WillOnce(Return(Credentials("akid", "skid")));
+  EXPECT_CALL(*chain, chainGetCredentials()).WillOnce(Return(Credentials("akid", "skid")));
 
   auto document = R"EOF(
 {
@@ -3214,7 +3215,7 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
 
   auto chain = std::make_shared<MockCredentialsProviderChain>();
   EXPECT_CALL(*chain, onCredentialUpdate());
-  EXPECT_CALL(*chain, getCredentials());
+  EXPECT_CALL(*chain, chainGetCredentials());
   auto chain2 = std::make_shared<MockCredentialsProviderChain>();
 
   auto document = R"EOF(

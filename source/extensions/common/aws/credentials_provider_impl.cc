@@ -971,10 +971,10 @@ void CredentialsProviderChain::onCredentialUpdate() {
   }
 }
 
-Credentials CredentialsProviderChain::getCredentials() {
+Credentials CredentialsProviderChain::chainGetCredentials() {
   for (auto& provider : providers_) {
     const auto credentials = provider->getCredentials();
-    if (credentials.accessKeyId() && credentials.secretAccessKey()) {
+    if (credentials.hasCredentials()) {
       return credentials;
     }
   }

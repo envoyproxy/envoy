@@ -33,6 +33,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:sigv4_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:server_factory_context_mocks",
@@ -60,6 +61,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:sigv4_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:server_factory_context_mocks",
@@ -76,6 +78,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:sigv4a_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:server_factory_context_mocks",
@@ -91,6 +94,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:message_lib",
+        "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:sigv4a_key_derivation_lib",
         "//source/extensions/common/aws:sigv4a_signer_impl_lib",
         "//test/extensions/common/aws:aws_mocks",

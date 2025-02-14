@@ -65,7 +65,7 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
     headers.setReferenceKey(SignatureHeaders::get().ContentSha256, content_hash);
   }
 
-  const auto credentials = credentials_provider_->getCredentials();
+  const auto credentials = credentials_provider_->chainGetCredentials();
 
   if (!credentials.hasCredentials()) {
     // Empty or "anonymous" credentials are a valid use-case for non-production environments.

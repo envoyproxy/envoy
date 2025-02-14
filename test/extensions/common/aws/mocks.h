@@ -39,7 +39,7 @@ public:
   ~MockCredentialsProvider() override;
 
   MOCK_METHOD(Credentials, getCredentials, ());
-  MOCK_METHOD(bool, credentialsPending, (CredentialsPendingCallback &&));
+  MOCK_METHOD(bool, credentialsPending, ());
   MOCK_METHOD(std::string, providerName, ());
 };
 
@@ -88,12 +88,10 @@ public:
   MOCK_METHOD(void, onClusterAddOrUpdate, ());
 };
 
-class MockCredentialsProviderChain : public CredentialsProvider,
-                                     public CredentialSubscriberCallbacks {
+class MockCredentialsProviderChain : public CredentialsProviderChain {
 public:
-  MOCK_METHOD(Credentials, getCredentials, ());
-  MOCK_METHOD(bool, credentialsPending, (CredentialsPendingCallback &&));
-  MOCK_METHOD(std::string, providerName, ());
+  MOCK_METHOD(Credentials, chainGetCredentials, ());
+  MOCK_METHOD(bool, addCallbackIfChainCredentialsPending, (CredentialsPendingCallback &&));
   MOCK_METHOD(void, onCredentialUpdate, ());
 };
 

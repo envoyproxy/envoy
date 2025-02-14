@@ -127,33 +127,6 @@ struct MetadataCredentialsProviderStats {
   ALL_METADATACREDENTIALSPROVIDER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
-// class CredentialsProviderChain;
-
-class CredentialSubscriberCallbacks {
-public:
-  virtual ~CredentialSubscriberCallbacks() = default;
-
-  virtual void onCredentialUpdate() PURE;
-};
-
-// Subscription model allowing CredentialsProviderChains to be notified of credential provider
-// updates. A credential provider chain will call credential_provider->subscribeToCredentialUpdates
-// to register itself for updates via onCredentialUpdate callback. When a credential provider has
-// successfully updated all threads with new credentials, via the setCredentialsToAllThreads method
-// it will notify all subscribers that credentials have been retrieved.
-// RAII is used, as credential providers may be instantiated as singletons, as such they may outlive
-// the credential provider chain. Subscription is only relevant for metadata credentials providers,
-// as these are the only credential providers that implement async credential retrieval
-// functionality.
-class CredentialSubscriberCallbacksHandle : public RaiiListElement<CredentialSubscriberCallbacks*> {
-public:
-  CredentialSubscriberCallbacksHandle(CredentialSubscriberCallbacks& cb,
-                                      std::list<CredentialSubscriberCallbacks*>& parent)
-      : RaiiListElement<CredentialSubscriberCallbacks*>(parent, &cb) {}
-};
-
-using CredentialSubscriberCallbacksHandlePtr = std::unique_ptr<CredentialSubscriberCallbacksHandle>;
-
 class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase,
                                         public AwsManagedClusterUpdateCallbacks {
 public:
@@ -361,48 +334,6 @@ private:
   bool needsRefresh() override;
   void refresh() override;
   void extractCredentials(const std::string&& credential_document_value);
-};
-
-/**
- * AWS credentials provider chain, able to fallback between multiple credential providers.
- */
-class CredentialsProviderChain : public CredentialsProvider,
-                                 public CredentialSubscriberCallbacks,
-                                 public Logger::Loggable<Logger::Id::aws> {
-public:
-  ~CredentialsProviderChain() override {
-    for (auto& subscriber_handle : subscriber_handles_) {
-      if (subscriber_handle) {
-        subscriber_handle->cancel();
-      }
-    }
-  }
-
-  void add(const CredentialsProviderSharedPtr& credentials_provider) {
-    providers_.emplace_back(credentials_provider);
-  }
-
-  Credentials getCredentials() override;
-
-  // TODO: @nbaws refactor this to remove class inheritance of CredentialsProvider
-  bool credentialsPending() override { return false; };
-  std::string providerName() override { return "CredentialsProviderChain"; };
-
-  bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
-
-  // Store the RAII handle for a subscription to credential provider notification
-  void storeSubscription(CredentialSubscriberCallbacksHandlePtr);
-  // Callback to notify on credential updates occurring from a chain member
-  void onCredentialUpdate() override;
-
-private:
-  bool chainProvidersPending();
-
-protected:
-  std::list<CredentialsProviderSharedPtr> providers_;
-  Thread::MutexBasicLockable mu_;
-  std::vector<CredentialsPendingCallback> credential_pending_callbacks_ ABSL_GUARDED_BY(mu_) = {};
-  std::list<CredentialSubscriberCallbacksHandlePtr> subscriber_handles_;
 };
 
 class CredentialsProviderChainFactories {
