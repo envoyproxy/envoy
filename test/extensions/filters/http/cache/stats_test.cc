@@ -26,6 +26,14 @@ MATCHER_P(OptCounterHasValue, m, "") {
       arg, result_listener);
 }
 
+MATCHER_P(OptGaugeHasValue, m, "") {
+  return testing::ExplainMatchResult(
+      testing::Optional(
+          testing::Property("get", &std::reference_wrapper<const Stats::Gauge>::get,
+                            testing::Property("value", &Envoy::Stats::Gauge::value, m))),
+      arg, result_listener);
+}
+
 MATCHER_P(OptCounterHasName, m, "") {
   return testing::ExplainMatchResult(
       testing::Optional(testing::Property(
@@ -74,6 +82,28 @@ TEST_F(CacheStatsTest, StatsAreConstructedCorrectly) {
   Stats::CounterOptConstRef lookup_errors = context_.store_.findCounterByString(
       "cache.event.cache_label.fake_cache.event_type.lookup_error");
   EXPECT_THAT(lookup_errors, OptCounterIs("cache.event", 1));
+
+  stats_->incActiveCacheEntries();
+  stats_->incActiveCacheEntries();
+  stats_->incActiveCacheEntries();
+  stats_->decActiveCacheEntries();
+  Stats::GaugeOptConstRef active_cache_entries =
+      context_.store_.findGaugeByString("cache.active_cache_entries.cache_label.fake_cache");
+  EXPECT_THAT(active_cache_entries, OptGaugeHasValue(2));
+
+  stats_->incActiveCacheSubscribers();
+  stats_->incActiveCacheSubscribers();
+  stats_->incActiveCacheSubscribers();
+  stats_->subActiveCacheSubscribers(2);
+  Stats::GaugeOptConstRef active_cache_subscribers =
+      context_.store_.findGaugeByString("cache.active_cache_subscribers.cache_label.fake_cache");
+  EXPECT_THAT(active_cache_subscribers, OptGaugeHasValue(1));
+
+  stats_->addUpstreamBufferedBytes(1024);
+  stats_->subUpstreamBufferedBytes(512);
+  Stats::GaugeOptConstRef upstream_buffered_bytes =
+      context_.store_.findGaugeByString("cache.upstream_buffered_bytes.cache_label.fake_cache");
+  EXPECT_THAT(upstream_buffered_bytes, OptGaugeHasValue(512));
 }
 
 } // namespace

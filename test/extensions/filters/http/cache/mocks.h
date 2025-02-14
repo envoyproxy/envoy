@@ -17,15 +17,34 @@ namespace Cache {
 void PrintTo(const EndStream& end_stream, std::ostream* os);
 void PrintTo(const Key& key, std::ostream* os);
 
+class MockCacheFilterStats : public CacheFilterStats {
+public:
+  MOCK_METHOD(void, incForStatus, (CacheEntryStatus s));
+  MOCK_METHOD(void, incActiveCacheEntries, ());
+  MOCK_METHOD(void, decActiveCacheEntries, ());
+  MOCK_METHOD(void, incActiveCacheSubscribers, ());
+  MOCK_METHOD(void, subActiveCacheSubscribers, (uint64_t count));
+  MOCK_METHOD(void, addUpstreamBufferedBytes, (uint64_t bytes));
+  MOCK_METHOD(void, subUpstreamBufferedBytes, (uint64_t bytes));
+};
+
 class MockActiveCache : public ActiveCache {
 public:
+  MockActiveCache() {
+    EXPECT_CALL(*this, stats).Times(testing::AnyNumber()).WillRepeatedly(testing::ReturnRef(mock_stats_));
+  }
   MOCK_METHOD(void, lookup, (ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb));
   MOCK_METHOD(CacheInfo, cacheInfo, (), (const));
   MOCK_METHOD(HttpCache&, cache, (), (const));
+  MOCK_METHOD(CacheFilterStats&, stats, (), (const));
+  testing::NiceMock<MockCacheFilterStats> mock_stats_;
 };
 
 class MockHttpCache : public HttpCache {
 public:
+  MockHttpCache() {
+    EXPECT_CALL(*this, cacheInfo).Times(testing::AnyNumber()).WillRepeatedly(testing::Return(CacheInfo{"mock_cache"}));
+  }
   MOCK_METHOD(void, lookup, (LookupRequest && request, LookupCallback&& callback));
   MOCK_METHOD(void, evict, (Event::Dispatcher & dispatcher, const Key& key));
   MOCK_METHOD(void, touch, (const Key& key, SystemTime timestamp));
@@ -53,9 +72,13 @@ public:
   MOCK_METHOD(void, getTrailers, (GetTrailersCallback && cb));
 };
 
-class MockCacheFilterStats : public CacheFilterStats {
+class MockCacheFilterStatsProvider : public CacheFilterStatsProvider {
 public:
-  MOCK_METHOD(void, incForStatus, (CacheEntryStatus s));
+  MockCacheFilterStatsProvider() {
+    ON_CALL(*this, stats).WillByDefault(testing::ReturnRef(mock_stats_));
+  }
+  MOCK_METHOD(CacheFilterStats&, stats, (), (const));
+  testing::NiceMock<MockCacheFilterStats> mock_stats_;
 };
 
 class FakeStreamHttpSource : public HttpSource {
@@ -109,7 +132,7 @@ public:
 
 class MockUpstreamRequestFactory : public UpstreamRequestFactory {
 public:
-  MOCK_METHOD(UpstreamRequestPtr, create, ());
+  MOCK_METHOD(UpstreamRequestPtr, create, (const std::shared_ptr<const CacheFilterStatsProvider> stats_provider));
 };
 
 class MockCacheableResponseChecker : public CacheableResponseChecker {

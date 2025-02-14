@@ -7,19 +7,22 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-UpstreamRequestPtr UpstreamRequestImplFactory::create() {
+UpstreamRequestPtr
+UpstreamRequestImplFactory::create(const std::shared_ptr<const CacheFilterStatsProvider> stats_provider) {
   // Can't use make_unique because the constructor is private.
-  auto ret = std::unique_ptr<UpstreamRequestImpl>(
-      new UpstreamRequestImpl(dispatcher_, async_client_, stream_options_));
+  auto ret = std::unique_ptr<UpstreamRequestImpl>(new UpstreamRequestImpl(
+      dispatcher_, async_client_, stream_options_, std::move(stats_provider)));
   return ret;
 }
 
 UpstreamRequestImpl::UpstreamRequestImpl(Event::Dispatcher& dispatcher,
                                          Http::AsyncClient& async_client,
-                                         const Http::AsyncClient::StreamOptions& options)
+                                         const Http::AsyncClient::StreamOptions& options,
+                                         const std::shared_ptr<const CacheFilterStatsProvider> stats_provider)
     : dispatcher_(dispatcher), stream_(async_client.start(*this, options)),
       body_buffer_([this]() { onBelowLowWatermark(); }, [this]() { onAboveHighWatermark(); },
-                   nullptr) {
+                   nullptr),
+      stats_provider_(std::move(stats_provider)) {
   ASSERT(stream_ != nullptr);
   body_buffer_.setWatermarks(options.buffer_limit_.value_or(0));
 }
@@ -78,6 +81,7 @@ void UpstreamRequestImpl::getBody(AdjustedByteRange range, GetBodyCallback&& cb)
 void UpstreamRequestImpl::onData(Buffer::Instance& data, bool end_stream) {
   ASSERT(dispatcher_.isThreadSafe());
   end_stream_after_body_ = end_stream;
+  stats().addUpstreamBufferedBytes(data.length());
   body_buffer_.move(data);
   return maybeDeliverBody();
 }
@@ -109,6 +113,7 @@ void UpstreamRequestImpl::maybeDeliverBody() {
   auto fragment = std::make_unique<Buffer::OwnedImpl>();
   fragment->move(body_buffer_, len);
   stream_pos_ += len;
+  stats().subUpstreamBufferedBytes(len);
   bool end_stream = end_stream_after_body_ && body_buffer_.length() == 0;
   return absl::get<GetBodyCallback>(consumeCallback())(
       std::move(fragment), end_stream ? EndStream::End : EndStream::More);
@@ -154,6 +159,9 @@ UpstreamRequestImpl::~UpstreamRequestImpl() {
   if (stream_) {
     // Resets the stream and calls onReset, guaranteeing no further callbacks.
     stream_->reset();
+  }
+  if (body_buffer_.length() > 0) {
+    stats().subUpstreamBufferedBytes(body_buffer_.length());
   }
 }
 

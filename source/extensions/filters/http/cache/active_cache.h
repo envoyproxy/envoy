@@ -6,6 +6,7 @@
 
 #include "source/extensions/filters/http/cache/http_cache.h"
 #include "source/extensions/filters/http/cache/key.pb.h"
+#include "source/extensions/filters/http/cache/stats.h"
 #include "source/extensions/filters/http/cache/upstream_request.h"
 
 namespace Envoy {
@@ -20,7 +21,8 @@ public:
       const Http::RequestHeaderMap& request_headers,
       UpstreamRequestFactoryPtr upstream_request_factory, absl::string_view cluster_name,
       Event::Dispatcher& dispatcher, SystemTime timestamp,
-      const std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker,
+      const std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker_,
+      const std::shared_ptr<const CacheFilterStatsProvider> stats_provider_,
       bool ignore_request_cache_control_header);
 
   const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
@@ -33,10 +35,16 @@ public:
   bool isCacheableResponse(const Http::ResponseHeaderMap& headers) const {
     return cacheable_response_checker_->isCacheableResponse(headers);
   }
-  std::shared_ptr<const CacheableResponseChecker> cacheableResponseChecker() const {
+  const std::shared_ptr<const CacheableResponseChecker>& cacheableResponseChecker() const {
     return cacheable_response_checker_;
   }
-  UpstreamRequestFactory& upstreamRequestFactory() const { return *upstream_request_factory_; }
+  const std::shared_ptr<const CacheFilterStatsProvider>& statsProvider() const {
+    return stats_provider_;
+  }
+  CacheFilterStats& stats() const {return statsProvider()->stats();}
+  UpstreamRequestPtr createUpstreamRequest() const {
+    return upstream_request_factory_->create(statsProvider());
+  }
   Event::Dispatcher& dispatcher() const { return dispatcher_; }
   SystemTime timestamp() const { return timestamp_; }
   bool requiresValidation(const Http::ResponseHeaderMap& response_headers,
@@ -53,6 +61,7 @@ private:
   std::vector<RawByteRange> request_range_spec_;
   Http::RequestHeaderMapPtr request_headers_;
   const std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker_;
+  const std::shared_ptr<const CacheFilterStatsProvider> stats_provider_;
   // Time when this LookupRequest was created (in response to an HTTP request).
   SystemTime timestamp_;
   RequestCacheControl request_cache_control_;
@@ -72,12 +81,12 @@ using ActiveLookupResultPtr = std::unique_ptr<ActiveLookupResult>;
 using ActiveLookupResultCallback = absl::AnyInvocable<void(ActiveLookupResultPtr)>;
 
 // May or may not be a singleton; must include the interface for the case when it is.
-class ActiveCache : public Singleton::Instance {
+class ActiveCache : public Singleton::Instance, public CacheFilterStatsProvider {
 public:
   // This is implemented in ActiveCacheImpl so that tests which only use a mock don't
   // need to build the real thing, but declared here so that the actual use-site can
   // create an instance without including the larger header.
-  static std::shared_ptr<ActiveCache> create(TimeSource& time_source,
+  static std::shared_ptr<ActiveCache> create(Server::Configuration::FactoryContext& context,
                                              std::unique_ptr<HttpCache> cache);
 
   virtual void lookup(ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb) PURE;

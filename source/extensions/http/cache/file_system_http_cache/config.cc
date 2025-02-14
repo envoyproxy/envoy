@@ -65,7 +65,7 @@ public:
       std::unique_ptr<FileSystemHttpCache> fs_cache = std::make_unique<FileSystemHttpCache>(
           singleton, cache_eviction_thread_, std::move(config), std::move(async_file_manager),
           context.scope());
-      cache = ActiveCache::create(context.serverFactoryContext().timeSource(), std::move(fs_cache));
+      cache = ActiveCache::create(context, std::move(fs_cache));
       caches_[key] = cache;
     } else {
       // Check that the config of the cache found in the lookup table for the given path

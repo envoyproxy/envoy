@@ -85,6 +85,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.cache"],
     rbe_pool = "6gig",
     deps = [
+        ":mocks",
         "//source/extensions/filters/http/cache:upstream_request_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
@@ -130,7 +131,7 @@ envoy_extension_cc_test(
     deps = [
         ":mocks",
         "//source/extensions/filters/http/cache:active_cache_impl_lib",
-        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],

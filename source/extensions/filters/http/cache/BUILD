@@ -33,6 +33,7 @@ envoy_cc_library(
     deps = [
         ":http_source_interface",
         ":range_utils_lib",
+        ":stats",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:cancel_wrapper_lib",
         "//source/common/common:logger_lib",
@@ -50,6 +51,7 @@ envoy_cc_library(
     ],
     deps = [
         ":http_cache_lib",
+        ":stats",
         ":upstream_request_lib",
         "//source/common/http:utility_lib",
     ],

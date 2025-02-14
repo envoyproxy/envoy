@@ -9,6 +9,7 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
+#include "stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -268,10 +269,12 @@ private:
 
 class ActiveCacheImpl : public ActiveCache, public std::enable_shared_from_this<ActiveCacheImpl> {
 public:
-  ActiveCacheImpl(TimeSource& time_source, std::unique_ptr<HttpCache> cache)
-      : time_source_(time_source), cache_(std::move(cache)) {}
+  ActiveCacheImpl(Server::Configuration::FactoryContext& context, std::unique_ptr<HttpCache> cache)
+      : time_source_(context.serverFactoryContext().timeSource()), cache_(std::move(cache)),
+        stats_(generateStats(context.scope(), cache_->cacheInfo().name_)) {}
 
   void lookup(ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb) override;
+  CacheFilterStats& stats() const override { return *stats_; }
 
   ResponseMetadata makeMetadata();
 
@@ -283,6 +286,7 @@ private:
 
   TimeSource& time_source_;
   std::unique_ptr<HttpCache> cache_;
+  CacheFilterStatsPtr stats_;
   std::chrono::duration<int> expiry_duration_ = std::chrono::minutes(5);
   mutable absl::Mutex mu_;
   // If there turns out to be problematic contention on this mutex, this could

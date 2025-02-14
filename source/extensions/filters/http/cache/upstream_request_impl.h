@@ -5,6 +5,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/cache/http_source.h"
 #include "source/extensions/filters/http/cache/range_utils.h"
+#include "source/extensions/filters/http/cache/stats.h"
 #include "source/extensions/filters/http/cache/upstream_request.h"
 
 #include "absl/types/variant.h"
@@ -44,7 +45,8 @@ public:
 private:
   friend class UpstreamRequestImplFactory;
   UpstreamRequestImpl(Event::Dispatcher& dispatcher, Http::AsyncClient& async_client,
-                      const Http::AsyncClient::StreamOptions& options);
+                      const Http::AsyncClient::StreamOptions& options,
+                      const std::shared_ptr<const CacheFilterStatsProvider> stats_provider);
   // If the headers and callback are both present, call the callback.
   void maybeDeliverHeaders();
 
@@ -64,6 +66,8 @@ private:
   // assert that it's empty.
   CallbackTypes consumeCallback() { return std::exchange(callback_, absl::monostate{}); }
 
+  CacheFilterStats& stats() const { return stats_provider_->stats(); }
+
   Event::Dispatcher& dispatcher_;
   Http::AsyncClient::Stream* stream_;
   Http::RequestHeaderMapPtr request_headers_;
@@ -76,6 +80,7 @@ private:
   bool end_stream_after_body_{false};
   Http::ResponseTrailerMapPtr trailers_;
   CancelWrapper::CancelFunction cancel_ = []() {};
+  const std::shared_ptr<const CacheFilterStatsProvider> stats_provider_;
 };
 
 class UpstreamRequestImplFactory : public UpstreamRequestFactory {
@@ -85,7 +90,7 @@ public:
       : dispatcher_(dispatcher), async_client_(async_client),
         stream_options_(std::move(stream_options)) {}
 
-  UpstreamRequestPtr create() override;
+  UpstreamRequestPtr create(const std::shared_ptr<const CacheFilterStatsProvider> stats_provider) override;
 
 private:
   Event::Dispatcher& dispatcher_;

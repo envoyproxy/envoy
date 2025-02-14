@@ -44,12 +44,10 @@ static constexpr absl::string_view CacheFilterAbortedDuringTrailers = "cache.abo
 
 CacheFilterConfig::CacheFilterConfig(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-    std::shared_ptr<ActiveCache> active_cache, CacheFilterStatsPtr stats,
-    Server::Configuration::CommonFactoryContext& context)
+    std::shared_ptr<ActiveCache> active_cache, Server::Configuration::CommonFactoryContext& context)
     : vary_allow_list_(config.allowed_vary_headers(), context), time_source_(context.timeSource()),
       ignore_request_cache_control_header_(config.ignore_request_cache_control_header()),
-      cluster_manager_(context.clusterManager()), active_cache_(std::move(active_cache)),
-      stats_(std::move(stats)) {}
+      cluster_manager_(context.clusterManager()), active_cache_(std::move(active_cache)) {}
 
 bool CacheFilterConfig::isCacheableResponse(const Http::ResponseHeaderMap& headers) const {
   return CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_);
@@ -138,7 +136,8 @@ Http::FilterHeadersStatus CacheFilter::decodeHeaders(Http::RequestHeaderMap& hea
       decoder_callbacks_->dispatcher(), *async_client, config_->upstreamOptions());
   auto lookup_request = std::make_unique<ActiveLookupRequest>(
       headers, std::move(upstream_request_factory), *cluster_name, decoder_callbacks_->dispatcher(),
-      config_->timeSource().systemTime(), config_, config_->ignoreRequestCacheControlHeader());
+      config_->timeSource().systemTime(), config_, config_,
+      config_->ignoreRequestCacheControlHeader());
   is_head_request_ = headers.getMethodValue() == Http::Headers::get().MethodValues.Head;
   ENVOY_STREAM_LOG(debug, "CacheFilter::decodeHeaders starting lookup", *decoder_callbacks_);
   config_->activeCache().lookup(

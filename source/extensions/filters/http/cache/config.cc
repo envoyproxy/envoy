@@ -27,12 +27,7 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
 
     cache = http_cache_factory->getCache(config, context);
   }
-  std::unique_ptr<CacheFilterStats> stats;
-  if (cache) {
-    stats = generateStats(context.scope(), cache->cacheInfo().name_);
-  }
-
-  return [config = std::make_shared<CacheFilterConfig>(config, std::move(cache), std::move(stats),
+  return [config = std::make_shared<CacheFilterConfig>(config, std::move(cache),
                                                        context.serverFactoryContext())](
              Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CacheFilter>(config));

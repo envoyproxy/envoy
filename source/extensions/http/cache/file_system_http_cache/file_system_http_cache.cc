@@ -56,7 +56,7 @@ void FileSystemHttpCache::lookup(LookupRequest&& lookup, LookupCallback&& callba
           if (open_result.status().code() == absl::StatusCode::kNotFound) {
             return callback(LookupResult{});
           }
-          ENVOY_LOG(debug, "open file failed: {}", open_result.status());
+          ENVOY_LOG(error, "open file failed: {}", open_result.status());
           return callback(open_result.status());
         }
         FileLookupContext::begin(dispatcher, std::move(open_result.value()), std::move(callback));
@@ -200,7 +200,7 @@ void FileSystemHttpCache::updateHeaders(Event::Dispatcher& dispatcher, const Key
       [&dispatcher = dispatcher, header_buffer = std::move(header_buffer)](
           absl::StatusOr<AsyncFileHandle> open_result) mutable {
         if (!open_result.ok()) {
-          ENVOY_LOG(debug, "open file for updateHeaders failed: {}", open_result.status());
+          ENVOY_LOG(error, "open file for updateHeaders failed: {}", open_result.status());
           return;
         }
         HeaderUpdateContext::begin(dispatcher, open_result.value(), std::move(header_buffer));

@@ -35,10 +35,7 @@ using ::testing::Return;
 class CacheFilterTest : public ::testing::Test {
 protected:
   CacheFilterSharedPtr makeFilter(std::shared_ptr<ActiveCache> cache, bool auto_destroy = true) {
-    auto mock_cache_filter_stats = std::make_unique<MockCacheFilterStats>();
-    mock_cache_filter_stats_ = mock_cache_filter_stats.get();
     auto config = std::make_shared<CacheFilterConfig>(config_, std::move(cache),
-                                                      std::move(mock_cache_filter_stats),
                                                       context_.server_factory_context_);
     std::shared_ptr<CacheFilter> filter(new CacheFilter(config), [auto_destroy](CacheFilter* f) {
       if (auto_destroy) {
@@ -101,8 +98,7 @@ protected:
   Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
   std::shared_ptr<MockActiveCache> mock_cache_ = std::make_shared<MockActiveCache>();
   std::unique_ptr<MockHttpSource> mock_http_source_ = std::make_unique<MockHttpSource>();
-  MockCacheFilterStats& stats() { return *mock_cache_filter_stats_; }
-  MockCacheFilterStats* mock_cache_filter_stats_;
+  MockCacheFilterStats& stats() { return mock_cache_->mock_stats_; }
   ActiveLookupRequestPtr captured_lookup_request_;
   ActiveLookupResultCallback captured_lookup_callback_;
   GetHeadersCallback captured_get_headers_callback_;

@@ -16,11 +16,14 @@ ActiveLookupRequest::ActiveLookupRequest(
     UpstreamRequestFactoryPtr upstream_request_factory, absl::string_view cluster_name,
     Event::Dispatcher& dispatcher, SystemTime timestamp,
     const std::shared_ptr<const CacheableResponseChecker> cacheable_response_checker,
+    const std::shared_ptr<const CacheFilterStatsProvider> stats_provider,
     bool ignore_request_cache_control_header)
     : upstream_request_factory_(std::move(upstream_request_factory)), dispatcher_(dispatcher),
       key_(CacheHeadersUtils::makeKey(request_headers, cluster_name)),
       request_headers_(Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers)),
-      cacheable_response_checker_(std::move(cacheable_response_checker)), timestamp_(timestamp) {
+      cacheable_response_checker_(std::move(cacheable_response_checker)),
+      stats_provider_(std::move(stats_provider)),
+      timestamp_(timestamp) {
   if (!ignore_request_cache_control_header) {
     initializeRequestCacheControl(request_headers);
   }

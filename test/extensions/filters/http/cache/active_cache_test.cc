@@ -7,7 +7,7 @@
 
 #include "test/extensions/filters/http/cache/mocks.h"
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -54,6 +54,7 @@ protected:
   std::vector<GetHeadersCallback> fake_upstream_get_headers_callbacks_;
   std::shared_ptr<MockCacheableResponseChecker> mock_cacheable_response_checker_ =
       std::make_shared<MockCacheableResponseChecker>();
+  testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context_;
 
   void advanceTime(std::chrono::milliseconds increment) {
     SystemTime current_time = time_system_.systemTime();
@@ -67,7 +68,7 @@ protected:
         .WillRepeatedly(Return(true));
     auto mock_http_cache = std::make_unique<MockHttpCache>();
     mock_http_cache_ = mock_http_cache.get();
-    active_cache_ = ActiveCache::create(api_->timeSource(), std::move(mock_http_cache));
+    active_cache_ = ActiveCache::create(mock_factory_context_, std::move(mock_http_cache));
     ON_CALL(*mock_http_cache_, lookup)
         .WillByDefault([this](LookupRequest&&, HttpCache::LookupCallback&& cb) {
           captured_lookup_callbacks_.push_back(std::move(cb));
@@ -130,7 +131,7 @@ protected:
   ActiveLookupRequestPtr testLookupRequest(Http::RequestHeaderMap& headers) {
     return std::make_unique<ActiveLookupRequest>(headers, mockUpstreamFactory(), "test_cluster",
                                                  *dispatcher_, api_->timeSource().systemTime(),
-                                                 mock_cacheable_response_checker_, false);
+                                                 mock_cacheable_response_checker_, active_cache_, false);
   }
 
   ActiveLookupRequestPtr testLookupRequest(absl::string_view path) {
@@ -253,6 +254,7 @@ TEST_F(ActiveCacheTest, ActiveCacheEntriesExpireOnAdjacentLookup) {
 TEST_F(ActiveCacheTest, CacheDeletionDuringLookupStillCompletesLookup) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a")));
   ActiveLookupResultPtr result;
   active_cache_->lookup(testLookupRequest("/a"),
                         [&result](ActiveLookupResultPtr r) { result = std::move(r); });

@@ -17,10 +17,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-class CacheFilterConfig : public CacheableResponseChecker {
+class CacheFilterConfig : public CacheableResponseChecker, public CacheFilterStatsProvider {
 public:
   CacheFilterConfig(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-                    std::shared_ptr<ActiveCache> active_cache, CacheFilterStatsPtr stats,
+                    std::shared_ptr<ActiveCache> active_cache,
                     Server::Configuration::CommonFactoryContext& context);
 
   // Implements CacheableResponseChecker::isCacheableResponse.
@@ -33,7 +33,7 @@ public:
   bool ignoreRequestCacheControlHeader() const { return ignore_request_cache_control_header_; }
   ActiveCache& activeCache() const { return *active_cache_; }
   bool hasCache() const { return active_cache_ != nullptr; }
-  CacheFilterStats& stats() const { return *stats_; }
+  CacheFilterStats& stats() const override { return active_cache_->stats(); }
 
 private:
   const VaryAllowList vary_allow_list_;
