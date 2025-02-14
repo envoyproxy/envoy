@@ -71,8 +71,8 @@ TEST(DynamicModuleTestLanguages, InitFunctionOnlyCalledOnce) {
   // Even with the do_not_close=true, init function should only be called once.
   m1 = newDynamicModule(path, true);
   EXPECT_TRUE(m1.ok());
-  m1->release();
-  // This m2 should point to the same module as m1 (which is already loaded), but
+  m1->release(); // Closing the module, but the module is still alive in the process.
+  // This m2 should point to the same module as m1 whose handle is already released, but
   // the init function should not be called again.
   m2 = newDynamicModule(path, true);
   EXPECT_TRUE(m2.ok());
