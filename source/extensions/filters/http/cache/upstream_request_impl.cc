@@ -7,18 +7,18 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
-UpstreamRequestPtr
-UpstreamRequestImplFactory::create(const std::shared_ptr<const CacheFilterStatsProvider> stats_provider) {
+UpstreamRequestPtr UpstreamRequestImplFactory::create(
+    const std::shared_ptr<const CacheFilterStatsProvider> stats_provider) {
   // Can't use make_unique because the constructor is private.
   auto ret = std::unique_ptr<UpstreamRequestImpl>(new UpstreamRequestImpl(
       dispatcher_, async_client_, stream_options_, std::move(stats_provider)));
   return ret;
 }
 
-UpstreamRequestImpl::UpstreamRequestImpl(Event::Dispatcher& dispatcher,
-                                         Http::AsyncClient& async_client,
-                                         const Http::AsyncClient::StreamOptions& options,
-                                         const std::shared_ptr<const CacheFilterStatsProvider> stats_provider)
+UpstreamRequestImpl::UpstreamRequestImpl(
+    Event::Dispatcher& dispatcher, Http::AsyncClient& async_client,
+    const Http::AsyncClient::StreamOptions& options,
+    const std::shared_ptr<const CacheFilterStatsProvider> stats_provider)
     : dispatcher_(dispatcher), stream_(async_client.start(*this, options)),
       body_buffer_([this]() { onBelowLowWatermark(); }, [this]() { onAboveHighWatermark(); },
                    nullptr),

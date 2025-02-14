@@ -31,7 +31,9 @@ public:
 class MockActiveCache : public ActiveCache {
 public:
   MockActiveCache() {
-    EXPECT_CALL(*this, stats).Times(testing::AnyNumber()).WillRepeatedly(testing::ReturnRef(mock_stats_));
+    EXPECT_CALL(*this, stats)
+        .Times(testing::AnyNumber())
+        .WillRepeatedly(testing::ReturnRef(mock_stats_));
   }
   MOCK_METHOD(void, lookup, (ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb));
   MOCK_METHOD(CacheInfo, cacheInfo, (), (const));
@@ -43,7 +45,9 @@ public:
 class MockHttpCache : public HttpCache {
 public:
   MockHttpCache() {
-    EXPECT_CALL(*this, cacheInfo).Times(testing::AnyNumber()).WillRepeatedly(testing::Return(CacheInfo{"mock_cache"}));
+    EXPECT_CALL(*this, cacheInfo)
+        .Times(testing::AnyNumber())
+        .WillRepeatedly(testing::Return(CacheInfo{"mock_cache"}));
   }
   MOCK_METHOD(void, lookup, (LookupRequest && request, LookupCallback&& callback));
   MOCK_METHOD(void, evict, (Event::Dispatcher & dispatcher, const Key& key));
@@ -132,7 +136,8 @@ public:
 
 class MockUpstreamRequestFactory : public UpstreamRequestFactory {
 public:
-  MOCK_METHOD(UpstreamRequestPtr, create, (const std::shared_ptr<const CacheFilterStatsProvider> stats_provider));
+  MOCK_METHOD(UpstreamRequestPtr, create,
+              (const std::shared_ptr<const CacheFilterStatsProvider> stats_provider));
 };
 
 class MockCacheableResponseChecker : public CacheableResponseChecker {

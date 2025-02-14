@@ -411,23 +411,24 @@ void ActiveCacheEntry::abortBodyOutOfRangeSubscribers() {
   auto active_cache = cache_.lock();
   body_subscribers_.erase(
       std::remove_if(body_subscribers_.begin(), body_subscribers_.end(),
-                     [this, end_stream, &active_cache](BodySubscriber& bs) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
-                       if (bs.range_.begin() >= body_length_available_) {
-                         if (bs.range_.begin() == body_length_available_) {
-                           auto cb = std::move(bs.callback_);
-                           bs.dispatcher().post([cb = std::move(cb), end_stream]() mutable {
-                             cb(nullptr, end_stream);
-                           });
-                         } else {
-                           bs.callback_(nullptr, EndStream::Reset);
-                         }
-                         if (active_cache) {
-                           active_cache->stats().subActiveCacheSubscribers(1);
-                         }
-                         return true;
-                       }
-                       return false;
-                     }),
+                     [this, end_stream, &active_cache](BodySubscriber& bs)
+                         ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+                           if (bs.range_.begin() >= body_length_available_) {
+                             if (bs.range_.begin() == body_length_available_) {
+                               auto cb = std::move(bs.callback_);
+                               bs.dispatcher().post([cb = std::move(cb), end_stream]() mutable {
+                                 cb(nullptr, end_stream);
+                               });
+                             } else {
+                               bs.callback_(nullptr, EndStream::Reset);
+                             }
+                             if (active_cache) {
+                               active_cache->stats().subActiveCacheSubscribers(1);
+                             }
+                             return true;
+                           }
+                           return false;
+                         }),
       body_subscribers_.end());
 }
 
@@ -523,7 +524,8 @@ void ActiveCacheEntry::onBodyChunkFromCache(AdjustedByteRange range, Buffer::Ins
     }
   }
   if (auto active_cache = cache_.lock()) {
-    active_cache->stats().subActiveCacheSubscribers(std::distance(recipients_begin, body_subscribers_.end()));
+    active_cache->stats().subActiveCacheSubscribers(
+        std::distance(recipients_begin, body_subscribers_.end()));
   }
   body_subscribers_.erase(recipients_begin, body_subscribers_.end());
   maybeTriggerBodyReadForWaitingSubscriber();

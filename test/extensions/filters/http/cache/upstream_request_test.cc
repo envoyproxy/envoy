@@ -31,7 +31,8 @@ class UpstreamRequestTest : public ::testing::Test {
     EXPECT_CALL(dispatcher_, isThreadSafe())
         .Times(testing::AnyNumber())
         .WillRepeatedly(testing::Return(true));
-    upstream_request_ = UpstreamRequestImplFactory(dispatcher_, async_client_, options).create(stats_provider_);
+    upstream_request_ =
+        UpstreamRequestImplFactory(dispatcher_, async_client_, options).create(stats_provider_);
     upstream_request_->sendHeaders(
         Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers_));
   }
@@ -42,7 +43,8 @@ protected:
   Http::MockAsyncClientStream http_stream_;
   Http::MockAsyncClient async_client_;
   Http::TestRequestHeaderMapImpl request_headers_{{":method", "GET"}, {":path", "/banana"}};
-  std::shared_ptr<MockCacheFilterStatsProvider> stats_provider_ = std::make_shared<testing::NiceMock<MockCacheFilterStatsProvider>>();
+  std::shared_ptr<MockCacheFilterStatsProvider> stats_provider_ =
+      std::make_shared<testing::NiceMock<MockCacheFilterStatsProvider>>();
   UpstreamRequestPtr upstream_request_;
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"}};
   Http::TestResponseTrailerMapImpl response_trailers_{{"x", "y"}};

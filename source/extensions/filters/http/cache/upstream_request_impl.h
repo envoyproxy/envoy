@@ -90,7 +90,8 @@ public:
       : dispatcher_(dispatcher), async_client_(async_client),
         stream_options_(std::move(stream_options)) {}
 
-  UpstreamRequestPtr create(const std::shared_ptr<const CacheFilterStatsProvider> stats_provider) override;
+  UpstreamRequestPtr
+  create(const std::shared_ptr<const CacheFilterStatsProvider> stats_provider) override;
 
 private:
   Event::Dispatcher& dispatcher_;

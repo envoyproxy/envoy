@@ -41,7 +41,7 @@ public:
   const std::shared_ptr<const CacheFilterStatsProvider>& statsProvider() const {
     return stats_provider_;
   }
-  CacheFilterStats& stats() const {return statsProvider()->stats();}
+  CacheFilterStats& stats() const { return statsProvider()->stats(); }
   UpstreamRequestPtr createUpstreamRequest() const {
     return upstream_request_factory_->create(statsProvider());
   }

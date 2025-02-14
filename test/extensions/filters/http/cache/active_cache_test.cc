@@ -129,9 +129,9 @@ protected:
   }
 
   ActiveLookupRequestPtr testLookupRequest(Http::RequestHeaderMap& headers) {
-    return std::make_unique<ActiveLookupRequest>(headers, mockUpstreamFactory(), "test_cluster",
-                                                 *dispatcher_, api_->timeSource().systemTime(),
-                                                 mock_cacheable_response_checker_, active_cache_, false);
+    return std::make_unique<ActiveLookupRequest>(
+        headers, mockUpstreamFactory(), "test_cluster", *dispatcher_,
+        api_->timeSource().systemTime(), mock_cacheable_response_checker_, active_cache_, false);
   }
 
   ActiveLookupRequestPtr testLookupRequest(absl::string_view path) {

@@ -22,8 +22,7 @@ ActiveLookupRequest::ActiveLookupRequest(
       key_(CacheHeadersUtils::makeKey(request_headers, cluster_name)),
       request_headers_(Http::createHeaderMap<Http::RequestHeaderMapImpl>(request_headers)),
       cacheable_response_checker_(std::move(cacheable_response_checker)),
-      stats_provider_(std::move(stats_provider)),
-      timestamp_(timestamp) {
+      stats_provider_(std::move(stats_provider)), timestamp_(timestamp) {
   if (!ignore_request_cache_control_header) {
     initializeRequestCacheControl(request_headers);
   }

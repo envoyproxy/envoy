@@ -28,7 +28,8 @@ using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
 // TODO(#33319): AsyncClient::Stream does not currently support watermark events.
 class UpstreamRequestFactory {
 public:
-  virtual UpstreamRequestPtr create(const std::shared_ptr<const CacheFilterStatsProvider> stats_provider) PURE;
+  virtual UpstreamRequestPtr
+  create(const std::shared_ptr<const CacheFilterStatsProvider> stats_provider) PURE;
   virtual ~UpstreamRequestFactory() = default;
 };
 

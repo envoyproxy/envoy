@@ -79,6 +79,7 @@ public:
   void subUpstreamBufferedBytes(uint64_t bytes) override {
     gauge_upstream_buffered_bytes_.sub(bytes);
   }
+
 private:
   CacheFilterStatsImpl(CacheFilterStatsImpl&) = delete;
   CacheStatNames stat_names_;
