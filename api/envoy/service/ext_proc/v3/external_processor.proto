@@ -139,6 +139,7 @@ message ProcessingRequest {
   //
   bool observability_mode = 10;
 
+  // [#not-implemented-hide:]
   // The filter protocol configurations to be sent to the server.
   ProtocolConfiguration protocol_config = 11;
 }
