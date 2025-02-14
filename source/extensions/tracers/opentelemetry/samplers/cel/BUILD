@@ -13,26 +13,14 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    copts = select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
+    tags = ["skip_on_windows"],
     deps = [
         ":cel_sampler_lib",
         "//envoy/registry",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "@envoy_api//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg_cc_proto",
-    ] + select(
-        {
-            "//bazel:windows_x86_64": [],
-            "//conditions:default": [
-                "@com_google_cel_cpp//parser",
-            ],
-        },
-    ),
+    ],
 )
 
 envoy_cc_library(

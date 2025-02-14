@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.samplers.cel"],
     rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
         "//source/extensions/tracers/opentelemetry/samplers/cel:cel_sampler_lib",
@@ -30,6 +31,7 @@ envoy_extension_cc_test(
     srcs = ["cel_sampler_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry.samplers.cel"],
     rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/tracers/opentelemetry/samplers/cel:cel_sampler_lib",
         "//source/extensions/tracers/opentelemetry/samplers/cel:config",
@@ -46,6 +48,7 @@ envoy_extension_cc_test(
     ],
     extension_names = ["envoy.tracers.opentelemetry.samplers.cel"],
     rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
     deps = [
         "//source/exe:main_common_lib",
         "//source/extensions/tracers/opentelemetry:config",
