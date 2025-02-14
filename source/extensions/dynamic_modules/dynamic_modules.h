@@ -19,7 +19,7 @@ namespace DynamicModules {
  */
 class DynamicModule {
 public:
-  DynamicModule(void* handle) : handle_(handle){};
+  DynamicModule(void* handle) : handle_(handle) {}
   ~DynamicModule();
 
   /**
