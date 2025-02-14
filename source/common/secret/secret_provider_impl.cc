@@ -65,7 +65,7 @@ ThreadLocalGenericSecretProvider::ThreadLocalGenericSecretProvider(
 
 const std::string& ThreadLocalGenericSecretProvider::secret() const { return (*tls_)->value_; }
 
-// This function is executed on the main during xDS update and can throw.
+// This function is executed on the main during xDS update.
 absl::Status ThreadLocalGenericSecretProvider::update() {
   std::string value;
   if (const auto* secret = provider_->secret(); secret != nullptr) {
