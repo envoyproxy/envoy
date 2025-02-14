@@ -3119,7 +3119,7 @@ TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) 
 
   envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider =
       {};
-
+// ::testing::FLAGS_gmock_verbose = "error";
   cred_provider.mutable_web_identity_token_data_source()->set_inline_string("abced");
   cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
   cred_provider.set_role_session_name("role-session-name");
@@ -3144,7 +3144,7 @@ TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) 
 
   auto chain = std::make_shared<MockCredentialsProviderChain>();
   EXPECT_CALL(*chain, onCredentialUpdate());
-  EXPECT_CALL(*chain, chainGetCredentials()).WillOnce(Return(Credentials("akid", "skid")));
+  EXPECT_CALL(*chain, chainGetCredentials()).WillRepeatedly(Return(Credentials("akid", "skid")));
 
   auto document = R"EOF(
 {
@@ -3215,7 +3215,7 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
 
   auto chain = std::make_shared<MockCredentialsProviderChain>();
   EXPECT_CALL(*chain, onCredentialUpdate());
-  EXPECT_CALL(*chain, chainGetCredentials());
+  EXPECT_CALL(*chain, chainGetCredentials()).WillRepeatedly(Return(Credentials("akid", "skid")));
   auto chain2 = std::make_shared<MockCredentialsProviderChain>();
 
   auto document = R"EOF(

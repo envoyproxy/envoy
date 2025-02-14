@@ -140,7 +140,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
 };
 
 void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
-  ENVOY_LOG_MISC(debug, "Received callback from aws cluster manager for cluster {}", cluster_name_);
+  ENVOY_LOG(debug, "Received callback from aws cluster manager for cluster {}", cluster_name_);
   if (!cache_duration_timer_) {
     cache_duration_timer_ = context_->mainThreadDispatcher().createTimer([this]() -> void {
       stats_->credential_refreshes_performed_.inc();
@@ -156,7 +156,7 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
   // Credential retrieval failed, so set blank (anonymous) credentials
   if (context_) {
     stats_->credential_refreshes_failed_.inc();
-    ENVOY_LOG_MISC(debug, "Error retrieving credentials, settings anonymous credentials");
+    ENVOY_LOG(debug, "Error retrieving credentials, settings anonymous credentials");
     setCredentialsToAllThreads(std::make_unique<Credentials>());
     handleFetchDone();
   }
@@ -202,7 +202,7 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
       // or whatever expiration is provided in the credential payload
       if (refresh_state_ == MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh) {
         cache_duration_timer_->enableTimer(initialization_timer_);
-        ENVOY_LOG_MISC(debug, "Metadata fetcher initialization failed, retrying in {}",
+        ENVOY_LOG(debug, "Metadata fetcher initialization failed, retrying in {}",
                        std::chrono::seconds(initialization_timer_.count()));
         // Timer begins at 2 seconds and doubles each time, to a maximum of 32 seconds. This avoids
         // excessive retries against STS or instance metadata service
@@ -215,13 +215,13 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
           const auto now = api_.timeSource().systemTime();
           cache_duration_ =
               std::chrono::duration_cast<std::chrono::seconds>(expiration_time_.value() - now);
-          ENVOY_LOG_MISC(debug,
+          ENVOY_LOG(debug,
                          "Metadata fetcher setting credential refresh to {}, based on "
                          "credential expiration",
                          std::chrono::seconds(cache_duration_.count()));
         } else {
           cache_duration_ = getCacheDuration();
-          ENVOY_LOG_MISC(
+          ENVOY_LOG(
               debug,
               "Metadata fetcher setting credential refresh to {}, based on default expiration",
               std::chrono::seconds(cache_duration_.count()));
@@ -235,7 +235,7 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
 void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
     CredentialsConstUniquePtr&& creds) {
 
-  ENVOY_LOG_MISC(debug, "{}: Setting credentials to all threads", this->providerName());
+  ENVOY_LOG(debug, "{}: Setting credentials to all threads", this->providerName());
 
   CredentialsConstSharedPtr shared_credentials = std::move(creds);
   if (tls_slot_ && !tls_slot_->isShutdown()) {
@@ -252,7 +252,7 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
             subscribers_copy = credentials_subscribers_;
           }
           for (auto& cb : subscribers_copy) {
-            ENVOY_LOG_MISC(debug, "Notifying subscriber of credential update");
+            ENVOY_LOG(debug, "Notifying subscriber of credential update");
             cb->onCredentialUpdate();
           }
         });
@@ -919,6 +919,9 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
   credentialsRetrievalError();
 }
 
+// Determine if we have a provider that is pending, based on priority ordering in the chain. 
+// Ignore any non-pending providers that have no credentials for us.
+
 bool CredentialsProviderChain::chainProvidersPending() {
   for (auto& provider : providers_) {
     if (provider->credentialsPending()) {
@@ -942,10 +945,10 @@ bool CredentialsProviderChain::addCallbackIfChainCredentialsPending(
     return false;
   }
   if (cb) {
-    ENVOY_LOG_MISC(debug, "Adding credentials pending callback to queue");
+    ENVOY_LOG(debug, "Adding credentials pending callback to queue");
     Thread::LockGuard guard(mu_);
     credential_pending_callbacks_.push_back(std::move(cb));
-    ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
+    ENVOY_LOG(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
   }
   return true;
 }
@@ -963,7 +966,7 @@ void CredentialsProviderChain::onCredentialUpdate() {
     credential_pending_callbacks_.clear();
   }
 
-  ENVOY_LOG_MISC(debug, "Notifying {} credential callbacks", callbacks_copy.size());
+  ENVOY_LOG(debug, "Notifying {} credential callbacks", callbacks_copy.size());
 
   // Call all of our callbacks to unblock pending requests
   for (const auto& cb : callbacks_copy) {
