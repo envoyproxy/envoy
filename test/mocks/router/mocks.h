@@ -250,6 +250,7 @@ public:
                const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info),
               (const));
+  MOCK_METHOD(bool, applyOnStreamDone, (), (const));
 
   uint64_t stage_{};
   std::string disable_key_;

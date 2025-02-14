@@ -336,6 +336,22 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_proto_library(
+    name = "async_round_robin_proto",
+    srcs = ["async_round_robin.proto"],
+)
+
+envoy_cc_test_library(
+    name = "async_round_robin_lb",
+    srcs = ["async_round_robin_lb.cc"],
+    hdrs = ["async_round_robin_lb.h"],
+    deps = [
+        "//source/common/router:router_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
+        "//test/integration:async_round_robin_proto_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "drain_close_integration_test",
     size = "large",
@@ -586,6 +602,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":integration_lib",
         ":socket_interface_swap_lib",
+        "//source/extensions/load_balancing_policies/subset:config",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
@@ -611,6 +628,7 @@ envoy_cc_test(
         ":integration_lib",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
+        "//test/integration/filters:async_upstream_filter_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:repick_cluster_filter_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -983,6 +1001,7 @@ envoy_cc_test_library(
     ],
     rbe_pool = "6gig",
     deps = [
+        ":async_round_robin_lb",
         ":integration_lib_light",
         ":test_host_predicate_lib",
         "//envoy/event:timer_interface",
@@ -1195,6 +1214,7 @@ envoy_cc_test_library(
     ],
     rbe_pool = "6gig",
     deps = [
+        ":async_round_robin_lb",
         ":autonomous_upstream_lib",
         ":fake_upstream_lib",
         ":integration_tcp_client_lib",

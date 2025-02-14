@@ -818,8 +818,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
     Server::Configuration::ServerFactoryContext& context)
-    : main_thread_dispatcher_(context.mainThreadDispatcher()), disabled_(config.disabled()),
-      name_(config.name()) {
+    : disabled_(config.disabled()), name_(config.name()) {
   if (disabled_ || !name_.empty()) {
     return;
   }

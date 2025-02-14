@@ -304,7 +304,7 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   return true;
 }
 
-bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool,
+bool AdminImpl::createFilterChain(Http::FilterChainManager& manager,
                                   const Http::FilterChainOptions&) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));

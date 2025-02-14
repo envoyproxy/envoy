@@ -200,6 +200,23 @@ public:
                          const StreamInfo::StreamInfo& stream_info) const override;
 };
 
+class QueryParameterFormatter : public FormatterProvider {
+public:
+  QueryParameterFormatter(absl::string_view parameter_key, absl::optional<size_t> max_length);
+
+  // FormatterProvider
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
+
+private:
+  const std::string parameter_key_;
+  absl::optional<size_t> max_length_;
+};
+
 class BuiltInHttpCommandParser : public CommandParser {
 public:
   BuiltInHttpCommandParser() = default;

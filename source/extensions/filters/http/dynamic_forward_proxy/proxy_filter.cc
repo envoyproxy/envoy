@@ -32,15 +32,16 @@ struct ResponseStringValues {
   const std::string SubClusterOverflow = "Sub cluster overflow";
   const std::string SubClusterWarmingTimeout = "Sub cluster warming timeout";
   const std::string DFPClusterIsGone = "Dynamic forward proxy cluster is gone";
+  const std::string EmptyHostHeader = "Empty host header";
 };
 
 struct RcDetailsValues {
   const std::string DnsCacheOverflow = "dns_cache_overflow";
   const std::string PendingRequestOverflow = "dynamic_forward_proxy_pending_request_overflow";
-  const std::string DnsResolutionFailure = "dns_resolution_failure";
   const std::string SubClusterOverflow = "sub_cluster_overflow";
   const std::string SubClusterWarmingTimeout = "sub_cluster_warming_timeout";
   const std::string DFPClusterIsGone = "dynamic_forward_proxy_cluster_is_gone";
+  const std::string EmptyHostHeader = "empty_host_header";
 };
 
 using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
@@ -279,6 +280,14 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   latchTime(decoder_callbacks_, DNS_START);
   const bool is_proxying = isProxying();
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_fail_on_empty_host_header")) {
+    if (headers.Host()->value().getStringView().empty()) {
+      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                         ResponseStrings::get().EmptyHostHeader, nullptr,
+                                         absl::nullopt, RcDetails::get().EmptyHostHeader);
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+  }
   auto result = config_->cache().loadDnsCacheEntryWithForceRefresh(
       headers.Host()->value().getStringView(), default_port, is_proxying, force_cache_refresh,
       *this);
@@ -412,14 +421,9 @@ void ProxyFilter::onDnsResolutionFail(absl::string_view details) {
 
   decoder_callbacks_->streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::DnsResolutionFailed);
-  std::string details_str = "";
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_details")) {
-    details_str = StringUtil::replaceAllEmptySpace(details);
-    ASSERT(details_str != "not_resolved");
-  }
-  decoder_callbacks_->sendLocalReply(
-      Http::Code::ServiceUnavailable, ResponseStrings::get().DnsResolutionFailure, nullptr,
-      absl::nullopt, absl::StrCat(RcDetails::get().DnsResolutionFailure, "{", details_str, "}"));
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
+                                     ResponseStrings::get().DnsResolutionFailure, nullptr,
+                                     absl::nullopt, details);
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(

@@ -43,8 +43,11 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 RateLimitFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<FilterConfigPerRoute>(proto_config);
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  absl::Status status = absl::OkStatus();
+  auto route_config = std::make_shared<FilterConfigPerRoute>(context, proto_config, status);
+  RETURN_IF_NOT_OK_REF(status);
+  return route_config;
 }
 
 /**

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <functional>
+#include <iostream>
+#include <ostream>
 
 #include "source/common/common/logger.h"
 #include "source/common/version/version.h"

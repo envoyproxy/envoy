@@ -6,6 +6,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
+#include "source/common/common/logger.h"
+
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "openssl/evp.h"
@@ -134,6 +136,23 @@ public:
 using CredentialsConstSharedPtr = std::shared_ptr<const Credentials>;
 using CredentialsConstUniquePtr = std::unique_ptr<const Credentials>;
 using CredentialsProviderSharedPtr = std::shared_ptr<CredentialsProvider>;
+
+/**
+ * AWS credentials provider chain, able to fallback between multiple credential providers.
+ */
+class CredentialsProviderChain : public Logger::Loggable<Logger::Id::aws> {
+public:
+  void add(const CredentialsProviderSharedPtr& credentials_provider) {
+    providers_.emplace_back(credentials_provider);
+  }
+
+  Credentials getCredentials();
+
+protected:
+  std::list<CredentialsProviderSharedPtr> providers_;
+};
+
+using CredentialsProviderChainSharedPtr = std::shared_ptr<CredentialsProviderChain>;
 
 /*
  * X509 credential provider used for IAM Roles Anywhere

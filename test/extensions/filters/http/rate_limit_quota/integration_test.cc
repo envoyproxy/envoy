@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/http/codec.h"
@@ -62,6 +63,8 @@ MATCHER_P2(ProtoEqIgnoringFieldAndOrdering, expected,
 
 using BlanketRule = envoy::type::v3::RateLimitStrategy::BlanketRule;
 using envoy::type::v3::RateLimitStrategy;
+using DenyResponseSettings = envoy::extensions::filters::http::rate_limit_quota::v3::
+    RateLimitQuotaBucketSettings::DenyResponseSettings;
 
 struct ConfigOption {
   bool valid_rlqs_server = true;
@@ -69,6 +72,7 @@ struct ConfigOption {
   bool unsupported_no_assignment_strategy = false;
   absl::optional<RateLimitStrategy> fallback_rate_limit_strategy = std::nullopt;
   int fallback_ttl_sec = 15;
+  absl::optional<DenyResponseSettings> deny_response_settings = std::nullopt;
 };
 
 // These tests exercise the rate limit quota filter through Envoy's integration test
@@ -165,6 +169,11 @@ protected:
             ->set_seconds(config_option.fallback_ttl_sec);
       }
 
+      if (config_option.deny_response_settings.has_value()) {
+        *mutable_bucket_settings.mutable_deny_response_settings() =
+            *config_option.deny_response_settings;
+      }
+
       mutable_config->PackFrom(mutable_bucket_settings);
       proto_config_.mutable_bucket_matchers()->MergeFrom(matcher);
 
@@ -196,7 +205,7 @@ protected:
   }
 
   void cleanUp() {
-    if (rlqs_connection_) {
+    if (rlqs_connection_ != nullptr) {
       ASSERT_TRUE(rlqs_connection_->close());
       ASSERT_TRUE(rlqs_connection_->waitForDisconnect());
     }
@@ -205,11 +214,27 @@ protected:
 
   void TearDown() override { cleanUp(); }
 
-  bool expectDeniedRequest(int expected_status_code) {
+  bool expectDeniedRequest(int expected_status_code,
+                           std::vector<std::pair<std::string, std::string>> expected_headers = {},
+                           std::string expected_body = "") {
     if (!response_->waitForEndStream())
       return false;
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ(response_->headers().getStatusValue(), absl::StrCat(expected_status_code));
+
+    // Check for expected headers & body if set.
+    for (const auto& [key, value] : expected_headers) {
+      Http::HeaderMap::GetResult result = response_->headers().get(Http::LowerCaseString(key));
+      if (result.empty()) {
+        EXPECT_FALSE(result.empty());
+        continue;
+      }
+      EXPECT_THAT(result[0]->value().getStringView(), testing::StrEq(value));
+    }
+    if (!expected_body.empty()) {
+      EXPECT_THAT(response_->body(), testing::StrEq(expected_body));
+    }
+
     cleanupUpstreamAndDownstream();
     return true;
   }
@@ -582,6 +607,117 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAll) {
     // (deny-all here).
     // Verify the response to downstream.
     EXPECT_TRUE(expectDeniedRequest(429));
+  }
+
+  simTime().advanceTimeWait(std::chrono::seconds(report_interval_sec_));
+  RateLimitQuotaUsageReports reports;
+  ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+  ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+  const auto& usage = reports.bucket_quota_usages(0);
+  // The request is denied by no_assignment_behavior.
+  EXPECT_EQ(usage.num_requests_allowed(), 0);
+  EXPECT_EQ(usage.num_requests_denied(), 2);
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAllWithSettings) {
+  ConfigOption option;
+  option.no_assignment_blanket_rule = RateLimitStrategy::DENY_ALL;
+  option.deny_response_settings = DenyResponseSettings();
+  option.deny_response_settings->mutable_http_status()->set_code(
+      envoy::type::v3::StatusCode::Forbidden);
+  *option.deny_response_settings->mutable_http_body()->mutable_value() =
+      "Denied by no-assignment behavior.";
+  envoy::config::core::v3::HeaderValueOption* new_header =
+      option.deny_response_settings->mutable_response_headers_to_add()->Add();
+  new_header->mutable_header()->set_key("custom-denial-header-key");
+  new_header->mutable_header()->set_value("custom-denial-header-value");
+
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+
+  for (int i = 0; i < 3; ++i) {
+    sendClientRequest(&custom_headers);
+
+    if (i == 0) {
+      // Start the gRPC stream to RLQS server on the first request.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+      rlqs_stream_->startGrpcStream();
+
+      // Expect an initial report.
+      RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+
+      // Verify the usage report content.
+      ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+      const auto& usage = reports.bucket_quota_usages(0);
+      // The request is denied by no_assignment_behavior.
+      EXPECT_EQ(usage.num_requests_allowed(), 0);
+      EXPECT_EQ(usage.num_requests_denied(), 1);
+    }
+
+    // No response sent so filter should fallback to NoAssignmentBehavior
+    // (deny-all here with a customized response code + body + headers).
+    // Verify the response to downstream.
+    EXPECT_TRUE(expectDeniedRequest(403,
+                                    {{"custom-denial-header-key", "custom-denial-header-value"}},
+                                    "Denied by no-assignment behavior."));
+  }
+
+  simTime().advanceTimeWait(std::chrono::seconds(report_interval_sec_));
+  RateLimitQuotaUsageReports reports;
+  ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+  ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+  const auto& usage = reports.bucket_quota_usages(0);
+  // The request is denied by no_assignment_behavior.
+  EXPECT_EQ(usage.num_requests_allowed(), 0);
+  EXPECT_EQ(usage.num_requests_denied(), 2);
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAllWithEmptyBodySettings) {
+  ConfigOption option;
+  option.no_assignment_blanket_rule = RateLimitStrategy::DENY_ALL;
+  option.deny_response_settings = DenyResponseSettings();
+  option.deny_response_settings->mutable_http_status()->set_code(
+      envoy::type::v3::StatusCode::Forbidden);
+  envoy::config::core::v3::HeaderValueOption* new_header =
+      option.deny_response_settings->mutable_response_headers_to_add()->Add();
+  new_header->mutable_header()->set_key("custom-denial-header-key");
+  new_header->mutable_header()->set_value("custom-denial-header-value");
+
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+
+  for (int i = 0; i < 3; ++i) {
+    sendClientRequest(&custom_headers);
+
+    if (i == 0) {
+      // Start the gRPC stream to RLQS server on the first request.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+      rlqs_stream_->startGrpcStream();
+
+      // Expect an initial report.
+      RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+
+      // Verify the usage report content.
+      ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+      const auto& usage = reports.bucket_quota_usages(0);
+      // The request is denied by no_assignment_behavior.
+      EXPECT_EQ(usage.num_requests_allowed(), 0);
+      EXPECT_EQ(usage.num_requests_denied(), 1);
+    }
+
+    // No response sent so filter should fallback to NoAssignmentBehavior
+    // (deny-all here with a customized response code + body + headers).
+    // Verify the response to downstream.
+    EXPECT_TRUE(
+        expectDeniedRequest(403, {{"custom-denial-header-key", "custom-denial-header-value"}}, ""));
   }
 
   simTime().advanceTimeWait(std::chrono::seconds(report_interval_sec_));
@@ -970,12 +1106,13 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketThrottling) {
 }
 
 TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketExpiration) {
-  int max_token = 1;
-  int tokens_per_fill = 30;
-  int fill_interval_sec = 15;
-  int expiration_sec = 30; // > fill_interval_sec so TokenBuckets can refill
-                           // between test phases.
-  int expiration_max_token = 2;
+  int max_token = 3;
+  int tokens_per_fill = 1;
+  int fill_interval_sec = 30;
+  // Set expiration so existing TokenBucket will refill to 33%% between test
+  // phases.
+  int expiration_sec = 30;
+  int expiration_max_token = 6;
   int fallback_expiration_sec = 20;
 
   RateLimitStrategy fallback_strategy;
@@ -1028,11 +1165,15 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketExpiration) {
   rlqs_stream_->sendGrpcMessage(rlqs_response);
   absl::SleepFor(absl::Seconds(0.5));
 
-  // The second request should be allowed by the token bucket assignment.
+  // The 2nd, 3rd and 4th requests are allowed by the token bucket assignment.
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectAllowedRequest());
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectAllowedRequest());
   sendClientRequest(&custom_headers);
   ASSERT_TRUE(expectAllowedRequest());
 
-  // The third request should be denied by the token bucket assignment.
+  // The 5th request should be denied by the token bucket assignment.
   sendClientRequest(&custom_headers);
   ASSERT_TRUE(expectDeniedRequest(429));
 
@@ -1040,14 +1181,14 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketExpiration) {
   // expiration.
   simTime().advanceTimeWait(std::chrono::seconds(expiration_sec));
 
-  // The fourth and fifth requests should be allowed by the fallback
-  // TokenBucket.
+  // The 6th & 7th requests should be allowed by the fallback TokenBucket as it
+  // should initialize at 33% capacity.
   sendClientRequest(&custom_headers);
   ASSERT_TRUE(expectAllowedRequest());
   sendClientRequest(&custom_headers);
   ASSERT_TRUE(expectAllowedRequest());
 
-  // The sixth request should be denied by the fallback TokenBucket.
+  // The 8th request should be denied by the emptied, fallback TokenBucket.
   sendClientRequest(&custom_headers);
   ASSERT_TRUE(expectDeniedRequest(429));
 
@@ -1061,58 +1202,104 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketExpiration) {
   }
 }
 
-TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucket) {
+TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithTokenBucketReplacement) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
                                                                   {"group", "envoy"}};
-  int max_token = 1;
-  int tokens_per_fill = 30;
-  int fill_interval_sec = 60;
-  int fill_one_token_in_ms = fill_interval_sec / tokens_per_fill * 1000;
-  for (int i = 0; i < 10; ++i) {
-    // We advance time by 2s so that token bucket can be refilled.
-    if (i == 4 || i == 6) {
-      simTime().advanceTimeAndRun(std::chrono::milliseconds(fill_one_token_in_ms), *dispatcher_,
-                                  Envoy::Event::Dispatcher::RunType::NonBlock);
-    }
-    // Send downstream client request to upstream.
-    sendClientRequest(&custom_headers);
+  int max_token = 2;
+  int tokens_per_fill = 1;
+  int fill_interval_sec = 1;
+  int replacement_max_token = 6;
+  int replacement_tokens_per_fill = 2;
+  int replacement_fill_interval_sec = 1;
 
-    // Only first downstream client request will trigger the reports to RLQS
-    // server as the subsequent requests will find the entry in the cache.
-    if (i == 0) {
-      // Start the gRPC stream to RLQS server.
-      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
-      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+  // First request is allowed by the default-open & triggers bucket creation +
+  // initial usage reporting.
+  sendClientRequest(&custom_headers);
 
-      // Expect an initial report when the RLQS bucket is first hit.
-      RateLimitQuotaUsageReports reports;
-      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
-      rlqs_stream_->startGrpcStream();
+  // Start the gRPC stream to RLQS server.
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+  ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
 
-      // Build the response.
-      RateLimitQuotaResponse rlqs_response;
-      absl::flat_hash_map<std::string, std::string> custom_headers_cpy = custom_headers;
-      custom_headers_cpy.insert({"name", "prod"});
-      auto* bucket_action = rlqs_response.add_bucket_action();
-      for (const auto& [key, value] : custom_headers_cpy) {
-        (*bucket_action->mutable_bucket_id()->mutable_bucket()).insert({key, value});
-        auto* quota_assignment = bucket_action->mutable_quota_assignment_action();
-        quota_assignment->mutable_assignment_time_to_live()->set_seconds(120);
-        auto* strategy = quota_assignment->mutable_rate_limit_strategy();
-        auto* token_bucket = strategy->mutable_token_bucket();
-        token_bucket->set_max_tokens(max_token);
-        token_bucket->mutable_tokens_per_fill()->set_value(30);
-        token_bucket->mutable_fill_interval()->set_seconds(60);
-      }
+  // Expect an initial report when the RLQS bucket is first hit.
+  RateLimitQuotaUsageReports reports;
+  ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+  rlqs_stream_->startGrpcStream();
 
-      // Send the response from RLQS server.
-      rlqs_stream_->sendGrpcMessage(rlqs_response);
-    }
+  // Expect default allow-all for the first request.
+  ASSERT_TRUE(expectAllowedRequest());
 
-    cleanUp();
-  }
+  // Build the TokenBucket response.
+  RateLimitQuotaResponse rlqs_response;
+  auto* bucket_action = rlqs_response.add_bucket_action();
+  bucket_action->mutable_bucket_id()->mutable_bucket()->insert(
+      {{"name", "prod"}, {"environment", "staging"}, {"group", "envoy"}});
+  auto* quota_assignment = bucket_action->mutable_quota_assignment_action();
+  quota_assignment->mutable_assignment_time_to_live()->set_seconds(120);
+  auto* strategy = quota_assignment->mutable_rate_limit_strategy();
+  auto* token_bucket = strategy->mutable_token_bucket();
+  token_bucket->set_max_tokens(max_token);
+  token_bucket->mutable_tokens_per_fill()->set_value(tokens_per_fill);
+  token_bucket->mutable_fill_interval()->set_seconds(fill_interval_sec);
+
+  // Send the response from RLQS server.
+  rlqs_stream_->sendGrpcMessage(rlqs_response);
+  absl::SleepFor(absl::Seconds(0.5));
+
+  // Initial requests are allowed by the token bucket assignment.
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectAllowedRequest());
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectAllowedRequest());
+  // Until the bucket is empty, then requests are denied.
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectDeniedRequest(429));
+
+  // Check that a single token fills after the fill interval.
+  simTime().advanceTimeWait(std::chrono::seconds(fill_interval_sec));
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectAllowedRequest());
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectDeniedRequest(429));
+
+  // Allow for a 50% refill of the TokenBucket again before replacing it.
+  simTime().advanceTimeWait(std::chrono::seconds(fill_interval_sec));
+
+  // Prep a response to replace the existing TokenBucket with a larger one.
+  RateLimitQuotaResponse replacement_rlqs_response(rlqs_response);
+  auto* replacement_token_bucket = replacement_rlqs_response.mutable_bucket_action(0)
+                                       ->mutable_quota_assignment_action()
+                                       ->mutable_rate_limit_strategy()
+                                       ->mutable_token_bucket();
+  replacement_token_bucket->set_max_tokens(replacement_max_token);
+  replacement_token_bucket->mutable_tokens_per_fill()->set_value(replacement_tokens_per_fill);
+  replacement_token_bucket->mutable_fill_interval()->set_seconds(replacement_fill_interval_sec);
+
+  // Send the response to update the TokenBucket.
+  rlqs_stream_->sendGrpcMessage(replacement_rlqs_response);
+  absl::SleepFor(absl::Seconds(0.5));
+
+  // Expect the new TokenBucket to initialize at 50% capacity, based on the
+  // existing TokenBucket.
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectAllowedRequest());
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectAllowedRequest());
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectAllowedRequest());
+  // Empty after 50%, not max_tokens.
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectDeniedRequest(429));
+
+  // Test new TokenBucket's refill rate.
+  simTime().advanceTimeWait(std::chrono::seconds(fill_interval_sec));
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectAllowedRequest());
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectAllowedRequest());
+  sendClientRequest(&custom_headers);
+  ASSERT_TRUE(expectDeniedRequest(429));
 }
 
 TEST_P(RateLimitQuotaIntegrationTest, MultiRequestWithUnsupportedStrategy) {

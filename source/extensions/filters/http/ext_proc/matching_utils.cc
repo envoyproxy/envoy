@@ -109,9 +109,7 @@ initHeaderMatchers(const envoy::type::matcher::v3::ListStringMatcher& header_lis
                    Server::Configuration::CommonFactoryContext& context) {
   std::vector<Matchers::StringMatcherPtr> header_matchers;
   for (const auto& matcher : header_list.patterns()) {
-    header_matchers.push_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher, context));
+    header_matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
   }
   return header_matchers;
 }

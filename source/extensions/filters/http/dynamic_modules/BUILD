@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
 )
@@ -33,16 +34,27 @@ envoy_cc_library(
     srcs = ["factory.cc"],
     hdrs = ["factory.h"],
     deps = [
+        ":abi_impl",
         ":filter_config_lib",
         ":filter_lib",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "factory_registration",
     srcs = ["factory_registration.cc"],
     deps = [
         ":factory_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "abi_impl",
+    srcs = ["abi_impl.cc"],
+    deps = [
+        ":filter_lib",
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
