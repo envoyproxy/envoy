@@ -203,7 +203,7 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
       if (refresh_state_ == MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh) {
         cache_duration_timer_->enableTimer(initialization_timer_);
         ENVOY_LOG(debug, "Metadata fetcher initialization failed, retrying in {}",
-                       std::chrono::seconds(initialization_timer_.count()));
+                  std::chrono::seconds(initialization_timer_.count()));
         // Timer begins at 2 seconds and doubles each time, to a maximum of 32 seconds. This avoids
         // excessive retries against STS or instance metadata service
         if (initialization_timer_ < std::chrono::seconds(32)) {
@@ -216,9 +216,9 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
           cache_duration_ =
               std::chrono::duration_cast<std::chrono::seconds>(expiration_time_.value() - now);
           ENVOY_LOG(debug,
-                         "Metadata fetcher setting credential refresh to {}, based on "
-                         "credential expiration",
-                         std::chrono::seconds(cache_duration_.count()));
+                    "Metadata fetcher setting credential refresh to {}, based on "
+                    "credential expiration",
+                    std::chrono::seconds(cache_duration_.count()));
         } else {
           cache_duration_ = getCacheDuration();
           ENVOY_LOG(
@@ -919,7 +919,7 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
   credentialsRetrievalError();
 }
 
-// Determine if we have a provider that is pending, based on priority ordering in the chain. 
+// Determine if we have a provider that is pending, based on priority ordering in the chain.
 // Ignore any non-pending providers that have no credentials for us.
 
 bool CredentialsProviderChain::chainProvidersPending() {
