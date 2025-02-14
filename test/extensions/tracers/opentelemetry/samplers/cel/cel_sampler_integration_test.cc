@@ -18,7 +18,7 @@ namespace {
 
 const char* TRACEPARENT_VALUE = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01";
 const char* TRACEPARENT_VALUE_START = "00-0af7651916cd43dd8448eb211c80319c";
-#if defined(USE_CEL_PARSER)
+
 class CELSamplerIntegrationTest : public Envoy::HttpIntegrationTest,
                                   public testing::TestWithParam<Network::Address::IpVersion> {
 public:
@@ -38,8 +38,27 @@ public:
         name: envoy.tracers.opentelemetry.samplers.cel
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
-          expression: "xds.node.id == 'node_name'"
-
+          expression:
+            parsed_expr:
+              expr:
+                id: 4
+                call_expr:
+                  function: _==_
+                  args:
+                  - id: 3
+                    select_expr:
+                      field: id
+                      operand:
+                        id: 2
+                        select_expr:
+                          field: node
+                          operand:
+                            id: 1
+                            ident_expr:
+                              name: xds
+                  - id: 5
+                    const_expr:
+                      string_value: "node_name"
   )EOF";
 
     auto tracing_config =
@@ -136,7 +155,7 @@ TEST_P(CELSamplerIntegrationTest, TestWithoutTraceparentAndTracestate) {
                                            .getStringView();
   EXPECT_EQ("", tracestate_value);
 }
-#endif
+
 } // namespace
 } // namespace OpenTelemetry
 } // namespace Tracers

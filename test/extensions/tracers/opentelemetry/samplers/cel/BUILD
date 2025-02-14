@@ -14,12 +14,6 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
     extension_names = ["envoy.tracers.opentelemetry.samplers.cel"],
     rbe_pool = "6gig",
     deps = [
@@ -34,12 +28,6 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "cel_sampler_test",
     srcs = ["cel_sampler_test.cc"],
-    copts = select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
     extension_names = ["envoy.tracers.opentelemetry.samplers.cel"],
     rbe_pool = "6gig",
     deps = [
@@ -56,12 +44,6 @@ envoy_extension_cc_test(
     srcs = [
         "cel_sampler_integration_test.cc",
     ],
-    copts = select({
-        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
-        "//conditions:default": [
-            "-DUSE_CEL_PARSER",
-        ],
-    }),
     extension_names = ["envoy.tracers.opentelemetry.samplers.cel"],
     rbe_pool = "6gig",
     deps = [

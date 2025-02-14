@@ -15,8 +15,6 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-#if defined(USE_CEL_PARSER)
-
 class CELSamplerTest : public testing::Test {
 public:
   CELSamplerTest() {
@@ -24,8 +22,28 @@ public:
     const std::string yaml = R"EOF(
     name: envoy.tracers.opentelemetry.samplers.cel
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
-        expression: xds.node.id == "node_name"
+      "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
+      expression:
+        parsed_expr:
+          expr:
+            id: 4
+            call_expr:
+              function: _==_
+              args:
+              - id: 3
+                select_expr:
+                  field: id
+                  operand:
+                    id: 2
+                    select_expr:
+                      field: node
+                      operand:
+                        id: 1
+                        ident_expr:
+                          name: xds
+              - id: 5
+                const_expr:
+                  string_value: "node_name"
   )EOF";
     TestUtility::loadFromYaml(yaml, typed_config);
     auto* factory = Registry::FactoryRegistry<SamplerFactory>::getFactory(
@@ -76,8 +94,24 @@ TEST_F(CELSamplerTest, TestEval) {
   const std::string yaml = R"EOF(
     name: envoy.tracers.opentelemetry.samplers.cel
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
-        expression: request.headers.contains("key1")
+      "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
+      expression:
+        parsed_expr:
+          expr:
+            id: 3
+            call_expr:
+              function: _==_
+              args:
+              - id: 2
+                select_expr:
+                  operand:
+                    id: 1
+                    ident_expr:
+                      name: request
+                  field: path
+              - id: 4
+                const_expr:
+                  string_value: "/test-1234-deny"
   )EOF";
   TestUtility::loadFromYaml(yaml, typed_config);
   auto* factory = Registry::FactoryRegistry<SamplerFactory>::getFactory(
@@ -103,8 +137,28 @@ TEST_F(CELSamplerTest, TestDecisionDrop) {
   const std::string yaml = R"EOF(
     name: envoy.tracers.opentelemetry.samplers.cel
     typed_config:
-        "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
-        expression: xds.node.id != "node_name"
+      "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
+      expression:
+        parsed_expr:
+          expr:
+            id: 4
+            call_expr:
+              function: _!=_
+              args:
+              - id: 3
+                select_expr:
+                  field: id
+                  operand:
+                    id: 2
+                    select_expr:
+                      field: node
+                      operand:
+                        id: 1
+                        ident_expr:
+                          name: xds
+              - id: 5
+                const_expr:
+                  string_value: "node_name"
   )EOF";
   TestUtility::loadFromYaml(yaml, typed_config);
   auto* factory = Registry::FactoryRegistry<SamplerFactory>::getFactory(
@@ -124,7 +178,7 @@ TEST_F(CELSamplerTest, TestDecisionDrop) {
   EXPECT_FALSE(sampling_result.isRecording());
   EXPECT_FALSE(sampling_result.isSampled());
 }
-#endif
+
 } // namespace OpenTelemetry
 } // namespace Tracers
 } // namespace Extensions

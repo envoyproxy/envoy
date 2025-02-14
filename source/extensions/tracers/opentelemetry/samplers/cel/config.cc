@@ -8,14 +8,12 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/tracers/opentelemetry/samplers/cel/cel_sampler.h"
 
-#if defined(USE_CEL_PARSER)
-#include "parser/parser.h"
-#endif
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
+
+using ::xds::type::v3::CelExpression;
 
 SamplerSharedPtr
 CELSamplerFactory::createSampler(const Protobuf::Message& config,
@@ -23,23 +21,27 @@ CELSamplerFactory::createSampler(const Protobuf::Message& config,
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
       dynamic_cast<const ProtobufWkt::Any&>(config), context.messageValidationVisitor(), *this);
 
-#if defined(USE_CEL_PARSER)
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::tracers::opentelemetry::samplers::v3::CELSamplerConfig&>(
       *mptr, context.messageValidationVisitor());
 
-  auto parse_status = google::api::expr::parser::Parse(proto_config.expression());
-  if (!parse_status.ok()) {
-    throw EnvoyException("Not able to parse cel expression: " + parse_status.status().ToString());
+  const CelExpression& input_expr = proto_config.expression();
+  google::api::expr::v1alpha1::Expr compiled_expr_;
+  switch (input_expr.expr_specifier_case()) {
+  case CelExpression::ExprSpecifierCase::kParsedExpr:
+    compiled_expr_ = input_expr.parsed_expr().expr();
+    break;
+  case CelExpression::ExprSpecifierCase::kCheckedExpr:
+    compiled_expr_ = input_expr.checked_expr().expr();
+    break;
+  case CelExpression::ExprSpecifierCase::EXPR_SPECIFIER_NOT_SET:
+    throw EnvoyException("CEL expression not set");
   }
 
   return std::make_unique<CELSampler>(
       context.serverFactoryContext().localInfo(),
       Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()),
-      parse_status.value().expr());
-#else
-  throw EnvoyException("CEL is not available for use in this environment.");
-#endif
+      compiled_expr_);
 }
 
 /**
