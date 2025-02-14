@@ -919,8 +919,7 @@ void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
   credentialsRetrievalError();
 }
 
-bool CredentialsProviderChain::chainProvidersPending()
-{
+bool CredentialsProviderChain::chainProvidersPending() {
   for (auto& provider : providers_) {
     if (provider->credentialsPending()) {
       ENVOY_LOG(debug, "Provider {} is still pending", provider->providerName());
@@ -937,9 +936,9 @@ bool CredentialsProviderChain::chainProvidersPending()
   return false;
 }
 
-bool CredentialsProviderChain::addCallbackIfChainCredentialsPending(CredentialsPendingCallback&& cb) {
-  if(!chainProvidersPending())
-  {
+bool CredentialsProviderChain::addCallbackIfChainCredentialsPending(
+    CredentialsPendingCallback&& cb) {
+  if (!chainProvidersPending()) {
     return false;
   }
   if (cb) {
@@ -949,12 +948,10 @@ bool CredentialsProviderChain::addCallbackIfChainCredentialsPending(CredentialsP
     ENVOY_LOG_MISC(debug, "We have {} pending callbacks", credential_pending_callbacks_.size());
   }
   return true;
-
 }
 
 void CredentialsProviderChain::onCredentialUpdate() {
-  if(chainProvidersPending())
-  {
+  if (chainProvidersPending()) {
     return;
   }
 
