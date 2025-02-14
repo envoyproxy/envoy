@@ -241,7 +241,7 @@ coverage --build_tests_only
 build:coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:coverage --action_env=GCOV=llvm-profdata
 build:coverage --copt=-DNDEBUG
-#build:coverage --copt=-mcmodel=large
+build:coverage --copt=-mcmodel=medium
 # 1.5x original timeout + 300s for trace merger in all categories
 build:coverage --test_timeout=390,750,1500,5700
 build:coverage --define=dynamic_link_tests=false
