@@ -52,7 +52,9 @@ bool DrainManagerImpl::drainClose(Network::DrainDirection direction) const {
     return true;
   }
 
-  if (!draining_.load().first) {
+  auto current_drain = draining_.load();
+
+  if (!current_drain.first) {
     return false;
   }
 
@@ -60,7 +62,7 @@ bool DrainManagerImpl::drainClose(Network::DrainDirection direction) const {
   // (e.g. direction = ALL, but draining_.second == INBOUND_ONLY), then don't
   // drain. We also don't want to drain if the direction is None (which doesn't really
   // make sense, but it's the correct behavior).
-  if (direction == Network::DrainDirection::None || direction > draining_.load().second) {
+  if (direction == Network::DrainDirection::None || direction > current_drain.second) {
     return false;
   }
 
@@ -98,8 +100,8 @@ bool DrainManagerImpl::drainClose(Network::DrainDirection direction) const {
 Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(Network::DrainDirection direction,
                                                               DrainCloseCb cb) const {
   ASSERT(dispatcher_.isThreadSafe());
-
-  if (draining_.load().first && direction <= draining_.load().second) {
+  auto current_drain = draining_.load();
+  if (current_drain.first && direction <= current_drain.second) {
     const MonotonicTime current_time = dispatcher_.timeSource().monotonicTime();
 
     // Calculate the delay. If using an immediate drain-strategy or past our deadline, use
