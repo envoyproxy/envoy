@@ -30,7 +30,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModule(const absl::string_view object
   if (handle != nullptr) {
     // This means the module is already loaded, and the return value is the handle of the already
     // loaded module. We don't need to call the init function again.
-    return std::make_unique<DynamicModule>(handle, do_not_close);
+    return std::make_unique<DynamicModule>(handle);
   }
   // RTLD_LOCAL is always needed to avoid collisions between multiple modules.
   // RTLD_LAZY is required for not only performance but also simply to load the module, otherwise
@@ -45,7 +45,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModule(const absl::string_view object
         absl::StrCat("Failed to load dynamic module: ", object_file_path, " : ", dlerror()));
   }
 
-  DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle, do_not_close);
+  DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle);
 
   const auto init_function =
       dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_program_init)>(
@@ -81,11 +81,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
   return newDynamicModule(file_path_absolute.string(), do_not_close);
 }
 
-DynamicModule::~DynamicModule() {
-  if (!do_not_close_) {
-    dlclose(handle_);
-  }
-}
+DynamicModule::~DynamicModule() { dlclose(handle_); }
 
 void* DynamicModule::getSymbol(const absl::string_view symbol_ref) const {
   // TODO(mathetake): maybe we should accept null-terminated const char* instead of string_view to

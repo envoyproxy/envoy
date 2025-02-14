@@ -19,8 +19,7 @@ namespace DynamicModules {
  */
 class DynamicModule {
 public:
-  DynamicModule(void* handle, const bool do_not_close)
-      : handle_(handle), do_not_close_(do_not_close){};
+  DynamicModule(void* handle) : handle_(handle){};
   ~DynamicModule();
 
   /**
@@ -51,9 +50,6 @@ private:
 
   // The raw dlopen handle that can be used to look up symbols.
   void* handle_;
-
-  // If true, the dlopen handle will not be closed with dlclose.
-  bool do_not_close_;
 };
 
 using DynamicModulePtr = std::unique_ptr<DynamicModule>;
