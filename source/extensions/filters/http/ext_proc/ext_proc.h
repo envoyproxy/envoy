@@ -326,8 +326,7 @@ private:
 
   const ImmediateMutationChecker immediate_mutation_checker_;
 
-  const std::function<std::unique_ptr<OnProcessingResponse>()> on_processing_response_factory_cb_ =
-      nullptr;
+  const std::function<std::unique_ptr<OnProcessingResponse>()> on_processing_response_factory_cb_;
 
   ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
 };

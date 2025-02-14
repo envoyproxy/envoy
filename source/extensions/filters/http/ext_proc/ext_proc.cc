@@ -1303,7 +1303,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleHeadersResponse(response->request_headers());
-    if (on_processing_response_ != nullptr) {
+    if (on_processing_response_) {
       on_processing_response_->afterProcessingRequestHeaders(*response, processing_status,
                                                              decoder_callbacks_->streamInfo());
     }
@@ -1311,7 +1311,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kResponseHeaders:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleHeadersResponse(response->response_headers());
-    if (on_processing_response_ != nullptr) {
+    if (on_processing_response_) {
       on_processing_response_->afterProcessingResponseHeaders(*response, processing_status,
                                                               decoder_callbacks_->streamInfo());
     }
@@ -1319,7 +1319,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kRequestBody:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleBodyResponse(response->request_body());
-    if (on_processing_response_ != nullptr) {
+    if (on_processing_response_) {
       on_processing_response_->afterProcessingRequestBody(*response, processing_status,
                                                           decoder_callbacks_->streamInfo());
     }
@@ -1327,7 +1327,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kResponseBody:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleBodyResponse(response->response_body());
-    if (on_processing_response_ != nullptr) {
+    if (on_processing_response_) {
       on_processing_response_->afterProcessingResponseBody(*response, processing_status,
                                                            decoder_callbacks_->streamInfo());
     }
@@ -1335,7 +1335,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kRequestTrailers:
     setDecoderDynamicMetadata(*response);
     processing_status = decoding_state_.handleTrailersResponse(response->request_trailers());
-    if (on_processing_response_ != nullptr) {
+    if (on_processing_response_) {
       on_processing_response_->afterProcessingRequestTrailers(*response, processing_status,
                                                               decoder_callbacks_->streamInfo());
     }
@@ -1343,7 +1343,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kResponseTrailers:
     setEncoderDynamicMetadata(*response);
     processing_status = encoding_state_.handleTrailersResponse(response->response_trailers());
-    if (on_processing_response_ != nullptr) {
+    if (on_processing_response_) {
       on_processing_response_->afterProcessingResponseTrailers(*response, processing_status,
                                                                decoder_callbacks_->streamInfo());
     }
@@ -1356,7 +1356,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       processing_status =
           absl::FailedPreconditionError("unhandled immediate response due to config disabled it");
 
-      if (on_processing_response_ != nullptr) {
+      if (on_processing_response_) {
         on_processing_response_->afterReceivingImmediateResponse(*response, processing_status,
                                                                  decoder_callbacks_->streamInfo());
       }
@@ -1368,7 +1368,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       processing_complete_ = true;
       onFinishProcessorCalls(Grpc::Status::Ok);
       closeStream();
-      if (on_processing_response_ != nullptr) {
+      if (on_processing_response_) {
         on_processing_response_->afterReceivingImmediateResponse(*response, processing_status,
                                                                  decoder_callbacks_->streamInfo());
       }
@@ -1686,7 +1686,7 @@ std::function<std::unique_ptr<OnProcessingResponse>()> FilterConfig::createOnPro
 }
 
 std::unique_ptr<OnProcessingResponse> FilterConfig::createOnProcessingResponse() const {
-  if (on_processing_response_factory_cb_ == nullptr) {
+  if (!on_processing_response_factory_cb_) {
     return nullptr;
   }
   return on_processing_response_factory_cb_();
