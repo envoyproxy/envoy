@@ -72,6 +72,15 @@ TEST(DynamiModulesTest, HeaderCallbacks) {
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
   filter->initializeInModuleFilter();
 
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
+  EXPECT_CALL(downstream_callbacks, clearRouteCache());
+  EXPECT_CALL(callbacks, downstreamCallbacks())
+      .WillOnce(testing::Return(OptRef(downstream_callbacks)));
+  filter->setDecoderFilterCallbacks(callbacks);
+
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};

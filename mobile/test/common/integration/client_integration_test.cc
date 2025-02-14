@@ -78,6 +78,7 @@ public:
   }
 
   void initialize() override {
+    builder_.setLogLevel(Logger::Logger::debug);
     builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
     builder_.addRuntimeGuard("quic_no_tcp_delay", true);
 

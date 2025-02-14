@@ -109,7 +109,7 @@ pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<
 /// imlementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
 pub trait HttpFilterConfig<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> {
   /// This is called when a HTTP filter chain is created for a new stream.
-  fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
     panic!("not implemented");
   }
 }
@@ -475,6 +475,12 @@ pub trait EnvoyHttpFilter {
   /// Note that after changing the response body, it is caller's responsibility to modify the
   /// content-length header if necessary.
   fn append_response_body(&mut self, data: &[u8]) -> bool;
+
+  /// Clear the route cache calculated during a previous phase of the filter chain.
+  ///
+  /// This is useful when the filter wants to force a re-evaluation of the route selection after
+  /// modifying the request headers, etc that affect the routing decision.
+  fn clear_route_cache(&mut self);
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -821,6 +827,10 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       )
     }
   }
+
+  fn clear_route_cache(&mut self) {
+    unsafe { abi::envoy_dynamic_module_callback_http_clear_route_cache(self.raw_ptr) }
+  }
 }
 
 impl EnvoyHttpFilterImpl {
@@ -1047,14 +1057,14 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_new(
   let filter_config = {
     let raw = filter_config_ptr
       as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>;
-    &**raw
+    &mut **raw
   };
   envoy_dynamic_module_on_http_filter_new_impl(&mut envoy_filter_config, filter_config)
 }
 
 fn envoy_dynamic_module_on_http_filter_new_impl(
   envoy_filter_config: &mut EnvoyHttpFilterConfigImpl,
-  filter_config: &dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
+  filter_config: &mut dyn HttpFilterConfig<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
 ) -> abi::envoy_dynamic_module_type_http_filter_module_ptr {
   let filter = filter_config.new_http_filter(envoy_filter_config);
   wrap_into_c_void_ptr!(filter)

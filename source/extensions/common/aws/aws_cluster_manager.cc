@@ -1,11 +1,13 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 
+#include <memory>
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
 
-AwsClusterManager::AwsClusterManager(Server::Configuration::ServerFactoryContext& context)
+AwsClusterManagerImpl::AwsClusterManagerImpl(Server::Configuration::ServerFactoryContext& context)
     : context_(context) {
 
   // If we are still initializing, defer cluster creation using an init target
@@ -23,16 +25,11 @@ AwsClusterManager::AwsClusterManager(Server::Configuration::ServerFactoryContext
     });
     context_.initManager().add(*init_target_);
   }
-  // We're pinned, so ensure that we remove our cluster update callbacks before cluster manager
-  // terminates
-  shutdown_handle_ = context.lifecycleNotifier().registerCallback(
-      Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-      [&](Event::PostCb) { cm_handle_.reset(); });
 };
 
 absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>
-AwsClusterManager::addManagedClusterUpdateCallbacks(absl::string_view cluster_name,
-                                                    AwsManagedClusterUpdateCallbacks& cb) {
+AwsClusterManagerImpl::addManagedClusterUpdateCallbacks(absl::string_view cluster_name,
+                                                        AwsManagedClusterUpdateCallbacks& cb) {
   auto it = managed_clusters_.find(cluster_name);
   ENVOY_LOG_MISC(debug, "Adding callback for cluster {}", cluster_name);
   if (it == managed_clusters_.end()) {
@@ -48,11 +45,11 @@ AwsClusterManager::addManagedClusterUpdateCallbacks(absl::string_view cluster_na
     return absl::AlreadyExistsError("Cluster already online");
   }
   return std::make_unique<AwsManagedClusterUpdateCallbacksHandle>(
-      cb, managed_cluster->update_callbacks_);
+      context_, cb, managed_cluster->update_callbacks_);
 }
 
-void AwsClusterManager::onClusterAddOrUpdate(absl::string_view cluster_name,
-                                             Upstream::ThreadLocalClusterCommand&) {
+void AwsClusterManagerImpl::onClusterAddOrUpdate(absl::string_view cluster_name,
+                                                 Upstream::ThreadLocalClusterCommand&) {
   // Mark our cluster as ready for use
   auto it = managed_clusters_.find(cluster_name);
   if (it != managed_clusters_.end()) {
@@ -66,9 +63,9 @@ void AwsClusterManager::onClusterAddOrUpdate(absl::string_view cluster_name,
 }
 
 // No removal handler required, as we are using avoid_cds_removal flag
-void AwsClusterManager::onClusterRemoval(const std::string&){};
+void AwsClusterManagerImpl::onClusterRemoval(const std::string&){};
 
-void AwsClusterManager::createQueuedClusters() {
+void AwsClusterManagerImpl::createQueuedClusters() {
   std::vector<std::string> failed_clusters;
   for (const auto& it : managed_clusters_) {
     auto cluster_name = it.first;
@@ -87,7 +84,7 @@ void AwsClusterManager::createQueuedClusters() {
   }
 }
 
-absl::Status AwsClusterManager::addManagedCluster(
+absl::Status AwsClusterManagerImpl::addManagedCluster(
     absl::string_view cluster_name,
     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri) {
 
@@ -120,7 +117,7 @@ absl::Status AwsClusterManager::addManagedCluster(
 }
 
 absl::StatusOr<std::string>
-AwsClusterManager::getUriFromClusterName(absl::string_view cluster_name) {
+AwsClusterManagerImpl::getUriFromClusterName(absl::string_view cluster_name) {
   auto it = managed_clusters_.find(cluster_name);
   if (it == managed_clusters_.end()) {
     return absl::InvalidArgumentError("Cluster not found");

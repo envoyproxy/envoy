@@ -61,8 +61,7 @@ AwsLambdaFilterFactory::getCredentialsProvider(
         server_context, credential_file_config);
   }
   return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-      server_context.api(), makeOptRef(server_context), server_context.singletonManager(), region,
-      nullptr);
+      server_context.api(), makeOptRef(server_context), region, nullptr);
 }
 
 absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
@@ -72,7 +71,8 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
 
   const auto arn = parseArn(proto_config.arn());
   if (!arn) {
-    throw EnvoyException(fmt::format("aws_lambda_filter: Invalid ARN: {}", proto_config.arn()));
+    return absl::InvalidArgumentError(
+        fmt::format("aws_lambda_filter: Invalid ARN: {}", proto_config.arn()));
   }
   const std::string region = arn->region();
 
@@ -103,7 +103,7 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
 
   const auto arn = parseArn(per_route_config.invoke_config().arn());
   if (!arn) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("aws_lambda_filter: Invalid ARN: {}", per_route_config.invoke_config().arn()));
   }
   const std::string region = arn->region();
