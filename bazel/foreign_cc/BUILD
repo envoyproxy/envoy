@@ -442,9 +442,6 @@ envoy_cmake(
         # Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
         "UNALIGNED_OK": "off",
     },
-    copts = [
-        "-std=c90",
-    ],
     lib_source = select({
         "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
         "//conditions:default": "@net_zlib//:all",
