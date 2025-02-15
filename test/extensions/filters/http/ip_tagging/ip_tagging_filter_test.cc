@@ -463,11 +463,12 @@ request_type: external
 ip_tags:
   - ip_tag_name: fooooooo
     ip_list:
-      - {address_prefix: 12345.12345.12345.12345, prefix_len: 12345}
+      - {address_prefix: 12345.12345.12345.12345, prefix_len: 999999}
 )EOF";
-  initializeFilter(external_request_yaml,
-                   "INVALID_ARGUMENT: invalid ip/mask combo '12345.12345.12345.12345' (format is "
-                   "<ip>/<# mask bits>)");
+  initializeFilter(
+      external_request_yaml,
+      "INVALID_ARGUMENT: invalid ip/mask combo '12345.12345.12345.12345/999999' (format is "
+      "<ip>/<# mask bits>)");
 }
 
 } // namespace

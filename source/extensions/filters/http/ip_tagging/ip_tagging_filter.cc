@@ -61,7 +61,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
         cidr_set.emplace_back(std::move(cidr_or_error.value()));
       } else {
         creation_status = absl::InvalidArgumentError(
-            fmt::format("invalid ip/mask combo '{}' (format is <ip>/<# mask bits>)",
+            fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
                         entry.address_prefix(), entry.prefix_len().value()));
         return;
       }
