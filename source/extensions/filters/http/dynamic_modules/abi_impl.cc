@@ -77,6 +77,10 @@ bool setHeaderValueImpl(Http::HeaderMap* map, envoy_dynamic_module_type_buffer_m
     return false;
   }
   absl::string_view key_view(key, key_length);
+  if (value == nullptr) {
+    map->remove(Envoy::Http::LowerCaseString(key_view));
+    return true;
+  }
   absl::string_view value_view(value, value_length);
   // TODO: we might want to avoid copying the key here by trusting the key is already lower case.
   map->setCopy(Envoy::Http::LowerCaseString(key_view), value_view);
