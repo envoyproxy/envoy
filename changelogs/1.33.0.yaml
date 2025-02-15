@@ -454,6 +454,10 @@ new_features:
 - area: access log
   change: |
     Added new command-line flag :option:`--skip-deprecated-logs`.
+- area: admin
+  change: |
+    Add support for the inbound_only and graceful query params of /drain_listeners to be used together by
+    implementing directional draining in DrainManager.
 
 deprecated:
 - area: rbac

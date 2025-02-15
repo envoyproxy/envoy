@@ -282,15 +282,15 @@ TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
   EXPECT_CALL(mock_server_context, drainManager).WillRepeatedly(ReturnRef(not_a_draining_manager));
   EXPECT_CALL(parent_context_, serverFactoryContext).WillRepeatedly(ReturnRef(mock_server_context));
 
-  EXPECT_FALSE(context0->drainDecision().drainClose());
-  EXPECT_FALSE(context1->drainDecision().drainClose());
+  EXPECT_FALSE(context0->drainDecision().drainClose(Network::DrainDirection::All));
+  EXPECT_FALSE(context1->drainDecision().drainClose(Network::DrainDirection::All));
 
   // Drain filter chain 0
   auto* context_impl_0 = dynamic_cast<PerFilterChainFactoryContextImpl*>(context0.get());
   context_impl_0->startDraining();
 
-  EXPECT_TRUE(context0->drainDecision().drainClose());
-  EXPECT_FALSE(context1->drainDecision().drainClose());
+  EXPECT_TRUE(context0->drainDecision().drainClose(Network::DrainDirection::All));
+  EXPECT_FALSE(context1->drainDecision().drainClose(Network::DrainDirection::All));
 }
 
 TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {
