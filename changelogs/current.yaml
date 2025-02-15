@@ -22,6 +22,9 @@ minor_behavior_changes:
   change: |
     Ignore request_header_mode field of :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
     when comparing the mode_override against allowed_override_modes as request_header mode override is not applicable.
+- area: cel
+  change: |
+    Support extension regex fuctions(e.g. ``re.extract``, ``re.capture`, ``re.captureN``) in CEL.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -169,5 +172,9 @@ new_features:
   change: |
     Added the initial support for shared libraries to be loaded by Envoy at runtime. Please refer to the overview documentation for the
     feature :ref:`here <arch_overview_dynamic_modules>`.
+- area: http
+  change: |
+    Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
+    work as an upstream filter.
 
 deprecated:

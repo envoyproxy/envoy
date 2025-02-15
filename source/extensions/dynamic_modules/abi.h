@@ -580,13 +580,13 @@ bool envoy_dynamic_module_callback_http_get_response_trailers(
  * envoy_dynamic_module_callback_http_set_request_header is called by the module to set
  * the value of the request header with the given key. If the header does not exist, it will be
  * created. If the header already exists, all existing values will be removed and the new value will
- * be set.
+ * be set. When the given value is null, the header will be removed if the key exists.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param key is the key of the header.
  * @param key_length is the length of the key.
- * @param value is the value of the header.
+ * @param value is the pointer to the buffer of the value. It can be null to remove the header.
  * @param value_length is the length of the value.
  * @return true if the operation is successful, false otherwise.
  *

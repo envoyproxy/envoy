@@ -250,6 +250,11 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the header is set successfully.
   fn set_request_header(&mut self, key: &str, value: &[u8]) -> bool;
 
+  /// Remove the request header with the given key.
+  ///
+  /// Returns true if the header is removed successfully.
+  fn remove_request_header(&mut self, key: &str) -> bool;
+
   /// Get the value of the request trailer with the given key.
   /// If the trailer is not found, this returns `None`.
   ///
@@ -276,6 +281,11 @@ pub trait EnvoyHttpFilter {
   ///
   /// Returns true if the trailer is set successfully.
   fn set_request_trailer(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Remove the request trailer with the given key.
+  ///
+  /// Returns true if the trailer is removed successfully.
+  fn remove_request_trailer(&mut self, key: &str) -> bool;
 
   /// Get the value of the response header with the given key.
   /// If the header is not found, this returns `None`.
@@ -304,6 +314,11 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the header is set successfully.
   fn set_response_header(&mut self, key: &str, value: &[u8]) -> bool;
 
+  /// Remove the response header with the given key.
+  ///
+  /// Returns true if the header is removed successfully.
+  fn remove_response_header(&mut self, key: &str) -> bool;
+
   /// Get the value of the response trailer with the given key.
   /// If the trailer is not found, this returns `None`.
   ///
@@ -329,6 +344,11 @@ pub trait EnvoyHttpFilter {
   ///
   /// Returns true if the operation is successful.
   fn set_response_trailer(&mut self, key: &str, value: &[u8]) -> bool;
+
+  /// Remove the response trailer with the given key.
+  ///
+  /// Returns true if the trailer is removed successfully.
+  fn remove_response_trailer(&mut self, key: &str) -> bool;
 
   /// Send a response to the downstream with the given status code, headers, and body.
   ///
@@ -830,6 +850,62 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
 
   fn clear_route_cache(&mut self) {
     unsafe { abi::envoy_dynamic_module_callback_http_clear_route_cache(self.raw_ptr) }
+  }
+
+  fn remove_request_header(&mut self, key: &str) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_request_header(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        std::ptr::null_mut(),
+        0,
+      )
+    }
+  }
+
+  fn remove_request_trailer(&mut self, key: &str) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_request_trailer(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        std::ptr::null_mut(),
+        0,
+      )
+    }
+  }
+
+  fn remove_response_header(&mut self, key: &str) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_response_header(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        std::ptr::null_mut(),
+        0,
+      )
+    }
+  }
+
+  fn remove_response_trailer(&mut self, key: &str) -> bool {
+    let key_ptr = key.as_ptr();
+    let key_size = key.len();
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_set_response_trailer(
+        self.raw_ptr,
+        key_ptr as *const _ as *mut _,
+        key_size,
+        std::ptr::null_mut(),
+        0,
+      )
+    }
   }
 }
 

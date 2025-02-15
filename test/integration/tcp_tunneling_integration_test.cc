@@ -4,6 +4,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/filters/http/credential_injector/v3/credential_injector.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
@@ -2323,6 +2324,65 @@ TEST_P(TcpTunnelingIntegrationTest,
   const std::string expected_log =
       "2 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE);
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
+}
+
+TEST_P(TcpTunnelingIntegrationTest, InjectProxyAuthorizationHeader) {
+  if (!(GetParam().tunneling_with_upstream_filters)) {
+    return;
+  }
+
+  // add credential injector to cluster http_filters
+  envoy::extensions::filters::http::credential_injector::v3::CredentialInjector
+      credential_injector_config;
+  TestUtility::loadFromYaml(R"EOF(
+  credential:
+    name: envoy.http.injected_credentials.generic
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.injected_credentials.generic.v3.Generic
+      credential:
+        name: proxy_authorization
+      header: Proxy-Authorization
+)EOF",
+                            credential_injector_config);
+  HttpFilterProto filter_config;
+  filter_config.set_name("envoy.filters.http.credential_injector");
+  filter_config.mutable_typed_config()->PackFrom(credential_injector_config);
+  addHttpUpstreamFilterToCluster(filter_config);
+  addHttpUpstreamFilterToCluster(getCodecFilterConfig());
+
+  // configure tunneling_config and create secret
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+
+    auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+    secret->set_name("proxy_authorization");
+    auto* generic = secret->mutable_generic_secret();
+    generic->mutable_secret()->set_inline_string("Basic base64EncodedUsernamePassword");
+  });
+  initialize();
+
+  setUpConnection(fake_upstream_connection_);
+  sendBidiData(fake_upstream_connection_);
+  EXPECT_EQ("Basic base64EncodedUsernamePassword",
+            upstream_request_->headers()
+                .get(Http::LowerCaseString("Proxy-Authorization"))[0]
+                ->value()
+                .getStringView());
+  closeConnection(fake_upstream_connection_);
 }
 
 INSTANTIATE_TEST_SUITE_P(

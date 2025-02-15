@@ -170,6 +170,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_cl
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_network_type_socket_option);
 // TODO(fredyw): Remove after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_nodata_noname_is_success);
+// TODO(abeyad): Evaluate and either remove or make a config knob in
+// https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_client_early_data);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
