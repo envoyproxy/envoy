@@ -16,8 +16,15 @@ Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
 
+  std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry =
+      context.serverFactoryContext().singletonManager().getTyped<IpTagsRegistrySingleton>(
+          SINGLETON_MANAGER_REGISTERED_NAME(ip_tags_registry),
+          [] { return std::make_shared<IpTagsRegistrySingleton>(); });
+
   IpTaggingFilterConfigSharedPtr config(new IpTaggingFilterConfig(
-      proto_config, stat_prefix, context.scope(), context.serverFactoryContext().runtime()));
+      proto_config, ip_tags_registry, stat_prefix, context.scope(),
+      context.serverFactoryContext().runtime(), context.serverFactoryContext().api(),
+      context.messageValidationVisitor()));
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<IpTaggingFilter>(config));

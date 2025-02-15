@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package envoy.data.ip_tagging.v3;
+
+import "envoy/config/core/v3/address.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.data.ip_tagging.v3";
+option java_outer_classname = "IpTaggingProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/data/ip_tagging/v3;ip_taggingv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// Supplies the IP tag name and the IP address subnets.
+message IPTag {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.ip_tagging.v2.IPTagging.IPTag";
+
+  // Specifies the IP tag name to apply.
+  string ip_tag_name = 1;
+
+  // A list of IP address subnets that will be tagged with
+  // ip_tag_name. Both IPv4 and IPv6 are supported.
+  repeated config.core.v3.CidrRange ip_list = 2;
+}
+
+// Specifies the content of the IP tag file.
+// Allow the file to be created with no IP tags.
+message IPTagFile {
+  repeated IPTag ip_tags = 1;
+}

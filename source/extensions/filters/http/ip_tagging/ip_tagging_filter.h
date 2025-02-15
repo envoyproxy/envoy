@@ -22,6 +22,49 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
+using IpTagFileProto = envoy::data::ip_tagging::v3::IPTagFile;
+using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
+// TODO supports stats for ip tags
+// Add tests for config and loading from file
+// Add tests for singleton
+// Support async reload of tags file
+class IpTagsLoader {
+public:
+  IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor);
+
+  LcTrieSharedPtr loadTags(const std::string& ip_tags_path);
+
+  LcTrieSharedPtr
+  parseInlineIpTags(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
+                    Stats::StatNameSetPtr& stat_name_set);
+
+private:
+  Api::Api& api_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+};
+
+/**
+ * A singleton for file based loading of ip tags and looking up parsed trie data structures with Ip
+ * tags. When given equivalent file paths to the Ip tags, the singleton returns pointers to the same
+ * trie structure.
+ */
+class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
+public:
+  IpTagsRegistrySingleton() { std::cerr << "****Create " << std::endl; }
+  LcTrieSharedPtr get(const std::string& ip_tags_path, IpTagsLoader& tags_loader);
+
+private:
+  absl::Mutex mu_;
+  //  We keep weak_ptr here so the trie structures can be destroyed if the config is updated to stop
+  //  using that trie. Each provider stores shared_ptrs to this singleton, which keeps the singleton
+  //  from being destroyed unless it's no longer keeping track of any providers. (The singleton
+  //  shared_ptr is *only* held by driver instances.)
+  absl::flat_hash_map<size_t, std::weak_ptr<Network::LcTrie::LcTrie<std::string>>>
+      ip_tags_registry_ ABSL_GUARDED_BY(mu_);
+};
+
+SINGLETON_MANAGER_REGISTRATION(ip_tags_registry);
+
 /**
  * Type of requests the filter should apply to.
  */
@@ -36,8 +79,10 @@ public:
       envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IpTagHeader::HeaderAction;
 
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
+                        std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry,
                         const std::string& stat_prefix, Stats::Scope& scope,
-                        Runtime::Loader& runtime);
+                        Runtime::Loader& runtime, Api::Api& api,
+                        ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
@@ -82,10 +127,15 @@ private:
   const Stats::StatName no_hit_;
   const Stats::StatName total_;
   const Stats::StatName unknown_tag_;
-  std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
+  LcTrieSharedPtr trie_;
   const Http::LowerCaseString
       ip_tag_header_; // An empty string indicates that no ip_tag_header is set.
   const HeaderAction ip_tag_header_action_;
+  const std::string ip_tags_path_;
+  // A shared_ptr to keep the ip tags registry singleton alive as long as any of its trie structures
+  // are in use.
+  const std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry_;
+  IpTagsLoader tags_loader_;
 };
 
 using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;

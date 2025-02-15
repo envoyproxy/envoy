@@ -13,28 +13,33 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-IpTaggingFilterConfig::IpTaggingFilterConfig(
-    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
-    const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
-      stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
-      stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
-      no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
-      unknown_tag_(stat_name_set_->add("unknown_tag.hit")),
-      ip_tag_header_(config.has_ip_tag_header() ? config.ip_tag_header().header() : ""),
-      ip_tag_header_action_(config.has_ip_tag_header()
-                                ? config.ip_tag_header().action()
-                                : HeaderAction::IPTagging_IpTagHeader_HeaderAction_SANITIZE) {
+IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor)
+    : api_(api), validation_visitor_(validation_visitor) {}
 
-  // Once loading IP tags from a file system is supported, the restriction on the size
-  // of the set should be removed and observability into what tags are loaded needs
-  // to be implemented.
-  // TODO(ccaraman): Remove size check once file system support is implemented.
-  // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
-  if (config.ip_tags().empty()) {
-    throw EnvoyException("HTTP IP Tagging Filter requires ip_tags to be specified.");
+LcTrieSharedPtr IpTagsLoader::loadTags(const std::string& ip_tags_path) {
+  if (!ip_tags_path.empty()) {
+    if (!absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Yaml) &&
+        !absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Json)) {
+      throw EnvoyException("Unsupported file format, unable to parse ip tags from file.");
+    }
+    auto file_or_error = api_.fileSystem().fileReadToEnd(ip_tags_path);
+    THROW_IF_NOT_OK_REF(file_or_error.status());
+    IpTagFileProto ip_tags_proto;
+    if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Yaml)) {
+      MessageUtil::loadFromYaml(file_or_error.value(), ip_tags_proto, validation_visitor_);
+    } else if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Json)) {
+      MessageUtil::loadFromJson(file_or_error.value(), ip_tags_proto, validation_visitor_);
+    }
+    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
+    tag_data.reserve(ip_tags_proto.ip_tags().size());
+    return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
   }
+  return nullptr;
+}
 
+LcTrieSharedPtr IpTagsLoader::parseInlineIpTags(
+    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
+    Stats::StatNameSetPtr& stat_name_set) {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   tag_data.reserve(config.ip_tags().size());
   for (const auto& ip_tag : config.ip_tags()) {
@@ -52,11 +57,63 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
                         entry.address_prefix(), entry.prefix_len().value()));
       }
     }
-
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
-    stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
+    stat_name_set->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
   }
-  trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
+  return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
+}
+
+LcTrieSharedPtr IpTagsRegistrySingleton::get(const std::string& ip_tags_path,
+                                             IpTagsLoader& tags_loader) {
+  LcTrieSharedPtr ip_tags;
+  const size_t key = std::hash<std::string>()(ip_tags_path);
+  absl::MutexLock lock(&mu_);
+  auto it = ip_tags_registry_.find(key);
+  if (it != ip_tags_registry_.end()) {
+    ip_tags = it->second.lock();
+  } else {
+    ip_tags = tags_loader.loadTags(ip_tags_path);
+    ip_tags_registry_[key] = ip_tags;
+  }
+  return ip_tags;
+}
+
+IpTaggingFilterConfig::IpTaggingFilterConfig(
+    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
+    std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry, const std::string& stat_prefix,
+    Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api,
+    ProtobufMessage::ValidationVisitor& validation_visitor)
+    : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
+      stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
+      stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
+      no_hit_(stat_name_set_->add("no_hit")), total_(stat_name_set_->add("total")),
+      unknown_tag_(stat_name_set_->add("unknown_tag.hit")),
+      ip_tag_header_(config.has_ip_tag_header() ? config.ip_tag_header().header() : ""),
+      ip_tag_header_action_(config.has_ip_tag_header()
+                                ? config.ip_tag_header().action()
+                                : HeaderAction::IPTagging_IpTagHeader_HeaderAction_SANITIZE),
+      ip_tags_path_(config.ip_tags_path()), ip_tags_registry_(ip_tags_registry),
+      tags_loader_(api, validation_visitor) {
+
+  // Once loading IP tags from a file system is supported, the restriction on the size
+  // of the set should be removed and observability into what tags are loaded needs
+  // to be implemented.
+  // TODO(ccaraman): Remove size check once file system support is implemented.
+  // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
+  if (config.ip_tags().empty() && config.ip_tags_path().empty()) {
+    throw EnvoyException(
+        "HTTP IP Tagging Filter requires either ip_tags or ip_tags_path to be specified.");
+  }
+
+  if (!config.ip_tags().empty() && !config.ip_tags_path().empty()) {
+    throw EnvoyException("Only one of ip_tags or ip_tags_path can be configured.");
+  }
+
+  if (!config.ip_tags().empty()) {
+    trie_ = tags_loader_.parseInlineIpTags(config, stat_name_set_);
+  } else {
+    trie_ = ip_tags_registry_->get(ip_tags_path_, tags_loader_);
+  }
 }
 
 void IpTaggingFilterConfig::incCounter(Stats::StatName name) {

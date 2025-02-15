@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ip_tagging.v3;
 
-import "envoy/config/core/v3/address.proto";
+import "envoy/data/ip_tagging/v3/ip_tagging.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // IP tagging :ref:`configuration overview <config_http_filters_ip_tagging>`.
 // [#extension: envoy.filters.http.ip_tagging]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message IPTagging {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ip_tagging.v2.IPTagging";
@@ -38,19 +38,6 @@ message IPTagging {
 
     // Only external requests will be tagged.
     EXTERNAL = 2;
-  }
-
-  // Supplies the IP tag name and the IP address subnets.
-  message IPTag {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.filter.http.ip_tagging.v2.IPTagging.IPTag";
-
-    // Specifies the IP tag name to apply.
-    string ip_tag_name = 1;
-
-    // A list of IP address subnets that will be tagged with
-    // ip_tag_name. Both IPv4 and IPv6 are supported.
-    repeated config.core.v3.CidrRange ip_list = 2;
   }
 
   // Specify to which header the tags will be written.
@@ -88,13 +75,21 @@ message IPTagging {
   // The type of request the filter should apply to.
   RequestType request_type = 1 [(validate.rules).enum = {defined_only: true}];
 
-  // [#comment:TODO(ccaraman): Extend functionality to load IP tags from file system.
-  // Tracked by issue https://github.com/envoyproxy/envoy/issues/2695]
   // The set of IP tags for the filter.
-  repeated IPTag ip_tags = 4 [(validate.rules).repeated = {min_items: 1}];
+  // Only one of :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>`
+  // or :ref:`ip_tags_path <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_path>`
+  // can be set for the Ip Tagging filter.
+  repeated data.ip_tagging.v3.IPTag ip_tags = 4 [(validate.rules).repeated = {min_items: 1}];
 
   // Specify to which header the tags will be written.
   //
   // If left unspecified, the tags will be appended to the ``x-envoy-ip-tags`` header.
   IpTagHeader ip_tag_header = 5;
+
+  // Absolute path to the file with ip tags.
+  // Supports Yaml and Json file formats for ip tags.
+  // Only one of :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>`
+  // or :ref:`ip_tags_path <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_path>`
+  // can be set for the Ip Tagging filter.
+  string ip_tags_path = 6 [(validate.rules).string = {min_len: 1}];
 }

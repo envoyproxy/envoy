@@ -10,6 +10,7 @@ def envoy_copts(repository, test = False):
         "-Wextra",
         "-Werror",
         "-Wnon-virtual-dtor",
+        "-Wno-implicit-function-declaration",
         "-Woverloaded-virtual",
         "-Wold-style-cast",
         "-Wformat",
