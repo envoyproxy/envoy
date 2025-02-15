@@ -88,7 +88,7 @@ public:
                                 const absl::string_view override_region = "") override;
   absl::Status signUnsignedPayload(Http::RequestHeaderMap& headers,
                                    const absl::string_view override_region = "") override;
-                                   
+
   // Used to request notification when credentials are available from a pending credentials provider
   bool addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb) override;
 
