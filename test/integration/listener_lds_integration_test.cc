@@ -567,6 +567,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndS
 }
 #endif
 
+#ifdef __linux__
 TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndKeepalive) {
   if (!ENVOY_SOCKET_SO_KEEPALIVE.hasValue()) {
     return; // Keepalive is not supported on this platform.
@@ -646,6 +647,7 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndK
   EXPECT_EQ(opt_len, sizeof(opt_value));
   EXPECT_EQ(1, opt_value);
 }
+#endif
 
 #ifdef __linux__
 TEST_P(ListenerMultiAddressesIntegrationTest,
