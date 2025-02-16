@@ -263,12 +263,15 @@ message TcpProxy {
 
   // If set, the specified PROXY protocol TLVs (Type-Length-Value) will be added to the PROXY protocol
   // state created by the TCP proxy filter. These TLVs will be sent in the PROXY protocol v2 header
-  // to upstream. If PROXY protocol state already exists from the downstream, this field has no effect.
+  // to upstream.
+  //
+  // This field only takes effect when the TCP proxy filter is creating new PROXY protocol
+  // state. If the connection already contains PROXY protocol state (including any TLVs)
+  // parsed by a downstream proxy protocol listener filter, the TLVs specified here are ignored.
   //
   // .. note::
-  //
-  //   To ensure specified TLVs are allowed in the upstream PROXY protocol header, configure the upstream
-  //   proxy protocol transport to passthrough these TLVs. See
+  //   To ensure specified TLVs are allowed in the upstream PROXY protocol header,  you must also
+  //   configure the passthrough TLVs on the upstream proxy protocol transport. See
   //   :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`
   //   for details.
   repeated config.core.v3.TlvEntry proxy_protocol_tlvs = 19;
