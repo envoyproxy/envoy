@@ -5,6 +5,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "source/common/common/base64.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/http/message_impl.h"
@@ -12,8 +13,8 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/common/aws/iam_roles_anywhere_credentials_provider_impl.h"
-#include "source/extensions/common/aws/iam_roles_anywhere_sigv4_signer_impl.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider_impl.h"
+#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -927,6 +928,14 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
     add(factories.createCredentialsFileCredentialsProvider(
         context, credential_provider_config.credentials_file_provider()));
   }
+
+  if(credential_provider_config.has_iam_roles_anywhere())
+  {
+    ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
+    add(factories.createIAMRolesAnywhereCredentialsProvider(
+        context, aws_cluster_manager_, region, credential_provider_config.iam_roles_anywhere()));
+  }
+
 }
 
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
@@ -976,7 +985,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
       web_identity.set_role_session_name(sessionName(api));
     }
 
-    if ((!web_identity.web_identity_token_data_source().filename().empty() ||
+        if ((!web_identity.web_identity_token_data_source().filename().empty() ||
          !web_identity.web_identity_token_data_source().inline_bytes().empty() ||
          !web_identity.web_identity_token_data_source().inline_string().empty() ||
          !web_identity.web_identity_token_data_source().environment_variable().empty()) &&
@@ -988,11 +997,9 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
       ENVOY_LOG(
           debug,
           "Using web identity credentials provider with STS endpoint: {} and session name: {}",
-          sts_endpoint, session_name);
-      add(factories.createWebIdentityCredentialsProvider(
-          api, context, fetch_metadata_using_curl, MetadataFetcher::create, cluster_name,
-          web_token_path, "", sts_endpoint, role_arn, session_name, refresh_state,
-          initialization_timer));
+          sts_endpoint, web_identity.role_session_name());
+      add(factories.createWebIdentityCredentialsProvider(context.value(), aws_cluster_manager_,
+                                                         region, web_identity));
     }
   }
 
@@ -1036,6 +1043,13 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
     add(factories.createInstanceProfileCredentialsProvider(
         api, context, makeOptRef(aws_cluster_manager_), fetch_metadata_using_curl,
         MetadataFetcher::create, refresh_state, initialization_timer, EC2_METADATA_CLUSTER));
+  }
+
+  if(credential_provider_config.has_iam_roles_anywhere() && context)
+  {
+    ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
+    add(factories.createIAMRolesAnywhereCredentialsProvider(
+        context.value(), aws_cluster_manager_, region, credential_provider_config.iam_roles_anywhere()));
   }
 }
 
@@ -1173,6 +1187,70 @@ CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCr
       *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
 
   if (handleOr.ok()) {
+    credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+  }
+  return credential_provider;
+};
+
+CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context,
+    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+        iam_roles_anywhere_config) const {
+
+  const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+  const auto initialization_timer = std::chrono::seconds(2);
+
+  auto cluster_name = Utility::getRolesAnywhereEndpoint(region);
+  auto uri = cluster_name + ":443";
+
+  auto status = aws_cluster_manager.ref()->addManagedCluster(
+      cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
+
+    //         Api::Api& api, ServerFactoryContextOptRef context,
+    // AwsClusterManagerOptRef aws_cluster_manager,
+    // absl::string_view cluster_name,
+    //   CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
+    //   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    //   std::chrono::seconds initialization_timer,
+    //   envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider iam_roles_anywhere_config);
+
+  auto credential_provider = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
+      context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
+      initialization_timer, iam_roles_anywhere_config);
+  auto handleOr = aws_cluster_manager.ref()->addManagedClusterUpdateCallbacks(
+      cluster_name,
+      *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
+  if (handleOr.ok()) {
+
+    credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
+  }
+  return credential_provider;
+};
+
+CredentialsProviderSharedPtr CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
+    Server::Configuration::ServerFactoryContext& context,
+    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+        iam_roles_anywhere_config) const {
+
+  const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
+  const auto initialization_timer = std::chrono::seconds(2);
+
+  auto cluster_name = Utility::getRolesAnywhereEndpoint(region);
+  auto uri = cluster_name + ":443";
+
+  auto status = aws_cluster_manager.ref()->addManagedCluster(
+      cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
+
+  auto credential_provider = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
+      context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
+      initialization_timer, iam_roles_anywhere_config);
+  auto handleOr = aws_cluster_manager.ref()->addManagedClusterUpdateCallbacks(
+      cluster_name,
+      *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
+  if (handleOr.ok()) {
+
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
   return credential_provider;

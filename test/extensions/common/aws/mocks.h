@@ -6,7 +6,7 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
-#include "source/extensions/common/aws/iam_roles_anywhere_credentials_provider_impl.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
 

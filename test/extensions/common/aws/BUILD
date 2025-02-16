@@ -62,6 +62,7 @@ envoy_cc_test(
         "//source/common/http:message_lib",
         "//source/extensions/common/aws:sigv4_signer_impl_lib",
         "//source/extensions/common/aws:sigv4a_signer_impl_lib",
+        "//source/extensions/common/aws:aws_cluster_manager_lib",
         "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",

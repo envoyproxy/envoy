@@ -1,4 +1,3 @@
-#include "source/extensions/common/aws/iam_roles_anywhere_credentials_provider_impl.h"
 
 #include <chrono>
 #include <memory>
@@ -14,7 +13,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
-#include "source/extensions/common/aws/iam_roles_anywhere_sigv4_signer_impl.h"
+#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/utility.h"
 
@@ -54,17 +54,16 @@ void CachedX509CredentialsProviderBase::refreshIfNeeded() {
 }
 
 IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider(
-    Api::Api& api, ThreadLocal::SlotAllocator& tls, Event::Dispatcher& dispatcher,
+    Server::Configuration::ServerFactoryContext& context,
     envoy::config::core::v3::DataSource certificate_data_source,
     envoy::config::core::v3::DataSource private_key_data_source,
     absl::optional<envoy::config::core::v3::DataSource> certificate_chain_data_source)
-    : api_(api), certificate_data_source_(certificate_data_source),
+    : context_(context), certificate_data_source_(certificate_data_source),
       private_key_data_source_(private_key_data_source),
-      certificate_chain_data_source_(certificate_chain_data_source), dispatcher_(dispatcher),
-      tls_(tls) {
+      certificate_chain_data_source_(certificate_chain_data_source) {
 
   auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
-      certificate_data_source_, dispatcher_, tls_, api_, false, 2048);
+      certificate_data_source_, context.mainThreadDispatcher(), context.threadLocal(), context.api(), false, 2048);
   if (provider_or_error_.ok()) {
     certificate_data_source_provider_ = std::move(provider_or_error_.value());
   } else {
@@ -75,7 +74,7 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
 
   if (certificate_chain_data_source_.has_value()) {
     auto chain_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
-        certificate_chain_data_source_.value(), dispatcher_, tls_, api_, false, 2048);
+        certificate_chain_data_source_.value(), context.mainThreadDispatcher(), context.threadLocal(), context.api(), false, 2048);
     if (chain_provider_or_error_.ok()) {
       certificate_chain_data_source_provider_ = std::move(chain_provider_or_error_.value());
     } else {
@@ -86,7 +85,7 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
   }
 
   auto pkey_provider_or_error_ = Config::DataSource::DataSourceProvider::create(
-      private_key_data_source_, dispatcher_, tls_, api_, false, 2048);
+      private_key_data_source_, context.mainThreadDispatcher(), context.threadLocal(), context.api(), false, 2048);
   if (pkey_provider_or_error_.ok()) {
     private_key_data_source_provider_ = std::move(pkey_provider_or_error_.value());
   } else {
@@ -98,7 +97,7 @@ IAMRolesAnywhereX509CredentialsProvider::IAMRolesAnywhereX509CredentialsProvider
 }
 
 bool IAMRolesAnywhereX509CredentialsProvider::needsRefresh() {
-  const auto now = api_.timeSource().systemTime();
+  const auto now = context_.api().timeSource().systemTime();
   auto expired = (now - last_updated_ > REFRESH_INTERVAL);
 
   if (expiration_time_.has_value()) {
@@ -289,30 +288,31 @@ std::chrono::seconds IAMRolesAnywhereX509CredentialsProvider::getCacheDuration()
 }
 
 IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
-    Api::Api& api, ServerFactoryContextOptRef context,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb,
-    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-    std::chrono::seconds initialization_timer, absl::string_view role_arn,
-    absl::string_view profile_arn, absl::string_view trust_anchor_arn,
-    absl::string_view role_session_name, absl::optional<uint16_t> session_duration,
-    absl::string_view region, absl::string_view cluster_name,
-    envoy::config::core::v3::DataSource certificate_data_source,
-    envoy::config::core::v3::DataSource private_key_data_source,
-    absl::optional<envoy::config::core::v3::DataSource> cert_chain_data_source
+    Server::Configuration::ServerFactoryContext& context,
+    AwsClusterManagerOptRef aws_cluster_manager,
+    absl::string_view cluster_name,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state, std::chrono::seconds initialization_timer,
+    envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider iam_roles_anywhere_config)
 
-    )
-    : MetadataCredentialsProviderBase(api, context, nullptr, create_metadata_fetcher_cb,
-                                      cluster_name,
-                                      envoy::config::cluster::v3::Cluster::LOGICAL_DNS,
-                                      cluster_name, refresh_state, initialization_timer),
-      role_arn_(role_arn), role_session_name_(role_session_name), profile_arn_(profile_arn),
-      trust_anchor_arn_(trust_anchor_arn), region_(region), session_duration_(session_duration),
+    : MetadataCredentialsProviderBase(context.api(), context, aws_cluster_manager, cluster_name, nullptr, create_metadata_fetcher_cb,
+                                      refresh_state, initialization_timer),
+      role_arn_(iam_roles_anywhere_config.role_arn()), role_session_name_(iam_roles_anywhere_config.role_session_name()), profile_arn_(iam_roles_anywhere_config.profile_arn()),
+      trust_anchor_arn_(iam_roles_anywhere_config.trust_anchor_arn()), region_(region),
       server_factory_context_(context) {
+
+
+    absl::optional<uint16_t> session_duration;
+    if (iam_roles_anywhere_config.has_session_duration()) {
+      session_duration = PROTOBUF_GET_SECONDS_OR_DEFAULT(
+          iam_roles_anywhere_config, session_duration,
+          Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration);
+    }
 
   auto roles_anywhere_certificate_provider =
       std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
-          api, context->threadLocal(), context->mainThreadDispatcher(), certificate_data_source,
-          private_key_data_source, cert_chain_data_source);
+          context, iam_roles_anywhere_config.certificate(),
+          iam_roles_anywhere_config.private_key(), iam_roles_anywhere_config.certificate_chain());
   // Create our own x509 signer just for IAM Roles Anywhere
   roles_anywhere_signer_ =
       std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4SignerImpl>(
@@ -337,12 +337,13 @@ bool IAMRolesAnywhereCredentialsProvider::needsRefresh() { return true; }
 
 void IAMRolesAnywhereCredentialsProvider::refresh() {
 
-  ENVOY_LOG(debug, "Getting AWS credentials from the rolesanywhere service at URI: {}", uri_);
+  const auto uri = aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_);
+  ENVOY_LOG(debug, "Getting AWS credentials from the rolesanywhere service at URI: {}",uri.value());
 
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Post);
-  message.headers().setHost(Http::Utility::parseAuthority(uri_).host_);
+  message.headers().setHost(Http::Utility::parseAuthority(uri.value()).host_);
   message.headers().setPath("/sessions");
   message.headers().setContentType("application/json");
 

@@ -2656,45 +2656,6 @@ public:
     TestEnvironment::unsetEnvVar("AWS_ROLE_SESSION_NAME");
   }
 
-  class MockCredentialsProviderChainFactories : public CredentialsProviderChainFactories {
-  public:
-    MOCK_METHOD(CredentialsProviderSharedPtr, createEnvironmentCredentialsProvider, (), (const));
-    MOCK_METHOD(CredentialsProviderSharedPtr, createCredentialsFileCredentialsProvider, (Api::Api&),
-                (const));
-
-    MOCK_METHOD(CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
-                (Api::Api&, ServerFactoryContextOptRef,
-                 const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
-                 CreateMetadataFetcherCb, absl::string_view, absl::string_view, absl::string_view,
-                 absl::string_view, absl::string_view, absl::string_view,
-                 MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds),
-                (const));
-    MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
-                (Api::Api&, ServerFactoryContextOptRef, Singleton::Manager&,
-                 const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
-                 CreateMetadataFetcherCb, absl::string_view, absl::string_view,
-                 MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
-                 absl::string_view),
-                (const));
-
-    MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
-                (Api::Api&, ServerFactoryContextOptRef, CreateMetadataFetcherCb,
-                 MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
-                 absl::string_view, absl::string_view, absl::string_view, absl::string_view,
-                 absl::optional<uint16_t>, absl::string_view, absl::string_view,
-                 const ::envoy::config::core::v3::DataSource&,
-                 const ::envoy::config::core::v3::DataSource&,
-                 absl::optional<const ::envoy::config::core::v3::DataSource>),
-                (const));
-
-    MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
-                (Api::Api&, ServerFactoryContextOptRef, Singleton::Manager&,
-                 const MetadataCredentialsProviderBase::CurlMetadataFetcher&,
-                 CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
-                 std::chrono::seconds, absl::string_view),
-                (const));
-  };
-
   TestScopedRuntime scoped_runtime_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;

@@ -1,4 +1,4 @@
-#include "source/extensions/common/aws/iam_roles_anywhere_sigv4_signer_impl.h"
+#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
 
 #include <openssl/ssl.h>
 
