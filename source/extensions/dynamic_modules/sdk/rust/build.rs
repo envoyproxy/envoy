@@ -15,8 +15,6 @@ fn main() {
     env::set_var("CLANG_PATH", "/opt/llvm/bin/clang");
   }
 
-  println!("cargo:rustc-link-arg=-Wl,-undefined,dynamic_lookup");
-
   println!("cargo:rerun-if-changed=abi.h");
   let bindings = bindgen::Builder::default()
     .header("../../abi.h")
