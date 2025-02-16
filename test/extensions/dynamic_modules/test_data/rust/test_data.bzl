@@ -6,8 +6,9 @@ def test_program(name):
     if name + "_test.rs" in native.glob(["*.rs"]):
         srcs = srcs + [name + "_test.rs"]
 
+    _name = "_" + name
     rust_shared_library(
-        name = "_" + name,
+        name = _name,
         srcs = srcs,
         edition = "2021",
         crate_root = name + ".rs",
@@ -22,13 +23,13 @@ def test_program(name):
     rustfmt_test(
         name = "fmt_" + name,
         tags = ["nocoverage"],
-        targets = [":" + "_" + name],
+        targets = [":" + _name],
         testonly = True,
     )
     rust_clippy(
         name = "clippy_" + name,
         tags = ["nocoverage"],
-        deps = [":" + "_" + name],
+        deps = [":" + _name],
         testonly = True,
     )
 
@@ -58,6 +59,6 @@ def test_program(name):
     # defaults to lib<name>.dylib.
     copy_file(
         name = name,
-        src = "_" + name,
+        src = _name,
         out = "lib{}.so".format(name),
     )
