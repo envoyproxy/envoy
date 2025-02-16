@@ -1,5 +1,4 @@
-load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_shared_library")
 
 # This declares a cc_library target that is used to build a shared library.
 # name + ".c" is the source file that is compiled to create the shared library.
@@ -19,11 +18,8 @@ def test_program(name):
         tags = ["notidy"],
         linkstatic = False,
     )
-
-    # Copy the shared library to the expected name especially for MacOS which
-    # defaults to lib<name>.dylib.
-    copy_file(
+    cc_shared_library(
         name = name,
-        src = "_" + name,
-        out = "lib{}.so".format(name),
+        shared_lib_name = "lib{}.so".format(name),
+        deps = ["_" + name],
     )
