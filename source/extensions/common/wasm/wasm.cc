@@ -495,9 +495,15 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
         if (password_secret_provider == nullptr) {
           throw EnvoyException("Secret provider for Wasm plugin is null");
         }
-        Secret::ThreadLocalGenericSecretProvider secret_reader(
+        auto secret_reader_result = Secret::ThreadLocalGenericSecretProvider::create(
           std::move(password_secret_provider), slot_alloc, api);
-        auto& password = secret_reader.secret();
+        if (!secret_reader_result.ok()) {
+          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), error, "Failed to create secret provider: {}", secret_reader_result.status().message());
+          throw EnvoyException("Failed to create secret provider");
+        }
+
+        auto& secret_reader = secret_reader_result.value();
+        auto& password = secret_reader->secret();
         if (password.empty()) {
           throw EnvoyException("Invalid secret configuration - password is empty");
         }
