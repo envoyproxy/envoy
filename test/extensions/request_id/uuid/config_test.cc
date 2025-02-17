@@ -85,7 +85,6 @@ TEST(UUIDRequestIDExtensionTest, SetRequestID) {
   }
 }
 
-
 TEST(UUIDRequestIDExtensionTest, SetRequestIDWhenEmpty) {
   testing::StrictMock<Random::MockRandomGenerator> random;
   UUIDRequestIDExtension uuid_utils(envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig(),
