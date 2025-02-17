@@ -89,7 +89,7 @@ pub type ProgramInitFunction = fn() -> bool;
 // TODO(@mathetake): I guess there would be a way to avoid the use of dyn in the first place.
 // E.g. one idea is to accept all concrete type parameters for HttpFilterConfig and HttpFilter
 // traits in declare_init_functions!, and generate the match statement based on that.
-type NewHttpFilterConfigFunction<EC, EHF> = fn(
+pub type NewHttpFilterConfigFunction<EC, EHF> = fn(
   envoy_filter_config: &mut EC,
   name: &str,
   config: &[u8],
