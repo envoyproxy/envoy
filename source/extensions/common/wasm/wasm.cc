@@ -15,6 +15,7 @@
 #include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/common/wasm/oci_async_datasource.h"
 #include "source/extensions/common/wasm/stats_handler.h"
+#include "source/extensions/common/wasm/oci/utility.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
 
@@ -473,9 +474,11 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
     } else {
       if (is_oci) {
         std::string registry, image_name, tag;
-        parseOCIImageURI(source, registry, image_name, tag);
-        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), info,
-                            fmt::format("Fetching Wasm image {}:{} from {}", image_name, tag, registry));
+        auto parse_status = Oci::parseImageURI(source, registry, image_name, tag);
+        if (!parse_status.ok()) {
+          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), info,
+                              fmt::format("Failed to parse Wasm image URI {}: {}", source, parse_status.message()));
+        }
 
         envoy::config::core::v3::HttpUri manifest_uri;
         manifest_uri.set_cluster(vm_config.code().remote().http_uri().cluster());
@@ -541,36 +544,6 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
     return complete_cb(code);
   }
   return true;
-}
-
-// Function to parse OCI image URI into components
-void parseOCIImageURI(const std::string& uri, std::string& registry, std::string& image_name,
-                      std::string& tag) {
-  const std::string prefix = "oci://";
-  if (!absl::StartsWith(uri, prefix)) {
-    // TODO(jewertow): handle it better
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), error,
-                        "Failed to load Wasm plugin - URI does not include oci scheme: {}", uri);
-  }
-  std::string without_prefix = uri.substr(prefix.length());
-
-  size_t slash_pos = without_prefix.find('/');
-  if (slash_pos == std::string::npos) {
-    // TODO(jewertow): handle it better
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), error,
-                        "Failed to load Wasm plugin - URI does not include '/': {}", uri);
-  }
-  registry = without_prefix.substr(0, slash_pos);
-
-  
-  size_t colon_pos = without_prefix.find_last_of(':');
-  if (colon_pos == std::string::npos || colon_pos < slash_pos + 1) {
-    // TODO(jewertow): handle it better
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), error,
-                        "Failed to load Wasm plugin - URI does not include ':': {}", uri);
-  }
-  image_name = without_prefix.substr(slash_pos + 1, colon_pos - (slash_pos + 1));
-  tag = without_prefix.substr(colon_pos + 1);
 }
 
 PluginHandleSharedPtr
