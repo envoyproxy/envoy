@@ -24,7 +24,7 @@ public:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
       expression:
-        parsed_expr:
+        cel_expr_parsed:
           expr:
             id: 4
             call_expr:
@@ -96,7 +96,7 @@ TEST_F(CELSamplerTest, TestEval) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
       expression:
-        parsed_expr:
+        cel_expr_parsed:
           expr:
             id: 3
             call_expr:
@@ -139,7 +139,7 @@ TEST_F(CELSamplerTest, TestDecisionDrop) {
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
       expression:
-        parsed_expr:
+        cel_expr_parsed:
           expr:
             id: 4
             call_expr:

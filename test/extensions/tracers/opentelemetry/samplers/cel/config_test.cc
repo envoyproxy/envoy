@@ -26,7 +26,7 @@ name: envoy.tracers.opentelemetry.samplers.cel
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
   expression:
-    parsed_expr:
+    cel_expr_parsed:
       expr:
         id: 3
         call_expr:
@@ -62,7 +62,7 @@ name: envoy.tracers.opentelemetry.samplers.cel
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
   expression:
-    checked_expr:
+    cel_expr_checked:
       expr:
         id: 3
         call_expr:

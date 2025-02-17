@@ -23,6 +23,7 @@ envoy_cc_library(
         "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
         "@com_google_cel_cpp//eval/public:cel_expression",
         "@com_google_cel_cpp//eval/public:cel_value",
+        "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
     ],
 )
 

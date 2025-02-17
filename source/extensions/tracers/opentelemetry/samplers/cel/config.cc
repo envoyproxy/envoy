@@ -13,8 +13,6 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-using ::xds::type::v3::CelExpression;
-
 SamplerSharedPtr
 CELSamplerFactory::createSampler(const Protobuf::Message& config,
                                  Server::Configuration::TracerFactoryContext& context) {
@@ -25,23 +23,14 @@ CELSamplerFactory::createSampler(const Protobuf::Message& config,
       const envoy::extensions::tracers::opentelemetry::samplers::v3::CELSamplerConfig&>(
       *mptr, context.messageValidationVisitor());
 
-  const CelExpression& input_expr = proto_config.expression();
-  google::api::expr::v1alpha1::Expr compiled_expr_;
-  switch (input_expr.expr_specifier_case()) {
-  case CelExpression::ExprSpecifierCase::kParsedExpr:
-    compiled_expr_ = input_expr.parsed_expr().expr();
-    break;
-  case CelExpression::ExprSpecifierCase::kCheckedExpr:
-    compiled_expr_ = input_expr.checked_expr().expr();
-    break;
-  case CelExpression::ExprSpecifierCase::EXPR_SPECIFIER_NOT_SET:
+  auto expr = Expr::getExpr(proto_config.expression());
+  if (!expr.has_value()) {
     throw EnvoyException("CEL expression not set");
   }
 
   return std::make_unique<CELSampler>(
       context.serverFactoryContext().localInfo(),
-      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()),
-      compiled_expr_);
+      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()), expr.value());
 }
 
 /**

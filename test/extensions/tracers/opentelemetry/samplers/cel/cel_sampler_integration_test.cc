@@ -39,7 +39,7 @@ public:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
           expression:
-            parsed_expr:
+            cel_expr_parsed:
               expr:
                 id: 4
                 call_expr:
