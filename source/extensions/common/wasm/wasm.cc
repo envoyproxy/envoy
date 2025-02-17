@@ -485,17 +485,17 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
         manifest_uri.set_uri(absl::StrFormat("https://%s/v2/%s/manifests/%s", registry, image_name, tag));
         manifest_uri.mutable_timeout()->set_seconds(vm_config.code().remote().http_uri().timeout().seconds());
 
-        auto& password_secret = vm_config.basic_credentials().password();
+        auto& image_pull_secret = vm_config.image_pull_secret();
 
-        auto password_secret_provider = secretsProvider(password_secret,
+        auto image_pull_secret_provider = secretsProvider(image_pull_secret,
           cluster_manager.clusterManagerFactory().secretManager(),
           transport_socket_factory, init_manager);
-        if (password_secret_provider == nullptr) {
+        if (image_pull_secret_provider == nullptr) {
           throw EnvoyException("Secret provider for Wasm plugin is null");
         }
 
         auto secret_reader_result = Secret::ThreadLocalGenericSecretProvider::create(
-          std::move(password_secret_provider), slot_alloc, api);
+          std::move(image_pull_secret_provider), slot_alloc, api);
         if (!secret_reader_result.ok()) {
           throw EnvoyException("Failed to create secret provider");
         }

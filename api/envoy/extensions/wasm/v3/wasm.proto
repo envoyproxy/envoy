@@ -133,8 +133,8 @@ message VmConfig {
   // Warning: Envoy rejects the configuration if there's conflict of key space.
   EnvironmentVariables environment_variables = 7;
 
-  // Specifies authentication credentials to remote OCI registry.
-  HttpBasicCredentials basic_credentials = 8;
+  // Secret that contains image pull secret for fetching Wasm plugin from an OCI registry.
+  transport_sockets.tls.v3.SdsSecretConfig image_pull_secret = 8;
 }
 
 message EnvironmentVariables {
@@ -199,10 +199,4 @@ message WasmService {
   // If true, create a single VM rather than creating one VM per worker. Such a singleton can
   // not be used with filters.
   bool singleton = 2;
-}
-
-message HttpBasicCredentials {
-  string user = 1;
-
-  transport_sockets.tls.v3.SdsSecretConfig password = 2;
 }
