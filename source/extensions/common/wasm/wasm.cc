@@ -35,14 +35,11 @@ namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
                 Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext* transport_socket_factory,
+                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
                 Init::Manager& init_manager) {
-  if (transport_socket_factory == nullptr) {
-    throw EnvoyException("WASM plugins with secret cannot be used in outbound filters");
-  }
   if (config.has_sds_config()) {
     return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
-                                                            *transport_socket_factory, init_manager);
+                                                            transport_socket_factory, init_manager);
   } else {
     return secret_manager.findStaticGenericSecretProvider(config.name());
   }
@@ -323,7 +320,7 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
 
 bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-                Server::Configuration::TransportSocketFactoryContext* transport_socket_factory,
+                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
                 Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc, Api::Api& api,
                 Server::ServerLifecycleNotifier& lifecycle_notifier,
                 RemoteAsyncDataProviderPtr& remote_data_provider,
@@ -680,7 +677,6 @@ std::pair<OptRef<PluginConfig::SinglePluginHandle>, Wasm*> PluginConfig::getPlug
 
 PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
                            Server::Configuration::ServerFactoryContext& context,
-                           Server::Configuration::TransportSocketFactoryContext* transport_socket_factory,
                            Stats::Scope& scope, Init::Manager& init_manager,
                            envoy::config::core::v3::TrafficDirection direction,
                            const envoy::config::core::v3::Metadata* metadata, bool singleton)
@@ -754,7 +750,7 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
   };
 
   if (!Common::Wasm::createWasm(plugin_, scope.createScope(""), context.clusterManager(),
-                                init_manager, transport_socket_factory, context.mainThreadDispatcher(),
+                                init_manager, context.getTransportSocketFactoryContext(), context.mainThreadDispatcher(),
                                 context.threadLocal(), context.api(),
                                 context.lifecycleNotifier(), remote_data_provider_,
                                 oci_manifest_provider_, oci_blob_provider_,

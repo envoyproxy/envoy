@@ -172,7 +172,7 @@ using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 // because that is the mechanism for reporting configuration errors.
 bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-                Server::Configuration::TransportSocketFactoryContext* transport_socket_factory,
+                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
                 Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc, Api::Api& api,
                 Server::ServerLifecycleNotifier& lifecycle_notifier,
                 RemoteAsyncDataProviderPtr& remote_data_provider,
@@ -199,7 +199,6 @@ public:
   // the type of the plugin if needed.
   PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
                Server::Configuration::ServerFactoryContext& context,
-               Server::Configuration::TransportSocketFactoryContext* transport_socket_factory,
                Stats::Scope& scope,
                Init::Manager& init_manager, envoy::config::core::v3::TrafficDirection direction,
                const envoy::config::core::v3::Metadata* metadata, bool singleton);
