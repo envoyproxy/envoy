@@ -43,7 +43,7 @@ pub mod abi {
 /// fn my_new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 ///   _envoy_filter_config: &mut EC,
 ///   _name: &str,
-///   _config: &str,
+///   _config: &[u8],
 /// ) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
 ///   Some(Box::new(MyHttpFilterConfig {}))
 /// }
@@ -89,10 +89,10 @@ pub type ProgramInitFunction = fn() -> bool;
 // TODO(@mathetake): I guess there would be a way to avoid the use of dyn in the first place.
 // E.g. one idea is to accept all concrete type parameters for HttpFilterConfig and HttpFilter
 // traits in declare_init_functions!, and generate the match statement based on that.
-pub type NewHttpFilterConfigFunction<EC, EHF> = fn(
+type NewHttpFilterConfigFunction<EC, EHF> = fn(
   envoy_filter_config: &mut EC,
   name: &str,
-  config: &str,
+  config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>>;
 
 /// The global init function for HTTP filter configurations. This is set via the
@@ -1050,10 +1050,16 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
 ) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
   // This assumes that the name and config are valid UTF-8 strings. Should we relax? At the moment,
   // both are String at protobuf level.
-  let name =
-    std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_size)).unwrap_or_default();
-  let config =
-    std::str::from_utf8(std::slice::from_raw_parts(config_ptr, config_size)).unwrap_or_default();
+  let name = if !name_ptr.is_null() {
+    std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_size)).unwrap_or_default()
+  } else {
+    ""
+  };
+  let config = if !config_ptr.is_null() {
+    std::slice::from_raw_parts(config_ptr, config_size)
+  } else {
+    b""
+  };
 
   let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
     raw_ptr: envoy_filter_config_ptr,
@@ -1104,7 +1110,7 @@ macro_rules! drop_wrapped_c_void_ptr {
 fn envoy_dynamic_module_on_http_filter_config_new_impl(
   envoy_filter_config: &mut EnvoyHttpFilterConfigImpl,
   name: &str,
-  config: &str,
+  config: &[u8],
   new_fn: &NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
 ) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
   if let Some(config) = new_fn(envoy_filter_config, name, config) {

@@ -18,7 +18,7 @@ fn test_envoy_dynamic_module_on_http_filter_config_new_impl() {
   let result = envoy_dynamic_module_on_http_filter_config_new_impl(
     &mut envoy_filter_config,
     "test_name",
-    "test_config",
+    b"test_config",
     &new_fn,
   );
   assert!(!result.is_null());
@@ -32,7 +32,7 @@ fn test_envoy_dynamic_module_on_http_filter_config_new_impl() {
   let result = envoy_dynamic_module_on_http_filter_config_new_impl(
     &mut envoy_filter_config,
     "test_name",
-    "test_config",
+    b"test_config",
     &new_fn,
   );
   assert!(result.is_null());
@@ -62,7 +62,7 @@ fn test_envoy_dynamic_module_on_http_filter_config_destroy() {
       raw_ptr: std::ptr::null_mut(),
     },
     "test_name",
-    "test_config",
+    b"test_config",
     &new_fn,
   );
 

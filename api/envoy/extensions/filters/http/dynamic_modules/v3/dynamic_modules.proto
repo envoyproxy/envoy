@@ -44,4 +44,7 @@ message DynamicModuleFilter {
   // filter_name is used to choose either logging or header manipulation. The filter_config can be used to
   // configure the logging level or the header manipulation behavior.
   string filter_config = 3;
+
+  // Similar to ``filter_config``, but as a raw byte string.
+  bytes filter_config_bytes = 4;
 }
