@@ -1,6 +1,7 @@
 #pragma once
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,6 +10,8 @@ namespace Wasm {
 namespace Oci {
 
 absl::Status parseImageURI(const std::string& uri, std::string& registry, std::string& image_name, std::string& tag);
+
+absl::StatusOr<std::string> prepareAuthorizationHeader(std::string image_pull_secret_raw, std::string registry);
 
 } // namespace Oci
 } // namespace Wasm

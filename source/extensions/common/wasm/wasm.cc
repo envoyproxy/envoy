@@ -485,35 +485,31 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
         manifest_uri.set_uri(absl::StrFormat("https://%s/v2/%s/manifests/%s", registry, image_name, tag));
         manifest_uri.mutable_timeout()->set_seconds(vm_config.code().remote().http_uri().timeout().seconds());
 
-        auto username = vm_config.basic_credentials().user();
         auto& password_secret = vm_config.basic_credentials().password();
 
         auto password_secret_provider = secretsProvider(password_secret,
           cluster_manager.clusterManagerFactory().secretManager(),
           transport_socket_factory, init_manager);
-        
         if (password_secret_provider == nullptr) {
           throw EnvoyException("Secret provider for Wasm plugin is null");
         }
+
         auto secret_reader_result = Secret::ThreadLocalGenericSecretProvider::create(
           std::move(password_secret_provider), slot_alloc, api);
         if (!secret_reader_result.ok()) {
-          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), error, "Failed to create secret provider: {}", secret_reader_result.status().message());
           throw EnvoyException("Failed to create secret provider");
         }
 
         auto& secret_reader = secret_reader_result.value();
-        auto& password = secret_reader->secret();
-        if (password.empty()) {
+        auto& image_pull_secret_raw = secret_reader->secret();
+        if (image_pull_secret_raw.empty()) {
           throw EnvoyException("Invalid secret configuration - password is empty");
         }
 
-        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), info,
-                        "Basic auth: user = {} password = {}", username, password);
-        
-        std::string base64_user_passwd;
-        absl::Base64Escape(absl::StrFormat("%s:%s", username, password), &base64_user_passwd);
-        std::string basic_authz_header = absl::StrFormat("Basic %s", base64_user_passwd);
+        auto basic_authz_header = Oci::prepareAuthorizationHeader(image_pull_secret_raw, registry);
+        if (!basic_authz_header.ok()) {
+          throw EnvoyException(absl::StrCat("Failed to create auth header: ", basic_authz_header.status().message()));
+        }
 
         auto get_blob_cb = [&oci_blob_provider, &cluster_manager, &init_manager, vm_config, basic_authz_header, fetch_callback,
           registry, image_name](const std::string& digest) {
@@ -529,11 +525,11 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
           blob_uri.set_uri(absl::StrFormat("https://%s/v2/%s/blobs/%s", registry, image_name, digest));
           blob_uri.mutable_timeout()->set_seconds(vm_config.code().remote().http_uri().timeout().seconds());
 
-          oci_blob_provider = std::make_unique<OciBlobProvider>(cluster_manager, init_manager, blob_uri, basic_authz_header, digest, "", false, fetch_callback);
+          oci_blob_provider = std::make_unique<OciBlobProvider>(cluster_manager, init_manager, blob_uri, basic_authz_header.value(), digest, "", false, fetch_callback);
         };
 
         oci_manifest_provider = std::make_unique<OciManifestProvider>(
-            cluster_manager, init_manager, manifest_uri, basic_authz_header, vm_config.code().remote().sha256(), true, get_blob_cb);
+            cluster_manager, init_manager, manifest_uri, basic_authz_header.value(), vm_config.code().remote().sha256(), true, get_blob_cb);
       } else {
         remote_data_provider = std::make_unique<RemoteAsyncDataProvider>(
             cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
