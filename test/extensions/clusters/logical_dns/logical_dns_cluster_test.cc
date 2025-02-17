@@ -34,6 +34,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+// TODO: sort these
+#include "source/common/upstream/upstream_impl.h"
+
 using testing::_;
 using testing::AnyNumber;
 using testing::Invoke;
@@ -60,7 +63,7 @@ protected:
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
         false);
-    absl::StatusOr<std::unique_ptr<LogicalDnsCluster>> status_or_cluster;
+    absl::StatusOr<std::unique_ptr<ClusterImplBase>> status_or_cluster;
 
     envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
     if (cluster_config.has_cluster_type()) {
@@ -77,8 +80,13 @@ protected:
       createDnsClusterFromLegacyFields(cluster_config, dns_cluster);
     }
 
+    // Here we tell the DnsClusterImpl it's going to behave like a logic DNS cluster:
+    dns_cluster.set_all_addresses_in_single_endpoint(true);
     status_or_cluster =
-        LogicalDnsCluster::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
+    //    LogicalDnsCluster::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
+    // Now comes the big change. We can use the feature flag to run tests for both
+    // "to be deprecated" and new implementation.
+          DnsClusterImpl::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
     THROW_IF_NOT_OK_REF(status_or_cluster.status());
     cluster_ = std::move(*status_or_cluster);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
@@ -173,6 +181,9 @@ protected:
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
+    // Updating the dynamic host, now that the logical DNS implementation
+    // is not using "in-place" address updates anymore.
+    logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_port), logical_host->address()->asString());
@@ -208,9 +219,16 @@ protected:
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+    // Now that we're moving towards a single implementation of DNS clusters, 
+    // this would be expected for logical DNS, as we're reusing the flows
+    // from strict DNS.
+    EXPECT_CALL(membership_updated_, ready());
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
+    // Updating the dynamic host, now that the logical DNS implementation
+    // is not using "in-place" address updates anymore.
+    logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_port), logical_host->address()->asString());
@@ -268,7 +286,7 @@ protected:
   Event::MockTimer* resolve_timer_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
-  std::shared_ptr<LogicalDnsCluster> cluster_;
+  std::shared_ptr<ClusterImplBase> cluster_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Common::CallbackHandlePtr priority_update_cb_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;

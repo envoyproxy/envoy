@@ -31,6 +31,11 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
        ProtobufWkt::Struct::GetDescriptor()->full_name())) {
     cluster_config_type_name =
         TypeUtil::typeUrlToDescriptorFullName(cluster.cluster_type().typed_config().type_url());
+    // This should be behind a runtime flag.
+    if (cluster_config_type_name == "envoy.cluster.strict_dns" || 
+        cluster_config_type_name == "envoy.cluster.logical_dns") {
+      cluster_config_type_name = "envoy.cluster.dns";
+    } 
     factory = Registry::FactoryRegistry<ClusterFactory>::getFactoryByType(cluster_config_type_name);
     if (factory == nullptr) {
       return absl::InvalidArgumentError(
@@ -44,11 +49,10 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
       case envoy::config::cluster::v3::Cluster::STATIC:
         cluster_name = "envoy.cluster.static";
         break;
-      case envoy::config::cluster::v3::Cluster::STRICT_DNS:
-        cluster_name = "envoy.cluster.strict_dns";
-        break;
+      // This should be behind a runtime flag.
       case envoy::config::cluster::v3::Cluster::LOGICAL_DNS:
-        cluster_name = "envoy.cluster.logical_dns";
+      case envoy::config::cluster::v3::Cluster::STRICT_DNS:
+        cluster_name = "envoy.cluster.dns";
         break;
       case envoy::config::cluster::v3::Cluster::ORIGINAL_DST:
         cluster_name = "envoy.cluster.original_dst";
