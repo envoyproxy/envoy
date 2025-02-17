@@ -1048,8 +1048,8 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_new(
   config_ptr: *const u8,
   config_size: usize,
 ) -> abi::envoy_dynamic_module_type_http_filter_config_module_ptr {
-  // This assumes that the name and config are valid UTF-8 strings. Should we relax? At the moment,
-  // both are String at protobuf level.
+  // This assumes that the name is a valid UTF-8 string. Should we relax? At the moment,
+  // it is a String at protobuf level.
   let name = if !name_ptr.is_null() {
     std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_size)).unwrap_or_default()
   } else {
