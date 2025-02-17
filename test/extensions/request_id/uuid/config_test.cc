@@ -165,8 +165,8 @@ TEST(UUIDRequestIDExtensionTest, GetRequestIdAndModRequestIDBy) {
   EXPECT_EQ(15, uuid_utils.getInteger(request_headers).value());
 
   request_headers.setRequestId("");
-  EXPECT_EQ("", uuid_utils.get(request_headers).value());
-  EXPECT_FALSE(uuid_utils.getInteger(request_headers).has_value());
+  EXPECT_TRUE(uuid_utils.get(request_headers));
+  EXPECT_TRUE(uuid_utils.getInteger(request_headers).has_value());
 
   request_headers.setRequestId("000000ff-0000-0000-0000-000000000000");
   EXPECT_EQ("000000ff-0000-0000-0000-000000000000", uuid_utils.get(request_headers).value());
