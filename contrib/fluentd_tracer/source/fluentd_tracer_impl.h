@@ -47,8 +47,8 @@ using EntryPtr = std::unique_ptr<Entry>;
 class SpanContext {
 public:
   SpanContext() = default;
-  SpanContext(const absl::string_view& version, const absl::string_view& trace_id,
-              const absl::string_view& parent_id, bool sampled, const absl::string_view& tracestate)
+  SpanContext(absl::string_view version, absl::string_view trace_id,
+              absl::string_view parent_id, bool sampled, absl::string_view tracestate)
       : version_(version), trace_id_(trace_id), parent_id_(parent_id), sampled_(sampled),
         tracestate_(tracestate) {}
 
