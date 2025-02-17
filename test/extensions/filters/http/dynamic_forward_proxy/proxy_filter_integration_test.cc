@@ -69,7 +69,13 @@ typed_config:
         Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, dns_query_timeout,
         disable_dns_refresh_on_failure, max_pending_requests, key_value_config_,
         typed_dns_resolver_config);
-    config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster : filter_use_dns_cache);
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+      config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster : filter_use_dns_cache);
+    } else if (use_sub_cluster) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
+                                        "false");
+      config_helper_.prependFilter(filter_use_sub_cluster);
+    }
 
     config_helper_.prependFilter(fmt::format(R"EOF(
 name: stream-info-to-headers-filter
@@ -289,8 +295,8 @@ typed_config:
     }
   }
 
-  void requestWithUnknownDomainTest(const std::string& typed_dns_resolver_config = "",
-                                    const std::string& hostname = "doesnotexist.example.com") {
+  void requestWithUnknownDomainTest(const std::string& typed_dns_resolver_config,
+                                    const std::string& hostname, const std::string details) {
     useAccessLog("%RESPONSE_CODE_DETAILS%");
     initializeWithArgs(1024, 1024, "", typed_dns_resolver_config);
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -300,14 +306,14 @@ typed_config:
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
     std::string access_log = waitForAccessLog(access_log_name_);
-    EXPECT_THAT(access_log, HasSubstr("dns_resolution_failure"));
+    EXPECT_THAT(access_log, HasSubstr(details));
     EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
 
     response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
     access_log = waitForAccessLog(access_log_name_, 1);
-    EXPECT_THAT(access_log, HasSubstr("dns_resolution_failure"));
+    EXPECT_THAT(access_log, HasSubstr(details));
     EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
   }
 
@@ -603,13 +609,25 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsSuccessfulHost
   auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response1->waitForEndStream());
   EXPECT_EQ("200", response1->headers().getStatusValue());
+  EXPECT_EQ(0, test_server_->counter("dns_cache.foo.cache_load")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
 
   // This should result in a cache hit because the previous DNS query succeeded.
-  EXPECT_LOG_CONTAINS("debug", "cache hit for host 'localhost", {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+    EXPECT_LOG_CONTAINS("debug", "cache hit for host 'localhost", {
+      auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+      ASSERT_TRUE(response2->waitForEndStream());
+      EXPECT_EQ("200", response2->headers().getStatusValue());
+      // No new query attempt.
+      EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+    });
+  } else {
     auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
     ASSERT_TRUE(response2->waitForEndStream());
     EXPECT_EQ("200", response2->headers().getStatusValue());
-  });
+    // No new query attempt.
+    EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
+  }
 }
 
 // TODO(yanavlasov) Enable per #26642
@@ -624,7 +642,6 @@ TEST_P(ProxyFilterIntegrationTest, FailOnEmptyHostHeader) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("400", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("empty_host_header"));
 }
 #endif
@@ -690,7 +707,10 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
 
 // Currently if the first DNS resolution fails, the filter will continue with
 // a null address. Make sure this mode fails gracefully.
-TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) { requestWithUnknownDomainTest(); }
+TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainCares) {
+  requestWithUnknownDomainTest("", "doesnotexist.example.com",
+                               "cares_norecords:Domain_name_not_found");
+}
 
 // TODO(yanavlasov) Enable per #26642
 #ifndef ENVOY_ENABLE_UHV
@@ -702,8 +722,13 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
-  // The suspicious host will be set to an empty host resulting in a bad request (400).
-  EXPECT_EQ("400", response->headers().getStatusValue());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+    // The suspicious host will be set to an empty host resulting in host not found (503)
+    EXPECT_EQ("503", response->headers().getStatusValue());
+  } else {
+    // The suspicious host will be set to an empty host resulting in a bad request (400)
+    EXPECT_EQ("400", response->headers().getStatusValue());
+  }
   std::string access_log = waitForAccessLog(access_log_name_);
   EXPECT_THAT(access_log, HasSubstr("empty_host_header"));
   EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
@@ -716,7 +741,8 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainGetAddrInfoResolver) 
     typed_dns_resolver_config:
       name: envoy.network.dns_resolver.getaddrinfo
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF");
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF",
+                               "doesnotexist.example.com", "Name_or_service_not_known");
 }
 
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainAndNoCaching) {
@@ -1626,6 +1652,36 @@ TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
   // No new cluster should be added as DFP cluster already exists
   test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+}
+
+TEST_P(ProxyFilterIntegrationTest, ResetStreamDuringDnsLookup) {
+  // Set up the fake resolver which will block DNS resolution.
+  Network::OverrideAddrInfoDnsResolverFactory factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
+  Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
+  std::string resolver_config = R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
+
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        hcm.mutable_stream_idle_timeout()->set_nanos(300 * TIMEOUT_FACTOR * 1000 * 1000);
+      });
+
+  upstream_tls_ = false;
+  autonomous_upstream_ = true;
+  initializeWithArgs(1024, 1024, "", resolver_config, false, 0);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("504", response->headers().getStatusValue());
 }
 
 } // namespace

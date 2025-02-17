@@ -130,7 +130,7 @@ void UdpUpstream::onSocketReadReady() {
 void UdpUpstream::processPacket(Network::Address::InstanceConstSharedPtr /*local_address*/,
                                 Network::Address::InstanceConstSharedPtr /*peer_address*/,
                                 Buffer::InstancePtr buffer, MonotonicTime /*receive_time*/,
-                                uint8_t /*tos*/, Buffer::RawSlice /*saved_cmsg*/) {
+                                uint8_t /*tos*/, Buffer::OwnedImpl /*saved_cmsg*/) {
   std::string data = buffer->toString();
   quiche::ConnectUdpDatagramUdpPacketPayload payload(data);
   quiche::QuicheBuffer serialized_capsule =

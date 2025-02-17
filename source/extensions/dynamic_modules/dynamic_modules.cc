@@ -18,6 +18,20 @@ constexpr char DYNAMIC_MODULES_SEARCH_PATH[] = "ENVOY_DYNAMIC_MODULES_SEARCH_PAT
 
 absl::StatusOr<DynamicModulePtr> newDynamicModule(const absl::string_view object_file_path,
                                                   const bool do_not_close) {
+  const std::filesystem::path file_path_absolute = std::filesystem::absolute(object_file_path);
+  // From the man page of dlopen(3):
+  //
+  // > This can be used to test if the object is already resident (dlopen() returns NULL if it
+  // > is not, or the object's handle if it is resident).
+  //
+  // So we can use RTLD_NOLOAD to check if the module is already loaded to avoid the duplicate call
+  // to the init function.
+  void* handle = dlopen(file_path_absolute.c_str(), RTLD_NOLOAD | RTLD_LAZY);
+  if (handle != nullptr) {
+    // This means the module is already loaded, and the return value is the handle of the already
+    // loaded module. We don't need to call the init function again.
+    return std::make_unique<DynamicModule>(handle);
+  }
   // RTLD_LOCAL is always needed to avoid collisions between multiple modules.
   // RTLD_LAZY is required for not only performance but also simply to load the module, otherwise
   // dlopen results in Invalid argument.
@@ -25,9 +39,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModule(const absl::string_view object
   if (do_not_close) {
     mode |= RTLD_NODELETE;
   }
-
-  const std::filesystem::path file_path_absolute = std::filesystem::absolute(object_file_path);
-  void* handle = dlopen(file_path_absolute.c_str(), mode);
+  handle = dlopen(file_path_absolute.c_str(), mode);
   if (handle == nullptr) {
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to load dynamic module: ", object_file_path, " : ", dlerror()));

@@ -116,10 +116,12 @@ class EnvoyConfigurationTest {
     upstreamTlsSni: String = "",
     h3ConnectionKeepaliveInitialIntervalMilliseconds: Int = 0,
     disableDnsRefreshOnFailure: Boolean = false,
+    disableDnsRefreshOnNetworkChange: Boolean = false,
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       connectTimeoutSeconds,
       disableDnsRefreshOnFailure,
+      disableDnsRefreshOnNetworkChange,
       dnsRefreshSeconds,
       dnsFailureRefreshSecondsBase,
       dnsFailureRefreshSecondsMax,

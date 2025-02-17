@@ -169,8 +169,7 @@ private:
   PayloadMatcher::MatchSegments receive_bytes_;
   const envoy::config::core::v3::RequestMethod method_;
   uint64_t response_buffer_size_;
-  absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
-      service_name_matcher_;
+  absl::optional<Matchers::StringMatcherImpl> service_name_matcher_;
   Router::HeaderParserPtr request_headers_parser_;
   const HttpStatusChecker http_status_checker_;
 

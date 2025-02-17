@@ -93,6 +93,18 @@ Config::WeightedClusterEntry::WeightedClusterEntry(
   }
 }
 
+OnDemandConfig::OnDemandConfig(
+    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand& on_demand_message,
+    Server::Configuration::FactoryContext& context, Stats::Scope& scope)
+    : odcds_(THROW_OR_RETURN_VALUE(
+          context.serverFactoryContext().clusterManager().allocateOdCdsApi(
+              &Upstream::OdCdsApiImpl::create, on_demand_message.odcds_config(),
+              OptRef<xds::core::v3::ResourceLocator>(), context.messageValidationVisitor()),
+          Upstream::OdCdsApiHandlePtr)),
+      lookup_timeout_(
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
+      stats_(generateStats(scope)) {}
+
 OnDemandStats OnDemandConfig::generateStats(Stats::Scope& scope) {
   return {ON_DEMAND_TCP_PROXY_STATS(POOL_COUNTER(scope))};
 }
