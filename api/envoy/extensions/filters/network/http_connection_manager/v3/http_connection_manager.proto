@@ -171,7 +171,9 @@ message HttpConnectionManager {
     // Default: 100%
     type.v3.Percent overall_sampling = 5;
 
-    // Whether tracing metadata should be propagated upstream when the request is not sampled.
+    // Whether tracing headers should be written should Envoy not sample the request for tracing.
+    // When set to false, the existing tracing headers are preserved when Envoy does not sample the
+    // request. This allows upstream services to make their own sampling decision.
     // Default: true.
     google.protobuf.BoolValue propagate_unsampled = 11;
 
