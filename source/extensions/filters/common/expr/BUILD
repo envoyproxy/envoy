@@ -18,12 +18,13 @@ envoy_cc_library(
         "//envoy/singleton:manager_interface",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
+        "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
         "@com_google_cel_cpp//eval/public:activation",
         "@com_google_cel_cpp//eval/public:builtin_func_registrar",
         "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
         "@com_google_cel_cpp//eval/public:cel_expression",
         "@com_google_cel_cpp//eval/public:cel_value",
-        "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
+        "@com_google_cel_cpp//extensions:regex_functions",
     ],
 )
 

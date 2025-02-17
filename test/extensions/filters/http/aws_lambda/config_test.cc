@@ -6,11 +6,13 @@
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Return;
 using ::testing::Truly;
 
 namespace Envoy {
@@ -290,14 +292,11 @@ credentials:
 
   auto provider =
       factory.getCredentialsProvider(proto_config, context.serverFactoryContext(), "region");
-
-  EXPECT_TRUE(
-      std::dynamic_pointer_cast<Extensions::Common::Aws::ConfigCredentialsProvider>(provider));
-  EXPECT_FALSE(
-      std::dynamic_pointer_cast<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
-          provider));
-  EXPECT_FALSE(std::dynamic_pointer_cast<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-      provider));
+  // hardwired credentials are set in provider configuration
+  auto credentials = provider->getCredentials();
+  EXPECT_EQ(credentials.accessKeyId().value(), "config_kid");
+  EXPECT_EQ(credentials.secretAccessKey().value(), "config_Key");
+  EXPECT_EQ(credentials.sessionToken().value(), "config_token");
 }
 
 TEST(AwsLambdaFilterConfigTest, GetProviderShouldPrioritizeProfileIfNoCredentials) {
@@ -311,19 +310,36 @@ credentials_profile: test_profile
   LambdaConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   AwsLambdaFilterFactoryWrapper factory;
 
-  auto provider =
-      factory.getCredentialsProvider(proto_config, context.serverFactoryContext(), "region");
+  auto provider = factory.getCredentialsProvider(proto_config, context_, "region");
 
-  EXPECT_FALSE(
-      std::dynamic_pointer_cast<Extensions::Common::Aws::ConfigCredentialsProvider>(provider));
-  EXPECT_TRUE(
-      std::dynamic_pointer_cast<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
-          provider));
-  EXPECT_FALSE(std::dynamic_pointer_cast<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-      provider));
+  const char CREDENTIALS_FILE_CONTENTS[] =
+      R"(
+[default]
+aws_access_key_id=default_access_key
+aws_secret_access_key=default_secret
+aws_session_token=default_token
+
+[test_profile]
+aws_access_key_id = profile4_access_key
+aws_secret_access_key = profile4_secret
+aws_session_token = profile4_token
+)";
+  const char CREDENTIALS_FILE[] = "test-profile";
+
+  auto file_path =
+      TestEnvironment::writeStringToFileForTest(CREDENTIALS_FILE, CREDENTIALS_FILE_CONTENTS);
+  TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", file_path, 1);
+  EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(file_path))
+      .WillRepeatedly(Return(CREDENTIALS_FILE_CONTENTS));
+
+  // test_profile is set in provider configuration
+  const auto credentials = provider->getCredentials();
+  EXPECT_EQ("profile4_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("profile4_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("profile4_token", credentials.sessionToken().value());
 }
 
 TEST(AwsLambdaFilterConfigTest, GetProviderShoudReturnLegacyChainIfNoProfileNorCredentials) {
@@ -336,19 +352,36 @@ invocation_mode: asynchronous
   LambdaConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   AwsLambdaFilterFactoryWrapper factory;
 
-  auto provider =
-      factory.getCredentialsProvider(proto_config, context.serverFactoryContext(), "region");
+  auto provider = factory.getCredentialsProvider(proto_config, context_, "region");
 
-  EXPECT_FALSE(
-      std::dynamic_pointer_cast<Extensions::Common::Aws::ConfigCredentialsProvider>(provider));
-  EXPECT_FALSE(
-      std::dynamic_pointer_cast<Extensions::Common::Aws::CredentialsFileCredentialsProvider>(
-          provider));
-  EXPECT_TRUE(std::dynamic_pointer_cast<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-      provider));
+  const char CREDENTIALS_FILE_CONTENTS[] =
+      R"(
+[default]
+aws_access_key_id=default_access_key
+aws_secret_access_key=default_secret
+aws_session_token=default_token
+
+[test_profile]
+aws_access_key_id = profile4_access_key
+aws_secret_access_key = profile4_secret
+aws_session_token = profile4_token
+)";
+  const char CREDENTIALS_FILE[] = "test-profile";
+
+  auto file_path =
+      TestEnvironment::writeStringToFileForTest(CREDENTIALS_FILE, CREDENTIALS_FILE_CONTENTS);
+  TestEnvironment::setEnvVar("AWS_SHARED_CREDENTIALS_FILE", file_path, 1);
+  EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(file_path))
+      .WillRepeatedly(Return(CREDENTIALS_FILE_CONTENTS));
+
+  // Default Credentials Provider chain will always return credentials from default profile
+  const auto credentials = provider->getCredentials();
+  EXPECT_EQ("default_access_key", credentials.accessKeyId().value());
+  EXPECT_EQ("default_secret", credentials.secretAccessKey().value());
+  EXPECT_EQ("default_token", credentials.sessionToken().value());
 }
 
 } // namespace
