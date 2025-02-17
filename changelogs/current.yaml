@@ -178,6 +178,6 @@ new_features:
     work as an upstream filter.
 - area: adaptive concurrency
   change: |
-    Allow fixing the minimum RTT by introducing ``fixed_value``.
+    Allow pinning the minimum RTT by introducing a new gradient concurrency controller, ``PinnedGradientControllerConfig``.
 
 deprecated:

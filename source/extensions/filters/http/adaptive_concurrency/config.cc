@@ -23,13 +23,22 @@ Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromP
   using Proto = envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency;
   ASSERT(config.concurrency_controller_config_case() ==
          Proto::ConcurrencyControllerConfigCase::kGradientControllerConfig);
-  auto gradient_controller_config = Controller::GradientControllerConfig(
-      config.gradient_controller_config(), server_context.runtime());
-  controller = std::make_shared<Controller::GradientController>(
-      std::move(gradient_controller_config), server_context.mainThreadDispatcher(),
-      server_context.runtime(), acc_stats_prefix + "gradient_controller.", context.scope(),
-      server_context.api().randomGenerator(), server_context.timeSource());
-
+  if (config.has_gradient_controller_config()) {
+    auto gradient_controller_config = Controller::DynamicGradientControllerConfig(
+        config.gradient_controller_config(), server_context.runtime());
+    controller = std::make_shared<Controller::DynamicGradientController>(
+        std::move(gradient_controller_config), server_context.mainThreadDispatcher(),
+        server_context.runtime(), acc_stats_prefix + "gradient_controller.", context.scope(),
+        server_context.api().randomGenerator(), server_context.timeSource());
+  } else {
+    ASSERT(config.has_pinned_gradient_controller_config());
+    auto gradient_controller_config = Controller::PinnedGradientControllerConfig(
+        config.pinned_gradient_controller_config(), server_context.runtime());
+    controller = std::make_shared<Controller::PinnedGradientController>(
+        std::move(gradient_controller_config), server_context.mainThreadDispatcher(),
+        server_context.runtime(), acc_stats_prefix + "gradient_controller.", context.scope(),
+        server_context.api().randomGenerator(), server_context.timeSource());
+  }
   AdaptiveConcurrencyFilterConfigSharedPtr filter_config(new AdaptiveConcurrencyFilterConfig(
       config, server_context.runtime(), std::move(acc_stats_prefix), context.scope(),
       server_context.timeSource()));
