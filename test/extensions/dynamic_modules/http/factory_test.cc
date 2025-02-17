@@ -59,7 +59,7 @@ dynamic_module_config:
     name: no_op
     do_not_close: true
 filter_name: foo
-filter_config_bytes: bar
+raw_filter_config: bar
 )EOF";
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;

@@ -21,21 +21,21 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
                                       std::string(dynamic_module.status().message()));
   }
 
-  absl::string_view filter_config_bytes{};
-  if (proto_config.filter_config().size() > 0 && proto_config.filter_config_bytes().size() > 0) {
+  absl::string_view raw_filter_config{};
+  if (proto_config.filter_config().size() > 0 && proto_config.raw_filter_config().size() > 0) {
     return absl::InvalidArgumentError(
-        "At most one of `filter_config` and `filter_config_bytes` must be set");
+        "At most one of `filter_config` and `raw_filter_config` must be set");
   } else if (proto_config.filter_config().size() > 0) {
-    filter_config_bytes = proto_config.filter_config();
-  } else if (proto_config.filter_config_bytes().size() > 0) {
-    filter_config_bytes = proto_config.filter_config_bytes();
+    raw_filter_config = proto_config.filter_config();
+  } else if (proto_config.raw_filter_config().size() > 0) {
+    raw_filter_config = proto_config.raw_filter_config();
   }
 
   absl::StatusOr<
       Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-              proto_config.filter_name(), filter_config_bytes, std::move(dynamic_module.value()));
+              proto_config.filter_name(), raw_filter_config, std::move(dynamic_module.value()));
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create filter config: " +

@@ -46,5 +46,5 @@ message DynamicModuleFilter {
   string filter_config = 3;
 
   // Similar to ``filter_config``, but as a raw byte string.
-  bytes filter_config_bytes = 4;
+  bytes raw_filter_config = 4;
 }
