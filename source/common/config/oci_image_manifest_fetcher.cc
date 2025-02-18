@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 
+#include "remote_data_fetcher.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
@@ -15,27 +16,17 @@ namespace DataFetcher {
 
 OciImageManifestFetcher::OciImageManifestFetcher(Upstream::ClusterManager& cm,
                                                  const envoy::config::core::v3::HttpUri& uri,
-                                                 const std::string& authz_header_value,
                                                  const std::string& content_hash,
-                                                 RemoteDataFetcherCallback& callback)
-    : cm_(cm), uri_(uri), authz_header_value_(authz_header_value), content_hash_(content_hash), callback_(callback) {}
-
-OciImageManifestFetcher::~OciImageManifestFetcher() { cancel(); }
-
-void OciImageManifestFetcher::cancel() {
-  if (request_) {
-    request_->cancel();
-    ENVOY_LOG(debug, "fetch oci image [uri = {}]: canceled", uri_.uri());
-  }
-
-  request_ = nullptr;
-}
+                                                 RemoteDataFetcherCallback& callback,
+                                                 const std::string& authz_header_value)
+    : RemoteDataFetcher(cm, uri, content_hash, callback), authz_header_value_(authz_header_value) {}
 
 void OciImageManifestFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   message->headers().setAuthorization(authz_header_value_);
-  // TODO: add "accept: application/vnd.oci.image.manifest.v1+json"
+
+  // TODO: set "Accept: application/vnd.oci.image.manifest.v1+json"
   ENVOY_LOG(info, "fetch oci image from [uri = {}]: start", uri_.uri());
   const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
   if (thread_local_cluster != nullptr) {
@@ -94,13 +85,6 @@ void OciImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
   }
 
   request_ = nullptr;
-}
-
-void OciImageManifestFetcher::onFailure(const Http::AsyncClient::Request&,
-                                        Http::AsyncClient::FailureReason reason) {
-  ENVOY_LOG(info, "fetch oci image [uri = {}]: network error {}", uri_.uri(), enumToInt(reason));
-  request_ = nullptr;
-  callback_.onFailure(FailureReason::Network);
 }
 
 } // namespace DataFetcher
