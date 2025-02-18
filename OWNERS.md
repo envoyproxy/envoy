@@ -49,6 +49,8 @@ routing PRs, questions, etc. to the right place.
   * ext_proc, data plane, flow control, CEL.
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
   * Overload manager, security, logging, wasm, data plane.
+* Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
+  * Load balancing, data plane.
 
 # Envoy mobile maintainers
 
