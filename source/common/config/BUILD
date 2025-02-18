@@ -154,8 +154,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "oci_image_fetcher_lib",
-    srcs = ["oci_image_manifest_fetcher.cc", "oci_image_blob_fetcher.cc"],
-    hdrs = ["oci_image_manifest_fetcher.h", "oci_image_blob_fetcher.h"],
+    srcs = [
+        "oci_image_blob_fetcher.cc",
+        "oci_image_manifest_fetcher.cc",
+    ],
+    hdrs = [
+        "oci_image_blob_fetcher.h",
+        "oci_image_manifest_fetcher.h",
+    ],
     deps = [
         ":remote_data_fetcher_lib",
         "//envoy/upstream:cluster_manager_interface",

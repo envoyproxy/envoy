@@ -2,13 +2,14 @@
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 
-#include "remote_data_fetcher.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+
+#include "remote_data_fetcher.h"
 
 namespace Envoy {
 namespace Config {
@@ -44,7 +45,8 @@ void OciImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
                                         Http::ResponseMessagePtr&& response) {
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code == enumToInt(Http::Code::OK)) {
-    ENVOY_LOG(info, "fetch oci image [uri = {}, body = {}]: success", uri_.uri(), response->body().toString());
+    ENVOY_LOG(info, "fetch oci image [uri = {}, body = {}]: success", uri_.uri(),
+              response->body().toString());
     if (response->body().length() > 0) {
       auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
       const auto content_hash = Hex::encode(crypto_util.getSha256Digest(response->body()));
@@ -62,16 +64,20 @@ void OciImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
           Json::ObjectSharedPtr json_body =
               THROW_OR_RETURN_VALUE(Json::Factory::loadFromString(body), Json::ObjectSharedPtr);
           auto layers = THROW_OR_RETURN_VALUE(json_body->getObjectArray("layers"),
-                                    std::vector<Json::ObjectSharedPtr>);
+                                              std::vector<Json::ObjectSharedPtr>);
           auto digest = layers[0]->getString("digest", "");
           if (digest->empty()) {
-            ENVOY_LOG(error, "fetch oci image [uri = {}, body = {}]: could not parse digest", uri_.uri(), response->body().toString());  
+            ENVOY_LOG(error, "fetch oci image [uri = {}, body = {}]: could not parse digest",
+                      uri_.uri(), response->body().toString());
           } else {
-            ENVOY_LOG(info, "fetch oci image [uri = {}, digest = {}]: found digest", uri_.uri(), digest->c_str());
+            ENVOY_LOG(info, "fetch oci image [uri = {}, digest = {}]: found digest", uri_.uri(),
+                      digest->c_str());
             callback_.onSuccess(digest.value());
           }
         } catch (...) {
-          ENVOY_LOG(error, "fetch oci image [uri = {}, body = {}]: failed to parse response body to JSON", uri_.uri(), response->body().toString());
+          ENVOY_LOG(error,
+                    "fetch oci image [uri = {}, body = {}]: failed to parse response body to JSON",
+                    uri_.uri(), response->body().toString());
         }
       }
     } else {
@@ -79,8 +85,8 @@ void OciImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
       callback_.onFailure(FailureReason::Network);
     }
   } else {
-    ENVOY_LOG(info, "fetch oci image [uri = {}, body = {}]: response status code {}", uri_.uri(), response->body().toString(),
-              status_code);
+    ENVOY_LOG(info, "fetch oci image [uri = {}, body = {}]: response status code {}", uri_.uri(),
+              response->body().toString(), status_code);
     callback_.onFailure(FailureReason::Network);
   }
 

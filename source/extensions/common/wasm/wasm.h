@@ -22,9 +22,9 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/version/version.h"
 #include "source/extensions/common/wasm/context.h"
+#include "source/extensions/common/wasm/oci_async_datasource.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/remote_async_datasource.h"
-#include "source/extensions/common/wasm/oci_async_datasource.h"
 #include "source/extensions/common/wasm/stats_handler.h"
 #include "source/extensions/common/wasm/wasm_vm.h"
 
@@ -173,15 +173,15 @@ using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
                 Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
-                Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc, Api::Api& api,
-                Server::ServerLifecycleNotifier& lifecycle_notifier,
+                Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc,
+                Api::Api& api, Server::ServerLifecycleNotifier& lifecycle_notifier,
                 RemoteAsyncDataProviderPtr& remote_data_provider,
                 OciManifestProviderPtr& oci_manifest_provider,
-                OciBlobProviderPtr& oci_blob_provider,
-                CreateWasmCallback&& callback,
+                OciBlobProviderPtr& oci_blob_provider, CreateWasmCallback&& callback,
                 CreateContextFn create_root_context_for_testing = nullptr);
 
-void parseOCIImageURI(const std::string& uri, std::string& registry, std::string& image_name, std::string& tag);
+void parseOCIImageURI(const std::string& uri, std::string& registry, std::string& image_name,
+                      std::string& tag);
 
 PluginHandleSharedPtr
 getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
@@ -198,8 +198,7 @@ public:
   // http filters, etc.), we may extend the constructor to takes a static string view to tell
   // the type of the plugin if needed.
   PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& config,
-               Server::Configuration::ServerFactoryContext& context,
-               Stats::Scope& scope,
+               Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
                Init::Manager& init_manager, envoy::config::core::v3::TrafficDirection direction,
                const envoy::config::core::v3::Metadata* metadata, bool singleton);
 

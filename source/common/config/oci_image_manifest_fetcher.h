@@ -4,6 +4,7 @@
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/upstream/cluster_manager.h"
+
 #include "source/common/config/oci_image_blob_fetcher.h"
 
 namespace Envoy {

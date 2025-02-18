@@ -139,7 +139,8 @@ protected:
 private:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> transport_socket_factory_context_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
 };
 
 INSTANTIATE_TEST_SUITE_P(

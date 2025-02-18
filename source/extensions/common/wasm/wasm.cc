@@ -5,19 +5,19 @@
 
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.h"
+#include "envoy/secret/secret_manager.h"
+#include "envoy/secret/secret_provider.h"
 
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/common/logger.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/secret/secret_provider_impl.h"
+#include "source/extensions/common/wasm/oci/utility.h"
+#include "source/extensions/common/wasm/oci_async_datasource.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/remote_async_datasource.h"
-#include "source/extensions/common/wasm/oci_async_datasource.h"
 #include "source/extensions/common/wasm/stats_handler.h"
-#include "source/extensions/common/wasm/oci/utility.h"
-#include "envoy/secret/secret_manager.h"
-#include "envoy/secret/secret_provider.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -322,12 +322,11 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
 bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
                 Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
-                Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc, Api::Api& api,
-                Server::ServerLifecycleNotifier& lifecycle_notifier,
+                Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc,
+                Api::Api& api, Server::ServerLifecycleNotifier& lifecycle_notifier,
                 RemoteAsyncDataProviderPtr& remote_data_provider,
                 OciManifestProviderPtr& oci_manifest_provider,
-                OciBlobProviderPtr& oci_blob_provider,
-                CreateWasmCallback&& cb,
+                OciBlobProviderPtr& oci_blob_provider, CreateWasmCallback&& cb,
                 CreateContextFn create_root_context_for_testing) {
   auto& stats_handler = getCreateStatsHandler();
   std::string source, code;
@@ -476,26 +475,29 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
         std::string registry, image_name, tag;
         auto parse_status = Oci::parseImageURI(source, registry, image_name, tag);
         if (!parse_status.ok()) {
-          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), info,
-                              fmt::format("Failed to parse Wasm image URI {}: {}", source, parse_status.message()));
+          ENVOY_LOG_TO_LOGGER(
+              Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), info,
+              fmt::format("Failed to parse Wasm image URI {}: {}", source, parse_status.message()));
         }
 
         envoy::config::core::v3::HttpUri manifest_uri;
         manifest_uri.set_cluster(vm_config.code().remote().http_uri().cluster());
-        manifest_uri.set_uri(absl::StrFormat("https://%s/v2/%s/manifests/%s", registry, image_name, tag));
-        manifest_uri.mutable_timeout()->set_seconds(vm_config.code().remote().http_uri().timeout().seconds());
+        manifest_uri.set_uri(
+            absl::StrFormat("https://%s/v2/%s/manifests/%s", registry, image_name, tag));
+        manifest_uri.mutable_timeout()->set_seconds(
+            vm_config.code().remote().http_uri().timeout().seconds());
 
         auto& image_pull_secret = vm_config.image_pull_secret();
 
-        auto image_pull_secret_provider = secretsProvider(image_pull_secret,
-          cluster_manager.clusterManagerFactory().secretManager(),
-          transport_socket_factory, init_manager);
+        auto image_pull_secret_provider = secretsProvider(
+            image_pull_secret, cluster_manager.clusterManagerFactory().secretManager(),
+            transport_socket_factory, init_manager);
         if (image_pull_secret_provider == nullptr) {
           throw EnvoyException("Secret provider for Wasm plugin is null");
         }
 
         auto secret_reader_result = Secret::ThreadLocalGenericSecretProvider::create(
-          std::move(image_pull_secret_provider), slot_alloc, api);
+            std::move(image_pull_secret_provider), slot_alloc, api);
         if (!secret_reader_result.ok()) {
           throw EnvoyException("Failed to create secret provider");
         }
@@ -508,28 +510,34 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
 
         auto basic_authz_header = Oci::prepareAuthorizationHeader(image_pull_secret_raw, registry);
         if (!basic_authz_header.ok()) {
-          throw EnvoyException(absl::StrCat("Failed to create auth header: ", basic_authz_header.status().message()));
+          throw EnvoyException(absl::StrCat("Failed to create auth header: ",
+                                            basic_authz_header.status().message()));
         }
 
-        auto get_blob_cb = [&oci_blob_provider, &cluster_manager, &init_manager, vm_config, basic_authz_header, fetch_callback,
-          registry, image_name](const std::string& digest) {
-
+        auto get_blob_cb = [&oci_blob_provider, &cluster_manager, &init_manager, vm_config,
+                            basic_authz_header, fetch_callback, registry,
+                            image_name](const std::string& digest) {
           if (digest.empty()) {
             ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), error,
                                 "cannot get image blob - image digest is empty");
             return;
           }
-          
+
           envoy::config::core::v3::HttpUri blob_uri;
           blob_uri.set_cluster(vm_config.code().remote().http_uri().cluster());
-          blob_uri.set_uri(absl::StrFormat("https://%s/v2/%s/blobs/%s", registry, image_name, digest));
-          blob_uri.mutable_timeout()->set_seconds(vm_config.code().remote().http_uri().timeout().seconds());
+          blob_uri.set_uri(
+              absl::StrFormat("https://%s/v2/%s/blobs/%s", registry, image_name, digest));
+          blob_uri.mutable_timeout()->set_seconds(
+              vm_config.code().remote().http_uri().timeout().seconds());
 
-          oci_blob_provider = std::make_unique<OciBlobProvider>(cluster_manager, init_manager, blob_uri, basic_authz_header.value(), digest, "", false, fetch_callback);
+          oci_blob_provider = std::make_unique<OciBlobProvider>(
+              cluster_manager, init_manager, blob_uri, basic_authz_header.value(), digest, "",
+              false, fetch_callback);
         };
 
         oci_manifest_provider = std::make_unique<OciManifestProvider>(
-            cluster_manager, init_manager, manifest_uri, basic_authz_header.value(), vm_config.code().remote().sha256(), true, get_blob_cb);
+            cluster_manager, init_manager, manifest_uri, basic_authz_header.value(),
+            vm_config.code().remote().sha256(), true, get_blob_cb);
       } else {
         remote_data_provider = std::make_unique<RemoteAsyncDataProvider>(
             cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
@@ -719,11 +727,10 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
   };
 
   if (!Common::Wasm::createWasm(plugin_, scope.createScope(""), context.clusterManager(),
-                                init_manager, context.getTransportSocketFactoryContext(), context.mainThreadDispatcher(),
-                                context.threadLocal(), context.api(),
-                                context.lifecycleNotifier(), remote_data_provider_,
-                                oci_manifest_provider_, oci_blob_provider_,
-                                std::move(callback))) {
+                                init_manager, context.getTransportSocketFactoryContext(),
+                                context.mainThreadDispatcher(), context.threadLocal(),
+                                context.api(), context.lifecycleNotifier(), remote_data_provider_,
+                                oci_manifest_provider_, oci_blob_provider_, std::move(callback))) {
     // TODO(wbpcode): use absl::Status to return error rather than throw.
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm plugin {}", plugin_->name_));

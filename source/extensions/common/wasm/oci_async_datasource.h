@@ -1,10 +1,11 @@
 #pragma once
 
-#include "envoy/config/core/v3/http_uri.pb.h"
+#include <string>
 
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/init/manager.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -17,7 +18,6 @@
 #include "source/common/init/target_impl.h"
 
 #include "absl/types/optional.h"
-#include <string>
 
 namespace Envoy {
 
@@ -27,15 +27,12 @@ namespace Envoy {
 using OciManifestCb = std::function<void(const std::string&)>;
 
 class OciManifestProvider : public Event::DeferredDeletable,
-                                public Config::DataFetcher::RemoteDataFetcherCallback,
-                                public Logger::Loggable<Logger::Id::config> {
+                            public Config::DataFetcher::RemoteDataFetcherCallback,
+                            public Logger::Loggable<Logger::Id::config> {
 public:
   OciManifestProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
-                          const envoy::config::core::v3::HttpUri uri,
-                          std::string token,
-                          std::string sha256,
-                          bool allow_empty,
-                          OciManifestCb&& callback);
+                      const envoy::config::core::v3::HttpUri uri, std::string token,
+                      std::string sha256, bool allow_empty, OciManifestCb&& callback);
 
   ~OciManifestProvider() override {
     init_target_.ready();
@@ -89,16 +86,12 @@ using OciManifestProviderPtr = std::unique_ptr<OciManifestProvider>;
 using OciBlobCb = std::function<void(const std::string&)>;
 
 class OciBlobProvider : public Event::DeferredDeletable,
-                                public Config::DataFetcher::RemoteDataFetcherCallback,
-                                public Logger::Loggable<Logger::Id::config> {
+                        public Config::DataFetcher::RemoteDataFetcherCallback,
+                        public Logger::Loggable<Logger::Id::config> {
 public:
   OciBlobProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
-                          const envoy::config::core::v3::HttpUri uri,
-                          std::string token,
-                          std::string digest,
-                          std::string sha256,
-                          bool allow_empty,
-                          OciBlobCb&& callback);
+                  const envoy::config::core::v3::HttpUri uri, std::string token, std::string digest,
+                  std::string sha256, bool allow_empty, OciBlobCb&& callback);
 
   ~OciBlobProvider() override {
     init_target_.ready();
