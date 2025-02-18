@@ -26,7 +26,6 @@ envoy_cc_library(
     name = "fluentd_tracer_lib",
     srcs = ["fluentd_tracer_impl.cc"],
     hdrs = ["fluentd_tracer_impl.h"],
-    copts = ["-Wno-unused-parameter -g"],
     tags = ["debug"],
     deps = [
         "//envoy/thread_local:thread_local_interface",

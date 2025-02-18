@@ -140,7 +140,7 @@ Driver::Driver(const FluentdConfigSharedPtr fluentd_config,
 }
 
 // Handles driver logic for starting a new span
-Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
+Tracing::SpanPtr Driver::startSpan(const Tracing::Config& /*config*/,
                                    Tracing::TraceContext& trace_context,
                                    const StreamInfo::StreamInfo& stream_info,
                                    const std::string& operation_name,
@@ -218,7 +218,7 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
 }
 
 // Log an event as a Fluentd entry
-void Span::log(SystemTime timestamp, const std::string& event) {
+void Span::log(SystemTime /*timestamp*/, const std::string& event) {
   uint64_t time =
       std::chrono::duration_cast<std::chrono::seconds>(time_source_.systemTime().time_since_epoch())
           .count();
@@ -256,7 +256,7 @@ void Span::finishSpan() {
 
 // Inject the span context into the trace context
 void Span::injectContext(Tracing::TraceContext& trace_context,
-                         const Tracing::UpstreamContext& upstream) {
+                         const Tracing::UpstreamContext& /*upstream*/) {
 
   std::string trace_id_hex = span_context_.traceId();
   std::string parent_id_hex = span_context_.parentId();
@@ -283,12 +283,12 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
 // Set the sampled flag for the span
 void Span::setSampled(bool sampled) { sampled_ = sampled; }
 
-std::string Span::getBaggage(absl::string_view key) {
+std::string Span::getBaggage(absl::string_view /*key*/) {
   // not implemented
   return EMPTY_STRING;
 }
 
-void Span::setBaggage(absl::string_view key, absl::string_view value) {
+void Span::setBaggage(absl::string_view /*key*/, absl::string_view /*value*/) {
   // not implemented
 }
 
