@@ -690,7 +690,7 @@ void ListenerImpl::buildListenSocketOptions(
       addListenSocketOptions(listen_socket_options_list_[i],
                              Network::SocketOptionFactory::buildReusePortOptions());
     }
-    if (!config.socket_options().empty()) {
+    if (!address_opts_list[i].get().empty()) {
       addListenSocketOptions(
           listen_socket_options_list_[i],
           Network::SocketOptionFactory::buildLiteralOptions(address_opts_list[i]));

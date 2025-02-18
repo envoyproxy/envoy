@@ -84,7 +84,7 @@ config_env() {
     fi
 
     # Install QEMU emulators
-    docker run --rm --privileged tonistiigi/binfmt --install all
+    docker run --rm --privileged tonistiigi/binfmt:qemu-v7.0.0 --install all
 
     # Remove older build instance
     docker buildx rm multi-builder 2> /dev/null || :

@@ -34,7 +34,14 @@ std::vector<std::string> directoryListing() {
 
 class SigV4ASignerCorpusTest : public ::testing::TestWithParam<std::string> {
 public:
-  SigV4ASignerCorpusTest() = default;
+  SigV4ASignerCorpusTest() {
+    chain_ = std::make_shared<CredentialsProviderChain>();
+    credentials_provider_ = std::make_shared<NiceMock<MockCredentialsProvider>>();
+    chain_->add(credentials_provider_);
+    signer_ = std::make_shared<SigV4ASignerImpl>(
+        "service", "region", chain_, context_,
+        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+  };
 
   void addMethod(const std::string& method) { message_.headers().setMethod(method); }
 
@@ -178,7 +185,6 @@ public:
     EC_KEY_free(ec_key);
   }
 
-  NiceMock<MockCredentialsProvider>* credentials_provider_;
   Http::RequestMessageImpl message_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Json::ObjectSharedPtr json_context_;
@@ -190,6 +196,9 @@ public:
   Event::SimulatedTimeSystem time_system_;
   absl::Time past_time_;
   std::string content_hash_ = "";
+  std::shared_ptr<SigV4ASignerImpl> signer_;
+  std::shared_ptr<NiceMock<MockCredentialsProvider>> credentials_provider_;
+  CredentialsProviderChainSharedPtr chain_;
 };
 
 class SigV4ASignerImplFriend {
@@ -275,11 +284,9 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusHeaderSigning) {
   setDate();
   addBodySigningIfRequired();
 
-  auto* credentials_provider_ = new NiceMock<MockCredentialsProvider>();
-
-  SigV4ASignerImpl headersigner_(
-      service_, region_, CredentialsProviderSharedPtr{credentials_provider_}, context_,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false, expiration_);
+  SigV4ASignerImpl headersigner_(service_, region_, chain_, context_,
+                                 Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, false,
+                                 expiration_);
 
   auto signer_friend = SigV4ASignerImplFriend(&headersigner_);
 
@@ -337,11 +344,10 @@ TEST_P(SigV4ASignerCorpusTest, SigV4ASignerCorpusQueryStringSigning) {
   addBodySigningIfRequired();
 
   const auto calculated_canonical_headers = Utility::canonicalizeHeaders(message_.headers(), {});
-  auto* credentials_provider_ = new NiceMock<MockCredentialsProvider>();
 
-  SigV4ASignerImpl querysigner_(
-      service_, region_, CredentialsProviderSharedPtr{credentials_provider_}, context_,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, expiration_);
+  SigV4ASignerImpl querysigner_(service_, region_, chain_, context_,
+                                Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
+                                expiration_);
 
   auto signer_friend = SigV4ASignerImplFriend(&querysigner_);
 

@@ -31,6 +31,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, admin()).WillByDefault(Return(OptRef<Server::Admin>{admin_}));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+  ON_CALL(*this, xdsManager()).WillByDefault(ReturnRef(xds_manager_));
   ON_CALL(*this, httpServerPropertiesCacheManager())
       .WillByDefault(ReturnRef(http_server_properties_cache_manager_));
   ON_CALL(*this, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));

@@ -90,5 +90,3 @@ The following statistics are output under the ``aws.metadata_credentials_provide
   <provider_cluster>.credential_refreshes_failed, Counter, Total credential refreshes failed by this cluster. For example', this would be incremented if a WebIdentity token was expired
   <provider_cluster>.credential_refreshes_succeeded, Counter, Total successful credential refreshes for this cluster. Successful refresh would indicate credentials are available for signing
   <provider_cluster>.metadata_refresh_state, Gauge, 0 means the cluster is in initial refresh state', ie no successful credential refreshes have been performed. In 0 state the cluster will attempt credential refresh up to a maximum of once every 30 seconds. 1 means the cluster is in normal credential expiration based refresh state
-  <provider_cluster>.clusters_removed_by_cds, Counter, Number of metadata clusters removed during CDS refresh
-  <provider_cluster>.clusters_readded_after_cds, Counter, Number of metadata clusters replaced when CDS deletion occurs

@@ -7,12 +7,18 @@
 namespace Envoy {
 namespace Config {
 
+absl::Status XdsManagerImpl::initialize(Upstream::ClusterManager* cm) {
+  ASSERT(cm != nullptr);
+  cm_ = cm;
+  return absl::OkStatus();
+}
+
 absl::Status
 XdsManagerImpl::setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   RETURN_IF_NOT_OK(validateAdsConfig(config_source));
 
-  return cm_.replaceAdsMux(config_source);
+  return cm_->replaceAdsMux(config_source);
 }
 
 absl::Status

@@ -91,7 +91,7 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
     if (!local_address) {
       auto address_or_error = io_handle->localAddress();
       RETURN_IF_NOT_OK_REF(address_or_error.status());
-      local_address = *address_or_error;
+      local_address = std::move(address_or_error.value());
     }
 
     // The accept() call that filled in remote_addr doesn't fill in more than the sa_family field
@@ -106,12 +106,12 @@ absl::Status TcpListenerImpl::onSocketEvent(short flags) {
     if (remote_addr.ss_family == AF_UNIX) {
       auto address_or_error = io_handle->peerAddress();
       RETURN_IF_NOT_OK_REF(address_or_error.status());
-      remote_address = *address_or_error;
+      remote_address = std::move(address_or_error.value());
     } else {
       auto address_or_error = Address::addressFromSockAddr(
           remote_addr, remote_addr_len, local_address->ip()->version() == Address::IpVersion::v6);
       RETURN_IF_NOT_OK_REF(address_or_error.status());
-      remote_address = *address_or_error;
+      remote_address = std::move(address_or_error.value());
     }
 
     cb_.onAccept(std::make_unique<AcceptedSocketImpl>(std::move(io_handle), local_address,
