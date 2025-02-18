@@ -83,10 +83,11 @@ protected:
     // Here we tell the DnsClusterImpl it's going to behave like a logic DNS cluster:
     dns_cluster.set_all_addresses_in_single_endpoint(true);
     status_or_cluster =
-    //    LogicalDnsCluster::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
-    // Now comes the big change. We can use the feature flag to run tests for both
-    // "to be deprecated" and new implementation.
-          DnsClusterImpl::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
+        //    LogicalDnsCluster::create(cluster_config, dns_cluster, factory_context,
+        //    dns_resolver_);
+        // Now comes the big change. We can use the feature flag to run tests for both
+        // "to be deprecated" and new implementation.
+        DnsClusterImpl::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
     THROW_IF_NOT_OK_REF(status_or_cluster.status());
     cluster_ = std::move(*status_or_cluster);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
@@ -219,7 +220,7 @@ protected:
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    // Now that we're moving towards a single implementation of DNS clusters, 
+    // Now that we're moving towards a single implementation of DNS clusters,
     // this would be expected for logical DNS, as we're reusing the flows
     // from strict DNS.
     EXPECT_CALL(membership_updated_, ready());

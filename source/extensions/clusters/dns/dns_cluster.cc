@@ -11,8 +11,6 @@
 #include "source/common/common/dns_utils.h"
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
-#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -23,12 +21,13 @@ DnsClusterFactory::createClusterWithConfig(
     const envoy::extensions::clusters::dns::v3::DnsCluster& proto_config,
     Upstream::ClusterFactoryContext& context) {
 
-  absl::StatusOr<Network::DnsResolverSharedPtr> dns_resolver_or_error = selectDnsResolver(cluster, context);
+  absl::StatusOr<Network::DnsResolverSharedPtr> dns_resolver_or_error =
+      selectDnsResolver(cluster, context);
   RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
   absl::StatusOr<std::unique_ptr<ClusterImplBase>> cluster_or_error;
-  cluster_or_error = DnsClusterImpl::create(cluster, proto_config, context,
-                                                  std::move(*dns_resolver_or_error));
+  cluster_or_error =
+      DnsClusterImpl::create(cluster, proto_config, context, std::move(*dns_resolver_or_error));
 
   RETURN_IF_NOT_OK(cluster_or_error.status());
   return std::make_pair(std::shared_ptr<ClusterImplBase>(std::move(*cluster_or_error)), nullptr);
@@ -40,22 +39,21 @@ DnsClusterFactory::createClusterWithConfig(
 
 absl::StatusOr<std::unique_ptr<DnsClusterImpl>>
 DnsClusterImpl::create(const envoy::config::cluster::v3::Cluster& cluster,
-                             const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
-                             ClusterFactoryContext& context,
-                             Network::DnsResolverSharedPtr dns_resolver) {
+                       const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
+                       ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<DnsClusterImpl>(new DnsClusterImpl(
-      cluster, dns_cluster, context, std::move(dns_resolver), creation_status));
+  auto ret = std::unique_ptr<DnsClusterImpl>(
+      new DnsClusterImpl(cluster, dns_cluster, context, std::move(dns_resolver), creation_status));
 
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
-DnsClusterImpl::DnsClusterImpl(
-    const envoy::config::cluster::v3::Cluster& cluster,
-    const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
-    ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
-    absl::Status& creation_status)
+DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                               const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
+                               ClusterFactoryContext& context,
+                               Network::DnsResolverSharedPtr dns_resolver,
+                               absl::Status& creation_status)
     : BaseDynamicClusterImpl(cluster, context, creation_status),
       load_assignment_(cluster.load_assignment()),
       local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
@@ -72,7 +70,8 @@ DnsClusterImpl::DnsClusterImpl(
 
   // If it's not using typed config, we fallback to the legacy config.
   if (!cluster.has_cluster_type()) {
-    all_addresses_in_single_endpoint_ = cluster.type() == envoy::config::cluster::v3::Cluster::LOGICAL_DNS;
+    all_addresses_in_single_endpoint_ =
+        cluster.type() == envoy::config::cluster::v3::Cluster::LOGICAL_DNS;
   }
 
   std::list<ResolveTargetPtr> resolve_targets;
@@ -111,9 +110,8 @@ void DnsClusterImpl::startPreInit() {
   }
 }
 
-void DnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
-                                          const HostVector& hosts_removed,
-                                          uint32_t current_priority) {
+void DnsClusterImpl::updateAllHosts(const HostVector& hosts_added, const HostVector& hosts_removed,
+                                    uint32_t current_priority) {
   PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
   // At this point we know that we are different so make a new host list and notify.
   //
@@ -170,7 +168,8 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
 
         if (status == Network::DnsResolver::ResolutionStatus::Completed &&
             (!parent_.all_addresses_in_single_endpoint_ || /* strict DNS accepts empty responses */
-             (parent_.all_addresses_in_single_endpoint_ && !response.empty()))) /* logical DNS doesn't */ { 
+             (parent_.all_addresses_in_single_endpoint_ &&
+              !response.empty()))) /* logical DNS doesn't */ {
           parent_.info_->configUpdateStats().update_success_.inc();
 
           HostVector new_hosts;

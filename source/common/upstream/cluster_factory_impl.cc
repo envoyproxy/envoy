@@ -32,10 +32,10 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
     cluster_config_type_name =
         TypeUtil::typeUrlToDescriptorFullName(cluster.cluster_type().typed_config().type_url());
     // This should be behind a runtime flag.
-    if (cluster_config_type_name == "envoy.cluster.strict_dns" || 
+    if (cluster_config_type_name == "envoy.cluster.strict_dns" ||
         cluster_config_type_name == "envoy.cluster.logical_dns") {
       cluster_config_type_name = "envoy.cluster.dns";
-    } 
+    }
     factory = Registry::FactoryRegistry<ClusterFactory>::getFactoryByType(cluster_config_type_name);
     if (factory == nullptr) {
       return absl::InvalidArgumentError(

@@ -42,9 +42,9 @@ public:
 
 protected:
   DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                       const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
-                       ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
-                       absl::Status& creation_status);
+                 const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
+                 ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
+                 absl::Status& creation_status);
 
 private:
   struct ResolveTarget {
@@ -97,7 +97,6 @@ private:
   bool weighted_priority_health_;
   bool all_addresses_in_single_endpoint_;
 };
-
 
 DECLARE_FACTORY(DnsClusterFactory);
 
