@@ -51,7 +51,7 @@ ip_tags:
       return;
     }
     EXPECT_TRUE(config_or.ok());
-    config_ = config_or.value();
+    config_ = std::move(config_or.value());
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
