@@ -46,6 +46,12 @@ fn test_header_callbacks_filter_on_request_headers() {
     .once();
 
   envoy_filter
+    .expect_remove_request_header()
+    .withf(|name| name == "to-be-deleted")
+    .return_const(true)
+    .once();
+
+  envoy_filter
     .expect_get_request_header_value()
     .withf(|name| name == "new")
     .returning(|_| Some(EnvoyBuffer::new("value")))
@@ -69,7 +75,7 @@ fn test_header_callbacks_filter_on_request_headers() {
 }
 
 #[test]
-fn test_header_callbacks_on_request_headers_local_resp() {
+fn test_send_response_filter() {
   let mut f = SendResponseFilter {};
   let mut envoy_filter = MockEnvoyHttpFilter::default();
 
