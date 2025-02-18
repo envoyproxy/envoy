@@ -30,16 +30,6 @@ getUpstreamRemoteAddress(const StreamInfo::StreamInfo& stream_info) {
     return nullptr;
   }
 
-  // TODO(wbpcode): remove this after the flag is removed.
-  const bool use_upstream_remote_address = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.upstream_remote_address_use_connection");
-  if (!use_upstream_remote_address) {
-    if (auto host = opt_ref->upstreamHost(); host != nullptr) {
-      return host->address();
-    }
-    return nullptr;
-  }
-
   if (auto addr = opt_ref->upstreamRemoteAddress(); addr != nullptr) {
     return addr;
   }

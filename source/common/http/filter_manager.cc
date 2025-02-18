@@ -347,8 +347,12 @@ bool ActiveStreamDecoderFilter::canContinue() {
 
 bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
-  // continue if a local reply has been sent.
-  return !parent_.state_.encoder_filter_chain_complete_;
+  // continue if a local reply has been sent or ActiveStreamDecoderFilter::recreateStream() is
+  // called, etc.
+  return !parent_.state_.encoder_filter_chain_complete_ &&
+         (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.filter_chain_aborted_can_not_continue") ||
+          !parent_.stopEncoderFilterChain());
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {

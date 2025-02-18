@@ -489,7 +489,18 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Stat
     default_value_.set_numerator(100);
     default_value_.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   }
-  trace_sampled_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, trace_sampled, true);
+  // If trace sampling is not explicitly configured in shadow_policy, we pass null optional to
+  // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
+  // disabled.
+  if (config.has_trace_sampled()) {
+    trace_sampled_ = config.trace_sampled().value();
+  } else {
+    // If the shadow policy does not specify trace_sampled, we will inherit the parent's sampling
+    // decision.
+    const bool user_parent_sampling_decision = Runtime::runtimeFeatureEnabled(
+        "envoy.reloadable_features.shadow_policy_inherit_trace_sampling");
+    trace_sampled_ = user_parent_sampling_decision ? absl::nullopt : absl::make_optional(true);
+  }
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
@@ -1660,7 +1671,10 @@ PrefixRouteEntryImpl::PrefixRouteEntryImpl(
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().prefix(), !case_sensitive(),
-                                                        factory_context)) {}
+                                                        factory_context)) {
+  // The createPrefix function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
+}
 
 void PrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                              bool insert_envoy_original_path) const {
@@ -1689,7 +1703,10 @@ PathRouteEntryImpl::PathRouteEntryImpl(const CommonVirtualHostSharedPtr& vhost,
                                        absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createExact(route.match().path(), !case_sensitive(),
-                                                       factory_context)) {}
+                                                       factory_context)) {
+  // The createExact function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
+}
 
 void PathRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                            bool insert_envoy_original_path) const {
@@ -1721,6 +1738,8 @@ RegexRouteEntryImpl::RegexRouteEntryImpl(
           Matchers::PathMatcher::createSafeRegex(route.match().safe_regex(), factory_context)) {
   ASSERT(route.match().path_specifier_case() ==
          envoy::config::route::v3::RouteMatch::PathSpecifierCase::kSafeRegex);
+  // The createSafeRegex function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
 }
 
 void RegexRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1784,7 +1803,10 @@ PathSeparatedPrefixRouteEntryImpl::PathSeparatedPrefixRouteEntryImpl(
     ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
     : RouteEntryImplBase(vhost, route, factory_context, validator, creation_status),
       path_matcher_(Matchers::PathMatcher::createPrefix(route.match().path_separated_prefix(),
-                                                        !case_sensitive(), factory_context)) {}
+                                                        !case_sensitive(), factory_context)) {
+  // The createPrefix function never returns nullptr.
+  ASSERT(path_matcher_ != nullptr);
+}
 
 void PathSeparatedPrefixRouteEntryImpl::rewritePathHeader(Http::RequestHeaderMap& headers,
                                                           bool insert_envoy_original_path) const {

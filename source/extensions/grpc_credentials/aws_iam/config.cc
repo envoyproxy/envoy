@@ -68,8 +68,8 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         // factory context.
 
         auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
-            context.api(), absl::nullopt /*Empty factory context*/, context.singletonManager(),
-            region, Common::Aws::Utility::fetchMetadataWithCurl);
+            context.api(), absl::nullopt /*Empty factory context*/, region,
+            Common::Aws::Utility::fetchMetadataWithCurl);
         auto signer = std::make_unique<Common::Aws::SigV4SignerImpl>(
             config.service_name(), region, credentials_provider, context,
             // TODO: extend API to allow specifying header exclusion. ref:

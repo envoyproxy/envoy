@@ -453,6 +453,7 @@ use_original_src_ip: true
                                                                     ENVOY_SOCKET_IPV6_TRANSPARENT};
   inline static const std::string upstream_ip_address_ = "20.0.0.1:443";
   inline static const std::string peer_ip_address_ = "10.0.0.1:1000";
+  NiceMock<Upstream::MockHostDescription> upstream_host_;
 };
 
 class UdpProxyFilterIpv6Test : public UdpProxyFilterTest {
@@ -801,7 +802,7 @@ matcher:
 
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{nullptr})));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(1, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                    .cluster_.info_->traffic_stats_->upstream_cx_none_healthy_.value());
@@ -1095,7 +1096,7 @@ matcher:
   auto new_host = createHost(new_host_address);
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(new_host));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{new_host})));
   expectSessionCreate(new_host_address);
   test_sessions_[1].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -1193,7 +1194,7 @@ use_per_packet_load_balancing: true
   auto new_host = createHost(new_host_address);
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(new_host));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{new_host})));
   expectSessionCreate(new_host_address);
   test_sessions_[1].expectWriteToUpstream("hello2", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
@@ -1230,7 +1231,7 @@ use_per_packet_load_balancing: true
 
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{nullptr})));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
   EXPECT_EQ(0, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
@@ -1264,7 +1265,7 @@ use_per_packet_load_balancing: true
 
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{nullptr})));
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
@@ -1338,7 +1339,7 @@ use_per_packet_load_balancing: true
   auto new_host = createHost(new_host_address);
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Return(new_host));
+      .WillOnce(Return(ByMove(Upstream::HostSelectionResponse{new_host})));
   expectSessionCreate(new_host_address);
   test_sessions_[1].expectWriteToUpstream("hello2", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
@@ -1878,7 +1879,6 @@ tunneling_config:
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.downstream_connection_info_provider_->setConnectionID(0);
-  Upstream::HostDescriptionConstSharedPtr upstream_host;
   Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
 
   auto session = filter_->createTunnelingSession();
@@ -1899,7 +1899,7 @@ tunneling_config:
   }));
 
   session->onNewSession();
-  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host,
+  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host_,
                          address_provider, nullptr);
 }
 
@@ -1928,7 +1928,6 @@ tunneling_config:
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.downstream_connection_info_provider_->setConnectionID(0);
-  Upstream::HostDescriptionConstSharedPtr upstream_host;
   Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
 
   auto session = filter_->createTunnelingSession();
@@ -1963,8 +1962,151 @@ tunneling_config:
       }));
 
   session->onNewSession();
-  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host,
+  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host_,
                          address_provider, nullptr);
+}
+
+TEST_F(UdpProxyFilterTest, TunnelingSessionOutlierDetectionConnectSuccessFinal) {
+  Event::MockTimer* idle_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  )EOF"),
+        true);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_connection_info_provider_->setConnectionID(0);
+  auto* upstream = new NiceMock<SessionFilters::MockHttpUpstream>();
+  Network::ConnectionInfoSetterImpl address_provider(nullptr, nullptr);
+
+  auto session = filter_->createTunnelingSession();
+  session->onNewSession();
+
+  EXPECT_CALL(upstream_host_.outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal, _));
+  session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host_,
+                         address_provider, nullptr);
+}
+
+TEST_F(UdpProxyFilterTest, TunnelingSessionOutlierDetectionConnectFailed) {
+  Event::MockTimer* idle_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  )EOF"),
+        true);
+
+  auto session = filter_->createTunnelingSession();
+  session->onNewSession();
+
+  EXPECT_CALL(upstream_host_.outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
+  session->onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "",
+                           upstream_host_);
+}
+
+TEST_F(UdpProxyFilterTest, TunnelingSessionOutlierDetectionTimeout) {
+  Event::MockTimer* idle_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  )EOF"),
+        true);
+
+  auto session = filter_->createTunnelingSession();
+  session->onNewSession();
+
+  EXPECT_CALL(upstream_host_.outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  session->onStreamFailure(ConnectionPool::PoolFailureReason::Timeout, "", upstream_host_);
+}
+
+TEST_F(UdpProxyFilterTest, TunnelingSessionFailedWithRetry) {
+  Event::MockTimer* idle_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _)).Times(0);
+
+  setup(readConfig(R"EOF(
+stat_prefix: foo
+matcher:
+  on_no_match:
+    action:
+      name: route
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+        cluster: fake_cluster
+tunneling_config:
+  proxy_host: host.com
+  target_host: host.com
+  default_target_port: 30
+  retry_options:
+    max_connect_attempts: 2
+  )EOF"),
+        true);
+
+  // Allow for two connect attempts.
+  factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_
+      ->resetResourceManager(2, 0, 0, 0, 0);
+  auto session = filter_->createTunnelingSession();
+
+  EXPECT_CALL(
+      factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
+      newStream(_, _, _))
+      .Times(2)
+      .WillRepeatedly(Return(nullptr));
+
+  session->onNewSession();
+
+  // First failure will enable the retry timer.
+  Event::MockTimer* retry_timer = new Event::MockTimer(&callbacks_.udp_listener_.dispatcher_);
+  EXPECT_CALL(*retry_timer, enableTimer(_, _));
+  session->onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "",
+                           upstream_host_);
+
+  // Second failure will remove the session directly and will not enable the retry timer.
+  retry_timer->invokeCallback();
+  EXPECT_CALL(*retry_timer, disableTimer());
+  session->onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "",
+                           upstream_host_);
+
+  EXPECT_EQ(1U, factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                    .cluster_.info_->stats_store_.counter("upstream_cx_connect_attempts_exceeded")
+                    .value());
 }
 
 using MockUdpTunnelingConfig = SessionFilters::MockUdpTunnelingConfig;
@@ -2367,14 +2509,19 @@ TEST_F(TunnelingConnectionPoolImplTest, PoolReady) {
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamFailure) {
   setup();
   createNewStream();
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+
   EXPECT_CALL(stream_callbacks_,
               onStreamFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "", _));
   pool_->onStreamFailure();
+  pool_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
 }
 
 TEST_F(TunnelingConnectionPoolImplTest, OnStreamSuccess) {
   setup();
   createNewStream();
+  pool_->onPoolReady(request_encoder_, upstream_host_, stream_info_, absl::nullopt);
+
   EXPECT_CALL(stream_callbacks_, onStreamReady(_, _, _, _, _));
   pool_->onStreamSuccess(request_encoder_);
 }

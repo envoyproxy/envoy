@@ -1,4 +1,5 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_mobile_package")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_import")
 load("//bazel:android_debug_info.bzl", "android_debug_info")
 
 licenses(["notice"])  # Apache 2

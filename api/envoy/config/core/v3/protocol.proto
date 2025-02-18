@@ -449,7 +449,7 @@ message KeepaliveSettings {
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
 
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message Http2ProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
@@ -633,6 +633,9 @@ message Http2ProtocolOptions {
   // If unset, HTTP/2 codec is selected based on envoy.reloadable_features.http2_use_oghttp2.
   google.protobuf.BoolValue use_oghttp2_codec = 16
       [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Configure the maximum amount of metadata than can be handled per stream. Defaults to 1 MB.
+  google.protobuf.UInt64Value max_metadata_size = 17;
 }
 
 // [#not-implemented-hide:]

@@ -16,6 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: HTTP filter for dynamic modules]
+// [#extension: envoy.filters.http.dynamic_modules]
 
 // Configuration of the HTTP filter for dynamic modules. This filter allows loading shared object files
 // that can be loaded via dlopen by the HTTP filter.

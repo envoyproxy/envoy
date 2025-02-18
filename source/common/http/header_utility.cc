@@ -131,14 +131,6 @@ bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
 
 bool HeaderUtility::headerNameIsValid(absl::string_view header_key) {
   if (!header_key.empty() && header_key[0] == ':') {
-#ifdef ENVOY_NGHTTP2
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.sanitize_http2_headers_without_nghttp2")) {
-      // For HTTP/2 pseudo header, use the HTTP/2 semantics for checking validity
-      return nghttp2_check_header_name(reinterpret_cast<const uint8_t*>(header_key.data()),
-                                       header_key.size()) != 0;
-    }
-#endif
     header_key.remove_prefix(1);
     if (header_key.empty()) {
       return false;

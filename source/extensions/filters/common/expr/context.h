@@ -83,6 +83,7 @@ constexpr absl::string_view Destination = "destination";
 // Upstream properties
 constexpr absl::string_view Upstream = "upstream";
 constexpr absl::string_view UpstreamLocalAddress = "local_address";
+constexpr absl::string_view UpstreamLocality = "locality";
 constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_reason";
 constexpr absl::string_view UpstreamRequestAttemptCount = "request_attempt_count";
 constexpr absl::string_view UpstreamConnectionPoolReadyDuration = "cx_pool_ready_duration";
@@ -177,16 +178,9 @@ public:
       return {};
     }
     auto str = std::string(key.StringOrDie().value());
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consistent_header_validation")) {
-      if (!Http::HeaderUtility::headerNameIsValid(str)) {
-        // Reject key if it is an invalid header string
-        return {};
-      }
-    } else {
-      if (!::Envoy::Http::validHeaderString(str)) {
-        // Reject key if it is an invalid header string
-        return {};
-      }
+    if (!Http::HeaderUtility::headerNameIsValid(str)) {
+      // Reject key if it is an invalid header string
+      return {};
     }
     return convertHeaderEntry(arena_, ::Envoy::Http::HeaderUtility::getAllOfHeaderAsString(
                                           *value_, ::Envoy::Http::LowerCaseString(str)));

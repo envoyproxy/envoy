@@ -52,9 +52,10 @@ ValidationInstance::ValidationInstance(
     Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
     Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
     const ProcessContextOptRef& process_context)
-    : options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields(),
-                                             !options.ignoreUnknownDynamicFields()),
+    : options_(options),
+      validation_context_(options_.allowUnknownStaticFields(),
+                          !options.rejectUnknownDynamicFields(),
+                          !options.ignoreUnknownDynamicFields(), options.skipDeprecatedLogs()),
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
                                    random_generator_, bootstrap_, process_context)),
@@ -144,6 +145,8 @@ void ValidationInstance::initialize(const Options& options,
           serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
           thread_local_);
 
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(validation_context_);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       server_contexts_, stats(), threadLocal(), http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
@@ -151,7 +154,6 @@ void ValidationInstance::initialize(const Options& options,
   THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
   THROW_IF_NOT_OK(runtime().initialize(clusterManager()));
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });
-  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(clusterManager(), validation_context_);
 }
 
 void ValidationInstance::shutdown() {

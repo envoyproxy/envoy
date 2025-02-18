@@ -58,7 +58,7 @@ public:
     Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
     for (auto& assignment : expected_assignments) {
       TestLoadBalancerContext context(assignment.first, read_command, read_policy);
-      auto host = lb->chooseHost(&context);
+      auto host = lb->chooseHost(&context).host;
       EXPECT_FALSE(host == nullptr);
       EXPECT_EQ(hosts[assignment.second]->address()->asString(), host->address()->asString());
     }
@@ -102,7 +102,7 @@ public:
 // Works correctly without any hosts.
 TEST_F(RedisClusterLoadBalancerTest, NoHost) {
   init();
-  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr).host);
 };
 
 // Works correctly with empty context
@@ -124,7 +124,7 @@ TEST_F(RedisClusterLoadBalancerTest, NoHash) {
   init();
   factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
   TestLoadBalancerContext context(absl::nullopt);
-  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(&context));
+  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(&context).host);
 };
 
 TEST_F(RedisClusterLoadBalancerTest, Basic) {
@@ -185,7 +185,7 @@ TEST_F(RedisClusterLoadBalancerTest, Shard) {
   Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   for (uint16_t i = 0; i < 5; i++) {
     RedisSpecifyShardContextImpl context(i, get_request);
-    auto host = lb->chooseHost(&context);
+    auto host = lb->chooseHost(&context).host;
     if (i < 3) {
       EXPECT_FALSE(host == nullptr);
       EXPECT_EQ(hosts[i]->address()->asString(), host->address()->asString());
@@ -359,7 +359,7 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesNoReplica) {
   Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   TestLoadBalancerContext context(1100, true,
                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
-  auto host = lb->chooseHost(&context);
+  auto host = lb->chooseHost(&context).host;
   EXPECT_TRUE(host == nullptr);
 }
 

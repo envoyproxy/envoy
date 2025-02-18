@@ -205,18 +205,15 @@ class AuthenticatedMatcher : public Matcher {
 public:
   AuthenticatedMatcher(const envoy::config::rbac::v3::Principal::Authenticated& auth,
                        Server::Configuration::CommonFactoryContext& context)
-      : matcher_(auth.has_principal_name()
-                     ? absl::make_optional<
-                           Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-                           auth.principal_name(), context)
-                     : absl::nullopt) {}
+      : matcher_(auth.has_principal_name() ? absl::make_optional<Matchers::StringMatcherImpl>(
+                                                 auth.principal_name(), context)
+                                           : absl::nullopt) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  const absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
-      matcher_;
+  const absl::optional<Matchers::StringMatcherImpl> matcher_;
 };
 
 /**
@@ -263,28 +260,24 @@ private:
 class FilterStateMatcher : public Matcher {
 public:
   FilterStateMatcher(const envoy::type::matcher::v3::FilterStateMatcher& matcher,
-                     Server::Configuration::CommonFactoryContext& context)
-      : matcher_(matcher, context) {}
+                     Server::Configuration::CommonFactoryContext& context);
 
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                const StreamInfo::StreamInfo& info) const override;
 
 private:
-  const Envoy::Matchers::FilterStateMatcher matcher_;
+  const Envoy::Matchers::FilterStateMatcherPtr matcher_;
 };
 
 /**
  * Perform a match against the request server from the client's connection
  * request. This is typically TLS SNI.
  */
-class RequestedServerNameMatcher
-    : public Matcher,
-      Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> {
+class RequestedServerNameMatcher : public Matcher, Envoy::Matchers::StringMatcherImpl {
 public:
   RequestedServerNameMatcher(const envoy::type::matcher::v3::StringMatcher& requested_server_name,
                              Server::Configuration::CommonFactoryContext& context)
-      : Envoy::Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>(
-            requested_server_name, context) {}
+      : Envoy::Matchers::StringMatcherImpl(requested_server_name, context) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;

@@ -146,7 +146,7 @@ void Filter::onDestroy() {
   // initRequest haven't be called yet, which mean haven't called into Go.
   if (req_->configId == 0) {
     // should release the req object, since stream reset may happen before calling into Go side,
-    // which means no GC finializer will be invoked to release this C++ object.
+    // which means no GC finalizer will be invoked to release this C++ object.
     delete req_;
     return;
   }
@@ -643,7 +643,7 @@ CAPIStatus Filter::copyHeaders(ProcessorState& state, GoString* go_strs, char* g
   return CAPIStatus::CAPIOK;
 }
 
-// It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
+// It won't take affect immediately while it's invoked from a Go thread, instead, it will post a
 // callback to run in the envoy worker thread.
 CAPIStatus Filter::setHeader(ProcessorState& state, absl::string_view key, absl::string_view value,
                              headerAction act) {
@@ -677,7 +677,7 @@ CAPIStatus Filter::setHeader(ProcessorState& state, absl::string_view key, absl:
       RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
     }
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
     auto value_str = std::string(value);
 
@@ -708,7 +708,7 @@ CAPIStatus Filter::setHeader(ProcessorState& state, absl::string_view key, absl:
   return CAPIStatus::CAPIOK;
 }
 
-// It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
+// It won't take affect immediately while it's invoked from a Go thread, instead, it will post a
 // callback to run in the envoy worker thread.
 CAPIStatus Filter::removeHeader(ProcessorState& state, absl::string_view key) {
   Thread::LockGuard lock(mutex_);
@@ -729,7 +729,7 @@ CAPIStatus Filter::removeHeader(ProcessorState& state, absl::string_view key) {
     // it's safe to write header in the safe thread.
     headers->remove(Http::LowerCaseString(key));
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
 
     auto weak_ptr = weak_from_this();
@@ -867,7 +867,7 @@ CAPIStatus Filter::setTrailer(ProcessorState& state, absl::string_view key, absl
       RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
     }
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
     auto value_str = std::string(value);
 
@@ -915,7 +915,7 @@ CAPIStatus Filter::removeTrailer(ProcessorState& state, absl::string_view key) {
   if (state.isThreadSafe()) {
     trailers->remove(Http::LowerCaseString(key));
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
 
     auto weak_ptr = weak_from_this();

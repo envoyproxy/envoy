@@ -34,7 +34,7 @@ public:
     initial_metadata_entry.set_key("downstream-local-address");
     initial_metadata_entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
 
-    grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
+    grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
     cm_.initializeThreadLocalClusters({"test_cluster"});
     ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
   }
@@ -90,7 +90,7 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
   config.mutable_envoy_grpc()->set_authority("demo.com");
 
-  grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSystem());
+  grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;

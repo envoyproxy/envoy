@@ -8,33 +8,36 @@
 namespace Envoy {
 namespace Upstream {
 
-CdsApiPtr CdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_config,
-                             const xds::core::v3::ResourceLocator* cds_resources_locator,
-                             ClusterManager& cm, Stats::Scope& scope,
-                             ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return CdsApiPtr{
-      new CdsApiImpl(cds_config, cds_resources_locator, cm, scope, validation_visitor)};
+absl::StatusOr<CdsApiPtr>
+CdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_config,
+                   const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
+                   Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = CdsApiPtr{new CdsApiImpl(cds_config, cds_resources_locator, cm, scope,
+                                      validation_visitor, creation_status)};
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
                        const xds::core::v3::ResourceLocator* cds_resources_locator,
                        ClusterManager& cm, Stats::Scope& scope,
-                       ProtobufMessage::ValidationVisitor& validation_visitor)
+                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                       absl::Status& creation_status)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
                                                                            "name"),
       helper_(cm, "cds"), cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   const auto resource_name = getResourceName();
+  absl::StatusOr<Config::SubscriptionPtr> subscription_or_error;
   if (cds_resources_locator == nullptr) {
-    subscription_ = THROW_OR_RETURN_VALUE(cm_.subscriptionFactory().subscriptionFromConfigSource(
-                                              cds_config, Grpc::Common::typeUrl(resource_name),
-                                              *scope_, *this, resource_decoder_, {}),
-                                          Config::SubscriptionPtr);
+    subscription_or_error = cm_.subscriptionFactory().subscriptionFromConfigSource(
+        cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
   } else {
-    subscription_ = THROW_OR_RETURN_VALUE(
-        cm.subscriptionFactory().collectionSubscriptionFromUrl(
-            *cds_resources_locator, cds_config, resource_name, *scope_, *this, resource_decoder_),
-        Config::SubscriptionPtr);
+    subscription_or_error = cm.subscriptionFactory().collectionSubscriptionFromUrl(
+        *cds_resources_locator, cds_config, resource_name, *scope_, *this, resource_decoder_);
   }
+  SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
+  subscription_ = std::move(*subscription_or_error);
 }
 
 absl::Status CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

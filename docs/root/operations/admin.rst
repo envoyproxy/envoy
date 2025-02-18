@@ -326,10 +326,10 @@ modify different aspects of the server:
 
   .. code-block:: text
 
-    source/server/admin/admin_filter.cc: 0
-    source/common/event/dispatcher_impl.cc: 0
-    source/common/network/tcp_listener_impl.cc: 0
-    source/common/network/udp_listener_impl.cc: 0
+    source/server/admin/admin_filter.cc: trace
+    source/common/event/dispatcher_impl.cc: trace
+    source/common/network/tcp_listener_impl.cc: trace
+    source/common/network/udp_listener_impl.cc: trace
 
   - ``/logging?paths=source/common/event/dispatcher_impl.cc:debug`` will make the level of ``source/common/event/dispatcher_impl.cc`` be debug.
   - ``/logging?admin_filter=info`` will make the level of ``source/server/admin/admin_filter.cc`` be info, and other unmatched loggers will be the default trace.
