@@ -134,7 +134,11 @@ message RedisProxy {
     // If not set, there will be no rate limiting on the reconnection.
     ConnectionRateLimit connection_rate_limit = 10;
 
-
+    // Optional configure redis custom commands for the proxy, eg -> ["my_custom_cmd1", "my_custom_cmd2"]
+    //
+    // .. note::
+    //   The is to support redis's feature wherein new commands can be added using redis' modules api:
+    //   https://redis.io/docs/latest/develop/reference/modules/
     repeated string custom_commands = 11;
   }
 

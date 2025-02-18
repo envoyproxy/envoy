@@ -8,6 +8,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Common {
 namespace Redis {
+
+absl::flat_hash_set<std::string> SupportedCommands::simpleCmdHashSet;
+
 namespace Client {
 namespace {
 // null_pool_callbacks is used for requests that must be filtered and not redirected such as
@@ -59,8 +62,8 @@ ConfigImpl::ConfigImpl(
     connection_rate_limit_per_sec_ = 100;
   }
 
-  for (int i=0; i < config.custom_commands_size(); i++) {
-     Extensions::NetworkFilters::Common::Redis::SupportedCommands::addCustomCommand(config.custom_commands(i));
+  for (auto cmd : config.custom_commands()) {
+    Extensions::NetworkFilters::Common::Redis::SupportedCommands::addCustomCommand(cmd);
   }
 }
 
