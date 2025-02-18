@@ -12,7 +12,7 @@ colorama
 coloredlogs
 cryptography>=43.0.1
 dependatool>=0.2.2
-envoy.base.utils>=0.5.0
+envoy.base.utils>=0.5.10
 envoy.ci.report>=0.0.3
 envoy.code.check>=0.5.12
 envoy.dependency.check>=0.1.10
@@ -26,11 +26,11 @@ envoy.gpg.sign>=0.2.0
 flake8>=6
 frozendict>=2.3.7
 gitpython
-icalendar
+icalendar>=6.1.1
 jinja2
 kafka-python-ng
 multidict>=6.0.2
-orjson
+orjson>=3.10.15
 pep8-naming
 ply
 # Upgrading beyond 4.21.x doesnt currently work. 4.23+ might work when the following is resolved

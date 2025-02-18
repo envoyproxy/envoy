@@ -633,12 +633,11 @@ typed_config:
 )EOF";
   initializeFilter(filter_config);
   test_server_->waitForCounterEq(
-      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 0,
-      std::chrono::milliseconds(10));
-  // ensures that the token request is retried
-  test_server_->waitForCounterGe(
       "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 1,
-      std::chrono::milliseconds(2000));
+      std::chrono::milliseconds(1490));
+  test_server_->waitForCounterEq(
+      "http.config_test.credential_injector.oauth2.token_fetch_failed_on_cluster_not_found", 2,
+      std::chrono::milliseconds(1490));
 }
 
 TEST_P(CredentialInjectorIntegrationTest, RetryOnStreamReset) {

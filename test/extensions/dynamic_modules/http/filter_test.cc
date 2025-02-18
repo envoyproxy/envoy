@@ -82,7 +82,7 @@ TEST(DynamiModulesTest, HeaderCallbacks) {
   filter->setDecoderFilterCallbacks(callbacks);
 
   std::initializer_list<std::pair<std::string, std::string>> headers = {
-      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
+      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}, {"to-be-deleted", "value"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
   Http::TestRequestTrailerMapImpl request_trailers{headers};
   Http::TestResponseHeaderMapImpl response_headers{headers};
