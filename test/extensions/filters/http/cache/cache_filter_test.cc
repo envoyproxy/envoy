@@ -174,6 +174,21 @@ TEST_F(CacheFilterTest, NoClusterShouldLocalReply) {
   EXPECT_THAT(decoder_callbacks_.details(), Eq("cache_no_cluster"));
 }
 
+TEST_F(CacheFilterTest, OverriddenClusterShouldTryThatCluster) {
+  config_.set_override_upstream_cluster("overridden_cluster");
+  CacheFilterSharedPtr filter = makeFilter(mock_cache_);
+  // Validate that the specified cluster was *tried*; letting it not exist
+  // to keep the test simple.
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_,
+              getThreadLocalCluster("overridden_cluster"))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, "cache_no_cluster"));
+  EXPECT_THAT(filter->decodeHeaders(request_headers_, true),
+              Eq(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_THAT(decoder_callbacks_.details(), Eq("cache_no_cluster"));
+}
+
 TEST_F(CacheFilterDeathTest, TimeoutBeforeLookupCompletesImpliesABug) {
   CacheFilterSharedPtr filter = makeFilter(mock_cache_, /* auto_destroy = */ false);
   EXPECT_CALL(*mock_cache_, lookup);

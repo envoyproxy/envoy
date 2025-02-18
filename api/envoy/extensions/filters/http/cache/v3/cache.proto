@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: HTTP Cache Filter]
 
 // [#extension: envoy.filters.http.cache]
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message CacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.cache.v2alpha.CacheConfig";
@@ -93,4 +93,16 @@ message CacheConfig {
   // causes the cache to validate with its upstream even if the lookup is a hit. Setting this
   // to true will ignore these headers.
   bool ignore_request_cache_control_header = 6;
+
+  // If this is set, requests sent upstream to populate the cache will go to the
+  // specified cluster rather than the cluster selected by the vhost and route.
+  //
+  // If you have actions to be taken by the router filter - either
+  // ``upstream_http_filters`` or one of the ``RouteConfiguration`` actions such as
+  // ``response_headers_to_add`` - then the cache's side-channel going directly to the
+  // routed cluster will bypass these actions. You can set ``override_upstream_cluster``
+  // to an internal listener which duplicates the relevant ``RouteConfiguration``, to
+  // replicate the desired behavior on the side-channel upstream request issued by the
+  // cache.
+  string override_upstream_cluster = 7;
 }

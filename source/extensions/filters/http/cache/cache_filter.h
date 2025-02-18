@@ -30,6 +30,7 @@ public:
   TimeSource& timeSource() const { return time_source_; }
   const Http::AsyncClient::StreamOptions& upstreamOptions() const { return upstream_options_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
+  const std::string& overrideUpstreamCluster() const { return override_upstream_cluster_; }
   bool ignoreRequestCacheControlHeader() const { return ignore_request_cache_control_header_; }
   ActiveCache& activeCache() const { return *active_cache_; }
   bool hasCache() const { return active_cache_ != nullptr; }
@@ -43,6 +44,7 @@ private:
   Http::AsyncClient::StreamOptions upstream_options_;
   std::shared_ptr<ActiveCache> active_cache_;
   CacheFilterStatsPtr stats_;
+  std::string override_upstream_cluster_;
 };
 
 /**

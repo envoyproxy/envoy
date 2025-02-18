@@ -47,7 +47,8 @@ CacheFilterConfig::CacheFilterConfig(
     std::shared_ptr<ActiveCache> active_cache, Server::Configuration::CommonFactoryContext& context)
     : vary_allow_list_(config.allowed_vary_headers(), context), time_source_(context.timeSource()),
       ignore_request_cache_control_header_(config.ignore_request_cache_control_header()),
-      cluster_manager_(context.clusterManager()), active_cache_(std::move(active_cache)) {}
+      cluster_manager_(context.clusterManager()), active_cache_(std::move(active_cache)),
+      override_upstream_cluster_(config.override_upstream_cluster()) {}
 
 bool CacheFilterConfig::isCacheableResponse(const Http::ResponseHeaderMap& headers) const {
   return CacheabilityUtils::isCacheableResponse(headers, vary_allow_list_);
@@ -69,6 +70,9 @@ void CacheFilter::onDestroy() {
 }
 
 absl::optional<absl::string_view> CacheFilter::clusterName() {
+  if (!config_->overrideUpstreamCluster().empty()) {
+    return config_->overrideUpstreamCluster();
+  }
   Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   const Router::RouteEntry* route_entry = (route == nullptr) ? nullptr : route->routeEntry();
   if (route_entry == nullptr) {
