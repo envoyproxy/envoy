@@ -38,6 +38,8 @@ protected:
   WasmFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
     if (std::get<2>(GetParam())) {
       ON_CALL(context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+      ON_CALL(context_.server_factory_context_, getTransportSocketFactoryContext())
+          .WillByDefault(ReturnRef(transport_socket_factory_context_));
       ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_scope_));
       ON_CALL(context_, listenerInfo()).WillByDefault(ReturnRef(listener_info_));
       ON_CALL(listener_info_, metadata()).WillByDefault(ReturnRef(listener_metadata_));
@@ -49,6 +51,8 @@ protected:
     } else {
       ON_CALL(upstream_factory_context_.server_factory_context_, api())
           .WillByDefault(ReturnRef(*api_));
+      ON_CALL(upstream_factory_context_.server_factory_context_, getTransportSocketFactoryContext())
+          .WillByDefault(ReturnRef(transport_socket_factory_context_));
       ON_CALL(upstream_factory_context_, scope()).WillByDefault(ReturnRef(stats_scope_));
       EXPECT_CALL(upstream_factory_context_, initManager())
           .WillRepeatedly(ReturnRef(init_manager_));
@@ -135,6 +139,7 @@ protected:
 private:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> transport_socket_factory_context_;
 };
 
 INSTANTIATE_TEST_SUITE_P(

@@ -82,8 +82,8 @@ public:
     plugin_->wasmConfig().allowedCapabilities() = allowed_capabilities_;
     // Passes ownership of root_context_.
     Extensions::Common::Wasm::createWasm(
-        plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api, lifecycle_notifier_,
-        remote_data_provider_, [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
+        plugin_, scope_, cluster_manager_, init_manager_, transport_socket_factory_context_, dispatcher_, tls_, *api, lifecycle_notifier_,
+        remote_data_provider_, oci_manifest_provider_, oci_blob_provider_, [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
     plugin_handle_ = getOrCreateThreadLocalPlugin(
         wasm_, plugin_, dispatcher_,
         [this, create_root](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) {
@@ -100,6 +100,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr scope_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> transport_socket_factory_context_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Init::MockManager> init_manager_;
@@ -115,6 +116,8 @@ public:
   envoy::config::core::v3::Metadata listener_metadata_;
   Context* root_context_ = nullptr; // Unowned.
   RemoteAsyncDataProviderPtr remote_data_provider_;
+  OciManifestProviderPtr oci_manifest_provider_;
+  OciBlobProviderPtr oci_blob_provider_;
 
   void setRootId(std::string root_id) { root_id_ = root_id; }
   void setVmConfiguration(std::string vm_configuration) { vm_configuration_ = vm_configuration; }
