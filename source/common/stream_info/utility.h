@@ -191,7 +191,8 @@ public:
       FlagStrings{DROP_OVERLOAD, DROP_OVERLOAD_LONG, CoreResponseFlag::DropOverLoad},
       FlagStrings{DOWNSTREAM_REMOTE_RESET, DOWNSTREAM_REMOTE_RESET_LONG,
                   CoreResponseFlag::DownstreamRemoteReset},
-      FlagStrings{UNCONDITIONAL_DROP_OVERLOAD, UNCONDITIONAL_DROP_OVERLOAD_LONG, CoreResponseFlag::UnconditionalDropOverload},
+      FlagStrings{UNCONDITIONAL_DROP_OVERLOAD, UNCONDITIONAL_DROP_OVERLOAD_LONG,
+                  CoreResponseFlag::UnconditionalDropOverload},
   };
 
 private:

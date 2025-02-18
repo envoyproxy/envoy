@@ -178,7 +178,8 @@ public:
   const LowerCaseString EnvoyOriginalPath{absl::StrCat(prefix(), "-original-path")};
   const LowerCaseString EnvoyOverloaded{absl::StrCat(prefix(), "-overloaded")};
   const LowerCaseString EnvoyDropOverload{absl::StrCat(prefix(), "-drop-overload")};
-  const LowerCaseString EnvoyUnconditionalDropOverload{absl::StrCat(prefix(), "-unconditional-drop-overload")};
+  const LowerCaseString EnvoyUnconditionalDropOverload{
+      absl::StrCat(prefix(), "-unconditional-drop-overload")};
   const LowerCaseString EnvoyRateLimited{absl::StrCat(prefix(), "-ratelimited")};
   const LowerCaseString EnvoyRetryOn{absl::StrCat(prefix(), "-retry-on")};
   const LowerCaseString EnvoyRetryGrpcOn{absl::StrCat(prefix(), "-retry-grpc-on")};

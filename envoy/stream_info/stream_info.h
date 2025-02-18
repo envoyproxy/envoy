@@ -198,7 +198,8 @@ struct ResponseCodeDetailValues {
   const std::string MaintenanceMode = "maintenance_mode";
   // The request was rejected by the router filter because the DROP_OVERLOAD configuration.
   const std::string DropOverload = "drop_overload";
-  // The request was rejected by the router filter because the DROP_OVERLOAD configuration is set to 100%.
+  // The request was rejected by the router filter because the DROP_OVERLOAD configuration is set to
+  // 100%.
   const std::string UnconditionalDropOverload = "unconditional_drop_overload";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";

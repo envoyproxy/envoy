@@ -2228,8 +2228,9 @@ bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
                      cluster.dropOverload().value());
 
     if (cluster.dropOverload().value() == 1.0) {
-      ENVOY_STREAM_LOG(debug, "The configured DROP_OVERLOAD ratio is 100%, drop everything unconditionally.",
-                       *callbacks_);
+      ENVOY_STREAM_LOG(
+          debug, "The configured DROP_OVERLOAD ratio is 100%, drop everything unconditionally.",
+          *callbacks_);
       callbacks_->streamInfo().setResponseFlag(
           StreamInfo::CoreResponseFlag::UnconditionalDropOverload);
       chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, true);
@@ -2237,9 +2238,8 @@ bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
           Http::Code::ServiceUnavailable, "unconditional drop overload",
           [modify_headers, this](Http::ResponseHeaderMap& headers) {
             if (!config_->suppress_envoy_headers_) {
-              headers.addReference(
-                  Http::Headers::get().EnvoyUnconditionalDropOverload,
-                  Http::Headers::get().EnvoyUnconditionalDropOverloadValues.True);
+              headers.addReference(Http::Headers::get().EnvoyUnconditionalDropOverload,
+                                   Http::Headers::get().EnvoyUnconditionalDropOverloadValues.True);
             }
             modify_headers(headers);
           },
