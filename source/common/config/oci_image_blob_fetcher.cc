@@ -1,3 +1,4 @@
+#include "remote_data_fetcher.h"
 #include "source/common/config/oci_image_manifest_fetcher.h"
 
 #include "envoy/config/core/v3/http_uri.pb.h"
@@ -15,22 +16,11 @@ namespace DataFetcher {
 
 OciImageBlobFetcher::OciImageBlobFetcher(Upstream::ClusterManager& cm,
                                          const envoy::config::core::v3::HttpUri& uri,
-                                         const std::string& authz_header_value,
-                                         const std::string& digest,
                                          const std::string& content_hash,
-                                         RemoteDataFetcherCallback& callback)
-    : cm_(cm), uri_(uri), authz_header_value_(authz_header_value), digest_(digest), content_hash_(content_hash), callback_(callback) {}
-
-OciImageBlobFetcher::~OciImageBlobFetcher() { cancel(); }
-
-void OciImageBlobFetcher::cancel() {
-  if (request_) {
-    request_->cancel();
-    ENVOY_LOG(debug, "fetch oci image blob [uri = {}]: canceled", uri_.uri());
-  }
-
-  request_ = nullptr;
-}
+                                         RemoteDataFetcherCallback& callback,
+                                         const std::string& authz_header_value,
+                                         const std::string& digest)
+    : RemoteDataFetcher(cm, uri, content_hash, callback), authz_header_value_(authz_header_value), digest_(digest) {}
 
 void OciImageBlobFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
@@ -105,13 +95,6 @@ void OciImageBlobFetcher::onSuccess(const Http::AsyncClient::Request&,
   }
 
   request_ = nullptr;
-}
-
-void OciImageBlobFetcher::onFailure(const Http::AsyncClient::Request&,
-                                  Http::AsyncClient::FailureReason reason) {
-  ENVOY_LOG(info, "fetch oci image blob [uri = {}]: network error {}", uri_.uri(), enumToInt(reason));
-  request_ = nullptr;
-  callback_.onFailure(FailureReason::Network);
 }
 
 } // namespace DataFetcher
