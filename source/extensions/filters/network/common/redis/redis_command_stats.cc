@@ -9,6 +9,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace Common {
 namespace Redis {
+  
 RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std::string& prefix)
     : symbol_table_(symbol_table), stat_name_set_(symbol_table_.makeSet("Redis")),
       prefix_(stat_name_set_->add(prefix)),
