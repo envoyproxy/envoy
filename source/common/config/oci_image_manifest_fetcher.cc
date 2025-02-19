@@ -60,7 +60,7 @@ void OciImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
       // Parse manifests response
       std::string digest_value;
       if (!body.empty()) {
-        try {
+        TRY_ASSERT_MAIN_THREAD {
           Json::ObjectSharedPtr json_body =
               THROW_OR_RETURN_VALUE(Json::Factory::loadFromString(body), Json::ObjectSharedPtr);
           auto layers = THROW_OR_RETURN_VALUE(json_body->getObjectArray("layers"),
@@ -74,7 +74,9 @@ void OciImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
                       digest->c_str());
             callback_.onSuccess(digest.value());
           }
-        } catch (...) {
+        }
+        END_TRY
+        catch (EnvoyException& e) {
           ENVOY_LOG(error,
                     "fetch oci image [uri = {}, body = {}]: failed to parse response body to JSON",
                     uri_.uri(), response->body().toString());
