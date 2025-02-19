@@ -23,7 +23,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // <envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.filter_state_name>`].
 // This extension supports saving of request and response headers and trailers,
 // and immmediate response.
-// [#next-free-field: 10]
+// [#next-free-field: 7]
 message SaveProcessingResponse {
   message SaveOptions {
     // Whether or not to save the response for the response type.
@@ -51,13 +51,13 @@ message SaveProcessingResponse {
 
   // Save the response to filter state when :ref:`request_trailers
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_trailers>` is set.
-  SaveOptions save_request_trailers = 6;
+  SaveOptions save_request_trailers = 4;
 
   // Save the response to filter state when :ref:`response_trailers
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_trailers>` is set.
-  SaveOptions save_response_trailers = 8;
+  SaveOptions save_response_trailers = 5;
 
   // Save the response to filter state when :ref:`immediate_response
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>` is set.
-  SaveOptions save_immediate_response = 9;
+  SaveOptions save_immediate_response = 6;
 }
