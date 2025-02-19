@@ -216,6 +216,8 @@ public:
 
   void setUp(const envoy::extensions::wasm::v3::PluginConfig plugin_config,
              bool singleton = false) {
+    ON_CALL(server_, getTransportSocketFactoryContext())
+        .WillByDefault(ReturnRef(transport_socket_factory_context_));
     plugin_config_ = std::make_shared<PluginConfig>(
         plugin_config, server_, server_.scope(), server_.initManager(),
         envoy::config::core::v3::TrafficDirection::UNSPECIFIED, /*metadata=*/nullptr, singleton);
@@ -231,6 +233,8 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
   PluginConfigSharedPtr plugin_config_;
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
