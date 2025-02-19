@@ -105,7 +105,7 @@ message SubstitutionFormatString {
   // * for ``json_format`` the keys with null values are omitted in the output structure.
   //
   // .. note::
-  //   This option cannot works perfectly with ``json_format``. The keys with null values
+  //   This option does not work perfectly with ``json_format`` as keys with ``null`` values
   //   will still be included in the output. See https://github.com/envoyproxy/envoy/issues/37941
   //   for more details.
   //
