@@ -86,7 +86,12 @@ public:
   Stats::ScopeSharedPtr scope_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
+  NiceMock<ThreadLocal::MockInstance> slot_alloc_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
+  OciManifestProviderPtr oci_manifest_provider_;
+  OciBlobProviderPtr oci_blob_provider_;
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest,
@@ -597,14 +602,16 @@ TEST_P(WasmCommonTest, VmCache) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_, nullptr);
 
   WasmHandleSharedPtr wasm_handle;
-  createWasm(plugin, scope_, cluster_manager_, init_manager, *dispatcher_, *api_,
-             lifecycle_notifier_, remote_data_provider_,
+  createWasm(plugin, scope_, cluster_manager_, init_manager, transport_socket_factory_context_,
+             *dispatcher_, slot_alloc_, *api_, lifecycle_notifier_, remote_data_provider_,
+             oci_manifest_provider_, oci_blob_provider_,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
   EXPECT_NE(wasm_handle, nullptr);
 
   WasmHandleSharedPtr wasm_handle2;
-  createWasm(plugin, scope_, cluster_manager_, init_manager, *dispatcher_, *api_,
-             lifecycle_notifier_, remote_data_provider_,
+  createWasm(plugin, scope_, cluster_manager_, init_manager, transport_socket_factory_context_,
+             *dispatcher_, slot_alloc_, *api_, lifecycle_notifier_, remote_data_provider_,
+             oci_manifest_provider_, oci_blob_provider_,
              [&wasm_handle2](const WasmHandleSharedPtr& w) { wasm_handle2 = w; });
   EXPECT_NE(wasm_handle2, nullptr);
   EXPECT_EQ(wasm_handle, wasm_handle2);
@@ -710,8 +717,9 @@ TEST_P(WasmCommonTest, RemoteCode) {
   EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
     init_target_handle = target.createHandle("test");
   }));
-  createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
-             lifecycle_notifier_, remote_data_provider_,
+  createWasm(plugin, scope_, cluster_manager, init_manager, transport_socket_factory_context_,
+             *dispatcher_, slot_alloc_, *api_, lifecycle_notifier_, remote_data_provider_,
+             oci_manifest_provider_, oci_blob_provider_,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
 
   EXPECT_CALL(init_watcher, ready());
@@ -823,8 +831,9 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
     init_target_handle = target.createHandle("test");
   }));
-  createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
-             lifecycle_notifier_, remote_data_provider_,
+  createWasm(plugin, scope_, cluster_manager, init_manager, transport_socket_factory_context_,
+             *dispatcher_, slot_alloc_, *api_, lifecycle_notifier_, remote_data_provider_,
+             oci_manifest_provider_, oci_blob_provider_,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
 
   EXPECT_CALL(init_watcher, ready());
@@ -1462,6 +1471,9 @@ public:
   void SetUp() override { clearCodeCacheForTesting(); }
 
   void setUp(const std::string& plugin_config_yaml, bool singleton) {
+    ON_CALL(server_, getTransportSocketFactoryContext())
+        .WillByDefault(ReturnRef(transport_socket_factory_context_));
+
     envoy::extensions::wasm::v3::PluginConfig plugin_config;
     TestUtility::loadFromYaml(plugin_config_yaml, plugin_config);
     plugin_config_ = std::make_shared<PluginConfig>(
@@ -1479,6 +1491,8 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
   PluginConfigSharedPtr plugin_config_;
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
