@@ -47,10 +47,12 @@ message SaveProcessingResponse {
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_headers>` is set.
   SaveOptions save_response_headers = 3;
 
+  // [#not-implemented-hide:]
   // Save the response to filter state when :ref:`request_body
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_body>` is set.
   SaveOptions save_request_body = 4;
 
+  // [#not-implemented-hide:]
   // Save the response to filter state when :ref:`response_body
   // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_body>` is set.
   SaveOptions save_response_body = 5;

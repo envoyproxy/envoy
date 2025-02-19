@@ -43,10 +43,12 @@ public:
                                 Envoy::StreamInfo::StreamInfo&) override;
   void afterProcessingResponseHeaders(const envoy::service::ext_proc::v3::ProcessingResponse&,
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
+  // Not implemented.
   void afterProcessingRequestBody(const envoy::service::ext_proc::v3::ProcessingResponse&,
-                                  absl::Status, Envoy::StreamInfo::StreamInfo&) override;
+                                  absl::Status, Envoy::StreamInfo::StreamInfo&) override {};
+  // Not implemented.
   void afterProcessingResponseBody(const envoy::service::ext_proc::v3::ProcessingResponse&,
-                                   absl::Status, Envoy::StreamInfo::StreamInfo&) override;
+                                   absl::Status, Envoy::StreamInfo::StreamInfo&) override {};
   void afterProcessingRequestTrailers(const envoy::service::ext_proc::v3::ProcessingResponse&,
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
   void afterProcessingResponseTrailers(const envoy::service::ext_proc::v3::ProcessingResponse&,
@@ -71,8 +73,6 @@ private:
 
   SaveOptions save_request_headers_;
   SaveOptions save_response_headers_;
-  SaveOptions save_request_body_;
-  SaveOptions save_response_body_;
   SaveOptions save_request_trailers_;
   SaveOptions save_response_trailers_;
   SaveOptions save_immediate_response_;

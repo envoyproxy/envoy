@@ -14,8 +14,6 @@ SaveProcessingResponse::SaveProcessingResponse(const SaveProcessingResponseProto
                                             ".", config.filter_state_name_suffix())),
       save_request_headers_(config.save_request_headers()),
       save_response_headers_(config.save_response_headers()),
-      save_request_body_(config.save_request_body()),
-      save_response_body_(config.save_response_body()),
       save_request_trailers_(config.save_request_trailers()),
       save_response_trailers_(config.save_response_trailers()),
       save_immediate_response_(config.save_immediate_response()) {}
@@ -53,18 +51,6 @@ void SaveProcessingResponse::afterProcessingResponseHeaders(
     const envoy::service::ext_proc::v3::ProcessingResponse& response, absl::Status status,
     Envoy::StreamInfo::StreamInfo& stream_info) {
   addToFilterState(save_response_headers_, response, status, stream_info);
-}
-
-void SaveProcessingResponse::afterProcessingRequestBody(
-    const envoy::service::ext_proc::v3::ProcessingResponse& response, absl::Status status,
-    Envoy::StreamInfo::StreamInfo& stream_info) {
-  addToFilterState(save_request_body_, response, status, stream_info);
-}
-
-void SaveProcessingResponse::afterProcessingResponseBody(
-    const envoy::service::ext_proc::v3::ProcessingResponse& response, absl::Status status,
-    Envoy::StreamInfo::StreamInfo& stream_info) {
-  addToFilterState(save_response_body_, response, status, stream_info);
 }
 
 void SaveProcessingResponse::afterProcessingRequestTrailers(

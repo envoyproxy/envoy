@@ -5664,7 +5664,7 @@ TEST_F(HttpFilterTest, OnProcessingResponseBodies) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
-TEST_F(HttpFilterTest, SaveProcessingResponseBodies) {
+TEST_F(HttpFilterTest, SaveProcessingResponseBodiesNotImplemented) {
   SaveProcessingResponseFactory factory;
   Envoy::Registry::InjectFactory<OnProcessingResponseFactory> registration(factory);
   initialize(R"EOF(
@@ -5714,25 +5714,7 @@ TEST_F(HttpFilterTest, SaveProcessingResponseBodies) {
 
   auto filter_state = stream_info_.filterState()->getDataMutable<SaveProcessingResponseFilterState>(
       SaveProcessingResponseFilterState::kFilterStateName);
-  ASSERT_TRUE(filter_state->response.has_value());
-  envoy::service::ext_proc::v3::ProcessingResponse expected_response;
-  TestUtility::loadFromJson(
-      R"EOF(
-{
-  "requestBody": {
-    "response": {
-      "bodyMutation": {
-        "clearBody": true
-      }
-    }
-  }
-})EOF",
-      expected_response);
-
-  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
-                                      expected_response));
-
-  filter_state->response.reset();
+  EXPECT_EQ(filter_state, nullptr);
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
@@ -5756,25 +5738,9 @@ TEST_F(HttpFilterTest, SaveProcessingResponseBodies) {
   });
   EXPECT_EQ("Hello, World!", buffered_response_data.toString());
 
-  ASSERT_TRUE(filter_state->response.has_value());
-  envoy::service::ext_proc::v3::ProcessingResponse expected_response_body;
-  TestUtility::loadFromJson(
-      R"EOF(
-{
-  "responseBody": {
-    "response": {
-      "bodyMutation": {
-        "body": "SGVsbG8sIFdvcmxkIQ=="
-      }
-    }
-  }
-})EOF",
-      expected_response_body);
-
-  EXPECT_TRUE(TestUtility::protoEqual(filter_state->response.value().processing_response,
-                                      expected_response_body));
-
-  filter_state->response.reset();
+  filter_state = stream_info_.filterState()->getDataMutable<SaveProcessingResponseFilterState>(
+      SaveProcessingResponseFilterState::kFilterStateName);
+  EXPECT_EQ(filter_state, nullptr);
 
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
