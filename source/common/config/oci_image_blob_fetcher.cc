@@ -69,11 +69,13 @@ void OciImageBlobFetcher::onSuccess(const Http::AsyncClient::Request&,
                 uri_.uri(), status_code);
       callback_.onFailure(FailureReason::Network);
     } else {
+      // TODO(jewertow): implement support for dynamic forward proxy cluster to handle redirects
       auto location_value = location[0]->value().getStringView();
       ENVOY_LOG(error, "fetch oci image blob [uri = {}, status code = {}]: redirected to {}",
                 uri_.uri(), status_code, location_value);
 
       envoy::config::core::v3::HttpUri uri;
+      // This is only a temporary workaround
       uri.set_cluster("oci_registry_blob_redirect_location");
       uri.set_uri(location_value);
       Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri);
