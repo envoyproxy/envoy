@@ -72,7 +72,7 @@ public:
 private:
   std::unique_ptr<SimpleLRUCache<std::string, ::google::jwt_verify::Jwt>> jwt_lru_cache_;
   TimeSource& time_source_;
-  unsigned int max_jwt_size_for_cache_;
+  uint32_t max_jwt_size_for_cache_;
 };
 } // namespace
 
