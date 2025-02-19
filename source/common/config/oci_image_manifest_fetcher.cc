@@ -44,54 +44,62 @@ void OciImageManifestFetcher::fetch() {
 void OciImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
                                         Http::ResponseMessagePtr&& response) {
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
-  if (status_code == enumToInt(Http::Code::OK)) {
-    ENVOY_LOG(info, "fetch oci image [uri = {}, body = {}]: success", uri_.uri(),
-              response->body().toString());
-    if (response->body().length() > 0) {
-      auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-      const auto content_hash = Hex::encode(crypto_util.getSha256Digest(response->body()));
-
-      // TODO(jewertow)
-      // if (content_hash_ != content_hash) {
-      //   ENVOY_LOG(info, "fetch oci image [uri = {}]: data is invalid", uri_.uri());
-      //   callback_.onFailure(FailureReason::InvalidData);
-      // } else {
-      std::string body = response->bodyAsString();
-      // Parse manifests response
-      std::string digest_value;
-      if (!body.empty()) {
-        TRY_ASSERT_MAIN_THREAD {
-          Json::ObjectSharedPtr json_body =
-              THROW_OR_RETURN_VALUE(Json::Factory::loadFromString(body), Json::ObjectSharedPtr);
-          auto layers = THROW_OR_RETURN_VALUE(json_body->getObjectArray("layers"),
-                                              std::vector<Json::ObjectSharedPtr>);
-          auto digest = layers[0]->getString("digest", "");
-          if (digest->empty()) {
-            ENVOY_LOG(error, "fetch oci image [uri = {}, body = {}]: could not parse digest",
-                      uri_.uri(), response->body().toString());
-          } else {
-            ENVOY_LOG(info, "fetch oci image [uri = {}, digest = {}]: found digest", uri_.uri(),
-                      digest->c_str());
-            callback_.onSuccess(digest.value());
-          }
-        }
-        END_TRY
-        catch (EnvoyException& e) {
-          ENVOY_LOG(error,
-                    "fetch oci image [uri = {}, body = {}]: failed to parse response body to JSON",
-                    uri_.uri(), response->body().toString());
-        }
-      }
-    } else {
-      ENVOY_LOG(info, "fetch oci image [uri = {}]: body is empty", uri_.uri());
-      callback_.onFailure(FailureReason::Network);
-    }
-  } else {
-    ENVOY_LOG(info, "fetch oci image [uri = {}, body = {}]: response status code {}", uri_.uri(),
-              response->body().toString(), status_code);
-    callback_.onFailure(FailureReason::Network);
+  if (status_code != enumToInt(Http::Code::OK)) {
+    onInvalidData(fmt::format("failed to fetch oci image [uri = {}, status code {}, body = {}]",
+                              uri_.uri(), response->body().toString(), status_code));
+    return;
   }
 
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  const auto content_hash = Hex::encode(crypto_util.getSha256Digest(response->body()));
+  if (content_hash_ != content_hash) {
+    onInvalidData(
+        fmt::format("failed to verify content hash [uri = {}, body = {}, content hash = {}]",
+                    uri_.uri(), response->body().toString(), content_hash));
+    return;
+  }
+
+  auto json_body = Json::Factory::loadFromString(response->bodyAsString());
+  if (!json_body.ok()) {
+    onInvalidData(fmt::format("failed to parse OCI manifest [uri = {}, response body = {}]: {}",
+                              uri_.uri(), response->body().toString(),
+                              json_body.status().message()));
+    return;
+  }
+
+  auto layers = json_body.value()->getObjectArray("layers");
+  if (!layers.ok()) {
+    onInvalidData(fmt::format(
+        "failed to parse 'layers' in the received manifest [uri = {}, response body = {}]: {}",
+        uri_.uri(), response->body().toString(), layers.status().message()));
+    return;
+  } else if (layers.value().empty()) {
+    onInvalidData(
+        fmt::format("received a manifest with empty layers [uri = {}, response body = {}]: {}",
+                    uri_.uri(), response->body().toString(), layers.status().message()));
+    return;
+  }
+
+  auto digest = layers.value()[0]->getString("digest", "");
+  if (!digest.ok()) {
+    onInvalidData(fmt::format("failed to parse 'layers[0].digest' in the received manifest [uri = "
+                              "{}, response body = {}]: {}",
+                              uri_.uri(), response->body().toString(), digest.status().message()));
+    return;
+  } else if (digest.value().empty()) {
+    onInvalidData(
+        fmt::format("received a manifest with empty digest [uri = {}, response body = {}]: {}",
+                    uri_.uri(), response->body().toString(), digest.status().message()));
+    return;
+  }
+
+  callback_.onSuccess(digest.value());
+  request_ = nullptr;
+}
+
+void OciImageManifestFetcher::onInvalidData(std::string error_message) {
+  ENVOY_LOG(error, error_message);
+  callback_.onFailure(FailureReason::InvalidData);
   request_ = nullptr;
 }
 

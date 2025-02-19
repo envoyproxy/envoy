@@ -27,6 +27,8 @@ public:
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
 
 private:
+  void onInvalidData(std::string error_message);
+
   const std::string authz_header_value_;
 
   Http::AsyncClient::Request* request_{};
