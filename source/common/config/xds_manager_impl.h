@@ -31,7 +31,7 @@ private:
   Event::Dispatcher& main_thread_dispatcher_;
   Api::Api& api_;
   ProtobufMessage::ValidationContext& validation_context_;
-  std::unique_ptr<Config::XdsConfigTracker> xds_config_tracker_;
+  Config::XdsConfigTrackerPtr xds_config_tracker_;
   // The cm_ will only be valid after the cluster-manager is initialized.
   // Note that this implies that the xDS-manager must be shut down properly
   // prior to the cluster-manager deletion.
