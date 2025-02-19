@@ -45,10 +45,10 @@ public:
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
   // Not implemented.
   void afterProcessingRequestBody(const envoy::service::ext_proc::v3::ProcessingResponse&,
-                                  absl::Status, Envoy::StreamInfo::StreamInfo&) override {};
+                                  absl::Status, Envoy::StreamInfo::StreamInfo&) override{};
   // Not implemented.
   void afterProcessingResponseBody(const envoy::service::ext_proc::v3::ProcessingResponse&,
-                                   absl::Status, Envoy::StreamInfo::StreamInfo&) override {};
+                                   absl::Status, Envoy::StreamInfo::StreamInfo&) override{};
   void afterProcessingRequestTrailers(const envoy::service::ext_proc::v3::ProcessingResponse&,
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
   void afterProcessingResponseTrailers(const envoy::service::ext_proc::v3::ProcessingResponse&,
