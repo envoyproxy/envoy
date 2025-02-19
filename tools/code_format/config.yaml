@@ -172,7 +172,6 @@ paths:
     - source/extensions/filters/http/grpc_json_transcoder
     - source/extensions/filters/http/grpc_stats
     - source/extensions/filters/http/health_check
-    - source/extensions/filters/http/ip_tagging
     - source/extensions/filters/http/json_to_metadata
     - source/extensions/filters/http/jwt_authn
     - source/extensions/filters/http/local_ratelimit
