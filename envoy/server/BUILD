@@ -52,7 +52,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "drain_manager_interface",
     hdrs = ["drain_manager.h"],
-    deps = ["//envoy/network:drain_decision_interface"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:drain_decision_interface",
+        "//envoy/thread_local:thread_local_object",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(

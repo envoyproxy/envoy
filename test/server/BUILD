@@ -142,6 +142,7 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/server:drain_manager_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/server:instance_mocks",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],

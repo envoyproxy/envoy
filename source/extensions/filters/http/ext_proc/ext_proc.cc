@@ -1270,7 +1270,12 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
           config_->allowedOverrideModes(),
           [&mode_override](
               const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& other) {
-            return Protobuf::util::MessageDifferencer::Equals(mode_override, other);
+            // Ignore matching on request_header_mode as it's not applicable.
+            return mode_override.request_body_mode() == other.request_body_mode() &&
+                   mode_override.request_trailer_mode() == other.request_trailer_mode() &&
+                   mode_override.response_header_mode() == other.response_header_mode() &&
+                   mode_override.response_body_mode() == other.response_body_mode() &&
+                   mode_override.response_trailer_mode() == other.response_trailer_mode();
           });
     }
 
@@ -1370,7 +1375,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   }
 }
 
-void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
+void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& message) {
   ENVOY_STREAM_LOG(debug, "Received gRPC error on stream: {}", *decoder_callbacks_, status);
   stats_.streams_failed_.inc();
 
@@ -1391,7 +1396,8 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     closeStream();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
-    errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
+    errorResponse.set_details(
+        absl::StrFormat("%s_gRPC_error_%i{%s}", ErrorPrefix, status, message));
     sendImmediateResponse(errorResponse);
   }
 }

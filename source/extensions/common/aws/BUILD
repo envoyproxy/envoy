@@ -106,9 +106,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "credentials_provider_interface",
-    hdrs = ["credentials_provider.h"],
+    hdrs = [
+        "credentials_provider.h",
+        "credentials_provider_impl.h",
+    ],
     deps = [
         "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
     ],
 )
 

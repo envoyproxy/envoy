@@ -316,24 +316,6 @@ private:
   void extractCredentials(const std::string&& credential_document_value);
 };
 
-/**
- * AWS credentials provider chain, able to fallback between multiple credential providers.
- */
-class CredentialsProviderChain : public CredentialsProvider,
-                                 public Logger::Loggable<Logger::Id::aws> {
-public:
-  ~CredentialsProviderChain() override = default;
-
-  void add(const CredentialsProviderSharedPtr& credentials_provider) {
-    providers_.emplace_back(credentials_provider);
-  }
-
-  Credentials getCredentials() override;
-
-protected:
-  std::list<CredentialsProviderSharedPtr> providers_;
-};
-
 class CredentialsProviderChainFactories {
 public:
   virtual ~CredentialsProviderChainFactories() = default;
