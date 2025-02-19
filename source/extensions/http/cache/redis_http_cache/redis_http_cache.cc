@@ -11,40 +11,6 @@ namespace RedisHttpCache {
 
 
 
-void RedisHttpCacheLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb)
-{
-    cb1_ = std::move(cb);
-  // TODO: handle here situation when client cannot connect to the redis server.
-    // maybe connect it when the first request comes and it is not connected.
-
-    
-  tls_slot_->send(fmt::format("getrange cache-{}-body {} {}", stableHashKey(lookup_.key()), range.begin(), range.begin() + range.length() - 1),
-    [this] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
-    if (!connected) {
-        ASSERT(false);
-    }
-
-    if (!success) {
-        // TODO: make sure that this path is tested.
-        ASSERT(false);
-        std::cout << "Nothing found in the database.\n";
-        // TODO: end_stream should be taken based on info from cache.
-
-        //(cb_)(LookupResult{}, /* end_stream (ignored) = */ true); true -> will not call getBody.
-        return;
-    }
-
-    // We need to strip quotes on both sides of the string.
-    // TODO: maybe move to redis async client.
-    redis_value = redis_value.value().substr(1, redis_value.value().length() - 2);
-
-  // TODO: this is not very efficient.
-  std::unique_ptr<Buffer::OwnedImpl> buf;
-    buf = std::make_unique<Buffer::OwnedImpl>();
-    buf->add(redis_value.value());
-        /*std::move(cb1_)*/cb1_(std::move(buf), !has_trailers_);
-    });
-}
 
 
 
@@ -60,7 +26,7 @@ InsertContextPtr RedisHttpCache::makeInsertContext(LookupContextPtr&& lookup,
                                       Http::StreamFilterCallbacks&/* callbacks*/) {
   auto redis_lookup_context = std::unique_ptr<RedisHttpCacheLookupContext>(
       dynamic_cast<RedisHttpCacheLookupContext*>(lookup.release()));
-  return std::make_unique<RedisHttpCacheInsertContext>(std::move(redis_lookup_context), cluster_manager_, tls_slot_);
+  return std::make_unique<RedisHttpCacheInsertContext>(std::move(redis_lookup_context), tls_slot_);
     
     }
 

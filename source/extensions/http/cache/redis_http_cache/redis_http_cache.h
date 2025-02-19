@@ -36,6 +36,7 @@ public:
 
     tls_slot_.set([&](Event::Dispatcher&) {return std::make_shared<ThreadLocalRedisClient>(cluster_manager_);});
 
+
 #if 0
     auto* cluster = cluster_manager_.getThreadLocalCluster("redis_cluster");
      if (!cluster) {
@@ -90,6 +91,7 @@ private:
     Upstream::ClusterManager& cluster_manager_;
 
     ThreadLocal::TypedSlot<ThreadLocalRedisClient> tls_slot_;
+
 };
 
 //} // namespace

@@ -22,7 +22,9 @@ public:
       : dispatcher_(dispatcher), 
     // cache_(cache), 
     key_(lookup.key()), tls_slot_(tls_slot), lookup_(std::move(lookup)),
-        /*redis_client_(redis_client),*/ cluster_manager_(cluster_manager) {}
+        /*redis_client_(redis_client),*/ cluster_manager_(cluster_manager) {
+    alive_ = std::make_shared<bool>(true);
+    }
 
   // From LookupContext
   void getHeaders(LookupHeadersCallback&&/* cb*/) final;// {ASSERT(false);}
@@ -60,6 +62,13 @@ private:
  // RedisHttpCache& cache_;
 
   Key key_;
+  
+    // This is used to derive weak pointer gived to lookup and insert contexts.
+    // Callbacks in those contexts check if the weak pointer is still valid.
+    // If the weak pointer is expired, it means that the session which issued the
+    // call to redis has been closed and the associated cache filter has been 
+    // destoyed.
+  std::shared_ptr<bool> alive_;
 
   LookupHeadersCallback lookup_headers_callback_;
   ThreadLocal::TypedSlot</*RedisHttpCache::*/ThreadLocalRedisClient>& tls_slot_;
@@ -67,6 +76,8 @@ private:
   //Extensions::Common::Redis::RedisAsyncClient& redis_client_;
   Upstream::ClusterManager& cluster_manager_; 
   bool has_trailers_;
+
+  //std::weak_ptr<bool> parent_;
 };
 
 } // namespace RedisHttpCache

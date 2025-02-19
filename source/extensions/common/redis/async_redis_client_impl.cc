@@ -19,7 +19,10 @@ RedisAsyncClient::RedisAsyncClient(Upstream::ClusterManager& cluster_manager) : 
 void RedisAsyncClient::onEvent(Network::ConnectionEvent event) {
     if (event == Network::ConnectionEvent::RemoteClose || 
     event == Network::ConnectionEvent::LocalClose) {
+    if (callback_) {
     callback_(false, false /*ignored*/, absl::nullopt/*ignored*/);
+    callback_ = nullptr; 
+    }
 
     // Iterate over all queued requests and call a callback 
     // indicating that connection failed. They would ost likely fail as well.
@@ -50,6 +53,7 @@ void RedisAsyncClient::onRespValue(NetworkFilters::Common::Redis::RespValuePtr&&
   } else {
     callback_(true, true, value->toString());
   }
+  callback_ = nullptr;
 
   value.reset();
 }

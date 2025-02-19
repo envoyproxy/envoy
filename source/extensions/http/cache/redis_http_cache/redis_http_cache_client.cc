@@ -7,17 +7,16 @@ namespace HttpFilters {
 namespace Cache {
 namespace RedisHttpCache {
 
-    void ThreadLocalRedisClient::send(std::string command, Common::Redis::RedisAsyncClient::ResultCallback&& callback) {
+    void ThreadLocalRedisClient::send(std::vector<absl::string_view> command, Common::Redis::RedisAsyncClient::ResultCallback&& callback) {
 
-    std::vector<std::string_view> v = absl::StrSplit(command, " ");
 
   Buffer::OwnedImpl buf;
 NetworkFilters::Common::Redis::RespValue request;
-  std::vector<NetworkFilters::Common::Redis::RespValue> values(v.size());
+  std::vector<NetworkFilters::Common::Redis::RespValue> values(command.size());
 
-  for (uint32_t i = 0; i < v.size(); i++) {
+  for (uint32_t i = 0; i < command.size(); i++) {
   values[i].type(NetworkFilters::Common::Redis::RespType::BulkString);
-  values[i].asString() = v[i];
+  values[i].asString() = command[i];
     }
 
   request.type(NetworkFilters::Common::Redis::RespType::Array);
@@ -25,8 +24,7 @@ NetworkFilters::Common::Redis::RespValue request;
   redis_client_.encoder_.encode(request, buf);  
 
   redis_client_.write(buf, false, std::move(callback));
-    }
-
+}
 
 } // namespace RedisHttpCache
 } // namespace Cache

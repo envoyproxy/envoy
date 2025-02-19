@@ -12,14 +12,16 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     // TODO: can I capture the cb instead of storing it in this.cb_?
     cb_ = std::move(cb);
 
-  // TODO: handle here situation when client cannot connect to the redis server.
-    // maybe connect it when the first request comes and it is not connected.
-
-    // Get trailers proto and add headers.
-    // Convert to string and add to redis command.
-
-  tls_slot_->send(fmt::format(RedisGetHeadersCmd, stableHashKey(lookup_.key())),
-    [this ] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
+    // Try to get headers from Redis. Passed callback is called when response is received
+    // or error happens.
+  std::weak_ptr<bool> weak = alive_;
+  tls_slot_->send({"get", fmt::format(RedisCacheHeadersEntry, stableHashKey(lookup_.key()))},
+    [this, weak] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
+    // Session was destructed during the call to Redis.
+    // Do nothing. Do not call callback because its context is gone.
+    if (weak.expired()) {
+        return;
+    }
 
     if (!connected) {
         // Failure to connect to Redis. Proceed without additional attempts
@@ -30,9 +32,7 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
         return;
     }
     if (!success) {
-        std::cout << "Nothing found in the database.\n";
-        // TODO: end_stream should be taken based on info from cache.
-
+        // Entry was not found. 
         (cb_)(LookupResult{}, /* end_stream (ignored) = */ false);
         return;
     }
@@ -47,10 +47,8 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
 
 
     // Entry is in redis, but is empty. It means that some other entity
-    // is filling the cache.
+    // is filling the cache. Return the same value as when not found.
     if (redis_value.value().length() == 0) {
-        // Entry exists but is empty. It means that some other entity is filling the cache.
-        // Continue as if the cache entry was not found.
         LookupResult lookup_result;
         lookup_result.cache_entry_status_ = CacheEntryStatus::LookupError;
         (cb_)(std::move(lookup_result), /* end_stream (ignored) = */ false);
@@ -60,9 +58,8 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
   CacheFileHeader header;
   header.ParseFromString(redis_value.value());
 
+    // Entry found, but its content is not as expected.
     if (header.headers().size() == 0) {
-        std::cout << "Nothing found in the database.\n";
-
         (cb_)(LookupResult{}, /* end_stream (ignored) = */ false);
         return;
     }
@@ -79,23 +76,64 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
 );
 }
 
+void RedisHttpCacheLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb)
+{
+    cb1_ = std::move(cb);
+
+  std::weak_ptr<bool> weak = alive_;
+  tls_slot_->send({"getrange", fmt::format(RedisCacheBodyEntry, stableHashKey(lookup_.key())), fmt::format("{}", range.begin()), fmt::format("{}", range.begin() + range.length() - 1)},
+    [this, weak] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
+    // Session was destructed during the call to Redis.
+    // Do nothing. Do not call callback because its context is gone.
+    if (weak.expired()) {
+        return;
+    }
+
+    if (!connected) {
+        // Connection to the redis server failed.
+        (cb1_)(nullptr, true);
+        return;
+    }
+
+    if (!success) {
+        // Entry was not found in Redis.
+        (cb1_)(nullptr, true);
+        return;
+    }
+
+    // We need to strip quotes on both sides of the string.
+    // TODO: maybe move to redis async client.
+    redis_value = redis_value.value().substr(1, redis_value.value().length() - 2);
+
+  // TODO: this is not very efficient.
+  std::unique_ptr<Buffer::OwnedImpl> buf;
+    buf = std::make_unique<Buffer::OwnedImpl>();
+    buf->add(redis_value.value());
+        /*std::move(cb1_)*/cb1_(std::move(buf), !has_trailers_);
+    });
+}
+
 void RedisHttpCacheLookupContext::getTrailers(LookupTrailersCallback&& cb) {
     cb2_ = std::move(cb);
 
-  tls_slot_->send(fmt::format(RedisGetTrailersCmd, stableHashKey(lookup_.key())),
-    [this ] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
+  std::weak_ptr<bool> weak = alive_;
+  tls_slot_->send({"get", fmt::format(RedisCacheTrailersEntry, stableHashKey(lookup_.key()))},
+    [this, weak] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
+
+    // Session was destructed during the call to Redis.
+    // Do nothing. Do not call callback because its context is gone.
+    if (weak.expired()) {
+        return;
+    }
     if(!connected) {
-        ASSERT(false);
+        LookupResult lookup_result;
+        lookup_result.cache_entry_status_ = CacheEntryStatus::LookupError;
+        (cb2_)(nullptr);
+        return;
     }
     
-
     if (!success) {
-        // TODO: make sure that this path is tested.
-        ASSERT(false);
-        std::cout << "Nothing found in the database.\n";
-        // TODO: end_stream should be taken based on info from cache.
-
-        //(cb_)(LookupResult{}, /* end_stream (ignored) = */ true); true -> will not call getBody.
+        (cb2_)(nullptr);
         return;
     }
 
