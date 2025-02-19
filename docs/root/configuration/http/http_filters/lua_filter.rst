@@ -579,6 +579,26 @@ Example:
     request_handle:setUpstreamOverrideHost("192.168.21.13", true)
   end
 
+.. _config_http_filters_lua_stream_handle_api_clear_route_cache:
+
+``clearRouteCache()``
+^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  handle:clearRouteCache()
+
+To clear the route cache for the current request. This will force the route to be recomputed.
+
+Example:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    -- Clear the route cache
+    request_handle:clearRouteCache()
+  end
+
 ``importPublicKey()``
 ^^^^^^^^^^^^^^^^^^^^^
 
