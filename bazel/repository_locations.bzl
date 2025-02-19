@@ -173,7 +173,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "aws-lc-{version}",
         urls = ["https://github.com/aws/aws-lc/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2025-02-05",
+        release_date = "2025-02-06",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     aspect_bazel_lib = dict(

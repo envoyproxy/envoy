@@ -246,8 +246,8 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = [
-        "utility.h",
         "aws_lc_compat.h",
+        "utility.h",
     ],
     external_deps = ["ssl"],
     deps = [

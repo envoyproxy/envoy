@@ -27,10 +27,10 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/utility.h"
+#include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/cert_validator/utility.h"
-#include "source/common/tls/aws_lc_compat.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
