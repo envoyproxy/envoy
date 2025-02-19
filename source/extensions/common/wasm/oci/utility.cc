@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "source/common/common/thread.h"
 #include "source/common/json/json_loader.h"
 
 #include "absl/strings/match.h"
@@ -44,26 +45,32 @@ absl::StatusOr<std::string> prepareAuthorizationHeader(std::string image_pull_se
   }
 
   Json::ObjectSharedPtr image_pull_secret;
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     Json::ObjectSharedPtr image_pull_secret = THROW_OR_RETURN_VALUE(
         Json::Factory::loadFromString(image_pull_secret_raw), Json::ObjectSharedPtr);
-  } catch (EnvoyException& e) {
+  }
+  END_TRY
+  catch (EnvoyException& e) {
     return absl::InvalidArgumentError(
         absl::StrCat("Failed to parse image pull secret: ", e.what()));
   }
 
   Json::ObjectSharedPtr auths;
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     auths = THROW_OR_RETURN_VALUE(image_pull_secret->getObject("auths"), Json::ObjectSharedPtr);
-  } catch (EnvoyException& e) {
+  }
+  END_TRY
+  catch (EnvoyException& e) {
     return absl::InvalidArgumentError(
         absl::StrCat("Did not find 'auths' key in the image pull secret: ", e.what()));
   }
 
   Json::ObjectSharedPtr registry_object;
-  try {
+  TRY_ASSERT_MAIN_THREAD {
     registry_object = THROW_OR_RETURN_VALUE(auths->getObject(registry), Json::ObjectSharedPtr);
-  } catch (EnvoyException& e) {
+  }
+  END_TRY
+  catch (EnvoyException& e) {
     return absl::InvalidArgumentError(absl::StrCat("Did not find 'auths.", registry,
                                                    "' key in the image pull secret: ", e.what()));
   }
