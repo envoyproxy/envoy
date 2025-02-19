@@ -5,7 +5,7 @@ and an image based on Windows2019.
 
 ## Ubuntu Envoy image
 
-The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build-ubuntu:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build/) is used for CI checks,
+The Ubuntu based Envoy Docker image at [`envoyproxy/envoy-build-ubuntu:<hash>`](https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/) is used for CI checks,
 where `<hash>` is specified in [`envoy_build_sha.sh`](https://github.com/envoyproxy/envoy/blob/main/ci/envoy_build_sha.sh). Developers
 may work with the latest build image SHA in [envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8)
 repo to provide a self-contained environment for building Envoy binaries and running tests that reflects the latest built Ubuntu Envoy image.
@@ -38,9 +38,8 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 
 # Build image base and compiler versions
 
-Currently there are three build images for Linux and one for Windows:
+Currently there are two build images for Linux and one for Windows:
 
-* `envoyproxy/envoy-build` &mdash; alias to `envoyproxy/envoy-build-ubuntu`.
 * `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 20.04 (Focal) with GCC 9 and Clang 14 compiler.
 * `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 with GCC 9 and Clang 14 compiler, this image is experimental and not well tested.
 * `envoyproxy/envoy-build-windows2019` &mdash; based on Windows ltsc2019 with VS 2019 Build Tools, as well as LLVM.
