@@ -21,8 +21,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Optional configuration options to be used with json_format.
 message JsonFormatOptions {
-  // The output JSON string properties will be sorted. The properties will always be sorted
-  // and this option makes no sense.
+  // The output JSON string properties will be sorted. 
+  // .. note::
+  //   As the properties are always sorted, this option has no effect and is deprecated.
+  //
   bool sort_properties = 1
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
