@@ -331,8 +331,10 @@ envoy.filters.http.cors:
 envoy.filters.http.credential_injector:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.credential_injector.v3.CredentialInjector
 envoy.filters.http.csrf:
@@ -1869,3 +1871,10 @@ envoy.generic_proxy.codecs.http1:
   status: alpha
   type_urls:
   - envoy.extensions.filters.network.generic_proxy.codecs.http1.v3.Http1CodecConfig
+envoy.filters.http.dynamic_modules:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter

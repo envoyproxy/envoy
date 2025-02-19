@@ -76,7 +76,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// With local Jwks, this test verifies a request is passed with a good Jwt token.
+// With local Jwks, this test verifies a request is passed with a good JWT.
 TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   config_helper_.prependFilter(getFilterConfig(true, false));
   initialize();
@@ -104,7 +104,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// With local Jwks, this test verifies a request is rejected with an expired Jwt token.
+// With local Jwks, this test verifies a request is rejected with an expired JWT.
 TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
   config_helper_.prependFilter(getFilterConfig(true, false));
   initialize();
@@ -174,7 +174,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
   EXPECT_THAT(response->body(), ::testing::IsEmpty());
 }
 
-// With local Jwks, this test verifies a request is rejected with an expired Jwt token
+// With local Jwks, this test verifies a request is rejected with an expired JWT
 // with only a 401 status without WWWAuthenticate/Body set with error details
 TEST_P(LocalJwksIntegrationTest, ExpiredTokenWithStripFailureResponse) {
   config_helper_.prependFilter(getFilterConfig(true, true));
@@ -232,7 +232,7 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// This test verifies a CORS preflight request without JWT token is allowed.
+// This test verifies a CORS preflight request without JWT is allowed.
 TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
   config_helper_.prependFilter(getFilterConfig(true, false));
   initialize();
@@ -464,7 +464,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// With remote Jwks, this test verifies a request is passed with a good Jwt token
+// With remote Jwks, this test verifies a request is passed with a good JWT
 // and a good public key fetched from a remote server.
 TEST_P(RemoteJwksIntegrationTest, WithGoodToken) {
   initializeFilter(/*add_cluster=*/true);
@@ -522,7 +522,7 @@ TEST_P(RemoteJwksIntegrationTest, WithGoodTokenClearRouteCache) {
   cleanup();
 }
 
-// With remote Jwks, this test verifies a request is rejected even with a good Jwt token
+// With remote Jwks, this test verifies a request is rejected even with a good JWT
 // when the remote jwks server replied with 500.
 TEST_P(RemoteJwksIntegrationTest, FetchFailedJwks) {
   initializeFilter(/*add_cluster=*/true);
@@ -722,7 +722,7 @@ TEST_P(PerRouteIntegrationTest, PerRouteConfigDisabled) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // So the request without a JWT token is OK.
+  // So the request without a JWT is OK.
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
@@ -759,7 +759,7 @@ TEST_P(PerRouteIntegrationTest, PerRouteConfigWrongRequireName) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // So the request with a good Jwt token is rejected.
+  // So the request with a good JWT is rejected.
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},
@@ -794,7 +794,7 @@ TEST_P(PerRouteIntegrationTest, PerRouteConfigOK) {
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // So the request with a JWT token is OK.
+  // So the request with a JWT is OK.
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"},
       {":path", "/"},

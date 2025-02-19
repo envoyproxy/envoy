@@ -14,13 +14,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
-Http::FilterFactoryCb HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::header_to_metadata::v3::Config& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
-  ConfigSharedPtr filter_config(
-      std::make_shared<Config>(proto_config, context.serverFactoryContext().regexEngine()));
+  absl::StatusOr<ConfigSharedPtr> filter_config_or =
+      Config::create(proto_config, context.serverFactoryContext().regexEngine(), false);
+  RETURN_IF_ERROR(filter_config_or.status());
 
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [filter_config = std::move(filter_config_or.value())](
+             Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
         Http::StreamFilterSharedPtr{new HeaderToMetadataFilter(filter_config)});
   };
@@ -30,7 +32,9 @@ absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 HeaderToMetadataConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const Config>(config, context.regexEngine(), true);
+  absl::StatusOr<ConfigSharedPtr> config_or = Config::create(config, context.regexEngine(), true);
+  RETURN_IF_ERROR(config_or.status());
+  return std::move(config_or.value());
 }
 
 /**

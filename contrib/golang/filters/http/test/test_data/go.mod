@@ -6,7 +6,7 @@ require github.com/envoyproxy/envoy v1.24.0
 
 require (
 	github.com/cncf/xds/go v0.0.0-20241223141626-cff3c89139a3
-	google.golang.org/protobuf v1.36.2
+	google.golang.org/protobuf v1.36.5
 )
 
 require (

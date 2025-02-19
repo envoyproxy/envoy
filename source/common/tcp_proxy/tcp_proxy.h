@@ -189,13 +189,7 @@ class OnDemandConfig {
 public:
   OnDemandConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand&
                      on_demand_message,
-                 Server::Configuration::FactoryContext& context, Stats::Scope& scope)
-      : odcds_(context.serverFactoryContext().clusterManager().allocateOdCdsApi(
-            &Upstream::OdCdsApiImpl::create, on_demand_message.odcds_config(),
-            OptRef<xds::core::v3::ResourceLocator>(), context.messageValidationVisitor())),
-        lookup_timeout_(std::chrono::milliseconds(
-            PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
-        stats_(generateStats(scope)) {}
+                 Server::Configuration::FactoryContext& context, Stats::Scope& scope);
   Upstream::OdCdsApiHandle& onDemandCds() const { return *odcds_; }
   std::chrono::milliseconds timeout() const { return lookup_timeout_; }
   const OnDemandStats& stats() const { return stats_; }
