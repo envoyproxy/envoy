@@ -8,6 +8,10 @@ load("//bazel:api_repositories.bzl", "envoy_api_dependencies")
 
 envoy_api_dependencies()
 
+load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
+
+rules_buf_toolchains(version = "v1.50.0")
+
 load("//bazel:repo.bzl", "envoy_repo")
 
 envoy_repo()
