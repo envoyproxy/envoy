@@ -60,7 +60,7 @@ public:
   }
 
   void insert(const std::string& token, std::unique_ptr<::google::jwt_verify::Jwt>&& jwt) override {
-    if (!jwt_lru_cache_ || token.size() > std::numeric_limits<unsigned int>::max()) {
+    if (!jwt_lru_cache_ || token.size() > std::numeric_limits<uint32_t>::max()) {
       return;
     }
     if (static_cast<unsigned int>(token.size()) <= max_jwt_size_for_cache_) {
