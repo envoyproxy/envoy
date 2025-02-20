@@ -184,7 +184,8 @@ void ExtensionRegistry::registerFactories() {
   Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
   Quic::forceRegisterQuicServerTransportSocketConfigFactory();
   Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
-  Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
+  Quic::Extensions::ConnectionIdGenerator::Deterministic::
+      forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
 #endif
 
   Quic::forceRegisterQuicClientTransportSocketConfigFactory();

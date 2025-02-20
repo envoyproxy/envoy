@@ -72,8 +72,17 @@ TEST(DynamiModulesTest, HeaderCallbacks) {
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
   filter->initializeInModuleFilter();
 
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
+  EXPECT_CALL(downstream_callbacks, clearRouteCache());
+  EXPECT_CALL(callbacks, downstreamCallbacks())
+      .WillOnce(testing::Return(OptRef(downstream_callbacks)));
+  filter->setDecoderFilterCallbacks(callbacks);
+
   std::initializer_list<std::pair<std::string, std::string>> headers = {
-      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
+      {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}, {"to-be-deleted", "value"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
   Http::TestRequestTrailerMapImpl request_trailers{headers};
   Http::TestResponseHeaderMapImpl response_headers{headers};
@@ -168,8 +177,12 @@ TEST(DynamiModulesTest, BodyCallbacks) {
   filter->setEncoderFilterCallbacks(encoder_callbacks);
   Buffer::OwnedImpl request_body;
   EXPECT_CALL(decoder_callbacks, decodingBuffer()).WillRepeatedly(testing::Return(&request_body));
+  EXPECT_CALL(decoder_callbacks, addDecodedData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> void {}));
   Buffer::OwnedImpl response_body;
   EXPECT_CALL(encoder_callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&response_body));
+  EXPECT_CALL(encoder_callbacks, addEncodedData(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> void {}));
   EXPECT_CALL(decoder_callbacks, modifyDecodingBuffer(_))
       .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(request_body);

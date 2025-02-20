@@ -30,12 +30,15 @@ FilterConfig::FilterConfig(
           PROTOBUF_GET_MS_OR_DEFAULT(config.token_bucket(), fill_interval, 0))),
       max_tokens_(config.token_bucket().max_tokens()),
       tokens_per_fill_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1)),
+      max_dynamic_descriptors_(
+          config.has_max_dynamic_descriptors() ? config.max_dynamic_descriptors().value() : 20),
       descriptors_(config.descriptors()),
       rate_limit_per_connection_(config.local_rate_limit_per_downstream_connection()),
       always_consume_default_token_bucket_(
           config.has_always_consume_default_token_bucket()
               ? config.always_consume_default_token_bucket().value()
               : true),
+
       local_info_(context.localInfo()), runtime_(context.runtime()),
       filter_enabled_(
           config.has_filter_enabled()
@@ -109,7 +112,7 @@ FilterConfig::FilterConfig(
 
   rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
       fill_interval_, max_tokens_, tokens_per_fill_, dispatcher_, descriptors_,
-      always_consume_default_token_bucket_, std::move(share_provider));
+      always_consume_default_token_bucket_, std::move(share_provider), max_dynamic_descriptors_);
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
@@ -196,7 +199,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   // We can never assume the decodeHeaders() was called before encodeHeaders().
-  if (used_config_->enableXRateLimitHeaders() && token_bucket_context_.has_value()) {
+  if (used_config_->enableXRateLimitHeaders() && token_bucket_context_) {
     headers.addReferenceKey(
         HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
         token_bucket_context_->maxTokens());
@@ -215,7 +218,7 @@ Filter::requestAllowed(absl::Span<const RateLimit::Descriptor> request_descripto
              : used_config_->requestAllowed(request_descriptors);
 }
 
-const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {
+Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionRateLimiter() {
   ASSERT(used_config_->rateLimitPerConnection());
 
   auto typed_state =
@@ -225,16 +228,16 @@ const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConne
   if (typed_state == nullptr) {
     auto limiter = std::make_shared<PerConnectionRateLimiter>(
         used_config_->fillInterval(), used_config_->maxTokens(), used_config_->tokensPerFill(),
-        decoder_callbacks_->dispatcher(), used_config_->descriptors(),
-        used_config_->consumeDefaultTokenBucket());
+        used_config_->maxDynamicDescriptors(), decoder_callbacks_->dispatcher(),
+        used_config_->descriptors(), used_config_->consumeDefaultTokenBucket());
 
     decoder_callbacks_->streamInfo().filterState()->setData(
         PerConnectionRateLimiter::key(), limiter, StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
-    return limiter->value();
+    return const_cast<Filters::Common::LocalRateLimit::LocalRateLimiterImpl&>(limiter->value());
   }
 
-  return typed_state->value();
+  return const_cast<Filters::Common::LocalRateLimit::LocalRateLimiterImpl&>(typed_state->value());
 }
 
 void Filter::populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors,

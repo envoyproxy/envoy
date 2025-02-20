@@ -74,13 +74,13 @@ absl::Status RdsRouteConfigSubscription::beforeProviderUpdate(
   return absl::OkStatus();
 }
 
-void RdsRouteConfigSubscription::afterProviderUpdate() {
+absl::Status RdsRouteConfigSubscription::afterProviderUpdate() {
   // RDS update removed VHDS configuration
   if (!config_update_info_->protobufConfigurationCast().has_vhds()) {
     vhds_subscription_.release();
   }
 
-  THROW_IF_NOT_OK(update_callback_manager_.runCallbacks());
+  return update_callback_manager_.runCallbacks();
 }
 
 // Initialize a no-op InitManager in case the one in the factory_context has completed

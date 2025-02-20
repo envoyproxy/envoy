@@ -52,6 +52,10 @@ public:
 
   // DrainDecision
   bool drainClose() const override;
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+    IS_ENVOY_BUG("Unexpected function call");
+    return nullptr;
+  }
 
   // Configuration::FactoryContext
   Network::DrainDecision& drainDecision() override;

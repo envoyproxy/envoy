@@ -443,6 +443,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
       primary_host_info->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
     }
   }
+  bool failure = status == Network::DnsResolver::ResolutionStatus::Failure || response.empty();
+  details_with_maybe_trace = absl::StrCat(
+      (failure ? "dns_resolution_failure{" : ""),
+      StringUtil::replaceAllEmptySpace(details_with_maybe_trace), (failure ? "}" : ""));
 
   bool first_resolve = false;
 

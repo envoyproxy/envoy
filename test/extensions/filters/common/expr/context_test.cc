@@ -1,7 +1,10 @@
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "source/common/network/address_impl.h"
 #include "source/common/network/filter_state_dst_address.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/extensions/filters/common/expr/cel_state.h"
@@ -537,6 +540,10 @@ TEST(Context, ConnectionAttributes) {
       Network::Utility::parseInternetAddressNoThrow("10.1.2.3", 679, false);
   Network::Address::InstanceConstSharedPtr upstream_local_address =
       Network::Utility::parseInternetAddressNoThrow("10.1.2.3", 1000, false);
+  ::envoy::config::core::v3::Locality upstream_locality;
+  upstream_locality.set_region("upstream_locality_region");
+  upstream_locality.set_zone("upstream_locality_zone");
+  upstream_locality.set_sub_zone("upstream_locality_sub_zone");
   const std::string sni_name = "kittens.com";
   info.downstream_connection_info_provider_->setLocalAddress(local);
   info.downstream_connection_info_provider_->setRemoteAddress(remote);
@@ -559,6 +566,7 @@ TEST(Context, ConnectionAttributes) {
 
   EXPECT_CALL(*downstream_ssl_info, peerCertificatePresented()).WillRepeatedly(Return(true));
   EXPECT_CALL(*upstream_host, address()).WillRepeatedly(Return(upstream_address));
+  EXPECT_CALL(*upstream_host, locality()).WillRepeatedly(ReturnRef(upstream_locality));
 
   const std::string tls_version = "TLSv1";
   EXPECT_CALL(*downstream_ssl_info, tlsVersion()).WillRepeatedly(ReturnRef(tls_version));
@@ -820,6 +828,14 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsString());
     EXPECT_EQ(upstream_transport_failure_reason, value.value().StringOrDie().value());
+  }
+
+  {
+    auto value = upstream[CelValue::CreateStringView(UpstreamLocality)];
+    ASSERT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMessage());
+    EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(*value.value().MessageOrDie(),
+                                                           upstream_locality));
   }
 }
 
@@ -1174,6 +1190,11 @@ TEST(Context, UpstreamEdgeCases) {
 
   {
     const auto value = upstream[CelValue::CreateStringView(UpstreamConnectionPoolReadyDuration)];
+    EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    const auto value = upstream[CelValue::CreateStringView(UpstreamLocality)];
     EXPECT_FALSE(value.has_value());
   }
 }

@@ -77,6 +77,10 @@ bool setHeaderValueImpl(Http::HeaderMap* map, envoy_dynamic_module_type_buffer_m
     return false;
   }
   absl::string_view key_view(key, key_length);
+  if (value == nullptr) {
+    map->remove(Envoy::Http::LowerCaseString(key_view));
+    return true;
+  }
   absl::string_view value_view(value, value_length);
   // TODO: we might want to avoid copying the key here by trusting the key is already lower case.
   map->setCopy(Envoy::Http::LowerCaseString(key_view), value_view);
@@ -375,7 +379,11 @@ bool envoy_dynamic_module_callback_http_get_request_body_vector(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->decoder_callbacks_->decodingBuffer();
   if (!buffer) {
-    return false;
+    buffer = filter->current_request_body_;
+    if (!buffer) {
+      return false;
+    }
+    // See the comment on current_request_body_ for when we reach this.
   }
   auto raw_slices = buffer->getRawSlices(std::nullopt);
   auto counter = 0;
@@ -392,7 +400,11 @@ bool envoy_dynamic_module_callback_http_get_request_body_vector_size(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->decoder_callbacks_->decodingBuffer();
   if (!buffer) {
-    return false;
+    buffer = filter->current_request_body_;
+    if (!buffer) {
+      return false;
+    }
+    // See the comment on current_request_body_ for when we reach this line.
   }
   *size = buffer->getRawSlices(std::nullopt).size();
   return true;
@@ -403,6 +415,11 @@ bool envoy_dynamic_module_callback_http_append_request_body(
     envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->decoder_callbacks_->decodingBuffer()) {
+    if (filter->current_request_body_) { // See the comment on current_request_body_ for when we
+                                         // enter this block.
+      filter->current_request_body_->add(absl::string_view(static_cast<const char*>(data), length));
+      return true;
+    }
     return false;
   }
   filter->decoder_callbacks_->modifyDecodingBuffer([data, length](Buffer::Instance& buffer) {
@@ -415,11 +432,17 @@ bool envoy_dynamic_module_callback_http_drain_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->decoder_callbacks_->decodingBuffer()) {
+    if (filter->current_request_body_) { // See the comment on current_request_body_ for when we
+                                         // enter this block.
+      auto size = std::min<uint64_t>(filter->current_request_body_->length(), number_of_bytes);
+      filter->current_request_body_->drain(size);
+      return true;
+    }
     return false;
   }
 
   filter->decoder_callbacks_->modifyDecodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
-    auto size = std::min(buffer.length(), number_of_bytes);
+    auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
     buffer.drain(size);
   });
   return true;
@@ -431,7 +454,11 @@ bool envoy_dynamic_module_callback_http_get_response_body_vector(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->encoder_callbacks_->encodingBuffer();
   if (!buffer) {
-    return false;
+    buffer = filter->current_response_body_;
+    if (!buffer) {
+      return false;
+    }
+    // See the comment on current_response_body_ for when we reach this line.
   }
   auto raw_slices = buffer->getRawSlices(std::nullopt);
   auto counter = 0;
@@ -448,7 +475,11 @@ bool envoy_dynamic_module_callback_http_get_response_body_vector_size(
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto buffer = filter->encoder_callbacks_->encodingBuffer();
   if (!buffer) {
-    return false;
+    buffer = filter->current_response_body_;
+    if (!buffer) {
+      return false;
+    }
+    // See the comment on current_response_body_ for when we reach this line.
   }
   *size = buffer->getRawSlices(std::nullopt).size();
   return true;
@@ -459,6 +490,12 @@ bool envoy_dynamic_module_callback_http_append_response_body(
     envoy_dynamic_module_type_buffer_module_ptr data, size_t length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->encoder_callbacks_->encodingBuffer()) {
+    if (filter->current_response_body_) { // See the comment on current_response_body_ for when we
+                                          // enter this block.
+      filter->current_response_body_->add(
+          absl::string_view(static_cast<const char*>(data), length));
+      return true;
+    }
     return false;
   }
   filter->encoder_callbacks_->modifyEncodingBuffer([data, length](Buffer::Instance& buffer) {
@@ -471,14 +508,26 @@ bool envoy_dynamic_module_callback_http_drain_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   if (!filter->encoder_callbacks_->encodingBuffer()) {
+    if (filter->current_response_body_) { // See the comment on current_response_body_ for when we
+                                          // enter this block.
+      auto size = std::min<uint64_t>(filter->current_response_body_->length(), number_of_bytes);
+      filter->current_response_body_->drain(size);
+      return true;
+    }
     return false;
   }
 
   filter->encoder_callbacks_->modifyEncodingBuffer([number_of_bytes](Buffer::Instance& buffer) {
-    auto size = std::min(buffer.length(), number_of_bytes);
+    auto size = std::min<uint64_t>(buffer.length(), number_of_bytes);
     buffer.drain(size);
   });
   return true;
+}
+
+void envoy_dynamic_module_callback_http_clear_route_cache(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  filter->decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
 }
 }
 } // namespace HttpFilters

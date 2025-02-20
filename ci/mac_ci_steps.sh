@@ -32,6 +32,7 @@ DEFAULT_TEST_TARGETS=(
   "//test/integration:protocol_integration_test"
   "//test/integration:tcp_proxy_integration_test"
   "//test/integration:extension_discovery_integration_test"
+  "//test/extensions/dynamic_modules/http:filter_test"
   "//test/integration:listener_lds_integration_test")
 
 if [[ $# -gt 0 ]]; then

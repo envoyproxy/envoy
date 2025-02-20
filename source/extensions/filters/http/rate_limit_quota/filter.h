@@ -30,6 +30,8 @@ using QuotaAssignmentAction = ::envoy::service::rate_limit_quota::v3::RateLimitQ
 using FilterConfig =
     envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig;
 using FilterConfigConstSharedPtr = std::shared_ptr<const FilterConfig>;
+using DenyResponseSettings = envoy::extensions::filters::http::rate_limit_quota::v3::
+    RateLimitQuotaBucketSettings::DenyResponseSettings;
 
 /**
  * Possible async results for a limit call.
@@ -71,7 +73,8 @@ public:
   }
 
 private:
-  Http::FilterHeadersStatus processCachedBucket(CachedBucket& cached_bucket);
+  Http::FilterHeadersStatus processCachedBucket(const DenyResponseSettings& deny_response_settings,
+                                                CachedBucket& cached_bucket);
   bool shouldAllowRequest(const CachedBucket& cached_bucket);
 
   FilterConfigConstSharedPtr config_;

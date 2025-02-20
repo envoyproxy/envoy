@@ -13,11 +13,23 @@ minor_behavior_changes:
     Setting :ref:`dns_query_timeout
     <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>`
     to 0 will disable the the Envoy DNS query timeout and use the underlying DNS implementation timeout.
+- area: ext_proc
+  change: |
+    When :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+    headers/trailers modes have the value ``DEFAULT`` (unset), no change will be made to the processing
+    mode set in the filter configuration.
+- area: ext_proc
+  change: |
+    Ignore request_header_mode field of :ref:`mode_override <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.mode_override>`
+    when comparing the mode_override against allowed_override_modes as request_header mode override is not applicable.
+- area: cel
+  change: |
+    Support extension regex fuctions(e.g. ``re.extract``, ``re.capture`, ``re.captureN``) in CEL.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: dfp
-  change:
+  change: |
     Fixes a bug when loading a DNS cache entry with an empty authority/host header. This fix can be reverted by setting
     runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` to ``false``.
 - area: router
@@ -28,7 +40,7 @@ bug_fixes:
     behavior can be temporarily reverted by setting runtime feature
     ``envoy_reloadable_features_enable_new_query_param_present_match_behavior`` to ``false``.
 - area: tcp_proxy
-  change:
+  change: |
     Fixes a bug when TCP is tunneled over HTTP and upstream connection closed before response headers received to the stream.
     The fix is to run the retry logic in a different event loop iteration to allow cleanup of the closed connection before retrying.
     This fix can be reverted by setting runtime guard ``envoy.reloadable_features.tcp_proxy_retry_on_different_event_loop`` to ``false``.
@@ -36,6 +48,17 @@ bug_fixes:
   change: |
     Fixed OAuth2 credential injector to send scope (if specified) to authorization server when requesting new access
     token using ``client_credentials`` flow.
+- area: original_src filter
+  change: |
+    Set IP_BIND_ADDRESS_NO_PORT socket option in the original_src filter to prevent port exhaustion caused by the
+    kernel prematurely reserving ephemeral ports. This behavior change can be reverted by setting runtime guard
+    ``envoy.reloadable_features.original_src_fix_port_exhaustion`` to ``false``.
+- area: listener
+  change: |
+    Fixed a bug where socket options specified only on an additional address were not applied unless
+    :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` on the listener is set.
+    Now additional address :ref:`socket_options <envoy_v3_api_field_config.listener.v3.AdditionalAddress.socket_options>` are correctly
+    applied even if the listener has no socket options configured.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -51,6 +74,9 @@ removed_config_or_runtime:
 - area: xds
   change: |
     Removed runtime guard ``envoy.reloadable_features.xdstp_path_avoid_colon_encoding`` and legacy code paths.
+- area: config
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.strict_duration_validation`` and legacy code paths.
 - area: thread_local
   change: |
     Removed runtime guard  ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads`` and legacy code paths.
@@ -65,6 +91,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.no_timer_based_rate_limit_token_bucket`` and legacy code paths.
 
 new_features:
+- area: dfp
+  change: |
+    The DFP cluster will now use the async lookup path to do DNS resolutions for null hosts. This behavioral change
+    can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.dfp_cluster_resolves_hosts``
+    to false.
 - area: oauth2
   change: |
     Add the option to specify SameSite cookie attribute values for oauth2 supported cookies.
@@ -103,6 +134,13 @@ new_features:
   change: |
     Adding support for a new body mode: ``FULL_DUPLEX_STREAMED`` in the ``ext_proc`` filter
     :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`.
+- area: proxy_protocol
+  change: |
+    Added support for injecting custom Type-Length-Value (TLV) entries into the Proxy Protocol v2 header for upstream
+    transport sockets. Custom TLVs can be defined both in the endpoint host's typed metadata under the
+    ``envoy.transport_sockets.proxy_protocol`` namespace and at the configuration level via the ``ProxyProtocolConfig``'s
+    ``added_tlvs`` field. Host-level TLV definitions override config-level entries when the same type is specified, allowing
+    default TLVs to be set globally, while enabling further per-endpoint customizations.
 - area: formatter
   change: |
     Added ``QUERY_PARAM`` support for substitution formatter. See :ref:`access log formatter <config_access_log_format>`
@@ -127,5 +165,24 @@ new_features:
   change: |
     Reporting a locality_stats to LRS server when ``rq_issued > 0``, disable by setting runtime guard
     ``envoy.reloadable_features.report_load_with_rq_issued`` to ``false``.
+- area: local_rate_limit
+  change: |
+    Added support for dynamic token buckets in local rate limit filter for http requests.
+- area: attributes
+  change: |
+    Added :ref:`attribute <arch_overview_attributes>` ``upstream.locality`` to obtain upstream locality information.
+- area: dynamic_modules
+  change: |
+    Added the initial support for shared libraries to be loaded by Envoy at runtime. Please refer to the overview documentation for the
+    feature :ref:`here <arch_overview_dynamic_modules>`.
+- area: ext_proc
+  change: |
+    Added an :ref:`extension
+    <envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse>` to save the
+    :ref:`response <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` from the external processor to filter state.
+- area: http
+  change: |
+    Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
+    work as an upstream filter.
 
 deprecated:

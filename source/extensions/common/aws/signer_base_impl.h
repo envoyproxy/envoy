@@ -63,7 +63,7 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 class SignerBaseImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
   SignerBaseImpl(absl::string_view service_name, absl::string_view region,
-                 const CredentialsProviderSharedPtr& credentials_provider,
+                 const CredentialsProviderChainSharedPtr& credentials_provider,
                  Server::Configuration::CommonFactoryContext& context,
                  const AwsSigningHeaderExclusionVector& matcher_config,
                  const bool query_string = false,
@@ -76,8 +76,7 @@ public:
         short_date_formatter_(std::string(SignatureConstants::ShortDateFormat)) {
     for (const auto& matcher : matcher_config) {
       excluded_header_matchers_.emplace_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              matcher, context));
+          std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
     }
   }
 
@@ -141,9 +140,7 @@ protected:
     for (const auto& header : default_excluded_headers_) {
       envoy::type::matcher::v3::StringMatcher m;
       m.set_exact(header);
-      matcher_ptrs.emplace_back(
-          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-              m, context));
+      matcher_ptrs.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(m, context));
     }
     return matcher_ptrs;
   }
@@ -154,7 +151,7 @@ protected:
       Http::Headers::get().ForwardedFor.get(), Http::Headers::get().ForwardedProto.get(),
       "x-amzn-trace-id"};
   std::vector<Matchers::StringMatcherPtr> excluded_header_matchers_;
-  CredentialsProviderSharedPtr credentials_provider_;
+  CredentialsProviderChainSharedPtr credentials_provider_;
   const bool query_string_;
   const uint16_t expiration_time_;
   TimeSource& time_source_;
