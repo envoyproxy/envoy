@@ -9,8 +9,8 @@ py_binary(
         "detector.py",
     ],
     data = [
-        "@rules_buf_toolchains//:buf",
         "@envoy_api//:proto_breaking_change_detector_buf_config",
+        "@rules_buf_toolchains//:buf",
     ],
     main = "detector.py",
     tags = ["manual"],
