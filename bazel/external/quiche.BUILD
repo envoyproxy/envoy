@@ -5176,6 +5176,7 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
+        ":quiche_common_platform",
         ":quiche_common_platform_export",
         ":quiche_common_platform_logging",
         "@com_google_absl//absl/algorithm:container",
