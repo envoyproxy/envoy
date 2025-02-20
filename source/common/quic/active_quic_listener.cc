@@ -223,6 +223,8 @@ void ActiveQuicListener::shutdownListener(const Network::ExtraShutdownListenerOp
 
 uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const {
   if (kernel_worker_routing_) {
+    ASSERT(select_connection_id_worker_(*data.buffer_, worker_index_) == worker_index_);
+
     // The kernel has already routed the packet correctly. Make it stay on the current worker.
     return worker_index_;
   }
@@ -353,24 +355,24 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 
   worker_selector_ =
       quic_cid_generator_factory_->getCompatibleConnectionIdWorkerSelector(concurrency_);
-#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   if (!disable_kernel_bpf_packet_routing_for_test_) {
     if (concurrency_ > 1) {
-      options_->push_back(
-          quic_cid_generator_factory_->createCompatibleLinuxBpfSocketOption(concurrency_));
+      Network::Socket::OptionConstSharedPtr opt =
+          quic_cid_generator_factory_->createCompatibleLinuxBpfSocketOption(concurrency_);
+      if (opt != nullptr) {
+        options_->push_back(opt);
+        kernel_worker_routing_ = true;
+      } else {
+        ENVOY_LOG(warn,
+                  "Efficient routing of QUIC packets to the correct worker is not supported or "
+                  "not implemented by Envoy on this platform or by the configured "
+                  "connection_id_generator. QUIC performance may be degraded.");
+      }
     } else {
       ENVOY_LOG(info, "Not applying BPF because concurrency is 1");
+      kernel_worker_routing_ = true;
     }
-
-    kernel_worker_routing_ = true;
   };
-
-#else
-  if (concurrency_ != 1) {
-    ENVOY_LOG(warn, "Efficient routing of QUIC packets to the correct worker is not supported or "
-                    "not implemented by Envoy on this platform. QUIC performance may be degraded.");
-  }
-#endif
 }
 
 Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::createActiveUdpListener(
