@@ -47,8 +47,7 @@ void UdpTapSink::UdpTapSinkHandle::submitTrace(TapCommon::TraceWrapperPtr&& trac
     FALLTHRU;
   case envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED:
     // will implement above format if it is needed.
-    ENVOY_LOG_MISC(debug,
-                   "{}: Not support PROTO_BINARY, PROTO_BINARY_LENGTH_DELIMITED,  PROTO_TEXT",
+    ENVOY_LOG_MISC(debug, "{}: Not support PROTO_BINARY and PROTO_BINARY_LENGTH_DELIMITEDT",
                    __func__);
     break;
   case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
