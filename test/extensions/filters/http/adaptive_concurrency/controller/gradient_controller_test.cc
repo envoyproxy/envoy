@@ -949,6 +949,27 @@ min_concurrency: 7
   verifyMinRTTValue(min_rtt);
 }
 
+TEST_F(GradientControllerTest, PinnedMinRTTSamplePercentileProcessTest) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  max_concurrency_limit:
+  concurrency_update_interval: 0.1s
+min_rtt: 0.05s
+)EOF";
+
+  auto controller = makePinnedController(yaml);
+
+  tryForward(*controller, true);
+  tryForward(*controller, true);
+  tryForward(*controller, true);
+  tryForward(*controller, false);
+  controller->cancelLatencySample();
+  tryForward(*controller, true);
+  tryForward(*controller, false);
+}
+
 } // namespace
 } // namespace Controller
 } // namespace AdaptiveConcurrency

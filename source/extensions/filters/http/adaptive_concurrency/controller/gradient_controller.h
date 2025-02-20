@@ -323,6 +323,9 @@ private:
 };
 using DynamicGradientControllerSharedPtr = std::shared_ptr<DynamicGradientController>;
 
+/**
+ * A concurrency controller similar to `DynamicGradientController`, except minRTT is fixed.
+ */
 class PinnedGradientController : public ConcurrencyController {
 public:
   PinnedGradientController(PinnedGradientControllerConfig config, Event::Dispatcher& dispatcher,
