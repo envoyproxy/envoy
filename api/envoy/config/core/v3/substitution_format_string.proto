@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Optional configuration options to be used with json_format.
 message JsonFormatOptions {
-  // The output JSON string properties will be sorted. 
+  // The output JSON string properties will be sorted.
   // .. note::
   //   As the properties are always sorted, this option has no effect and is deprecated.
   //
