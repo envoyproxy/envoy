@@ -25,6 +25,11 @@ minor_behavior_changes:
 - area: cel
   change: |
     Support extension regex fuctions(e.g. ``re.extract``, ``re.capture`, ``re.captureN``) in CEL.
+- area: tracing
+  change: |
+    :ref:`generate_request_id
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.generate_request_id>`
+    will generate a request id on non-present and now on empty ``x-request-id`` header.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
