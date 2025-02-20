@@ -275,11 +275,11 @@ additional addresses from XFF:
  :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>` original IP
  detection option instead.
 
- * If the remote address is contained by an entry in ``xff_trusted_cidrs``, and the *last*
-   (rightmost) entry is also contained by an entry in ``xff_trusted_cidrs``, the trusted client
-   address is *second-last* IP address in XFF.
- * If all entries in XFF are contained by an entry in ``xff_trusted_cidrs``, the trusted client
-   address is the *first* (leftmost) IP address in XFF.
+* If the remote address is contained by an entry in ``xff_trusted_cidrs``, and the *last*
+  (rightmost) entry is also contained by an entry in ``xff_trusted_cidrs``, the trusted client
+  address is *second-last* IP address in XFF.
+* If all entries in XFF are contained by an entry in ``xff_trusted_cidrs``, the trusted client
+  address is the *first* (leftmost) IP address in XFF.
 
 Envoy uses the trusted client address contents to determine whether a request originated
 externally or internally. This influences whether the

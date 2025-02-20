@@ -622,15 +622,15 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsEmptyXFFHeader) {
 }
 
 struct ExampleParameters {
-  bool use_remote_address { false };
-  uint32_t xff_num_trusted_hops { 0 };
+  bool use_remote_address{false};
+  uint32_t xff_num_trusted_hops{0};
   std::string downstream_ip_address;
   std::string received_xff_header;
   std::string trusted_client_address;
   std::string x_envoy_external_address;
   std::string modified_xff_header;
   std::vector<std::pair<std::string, unsigned char>> xff_trusted_cidrs;
-  bool envoy_internal { false };
+  bool envoy_internal{false};
 
   ExampleParameters& useRemoteAddress(bool value) {
     use_remote_address = value;
@@ -678,10 +678,8 @@ struct ExampleParameters {
   }
 };
 
-class DocumentationExamples : public ConnectionManagerUtilityTest, 
-                              public testing::WithParamInterface<ExampleParameters> {
-
-};
+class DocumentationExamples : public ConnectionManagerUtilityTest,
+                              public testing::WithParamInterface<ExampleParameters> {};
 
 // Verify that we use the first address in XFF and XFF is appended to.
 TEST_P(DocumentationExamples, Example) {
@@ -706,7 +704,7 @@ TEST_P(DocumentationExamples, Example) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(params.use_remote_address));
   TestRequestHeaderMapImpl headers;
   if (!params.received_xff_header.empty()) {
-      headers.setForwardedFor(params.received_xff_header);
+    headers.setForwardedFor(params.received_xff_header);
   }
 
   const auto mutateRequestRet = callMutateRequestHeaders(headers, Protocol::Http2);
@@ -720,85 +718,85 @@ TEST_P(DocumentationExamples, Example) {
   }
 
   if (!params.received_xff_header.empty()) {
-    EXPECT_EQ(headers.getForwardedForValue(), absl::string_view{ params.modified_xff_header });
+    EXPECT_EQ(headers.getForwardedForValue(), absl::string_view{params.modified_xff_header});
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(ConnectionManagerUtilityTest,
-  DocumentationExamples,
-  testing::Values(ExampleParameters() // Example 1
-  .useRemoteAddress(true)
-  .xffNumTrustedHops(0)
-  .downstreamIPAddress("192.0.2.5")
-  .receivedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1")
-  .trustedClientAddress("192.0.2.5:0")
-  .xEnvoyExternalAddress("192.0.2.5")
-  .modifiedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5")
-  .envoyInternal(false),
+INSTANTIATE_TEST_SUITE_P(
+    ConnectionManagerUtilityTest, DocumentationExamples,
+    testing::Values(
+        ExampleParameters() // Example 1
+            .useRemoteAddress(true)
+            .xffNumTrustedHops(0)
+            .downstreamIPAddress("192.0.2.5")
+            .receivedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1")
+            .trustedClientAddress("192.0.2.5:0")
+            .xEnvoyExternalAddress("192.0.2.5")
+            .modifiedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5")
+            .envoyInternal(false),
 
-  ExampleParameters() // Example 2
-  .useRemoteAddress(false)
-  .xffNumTrustedHops(0)
-  .downstreamIPAddress("10.11.12.13")
-  .receivedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5")
-  .trustedClientAddress("192.0.2.5:0")
-  .modifiedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5,10.11.12.13")
-  .envoyInternal(false),
+        ExampleParameters() // Example 2
+            .useRemoteAddress(false)
+            .xffNumTrustedHops(0)
+            .downstreamIPAddress("10.11.12.13")
+            .receivedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5")
+            .trustedClientAddress("192.0.2.5:0")
+            .modifiedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5,10.11.12.13")
+            .envoyInternal(false),
 
-  ExampleParameters() // Example 3
-  .useRemoteAddress(true)
-  .xffNumTrustedHops(2)
-  .downstreamIPAddress("192.0.2.5")
-  .receivedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1")
-  .trustedClientAddress("203.0.113.10:0")
-  .xEnvoyExternalAddress("203.0.113.10")
-  .modifiedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5")
-  .envoyInternal(false),
+        ExampleParameters() // Example 3
+            .useRemoteAddress(true)
+            .xffNumTrustedHops(2)
+            .downstreamIPAddress("192.0.2.5")
+            .receivedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1")
+            .trustedClientAddress("203.0.113.10:0")
+            .xEnvoyExternalAddress("203.0.113.10")
+            .modifiedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5")
+            .envoyInternal(false),
 
-  ExampleParameters() // Example 4
-  .useRemoteAddress(false)
-  .xffNumTrustedHops(2)
-  .downstreamIPAddress("10.11.12.13")
-  .receivedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5")
-  .trustedClientAddress("203.0.113.10:0")
-  .modifiedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5,10.11.12.13")
-  .envoyInternal(false),
+        ExampleParameters() // Example 4
+            .useRemoteAddress(false)
+            .xffNumTrustedHops(2)
+            .downstreamIPAddress("10.11.12.13")
+            .receivedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5")
+            .trustedClientAddress("203.0.113.10:0")
+            .modifiedXFFHeader("203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5,10.11.12.13")
+            .envoyInternal(false),
 
-  ExampleParameters() // Example 5
-  .useRemoteAddress(false)
-  .xffNumTrustedHops(0)
-  .downstreamIPAddress("10.20.30.40")
-  .trustedClientAddress("10.20.30.40:0")
-  .envoyInternal(false),
+        ExampleParameters() // Example 5
+            .useRemoteAddress(false)
+            .xffNumTrustedHops(0)
+            .downstreamIPAddress("10.20.30.40")
+            .trustedClientAddress("10.20.30.40:0")
+            .envoyInternal(false),
 
-  ExampleParameters() // Example 6
-  .useRemoteAddress(false)
-  .xffNumTrustedHops(0)
-  .downstreamIPAddress("10.20.30.50")
-  .receivedXFFHeader("10.20.30.40")
-  .trustedClientAddress("10.20.30.40:0")
-  .modifiedXFFHeader("10.20.30.40,10.20.30.50")
-  .envoyInternal(true),
+        ExampleParameters() // Example 6
+            .useRemoteAddress(false)
+            .xffNumTrustedHops(0)
+            .downstreamIPAddress("10.20.30.50")
+            .receivedXFFHeader("10.20.30.40")
+            .trustedClientAddress("10.20.30.40:0")
+            .modifiedXFFHeader("10.20.30.40,10.20.30.50")
+            .envoyInternal(true),
 
-  ExampleParameters() // Example 7
-  .useRemoteAddress(false)
-  .addTrustedCidr("192.0.2.0", 24)
-  .downstreamIPAddress("192.0.2.5")
-  .receivedXFFHeader("203.0.113.128,203.0.113.10,192.0.2.1")
-  .trustedClientAddress("203.0.113.10:0")
-  .modifiedXFFHeader("203.0.113.128,203.0.113.10,192.0.2.1,192.0.2.5")
-  .envoyInternal(false),
+        ExampleParameters() // Example 7
+            .useRemoteAddress(false)
+            .addTrustedCidr("192.0.2.0", 24)
+            .downstreamIPAddress("192.0.2.5")
+            .receivedXFFHeader("203.0.113.128,203.0.113.10,192.0.2.1")
+            .trustedClientAddress("203.0.113.10:0")
+            .modifiedXFFHeader("203.0.113.128,203.0.113.10,192.0.2.1,192.0.2.5")
+            .envoyInternal(false),
 
-  ExampleParameters() // Example 8
-  .useRemoteAddress(false)
-  .addTrustedCidr("192.0.2.0", 24)
-  .addTrustedCidr("198.51.100.0", 24)
-  .downstreamIPAddress("192.0.2.5")
-  .receivedXFFHeader("203.0.113.128,203.0.113.10,198.51.100.1")
-  .trustedClientAddress("203.0.113.10:0")
-  .modifiedXFFHeader("203.0.113.128,203.0.113.10,198.51.100.1,192.0.2.5")
-  .envoyInternal(false)
-  ));
+        ExampleParameters() // Example 8
+            .useRemoteAddress(false)
+            .addTrustedCidr("192.0.2.0", 24)
+            .addTrustedCidr("198.51.100.0", 24)
+            .downstreamIPAddress("192.0.2.5")
+            .receivedXFFHeader("203.0.113.128,203.0.113.10,198.51.100.1")
+            .trustedClientAddress("203.0.113.10:0")
+            .modifiedXFFHeader("203.0.113.128,203.0.113.10,198.51.100.1,192.0.2.5")
+            .envoyInternal(false)));
 
 // Verify we preserve hop by hop headers if configured to do so.
 TEST_F(ConnectionManagerUtilityTest, PreserveHopByHop) {
@@ -2477,8 +2475,6 @@ TEST_F(ConnectionManagerUtilityTest, DiscardTEHeaderWithoutTrailers) {
 
   EXPECT_EQ("", headers.getTEValue());
 }
-
-
 
 } // namespace Http
 } // namespace Envoy
