@@ -213,11 +213,15 @@ address of the nearest client to the XFF list before proxying the request. Some 
 2. ``x-forwarded-for: 50.0.0.1, 40.0.0.1`` (external proxy hop)
 3. ``x-forwarded-for: 50.0.0.1, 10.0.0.1`` (internal proxy hop)
 
-Envoy will only append to XFF if the :ref:`use_remote_address
+Envoy will only append to XFF when at least one of the following conditions is met:
+1. The :ref:`use_remote_address
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
-HTTP connection manager option is set to true and the :ref:`skip_xff_append
+HTTP connection manager option is set to true
+2. The :ref:`skip_xff_append
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.skip_xff_append>`
-is set false. This means that if ``use_remote_address`` is false (which is the default) or
+is set false. 
+
+This means that if ``use_remote_address`` is false (which is the default) or
 ``skip_xff_append`` is true, the connection manager operates in a transparent mode where it does not
 modify XFF.
 
@@ -377,8 +381,8 @@ Example 7: Envoy as edge proxy, with one trusted CIDR
       | XFF = "203.0.113.128, 203.0.113.10, 192.0.2.1"
 
     Result:
-      | Trusted client address = 192.0.2.1
-      | X-Envoy-External-Address is set to 192.0.2.1
+      | Trusted client address = 203.0.113.10
+      | X-Envoy-External-Address remains unset
       | XFF is changed to "203.0.113.128, 203.0.113.10, 192.0.2.1, 192.0.2.5"
       | X-Envoy-Internal is removed (if it was present in the incoming request)
 
@@ -393,7 +397,7 @@ Example 8: Envoy as edge proxy, with two trusted CIDRs
 
     Result:
       | Trusted client address = 203.0.113.10
-      | X-Envoy-External-Address is set to 203.0.113.10
+      | X-Envoy-External-Address remains unset
       | XFF is changed to "203.0.113.128, 203.0.113.10, 198.51.100.1, 192.0.2.5"
       | X-Envoy-Internal is removed (if it was present in the incoming request)
 
