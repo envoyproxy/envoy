@@ -22,6 +22,30 @@ public:
     addFakeUpstream(Http::CodecType::HTTP2);
   }
 
+  static std::vector<std::tuple<HttpProtocolTestParams, bool>>
+  getDefaultTestParams(const std::vector<Http::CodecType>& downstream_protocols =
+                           {
+                               Http::CodecType::HTTP1,
+                               Http::CodecType::HTTP2,
+                           },
+                       const std::vector<Http::CodecType>& upstream_protocols = {
+                           Http::CodecType::HTTP1,
+                           Http::CodecType::HTTP2,
+                       }) {
+    std::vector<std::tuple<HttpProtocolTestParams, bool>> ret;
+    std::vector<HttpProtocolTestParams> protocol_defaults =
+        HttpProtocolIntegrationTest::getProtocolTestParams(downstream_protocols,
+                                                           upstream_protocols);
+    const std::vector<bool> testing_downstream_filter_values{true, false};
+
+    for (auto& param : protocol_defaults) {
+      for (bool testing_downstream_filter : testing_downstream_filter_values) {
+        ret.push_back(std::make_tuple(param, testing_downstream_filter));
+      }
+    }
+    return ret;
+  }
+
   void initializeFilter(const std::string& filter_config, const std::string& domain = "*") {
     config_helper_.prependFilter(filter_config, testing_downstream_filter_);
 
@@ -262,10 +286,9 @@ public:
   FakeStreamPtr lua_request_;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    Protocols, LuaIntegrationTest,
-    testing::ValuesIn(UpstreamDownstreamIntegrationTest::getDefaultTestParams()),
-    UpstreamDownstreamIntegrationTest::testParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, LuaIntegrationTest,
+                         testing::ValuesIn(LuaIntegrationTest::getDefaultTestParams()),
+                         UpstreamDownstreamIntegrationTest::testParamsToString);
 
 // Regression test for pulling route info during early local replies using the Lua filter
 // metadata() API. Covers both the upgrade required and no authority cases.
