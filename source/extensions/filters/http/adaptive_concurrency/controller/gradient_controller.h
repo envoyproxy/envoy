@@ -58,23 +58,23 @@ public:
         min_concurrency_(min_concurrency), min_rtt_buffer_pct_(min_rtt_buffer_pct) {}
   virtual ~GradientControllerConfig() = default;
 
-  virtual std::chrono::milliseconds sampleRTTCalcInterval() const {
+  std::chrono::milliseconds sampleRTTCalcInterval() const {
     const auto ms = runtime_.snapshot().getInteger(RuntimeKeys::get().SampleRTTCalcIntervalKey,
                                                    sample_rtt_calc_interval_.count());
     return std::chrono::milliseconds(ms);
   }
 
-  virtual uint32_t minConcurrency() const {
+  uint32_t minConcurrency() const {
     return runtime_.snapshot().getInteger(RuntimeKeys::get().MinConcurrencyKey, min_concurrency_);
   }
 
-  virtual uint32_t maxConcurrencyLimit() const {
+  uint32_t maxConcurrencyLimit() const {
     return runtime_.snapshot().getInteger(RuntimeKeys::get().MaxConcurrencyLimitKey,
                                           max_concurrency_limit_);
   }
 
   // The percentage is normalized to the range [0.0, 1.0].
-  virtual double sampleAggregatePercentile() const {
+  double sampleAggregatePercentile() const {
     const double val = runtime_.snapshot().getDouble(
         RuntimeKeys::get().SampleAggregatePercentileKey, sample_aggregate_percentile_);
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
