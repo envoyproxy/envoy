@@ -64,10 +64,6 @@ public:
     return std::chrono::milliseconds(ms);
   }
 
-  uint32_t minConcurrency() const {
-    return runtime_.snapshot().getInteger(RuntimeKeys::get().MinConcurrencyKey, min_concurrency_);
-  }
-
   uint32_t maxConcurrencyLimit() const {
     return runtime_.snapshot().getInteger(RuntimeKeys::get().MaxConcurrencyLimitKey,
                                           max_concurrency_limit_);
@@ -80,10 +76,14 @@ public:
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
+  uint32_t minConcurrency() const {
+    return runtime_.snapshot().getInteger(RuntimeKeys::get().MinConcurrencyKey, min_concurrency_);
+  }
+
   // The percentage is normalized to the range [0.0, 1.0].
   double minRTTBufferPercent() const {
-    const double val = GradientControllerConfig::runtime().snapshot().getDouble(
-        RuntimeKeys::get().MinRTTBufferPercentKey, min_rtt_buffer_pct_);
+    const double val = runtime_.snapshot().getDouble(RuntimeKeys::get().MinRTTBufferPercentKey,
+                                                     min_rtt_buffer_pct_);
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
