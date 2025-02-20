@@ -50,11 +50,12 @@ class GradientControllerConfig {
 public:
   GradientControllerConfig(std::chrono::milliseconds sample_rtt_calc_interval,
                            uint64_t max_concurrency_limit, double sample_aggregate_percentile,
-                           uint64_t min_concurrency, Runtime::Loader& runtime)
+                           uint64_t min_concurrency, double min_rtt_buffer_pct,
+                           Runtime::Loader& runtime)
       : runtime_(runtime), sample_rtt_calc_interval_(sample_rtt_calc_interval),
         max_concurrency_limit_(max_concurrency_limit),
         sample_aggregate_percentile_(sample_aggregate_percentile),
-        min_concurrency_(min_concurrency) {}
+        min_concurrency_(min_concurrency), min_rtt_buffer_pct_(min_rtt_buffer_pct) {}
   virtual ~GradientControllerConfig() = default;
 
   virtual std::chrono::milliseconds sampleRTTCalcInterval() const {
@@ -76,6 +77,13 @@ public:
   virtual double sampleAggregatePercentile() const {
     const double val = runtime_.snapshot().getDouble(
         RuntimeKeys::get().SampleAggregatePercentileKey, sample_aggregate_percentile_);
+    return std::max(0.0, std::min(val, 100.0)) / 100.0;
+  }
+
+  // The percentage is normalized to the range [0.0, 1.0].
+  double minRTTBufferPercent() const {
+    const double val = GradientControllerConfig::runtime().snapshot().getDouble(
+        RuntimeKeys::get().MinRTTBufferPercentKey, min_rtt_buffer_pct_);
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
@@ -109,6 +117,8 @@ private:
   const uint64_t max_concurrency_limit_;
   const double sample_aggregate_percentile_;
   const uint64_t min_concurrency_;
+  // The amount added to the measured minRTT as a hedge against natural variability in latency.
+  const double min_rtt_buffer_pct_;
 };
 
 class DynamicGradientControllerConfig : public Logger::Loggable<Logger::Id::filter>,
@@ -139,13 +149,6 @@ public:
     return std::max(0.0, std::min(val, 100.0)) / 100.0;
   }
 
-  // The percentage is normalized to the range [0.0, 1.0].
-  double minRTTBufferPercent() const {
-    const double val = GradientControllerConfig::runtime().snapshot().getDouble(
-        RuntimeKeys::get().MinRTTBufferPercentKey, min_rtt_buffer_pct_);
-    return std::max(0.0, std::min(val, 100.0)) / 100.0;
-  }
-
 private:
   // The measured request round-trip time under ideal conditions.
   const std::chrono::milliseconds min_rtt_calc_interval_;
@@ -155,9 +158,6 @@ private:
 
   // The number of requests to aggregate/sample during the minRTT recalculation.
   const uint32_t min_rtt_aggregate_request_count_;
-
-  // The amount added to the measured minRTT as a hedge against natural variability in latency.
-  const double min_rtt_buffer_pct_;
 };
 using DynamicGradientControllerConfigSharedPtr = std::shared_ptr<DynamicGradientControllerConfig>;
 
@@ -392,6 +392,12 @@ private:
   Thread::ThreadSynchronizer synchronizer_;
 };
 using PinnedGradientControllerSharedPtr = std::shared_ptr<PinnedGradientController>;
+
+uint32_t calculateNewConcurrencyLimit(std::chrono::nanoseconds min_rtt,
+                                      std::chrono::nanoseconds sample_rtt,
+                                      uint32_t concurrency_limit,
+                                      const GradientControllerConfig& config,
+                                      GradientControllerStats& stats);
 
 } // namespace Controller
 } // namespace AdaptiveConcurrency
