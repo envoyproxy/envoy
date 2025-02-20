@@ -1099,13 +1099,23 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
   const std::string hcm_str =
       "type.googleapis.com/"
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager";
-  if (is_quic &&
-      (filter_chain.filters().empty() ||
-       filter_chain.filters(filter_chain.filters().size() - 1).typed_config().type_url() !=
-           hcm_str)) {
-    return absl::InvalidArgumentError(
-        fmt::format("error building network filter chain for quic listener: requires "
-                    "http_connection_manager filter to be last in the chain."));
+  if (is_quic) {
+    bool filter_chain_ok = false;
+    if (!filter_chain.filters().empty()) {
+      auto& last = filter_chain.filters(filter_chain.filters().size() - 1);
+      if (last.has_typed_config() && last.typed_config().type_url() == hcm_str) {
+        filter_chain_ok = true;
+      } else if (last.has_config_discovery() && last.config_discovery().type_urls_size() == 1) {
+        if (last.config_discovery().type_urls(0) == hcm_str) {
+          filter_chain_ok = true;
+        }
+      }
+    }
+    if (!filter_chain_ok) {
+      return absl::InvalidArgumentError(
+          fmt::format("error building network filter chain for quic listener: requires "
+                      "http_connection_manager filter to be last in the chain."));
+    }
   }
 #else
   // When QUIC is compiled out it should not be possible to configure either the QUIC transport
