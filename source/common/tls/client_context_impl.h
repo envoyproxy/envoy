@@ -45,22 +45,26 @@ public:
 
   absl::StatusOr<bssl::UniquePtr<SSL>>
   newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
-         Upstream::HostDescriptionConstSharedPtr host) override;
+         const Upstream::HostDescriptionConstSharedPtr& host) override;
 
 private:
   ClientContextImpl(Stats::Scope& scope, const Envoy::Ssl::ClientContextConfig& config,
                     Server::Configuration::CommonFactoryContext& factory_context,
                     absl::Status& creation_status);
 
-  int newSessionKey(SSL_SESSION* session);
+  int newSessionKey(SSL_SESSION* session, const Upstream::HostDescriptionConstSharedPtr& host);
+  static int sslSocketUpstreamHostIndex();
+  uint64_t sessionCacheKey(const Upstream::HostDescriptionConstSharedPtr& host);
 
   const std::string server_name_indication_;
   const bool auto_host_sni_;
   const bool allow_renegotiation_;
   const bool enforce_rsa_key_usage_;
   const size_t max_session_keys_;
-  absl::Mutex session_keys_mu_;
-  std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ ABSL_GUARDED_BY(session_keys_mu_);
+  const size_t max_session_cache_upstream_hosts_;
+  absl::Mutex session_keys_map_mu_;
+  absl::flat_hash_map<uint64_t, std::deque<bssl::UniquePtr<SSL_SESSION>>>
+      session_keys_map_ ABSL_GUARDED_BY(session_keys_map_mu_);
   bool session_keys_single_use_{false};
 };
 

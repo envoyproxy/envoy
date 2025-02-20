@@ -63,7 +63,8 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
       auto_host_sni_(config.autoHostServerNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
       enforce_rsa_key_usage_(config.enforceRsaKeyUsage()),
-      max_session_keys_(config.maxSessionKeys()) {
+      max_session_keys_(config.maxSessionKeys()),
+      max_session_cache_upstream_hosts_(config.maxSessionCacheUpstreamHosts()) {
   if (!creation_status.ok()) {
     return;
   }
@@ -93,20 +94,34 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
               static_cast<ContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
           ClientContextImpl* client_context_impl = dynamic_cast<ClientContextImpl*>(context_impl);
           RELEASE_ASSERT(client_context_impl != nullptr, ""); // for Coverity
-          return client_context_impl->newSessionKey(session);
+          auto* host = static_cast<const Upstream::HostDescriptionConstSharedPtr*>(
+              SSL_get_ex_data(ssl, sslSocketUpstreamHostIndex()));
+          RELEASE_ASSERT(host != nullptr, "upstream host description not set in SSL socket");
+          return client_context_impl->newSessionKey(session, *host);
         });
   }
 }
 
+int ClientContextImpl::sslSocketUpstreamHostIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() -> int {
+    int ssl_socket_upstream_host_index =
+        SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    RELEASE_ASSERT(ssl_socket_upstream_host_index >= 0, "");
+    return ssl_socket_upstream_host_index;
+  }());
+}
+
 absl::StatusOr<bssl::UniquePtr<SSL>>
 ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
-                          Upstream::HostDescriptionConstSharedPtr host) {
+                          const Upstream::HostDescriptionConstSharedPtr& host) {
   absl::StatusOr<bssl::UniquePtr<SSL>> ssl_con_or_status(ContextImpl::newSsl(options, host));
   if (!ssl_con_or_status.ok()) {
     return ssl_con_or_status;
   }
 
   bssl::UniquePtr<SSL> ssl_con = std::move(ssl_con_or_status.value());
+  SSL_set_ex_data(ssl_con.get(), sslSocketUpstreamHostIndex(),
+                  const_cast<Upstream::HostDescriptionConstSharedPtr*>(&host));
 
   std::string server_name_indication;
   if (options && options->serverNameOverride().has_value()) {
@@ -159,26 +174,30 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
   SSL_set_enforce_rsa_key_usage(ssl_con.get(), enforce_rsa_key_usage_);
 
   if (max_session_keys_ > 0) {
+    uint64_t key = sessionCacheKey(host);
     if (session_keys_single_use_) {
       // Stored single-use session keys, use write/write locks.
-      absl::WriterMutexLock l(&session_keys_mu_);
-      if (!session_keys_.empty()) {
+      absl::WriterMutexLock l(&session_keys_map_mu_);
+      auto it = session_keys_map_.find(key);
+      if (it != session_keys_map_.end() && !it->second.empty()) {
+        auto& session_keys = it->second;
         // Use the most recently stored session key, since it has the highest
         // probability of still being recognized/accepted by the server.
-        SSL_SESSION* session = session_keys_.front().get();
+        SSL_SESSION* session = session_keys.front().get();
         SSL_set_session(ssl_con.get(), session);
         // Remove single-use session key (TLS 1.3) after first use.
         if (SSL_SESSION_should_be_single_use(session)) {
-          session_keys_.pop_front();
+          session_keys.pop_front();
         }
       }
     } else {
       // Never stored single-use session keys, use read/write locks.
-      absl::ReaderMutexLock l(&session_keys_mu_);
-      if (!session_keys_.empty()) {
+      absl::ReaderMutexLock l(&session_keys_map_mu_);
+      auto it = session_keys_map_.find(key);
+      if (it != session_keys_map_.end() && !it->second.empty()) {
         // Use the most recently stored session key, since it has the highest
         // probability of still being recognized/accepted by the server.
-        SSL_SESSION* session = session_keys_.front().get();
+        SSL_SESSION* session = it->second.front().get();
         SSL_set_session(ssl_con.get(), session);
       }
     }
@@ -187,20 +206,61 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
   return ssl_con;
 }
 
-int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
+int ClientContextImpl::newSessionKey(SSL_SESSION* session,
+                                     const Upstream::HostDescriptionConstSharedPtr& host) {
   // In case we ever store single-use session key (TLS 1.3),
   // we need to switch to using write/write locks.
   if (SSL_SESSION_should_be_single_use(session)) {
     session_keys_single_use_ = true;
   }
-  absl::WriterMutexLock l(&session_keys_mu_);
+
+  uint64_t key = sessionCacheKey(host);
+  absl::WriterMutexLock l(&session_keys_map_mu_);
+
+  auto it = session_keys_map_.find(key);
+  if (it == session_keys_map_.end()) {
+    std::tie(it, std::ignore) =
+        session_keys_map_.emplace(key, std::deque<bssl::UniquePtr<SSL_SESSION>>());
+    if (max_session_cache_upstream_hosts_ > 0) {
+      if (session_keys_map_.size() > max_session_cache_upstream_hosts_) {
+        // When the cache size has exceeded, remove the key next to the one that was just added
+        // for randomization.
+        auto next_it = std::next(it);
+        if (next_it == session_keys_map_.end()) {
+          // Wrap around to the first key.
+          next_it = session_keys_map_.begin();
+        }
+        session_keys_map_.erase(next_it);
+      }
+    } else {
+      // If cache by upstream is disabled, we fallback to the original behavior by
+      // storing session keys under the first key (0).
+      ASSERT(key == 0);
+    }
+  }
+
+  auto& session_keys = it->second;
   // Evict oldest entries.
-  while (session_keys_.size() >= max_session_keys_) {
-    session_keys_.pop_back();
+  while (session_keys.size() >= max_session_keys_) {
+    session_keys.pop_back();
   }
   // Add new session key at the front of the queue, so that it's used first.
-  session_keys_.push_front(bssl::UniquePtr<SSL_SESSION>(session));
+  session_keys.push_front(bssl::UniquePtr<SSL_SESSION>(session));
   return 1; // Tell BoringSSL that we took ownership of the session.
+}
+
+uint64_t ClientContextImpl::sessionCacheKey(const Upstream::HostDescriptionConstSharedPtr& host) {
+  // If cache by upstream is disabled, we fallback to the original behavior by
+  // storing session keys under the first key (0).
+  if (max_session_cache_upstream_hosts_ == 0 || host == nullptr) {
+    return 0;
+  }
+
+  const auto& addr_str = host->address()->asString();
+  if (addr_str.empty()) {
+    return 0;
+  }
+  return HashUtil::xxHash64(addr_str);
 }
 
 } // namespace Tls

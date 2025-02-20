@@ -155,6 +155,11 @@ public:
    * and incompatible with the TLS usage is enabled.
    */
   virtual bool enforceRsaKeyUsage() const PURE;
+
+  /**
+   * @return The maximum number of entries in the upstream session keys cache.
+   */
+  virtual size_t maxSessionCacheUpstreamHosts() const PURE;
 };
 
 using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;
