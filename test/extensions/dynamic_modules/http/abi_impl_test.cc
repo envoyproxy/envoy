@@ -225,6 +225,14 @@ TEST_P(DynamicModuleHttpFilterSetHeaderValueTest, SetHeaderValue) {
   auto values3 = header_map->get(Envoy::Http::LowerCaseString(key3));
   EXPECT_EQ(values3.size(), 1);
   EXPECT_EQ(values3[0]->value().getStringView(), value3);
+
+  // Remove the key by passing null value.
+  const std::string remove_key = "single";
+  envoy_dynamic_module_type_buffer_envoy_ptr remove_key_ptr = const_cast<char*>(remove_key.data());
+  size_t remove_key_length = remove_key.size();
+  EXPECT_TRUE(callback(filter_.get(), remove_key_ptr, remove_key_length, nullptr, 0));
+  auto removed_values = header_map->get(Envoy::Http::LowerCaseString(remove_key));
+  EXPECT_EQ(removed_values.size(), 0);
 }
 
 INSTANTIATE_TEST_SUITE_P(
