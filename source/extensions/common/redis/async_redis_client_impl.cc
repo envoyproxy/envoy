@@ -47,7 +47,10 @@ void RedisAsyncClient::onRespValue(NetworkFilters::Common::Redis::RespValuePtr&&
   if (value->type() == NetworkFilters::Common::Redis::RespType::Null) {
     callback_(true, false, absl::nullopt);
   } else {
-    callback_(true, true, value->toString());
+    std::string response = value->toString();
+    // Result is a string containing quotes. Drop the quotes on both sides of the string.
+    response = response.substr(1, response.length() - 2);
+    callback_(true, true, std::move(response));
   }
   callback_ = nullptr;
 

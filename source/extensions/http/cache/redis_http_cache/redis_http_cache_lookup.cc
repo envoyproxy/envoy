@@ -38,18 +38,9 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
         return;
     }
 
-    // We need to strip quotes on both sides of the string.
-    // TODO: maybe move to redis async client.
-    if (redis_value.value().length() == 4)  {
-        redis_value.value().clear();
-    } else {
-        redis_value = redis_value.value().substr(1, redis_value.value().length() - 2);
-    }
-
-
-    // Entry is in redis, but is empty. It means that some other entity
+    // Entry is in redis, but is empty (2 quotes only). It means that some other entity
     // is filling the cache. Return the same value as when not found.
-    if (redis_value.value().length() == 0) {
+    if (redis_value.value().length() == 2) {
         LookupResult lookup_result;
         lookup_result.cache_entry_status_ = CacheEntryStatus::LookupError;
         (cb_)(std::move(lookup_result), /* end_stream (ignored) = */ false);
@@ -109,10 +100,6 @@ void RedisHttpCacheLookupContext::getBody(const AdjustedByteRange& range, Lookup
         return;
     }
 
-    // We need to strip quotes on both sides of the string.
-    // TODO: maybe move to redis async client.
-    redis_value = redis_value.value().substr(1, redis_value.value().length() - 2);
-
   // TODO: this is not very efficient.
   std::unique_ptr<Buffer::OwnedImpl> buf;
     buf = std::make_unique<Buffer::OwnedImpl>();
@@ -150,10 +137,6 @@ void RedisHttpCacheLookupContext::getTrailers(LookupTrailersCallback&& cb) {
         (cb2_)(nullptr);
         return;
     }
-
-    // We need to strip quotes on both sides of the string.
-    // TODO: maybe move to redis async client.
-    redis_value = redis_value.value().substr(1, redis_value.value().length() - 2);
 
     CacheFileTrailer trailers;
     trailers.ParseFromString(redis_value.value());
