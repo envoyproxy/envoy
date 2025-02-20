@@ -1,4 +1,5 @@
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/http/cache/redis_http_cache/redis_http_cache.h"
 #include "source/extensions/http/cache/redis_http_cache/redis_http_cache_lookup.h"
 #include "source/extensions/http/cache/redis_http_cache/cache_header_proto_util.h"
 
@@ -15,7 +16,7 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     // Try to get headers from Redis. Passed callback is called when response is received
     // or error happens.
   std::weak_ptr<bool> weak = alive_;
-  tls_slot_->send({"get", fmt::format(RedisCacheHeadersEntry, stableHashKey(lookup_.key()))},
+  if(!tls_slot_->send(cluster_name_, {"get", fmt::format(RedisCacheHeadersEntry, stableHashKey(lookup_.key()))},
     [this, weak] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
     // Session was destructed during the call to Redis.
     // Do nothing. Do not call callback because its context is gone.
@@ -73,7 +74,14 @@ void RedisHttpCacheLookupContext::getHeaders(LookupHeadersCallback&& cb) {
     bool stream_end = (body_size == 0) && (!has_trailers_);
     /*std::move*/(cb_)(lookup_.makeLookupResult(std::move(headers), metadataFromHeaderProto(header), body_size), stream_end);
     }
-);
+)) {
+        // Callback must be executed of filter's thread.
+        dispatcher_.post([this](){ 
+        LookupResult lookup_result;
+        lookup_result.cache_entry_status_ = CacheEntryStatus::LookupError;
+        (cb_)(std::move(lookup_result), /* end_stream (ignored) = */ false);
+        });
+    }
 }
 
 void RedisHttpCacheLookupContext::getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb)
@@ -81,7 +89,7 @@ void RedisHttpCacheLookupContext::getBody(const AdjustedByteRange& range, Lookup
     cb1_ = std::move(cb);
 
   std::weak_ptr<bool> weak = alive_;
-  tls_slot_->send({"getrange", fmt::format(RedisCacheBodyEntry, stableHashKey(lookup_.key())), fmt::format("{}", range.begin()), fmt::format("{}", range.begin() + range.length() - 1)},
+  if(!tls_slot_->send(cluster_name_, {"getrange", fmt::format(RedisCacheBodyEntry, stableHashKey(lookup_.key())), fmt::format("{}", range.begin()), fmt::format("{}", range.begin() + range.length() - 1)},
     [this, weak] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
     // Session was destructed during the call to Redis.
     // Do nothing. Do not call callback because its context is gone.
@@ -110,14 +118,20 @@ void RedisHttpCacheLookupContext::getBody(const AdjustedByteRange& range, Lookup
     buf = std::make_unique<Buffer::OwnedImpl>();
     buf->add(redis_value.value());
         /*std::move(cb1_)*/cb1_(std::move(buf), !has_trailers_);
-    });
+    }))
+ {
+        // Callback must be executed of filter's thread.
+        dispatcher_.post([this](){ 
+        (cb1_)(nullptr, true);
+        });
+    }
 }
 
 void RedisHttpCacheLookupContext::getTrailers(LookupTrailersCallback&& cb) {
     cb2_ = std::move(cb);
 
   std::weak_ptr<bool> weak = alive_;
-  tls_slot_->send({"get", fmt::format(RedisCacheTrailersEntry, stableHashKey(lookup_.key()))},
+  if(!tls_slot_->send(cluster_name_, {"get", fmt::format(RedisCacheTrailersEntry, stableHashKey(lookup_.key()))},
     [this, weak] (bool connected, bool success, absl::optional<std::string> redis_value) mutable {
 
     // Session was destructed during the call to Redis.
@@ -145,7 +159,13 @@ void RedisHttpCacheLookupContext::getTrailers(LookupTrailersCallback&& cb) {
     trailers.ParseFromString(redis_value.value());
     cb2_(trailersFromTrailerProto(trailers));
     }
-);
+))
+ {
+        // Callback must be executed of filter's thread.
+        dispatcher_.post([this](){ 
+        (cb2_)(nullptr);
+        });
+    }
 } 
     
 } // namespace RedisHttpCache

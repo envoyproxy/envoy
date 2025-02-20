@@ -19,7 +19,7 @@ namespace RedisHttpCache {
 
 LookupContextPtr RedisHttpCache::makeLookupContext(LookupRequest&& lookup,
                                                         Http::StreamFilterCallbacks& callbacks) {
-  return std::make_unique<RedisHttpCacheLookupContext>(callbacks.dispatcher(), /**this,*/ cluster_manager_, tls_slot_, std::move(lookup));
+  return std::make_unique<RedisHttpCacheLookupContext>(cluster_name_, callbacks.dispatcher(), /**this,*/ cluster_manager_, tls_slot_, std::move(lookup));
 }
 
 InsertContextPtr RedisHttpCache::makeInsertContext(LookupContextPtr&& lookup,

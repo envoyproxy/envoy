@@ -14,7 +14,7 @@ class RedisAsyncClient : public Tcp::AsyncTcpClientCallbacks,
                          public NetworkFilters::Common::Redis::DecoderCallbacks {
 public:
   using ResultCallback = std::function<void(bool, bool, absl::optional<std::string>)>;
-  RedisAsyncClient(Upstream::ClusterManager&);
+  RedisAsyncClient(Tcp::AsyncTcpClientPtr&& tcp_client, Upstream::ClusterManager&);
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
@@ -25,7 +25,7 @@ public:
   // class DecoderCallbacks
   void onRespValue(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
 
-  Tcp::AsyncTcpClientPtr client_{nullptr};
+  Tcp::AsyncTcpClientPtr tcp_client_{nullptr};
   // Callback to be called when response from Redis is received.
   ResultCallback callback_;
 

@@ -19,6 +19,8 @@ namespace RedisHttpCache {
 
 using ConfigProto = envoy::extensions::http::cache::redis_http_cache::v3::RedisHttpCacheConfig;
 
+//constexpr absl::string_view redis_cluster = "redis_cluster";
+
 class RedisHttpCache : public HttpCache {
 public:
 #if 0
@@ -32,7 +34,7 @@ public:
     Extensions::Common::Redis::RedisAsyncClient redis_client_;
     };
 #endif
-    RedisHttpCache(Upstream::ClusterManager& cluster_manager, ThreadLocal::SlotAllocator& tls) : cluster_manager_(cluster_manager), tls_slot_(tls) {
+    RedisHttpCache(absl::string_view cluster_name, Upstream::ClusterManager& cluster_manager, ThreadLocal::SlotAllocator& tls) : cluster_name_(cluster_name), cluster_manager_(cluster_manager), tls_slot_(tls) {
 
     tls_slot_.set([&](Event::Dispatcher&) {return std::make_shared<ThreadLocalRedisClient>(cluster_manager_);});
 
@@ -88,6 +90,7 @@ static absl::string_view name() {return "redis cache";}
 
 private:
     //Extensions::Common::Redis::RedisAsyncClient redis_client_;
+    std::string cluster_name_;
     Upstream::ClusterManager& cluster_manager_;
 
     ThreadLocal::TypedSlot<ThreadLocalRedisClient> tls_slot_;

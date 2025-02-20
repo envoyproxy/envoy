@@ -26,16 +26,21 @@ public:
   CacheSingleton(Upstream::ClusterManager& cluster_manager, ThreadLocal::SlotAllocator& slot_allocator) : cluster_manager_(cluster_manager), slot_allocator_(slot_allocator)  {}
 
   std::shared_ptr<RedisHttpCache> getCache(std::shared_ptr<CacheSingleton> /*singleton*/,
-                          //                 const ConfigProto& non_normalized_config,
+                                           const ConfigProto& config,
                                            Stats::Scope& /*stats_scope*/) {
     absl::MutexLock lock(&mu_);
 
-    // TODO (cpakulski): build hash table based on config. Caching may happen using different clusters.
-    if (!cache_) {
-        cache_ = std::make_shared<RedisHttpCache>(cluster_manager_, slot_allocator_);
+    auto cache = caches_.find(config.cluster());
+    if (cache != caches_.end()) {
+        return cache->second.lock();
     }
-        
-    return cache_;
+
+    // TODO: make sure that only one TLS slot is allocated for all caches.
+    // TLS internally maps into 1+ clusters.
+    std::shared_ptr<RedisHttpCache> new_cache = std::make_shared<RedisHttpCache>(config.cluster(), cluster_manager_, slot_allocator_);
+    
+    caches_.emplace(config.cluster(), new_cache);
+    return new_cache;
   }
 
 private:
@@ -43,10 +48,10 @@ private:
   // that config of cache. The caches each keep shared_ptrs to this singleton, which keeps the
   // singleton from being destroyed unless it's no longer keeping track of any caches.
   // (The singleton shared_ptr is *only* held by cache instances.)
+  absl::flat_hash_map<std::string, std::weak_ptr<RedisHttpCache>> caches_ ABSL_GUARDED_BY(mu_);
 #if 0
-  absl::flat_hash_map<std::string, std::weak_ptr<FileSystemHttpCache>> caches_ ABSL_GUARDED_BY(mu_);
-#endif
   std::shared_ptr<RedisHttpCache> cache_;
+#endif
   absl::Mutex mu_;
   Upstream::ClusterManager& cluster_manager_;
   ThreadLocal::SlotAllocator& slot_allocator_; 
@@ -74,7 +79,7 @@ public:
             SINGLETON_MANAGER_REGISTERED_NAME(redis_http_cache_singleton), [&context] {
               return std::make_shared<CacheSingleton>(context.serverFactoryContext().clusterManager(), context.serverFactoryContext().threadLocal());
             });
-    return caches->getCache(caches, /*config,*/ context.scope());
+    return caches->getCache(caches, config, context.scope());
   }
 };
 

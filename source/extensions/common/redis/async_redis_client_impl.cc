@@ -8,12 +8,8 @@ namespace Extensions {
 namespace Common {
 namespace Redis {
 
-RedisAsyncClient::RedisAsyncClient(Upstream::ClusterManager& cluster_manager) : decoder_(*this), cluster_manager_(cluster_manager) {
-    // Allocate thread local slot, where async client and queue with pending requests are stored.
-    cluster_ = cluster_manager_.getThreadLocalCluster("redis_cluster");
-     if (!cluster_) {
-        ASSERT(false);
-    }
+RedisAsyncClient::RedisAsyncClient(Tcp::AsyncTcpClientPtr&& tcp_client, Upstream::ClusterManager& cluster_manager) : tcp_client_(std::move(tcp_client)), decoder_(*this), cluster_manager_(cluster_manager) {
+    tcp_client_->setAsyncTcpClientCallbacks(*this);
 }
 
 void RedisAsyncClient::onEvent(Network::ConnectionEvent event) {
@@ -59,12 +55,8 @@ void RedisAsyncClient::onRespValue(NetworkFilters::Common::Redis::RespValuePtr&&
 }
 
   void RedisAsyncClient::write(Buffer::Instance& data, bool end_stream,  ResultCallback&& result_callback) {
-    if (client_ == nullptr) {
-    client_ = cluster_->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
-    client_->setAsyncTcpClientCallbacks(*this);
-    }
-    if (!client_->connected()) {
-    client_->connect();
+    if (!tcp_client_->connected()) {
+    tcp_client_->connect();
     }
 
     // No synch requires, because this is never executed on different threads.
@@ -80,7 +72,7 @@ void RedisAsyncClient::onRespValue(NetworkFilters::Common::Redis::RespValuePtr&&
 
     waiting_for_response_ = true;
     callback_ = std::move(result_callback);
-    client_->write(data, end_stream);
+    tcp_client_->write(data, end_stream);
   }
 } // namespace Redis
 } // namespace Common

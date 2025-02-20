@@ -1,3 +1,4 @@
+#pragma once
 //#include "envoy/thread_local/thread_local.h"
 #include "source/extensions/filters/http/cache/http_cache.h"
 
@@ -14,7 +15,7 @@ namespace RedisHttpCache {
 
 class RedisHttpCacheLookupContext : public LookupContext {
 public:
-  RedisHttpCacheLookupContext(Event::Dispatcher& dispatcher, 
+  RedisHttpCacheLookupContext(absl::string_view cluster_name, Event::Dispatcher& dispatcher, 
 //   RedisHttpCache& cache, 
                     Upstream::ClusterManager& cluster_manager,
                                       ThreadLocal::TypedSlot</*RedisHttpCache::*/ThreadLocalRedisClient>& tls_slot,
@@ -22,7 +23,7 @@ public:
       : dispatcher_(dispatcher), 
     // cache_(cache), 
     key_(lookup.key()), tls_slot_(tls_slot), lookup_(std::move(lookup)),
-        /*redis_client_(redis_client),*/ cluster_manager_(cluster_manager) {
+        /*redis_client_(redis_client),*/ cluster_manager_(cluster_manager), cluster_name_(cluster_name) {
     alive_ = std::make_shared<bool>(true);
     }
 
@@ -39,6 +40,7 @@ public:
   const Key& key() const { return key_; }
   //bool workInProgress() const;
   Event::Dispatcher* dispatcher() const { return &dispatcher_; }
+  absl::string_view clusterName() const {return cluster_name_;}
 
   LookupHeadersCallback cb_;
   LookupBodyCallback cb1_;
@@ -76,6 +78,7 @@ private:
   //Extensions::Common::Redis::RedisAsyncClient& redis_client_;
   Upstream::ClusterManager& cluster_manager_; 
   bool has_trailers_;
+  absl::string_view cluster_name_;
 
   //std::weak_ptr<bool> parent_;
 };
