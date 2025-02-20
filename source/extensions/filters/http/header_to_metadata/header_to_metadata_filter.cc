@@ -41,11 +41,21 @@ absl::optional<std::string> CookieValueSelector::extract(Http::HeaderMap& map) c
   return absl::nullopt;
 }
 
-Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine) : rule_(rule) {
+absl::StatusOr<Rule> Rule::create(const ProtoRule& rule, Regex::Engine& regex_engine) {
+  absl::Status creation_status = absl::OkStatus();
+  auto r = Rule(rule, regex_engine, creation_status);
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return r;
+}
+
+Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& creation_status)
+    : rule_(rule) {
   // Ensure only one of header and cookie is specified.
   // TODO(radha13): remove this once we are on v4 and these fields are folded into a oneof.
   if (!rule.cookie().empty() && !rule.header().empty()) {
-    throw EnvoyException("Cannot specify both header and cookie");
+    creation_status =
+        absl::InvalidArgumentError("Cannot specify both header and cookie in the same rule");
+    return;
   }
 
   // Initialize the shared pointer.
@@ -55,66 +65,94 @@ Rule::Rule(const ProtoRule& rule, Regex::Engine& regex_engine) : rule_(rule) {
   } else if (!rule.cookie().empty()) {
     selector_ = std::make_shared<CookieValueSelector>(rule.cookie());
   } else {
-    throw EnvoyException("One of Cookie or Header option needs to be specified");
+    creation_status =
+        absl::InvalidArgumentError("One of Cookie or Header option needs to be specified");
+    return;
   }
 
   // Rule must have at least one of the `on_header_*` fields set.
   if (!rule.has_on_header_present() && !rule.has_on_header_missing()) {
-    const auto& error = fmt::format("header to metadata filter: rule for {} has neither "
-                                    "`on_header_present` nor `on_header_missing` set",
-                                    selector_->toString());
-    throw EnvoyException(error);
+    creation_status =
+        absl::InvalidArgumentError(fmt::format("header to metadata filter: rule for {} has neither "
+                                               "`on_header_present` nor `on_header_missing` set",
+                                               selector_->toString()));
+    return;
   }
 
   // Ensure value and regex_value_rewrite are not mixed.
   // TODO(rgs1): remove this once we are on v4 and these fields are folded into a oneof.
   if (!rule.on_header_present().value().empty() &&
       rule.on_header_present().has_regex_value_rewrite()) {
-    throw EnvoyException("Cannot specify both value and regex_value_rewrite");
+    creation_status =
+        absl::InvalidArgumentError("Cannot specify both value and regex_value_rewrite");
+    return;
   }
 
   // Remove field is un-supported for cookie.
   if (!rule.cookie().empty() && rule.remove()) {
-    throw EnvoyException("Cannot specify remove for cookie");
+    creation_status = absl::InvalidArgumentError("Cannot specify remove for cookie");
+    return;
   }
 
   if (rule.has_on_header_missing() && rule.on_header_missing().value().empty()) {
-    throw EnvoyException("Cannot specify on_header_missing rule with an empty value");
+    creation_status =
+        absl::InvalidArgumentError("Cannot specify on_header_missing rule with an empty value");
+    return;
   }
 
   if (rule.on_header_present().has_regex_value_rewrite()) {
     const auto& rewrite_spec = rule.on_header_present().regex_value_rewrite();
-    regex_rewrite_ =
-        THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine),
-                              Regex::CompiledMatcherPtr);
+    auto regex_rewrite_or = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
+    SET_AND_RETURN_IF_NOT_OK(regex_rewrite_or.status(), creation_status);
+    regex_rewrite_ = std::move(regex_rewrite_or.value());
     regex_rewrite_substitution_ = rewrite_spec.substitution();
   }
 }
 
+absl::StatusOr<ConfigSharedPtr>
+Config::create(const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,
+               Regex::Engine& regex_engine, bool per_route) {
+  absl::Status creation_status = absl::OkStatus();
+  auto cfg = ConfigSharedPtr(new Config(config, regex_engine, per_route, creation_status));
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return cfg;
+}
+
 Config::Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
-               Regex::Engine& regex_engine, const bool per_route) {
-  request_set_ = Config::configToVector(config.request_rules(), request_rules_, regex_engine);
-  response_set_ = Config::configToVector(config.response_rules(), response_rules_, regex_engine);
+               Regex::Engine& regex_engine, const bool per_route, absl::Status& creation_status) {
+  absl::StatusOr<bool> request_set_or =
+      Config::configToVector(config.request_rules(), request_rules_, regex_engine);
+  SET_AND_RETURN_IF_NOT_OK(request_set_or.status(), creation_status);
+  request_set_ = request_set_or.value();
+
+  absl::StatusOr<bool> response_set_or =
+      Config::configToVector(config.response_rules(), response_rules_, regex_engine);
+  SET_AND_RETURN_IF_NOT_OK(response_set_or.status(), creation_status);
+  response_set_ = response_set_or.value();
 
   // Note: empty configs are fine for the global config, which would be the case for enabling
   //       the filter globally without rules and then applying them at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an empty
-  //       config so we throw an error.
+  //       config so we return an error.
   if (per_route && !response_set_ && !request_set_) {
-    throw EnvoyException("header_to_metadata_filter: Per filter configs must at least specify "
-                         "either request or response rules");
+    creation_status = absl::InvalidArgumentError("header_to_metadata_filter: Per filter configs "
+                                                 "must at least specify either request or response "
+                                                 "rules");
   }
 }
 
-bool Config::configToVector(const ProtobufRepeatedRule& proto_rules, HeaderToMetadataRules& vector,
-                            Regex::Engine& regex_engine) {
+absl::StatusOr<bool> Config::configToVector(const ProtobufRepeatedRule& proto_rules,
+                                            HeaderToMetadataRules& vector,
+                                            Regex::Engine& regex_engine) {
   if (proto_rules.empty()) {
     ENVOY_LOG(debug, "no rules provided");
     return false;
   }
 
   for (const auto& entry : proto_rules) {
-    vector.emplace_back(entry, regex_engine);
+    auto rule = Rule::create(entry, regex_engine);
+    RETURN_IF_NOT_OK_REF(rule.status());
+    vector.emplace_back(std::move(rule.value()));
   }
 
   return true;

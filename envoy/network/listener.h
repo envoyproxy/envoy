@@ -359,7 +359,7 @@ struct UdpRecvData {
   Buffer::InstancePtr buffer_;
   MonotonicTime receive_time_;
   uint8_t tos_ = 0;
-  Buffer::RawSlice saved_cmsg_;
+  Buffer::OwnedImpl saved_cmsg_;
 };
 
 /**

@@ -25,10 +25,10 @@ namespace Upstream {
 class CdsApiImpl : public CdsApi,
                    Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster> {
 public:
-  static CdsApiPtr create(const envoy::config::core::v3::ConfigSource& cds_config,
-                          const xds::core::v3::ResourceLocator* cds_resources_locator,
-                          ClusterManager& cm, Stats::Scope& scope,
-                          ProtobufMessage::ValidationVisitor& validation_visitor);
+  static absl::StatusOr<CdsApiPtr>
+  create(const envoy::config::core::v3::ConfigSource& cds_config,
+         const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
+         Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Upstream::CdsApi
   void initialize() override { subscription_->start({}); }
@@ -48,7 +48,8 @@ private:
                             const EnvoyException* e) override;
   CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
              const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
-             Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
+             Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+             absl::Status& creation_status);
   void runInitializeCallbackIfAny();
 
   CdsApiHelper helper_;

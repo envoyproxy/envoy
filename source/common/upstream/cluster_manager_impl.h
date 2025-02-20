@@ -87,9 +87,9 @@ public:
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
-  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-                      const xds::core::v3::ResourceLocator* cds_resources_locator,
-                      ClusterManager& cm) override;
+  absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                                      const xds::core::v3::ResourceLocator* cds_resources_locator,
+                                      ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
   Singleton::Manager& singletonManager() override { return context_.singletonManager(); }
 
@@ -296,6 +296,7 @@ public:
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     ads_mux_.reset();
+    xds_manager_.shutdown();
     active_clusters_.clear();
     warming_clusters_.clear();
     updateClusterCounts();
@@ -318,7 +319,7 @@ public:
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
-  OdCdsApiHandlePtr
+  absl::StatusOr<OdCdsApiHandlePtr>
   allocateOdCdsApi(OdCdsCreationFunction creation_function,
                    const envoy::config::core::v3::ConfigSource& odcds_config,
                    OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
@@ -381,14 +382,17 @@ public:
 protected:
   // ClusterManagerImpl's constructor should not be invoked directly; create instances from the
   // clusterManagerFromProto() static method. The init() method must be called after construction.
-  ClusterManagerImpl(
-      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-      Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-      OptRef<Server::Admin> admin, ProtobufMessage::ValidationContext& validation_context,
-      Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
-      Router::Context& router_context, Server::Instance& server, absl::Status& creation_status);
+  ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                     ClusterManagerFactory& factory,
+                     Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
+                     ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                     const LocalInfo::LocalInfo& local_info,
+                     AccessLog::AccessLogManager& log_manager,
+                     Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
+                     ProtobufMessage::ValidationContext& validation_context, Api::Api& api,
+                     Http::Context& http_context, Grpc::Context& grpc_context,
+                     Router::Context& router_context, Server::Instance& server,
+                     Config::XdsManager& xds_manager, absl::Status& creation_status);
 
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -889,7 +893,6 @@ private:
   void notifyClusterDiscoveryStatus(absl::string_view name, ClusterDiscoveryStatus status);
 
 protected:
-  ClusterMap active_clusters_;
   ClusterInitializationMap cluster_initialization_map_;
 
 private:
@@ -913,8 +916,8 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
   // Contains information about ongoing on-demand cluster discoveries.
   ClusterCreationsMap pending_cluster_creations_;
+  Config::XdsManager& xds_manager_;
   Random::RandomGenerator& random_;
-  ClusterMap warming_clusters_;
   const bool deferred_cluster_creation_;
   absl::optional<envoy::config::core::v3::BindConfig> bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
@@ -957,6 +960,17 @@ private:
   bool initialized_{};
   bool ads_mux_initialized_{};
   std::atomic<bool> shutdown_{};
+
+  // Keep all the ClusterMaps at the end, so that they get destroyed first.
+  // Clusters may keep references to the cluster manager and in destructor can call
+  // cluster manager methods.
+  //
+  // This might make MSAN unhappy because it thinks that we are accessing uninitialized
+  // memory when those methods access fields of the cluster manager class.
+  ClusterMap warming_clusters_;
+
+protected:
+  ClusterMap active_clusters_;
 };
 
 } // namespace Upstream
