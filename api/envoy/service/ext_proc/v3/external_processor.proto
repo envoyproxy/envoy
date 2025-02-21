@@ -77,7 +77,7 @@ message ProtocolConfiguration {
 
   // Specify whether the filter :ref:`send_body_without_waiting_for_header_response
   // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`
-  // flag is set. If Envoy is waiting for a header response for the server, Setting ``true`` means Envoy will send body to
+  // flag is set. If Envoy is waiting for a header response from the server, setting ``true`` means Envoy will send body to
   // the server as they arrive. Setting ``false`` means Envoy will buffer the arrived data and not send it to the server.
   bool send_body_without_waiting_for_header_response = 3;
 }
