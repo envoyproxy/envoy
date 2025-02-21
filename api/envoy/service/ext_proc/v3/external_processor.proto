@@ -59,19 +59,19 @@ service ExternalProcessor {
 // This message specifies the filter protocol configurations which will be sent to the ext_proc
 // server in a :ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3.ProcessingRequest>`.
 // If the server does not support these protocol configurations, it may choose to close the gRPC stream.
-// If the server supports these protocol configurations, they should respond based on the API specification.
+// If the server supports these protocol configurations, it should respond based on the API specification.
 message ProtocolConfiguration {
   // Specify whether the filter
   // :ref:`request_body_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ProcessingMode.request_body_mode>`
   // is set to FULL_DUPLEX_STREAMED. A "true" means Envoy is operating in the FULL_DUPLEX_STREAMED
-  // body mode in the request direction. The server need to operate in that mode as well.
+  // body mode in the request direction. The server needs to operate in that mode as well.
   // A "false" means Envoy is expecting a response for each request it sends.
   bool is_request_body_mode_full_duplex = 1;
 
   // Specify whether the filter
   // :ref:`response_body_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ProcessingMode.response_body_mode>`
   // is set to FULL_DUPLEX_STREAMED. A "true" means Envoy is operating in the FULL_DUPLEX_STREAMED
-  // body mode in the response direction. The server need to operate in that mode as well.
+  // body mode in the response direction. The server needs to operate in that mode as well.
   // A "false" means Envoy is expecting a response for each request it sends.
 
   bool is_response_body_mode_full_duplex = 2;
