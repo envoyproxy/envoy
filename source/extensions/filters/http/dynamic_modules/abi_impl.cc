@@ -536,6 +536,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     envoy_dynamic_module_type_attribute_id attribute_id,
     envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  bool ok = false;
   switch (attribute_id) {
   case envoy_dynamic_module_type_attribute_id_RequestProtocol: {
     const auto stream_info = filter->streamInfo();
@@ -545,7 +546,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         const auto& protocol_string_ref = Http::Utility::getProtocolString(protocol.value());
         *result = const_cast<char*>(protocol_string_ref.data());
         *result_length = protocol_string_ref.size();
-        return true;
+        ok = true;
       }
     }
     break;
@@ -558,7 +559,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         auto addr = upstream_host->address()->asStringView();
         *result = const_cast<char*>(addr.data());
         *result_length = addr.size();
-        return true;
+        ok = true;
       }
     }
     break;
@@ -570,7 +571,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
           stream_info->downstreamAddressProvider().remoteAddress()->asStringView();
       *result = const_cast<char*>(addressProvider.data());
       *result_length = addressProvider.size();
-      return true;
+      ok = true;
     }
     break;
   }
@@ -581,7 +582,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
           stream_info->downstreamAddressProvider().localAddress()->asStringView();
       *result = const_cast<char*>(addressProvider.data());
       *result_length = addressProvider.size();
-      return true;
+      ok = true;
     }
     break;
   }
@@ -591,13 +592,14 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
                         static_cast<int64_t>(attribute_id));
     break;
   }
-  return false;
+  return ok;
 }
 
 bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  bool ok = false;
   switch (attribute_id) {
   case envoy_dynamic_module_type_attribute_id_ResponseCode: {
     const auto stream_info = filter->streamInfo();
@@ -605,7 +607,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
       const auto code = stream_info->responseCode();
       if (code.has_value()) {
         *result = code.value();
-        return true;
+        ok = true;
       }
     }
     break;
@@ -618,7 +620,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
         auto ip = upstream_host->address()->ip();
         if (ip) {
           *result = ip->port();
-          return true;
+          ok = true;
         }
       }
     }
@@ -630,7 +632,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
       const auto ip = stream_info->downstreamAddressProvider().remoteAddress()->ip();
       if (ip) {
         *result = ip->port();
-        return true;
+        ok = true;
       }
     }
     break;
@@ -641,7 +643,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
       const auto ip = stream_info->downstreamAddressProvider().localAddress()->ip();
       if (ip) {
         *result = ip->port();
-        return true;
+        ok = true;
       }
     }
     break;
@@ -650,7 +652,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
                         "Unsupported attribute ID {} as int", static_cast<int64_t>(attribute_id));
   }
-  return false;
+  return ok;
 }
 }
 } // namespace HttpFilters
