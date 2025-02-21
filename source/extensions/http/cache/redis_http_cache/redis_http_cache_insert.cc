@@ -13,7 +13,7 @@ namespace RedisHttpCache {
 void RedisHttpCacheInsertContext::insertHeaders(const Http::ResponseHeaderMap& response_headers,
                      const ResponseMetadata& metadata, InsertCallback cb,
                      bool end_stream) {
-    cb_ = std::move(cb);
+    insert_callback_ = std::move(cb);
   
   // Make proto with received headers. It will be sent to Redis as the last item (after body and trailers).
   header_proto_ = makeCacheFileHeaderProto(lookup_->key(),
@@ -32,7 +32,7 @@ void RedisHttpCacheInsertContext::insertHeaders(const Http::ResponseHeaderMap& r
     if (!connected) {
         // The client could not successfully connect to the database.
         // Return false to indicate not to continue with caching.
-        (cb_)(false);
+        (insert_callback_)(false);
     }
 
     if (!success) {
@@ -40,19 +40,19 @@ void RedisHttpCacheInsertContext::insertHeaders(const Http::ResponseHeaderMap& r
         // - Entry containing headers exists. The entry was added most likely by other Envoy or by other thread.
         //   In both cases, do not attempt to update the cache.
         // - Error happened while writing to the database.
-        (cb_)(false);
+        (insert_callback_)(false);
     }
     
     if (end_stream) {
         onStreamEnd();
     }
-    /*std::move*/(cb_)(true);
+    /*std::move*/(insert_callback_)(true);
     }))
 
  {
-        // Callback must be executed of filter's thread.
+        // Callback must be executed on filter's thread.
         lookup_->dispatcher()->post([this](){ 
-        (cb_)(false);
+        (insert_callback_)(false);
         });
     }
     
@@ -62,7 +62,7 @@ void RedisHttpCacheInsertContext::insertBody(const Buffer::Instance& chunk,
                 InsertCallback ready_for_next_chunk,
                   bool end_stream) {
     
-    cb_ = std::move(ready_for_next_chunk);
+    insert_callback_ = std::move(ready_for_next_chunk);
 
   std::weak_ptr<bool> weak = alive_;
   Extensions::Common::Redis::RedisAsyncClient::ResultCallback result_callback =
@@ -74,17 +74,17 @@ void RedisHttpCacheInsertContext::insertBody(const Buffer::Instance& chunk,
     }
 
     if(!connected) {
-       (cb_)(false);
+       (insert_callback_)(false);
     }
 
     if (!success) {
-       (cb_)(false);
+       (insert_callback_)(false);
     }
 
     if (end_stream) {
         onStreamEnd();
     }
-    /*std::move*/(cb_)(true);
+    /*std::move*/(insert_callback_)(true);
     };
 
     bool success = false;
@@ -97,9 +97,9 @@ void RedisHttpCacheInsertContext::insertBody(const Buffer::Instance& chunk,
     }
 
     if(!success) {
-        // Callback must be executed of filter's thread.
+        // Callback must be executed on filter's thread.
         lookup_->dispatcher()->post([this](){ 
-        (cb_)(false);
+        (insert_callback_)(false);
         });
         return;
     }
@@ -110,7 +110,7 @@ void RedisHttpCacheInsertContext::insertBody(const Buffer::Instance& chunk,
 
   void RedisHttpCacheInsertContext::insertTrailers(const Http::ResponseTrailerMap& trailers,
                       InsertCallback insert_complete) {
-    cb1_ = std::move(insert_complete);
+    insert_callback_ = std::move(insert_complete);
 
     CacheFileTrailer trailers_proto = makeCacheFileTrailerProto(trailers);
 
@@ -124,7 +124,7 @@ void RedisHttpCacheInsertContext::insertBody(const Buffer::Instance& chunk,
     }
 
     if(!connected) {
-        (cb1_)(false);
+        (insert_callback_)(false);
         return;
     }
 
@@ -133,12 +133,12 @@ void RedisHttpCacheInsertContext::insertBody(const Buffer::Instance& chunk,
         header_proto_.set_trailers(true);
         onStreamEnd();
     }
-    /*std::move*/(cb1_)(success);
+    /*std::move*/(insert_callback_)(success);
     }))
     {
-        // Callback must be executed of filter's thread.
+        // Callback must be executed on filter's thread.
         lookup_->dispatcher()->post([this](){ 
-        (cb1_)(false);
+        (insert_callback_)(false);
         });
     }
   }

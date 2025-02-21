@@ -42,9 +42,6 @@ public:
   Event::Dispatcher* dispatcher() const { return &dispatcher_; }
   absl::string_view clusterName() const {return cluster_name_;}
 
-  LookupHeadersCallback cb_;
-  LookupBodyCallback cb1_;
-  LookupTrailersCallback cb2_;
 
 private:
   // TODO: probaly some of those methods are not required.
@@ -73,6 +70,8 @@ private:
   std::shared_ptr<bool> alive_;
 
   LookupHeadersCallback lookup_headers_callback_;
+  LookupBodyCallback lookup_body_callback_;
+  LookupTrailersCallback lookup_trailers_callback_;
   ThreadLocal::TypedSlot</*RedisHttpCache::*/ThreadLocalRedisClient>& tls_slot_;
   const LookupRequest lookup_;
   //Extensions::Common::Redis::RedisAsyncClient& redis_client_;

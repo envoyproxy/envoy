@@ -34,14 +34,14 @@ private:
   // The sequence of actions involved in writing the cache entry to a file. Each
     //LookupContextPtr lookup_;
     std::unique_ptr<RedisHttpCacheLookupContext> lookup_;
-    InsertCallback cb_;
+    InsertCallback insert_callback_;
     // TODO: can I move cluster_manager to struct stored in threadlocal.
 //                    Upstream::ClusterManager& cluster_manager_;
                                       ThreadLocal::TypedSlot</*RedisHttpCache::*/ThreadLocalRedisClient>& tls_slot_;
     bool first_body_chunk_{true};
     uint64_t body_length_{0};
   CacheFileHeader header_proto_;
- InsertCallback cb1_;
+ //InsertCallback cb1_;
 
     // This is used to derive weak pointer gived to lookup and insert contexts.
     // Callbacks in those contexts check if the weak pointer is still valid.
