@@ -608,6 +608,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
         return true;
       }
     }
+    break;
   }
   case envoy_dynamic_module_type_attribute_id_UpstreamPort: {
     const auto upstream_info = filter->upstreamInfo();
