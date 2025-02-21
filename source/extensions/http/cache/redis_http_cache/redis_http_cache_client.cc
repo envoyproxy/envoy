@@ -13,9 +13,9 @@ bool ThreadLocalRedisClient::send(
     Extensions::Common::Redis::RedisAsyncClient::ResultCallback&& callback) {
 
   // locate the cluster
-  auto redis_client = redis_client_.find(cluster_name);
+  auto redis_client = redis_clients_.find(cluster_name);
 
-  if (redis_client == redis_client_.end()) {
+  if (redis_client == redis_clients_.end()) {
     auto cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
     if (!cluster) {
       ENVOY_LOG_MISC(trace, "Cannot find cluster: {}", cluster_name);
@@ -23,10 +23,10 @@ bool ThreadLocalRedisClient::send(
     }
     auto tcp_client =
         cluster->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
-    redis_client_.emplace(cluster_name,
-                          std::make_unique<Extensions::Common::Redis::RedisAsyncClient>(
-                              std::move(tcp_client), cluster_manager_));
-    redis_client = redis_client_.find(cluster_name);
+    redis_clients_.emplace(cluster_name,
+                           std::make_unique<Extensions::Common::Redis::RedisAsyncClient>(
+                               std::move(tcp_client), cluster_manager_));
+    redis_client = redis_clients_.find(cluster_name);
   }
 
   Buffer::OwnedImpl buf;

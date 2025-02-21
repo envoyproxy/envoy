@@ -16,8 +16,10 @@ struct ThreadLocalRedisClient : public ThreadLocal::ThreadLocalObject {
       : cluster_manager_(cluster_manager) {}
   ~ThreadLocalRedisClient() override {}
 
+  // Each worker thread has single RedisAsyncClient associated with a particular cluster.
+  // The clients are found by cluster name.
   absl::flat_hash_map<std::string, std::unique_ptr<Extensions::Common::Redis::RedisAsyncClient>>
-      redis_client_;
+      redis_clients_;
 
   bool send(absl::string_view cluster, std::vector<absl::string_view> command,
             Extensions::Common::Redis::RedisAsyncClient::ResultCallback&& callback);
