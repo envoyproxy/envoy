@@ -576,7 +576,11 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndK
   on_server_init_function_ = [&]() {
     createLdsStream();
     listener_config_.mutable_tcp_keepalive();
-    listener_config_.mutable_additional_addresses(0)->mutable_tcp_keepalive();
+    listener_config_.mutable_additional_addresses(0)
+        ->mutable_tcp_keepalive_override()
+        ->mutable_tcp_keepalive()
+        ->mutable_keepalive_probes()
+        ->set_value(3);
     sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
     createRdsStream(route_table_name_);
   };
@@ -643,9 +647,14 @@ TEST_P(ListenerMultiAddressesIntegrationTest, BasicSuccessWithMultiAddressesAndK
   EXPECT_EQ(1, opt_value);
   // Verify second address.
   EXPECT_TRUE(getSocketOption("testing-listener-0", ENVOY_SOCKET_SO_KEEPALIVE.level(),
-                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len, 0));
+                              ENVOY_SOCKET_SO_KEEPALIVE.option(), &opt_value, &opt_len, 1));
   EXPECT_EQ(opt_len, sizeof(opt_value));
   EXPECT_EQ(1, opt_value);
+
+  EXPECT_TRUE(getSocketOption("testing-listener-0", ENVOY_SOCKET_TCP_KEEPCNT.level(),
+                              ENVOY_SOCKET_TCP_KEEPCNT.option(), &opt_value, &opt_len, 1));
+  EXPECT_EQ(opt_len, sizeof(opt_value));
+  EXPECT_EQ(3, opt_value);
 }
 #endif
 
