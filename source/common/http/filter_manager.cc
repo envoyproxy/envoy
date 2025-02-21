@@ -62,8 +62,8 @@ void ActiveStreamFilterBase::commonContinue() {
     state.emplace(&encapsulated_object, parent_.dispatcher_);
   }
 
-  ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", *this,
-                   static_cast<const void*>(this));
+  ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}, observedEndStream={}", *this,
+                   static_cast<const void*>(this), observedEndStream());
   ASSERT(!canIterate(),
          "Attempting to continue iteration while the IterationState is already Continue");
   // If iteration has stopped for all frame types, set iterate_from_current_filter_ to true so the
@@ -427,12 +427,34 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
+  if (end_stream && parent_.state_.decode_end_stream_consumer_) {
+    ASSERT(parent_.state_.decode_end_stream_consumer_ == this);
+    if (parent_.state_.decode_end_stream_consumer_ == this) {
+      parent_.state_.observed_decode_end_stream_ = true;
+      parent_.state_.decode_end_stream_consumer_ = nullptr;
+      ENVOY_STREAM_LOG(debug, "Filter {} injected decode end stream", *this,
+                       filter_context_.config_name);
+    }
+  }
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(false);
   }
   parent_.decodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
+}
+
+bool ActiveStreamDecoderFilter::consumeDecodeEndStream() {
+  ASSERT(!parent_.state_.decode_end_stream_consumer_);
+  if (parent_.state_.decode_end_stream_consumer_) {
+    ENVOY_STREAM_LOG(debug, "Decode end stream has already been consumed", *this);
+    return false;
+  }
+  parent_.state_.observed_decode_end_stream_ = false;
+  parent_.state_.decode_end_stream_consumer_ = this;
+  ENVOY_STREAM_LOG(debug, "Filter {} consumed decode end stream", *this,
+                   filter_context_.config_name);
+  return true;
 }
 
 void ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
@@ -1845,12 +1867,35 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
+  if (end_stream && parent_.state_.encode_end_stream_consumer_) {
+    ASSERT(parent_.state_.encode_end_stream_consumer_ == this);
+    if (parent_.state_.encode_end_stream_consumer_ == this) {
+      parent_.state_.observed_encode_end_stream_ = true;
+      parent_.state_.encode_end_stream_consumer_ = nullptr;
+      ENVOY_STREAM_LOG(debug, "Filter {} injected decode end stream", *this,
+                       filter_context_.config_name);
+    }
+  }
+
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(false);
   }
   parent_.encodeData(this, data, end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
+}
+
+bool ActiveStreamEncoderFilter::consumeEncodeEndStream() {
+  ASSERT(!parent_.state_.encode_end_stream_consumer_);
+  if (parent_.state_.encode_end_stream_consumer_ != nullptr) {
+    ENVOY_STREAM_LOG(debug, "Encode end stream has already been consumed", *this);
+    return false;
+  }
+  parent_.state_.observed_encode_end_stream_ = false;
+  parent_.state_.encode_end_stream_consumer_ = this;
+  ENVOY_STREAM_LOG(debug, "Filter {} consumed encode end stream", *this,
+                   filter_context_.config_name);
+  return true;
 }
 
 ResponseTrailerMap& ActiveStreamEncoderFilter::addEncodedTrailers() {

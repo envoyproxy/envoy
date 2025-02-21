@@ -91,21 +91,26 @@ BandwidthLimitStats FilterConfig::generateStats(const std::string& prefix, Stats
 
 // BandwidthLimiter members
 
-Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap&, bool) {
+Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap&,
+                                                          bool end_stream) {
   const auto& config = getConfig();
 
   if (config.enabled() && (config.enableMode() & BandwidthLimit::REQUEST)) {
     config.stats().request_enabled_.inc();
     request_limiter_ = std::make_unique<StreamRateLimiter>(
         config.limit(), decoder_callbacks_->decoderBufferLimit(),
+        // pause callback
         [this] { decoder_callbacks_->onDecoderFilterAboveWriteBufferHighWatermark(); },
+        // resume callback
         [this] { decoder_callbacks_->onDecoderFilterBelowWriteBufferLowWatermark(); },
+        // continue callback
         [this](Buffer::Instance& data, bool end_stream) {
           if (end_stream) {
             updateStatsOnDecodeFinish();
           }
           decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
         },
+        // write stats callback
         [this] {
           updateStatsOnDecodeFinish();
           decoder_callbacks_->continueDecoding();
@@ -120,6 +125,9 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
         },
         const_cast<FilterConfig*>(&config)->timeSource(), decoder_callbacks_->dispatcher(),
         decoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
+    if (!end_stream) {
+      return Http::FilterHeadersStatus::StopIteration;
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -139,6 +147,9 @@ Http::FilterDataStatus BandwidthLimiter::decodeData(Buffer::Instance& data, bool
     config.stats().request_incoming_total_size_.add(data.length());
 
     request_limiter_->writeData(data, end_stream);
+    if (end_stream) {
+      decoder_callbacks_->consumeDecodeEndStream();
+    }
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
   ENVOY_LOG(debug, "BandwidthLimiter <decode data>: request_limiter not set.");
@@ -157,7 +168,8 @@ Http::FilterTrailersStatus BandwidthLimiter::decodeTrailers(Http::RequestTrailer
   return Http::FilterTrailersStatus::Continue;
 }
 
-Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMap&, bool) {
+Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMap&,
+                                                          bool end_stream) {
   auto& config = getConfig();
 
   if (config.enabled() && (config.enableMode() & BandwidthLimit::RESPONSE)) {
@@ -165,14 +177,18 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
 
     response_limiter_ = std::make_unique<StreamRateLimiter>(
         config.limit(), encoder_callbacks_->encoderBufferLimit(),
+        // pause callback
         [this] { encoder_callbacks_->onEncoderFilterAboveWriteBufferHighWatermark(); },
+        // resume callback
         [this] { encoder_callbacks_->onEncoderFilterBelowWriteBufferLowWatermark(); },
+        // write callback
         [this](Buffer::Instance& data, bool end_stream) {
           if (end_stream) {
             updateStatsOnEncodeFinish();
           }
           encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
         },
+        // continue callback
         [this] {
           updateStatsOnEncodeFinish();
           encoder_callbacks_->continueEncoding();
@@ -187,6 +203,9 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
         },
         const_cast<FilterConfig*>(&config)->timeSource(), encoder_callbacks_->dispatcher(),
         encoder_callbacks_->scope(), config.tokenBucket(), config.fillInterval());
+    if (!end_stream) {
+      return Http::FilterHeadersStatus::StopIteration;
+    }
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -214,6 +233,9 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
     config.stats().response_incoming_total_size_.add(data.length());
 
     response_limiter_->writeData(data, end_stream, trailer_added);
+    if (end_stream) {
+      encoder_callbacks_->consumeEncodeEndStream();
+    }
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
   ENVOY_LOG(debug, "BandwidthLimiter <encode data>: response_limiter not set");

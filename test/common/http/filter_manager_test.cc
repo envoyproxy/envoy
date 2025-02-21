@@ -24,6 +24,7 @@
 
 using testing::_;
 using testing::InSequence;
+using testing::Ref;
 using testing::Return;
 
 namespace Envoy {
@@ -755,6 +756,246 @@ TEST_F(FilterManagerTest, IdleTimerResets) {
   ResponseTrailerMapPtr basic_resp_trailers{new TestResponseTrailerMapImpl{{"x", "y"}}};
   EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
   filter_1->decoder_callbacks_->encodeTrailers(std::move(basic_resp_trailers));
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, ConsumeEndStreamOnDecode) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> filter1(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<MockStreamDecoderFilter> filter2(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(*filter1, decodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        EXPECT_TRUE(filter1->callbacks_->consumeDecodeEndStream());
+        return FilterHeadersStatus::Continue;
+      }));
+
+  EXPECT_CALL(*filter2, decodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+#ifndef NDEBUG
+        // When running in debug mode, verify that calls to consumeDecodeEndStream
+        // trigger ASSERT failure if end stream has already been consumed.
+        EXPECT_DEBUG_DEATH(filter2->callbacks_->consumeDecodeEndStream(), "");
+        return FilterHeadersStatus::Continue;
+#else
+        // end_stream has been already consumed by filter1.
+        EXPECT_FALSE(filter2->callbacks_->consumeDecodeEndStream());
+        return FilterHeadersStatus::Continue;
+#endif
+      }));
+
+  Buffer::OwnedImpl request_data("helloo");
+
+  EXPECT_CALL(*filter1, decodeData(_, true))
+      .WillRepeatedly(Invoke(
+          [&](Buffer::Instance&, bool) -> FilterDataStatus { return FilterDataStatus::Continue; }));
+
+  EXPECT_CALL(*filter2, decodeData(Ref(request_data), true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+        filter2->callbacks_->injectDecodedDataToFilterChain(data, false);
+        return FilterDataStatus::StopIterationNoBuffer;
+      }));
+
+  RequestHeaderMapPtr request_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"},
+                                   {":path", "/"},
+                                   {":method", "GET"},
+                                   {"content-type", "application/grpc"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*request_headers)));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory1 = createDecoderFilterFactoryCb(filter1);
+        manager.applyFilterFactoryCb({"configName1"}, factory1);
+        auto factory2 = createDecoderFilterFactoryCb(filter2);
+        manager.applyFilterFactoryCb({"configName2"}, factory2);
+        return true;
+      }));
+
+  filter_manager_->createFilterChain();
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->decodeHeaders(*request_headers, false);
+  filter_manager_->decodeData(request_data, true);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, ConsumeEndStreamOnEncode) {
+  initialize();
+
+  std::shared_ptr<MockStreamEncoderFilter> filter1(new NiceMock<MockStreamEncoderFilter>());
+  std::shared_ptr<MockStreamEncoderFilter> filter2(new NiceMock<MockStreamEncoderFilter>());
+
+  EXPECT_CALL(*filter1, encodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](ResponseHeaderMap&, bool) -> FilterHeadersStatus {
+#ifndef NDEBUG
+        // When running in debug mode, verify that calls to consumeEncodeEndStream
+        // trigger ASSERT failure if end stream has already been consumed.
+        EXPECT_DEBUG_DEATH(filter1->callbacks_->consumeEncodeEndStream(), "");
+        return FilterHeadersStatus::Continue;
+#else
+        // end_stream has been already consumed by filter1.
+        EXPECT_FALSE(filter1->callbacks_->consumeEncodeEndStream());
+        return FilterHeadersStatus::Continue;
+#endif
+      }));
+
+  EXPECT_CALL(*filter2, encodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](ResponseHeaderMap&, bool) -> FilterHeadersStatus {
+        EXPECT_TRUE(filter2->callbacks_->consumeEncodeEndStream());
+        return FilterHeadersStatus::Continue;
+      }));
+
+  Buffer::OwnedImpl response_data("helloo");
+
+  EXPECT_CALL(*filter1, encodeData(_, false))
+      .WillRepeatedly(Invoke(
+          [&](Buffer::Instance&, bool) -> FilterDataStatus { return FilterDataStatus::Continue; }));
+
+  EXPECT_CALL(*filter2, encodeData(Ref(response_data), true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+        filter2->callbacks_->injectEncodedDataToFilterChain(data, false);
+        return FilterDataStatus::StopIterationNoBuffer;
+      }));
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+
+  ON_CALL(filter_manager_callbacks_, responseHeaders())
+      .WillByDefault(Return(makeOptRef(*response_headers)));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory1 = createEncoderFilterFactoryCb(filter1);
+        manager.applyFilterFactoryCb({"configName1"}, factory1);
+        auto factory2 = createEncoderFilterFactoryCb(filter2);
+        manager.applyFilterFactoryCb({"configName2"}, factory2);
+        return true;
+      }));
+
+  filter_manager_->createFilterChain();
+  filter2->encodeHeaders(*response_headers, false);
+  filter2->encodeData(response_data, true);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, InjectEndStreamOnDecode) {
+  initialize();
+
+  std::shared_ptr<MockStreamDecoderFilter> filter1(new NiceMock<MockStreamDecoderFilter>());
+  std::shared_ptr<MockStreamDecoderFilter> filter2(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(*filter1, decodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        EXPECT_TRUE(filter1->callbacks_->consumeDecodeEndStream());
+        return FilterHeadersStatus::Continue;
+      }));
+
+  EXPECT_CALL(*filter2, decodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::Continue;
+      }));
+
+  Buffer::OwnedImpl request_data("helloo");
+
+  EXPECT_CALL(*filter1, decodeData(_, true))
+      .WillRepeatedly(Invoke(
+          [&](Buffer::Instance&, bool) -> FilterDataStatus { return FilterDataStatus::Continue; }));
+
+  EXPECT_CALL(*filter2, decodeData(Ref(request_data), true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+#ifndef NDEBUG
+        // When running in debug mode, verify that call to injectDecodedDataToFilterChain
+        // trigger ASSERT failure on end stream event if end stream has not been
+        // previously consumed by the calling filter.
+        EXPECT_DEBUG_DEATH(filter2->callbacks_->injectDecodedDataToFilterChain(data, true), "");
+        return FilterDataStatus::StopIterationNoBuffer;
+#else
+        filter2->callbacks_->injectDecodedDataToFilterChain(data, true);
+        return FilterDataStatus::StopIterationNoBuffer;
+#endif
+      }));
+
+  RequestHeaderMapPtr request_headers{
+      new TestRequestHeaderMapImpl{{":authority", "host"},
+                                   {":path", "/"},
+                                   {":method", "GET"},
+                                   {"content-type", "application/grpc"}}};
+
+  ON_CALL(filter_manager_callbacks_, requestHeaders())
+      .WillByDefault(Return(makeOptRef(*request_headers)));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory1 = createDecoderFilterFactoryCb(filter1);
+        manager.applyFilterFactoryCb({"configName1"}, factory1);
+        auto factory2 = createDecoderFilterFactoryCb(filter2);
+        manager.applyFilterFactoryCb({"configName2"}, factory2);
+        return true;
+      }));
+
+  filter_manager_->createFilterChain();
+  filter_manager_->requestHeadersInitialized();
+  filter_manager_->decodeHeaders(*request_headers, false);
+  filter_manager_->decodeData(request_data, true);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerTest, InjectEndStreamOnEncode) {
+  initialize();
+
+  std::shared_ptr<MockStreamEncoderFilter> filter1(new NiceMock<MockStreamEncoderFilter>());
+  std::shared_ptr<MockStreamEncoderFilter> filter2(new NiceMock<MockStreamEncoderFilter>());
+
+  EXPECT_CALL(*filter1, encodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](ResponseHeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::Continue;
+      }));
+
+  EXPECT_CALL(*filter2, encodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](ResponseHeaderMap&, bool) -> FilterHeadersStatus {
+        EXPECT_TRUE(filter2->callbacks_->consumeEncodeEndStream());
+        return FilterHeadersStatus::Continue;
+      }));
+
+  Buffer::OwnedImpl response_data("helloo");
+
+  EXPECT_CALL(*filter1, encodeData(_, false))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) -> FilterDataStatus {
+#ifndef NDEBUG
+        // When running in debug mode, verify that call to injectDecodedDataToFilterChain
+        // trigger ASSERT failure on end stream event if end stream has not been
+        // previously consumed by the calling filter.
+        EXPECT_DEBUG_DEATH(filter1->callbacks_->injectEncodedDataToFilterChain(data, true), "");
+        return FilterDataStatus::StopIterationNoBuffer;
+#else
+        filter2->callbacks_->injectEncodedDataToFilterChain(data, true);
+        return FilterDataStatus::StopIterationNoBuffer;
+#endif
+      }));
+
+  EXPECT_CALL(*filter2, encodeData(Ref(response_data), true))
+      .WillRepeatedly(Invoke(
+          [&](Buffer::Instance&, bool) -> FilterDataStatus { return FilterDataStatus::Continue; }));
+
+  ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+
+  ON_CALL(filter_manager_callbacks_, responseHeaders())
+      .WillByDefault(Return(makeOptRef(*response_headers)));
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory1 = createEncoderFilterFactoryCb(filter1);
+        manager.applyFilterFactoryCb({"configName1"}, factory1);
+        auto factory2 = createEncoderFilterFactoryCb(filter2);
+        manager.applyFilterFactoryCb({"configName2"}, factory2);
+        return true;
+      }));
+
+  filter_manager_->createFilterChain();
+  filter2->encodeHeaders(*response_headers, false);
+  filter2->encodeData(response_data, true);
   filter_manager_->destroyFilters();
 }
 } // namespace
