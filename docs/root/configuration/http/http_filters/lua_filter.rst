@@ -588,7 +588,10 @@ Example:
 
   handle:clearRouteCache()
 
-To clear the route cache for the current request. This will force the route to be recomputed.
+To clear the route cache for the current request. This will force the route to be recomputed. If you
+updated the request headers, metadata, or other information that affects the route and expect the route
+to be recomputed, you can call this function to clear the route cache. Then the route will be recomputed
+when the route is accessed next time.
 
 Example:
 
