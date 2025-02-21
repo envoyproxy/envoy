@@ -1337,14 +1337,14 @@ typed_config:
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(2500));
   initialize();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setExpectedPeerAddress(fmt::format(
           "{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Change the handshake timeout to be 500ms to fail the handshake while the cert validation is
   // pending.
-  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(500);
+  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(2000);
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
@@ -1378,11 +1378,11 @@ typed_config:
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(2500));
   initialize();
   // Change the handshake timeout to be 500ms to fail the handshake while the cert validation is
   // pending.
-  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(500);
+  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(2000);
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);

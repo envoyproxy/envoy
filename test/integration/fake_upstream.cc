@@ -980,7 +980,7 @@ AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<Asserti
 
 void FakeUpstream::runOnDispatcherThread(std::function<void()> cb) {
   ASSERT(!dispatcher_->isThreadSafe());
-  dispatcher_->post([&]() { cb(); });
+  dispatcher_->post([cb = std::move(cb)]() { cb(); });
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,
