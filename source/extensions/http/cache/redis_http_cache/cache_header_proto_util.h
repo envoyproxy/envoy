@@ -12,6 +12,10 @@ namespace HttpFilters {
 namespace Cache {
 namespace RedisHttpCache {
 
+// TODO: This file is a copy from files based cache.
+// Consider moving it to common place where it can be used
+// by redis and file backend.
+
 /**
  * Update an existing CacheFileHeader with new values from an updateHeaders operation.
  * See applyHeaderUpdate in cache_entry_utils.h for details of merge behavior.
@@ -97,7 +101,7 @@ ResponseMetadata metadataFromHeaderProto(const CacheFileHeader& header);
  */
 CacheFileHeader makeCacheFileHeaderProto(Buffer::Instance& buffer);
 
-} // namespace FileSystemHttpCache
+} // namespace RedisHttpCache
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

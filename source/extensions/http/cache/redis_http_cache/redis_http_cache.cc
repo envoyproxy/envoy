@@ -9,26 +9,18 @@ namespace HttpFilters {
 namespace Cache {
 namespace RedisHttpCache {
 
-
-
-
-
-
-
-
-
 LookupContextPtr RedisHttpCache::makeLookupContext(LookupRequest&& lookup,
-                                                        Http::StreamFilterCallbacks& callbacks) {
-  return std::make_unique<RedisHttpCacheLookupContext>(cluster_name_, callbacks.dispatcher(), /**this,*/ cluster_manager_, tls_slot_, std::move(lookup));
+                                                   Http::StreamFilterCallbacks& callbacks) {
+  return std::make_unique<RedisHttpCacheLookupContext>(cluster_name_, callbacks.dispatcher(),
+                                                       tls_slot_, std::move(lookup));
 }
 
 InsertContextPtr RedisHttpCache::makeInsertContext(LookupContextPtr&& lookup,
-                                      Http::StreamFilterCallbacks&/* callbacks*/) {
+                                                   Http::StreamFilterCallbacks& /* callbacks*/) {
   auto redis_lookup_context = std::unique_ptr<RedisHttpCacheLookupContext>(
       dynamic_cast<RedisHttpCacheLookupContext*>(lookup.release()));
   return std::make_unique<RedisHttpCacheInsertContext>(std::move(redis_lookup_context), tls_slot_);
-    
-    }
+}
 
 } // namespace RedisHttpCache
 } // namespace Cache
