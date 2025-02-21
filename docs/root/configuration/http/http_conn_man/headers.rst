@@ -219,7 +219,7 @@ Envoy will only append to XFF when at least one of the following conditions is m
 HTTP connection manager option is set to true
 2. The :ref:`skip_xff_append
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.skip_xff_append>`
-is set false. 
+is set false.
 
 This means that if ``use_remote_address`` is false (which is the default) or
 ``skip_xff_append`` is true, the connection manager operates in a transparent mode where it does not
