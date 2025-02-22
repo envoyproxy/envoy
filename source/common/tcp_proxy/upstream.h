@@ -301,7 +301,6 @@ public:
   bool readDisable(bool disable) override;
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
     conn_pool_callbacks_ = std::move(callbacks);
-
   }
   void recordUpstreamSslConnection() {
     auto is_ssl = upstream_request_->streamInfo().upstreamInfo()->upstreamSslConnection();
