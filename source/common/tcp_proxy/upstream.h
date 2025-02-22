@@ -282,7 +282,7 @@ private:
   std::unique_ptr<HttpConnPool::Callbacks> conn_pool_callbacks_;
 };
 
-class CombinedUpstream : public GenericUpstream, public Envoy::Router::RouterFilterInterface, public Logger::Loggable<Logger::Id::router> {
+class CombinedUpstream : public GenericUpstream, public Envoy::Router::RouterFilterInterface {
 public:
   CombinedUpstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                    Http::StreamDecoderFilterCallbacks& decoder_callbacks,
