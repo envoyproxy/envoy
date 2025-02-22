@@ -15,7 +15,7 @@ public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
                           Server::Configuration::FactoryContext& context,
-                          std::vector<Formatter::CommandParserPtr> command_parsers = {}) override;
+                          std::vector<Formatter::CommandParserPtr>&& command_parsers = {}) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

@@ -61,10 +61,10 @@ public:
   static absl::StatusOr<FormatterBasePtr<FormatterContext>>
   fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config,
                   Server::Configuration::GenericFactoryContext& context,
-                  std::vector<CommandParserBasePtr<FormatterContext>> commands_parsers = {}) {
+                  std::vector<CommandParserBasePtr<FormatterContext>>&& command_parsers = {}) {
     // Instantiate formatter extensions.
-    auto commands = parseFormatters<FormatterContext>(config.formatters(), context,
-                                                      std::move(commands_parsers));
+    auto commands =
+        parseFormatters<FormatterContext>(config.formatters(), context, std::move(command_parsers));
     RETURN_IF_NOT_OK_REF(commands.status());
 
     switch (config.format_case()) {

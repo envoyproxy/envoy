@@ -16,7 +16,7 @@ namespace Wasm {
 
 AccessLog::InstanceSharedPtr WasmAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& proto_config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::FactoryContext& context, std::vector<Formatter::CommandParserPtr>) {
+    Server::Configuration::FactoryContext& context, std::vector<Formatter::CommandParserPtr>&&) {
   const auto& config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::wasm::v3::WasmAccessLog&>(
       proto_config, context.messageValidationVisitor());

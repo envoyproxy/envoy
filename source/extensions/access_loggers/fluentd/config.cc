@@ -34,7 +34,7 @@ getAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& conte
 AccessLog::InstanceSharedPtr FluentdAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
     Server::Configuration::FactoryContext& context,
-    std::vector<Formatter::CommandParserPtr> commands_parsers) {
+    std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig&>(
       config, context.messageValidationVisitor());
@@ -62,7 +62,7 @@ AccessLog::InstanceSharedPtr FluentdAccessLogFactory::createAccessLogInstance(
   //                 will directly serialize the record to msgpack payload.
   auto commands = THROW_OR_RETURN_VALUE(
       Formatter::SubstitutionFormatStringUtils::parseFormatters(proto_config.formatters(), context,
-                                                                std::move(commands_parsers)),
+                                                                std::move(command_parsers)),
       std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>>);
 
   Formatter::FormatterPtr json_formatter =

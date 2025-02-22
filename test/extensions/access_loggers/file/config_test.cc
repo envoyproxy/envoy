@@ -60,7 +60,7 @@ public:
   FileAccessLogTest() = default;
 
   void runTest(const std::string& yaml, absl::string_view expected, bool is_json,
-               std::vector<Formatter::CommandParserPtr> command_parsers = {}) {
+               std::vector<Formatter::CommandParserPtr>&& command_parsers = {}) {
     envoy::extensions::access_loggers::file::v3::FileAccessLog fal_config;
     TestUtility::loadFromYaml(yaml, fal_config);
 
@@ -214,7 +214,7 @@ TEST_F(FileAccessLogTest, LogFormatJsonWithCustomCommands) {
   }
 
   {
-    std::vector<Formatter::CommandParserPtr> command_parsers;
+    std::vector<Formatter::CommandParserPtr>&& command_parsers;
     command_parsers.push_back(std::make_unique<TestCustomCommandParser>());
 
     runTest(format_yaml, R"({

@@ -331,7 +331,7 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
 InstanceSharedPtr
 AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
                             Server::Configuration::FactoryContext& context,
-                            std::vector<Formatter::CommandParserPtr> command_parsers) {
+                            std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   FilterPtr filter;
   if (config.has_filter()) {
     filter = FilterFactory::fromProto(config.filter(), context);

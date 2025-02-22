@@ -77,7 +77,7 @@ public:
   virtual AccessLog::InstanceBaseSharedPtr<Context> createAccessLogInstance(
       const Protobuf::Message& config, AccessLog::FilterBasePtr<Context>&& filter,
       Server::Configuration::FactoryContext& context,
-      std::vector<Formatter::CommandParserBasePtr<Context>> command_parsers = {}) PURE;
+      std::vector<Formatter::CommandParserBasePtr<Context>>&& command_parsers = {}) PURE;
 
   std::string category() const override { return category_; }
 

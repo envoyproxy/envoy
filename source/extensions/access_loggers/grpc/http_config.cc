@@ -20,7 +20,7 @@ namespace HttpGrpc {
 
 AccessLog::InstanceSharedPtr HttpGrpcAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::FactoryContext& context, std::vector<Formatter::CommandParserPtr>) {
+    Server::Configuration::FactoryContext& context, std::vector<Formatter::CommandParserPtr>&&) {
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<

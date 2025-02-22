@@ -23,11 +23,11 @@ namespace File {
 AccessLog::InstanceSharedPtr StdoutAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
     Server::Configuration::FactoryContext& context,
-    std::vector<Formatter::CommandParserPtr> commands_parsers) {
+    std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   return AccessLoggers::createStreamAccessLogInstance<
       envoy::extensions::access_loggers::stream::v3::StdoutAccessLog,
       Filesystem::DestinationType::Stdout>(config, std::move(filter), context,
-                                           std::move(commands_parsers));
+                                           std::move(command_parsers));
 }
 
 ProtobufTypes::MessagePtr StdoutAccessLogFactory::createEmptyConfigProto() {
@@ -46,11 +46,11 @@ LEGACY_REGISTER_FACTORY(StdoutAccessLogFactory, AccessLog::AccessLogInstanceFact
 AccessLog::InstanceSharedPtr StderrAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
     Server::Configuration::FactoryContext& context,
-    std::vector<Formatter::CommandParserPtr> commands_parsers) {
+    std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   return createStreamAccessLogInstance<
       envoy::extensions::access_loggers::stream::v3::StderrAccessLog,
       Filesystem::DestinationType::Stderr>(config, std::move(filter), context,
-                                           std::move(commands_parsers));
+                                           std::move(command_parsers));
 }
 
 ProtobufTypes::MessagePtr StderrAccessLogFactory::createEmptyConfigProto() {

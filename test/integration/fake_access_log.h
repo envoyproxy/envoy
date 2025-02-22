@@ -31,7 +31,7 @@ public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,
                           Server::Configuration::FactoryContext&,
-                          std::vector<Formatter::CommandParserPtr> = {}) override {
+                          std::vector<Formatter::CommandParserPtr>&& = {}) override {
     std::lock_guard<std::mutex> guard(log_callback_lock_);
     auto access_log_instance = std::make_shared<FakeAccessLog>(log_cb_);
     access_log_instances_.push_back(access_log_instance);

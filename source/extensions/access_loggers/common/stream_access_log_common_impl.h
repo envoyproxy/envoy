@@ -14,14 +14,14 @@ template <class T, Filesystem::DestinationType destination_type>
 AccessLog::InstanceSharedPtr
 createStreamAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
                               Server::Configuration::FactoryContext& context,
-                              std::vector<Formatter::CommandParserPtr> commands_parsers = {}) {
+                              std::vector<Formatter::CommandParserPtr>&& command_parsers = {}) {
   const auto& fal_config =
       MessageUtil::downcastAndValidate<const T&>(config, context.messageValidationVisitor());
   Formatter::FormatterPtr formatter;
   if (fal_config.access_log_format_case() == T::AccessLogFormatCase::kLogFormat) {
     formatter =
         THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-                                  fal_config.log_format(), context, std::move(commands_parsers)),
+                                  fal_config.log_format(), context, std::move(command_parsers)),
                               Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
   } else if (fal_config.access_log_format_case() ==
              T::AccessLogFormatCase::ACCESS_LOG_FORMAT_NOT_SET) {

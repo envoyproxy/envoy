@@ -45,7 +45,7 @@ public:
   AccessLog::InstanceBaseSharedPtr<Context> createAccessLogInstance(
       const Protobuf::Message& config, AccessLog::FilterBasePtr<Context>&& filter,
       Server::Configuration::FactoryContext& context,
-      std::vector<Formatter::CommandParserBasePtr<Context>> command_parsers = {}) override {
+      std::vector<Formatter::CommandParserBasePtr<Context>>&& command_parsers = {}) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
         config, context.messageValidationVisitor());
