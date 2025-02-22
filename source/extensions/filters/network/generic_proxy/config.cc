@@ -5,7 +5,7 @@
 #include "source/extensions/filters/network/generic_proxy/rds.h"
 #include "source/extensions/filters/network/generic_proxy/rds_impl.h"
 
-#include "access_log.h"
+#include "source/extensions/filters/network/generic_proxy/access_log.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -126,7 +126,10 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
   // Access log configuration.
   std::vector<AccessLog::InstanceSharedPtr> access_logs;
   for (const auto& access_log : proto_config.access_log()) {
-    AccessLog::InstanceSharedPtr current_access_log = accessLoggerFromProto(access_log, context);
+    std::vector<Formatter::CommandParserPtr> command_parsers;
+    command_parsers.push_back(createGenericProxyCommandParser());
+    AccessLog::InstanceSharedPtr current_access_log =
+        AccessLog::AccessLogFactory::fromProto(access_log, context, std::move(command_parsers));
     access_logs.push_back(current_access_log);
   }
 

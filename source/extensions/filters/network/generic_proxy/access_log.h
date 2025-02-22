@@ -64,10 +64,6 @@ public:
 
 Formatter::CommandParserPtr createGenericProxyCommandParser();
 
-AccessLog::InstanceSharedPtr
-accessLoggerFromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                      Server::Configuration::FactoryContext& context);
-
 } // namespace GenericProxy
 } // namespace NetworkFilters
 } // namespace Extensions
