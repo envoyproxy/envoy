@@ -1136,6 +1136,13 @@ Status ConnectionImpl::onHeaders(int32_t stream_id, size_t length, uint8_t flags
   stream->bytes_meter_->addWireBytesReceived(length + H2_FRAME_HEADER_SIZE);
   stream->bytes_meter_->addHeaderBytesReceived(length + H2_FRAME_HEADER_SIZE);
 
+  ENVOY_CONN_LOG(trace, "vikas recv frame type=HEADERS stream_id={}", connection_, stream_id);
+  stream->headers().iterate([](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    ENVOY_LOG(warn, "vikas req header : {}:{}", header.key().getStringView(),
+              header.value().getStringView());
+    return Http::HeaderMap::Iterate::Continue;
+  });
+
   stream->remote_end_stream_ = flags & FLAG_END_STREAM;
   if (!stream->cookies_.empty()) {
     HeaderString key(Headers::get().Cookie);

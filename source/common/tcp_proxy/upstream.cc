@@ -367,6 +367,7 @@ void HttpConnPool::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPt
   }
   combined_upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(
       *this, host, downstream_info_.downstreamAddressProvider().sslConnection()));
+  combined_upstream_->recordUpstreamSslConnection();
 }
 
 void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
@@ -524,13 +525,6 @@ void CombinedUpstream::onUpstreamTrailers(Http::ResponseTrailerMapPtr&& trailers
 }
 
 Http::RequestHeaderMap* CombinedUpstream::downstreamHeaders() {
-  if (!downstream_headers_) {
-    downstream_headers_ = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-        {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
-        {Http::Headers::get().Host, config_.host(downstream_info_)},
-    });
-    downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
-  }
   if ((type_ != Http::CodecType::HTTP1) && (config_.usePost())) {
     const std::string& scheme =
         is_ssl_ ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;

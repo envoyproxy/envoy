@@ -282,7 +282,7 @@ private:
   std::unique_ptr<HttpConnPool::Callbacks> conn_pool_callbacks_;
 };
 
-class CombinedUpstream : public GenericUpstream, public Envoy::Router::RouterFilterInterface {
+class CombinedUpstream : public GenericUpstream, public Envoy::Router::RouterFilterInterface, public Logger::Loggable<Logger::Id::router> {
 public:
   CombinedUpstream(HttpConnPool& http_conn_pool, Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
                    Http::StreamDecoderFilterCallbacks& decoder_callbacks,
@@ -301,6 +301,9 @@ public:
   bool readDisable(bool disable) override;
   void setConnPoolCallbacks(std::unique_ptr<HttpConnPool::Callbacks>&& callbacks) {
     conn_pool_callbacks_ = std::move(callbacks);
+
+  }
+  void recordUpstreamSslConnection() {
     auto is_ssl = upstream_request_->streamInfo().upstreamInfo()->upstreamSslConnection();
     is_ssl_ = is_ssl ? true : false;
   }

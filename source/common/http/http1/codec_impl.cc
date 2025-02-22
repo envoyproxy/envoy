@@ -499,6 +499,11 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     connection_.buffer().addFragments(
         {method->value().getStringView(), SPACE, host_or_path_view, REQUEST_POSTFIX});
   }
+  headers.iterate([](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    ENVOY_LOG(warn, "vikas req header : {}:{}", header.key().getStringView(),
+              header.value().getStringView());
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   encodeHeadersBase(headers, absl::nullopt, end_stream,
                     HeaderUtility::requestShouldHaveNoBody(headers));
