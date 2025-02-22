@@ -924,6 +924,11 @@ int StreamHandleWrapper::luaSetUpstreamOverrideHost(lua_State* state) {
   return 0;
 }
 
+int StreamHandleWrapper::luaClearRouteCache(lua_State*) {
+  callbacks_.clearRouteCache();
+  return 0;
+}
+
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                                        lua_State*) {
   uint64_t status = Http::Utility::getResponseStatus(*headers);

@@ -49,6 +49,22 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_library(
+    name = "jni_init_lib",
+    srcs = [
+        "jni_init.cc",
+    ],
+    hdrs = [
+        "jni_init.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":jni_helper_lib",
+        ":jni_utility_lib",
+    ],
+    alwayslink = True,
+)
+
 # Implementations of the various "native" Java methods for classes
 # in library/java/io/envoyproxy/envoymobile.
 envoy_cc_library(
@@ -59,6 +75,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":android_network_utility_lib",
+        ":jni_init_lib",
         ":jni_utility_lib",
         "//library/cc:engine_builder_lib",
         "//library/common:internal_engine_lib",

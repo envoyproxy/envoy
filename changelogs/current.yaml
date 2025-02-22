@@ -25,6 +25,11 @@ minor_behavior_changes:
 - area: cel
   change: |
     Support extension regex fuctions(e.g. ``re.extract``, ``re.capture`, ``re.captureN``) in CEL.
+- area: http
+  change: |
+    :ref:`generate_request_id
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.generate_request_id>`
+    will generate a request id on non-present and now on empty ``x-request-id`` header.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -74,6 +79,9 @@ removed_config_or_runtime:
 - area: xds
   change: |
     Removed runtime guard ``envoy.reloadable_features.xdstp_path_avoid_colon_encoding`` and legacy code paths.
+- area: config
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.strict_duration_validation`` and legacy code paths.
 - area: thread_local
   change: |
     Removed runtime guard  ``envoy.reloadable_features.allow_slot_destroy_on_worker_threads`` and legacy code paths.
@@ -162,13 +170,10 @@ new_features:
   change: |
     Reporting a locality_stats to LRS server when ``rq_issued > 0``, disable by setting runtime guard
     ``envoy.reloadable_features.report_load_with_rq_issued`` to ``false``.
-- area: generic_proxy
+- area: lua
   change: |
-    Added :ref:`generic proxy log formatter support
-    <envoy_v3_api_msg_extensions.filters.network.generic_proxy.v3.GenericProxySubstitutionFormatter>` which could be
-    configured at the :ref:`formatters <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.formatters>`
-    extension point of logger to support generic proxy specific substitution commands. And all access loggers could be
-    used in generic proxy now.
+    Added support for clearing the route cache explicitly in the Lua filter.
+    See :ref:`clearRouteCache() <config_http_filters_lua_stream_handle_api_clear_route_cache>` for more details.
 - area: local_rate_limit
   change: |
     Added support for dynamic token buckets in local rate limit filter for http requests.
@@ -179,9 +184,19 @@ new_features:
   change: |
     Added the initial support for shared libraries to be loaded by Envoy at runtime. Please refer to the overview documentation for the
     feature :ref:`here <arch_overview_dynamic_modules>`.
+- area: ext_proc
+  change: |
+    Added an :ref:`extension
+    <envoy_v3_api_msg_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse>` to save the
+    :ref:`response <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` from the external processor to filter state.
 - area: http
   change: |
     Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
     work as an upstream filter.
 
+- area: tcp_proxy
+  change: |
+    added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
+    downstream connection before TCP proxy has opened the upstream connection, by setting a filter state object for the key
+    ``envoy.tcp_proxy.receive_before_connect``.
 deprecated:
