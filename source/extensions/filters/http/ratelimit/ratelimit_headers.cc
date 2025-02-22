@@ -29,7 +29,7 @@ Http::ResponseHeaderMapPtr XRateLimitHeaderUtils::create(
         status.limit_remaining() < min_remaining_limit_status.value().limit_remaining()) {
       min_remaining_limit_status.emplace(status);
     }
-    const uint32_t window = convertRateLimitUnit(status.current_limit().unit());
+    const uint32_t window = convertRateLimitUnit(status.current_limit().unit(), status.current_limit().unit_multiplier());
     // Constructing the quota-policy per RFC
     // https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html#name-ratelimit-limit
     // Example of the result: `, 10;w=1;name="per-ip", 1000;w=3600`
@@ -65,22 +65,22 @@ Http::ResponseHeaderMapPtr XRateLimitHeaderUtils::create(
 }
 
 uint32_t XRateLimitHeaderUtils::convertRateLimitUnit(
-    const envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit) {
+    const envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit, const uint32_t unit_multiplier) {
   switch (unit) {
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::SECOND:
-    return 1;
+    return 1 * unit_multiplier;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE:
-    return 60;
+    return 60 * unit_multiplier;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::HOUR:
-    return 60 * 60;
+    return 60 * 60 * unit_multiplier;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::DAY:
-    return 24 * 60 * 60;
+    return 24 * 60 * 60 * unit_multiplier;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::WEEK:
-    return 7 * 24 * 60 * 60;
+    return 7 * 24 * 60 * 60 * unit_multiplier;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MONTH:
-    return 30 * 24 * 60 * 60;
+    return 30 * 24 * 60 * 60 * unit_multiplier;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::YEAR:
-    return 365 * 24 * 60 * 60;
+    return 365 * 24 * 60 * 60 * unit_multiplier;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::UNKNOWN:
   default:
     return 0;

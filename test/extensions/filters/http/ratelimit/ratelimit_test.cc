@@ -438,7 +438,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
 
   auto descriptor_statuses = {
       Envoy::RateLimit::buildDescriptorStatus(
-          1, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE, "first", 2, 3),
+          1, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE, "first", 2, 3, 8),
       Envoy::RateLimit::buildDescriptorStatus(
           4, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::HOUR, "second", 5, 6)};
   auto descriptor_statuses_ptr =
@@ -447,7 +447,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
                                std::move(descriptor_statuses_ptr), nullptr, nullptr, "", nullptr);
 
   Http::TestResponseHeaderMapImpl expected_headers{
-      {"x-ratelimit-limit", "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""},
+      {"x-ratelimit-limit", "1, 1;w=480;name=\"first\", 4;w=3600;name=\"second\""},
       {"x-ratelimit-remaining", "2"},
       {"x-ratelimit-reset", "3"}};
   Http::TestResponseHeaderMapImpl response_headers;
