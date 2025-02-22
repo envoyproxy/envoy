@@ -214,7 +214,7 @@ TEST_F(FileAccessLogTest, LogFormatJsonWithCustomCommands) {
   }
 
   {
-    std::vector<Formatter::CommandParserPtr>&& command_parsers;
+    std::vector<Formatter::CommandParserPtr> command_parsers;
     command_parsers.push_back(std::make_unique<TestCustomCommandParser>());
 
     runTest(format_yaml, R"({
