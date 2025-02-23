@@ -12,16 +12,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-Http::FilterFactoryCb IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> IpTaggingFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& proto_config,
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
 
-  IpTaggingFilterConfigSharedPtr config(new IpTaggingFilterConfig(
-      proto_config, stat_prefix, context.scope(), context.serverFactoryContext().runtime()));
-
-  return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(std::make_shared<IpTaggingFilter>(config));
-  };
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config = IpTaggingFilterConfig::create(
+      proto_config, stat_prefix, context.scope(), context.serverFactoryContext().runtime());
+  RETURN_IF_NOT_OK_REF(config.status());
+  return
+      [config = std::move(config.value())](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addStreamDecoderFilter(std::make_shared<IpTaggingFilter>(config));
+      };
 }
 
 /**

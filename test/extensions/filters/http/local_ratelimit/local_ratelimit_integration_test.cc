@@ -165,13 +165,13 @@ protected:
     auto response = makeRequest(cluster);
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(default_response_headers_, 1);
-    verifyResponse(move(response), expected_status, expected_body_size);
+    verifyResponse(std::move(response), expected_status, expected_body_size);
     EXPECT_TRUE(upstream_request_->complete());
     EXPECT_EQ(0U, upstream_request_->bodyLength());
   }
   void sendRateLimitedRequest(const std::string& cluster) {
     auto response = makeRequest(cluster);
-    verifyResponse(move(response), "429",
+    verifyResponse(std::move(response), "429",
                    18); // 18 is the expected body size for rate-limited responses.
   }
 

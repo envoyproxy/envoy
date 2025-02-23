@@ -140,6 +140,7 @@ categories:
 - envoy.load_balancing_policies
 - envoy.http.early_header_mutation
 - envoy.http.custom_response
+- envoy.http.ext_proc.response_processors
 - envoy.router.cluster_specifier_plugin
 - envoy.tap_sinks.udp_sink
 - envoy.tracers.opentelemetry.resource_detectors
