@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/config/xds_manager.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -122,6 +123,11 @@ public:
   virtual Upstream::ClusterManager& clusterManager() PURE;
 
   /**
+   * @return Config::XdsManager& singleton for use by the entire server.
+   */
+  virtual Config::XdsManager& xdsManager() PURE;
+
+  /**
    * @return const Http::HttpServerPropertiesCacheManager& instance for use by the entire server.
    */
   virtual Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() PURE;
@@ -176,6 +182,11 @@ public:
    * process context. Will be unset when running in validation mode.
    */
   virtual ProcessContextOptRef processContext() PURE;
+
+  /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 
   /**
    * @return the init manager of the cluster. This can be used for extensions that need

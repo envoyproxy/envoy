@@ -10,6 +10,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/synchronization/notification.h"
+#include "library/common/mobile_process_wide.h"
 #include "library/common/network/proxy_api.h"
 #include "library/common/stats/utility.h"
 
@@ -19,6 +20,11 @@ constexpr absl::Duration ENGINE_RUNNING_TIMEOUT = absl::Seconds(30);
 // Google DNS address used for IPv6 probes.
 constexpr absl::string_view IPV6_PROBE_ADDRESS = "2001:4860:4860::8888";
 constexpr uint32_t IPV6_PROBE_PORT = 53;
+
+// There is only one shared MobileProcessWide instance for all Envoy Mobile engines.
+MobileProcessWide& initOnceMobileProcessWide(const OptionsImplBase& options) {
+  MUTABLE_CONSTRUCT_ON_FIRST_USE(MobileProcessWide, options);
+}
 } // namespace
 
 static std::atomic<envoy_stream_t> current_stream_handle_{0};
@@ -27,11 +33,13 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
                                absl::optional<int> thread_priority,
+                               bool disable_dns_refresh_on_network_change,
                                Thread::PosixThreadFactoryPtr thread_factory)
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
       logger_(std::move(logger)), event_tracker_(std::move(event_tracker)),
       thread_priority_(thread_priority),
-      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
+      dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
+      disable_dns_refresh_on_network_change_(disable_dns_refresh_on_network_change) {
   ExtensionRegistry::registerFactories();
 
   Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker_);
@@ -40,9 +48,11 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
-                               absl::optional<int> thread_priority)
+                               absl::optional<int> thread_priority,
+                               bool disable_dns_refresh_on_network_change)
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
-                     thread_priority, Thread::PosixThreadFactory::create()) {}
+                     thread_priority, disable_dns_refresh_on_network_change,
+                     Thread::PosixThreadFactory::create()) {}
 
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
@@ -90,7 +100,8 @@ envoy_status_t InternalEngine::cancelStream(envoy_stream_t stream) {
 // This function takes a `std::shared_ptr` instead of `std::unique_ptr` because `std::function` is a
 // copy-constructible type, so it's not possible to move capture `std::unique_ptr` with
 // `std::function`.
-envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> options) {
+envoy_status_t InternalEngine::run(std::shared_ptr<OptionsImplBase> options) {
+  initOnceMobileProcessWide(*options);
   Thread::Options thread_options;
   thread_options.priority_ = thread_priority_;
   main_thread_ = thread_factory_->createThread([this, options]() mutable -> void { main(options); },
@@ -98,7 +109,7 @@ envoy_status_t InternalEngine::run(std::shared_ptr<Envoy::OptionsImplBase> optio
   return (main_thread_ != nullptr) ? ENVOY_SUCCESS : ENVOY_FAILURE;
 }
 
-envoy_status_t InternalEngine::main(std::shared_ptr<Envoy::OptionsImplBase> options) {
+envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
   // Using unique_ptr ensures main_common's lifespan is strictly scoped to this function.
   std::unique_ptr<EngineCommon> main_common;
   {
@@ -279,7 +290,7 @@ void InternalEngine::onDefaultNetworkAvailable() {
   ENVOY_LOG_MISC(trace, "Calling the default network available callback");
 }
 
-void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
+void InternalEngine::onDefaultNetworkChanged(int network) {
   ENVOY_LOG_MISC(trace, "Calling the default network changed callback");
   dispatcher_->post([&, network]() -> void {
     envoy_netconf_t configuration = Network::ConnectivityManagerImpl::setPreferredNetwork(network);
@@ -316,7 +327,9 @@ void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
           [](Http::HttpServerPropertiesCache& cache) { cache.resetStatus(); };
       cache_manager.forEachThreadLocalCache(reset_status);
     }
-    connectivity_manager_->refreshDns(configuration, true);
+    if (!disable_dns_refresh_on_network_change_) {
+      connectivity_manager_->refreshDns(configuration, true);
+    }
   });
 }
 

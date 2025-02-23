@@ -80,8 +80,7 @@ absl::StatusOr<std::string> TcmallocProfiler::tcmallocHeapProfile() {
 absl::Status TcmallocProfiler::startAllocationProfile() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (alloc_profiler != nullptr) {
-    return absl::Status(absl::StatusCode::kFailedPrecondition,
-                        "Allocation profiler has already started");
+    return {absl::StatusCode::kFailedPrecondition, "Allocation profiler has already started"};
   }
   alloc_profiler = new tcmalloc::MallocExtension::AllocationProfilingToken(
       tcmalloc::MallocExtension::StartAllocationProfiling());

@@ -20,6 +20,8 @@ application layer:
 * gRPC-JSON transcoder is supported by a :ref:`filter <config_http_filters_grpc_json_transcoder>`
   that allows a RESTful JSON API client to send requests to Envoy over HTTP and get proxied to a
   gRPC service.
+* gRPC-JSON reverse transcoder is supported by a :ref:`filter <config_http_filters_grpc_json_reverse_transcoder>`
+  that allows a gRPC client to send requests to Envoy and get proxied to a RESTful JSON API service.
 
 .. _arch_overview_grpc_bridging:
 

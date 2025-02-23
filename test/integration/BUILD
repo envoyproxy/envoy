@@ -336,6 +336,22 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_proto_library(
+    name = "async_round_robin_proto",
+    srcs = ["async_round_robin.proto"],
+)
+
+envoy_cc_test_library(
+    name = "async_round_robin_lb",
+    srcs = ["async_round_robin_lb.cc"],
+    hdrs = ["async_round_robin_lb.h"],
+    deps = [
+        "//source/common/router:router_lib",
+        "//source/extensions/load_balancing_policies/round_robin:config",
+        "//test/integration:async_round_robin_proto_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "drain_close_integration_test",
     size = "large",
@@ -557,6 +573,7 @@ envoy_cc_test(
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
         "//test/integration/filters:response_metadata_filter_config_lib",
+        "//test/integration/filters:send_goaway_filter_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/integration/filters:stop_in_headers_continue_in_data_filter_lib",
@@ -585,6 +602,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":integration_lib",
         ":socket_interface_swap_lib",
+        "//source/extensions/load_balancing_policies/subset:config",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
@@ -610,6 +628,7 @@ envoy_cc_test(
         ":integration_lib",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
+        "//test/integration/filters:async_upstream_filter_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:repick_cluster_filter_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -982,6 +1001,7 @@ envoy_cc_test_library(
     ],
     rbe_pool = "6gig",
     deps = [
+        ":async_round_robin_lb",
         ":integration_lib_light",
         ":test_host_predicate_lib",
         "//envoy/event:timer_interface",
@@ -1194,6 +1214,7 @@ envoy_cc_test_library(
     ],
     rbe_pool = "6gig",
     deps = [
+        ":async_round_robin_lb",
         ":autonomous_upstream_lib",
         ":fake_upstream_lib",
         ":integration_tcp_client_lib",
@@ -1867,6 +1888,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
+        "//source/common/stream_info:bool_accessor_lib",
         "//source/common/tls:context_config_lib",
         "//source/common/tls:context_lib",
         "//source/extensions/access_loggers/file:config",
@@ -1935,7 +1957,9 @@ envoy_cc_test(
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         ":tcp_tunneling_integration_lib",
+        "//source/extensions/filters/http/credential_injector:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/http/injected_credentials/generic:config",
         "//source/extensions/upstreams/http/tcp:config",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
@@ -1943,6 +1967,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/credential_injector/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
     ],

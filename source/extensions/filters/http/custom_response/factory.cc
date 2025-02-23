@@ -18,7 +18,7 @@ namespace CustomResponse {
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 CustomResponseFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::custom_response::v3::CustomResponse& config,
     Envoy::Server::Configuration::ServerFactoryContext& context,

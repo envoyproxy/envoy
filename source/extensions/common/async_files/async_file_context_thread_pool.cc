@@ -172,6 +172,25 @@ private:
   const off_t offset_;
 };
 
+class ActionTruncateFile : public AsyncFileActionThreadPool<absl::Status> {
+public:
+  ActionTruncateFile(AsyncFileHandle handle, size_t length,
+                     absl::AnyInvocable<void(absl::Status)> on_complete)
+      : AsyncFileActionThreadPool<absl::Status>(handle, std::move(on_complete)), length_(length) {}
+
+  absl::Status executeImpl() override {
+    ASSERT(fileDescriptor() != -1);
+    Api::SysCallIntResult result = posix().ftruncate(fileDescriptor(), length_);
+    if (result.return_value_ == -1) {
+      return statusAfterFileError(result);
+    }
+    return absl::OkStatus();
+  }
+
+private:
+  const size_t length_;
+};
+
 class ActionDuplicateFile : public AsyncFileActionThreadPool<absl::StatusOr<AsyncFileHandle>> {
 public:
   ActionDuplicateFile(AsyncFileHandle handle,
@@ -242,6 +261,13 @@ absl::StatusOr<CancelFunction> AsyncFileContextThreadPool::duplicate(
     absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete) {
   return checkFileAndEnqueue(
       dispatcher, std::make_unique<ActionDuplicateFile>(handle(), std::move(on_complete)));
+}
+
+absl::StatusOr<CancelFunction>
+AsyncFileContextThreadPool::truncate(Event::Dispatcher* dispatcher, size_t length,
+                                     absl::AnyInvocable<void(absl::Status)> on_complete) {
+  return checkFileAndEnqueue(
+      dispatcher, std::make_unique<ActionTruncateFile>(handle(), length, std::move(on_complete)));
 }
 
 absl::StatusOr<CancelFunction>

@@ -1,252 +1,18 @@
 diff --git a/java/repositories.bzl b/java/repositories.bzl
-index 7e5b939..e8d10b3 100644
+index 27f4f85..15b5306 100644
 --- a/java/repositories.bzl
 +++ b/java/repositories.bzl
-@@ -88,7 +88,7 @@ def remote_jdk8_repos(name = ""):
-     maybe(
-         remote_java_repository,
-         name = "remote_jdk8_linux_aarch64",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:aarch64",
-         ],
-@@ -103,7 +103,7 @@ def remote_jdk8_repos(name = ""):
-     maybe(
-         remote_java_repository,
-         name = "remote_jdk8_linux_s390x",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:s390x",
-         ],
-@@ -117,7 +117,7 @@ def remote_jdk8_repos(name = ""):
-     maybe(
-         remote_java_repository,
-         name = "remote_jdk8_linux",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:x86_64",
-         ],
-@@ -132,7 +132,7 @@ def remote_jdk8_repos(name = ""):
-     maybe(
-         remote_java_repository,
-         name = "remote_jdk8_macos_aarch64",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:macos",
-             "@platforms//cpu:aarch64",
-         ],
-@@ -146,7 +146,7 @@ def remote_jdk8_repos(name = ""):
-     maybe(
-         remote_java_repository,
-         name = "remote_jdk8_macos",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:macos",
-             "@platforms//cpu:x86_64",
-         ],
-@@ -161,7 +161,7 @@ def remote_jdk8_repos(name = ""):
-     maybe(
-         remote_java_repository,
-         name = "remote_jdk8_windows",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:windows",
-             "@platforms//cpu:x86_64",
-         ],
-@@ -189,7 +189,7 @@ def remote_jdk11_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk11_linux",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:x86_64",
-         ],
-@@ -205,7 +205,7 @@ def remote_jdk11_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk11_linux_aarch64",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:aarch64",
-         ],
-@@ -221,7 +221,7 @@ def remote_jdk11_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk11_linux_ppc64le",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:ppc",
-         ],
-@@ -237,7 +237,7 @@ def remote_jdk11_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk11_linux_s390x",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:s390x",
-         ],
-@@ -253,7 +253,7 @@ def remote_jdk11_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk11_macos",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:macos",
-             "@platforms//cpu:x86_64",
-         ],
-@@ -269,7 +269,7 @@ def remote_jdk11_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk11_macos_aarch64",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:macos",
-             "@platforms//cpu:aarch64",
-         ],
-@@ -285,7 +285,7 @@ def remote_jdk11_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk11_win",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:windows",
-             "@platforms//cpu:x86_64",
-         ],
-@@ -301,7 +301,7 @@ def remote_jdk11_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk11_win_arm64",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:windows",
-             "@platforms//cpu:arm64",
-         ],
-@@ -318,7 +318,7 @@ def remote_jdk17_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk17_linux",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:x86_64",
-         ],
-@@ -334,7 +334,7 @@ def remote_jdk17_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk17_linux_aarch64",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:aarch64",
-         ],
-@@ -350,7 +350,7 @@ def remote_jdk17_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk17_linux_s390x",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:s390x",
-         ],
-@@ -366,7 +366,7 @@ def remote_jdk17_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk17_linux_ppc64le",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:ppc",
-         ],
-@@ -382,7 +382,7 @@ def remote_jdk17_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk17_macos",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:macos",
-             "@platforms//cpu:x86_64",
-         ],
-@@ -398,7 +398,7 @@ def remote_jdk17_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk17_macos_aarch64",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:macos",
-             "@platforms//cpu:aarch64",
-         ],
-@@ -413,7 +413,7 @@ def remote_jdk17_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk17_win",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:windows",
-             "@platforms//cpu:x86_64",
-         ],
-@@ -428,7 +428,7 @@ def remote_jdk17_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk17_win_arm64",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:windows",
-             "@platforms//cpu:arm64",
-         ],
-@@ -446,7 +446,7 @@ def remote_jdk20_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk20_linux",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:x86_64",
-         ],
-@@ -462,7 +462,7 @@ def remote_jdk20_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk20_linux_aarch64",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:linux",
-             "@platforms//cpu:aarch64",
-         ],
-@@ -478,7 +478,7 @@ def remote_jdk20_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk20_macos",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:macos",
-             "@platforms//cpu:x86_64",
-         ],
-@@ -494,7 +494,7 @@ def remote_jdk20_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk20_macos_aarch64",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:macos",
-             "@platforms//cpu:aarch64",
-         ],
-@@ -509,7 +509,7 @@ def remote_jdk20_repos():
-     maybe(
-         remote_java_repository,
-         name = "remotejdk20_win",
--        target_compatible_with = [
-+        exec_compatible_with = [
-             "@platforms//os:windows",
-             "@platforms//cpu:x86_64",
-         ],
+@@ -333,7 +333,7 @@ def _remote_jdk_repos_for_version(version):
+         maybe(
+             remote_java_repository,
+             name = item.name,
+-            target_compatible_with = item.target_compatible_with,
++            exec_compatible_with = item.target_compatible_with,
+             sha256 = item.sha256,
+             strip_prefix = item.strip_prefix,
+             urls = item.urls,
 diff --git a/toolchains/remote_java_repository.bzl b/toolchains/remote_java_repository.bzl
-index 86916ec..5521fcf 100644
+index 65bbe48..3501e69 100644
 --- a/toolchains/remote_java_repository.bzl
 +++ b/toolchains/remote_java_repository.bzl
 @@ -32,20 +32,20 @@ _toolchain_config = repository_rule(
@@ -282,7 +48,16 @@ index 86916ec..5521fcf 100644
      target_settings = [":version_or_prefix_version_setting"],
      toolchain_type = "@bazel_tools//tools/jdk:runtime_toolchain_type",
      toolchain = "{toolchain}",
-@@ -85,7 +85,7 @@ toolchain(
+@@ -87,7 +87,7 @@ toolchain(
+     # These constraints are not required for correctness, but prevent fetches of remote JDK for
+     # different architectures. As every Java compilation toolchain depends on a bootstrap runtime in
+     # the same configuration, this constraint will not result in toolchain resolution failures.
+-    exec_compatible_with = {target_compatible_with},
++    exec_compatible_with = {exec_compatible_with},
+     target_settings = [":version_or_prefix_version_setting"],
+     toolchain_type = "@bazel_tools//tools/jdk:bootstrap_runtime_toolchain_type",
+     toolchain = "{toolchain}",
+@@ -95,7 +95,7 @@ toolchain(
  """.format(
              prefix = prefix,
              version = version,

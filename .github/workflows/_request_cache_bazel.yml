@@ -33,7 +33,7 @@ on:
         required: true
       runs-on:
         type: string
-        default: ubuntu-24.04
+        default:
       lock-repository:
         type: string
         default: envoyproxy/ci-mutex
@@ -47,11 +47,11 @@ jobs:
     permissions:
       contents: read
       packages: read
-    runs-on: ${{ inputs.runs-on || 'ubuntu-24.04' }}
+    runs-on: ${{ inputs.runs-on || fromJSON(inputs.request).config.ci.agent-ubuntu }}
     name: "[${{ inputs.arch }}] Prime Bazel cache"
     if: ${{ ! fromJSON(inputs.caches).bazel[inputs.arch] }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.11
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.15
       id: checkout-target
       name: Checkout Envoy repository (target branch)
       with:
@@ -59,23 +59,24 @@ jobs:
         config: |
           fetch-depth: 1
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.11
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.15
       id: appauth
       name: Appauth (mutex lock)
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
 
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.11
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.15
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cache-key }}
+        force-install: ${{ contains(fromJSON('["envoy-arm64-medium", "github-arm64-2c-8gb"]'), inputs.runs-on) }}
     - run: |
         # Simulate container build directory
         sudo mkdir /build
         sudo chown runner:docker /build
         echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV
-    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.11
+    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.15
       id: bazel-cache
       name: Prime Bazel cache
       with:

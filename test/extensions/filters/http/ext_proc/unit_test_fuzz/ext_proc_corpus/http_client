@@ -1,0 +1,12 @@
+config {
+  allow_mode_override: true
+  http_service {
+  }
+  send_body_without_waiting_for_header_response: true
+}
+request {
+}
+response {
+  request_body {
+  }
+}

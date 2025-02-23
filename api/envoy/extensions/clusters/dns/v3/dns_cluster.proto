@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package envoy.extensions.clusters.dns.v3;
+
+import "envoy/config/core/v3/extension.proto";
+import "envoy/extensions/clusters/common/dns/v3/dns.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.clusters.dns.v3";
+option java_outer_classname = "DnsClusterProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/dns/v3;dnsv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: DNS cluster configuration]
+
+// Configuration for DNS discovery clusters.
+// [#extension: envoy.clusters.dns]
+
+// [#next-free-field: 10]
+message DnsCluster {
+  message RefreshRate {
+    // Specifies the base interval between refreshes. This parameter is required and must be greater
+    // than zero and less than
+    // :ref:`max_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.RefreshRate.max_interval>`.
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+      required: true
+      gt {nanos: 1000000}
+    }];
+
+    // Specifies the maximum interval between refreshes. This parameter is optional, but must be
+    // greater than or equal to the
+    // :ref:`base_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.RefreshRate.base_interval>`  if set. The default
+    // is 10 times the :ref:`base_interval <envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.RefreshRate.base_interval>`.
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
+  }
+
+  // This value is the cluster’s DNS refresh rate. The value configured must be at least 1ms.
+  // If this setting is not specified, the
+  // value defaults to 5000ms.
+  google.protobuf.Duration dns_refresh_rate = 3 [(validate.rules).duration = {gt {nanos: 1000000}}];
+
+  // This is the cluster’s DNS refresh rate when requests are failing. If this setting is
+  // not specified, the failure refresh rate defaults to the DNS refresh rate.
+  RefreshRate dns_failure_refresh_rate = 4;
+
+  // Optional configuration for setting cluster's DNS refresh rate. If the value is set to true,
+  // cluster's DNS refresh rate will be set to resource record's TTL which comes from DNS
+  // resolution.
+  bool respect_dns_ttl = 5;
+
+  // DNS jitter causes the cluster to refresh DNS entries later by a random amount of time to avoid a
+  // stampede of DNS requests. This value sets the upper bound (exclusive) for the random amount.
+  // There will be no jitter if this value is omitted.
+  google.protobuf.Duration dns_jitter = 6 [(validate.rules).duration = {gte {}}];
+
+  // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
+  // or any other DNS resolver types and the related parameters.
+  // For example, an object of
+  // :ref:`CaresDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
+  // can be packed into this ``typed_dns_resolver_config``. This configuration replaces the
+  // :ref:`Cluster.typed_dns_resolver_config<envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`
+  // configuration which replaces :ref:`Cluster.dns_resolution_config<envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`.
+  // During the transition period when
+  // :ref:`DnsCluster.typed_dns_resolver_config<envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.typed_dns_resolver_config>`,
+  // :ref:`Cluster.typed_dns_resolver_config<envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`,
+  // and :ref:`Cluster.dns_resolution_config<envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
+  // exist, Envoy will use
+  // :ref:`DnsCluster.typed_dns_resolver_config<envoy_v3_api_field_extensions.clusters.dns.v3.DnsCluster.typed_dns_resolver_config>`
+  // and ignore
+  // DNS resolver-related fields in :ref:`Cluster<envoy_v3_api_msg_config.cluster.v3.Cluster>` if the cluster is configured via the
+  // :ref:`Cluster.cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` extension point with the
+  // :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>` extension type.
+  // Otherwise, see  :ref:`Cluster.typed_dns_resolver_config<envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`.
+  // [#extension-category: envoy.network.dns_resolver]
+  config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 7;
+
+  // The DNS IP address resolution policy. If this setting is not specified, the
+  // value defaults to
+  // :ref:`AUTO<envoy_v3_api_enum_value_extensions.clusters.common.dns.v3.DnsLookupFamily.AUTO>`.
+  common.dns.v3.DnsLookupFamily dns_lookup_family = 8;
+
+  // If true, all returned addresses are considered to be associated with a single endpoint,
+  // which maps to :ref:`logical DNS discovery <arch_overview_service_discovery_types_logical_dns>`
+  // semantics. Otherwise, each address is considered to be a separate endpoint, which maps to
+  // :ref:`strict DNS discovery <arch_overview_service_discovery_types_strict_dns>` semantics.
+  bool all_addresses_in_single_endpoint = 9;
+}

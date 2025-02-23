@@ -102,7 +102,7 @@ TEST_F(AwsMetadataIntegrationTestSuccess, Success) {
   auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
       {":path", "/"}, {":authority", authority}, {":scheme", "http"}, {":method", "GET"}}};
   Http::RequestMessageImpl message(std::move(headers));
-  const auto response = Utility::fetchMetadata(message);
+  const auto response = Utility::fetchMetadataWithCurl(message);
 
   ASSERT_TRUE(response.has_value());
   EXPECT_EQ("METADATA_VALUE", *response);
@@ -121,7 +121,7 @@ TEST_F(AwsMetadataIntegrationTestSuccess, AuthToken) {
                                          {":method", "GET"},
                                          {"authorization", "AUTH_TOKEN"}}};
   Http::RequestMessageImpl message(std::move(headers));
-  const auto response = Utility::fetchMetadata(message);
+  const auto response = Utility::fetchMetadataWithCurl(message);
 
   ASSERT_TRUE(response.has_value());
   EXPECT_EQ("METADATA_VALUE_WITH_AUTH", *response);
@@ -140,7 +140,7 @@ TEST_F(AwsMetadataIntegrationTestSuccess, FetchTokenHttpPut) {
                                          {":method", "PUT"},
                                          {"X-aws-ec2-metadata-token-ttl-seconds", "21600"}}};
   Http::RequestMessageImpl message(std::move(headers));
-  const auto response = Utility::fetchMetadata(message);
+  const auto response = Utility::fetchMetadataWithCurl(message);
 
   ASSERT_TRUE(response.has_value());
   EXPECT_EQ("TOKEN_VALUE", *response);
@@ -161,7 +161,7 @@ TEST_F(AwsMetadataIntegrationTestSuccess, Redirect) {
                                          {":method", "GET"},
                                          {"authorization", "AUTH_TOKEN"}}};
   Http::RequestMessageImpl message(std::move(headers));
-  const auto response = Utility::fetchMetadata(message);
+  const auto response = Utility::fetchMetadataWithCurl(message);
 
   ASSERT_TRUE(response.has_value());
   EXPECT_EQ("METADATA_VALUE_WITH_AUTH", *response);
@@ -191,7 +191,7 @@ TEST_F(AwsMetadataIntegrationTestFailure, Failure) {
 
   Http::RequestMessageImpl message(std::move(headers));
   const auto start_time = timeSystem().monotonicTime();
-  const auto response = Utility::fetchMetadata(message);
+  const auto response = Utility::fetchMetadataWithCurl(message);
   const auto end_time = timeSystem().monotonicTime();
 
   EXPECT_FALSE(response.has_value());
@@ -218,7 +218,7 @@ TEST_F(AwsMetadataIntegrationTestTimeout, Timeout) {
   Http::RequestMessageImpl message(std::move(headers));
 
   const auto start_time = timeSystem().monotonicTime();
-  const auto response = Utility::fetchMetadata(message);
+  const auto response = Utility::fetchMetadataWithCurl(message);
   const auto end_time = timeSystem().monotonicTime();
 
   EXPECT_FALSE(response.has_value());
