@@ -336,7 +336,7 @@ public:
   }
   void processConcurrencyLimitUpdate(int consecutive_min_concurrency_set) override;
   std::chrono::nanoseconds minRTT() const override { return min_rtt_; }
-  void recalculateAfterSample() override;
+  void recalculateAfterSample() override ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
 
 private:
   void enterMinRTTSamplingWindow();
