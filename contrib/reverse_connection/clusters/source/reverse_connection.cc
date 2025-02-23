@@ -19,7 +19,8 @@ namespace Envoy {
 namespace Extensions {
 namespace ReverseConnection {
 
-Upstream::HostConstSharedPtr RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
+Upstream::HostConstSharedPtr
+RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (!context) {
     ENVOY_LOG(debug, "Invalid downstream connection or invalid downstream request");
     return nullptr;
@@ -75,11 +76,11 @@ Upstream::HostSharedPtr RevConCluster::checkAndCreateHost(const std::string host
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 0, nullptr));
   Upstream::HostSharedPtr host(std::shared_ptr<Upstream::HostImpl>(THROW_OR_RETURN_VALUE(
       Upstream::HostImpl::create(
-        info(), absl::StrCat(info()->name(), static_cast<std::string>(host_id)),
-        std::move(host_ip_port), nullptr /* metadata */, nullptr, 1 /* initial_weight */,
-        envoy::config::core::v3::Locality().default_instance(),
-        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
-        0 /* priority */, envoy::config::core::v3::UNKNOWN, time_source_),
+          info(), absl::StrCat(info()->name(), static_cast<std::string>(host_id)),
+          std::move(host_ip_port), nullptr /* metadata */, nullptr, 1 /* initial_weight */,
+          envoy::config::core::v3::Locality().default_instance(),
+          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
+          0 /* priority */, envoy::config::core::v3::UNKNOWN, time_source_),
       std::unique_ptr<Upstream::HostImpl>)));
   host->setHostId(host_id);
   ENVOY_LOG(trace, "Created a host {} for {}.", *host, host_id);
@@ -129,13 +130,15 @@ absl::string_view RevConCluster::getHostIdValue(const Http::RequestHeaderMap* re
   return absl::string_view();
 }
 
-RevConCluster::RevConCluster(const envoy::config::cluster::v3::Cluster& config,
-                             Upstream::ClusterFactoryContext& context, absl::Status& creation_status,
-                             const envoy::extensions::clusters::reverse_connection::v3alpha::RevConClusterConfig& rev_con_config)
+RevConCluster::RevConCluster(
+    const envoy::config::cluster::v3::Cluster& config, Upstream::ClusterFactoryContext& context,
+    absl::Status& creation_status,
+    const envoy::extensions::clusters::reverse_connection::v3alpha::RevConClusterConfig&
+        rev_con_config)
     : ClusterImplBase(config, context, creation_status),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
-      cleanup_interval_(
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(rev_con_config, cleanup_interval, 10000))),
+      cleanup_interval_(std::chrono::milliseconds(
+          PROTOBUF_GET_MS_OR_DEFAULT(rev_con_config, cleanup_interval, 10000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })) {
   default_host_id_ =
       Config::Metadata::metadataValue(&config.metadata(), "envoy.reverse_conn", "host_id")
@@ -159,7 +162,7 @@ RevConClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluste
                                         Upstream::ClusterFactoryContext& context) {
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     return absl::InvalidArgumentError(
-      fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "
+        fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "
                     "'CLUSTER_PROVIDED' is allowed with cluster type 'REVERSE_CONNECTION'",
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy()),
                     envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type())));
@@ -173,7 +176,8 @@ RevConClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluste
   }
 
   if (cluster.has_load_assignment()) {
-    return absl::InvalidArgumentError("Reverse Conn clusters must have no load assignment configured");
+    return absl::InvalidArgumentError(
+        "Reverse Conn clusters must have no load assignment configured");
   }
 
   // Parse and validate the typed_config as RevConClusterConfig.
@@ -183,8 +187,8 @@ RevConClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluste
   }
 
   absl::Status creation_status = absl::OkStatus();
-  auto new_cluster =
-      std::shared_ptr<RevConCluster>(new RevConCluster(cluster, context, creation_status, rev_con_config));
+  auto new_cluster = std::shared_ptr<RevConCluster>(
+      new RevConCluster(cluster, context, creation_status, rev_con_config));
   RETURN_IF_NOT_OK(creation_status);
   auto lb = std::make_unique<RevConCluster::ThreadAwareLoadBalancer>(new_cluster);
   return std::make_pair(new_cluster, std::move(lb));

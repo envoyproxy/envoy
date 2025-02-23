@@ -6,11 +6,12 @@
 #include <vector>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "contrib/envoy/extensions/clusters/reverse_connection/v3alpha/reverse_connection.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+
+#include "contrib/envoy/extensions/clusters/reverse_connection/v3alpha/reverse_connection.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,8 +25,10 @@ namespace ReverseConnection {
  */
 class RevConCluster : public Upstream::ClusterImplBase {
 public:
-  RevConCluster(const envoy::config::cluster::v3::Cluster& config, Upstream::ClusterFactoryContext& context,
-                absl::Status& creation_status, const envoy::extensions::clusters::reverse_connection::v3alpha::RevConClusterConfig& rev_con_config);
+  RevConCluster(const envoy::config::cluster::v3::Cluster& config,
+                Upstream::ClusterFactoryContext& context, absl::Status& creation_status,
+                const envoy::extensions::clusters::reverse_connection::v3alpha::RevConClusterConfig&
+                    rev_con_config);
 
   ~RevConCluster() override { cleanup_timer_->disableTimer(); }
 
@@ -39,7 +42,9 @@ public:
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
 
     // Virtual functions that are not supported by our custom load-balancer.
-    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override { return nullptr; }
+    Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
+      return nullptr;
+    }
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                              const Upstream::Host& /*host*/,
@@ -109,7 +114,8 @@ class RevConClusterFactory : public Upstream::ClusterFactoryImplBase {
 public:
   RevConClusterFactory() : Upstream::ClusterFactoryImplBase("envoy.clusters.reverse_connection") {}
 
-  absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
+  absl::StatusOr<
+      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
                     Upstream::ClusterFactoryContext& context) override;
 
@@ -119,4 +125,3 @@ private:
 } // namespace ReverseConnection
 } // namespace Extensions
 } // namespace Envoy
-
