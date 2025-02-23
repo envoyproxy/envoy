@@ -162,7 +162,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   } else {
     // Leave and let our callback handle the rest of the processing
-    return Http::FilterHeadersStatus::StopAllIterationAndWatermark;
+    return Http::FilterHeadersStatus::StopIteration;
   }
 }
 
@@ -249,7 +249,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     return Http::FilterDataStatus::Continue;
   } else {
     // Leave and let our callback handle the rest of the processing
-    return Http::FilterDataStatus::StopIterationAndWatermark;
+    return Http::FilterDataStatus::StopIterationAndBuffer;
   }
 }
 
