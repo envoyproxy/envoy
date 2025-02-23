@@ -98,7 +98,7 @@ void DynamicGradientController::enterMinRTTSamplingWindow() {
     return;
   }
 
-  absl::MutexLock ml(&sampleMutationMutex());
+  absl::MutexLock ml(&sample_mutation_mtx_);
 
   stats().min_rtt_calculation_active_.set(1);
 

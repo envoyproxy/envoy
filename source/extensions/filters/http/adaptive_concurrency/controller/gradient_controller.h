@@ -193,11 +193,10 @@ public:
 protected:
   virtual bool shouldSampleRTT() const { return true; }
   virtual bool shouldRecordSample(MonotonicTime /*MonotonicTime*/) const { return true; }
-  virtual void recalculateAfterSample() {}
+  virtual void recalculateAfterSample() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_) {}
   virtual std::chrono::nanoseconds minRTT() const = 0;
   virtual void processConcurrencyLimitUpdate(int /*consecutive_min_concurrency_set*/) {}
 
-  absl::Mutex& sampleMutationMutex() { return sample_mutation_mtx_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
   GradientControllerStats& stats() { return stats_; }
   TimeSource& timeSource() { return time_source_; }
@@ -209,6 +208,11 @@ protected:
   void clearSamples() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void enableSamplingTimer() { sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval()); }
 
+  // Protects data related to latency sampling and RTT values. In addition to protecting the latency
+  // sample histogram, the mutex ensures that the minRTT calculation window and the sample window
+  // (where the new concurrency limit is determined) do not overlap.
+  absl::Mutex sample_mutation_mtx_;
+
 private:
   uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
@@ -218,11 +222,6 @@ private:
   Stats::Scope& scope_;
   GradientControllerStats stats_;
   TimeSource& time_source_;
-
-  // Protects data related to latency sampling and RTT values. In addition to protecting the latency
-  // sample histogram, the mutex ensures that the minRTT calculation window and the sample window
-  // (where the new concurrency limit is determined) do not overlap.
-  absl::Mutex sample_mutation_mtx_;
 
   // Stores the aggregated sampled latencies for use in the gradient calculation.
   std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(sample_mutation_mtx_);
@@ -337,7 +336,7 @@ public:
   }
   void processConcurrencyLimitUpdate(int consecutive_min_concurrency_set) override;
   std::chrono::nanoseconds minRTT() const override { return min_rtt_; }
-  void recalculateAfterSample();
+  void recalculateAfterSample() override;
 
 private:
   void enterMinRTTSamplingWindow();
