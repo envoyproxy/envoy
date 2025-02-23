@@ -34,6 +34,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/router.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
@@ -47,11 +48,9 @@ public:
   UpstreamFilterManager(Http::FilterManagerCallbacks& filter_manager_callbacks,
                         Event::Dispatcher& dispatcher, OptRef<const Network::Connection> connection,
                         uint64_t stream_id, Buffer::BufferMemoryAccountSharedPtr account,
-                        bool proxy_100_continue, uint32_t buffer_limit,
-                        const Http::FilterChainFactory& filter_chain_factory,
-                        UpstreamRequest& request)
+                        bool proxy_100_continue, uint32_t buffer_limit, UpstreamRequest& request)
       : FilterManager(filter_manager_callbacks, dispatcher, connection, stream_id, account,
-                      proxy_100_continue, buffer_limit, filter_chain_factory),
+                      proxy_100_continue, buffer_limit),
         upstream_request_(request) {}
 
   StreamInfo::StreamInfo& streamInfo() override {
@@ -127,6 +126,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info_.route_ = parent_.callbacks()->route();
+  stream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
@@ -142,18 +142,18 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   filter_manager_ = std::make_unique<UpstreamFilterManager>(
       *filter_manager_callbacks_, parent_.callbacks()->dispatcher(), UpstreamRequest::connection(),
       parent_.callbacks()->streamId(), parent_.callbacks()->account(), true,
-      parent_.callbacks()->decoderBufferLimit(), *parent_.cluster(), *this);
+      parent_.callbacks()->decoderBufferLimit(), *this);
   // Attempt to create custom cluster-specified filter chain
-  bool created = parent_.cluster()->createFilterChain(*filter_manager_,
-                                                      /*only_create_if_configured=*/true);
+  bool created = filter_manager_->createFilterChain(*parent_.cluster()).created();
+
   if (!created) {
     // Attempt to create custom router-specified filter chain.
-    created = parent_.config().createFilterChain(*filter_manager_);
+    created = filter_manager_->createFilterChain(parent_.config()).created();
   }
   if (!created) {
     // Neither cluster nor router have a custom filter chain; add the default
     // cluster filter chain, which only consists of the codec filter.
-    created = parent_.cluster()->createFilterChain(*filter_manager_, false);
+    created = filter_manager_->createFilterChain(defaultUpstreamHttpFilterChainFactory()).created();
   }
   // There will always be a codec filter present, which sets the upstream
   // interface. Fast-fail any tests that don't set up mocks correctly.

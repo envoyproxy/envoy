@@ -39,16 +39,28 @@ ip_tags:
 
 )EOF";
 
-  void initializeFilter(const std::string& yaml) {
+  void initializeFilter(const std::string& yaml,
+                        absl::optional<std::string> expected_error = absl::nullopt) {
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ =
-        std::make_shared<IpTaggingFilterConfig>(config, "prefix.", *stats_.rootScope(), runtime_);
+    auto config_or =
+        IpTaggingFilterConfig::create(config, "prefix.", *stats_.rootScope(), runtime_);
+    if (expected_error.has_value()) {
+      EXPECT_FALSE(config_or.ok());
+      EXPECT_EQ(expected_error.value(), absl::StrCat(config_or.status()));
+      return;
+    }
+    EXPECT_TRUE(config_or.ok());
+    config_ = std::move(config_or.value());
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
-  ~IpTaggingFilterTest() override { filter_->onDestroy(); }
+  ~IpTaggingFilterTest() override {
+    if (filter_ != nullptr) {
+      filter_->onDestroy();
+    }
+  }
 
   NiceMock<Stats::MockStore> stats_;
   IpTaggingFilterConfigSharedPtr config_;
@@ -435,6 +447,28 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
   request_headers = Http::TestRequestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
+}
+
+TEST_F(IpTaggingFilterTest, EmptyIpTags) {
+  const std::string external_request_yaml = R"EOF(
+request_type: external
+)EOF";
+  initializeFilter(external_request_yaml,
+                   "INVALID_ARGUMENT: HTTP IP Tagging Filter requires ip_tags to be specified.");
+}
+
+TEST_F(IpTaggingFilterTest, InvalidCidr) {
+  const std::string external_request_yaml = R"EOF(
+request_type: external
+ip_tags:
+  - ip_tag_name: fooooooo
+    ip_list:
+      - {address_prefix: 12345.12345.12345.12345, prefix_len: 999999}
+)EOF";
+  initializeFilter(
+      external_request_yaml,
+      "INVALID_ARGUMENT: invalid ip/mask combo '12345.12345.12345.12345/999999' (format is "
+      "<ip>/<# mask bits>)");
 }
 
 } // namespace

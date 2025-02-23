@@ -1218,10 +1218,16 @@ ApiPtr createApiForTest(Stats::Store& stat_store, Event::TimeSystem& time_system
 class MessageTrackedObject : public ScopeTrackedObject {
 public:
   MessageTrackedObject(absl::string_view sv) : sv_(sv) {}
+  MessageTrackedObject(absl::string_view sv, const StreamInfo::StreamInfo& tracked_stream)
+      : sv_(sv), tracked_stream_(tracked_stream) {}
+
+  OptRef<const StreamInfo::StreamInfo> trackedStream() const override { return tracked_stream_; }
+
   void dumpState(std::ostream& os, int /*indent_level*/) const override { os << sv_; }
 
 private:
   absl::string_view sv_;
+  OptRef<const StreamInfo::StreamInfo> tracked_stream_;
 };
 
 MATCHER_P(HeaderMapEqualIgnoreOrder, expected, "") {

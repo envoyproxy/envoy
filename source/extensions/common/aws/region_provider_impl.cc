@@ -40,14 +40,29 @@ absl::optional<std::string> EnvironmentRegionProvider::getRegionSet() {
   return regionSet;
 }
 
+AWSCredentialsFileRegionProvider::AWSCredentialsFileRegionProvider(
+    const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+        credential_file_config) {
+  if (credential_file_config.has_credentials_data_source() &&
+      credential_file_config.credentials_data_source().has_filename()) {
+    credential_file_path_ = credential_file_config.credentials_data_source().filename();
+  }
+  if (!credential_file_config.profile().empty()) {
+    profile_ = credential_file_config.profile();
+  }
+}
+
 absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegion() {
   absl::flat_hash_map<std::string, std::string> elements = {{REGION, ""}};
   absl::flat_hash_map<std::string, std::string>::iterator it;
 
-  // Search for the region in the credentials file
+  std::string file_path, profile;
+  file_path = credential_file_path_.has_value() ? credential_file_path_.value()
+                                                : Utility::getCredentialFilePath();
+  profile = profile_.has_value() ? profile_.value() : Utility::getCredentialProfileName();
 
-  if (!Utility::resolveProfileElements(Utility::getCredentialFilePath(),
-                                       Utility::getCredentialProfileName(), elements)) {
+  // Search for the region in the credentials file
+  if (!Utility::resolveProfileElementsFromFile(file_path, profile, elements)) {
     return absl::nullopt;
   }
   it = elements.find(REGION);
@@ -64,10 +79,14 @@ absl::optional<std::string> AWSCredentialsFileRegionProvider::getRegionSet() {
   absl::flat_hash_map<std::string, std::string> elements = {{SIGV4A_SIGNING_REGION_SET, ""}};
   absl::flat_hash_map<std::string, std::string>::iterator it;
 
-  // Search for the region in the credentials file
+  std::string file_path, profile;
+  file_path = credential_file_path_.has_value() ? credential_file_path_.value()
+                                                : Utility::getCredentialFilePath();
 
-  if (!Utility::resolveProfileElements(Utility::getCredentialFilePath(),
-                                       Utility::getCredentialProfileName(), elements)) {
+  profile = profile_.has_value() ? profile_.value() : Utility::getCredentialProfileName();
+
+  // Search for the region in the credentials file
+  if (!Utility::resolveProfileElementsFromFile(file_path, profile, elements)) {
     return absl::nullopt;
   }
   it = elements.find(SIGV4A_SIGNING_REGION_SET);
@@ -86,8 +105,8 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegion() {
 
   // Search for the region in the config file
 
-  if (!Utility::resolveProfileElements(Utility::getConfigFilePath(),
-                                       Utility::getConfigProfileName(), elements)) {
+  if (!Utility::resolveProfileElementsFromFile(Utility::getConfigFilePath(),
+                                               Utility::getConfigProfileName(), elements)) {
     return absl::nullopt;
   }
 
@@ -106,8 +125,8 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegionSet() {
 
   // Search for the region in the config file
 
-  if (!Utility::resolveProfileElements(Utility::getConfigFilePath(),
-                                       Utility::getConfigProfileName(), elements)) {
+  if (!Utility::resolveProfileElementsFromFile(Utility::getConfigFilePath(),
+                                               Utility::getConfigProfileName(), elements)) {
     return absl::nullopt;
   }
 
@@ -133,10 +152,12 @@ absl::optional<std::string> AWSConfigFileRegionProvider::getRegionSet() {
 // Credentials and profile format can be found here:
 // https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
 //
-RegionProviderChain::RegionProviderChain() {
+RegionProviderChain::RegionProviderChain(
+    const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+        credential_file_config) {
   // TODO(nbaws): Verify that bypassing virtual dispatch here was intentional
   add(RegionProviderChain::createEnvironmentRegionProvider());
-  add(RegionProviderChain::createAWSCredentialsFileRegionProvider());
+  add(RegionProviderChain::createAWSCredentialsFileRegionProvider(credential_file_config));
   add(RegionProviderChain::createAWSConfigFileRegionProvider());
 }
 

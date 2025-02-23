@@ -11,6 +11,7 @@
 
 #include "test/common/upstream/test_cluster_manager.h"
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/simulated_time_system.h"
@@ -65,8 +66,8 @@ protected:
     cluster_manager_ = TestClusterManagerImpl::createAndInit(
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_,
-        server_);
+        validation_context_, *factory_.api_, http_context_, grpc_context_, router_context_, server_,
+        xds_manager_);
     cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
       THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
     });
@@ -112,6 +113,7 @@ protected:
 
   NiceMock<TestClusterManagerFactory> factory_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
+  NiceMock<Config::MockXdsManager> xds_manager_;
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
@@ -203,7 +205,7 @@ TEST_P(StaticClusterTest, CdsStaticClustersAreDeferredInitialized) {
   )EOF";
 
   EXPECT_LOG_CONTAINS("debug", "Deferring add or update for TLS cluster cluster_1", {
-    EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
         parseClusterFromV3Yaml(static_cds_cluster_yaml, getStaticClusterType()), "version1"));
   });
   EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
@@ -243,7 +245,7 @@ TEST_P(StaticClusterTest, MergeStaticCdsClusterUpdates) {
   )EOF";
 
     EXPECT_LOG_CONTAINS("debug", "Deferring add or update for TLS cluster cluster_1", {
-      EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+      EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
           parseClusterFromV3Yaml(static_cds_cluster_yaml_v1, getStaticClusterType()), "version1"));
     });
     EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
@@ -274,7 +276,7 @@ TEST_P(StaticClusterTest, MergeStaticCdsClusterUpdates) {
   )EOF";
 
     EXPECT_LOG_CONTAINS("debug", "Deferring add or update for TLS cluster cluster_1", {
-      EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+      EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
           parseClusterFromV3Yaml(static_cds_cluster_yaml_v2, getStaticClusterType()), "version2"));
     });
     EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
@@ -325,7 +327,7 @@ TEST_P(StaticClusterTest, ActiveClusterGetsUpdated) {
   )EOF";
 
     EXPECT_LOG_CONTAINS("debug", "Deferring add or update for TLS cluster cluster_1", {
-      EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+      EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
           parseClusterFromV3Yaml(static_cds_cluster_yaml_v1, getStaticClusterType()), "version1"));
     });
     EXPECT_LOG_CONTAINS("debug", "initializing TLS cluster cluster_1 inline",
@@ -358,7 +360,7 @@ TEST_P(StaticClusterTest, ActiveClusterGetsUpdated) {
   )EOF";
     // Expect this line to fail as we should just inflate as usual.
     EXPECT_LOG_CONTAINS("debug", "updating TLS cluster cluster_1", {
-      EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+      EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
           parseClusterFromV3Yaml(static_cds_cluster_yaml_v2, getStaticClusterType()), "version2"));
     });
     EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 1);
@@ -405,7 +407,7 @@ TEST_P(StaticClusterTest, RemoveDeferredCluster) {
   )EOF";
 
   EXPECT_LOG_CONTAINS("debug", "Deferring add or update for TLS cluster cluster_1", {
-    EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+    EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
         parseClusterFromV3Yaml(static_cds_cluster_yaml_v1, getStaticClusterType()), "version1"));
   });
   EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
@@ -496,7 +498,7 @@ TEST_P(EdsTest, ShouldMergeAddingHosts) {
       }));
 
   EXPECT_EQ(readGauge("thread_local_cluster_manager.test_thread.clusters_inflated"), 0);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
       parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
@@ -560,7 +562,7 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
             refresh_delay: 1s
     )EOF";
   auto cluster = parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType());
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(cluster, "version1"));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster, "version1"));
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
@@ -576,7 +578,7 @@ TEST_P(EdsTest, ShouldNotMergeAddingHostsForDifferentClustersWithSameName) {
   // Update the cluster with a different lb policy. Now it's a different cluster and should
   // not be merged.
   cluster.set_lb_policy(::envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(cluster, "version2"));
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(cluster, "version2"));
 
   // Because the eds_service_name is the same, we can reuse the same load assignment here.
   cluster_load_assignment.clear_endpoints();
@@ -638,7 +640,7 @@ TEST_P(EdsTest, ShouldNotHaveRemovedHosts) {
         return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
       }));
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
       parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));
 
   // ClusterLoadAssignment should contain all hosts to be kept for the
@@ -710,7 +712,7 @@ TEST_P(EdsTest, ShouldHaveHostThatWasAddedAfterRemoval) {
         return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
       }));
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
       parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));
 
   // ClusterLoadAssignment should contain all hosts to be kept for the
@@ -786,7 +788,7 @@ TEST_P(EdsTest, MultiplePrioritiesShouldMergeCorrectly) {
         return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
       }));
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
       parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
@@ -858,7 +860,7 @@ TEST_P(EdsTest, ActiveClusterGetsUpdated) {
         return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
       }));
 
-  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(
       parseClusterFromV3Yaml(eds_cluster_yaml, getEdsClusterType()), "version1"));
 
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;

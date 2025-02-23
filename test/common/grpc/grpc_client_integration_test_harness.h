@@ -234,7 +234,16 @@ public:
 
   void closeStream() {
     grpc_stream_->closeStream();
+    waitForEndStream();
+  }
+
+  void waitForEndStream() {
     AssertionResult result = fake_stream_->waitForEndStream(dispatcher_helper_.dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+  }
+
+  void waitForReset() {
+    AssertionResult result = fake_stream_->waitForReset(dispatcher_helper_.dispatcher_);
     RELEASE_ASSERT(result, result.message());
   }
 
@@ -347,7 +356,10 @@ public:
     http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, api_->randomGenerator(),
                                                     host_ptr_, Upstream::ResourcePriority::Default,
                                                     nullptr, nullptr, state_);
-    EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
+    EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillRepeatedly(Invoke([this] {
+      return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+    }));
+    EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, cm_,
@@ -364,7 +376,7 @@ public:
     config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
 
     fillServiceWideInitialMetadata(config);
-    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
+    return *AsyncClientImpl::create(cm_, config, dispatcher_->timeSource());
   }
 
   virtual envoy::config::core::v3::GrpcService createGoogleGrpcConfig() {

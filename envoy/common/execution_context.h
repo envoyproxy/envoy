@@ -107,15 +107,15 @@ private:
 
 #define ENVOY_EXECUTION_SCOPE_CAT_(a, b) a##b
 #define ENVOY_EXECUTION_SCOPE_CAT(a, b) ENVOY_EXECUTION_SCOPE_CAT_(a, b)
-// Invoked when |scopedObject| is active from the current line to the end of the current c++ scope.
-// |trackedStream| is a OptRef<const StreamInfo> from which a ExecutionContext is extracted.
-// |scopedObject| is a pointer to a Envoy::Tracing::Span or a Http::FilterContext.
+// Invoked when |scopedObject| is active from the current line to the end of the current C++ scope.
+// |trackedStream| is an OptRef<const StreamInfo> from which an ExecutionContext is extracted.
+// |scopedObject| is a pointer to an Envoy::Tracing::Span or an Http::FilterContext.
 #define ENVOY_EXECUTION_SCOPE(trackedStream, scopedObject)                                         \
   Envoy::Cleanup ENVOY_EXECUTION_SCOPE_CAT(on_scope_exit_, __LINE__) =                             \
       [execution_context = ExecutionContext::fromStreamInfo(trackedStream),                        \
        scoped_object = (scopedObject)] {                                                           \
         if (execution_context == nullptr) {                                                        \
-          return Envoy::Cleanup::Noop();                                                           \
+          return Envoy::Cleanup::noop();                                                           \
         }                                                                                          \
         return execution_context->onScopeEnter(scoped_object);                                     \
       }()

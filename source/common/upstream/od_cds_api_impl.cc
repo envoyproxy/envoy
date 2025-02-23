@@ -8,20 +8,24 @@
 namespace Envoy {
 namespace Upstream {
 
-OdCdsApiSharedPtr
+absl::StatusOr<OdCdsApiSharedPtr>
 OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                      ClusterManager& cm, MissingClusterNotifier& notifier, Stats::Scope& scope,
                      ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm, notifier,
-                                            scope, validation_visitor));
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm, notifier,
+                                                scope, validation_visitor, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 
 OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
                            OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
                            ClusterManager& cm, MissingClusterNotifier& notifier,
                            Stats::Scope& scope,
-                           ProtobufMessage::ValidationVisitor& validation_visitor)
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           absl::Status& creation_status)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
                                                                            "name"),
       helper_(cm, "odcds"), cm_(cm), notifier_(notifier),
@@ -29,17 +33,16 @@ OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_co
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
   const auto resource_name = getResourceName();
+  absl::StatusOr<Config::SubscriptionPtr> subscription_or_error;
   if (!odcds_resources_locator.has_value()) {
-    subscription_ = THROW_OR_RETURN_VALUE(cm_.subscriptionFactory().subscriptionFromConfigSource(
-                                              odcds_config, Grpc::Common::typeUrl(resource_name),
-                                              *scope_, *this, resource_decoder_, {}),
-                                          Config::SubscriptionPtr);
+    subscription_or_error = cm_.subscriptionFactory().subscriptionFromConfigSource(
+        odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
   } else {
-    subscription_ = THROW_OR_RETURN_VALUE(cm.subscriptionFactory().collectionSubscriptionFromUrl(
-                                              *odcds_resources_locator, odcds_config, resource_name,
-                                              *scope_, *this, resource_decoder_),
-                                          Config::SubscriptionPtr);
+    subscription_or_error = cm.subscriptionFactory().collectionSubscriptionFromUrl(
+        *odcds_resources_locator, odcds_config, resource_name, *scope_, *this, resource_decoder_);
   }
+  SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
+  subscription_ = std::move(*subscription_or_error);
 }
 
 absl::Status OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,

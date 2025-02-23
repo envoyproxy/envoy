@@ -57,7 +57,7 @@ class SigV4ASignerImpl : public SignerBaseImpl {
 public:
   SigV4ASignerImpl(
       absl::string_view service_name, absl::string_view region,
-      const CredentialsProviderSharedPtr& credentials_provider,
+      const CredentialsProviderChainSharedPtr& credentials_provider,
       Server::Configuration::CommonFactoryContext& context,
       const AwsSigningHeaderExclusionVector& matcher_config, const bool query_string = false,
       const uint16_t expiration_time = SignatureQueryParameterValues::DefaultExpiration)
