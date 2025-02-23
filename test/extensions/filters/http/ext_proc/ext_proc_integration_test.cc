@@ -2231,11 +2231,10 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnStreamedRequestBody) {
         hdr->mutable_header()->set_raw_value("bar");
         return true;
       });
-  processAndRespondImmediately(
-      *grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
-        immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
-        immediate.set_body("{\"reason\": \"Request too evil\"}");
-        immediate.set_details("Failed because I don't like this payload");
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
+    immediate.set_body("{\"reason\": \"Request too evil\"}");
+    immediate.set_details("Failed because I don't like this payload");
   });
   verifyDownstreamResponse(*response, 400);
   EXPECT_EQ("{\"reason\": \"Request too evil\"}", response->body());
@@ -2263,11 +2262,10 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnStreamedResponseBody) {
         hdr->mutable_header()->set_raw_value("bar");
         return true;
       });
-  processAndRespondImmediately(
-      *grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
-        immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
-        immediate.set_body("{\"reason\": \"Response too evil\"}");
-        immediate.set_details("Failed because I don't like this payload");
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
+    immediate.set_body("{\"reason\": \"Response too evil\"}");
+    immediate.set_details("Failed because I don't like this payload");
   });
   verifyDownstreamResponse(*response, 400);
   EXPECT_EQ("{\"reason\": \"Response too evil\"}", response->body());
