@@ -6401,6 +6401,52 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       LiteralSockoptListenerEnabledWithSocketOptOnAdditionalAddressOnly) {
+  const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    additional_addresses:
+    - address:
+        socket_address: { address: 127.0.0.1, port_value: 2222 }
+      socket_options:
+        socket_options: [
+          # The socket goes through socket() and bind() but never listen(), so if we
+          # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+          { level: 11, name: 12, int_value: 13, state: STATE_PREBIND },
+          { level: 14, name: 15, int_value: 16, state: STATE_BOUND },
+          { level: 17, name: 18, int_value: 19, state: STATE_LISTENING },
+        ]
+    enable_reuse_port: false
+    filter_chains:
+    - filters: []
+      name: foo
+  )EOF");
+
+  // Second address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 3,
+                           ListenerComponentFactory::BindType::NoReusePort);
+  // First address.
+  expectCreateListenSocket(envoy::config::core::v3::SocketOption::STATE_PREBIND,
+                           /* expected_num_options */ 0,
+                           ListenerComponentFactory::BindType::NoReusePort);
+
+  // Second address' prebind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 11,
+      /* expected_sockopt_name */ 12,
+      /* expected_value */ 13);
+  // Second address' bind options.
+  expectSetsockopt(
+      /* expected_sockopt_level */ 14,
+      /* expected_sockopt_name */ 15,
+      /* expected_value */ 16);
+  addOrUpdateListener(listener);
+  EXPECT_EQ(1U, manager_->listeners().size());
+}
+
 // This test relies on linux-only code, and a linux-only name IPPROTO_MPTCP
 #if defined(__linux__)
 TEST_P(ListenerManagerImplWithRealFiltersTest, Mptcp) {

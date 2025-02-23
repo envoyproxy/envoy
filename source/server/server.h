@@ -178,6 +178,7 @@ public:
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
+  Config::XdsManager& xdsManager() override { return server_.xdsManager(); }
   Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
     return server_.httpServerPropertiesCacheManager();
   }
@@ -187,6 +188,9 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
   }
+  TransportSocketFactoryContext& getTransportSocketFactoryContext() const override {
+    return server_.transportSocketFactoryContext();
+  };
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
   Stats::Scope& serverScope() override { return *server_scope_; }

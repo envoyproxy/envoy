@@ -1215,6 +1215,14 @@ UDP
   UDP
     Not implemented ("-").
 
+%TLS_JA3_FINGERPRINT%
+  HTTP/TCP/Thrift
+    The JA3 fingerprint (MD5 hash) of the TLS Client Hello message from the downstream connection.
+    Provides a way to fingerprint TLS clients based on various Client Hello parameters like cipher suites,
+    extensions, elliptic curves, etc. Will be ``-`` if TLS is not used or the handshake is incomplete.
+  UDP
+    Not implemented (``-``).
+
 .. _config_access_log_format_downstream_peer_cert_v_start:
 
 %DOWNSTREAM_PEER_CERT_V_START%
@@ -1372,5 +1380,12 @@ UDP
 %TRACE_ID%
   HTTP
     The trace ID of the request. If the request does not have a trace ID, this will be an empty string.
+  TCP/UDP
+    Not implemented ("-").
+
+%QUERY_PARAM(X):Z%
+  HTTP
+    The value of the query parameter X. If the query parameter X is not present, '-' symbol will be used.
+    Z is an optional parameter denoting string truncation up to Z characters long.
   TCP/UDP
     Not implemented ("-").

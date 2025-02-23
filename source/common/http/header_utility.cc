@@ -131,14 +131,6 @@ bool HeaderUtility::headerValueIsValid(const absl::string_view header_value) {
 
 bool HeaderUtility::headerNameIsValid(absl::string_view header_key) {
   if (!header_key.empty() && header_key[0] == ':') {
-#ifdef ENVOY_NGHTTP2
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.sanitize_http2_headers_without_nghttp2")) {
-      // For HTTP/2 pseudo header, use the HTTP/2 semantics for checking validity
-      return nghttp2_check_header_name(reinterpret_cast<const uint8_t*>(header_key.data()),
-                                       header_key.size()) != 0;
-    }
-#endif
     header_key.remove_prefix(1);
     if (header_key.empty()) {
       return false;
@@ -168,7 +160,7 @@ namespace {
 // HTTP/2 valid characters (similar to oghttp2's implementation) and the "@" character.
 // Once UHV is used, this function should be removed, and the HTTP/1 and HTTP/2
 // authority validations should be different.
-bool check_authority_h1_h2(const absl::string_view header_value) {
+bool checkAuthorityH1H2(const absl::string_view header_value) {
   static constexpr char ValidAuthorityChars[] = {
       0 /* NUL  */, 0 /* SOH  */, 0 /* STX  */, 0 /* ETX  */,
       0 /* EOT  */, 0 /* ENQ  */, 0 /* ACK  */, 0 /* BEL  */,
@@ -248,7 +240,7 @@ bool check_authority_h1_h2(const absl::string_view header_value) {
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.internal_authority_header_validator")) {
-    return check_authority_h1_h2(header_value);
+    return checkAuthorityH1H2(header_value);
   }
   return http2::adapter::HeaderValidator::IsValidAuthority(header_value);
 }

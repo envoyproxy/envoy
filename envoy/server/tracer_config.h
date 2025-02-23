@@ -51,6 +51,7 @@ public:
    *       to be unique.
    *       That is why the return type has been changed to std::shared_ptr<> instead of a more
    *       idiomatic std::unique_ptr<>.
+   * TODO(ggreenway): `opencensus` is now removed, so convert this to a unique_ptr.
    *
    * @param config supplies the proto configuration for the Tracer
    * @param context supplies the factory context

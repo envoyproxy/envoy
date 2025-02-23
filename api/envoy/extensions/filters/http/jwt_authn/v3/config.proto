@@ -35,7 +35,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * issuer: the principal that issues the JWT. If specified, it has to match the ``iss`` field in JWT.
 // * allowed audiences: the ones in the token have to be listed here.
 // * how to fetch public key JWKS to verify the token signature.
-// * how to extract JWT token in the request.
+// * how to extract the JWT in the request.
 // * how to pass successfully verified token payload.
 //
 // Example:
@@ -208,7 +208,7 @@ message JwtProvider {
   // Multiple JWTs can be verified for a request. Each JWT has to be extracted from the locations
   // its provider specified or from the default locations.
   //
-  // Specify the HTTP headers to extract JWT token. For examples, following config:
+  // Specify the HTTP headers to extract the JWT. For examples, following config:
   //
   // .. code-block:: yaml
   //
@@ -348,7 +348,7 @@ message JwtProvider {
   uint32 clock_skew_seconds = 10;
 
   // Enables JWT cache, its size is specified by ``jwt_cache_size``.
-  // Only valid JWT tokens are cached.
+  // Only valid JWTs are cached.
   JwtCacheConfig jwt_cache_config = 12;
 
   // Add JWT claim to HTTP Header
@@ -365,7 +365,7 @@ message JwtProvider {
   // This header is only reserved for jwt claim; any other value will be overwritten.
   repeated JwtClaimToHeader claim_to_headers = 15;
 
-  // Clears route cache in order to allow JWT token to correctly affect
+  // Clears route cache in order to allow the JWT to correctly affect
   // routing decisions. Filter clears all cached routes when:
   //
   // 1. The field is set to ``true``.
@@ -378,7 +378,7 @@ message JwtProvider {
 
 // This message specifies JWT Cache configuration.
 message JwtCacheConfig {
-  // The unit is number of JWT tokens, default to 100.
+  // The unit is number of JWTs, default to 100.
   uint32 jwt_cache_size = 1;
 }
 
@@ -469,7 +469,7 @@ message JwksAsyncFetch {
   google.protobuf.Duration failed_refetch_duration = 2;
 }
 
-// This message specifies a header location to extract JWT token.
+// This message specifies a header location to extract the JWT.
 message JwtHeader {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtHeader";
@@ -576,7 +576,7 @@ message JwtRequirement {
     // The requirement is always satisfied even if JWT is missing or the JWT
     // verification fails. A typical usage is: this filter is used to only verify
     // JWTs and pass the verified JWT payloads to another filter, the other filter
-    // will make decision. In this mode, all JWT tokens will be verified.
+    // will make decision. In this mode, all JWTs will be verified.
     google.protobuf.Empty allow_missing_or_failed = 5;
 
     // The requirement is satisfied if JWT is missing, but failed if JWT is

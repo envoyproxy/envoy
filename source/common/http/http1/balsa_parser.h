@@ -85,6 +85,9 @@ private:
   // Latched value of `envoy.reloadable_features.http1_balsa_delay_reset`.
   const bool delay_reset_ =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_balsa_delay_reset");
+  // Latched value of `envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`.
+  const bool wait_for_first_byte_before_msg_done_ = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done");
 };
 
 } // namespace Http1

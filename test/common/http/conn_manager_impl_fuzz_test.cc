@@ -482,7 +482,7 @@ public:
       break;
     }
     case test::common::http::RequestAction::kContinueDecoding: {
-      if (!decoding_done_ &&
+      if (!decoding_done_ && state != StreamState::Closed &&
           (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
            header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
            header_status_ == FilterHeadersStatus::StopIteration) &&

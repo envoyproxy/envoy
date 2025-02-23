@@ -153,26 +153,6 @@ TEST_F(LuaClusterSpecifierPluginTest, DestructLuaClusterSpecifierConfig) {
   config_.reset();
 }
 
-TEST_F(LuaClusterSpecifierPluginTest, DestructLuaClusterSpecifierConfigDisableRuntime) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.restart_features.allow_slot_destroy_on_worker_threads", "false"}});
-
-  setUpTest(normal_lua_config_yaml_);
-  InSequence s;
-  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(false));
-  EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
-  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(true));
-  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
-
-  config_.reset();
-  plugin_.reset();
-
-  LuaClusterSpecifierConfigProto proto_config{};
-  TestUtility::loadFromYaml(normal_lua_config_yaml_, proto_config);
-  config_ = std::make_shared<LuaClusterSpecifierConfig>(proto_config, server_factory_context_);
-  config_.reset();
-}
-
 TEST_F(LuaClusterSpecifierPluginTest, GetClustersBadArg) {
   const std::string config = R"EOF(
   source_code:
@@ -305,6 +285,33 @@ TEST_F(LuaClusterSpecifierPluginTest, ClusterRef) {
 
   // Force the runtime to gc and destroy all the userdata.
   config_->perLuaCodeSetup()->runtimeGC();
+}
+
+TEST_F(LuaClusterSpecifierPluginTest, Logging) {
+  const std::string config = R"EOF(
+  source_code:
+    inline_string: |
+      function envoy_on_route(route_handle)
+        route_handle:logTrace("log test")
+        route_handle:logDebug("log test")
+        route_handle:logInfo("log test")
+        route_handle:logWarn("log test")
+        route_handle:logErr("log test")
+        route_handle:logCritical("log test")
+      end
+  default_cluster: default_service
+  )EOF";
+  setUpTest(config);
+
+  auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({{"trace", "log test"},
+                                                         {"debug", "log test"},
+                                                         {"info", "log test"},
+                                                         {"warn", "log test"},
+                                                         {"error", "log test"},
+                                                         {"critical", "log test"}}),
+                             { plugin_->route(mock_route, headers); });
 }
 
 } // namespace Lua

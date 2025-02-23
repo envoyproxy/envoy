@@ -109,7 +109,7 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
   }
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {

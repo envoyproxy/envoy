@@ -189,6 +189,9 @@ private:
                         absl::string_view details) override {
       return filter_manager_.sendLocalReply(code, body, modify_headers, grpc_status, details);
     }
+
+    void sendGoAwayAndClose() override { return connection_manager_.sendGoAwayAndClose(); }
+
     AccessLog::InstanceSharedPtrVector accessLogHandlers() override {
       const AccessLog::InstanceSharedPtrVector& config_log_handlers =
           connection_manager_.config_->accessLogs();
@@ -283,11 +286,6 @@ private:
     }
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
-    void upgradeFilterChainCreated() override {
-      connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
-      connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
-      state_.successful_upgrade_ = true;
-    }
     void disarmRequestTimeout() override;
     void resetIdleTimer() override;
     void recreateStream(StreamInfo::FilterStateSharedPtr filter_state) override;
@@ -597,6 +595,8 @@ private:
   void doConnectionClose(absl::optional<Network::ConnectionCloseType> close_type,
                          absl::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
+  void sendGoAwayAndClose();
+
   // Returns true if a RST_STREAM for the given stream is premature. Premature
   // means the RST_STREAM arrived before response headers were sent and than
   // the stream was alive for short period of time. This period is specified
@@ -646,6 +646,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
+  bool go_away_sent_{false};
   bool remote_close_{};
   // Hop by hop headers should always be cleared for Envoy-as-a-proxy but will
   // not be for Envoy-mobile.

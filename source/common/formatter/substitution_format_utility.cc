@@ -105,19 +105,10 @@ SubstitutionFormatUtils::parseSubcommandHeaders(absl::string_view subcommand) {
         absl::StrCat("More than 1 alternative header specified in token: ", subcommand));
   }
 
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.consistent_header_validation")) {
-    if (!Http::HeaderUtility::headerNameIsValid(absl::AsciiStrToLower(main_header)) ||
-        !Http::HeaderUtility::headerNameIsValid(absl::AsciiStrToLower(alternative_header))) {
-      return absl::InvalidArgumentError(
-          "Invalid header configuration. Format string contains invalid characters.");
-    }
-  } else {
-    // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
-    if (!Envoy::Http::validHeaderString(main_header) ||
-        !Envoy::Http::validHeaderString(alternative_header)) {
-      return absl::InvalidArgumentError(
-          "Invalid header configuration. Format string contains null or newline.");
-    }
+  if (!Http::HeaderUtility::headerNameIsValid(absl::AsciiStrToLower(main_header)) ||
+      !Http::HeaderUtility::headerNameIsValid(absl::AsciiStrToLower(alternative_header))) {
+    return absl::InvalidArgumentError(
+        "Invalid header configuration. Format string contains invalid characters.");
   }
   return {std::make_pair(main_header, alternative_header)};
 }

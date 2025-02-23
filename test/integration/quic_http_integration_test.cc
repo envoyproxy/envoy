@@ -169,11 +169,11 @@ public:
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
-                     Buffer::RawSlice saved_cmsg) override {
+                     Buffer::OwnedImpl saved_cmsg) override {
     last_local_address_ = local_address;
     last_peer_address_ = peer_address;
     EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
-                                             receive_time, tos, saved_cmsg);
+                                             receive_time, tos, std::move(saved_cmsg));
   }
 
   Network::Address::InstanceConstSharedPtr getLastLocalAddress() const {
@@ -828,6 +828,45 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   codec_client_->close();
 }
 
+// Envoy Mobile does not have listeners, so the above test is not applicable.
+// This test ensures that a mobile client can connect when early data is disabled on the QUICHE
+// layer.
+TEST_P(QuicHttpIntegrationTest, ClientEarlyDataDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_disable_client_early_data",
+                                    "true");
+  // Make sure all connections use the same PersistentQuicInfoImpl.
+  concurrency_ = 1;
+  initialize();
+  // Start the first connection.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
+            codec_client_->connection()->requestedServerName());
+  // Send a complete request on the first connection.
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  // Close the first connection.
+  codec_client_->close();
+
+  // Start a second connection.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  // Send a complete request on the second connection.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  // Ensure the 2nd connection is using resumption ticket but doesn't accept early data.
+  EnvoyQuicClientSession* quic_session =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
+  EXPECT_TRUE(quic_session->IsResumption());
+  EXPECT_FALSE(quic_session->EarlyDataAccepted());
+  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().EarlyData).empty());
+
+  // Close the second connection.
+  codec_client_->close();
+}
+
 // Not only test multiple quic connections, but disconnect and reconnect to
 // trigger resumption.
 TEST_P(QuicHttpIntegrationTest, MultipleUpstreamQuicConnections) {
@@ -1298,14 +1337,14 @@ typed_config:
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(2500));
   initialize();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setExpectedPeerAddress(fmt::format(
           "{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Change the handshake timeout to be 500ms to fail the handshake while the cert validation is
   // pending.
-  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(500);
+  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(2000);
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
@@ -1339,11 +1378,11 @@ typed_config:
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(2500));
   initialize();
   // Change the handshake timeout to be 500ms to fail the handshake while the cert validation is
   // pending.
-  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(500);
+  quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(2000);
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
@@ -1417,13 +1456,21 @@ TEST_P(QuicHttpIntegrationTest, DeferredLogging) {
 TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
                                     "true");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_"
+                                    "quic_notify_stream_soon_to_destroy",
+                                    "true");
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_"
+                                    "quic_notify_ack_listener_earlier",
+                                    "true");
+
   useAccessLog(
       "%PROTOCOL%,%ROUNDTRIP_DURATION%,%REQUEST_DURATION%,%RESPONSE_DURATION%,%RESPONSE_"
       "CODE%,%BYTES_RECEIVED%,%ROUTE_NAME%,%VIRTUAL_CLUSTER_NAME%,%RESPONSE_CODE_DETAILS%,%"
       "CONNECTION_TERMINATION_DETAILS%,%START_TIME%,%UPSTREAM_HOST%,%DURATION%,%BYTES_SENT%,%"
       "RESPONSE_FLAGS%,%DOWNSTREAM_LOCAL_ADDRESS%,%UPSTREAM_CLUSTER%,%STREAM_ID%,%DYNAMIC_"
       "METADATA("
-      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%");
+      "udp.proxy.session:bytes_sent)%,%REQ(:path)%,%STREAM_INFO_REQ(:path)%,%DOWNSTREAM_TLS_"
+      "CIPHER%");
   initialize();
 
   // Make a header-only request and delay the response by 1ms to ensure that the ROUNDTRIP_DURATION
@@ -1455,7 +1502,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   std::string log = entries[0];
 
   std::vector<std::string> metrics = absl::StrSplit(log, ',');
-  ASSERT_EQ(metrics.size(), 21);
+  ASSERT_EQ(metrics.size(), 22);
   EXPECT_EQ(/* PROTOCOL */ metrics.at(0), "HTTP/3");
   EXPECT_EQ(/* ROUNDTRIP_DURATION */ metrics.at(1), "-");
   EXPECT_GE(/* REQUEST_DURATION */ std::stoi(metrics.at(2)), 0);
@@ -1465,7 +1512,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithBlackholedClient) {
   // Ensure that request headers from top-level access logger parameter and stream info are
   // consistent.
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
-
+  EXPECT_THAT(/* DOWNSTREAM_TLS_CIPHER */ metrics.at(21),
+              ::testing::MatchesRegex("TLS_(AES_128_GCM|CHACHA20_POLY1305)_SHA256"));
   codec_client_->close();
 }
 

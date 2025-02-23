@@ -95,7 +95,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
       THROW_IF_NOT_OK_REF(factory_or_error.status());
       Grpc::AsyncClientFactoryPtr&& factory = std::move(factory_or_error.value());
       const Grpc::RawAsyncClientSharedPtr& async_client_shared_ptr =
-          factory->createUncachedRawAsyncClient();
+          THROW_OR_RETURN_VALUE(factory->createUncachedRawAsyncClient(), Grpc::RawAsyncClientPtr);
       exporter = std::make_unique<OpenTelemetryGrpcTraceExporter>(async_client_shared_ptr);
     } else if (opentelemetry_config.has_http_service()) {
       exporter = std::make_unique<OpenTelemetryHttpTraceExporter>(

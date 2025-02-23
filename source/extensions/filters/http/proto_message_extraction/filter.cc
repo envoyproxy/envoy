@@ -146,13 +146,18 @@ Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeade
 
   // Cast away const for necessary modifications in a controlled context.
   extractor_ = const_cast<Extractor*>(extractor);
+
+  // The extractor is created per proto path. In case the of previously received proto path, clear
+  // any cached result from the extractor.
+  extractor_->ClearResult();
+
   auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
       []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 
   request_msg_converter_ = std::make_unique<MessageConverter>(
       std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
 
-  return Envoy::Http::FilterHeadersStatus::StopIteration;
+  return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
 Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data, bool end_stream) {
@@ -269,7 +274,7 @@ Envoy::Http::FilterHeadersStatus Filter::encodeHeaders(Envoy::Http::ResponseHead
   response_msg_converter_ = std::make_unique<MessageConverter>(
       std::move(cord_message_data_factory), encoder_callbacks_->encoderBufferLimit());
 
-  return Http::FilterHeadersStatus::StopIteration;
+  return Http::FilterHeadersStatus::Continue;
 }
 
 Envoy::Http::FilterDataStatus Filter::encodeData(Envoy::Buffer::Instance& data, bool end_stream) {

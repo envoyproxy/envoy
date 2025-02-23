@@ -211,7 +211,7 @@ HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster
                                    store_stats_, ssl_context_manager_, false, *info_factory_, tls_);
 
   // Begin HCs in the background.
-  new_cluster->initialize([] {});
+  new_cluster->initialize([] { return absl::OkStatus(); });
   new_cluster->initHealthchecks();
 
   return new_cluster;
@@ -547,7 +547,7 @@ void HdsCluster::initHealthchecks() {
   }
 }
 
-void HdsCluster::initialize(std::function<void()> callback) {
+void HdsCluster::initialize(std::function<absl::Status()> callback) {
   initialization_complete_callback_ = callback;
 
   // If this function gets called again we do not want to touch the priority set again with the

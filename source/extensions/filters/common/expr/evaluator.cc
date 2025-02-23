@@ -3,6 +3,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/singleton/manager.h"
 
+#include "extensions/regex_functions.h"
+
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
 
@@ -104,6 +106,7 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
   options.enable_comprehension = false;
   options.enable_regex = true;
   options.regex_max_program_size = 100;
+  options.enable_qualified_identifier_rewrites = true;
   options.enable_string_conversion = false;
   options.enable_string_concat = false;
   options.enable_list_concat = false;
@@ -120,6 +123,12 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
   if (!register_status.ok()) {
     throw CelException(
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
+  }
+  auto ext_register_status =
+      cel::extensions::RegisterRegexFunctions(builder->GetRegistry(), options);
+  if (!ext_register_status.ok()) {
+    throw CelException(absl::StrCat("failed to register extension regex functions: ",
+                                    ext_register_status.message()));
   }
   return builder;
 }

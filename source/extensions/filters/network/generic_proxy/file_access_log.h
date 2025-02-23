@@ -42,10 +42,10 @@ public:
   FileAccessLogFactoryBase()
       : name_(fmt::format("envoy.{}.access_loggers.file", Context::category())) {}
 
-  AccessLog::InstanceBaseSharedPtr<Context>
-  createAccessLogInstance(const Protobuf::Message& config,
-                          AccessLog::FilterBasePtr<Context>&& filter,
-                          Server::Configuration::FactoryContext& context) override {
+  AccessLog::InstanceBaseSharedPtr<Context> createAccessLogInstance(
+      const Protobuf::Message& config, AccessLog::FilterBasePtr<Context>&& filter,
+      Server::Configuration::FactoryContext& context,
+      std::vector<Formatter::CommandParserBasePtr<Context>>&& command_parsers = {}) override {
     const auto& typed_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
         config, context.messageValidationVisitor());
@@ -60,29 +60,31 @@ public:
         envoy::config::core::v3::SubstitutionFormatString sff_config;
         sff_config.mutable_text_format_source()->set_inline_string(typed_config.format());
         formatter = THROW_OR_RETURN_VALUE(
-            Formatter::SubstitutionFormatStringUtils::fromProtoConfig<Context>(sff_config, context),
+            Formatter::SubstitutionFormatStringUtils::fromProtoConfig<Context>(
+                sff_config, context, std::move(command_parsers)),
             Formatter::FormatterBasePtr<Context>);
       }
       break;
     case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
         kJsonFormat:
       formatter = Formatter::SubstitutionFormatStringUtils::createJsonFormatter<Context>(
-          typed_config.json_format(), false, false, false);
+          typed_config.json_format(), false, false, false, command_parsers);
       break;
     case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
         kTypedJsonFormat: {
       envoy::config::core::v3::SubstitutionFormatString sff_config;
       *sff_config.mutable_json_format() = typed_config.typed_json_format();
-      formatter = THROW_OR_RETURN_VALUE(
-          Formatter::SubstitutionFormatStringUtils::fromProtoConfig<Context>(sff_config, context),
-          Formatter::FormatterBasePtr<Context>);
+      formatter =
+          THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig<Context>(
+                                    sff_config, context, std::move(command_parsers)),
+                                Formatter::FormatterBasePtr<Context>);
       break;
     }
     case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
         kLogFormat:
       formatter =
           THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig<Context>(
-                                    typed_config.log_format(), context),
+                                    typed_config.log_format(), context, std::move(command_parsers)),
                                 Formatter::FormatterBasePtr<Context>);
       break;
     case envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::

@@ -9,8 +9,8 @@ py_binary(
         "detector.py",
     ],
     data = [
-        "@com_github_bufbuild_buf//:buf",
         "@envoy_api//:proto_breaking_change_detector_buf_config",
+        "@rules_buf_toolchains//:buf",
     ],
     main = "detector.py",
     tags = ["manual"],
@@ -25,9 +25,9 @@ py_binary(
     srcs = [
         "detector_ci.py",
     ],
-    args = ["$(location @com_github_bufbuild_buf//:buf)"],
+    args = ["$(location @rules_buf_toolchains//:buf)"],
     data = [
-        "@com_github_bufbuild_buf//:buf",
+        "@rules_buf_toolchains//:buf",
     ],
     deps = [
         ":detector",

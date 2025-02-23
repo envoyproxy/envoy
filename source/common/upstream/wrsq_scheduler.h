@@ -1,7 +1,7 @@
 #pragma once
 
 #include <algorithm>
-#include <iostream>
+#include <iosfwd>
 #include <memory>
 #include <queue>
 #include <utility>
