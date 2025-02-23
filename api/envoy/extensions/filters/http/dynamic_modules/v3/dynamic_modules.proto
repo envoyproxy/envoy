@@ -4,6 +4,8 @@ package envoy.extensions.filters.http.dynamic_modules.v3;
 
 import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
 
+import "google/protobuf/any.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
@@ -43,8 +45,5 @@ message DynamicModuleFilter {
   // For example, if a module has two filter implementations, one for logging and one for header manipulation,
   // filter_name is used to choose either logging or header manipulation. The filter_config can be used to
   // configure the logging level or the header manipulation behavior.
-  string filter_config = 3;
-
-  // Similar to ``filter_config``, but as a raw byte string.
-  bytes raw_filter_config = 4;
+  google.protobuf.Any filter_config = 3;
 }
