@@ -34,6 +34,7 @@ envoy_cc_library(
         ":client_interface",
         ":matching_utils_lib",
         ":mutation_utils_lib",
+        ":on_processing_response_interface",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
@@ -138,6 +139,18 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:typed_async_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "on_processing_response_interface",
+    hdrs = ["on_processing_response.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )

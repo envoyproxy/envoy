@@ -1,0 +1,61 @@
+diff --git MODULE.bazel MODULE.bazel
+index 225ff331..e4d5ba86 100644
+--- MODULE.bazel
++++ MODULE.bazel
+@@ -19,7 +19,7 @@ bazel_dep(
+ )
+ bazel_dep(
+     name = "platforms",
+-    version = "0.0.10",
++    version = "0.0.11",
+ )
+ bazel_dep(
+     name = "rules_cc",
+diff --git rust/platform/triple.bzl rust/platform/triple.bzl
+index 096ec5ef..9717b23a 100644
+--- rust/platform/triple.bzl
++++ rust/platform/triple.bzl
+@@ -117,7 +117,7 @@ def get_host_triple(repository_ctx, abi = None):
+     # Detect the host's cpu architecture
+ 
+     supported_architectures = {
+-        "linux": ["aarch64", "x86_64", "s390x"],
++        "linux": ["aarch64", "x86_64", "s390x", "powerpc64le"],
+         "macos": ["aarch64", "x86_64"],
+         "windows": ["aarch64", "x86_64"],
+     }
+@@ -126,6 +126,9 @@ def get_host_triple(repository_ctx, abi = None):
+     if arch == "amd64":
+         arch = "x86_64"
+ 
++    if arch == "ppc64le":
++        arch = "powerpc64le"
++
+     if "linux" in repository_ctx.os.name:
+         _validate_cpu_architecture(arch, supported_architectures["linux"])
+         return triple("{}-unknown-linux-{}".format(
+diff --git rust/platform/triple_mappings.bzl rust/platform/triple_mappings.bzl
+index b436af3a..20f02e37 100644
+--- rust/platform/triple_mappings.bzl
++++ rust/platform/triple_mappings.bzl
+@@ -112,7 +112,7 @@ _CPU_ARCH_TO_BUILTIN_PLAT_SUFFIX = {
+     "mipsel": None,
+     "powerpc": "ppc",
+     "powerpc64": None,
+-    "powerpc64le": None,
++    "powerpc64le": "ppc64le",
+     "riscv32": "riscv32",
+     "riscv32imc": "riscv32",
+     "riscv64": "riscv64",
+diff --git rust/repositories.bzl rust/repositories.bzl
+index 06de237d..3d24925b 100644
+--- rust/repositories.bzl
++++ rust/repositories.bzl
+@@ -41,6 +41,7 @@ DEFAULT_TOOLCHAIN_TRIPLES = {
+     "aarch64-pc-windows-msvc": "rust_windows_aarch64",
+     "aarch64-unknown-linux-gnu": "rust_linux_aarch64",
+     "s390x-unknown-linux-gnu": "rust_linux_s390x",
++    "powerpc64le-unknown-linux-gnu": "rust_linux_powerpc64le",
+     "x86_64-apple-darwin": "rust_darwin_x86_64",
+     "x86_64-pc-windows-msvc": "rust_windows_x86_64",
+     "x86_64-unknown-freebsd": "rust_freebsd_x86_64",

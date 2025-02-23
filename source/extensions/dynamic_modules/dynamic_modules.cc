@@ -2,7 +2,6 @@
 
 #include <dlfcn.h>
 
-#include <filesystem>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -16,9 +15,8 @@ namespace DynamicModules {
 
 constexpr char DYNAMIC_MODULES_SEARCH_PATH[] = "ENVOY_DYNAMIC_MODULES_SEARCH_PATH";
 
-absl::StatusOr<DynamicModulePtr> newDynamicModule(const absl::string_view object_file_path,
-                                                  const bool do_not_close) {
-  const std::filesystem::path file_path_absolute = std::filesystem::absolute(object_file_path);
+absl::StatusOr<DynamicModulePtr>
+newDynamicModule(const std::filesystem::path& object_file_absolute_path, const bool do_not_close) {
   // From the man page of dlopen(3):
   //
   // > This can be used to test if the object is already resident (dlopen() returns NULL if it
@@ -26,7 +24,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModule(const absl::string_view object
   //
   // So we can use RTLD_NOLOAD to check if the module is already loaded to avoid the duplicate call
   // to the init function.
-  void* handle = dlopen(file_path_absolute.c_str(), RTLD_NOLOAD | RTLD_LAZY);
+  void* handle = dlopen(object_file_absolute_path.c_str(), RTLD_NOLOAD | RTLD_LAZY);
   if (handle != nullptr) {
     // This means the module is already loaded, and the return value is the handle of the already
     // loaded module. We don't need to call the init function again.
@@ -39,10 +37,10 @@ absl::StatusOr<DynamicModulePtr> newDynamicModule(const absl::string_view object
   if (do_not_close) {
     mode |= RTLD_NODELETE;
   }
-  handle = dlopen(file_path_absolute.c_str(), mode);
+  handle = dlopen(object_file_absolute_path.c_str(), mode);
   if (handle == nullptr) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Failed to load dynamic module: ", object_file_path, " : ", dlerror()));
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Failed to load dynamic module: ", object_file_absolute_path.c_str(), " : ", dlerror()));
   }
 
   DynamicModulePtr dynamic_module = std::make_unique<DynamicModule>(handle);
@@ -58,7 +56,7 @@ absl::StatusOr<DynamicModulePtr> newDynamicModule(const absl::string_view object
   const char* abi_version = (*init_function.value())();
   if (abi_version == nullptr) {
     return absl::InvalidArgumentError(
-        absl::StrCat("Failed to initialize dynamic module: ", object_file_path));
+        absl::StrCat("Failed to initialize dynamic module: ", object_file_absolute_path.c_str()));
   }
   // Checks the kAbiVersion and the version of the dynamic module.
   if (absl::string_view(abi_version) != absl::string_view(kAbiVersion)) {
@@ -76,9 +74,9 @@ absl::StatusOr<DynamicModulePtr> newDynamicModuleByName(const absl::string_view 
                                                    " : ", DYNAMIC_MODULES_SEARCH_PATH,
                                                    " is not set"));
   }
-  const std::filesystem::path file_path_absolute = std::filesystem::absolute(
-      fmt::format("{}/lib{}.so", std::string(module_search_path), std::string(module_name)));
-  return newDynamicModule(file_path_absolute.string(), do_not_close);
+  const std::filesystem::path file_path_absolute =
+      std::filesystem::absolute(fmt::format("{}/lib{}.so", module_search_path, module_name));
+  return newDynamicModule(file_path_absolute, do_not_close);
 }
 
 DynamicModule::~DynamicModule() { dlclose(handle_); }
