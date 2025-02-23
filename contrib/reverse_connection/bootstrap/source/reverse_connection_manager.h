@@ -4,7 +4,6 @@
 
 #include "envoy/network/connection_handler.h"
 
-
 namespace Envoy {
 namespace Upstream {
 class ClusterManager;
@@ -72,7 +71,7 @@ public:
    * @param listener_ref Reference to the requesting listener.
    */
   virtual void registerRCInitiators(Network::ConnectionHandler& conn_handler,
-                            const Network::ListenerConfig& listener_ref) PURE;
+                                    const Network::ListenerConfig& listener_ref) PURE;
 
   /**
    * Unregister a reverse connection creation request with the reverse connection manager.
@@ -86,7 +85,7 @@ public:
    * @param connectionKey the connection key of the closed connection.
    */
   virtual void registerConnection(const std::string& connectionKey,
-                          ReverseConnectionInitiator* rc_inititator) PURE;
+                                  ReverseConnectionInitiator* rc_inititator) PURE;
 
   /**
    * Unregister a connection and remove it from the connection -> RCInitiator mapping.
@@ -126,7 +125,8 @@ public:
    * @param listener_ref the listener for which the RCInitiator is requested.
    * @return the RCInitiator for the listener.
    */
-  virtual ReverseConnectionInitiator* getRCInitiatorPtr(const Network::ListenerConfig& listener_ref) PURE;
+  virtual ReverseConnectionInitiator*
+  getRCInitiatorPtr(const Network::ListenerConfig& listener_ref) PURE;
 };
 
 } // namespace ReverseConnection

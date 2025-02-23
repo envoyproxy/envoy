@@ -1,8 +1,9 @@
 #pragma once
 
+#include <future>
 #include <list>
 #include <string>
-#include <future>
+
 #include "envoy/common/random_generator.h"
 #include "envoy/event/dispatcher.h"
 
@@ -10,7 +11,6 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
-
 
 /**
  * All ReverseConnectionHandler stats. @see stats_macros.h
@@ -52,7 +52,7 @@ public:
   void addConnectionSocket(const std::string& node_id, const std::string& cluster_id,
                            Network::ConnectionSocketPtr socket, bool expects_proxy_protocol,
                            const std::chrono::seconds& ping_interval, bool rebalanced);
-  
+
   /** Add the accepted connection and remote cluster mapping to RCHandler maps
    * through the thread local dispatcher.
    * @param node_id node_id of initiating node.
@@ -82,9 +82,8 @@ public:
    * to pick the most appropriate thread.
    * @param socket_promise the promise to be set with the connection socket.
    */
-  void rebalanceGetConnectionSocket(
-      const std::string& key, bool rebalanced,
-      std::shared_ptr<std::promise<RCSocketPair>> socket_promise);
+  void rebalanceGetConnectionSocket(const std::string& key, bool rebalanced,
+                                    std::shared_ptr<std::promise<RCSocketPair>> socket_promise);
 
   /**
    * @return the number of reverse connections across all workers

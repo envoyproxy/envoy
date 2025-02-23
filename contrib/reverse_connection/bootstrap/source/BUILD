@@ -86,4 +86,4 @@ envoy_cc_extension(
         "@envoy_api//contrib/envoy/extensions/reverse_connection/reverse_connection_listener_config/v3alpha:pkg_cc_proto",
     ],
     alwayslink = 1,
-)
+

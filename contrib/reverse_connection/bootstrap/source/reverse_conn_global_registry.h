@@ -1,18 +1,17 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
-#include "contrib/envoy/extensions/bootstrap/reverse_connection/v3alpha/reverse_connection.pb.h"
-#include "contrib/envoy/extensions/bootstrap/reverse_connection/v3alpha/reverse_connection.pb.validate.h"
-#include "contrib/envoy/extensions/reverse_connection/reverse_connection_listener_config/v3alpha/reverse_connection_listener_config.pb.h"
-#include "contrib/envoy/extensions/reverse_connection/reverse_connection_listener_config/v3alpha/reverse_connection_listener_config.pb.validate.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/bootstrap_extension_config.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "contrib/envoy/extensions/bootstrap/reverse_connection/v3alpha/reverse_connection.pb.h"
+#include "contrib/envoy/extensions/bootstrap/reverse_connection/v3alpha/reverse_connection.pb.validate.h"
+#include "contrib/envoy/extensions/reverse_connection/reverse_connection_listener_config/v3alpha/reverse_connection_listener_config.pb.h"
+#include "contrib/envoy/extensions/reverse_connection/reverse_connection_listener_config/v3alpha/reverse_connection_listener_config.pb.validate.h"
 #include "contrib/reverse_connection/bootstrap/source/reverse_conn_thread_local_registry.h"
 #include "contrib/reverse_connection/reverse_connection_listener_config/source/reverse_connection_listener_config_impl.h"
-
-#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,8 +25,8 @@ class ReverseConnRegistry : public Singleton::Instance,
 public:
   Bootstrap::ReverseConnection::RCThreadLocalRegistry* getLocalRegistry() override;
 
-  absl::StatusOr<Network::ReverseConnectionListenerConfigPtr> fromAnyConfig(
-      const google::protobuf::Any& config) override;
+  absl::StatusOr<Network::ReverseConnectionListenerConfigPtr>
+  fromAnyConfig(const google::protobuf::Any& config) override;
 
   std::unique_ptr<ThreadLocal::TypedSlot<Bootstrap::ReverseConnection::RCThreadLocalRegistry>>
       tls_slot_;

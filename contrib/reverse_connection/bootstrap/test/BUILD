@@ -1,8 +1,7 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_cc_mock",
-    "envoy_cc_test_library",
+    "envoy_cc_test",
     "envoy_contrib_package",
 )
 
@@ -14,11 +13,11 @@ envoy_cc_test(
     name = "reverse_conn_registry_test",
     srcs = ["reverse_conn_registry_test.cc"],
     deps = [
+        "//contrib/reverse_connection/bootstrap/source:reverse_conn_global_registry",
         "//test/mocks/event:event_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
-        "//contrib/reverse_connection/bootstrap/source:reverse_conn_global_registry",
     ],
 )
 
@@ -27,10 +26,10 @@ envoy_cc_test(
     srcs = ["reverse_connection_initiator_test.cc"],
     deps = [
         ":rev_conn_mocks",
+        "//source/common/network:address_lib",
+        "//source/common/stats:isolated_store_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/stats:stats_mocks",
-        "//source/common/stats:isolated_store_lib",
-        "//source/common/network:address_lib",
     ],
 )
 

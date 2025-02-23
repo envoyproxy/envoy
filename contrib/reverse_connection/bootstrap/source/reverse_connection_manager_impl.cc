@@ -1,13 +1,16 @@
 #include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager_impl.h"
-#include "contrib/reverse_connection/bootstrap/source/reverse_connection_initiator.h"
+
 #include "envoy/upstream/cluster_manager.h"
+
+#include "contrib/reverse_connection/bootstrap/source/reverse_connection_initiator.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-ReverseConnectionManagerImpl::ReverseConnectionManagerImpl(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cluster_manager)
+ReverseConnectionManagerImpl::ReverseConnectionManagerImpl(
+    Event::Dispatcher& dispatcher, Upstream::ClusterManager& cluster_manager)
     : parent_dispatcher_(dispatcher), cluster_manager_(cluster_manager) {
   ASSERT(parent_dispatcher_.isThreadSafe());
 }
@@ -19,9 +22,7 @@ void ReverseConnectionManagerImpl::initializeStats(Stats::Scope& scope) {
             stats_root_scope_->constSymbolTable().toString(stats_root_scope_->prefix()));
 }
 
-Event::Dispatcher& ReverseConnectionManagerImpl::dispatcher() const {
-  return parent_dispatcher_;
-}
+Event::Dispatcher& ReverseConnectionManagerImpl::dispatcher() const { return parent_dispatcher_; }
 
 Network::ConnectionHandler* ReverseConnectionManagerImpl::connectionHandler() const {
   ASSERT(conn_handler_ != nullptr, "Connection Handler is not set");
@@ -91,8 +92,7 @@ void ReverseConnectionManagerImpl::createRCInitiatorDone(ReverseConnectionInitia
 }
 
 void ReverseConnectionManagerImpl::registerRCInitiators(
-    Network::ConnectionHandler& conn_handler,
-    const Network::ListenerConfig& listener_ref) {
+    Network::ConnectionHandler& conn_handler, const Network::ListenerConfig& listener_ref) {
   // The conn handler needs to be set once for the thread local RCManager.
   if (conn_handler_ == nullptr) {
     ENVOY_LOG(error, "RCManager: Setting connection handler for the first time");

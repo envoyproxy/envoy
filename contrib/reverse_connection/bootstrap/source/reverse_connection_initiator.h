@@ -2,12 +2,12 @@
 
 #include <memory>
 
-#include "contrib/envoy/extensions/filters/http/reverse_conn/v3alpha/reverse_conn.pb.h"
-
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+
+#include "contrib/envoy/extensions/filters/http/reverse_conn/v3alpha/reverse_conn.pb.h"
 #include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
 
 namespace Envoy {
@@ -56,7 +56,7 @@ using RCInitiatorStatsPtr = std::unique_ptr<RCInitiatorStats>;
  */
 class ReverseConnectionInitiator : Logger::Loggable<Logger::Id::main> {
 
-friend class ReverseConnectionInitiatorTest;
+  friend class ReverseConnectionInitiatorTest;
 
 public:
   // Parameters used by the current initiator during their cycle.

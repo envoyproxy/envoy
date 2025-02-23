@@ -1,17 +1,16 @@
 #pragma once
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/upstream/cluster_manager.h"
 
 #include "contrib/reverse_connection/bootstrap/source/reverse_conn_global_registry.h"
 #include "contrib/reverse_connection/bootstrap/source/reverse_conn_thread_local_registry.h"
 #include "contrib/reverse_connection/bootstrap/source/reverse_connection_handler.h"
-#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
 #include "contrib/reverse_connection/bootstrap/source/reverse_connection_initiator.h"
-
-#include "test/mocks/event/mocks.h"
-#include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/network/mocks.h"
+#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,26 +22,28 @@ class MockReverseConnectionManager : public ReverseConnectionManager {
 public:
   MockReverseConnectionManager();
 
-  MOCK_METHOD(void, initializeStats, (Stats::Scope& scope));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (const));
   MOCK_METHOD(Network::ConnectionHandler*, connectionHandler, (), (const));
-  MOCK_METHOD(void, setConnectionHandler, (Network::ConnectionHandler& conn_handler));
+  MOCK_METHOD(void, setConnectionHandler, (Network::ConnectionHandler & conn_handler));
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, (), (const));
   MOCK_METHOD(void, findOrCreateRCInitiator,
               (const Network::ListenerConfig& listener_ref, const std::string& src_node_id,
                const std::string& src_cluster_id, const std::string& src_tenant_id,
-              (const absl::flat_hash_map<std::string, uint32_t>& remote_cluster_to_conns)));
-  MOCK_METHOD(void, registerRCInitiators, (Network::ConnectionHandler& conn_handler,
-                                           const Network::ListenerConfig& listener_ref));
+               (const absl::flat_hash_map<std::string, uint32_t>& remote_cluster_to_conns)));
+  MOCK_METHOD(void, registerRCInitiators,
+              (Network::ConnectionHandler & conn_handler,
+               const Network::ListenerConfig& listener_ref));
   MOCK_METHOD(void, unregisterRCInitiator, (const Network::ListenerConfig& listener_ref));
-  MOCK_METHOD(void, registerConnection, (const std::string& connectionKey,
-                                         ReverseConnectionInitiator* rc_inititator));
+  MOCK_METHOD(void, registerConnection,
+              (const std::string& connectionKey, ReverseConnectionInitiator* rc_inititator));
   MOCK_METHOD(int, unregisterConnection, (const std::string& connectionKey));
   MOCK_METHOD(void, notifyConnectionClose, (const std::string& connectionKey, bool is_used));
   MOCK_METHOD(void, markConnUsed, (const std::string& connectionKey));
   MOCK_METHOD(uint64_t, getNumberOfSockets, (const std::string& key));
   MOCK_METHOD((absl::flat_hash_map<std::string, size_t>), getSocketCountMap, ());
-  MOCK_METHOD(ReverseConnectionInitiator*, getRCInitiatorPtr, (const Network::ListenerConfig& listener_ref));
+  MOCK_METHOD(ReverseConnectionInitiator*, getRCInitiatorPtr,
+              (const Network::ListenerConfig& listener_ref));
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;

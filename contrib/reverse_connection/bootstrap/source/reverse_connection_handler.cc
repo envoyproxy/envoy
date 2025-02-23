@@ -42,9 +42,8 @@ void ReverseConnectionHandler::tryEnablePingTimer(const std::chrono::seconds& pi
 // will be used to look for a better thread to rebalance the connection to. If another
 // thread has a lesser count for a particular node than the current thread,
 // the connection is moved to that thread.
-ReverseConnectionHandler&
-ReverseConnectionHandler::pickMinHandler(const std::string& node_id,
-                                             const std::string& cluster_id) {
+ReverseConnectionHandler& ReverseConnectionHandler::pickMinHandler(const std::string& node_id,
+                                                                   const std::string& cluster_id) {
   absl::WriterMutexLock wlock(&ReverseConnectionHandler::handler_lock);
 
   // Assume that this thread is the best candidate.
@@ -88,7 +87,7 @@ ReverseConnectionHandler::pickMinHandler(const std::string& node_id,
 // rebalance requests to a worker that has a non-zero number of sockets.
 ReverseConnectionHandler*
 ReverseConnectionHandler::pickTargetHandler(const std::string& node_id,
-                                                const std::string& cluster_id) {
+                                            const std::string& cluster_id) {
   absl::WriterMutexLock wlock(&ReverseConnectionHandler::handler_lock);
 
   const std::string source_worker = this->dispatcher_->name();
@@ -117,9 +116,9 @@ ReverseConnectionHandler::pickTargetHandler(const std::string& node_id,
 }
 
 void ReverseConnectionHandler::post(const std::string& node_id, const std::string& cluster_id,
-                                        Network::ConnectionSocketPtr socket,
-                                        const bool expects_proxy_protocol,
-                                        const std::chrono::seconds& ping_interval) {
+                                    Network::ConnectionSocketPtr socket,
+                                    const bool expects_proxy_protocol,
+                                    const std::chrono::seconds& ping_interval) {
   dispatcher_->post([&, node_id, cluster_id, expects_proxy_protocol, ping_interval,
                      socket = std::move(socket)]() -> void {
     this->addConnectionSocket(node_id, cluster_id, socket, expects_proxy_protocol, ping_interval,

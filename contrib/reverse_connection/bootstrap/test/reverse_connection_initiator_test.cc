@@ -1,21 +1,24 @@
 #include <cstdint>
-#include "contrib/reverse_connection/bootstrap/test/mocks.h"
-#include "source/common/stats/isolated_store_impl.h"
+
 #include "source/common/network/address_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/network/mocks.h"
 #include "test/test_common/network_utility.h"
+
+#include "contrib/reverse_connection/bootstrap/test/mocks.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Return;
-using testing::NiceMock;
-using testing::ReturnRef;
 using testing::Invoke;
+using testing::NiceMock;
+using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -25,17 +28,17 @@ namespace ReverseConnection {
 class ReverseConnectionInitiatorTest : public testing::Test {
 public:
   ReverseConnectionInitiatorTest() {
-     // Set up listener properties
+    // Set up listener properties
     static const std::string listener_name = "test_listener";
     const uint64_t listener_tag = 1;
     static const std::string version_info = "v1";
-  
+
     ON_CALL(listener_config_, name()).WillByDefault(ReturnRef(listener_name));
     ON_CALL(listener_config_, listenerTag()).WillByDefault(Return(listener_tag));
     ON_CALL(listener_config_, versionInfo()).WillByDefault(ReturnRef(version_info));
   }
 
-  void SetUp(){
+  void SetUp() {
     // Initialize ReverseConnectionOptions
     rc_options_.src_node_id_ = "test_node_id";
     rc_options_.src_cluster_id_ = "test_cluster_id";
@@ -44,8 +47,8 @@ public:
     // Initialize ReverseConnectionInitiator
     rc_manager_ = std::make_shared<ReverseConnectionManager>(dispatcher_, cluster_manager_);
     base_scope_ = Stats::ScopeSharedPtr(stats_store.createScope("rc_initiator."));
-    rc_initiator_ = std::make_unique<ReverseConnectionInitiator>(
-        listener_config_, rc_options_, *rc_manager_, *base_scope_);
+    rc_initiator_ = std::make_unique<ReverseConnectionInitiator>(listener_config_, rc_options_,
+                                                                 *rc_manager_, *base_scope_);
   }
 
   struct MockConnectionSetup {
@@ -57,10 +60,9 @@ public:
     std::unique_ptr<NiceMock<Network::MockIoHandle>> io_handle;
   };
 
-  MockConnectionSetup createMockConnection(const std::string& remote_cluster, 
-                                          const std::string& remote_address, 
-                                          const std::string& local_address, 
-                                          uint32_t port) {
+  MockConnectionSetup createMockConnection(const std::string& remote_cluster,
+                                           const std::string& remote_address,
+                                           const std::string& local_address, uint32_t port) {
     MockConnectionSetup setup;
 
     // Create the mock connection
@@ -80,7 +82,6 @@ public:
     EXPECT_EQ(setup.socket->connection_info_provider_->localAddress()->asString(),
               local_address + ":" + std::to_string(port));
 
-
     // setup.socket->io_handle_ = std::make_unique<Network::Test::IoSocketHandlePlatformImpl>();
     // EXPECT_CALL(*setup.socket, ioHandle()).WillRepeatedly(ReturnRef(*setup.socket->io_handle_));
     // setup.socket->io_handle_->initializeFileEvent(
@@ -93,16 +94,15 @@ public:
     // EXPECT_CALL(*setup.socket, isOpen()).WillRepeatedly(Return(true));
 
     // Tie the mock connection to the provider and socket
-    EXPECT_CALL(*setup.connection, connectionInfoProvider()).WillRepeatedly(ReturnRef(*setup.provider));
+    EXPECT_CALL(*setup.connection, connectionInfoProvider())
+        .WillRepeatedly(ReturnRef(*setup.provider));
     EXPECT_CALL(*setup.connection, getSocket()).WillRepeatedly(ReturnRef(setup.socket));
-    
 
     // Mock cluster information
     setup.conn_info.connection_ = setup.connection.get();
     const std::string url = "tcp://" + remote_address + ":" + std::to_string(port);
-    setup.conn_info.host_description_ =
-        Upstream::makeTestHost(std::make_unique<NiceMock<Upstream::MockClusterInfo>>(),
-                              url, dispatcher_.timeSource());
+    setup.conn_info.host_description_ = Upstream::makeTestHost(
+        std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), url, dispatcher_.timeSource());
 
     cluster_manager_.initializeThreadLocalClusters({remote_cluster});
     EXPECT_CALL(cluster_manager_, getThreadLocalCluster(remote_cluster))
@@ -175,7 +175,8 @@ TEST_F(ReverseConnectionInitiatorTest, ReverseConnFailureUnknownCluster) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(remote_cluster)).WillOnce(Return(nullptr));
 
   // Initiate the reverse connection.
-  bool success = rc_initiator_->initiateOneReverseConnection(remote_cluster, remote_address + ":" + std::to_string(port));
+  bool success = rc_initiator_->initiateOneReverseConnection(
+      remote_cluster, remote_address + ":" + std::to_string(port));
   EXPECT_FALSE(success);
 }
 
@@ -196,11 +197,13 @@ TEST_F(ReverseConnectionInitiatorTest, InitiateReverseConnForCluster) {
   const std::string expected_conn_key = local_address + ":" + std::to_string(port);
   const std::string remote_host = remote_address + ":" + std::to_string(port);
 
-  // RCInitiator should not have any connection key -> remote cluster mapping since reverse conn has not been initiated yet.
+  // RCInitiator should not have any connection key -> remote cluster mapping since reverse conn has
+  // not been initiated yet.
   EXPECT_EQ(rc_initiator_->getRemoteClusterForConn(expected_conn_key), "");
 
   // Call the helper to set up the connection.
-  MockConnectionSetup setup = createMockConnection(remote_cluster, remote_address, local_address, port);
+  MockConnectionSetup setup =
+      createMockConnection(remote_cluster, remote_address, local_address, port);
 
   // Initiate the reverse connection.
   bool success = rc_initiator_->initiateOneReverseConnection(remote_cluster, remote_host);
@@ -229,11 +232,13 @@ TEST_F(ReverseConnectionInitiatorTest, HostRemovalAfterReverseConnInitiation) {
   const std::string expected_conn_key = local_address + ":" + std::to_string(port);
   const std::string remote_host = remote_address + ":" + std::to_string(port);
 
-  // RCInitiator should not have any connection key -> remote cluster mapping since reverse conn has not been initiated yet.
+  // RCInitiator should not have any connection key -> remote cluster mapping since reverse conn has
+  // not been initiated yet.
   EXPECT_EQ(rc_initiator_->getRemoteClusterForConn(expected_conn_key), "");
 
   // Call the helper to set up the connection.
-  MockConnectionSetup setup = createMockConnection(remote_cluster, remote_address, local_address, port);
+  MockConnectionSetup setup =
+      createMockConnection(remote_cluster, remote_address, local_address, port);
 
   // Initiate the reverse connection.
   bool success = rc_initiator_->initiateOneReverseConnection(remote_cluster, remote_host);
@@ -277,11 +282,12 @@ TEST_F(ReverseConnectionInitiatorTest, ReverseConnCloseAfterInitiation) {
   const std::string remote_host = remote_address + ":" + std::to_string(port);
 
   // Call the helper to set up the connection and initiate the reverse connection.
-  MockConnectionSetup setup = createMockConnection(remote_cluster, remote_address, local_address, port);
+  MockConnectionSetup setup =
+      createMockConnection(remote_cluster, remote_address, local_address, port);
   bool success = rc_initiator_->initiateOneReverseConnection(remote_cluster, remote_host);
   EXPECT_TRUE(success);
   // RCInitiator should have the connection key -> remote cluster mapping.
-  EXPECT_EQ(rc_initiator_->getRemoteClusterForConn(expected_conn_key), remote_cluster);  
+  EXPECT_EQ(rc_initiator_->getRemoteClusterForConn(expected_conn_key), remote_cluster);
   createRCManager(setup);
 
   // Trigger a remote close event on the connection.
@@ -290,7 +296,7 @@ TEST_F(ReverseConnectionInitiatorTest, ReverseConnCloseAfterInitiation) {
   }));
   setup.rcManagerPtr->onEvent(Network::ConnectionEvent::RemoteClose);
   // No entry should be added to host_to_rc_conns_map_ map since the connection is closed.
-  EXPECT_EQ(getHostToConnMap().size(), 0);                  
+  EXPECT_EQ(getHostToConnMap().size(), 0);
 }
 
 // TEST_F(ReverseConnectionInitiatorTest, ReverseConnEstablished) {
@@ -309,8 +315,8 @@ TEST_F(ReverseConnectionInitiatorTest, ReverseConnCloseAfterInitiation) {
 //   const std::string remote_host = remote_address + ":" + std::to_string(port);
 
 //   // Call the helper to set up the connection and initiate the reverse connection.
-//   MockConnectionSetup setup = createMockConnection(remote_cluster, remote_address, local_address, port);
-//   bool success = rc_initiator_->initiateOneReverseConnection(remote_cluster, remote_host);
+//   MockConnectionSetup setup = createMockConnection(remote_cluster, remote_address, local_address,
+//   port); bool success = rc_initiator_->initiateOneReverseConnection(remote_cluster, remote_host);
 //   EXPECT_TRUE(success);
 //   // RCInitiator should have the connection key -> remote cluster mapping.
 //   EXPECT_EQ(rc_initiator_->getRemoteClusterForConn(expected_conn_key), remote_cluster);

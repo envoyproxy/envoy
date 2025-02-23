@@ -23,14 +23,16 @@ Bootstrap::ReverseConnection::RCThreadLocalRegistry* ReverseConnRegistry::getLoc
   return nullptr;
 }
 
-absl::StatusOr<Network::ReverseConnectionListenerConfigPtr> ReverseConnRegistry::fromAnyConfig(
-    const google::protobuf::Any& config) {
-  envoy::extensions::reverse_connection::reverse_connection_listener_config::v3alpha::ReverseConnectionListenerConfig reverse_conn_config;
+absl::StatusOr<Network::ReverseConnectionListenerConfigPtr>
+ReverseConnRegistry::fromAnyConfig(const google::protobuf::Any& config) {
+  envoy::extensions::reverse_connection::reverse_connection_listener_config::v3alpha::
+      ReverseConnectionListenerConfig reverse_conn_config;
   if (!config.UnpackTo(&reverse_conn_config)) {
     return absl::InvalidArgumentError("Failed to unpack reverse connection listener config");
   }
   if (reverse_conn_config.src_node_id().empty()) {
-    return absl::InvalidArgumentError("Source node ID is missing in reverse connection listener config");
+    return absl::InvalidArgumentError(
+        "Source node ID is missing in reverse connection listener config");
   } else if (reverse_conn_config.remote_cluster_to_conn_count().empty()) {
     return absl::InvalidArgumentError(
         "Remote cluster to connection count map is missing in reverse connection listener config");
@@ -52,9 +54,10 @@ absl::StatusOr<Network::ReverseConnectionListenerConfigPtr> ReverseConnRegistry:
         remote_cluster_conn_pair.cluster_name(),
         remote_cluster_conn_pair.reverse_connection_count().value());
   }
-  return std::make_unique<Envoy::Extensions::ReverseConnection::ReverseConnectionListenerConfigImpl>(std::move(rc_params), *this);
+  return std::make_unique<
+      Envoy::Extensions::ReverseConnection::ReverseConnectionListenerConfigImpl>(
+      std::move(rc_params), *this);
 }
-
 
 ReverseConnExtension::ReverseConnExtension(
     Server::Configuration::ServerFactoryContext& server_context,
@@ -82,10 +85,11 @@ void ReverseConnExtension::onServerInitialized() {
           server_context_.threadLocal());
   Stats::Scope& scope = server_context_.scope();
   Upstream::ClusterManager& cluster_manager = server_context_.clusterManager();
-  global_tls_registry_->tls_slot_->set([this, &scope, &cluster_manager](Event::Dispatcher& dispatcher) {
-    return std::make_shared<Bootstrap::ReverseConnection::RCThreadLocalRegistry>(dispatcher, scope,
-                                                                                 stat_prefix_, cluster_manager);
-  });
+  global_tls_registry_->tls_slot_->set(
+      [this, &scope, &cluster_manager](Event::Dispatcher& dispatcher) {
+        return std::make_shared<Bootstrap::ReverseConnection::RCThreadLocalRegistry>(
+            dispatcher, scope, stat_prefix_, cluster_manager);
+      });
 }
 
 Server::BootstrapExtensionPtr ReverseConnExtensionFactory::createBootstrapExtension(

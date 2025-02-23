@@ -13,7 +13,8 @@ namespace ReverseConnection {
 class ReverseConnectionManagerImpl : public ReverseConnectionManager,
                                      public Logger::Loggable<Logger::Id::main> {
 public:
-  ReverseConnectionManagerImpl(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cluster_manager);
+  ReverseConnectionManagerImpl(Event::Dispatcher& dispatcher,
+                               Upstream::ClusterManager& cluster_manager);
 
   void initializeStats(Stats::Scope& scope) override;
 
@@ -82,7 +83,8 @@ public:
    */
   absl::flat_hash_map<std::string, size_t> getSocketCountMap() override;
 
-  ReverseConnectionInitiator* getRCInitiatorPtr(const Network::ListenerConfig& listener_ref) override {
+  ReverseConnectionInitiator*
+  getRCInitiatorPtr(const Network::ListenerConfig& listener_ref) override {
     const auto& available_rc_initiators_iter =
         available_rc_initiators_.find(listener_ref.listenerTag());
     if (available_rc_initiators_iter == available_rc_initiators_.end()) {
@@ -92,7 +94,6 @@ public:
   }
 
 private:
-
   // Callback to be called when a ReverseConnectionInitiator has been created.
   void createRCInitiatorDone(ReverseConnectionInitiator* initiator);
 
