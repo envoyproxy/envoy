@@ -6,17 +6,20 @@ namespace ReverseConnection {
 
 ActiveReverseConnectionListener::ActiveReverseConnectionListener(
     Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
-    Network::ListenerConfig& config, Bootstrap::ReverseConnection::RCThreadLocalRegistry& local_registry)
+    Network::ListenerConfig& config,
+    Bootstrap::ReverseConnection::RCThreadLocalRegistry& local_registry)
     : Server::OwnedActiveStreamListenerBase(
-          conn_handler, dispatcher, std::make_unique<NetworkReverseConnectionListener>(), config), local_registry_(local_registry) {
+          conn_handler, dispatcher, std::make_unique<NetworkReverseConnectionListener>(), config),
+      local_registry_(local_registry) {
   startRCWorkflow(dispatcher, conn_handler, config);
 }
 
 ActiveReverseConnectionListener::ActiveReverseConnectionListener(
     Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
-    Network::ListenerPtr listener, Network::ListenerConfig& config, Bootstrap::ReverseConnection::RCThreadLocalRegistry& local_registry)
-    : Server::OwnedActiveStreamListenerBase(conn_handler, dispatcher, std::move(listener), config), local_registry_(local_registry) {
-}
+    Network::ListenerPtr listener, Network::ListenerConfig& config,
+    Bootstrap::ReverseConnection::RCThreadLocalRegistry& local_registry)
+    : Server::OwnedActiveStreamListenerBase(conn_handler, dispatcher, std::move(listener), config),
+      local_registry_(local_registry) {}
 
 ActiveReverseConnectionListener::~ActiveReverseConnectionListener() {
   is_deleting_ = true;
@@ -60,16 +63,14 @@ void ActiveReverseConnectionListener::removeConnection(Server::ActiveTcpConnecti
           ->asStringView());
 
   // Notify that an used reverse connection has been closed.
-  local_registry_.getRCManager().notifyConnectionClose(
-      connectionKey, true /* is_used */);
+  local_registry_.getRCManager().notifyConnectionClose(connectionKey, true /* is_used */);
 
   Server::OwnedActiveStreamListenerBase::removeConnection(connection);
 }
 
 void ActiveReverseConnectionListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   incNumConnections();
-  auto active_socket = std::make_unique<Server::ActiveTcpSocket>(
-      *this, std::move(socket), false);
+  auto active_socket = std::make_unique<Server::ActiveTcpSocket>(*this, std::move(socket), false);
 
   onSocketAccepted(std::move(active_socket));
 }

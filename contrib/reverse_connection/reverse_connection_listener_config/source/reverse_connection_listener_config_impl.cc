@@ -2,7 +2,6 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace ReverseConnection {
-} // namespace ReverseConnection
+namespace ReverseConnection {} // namespace ReverseConnection
 } // namespace Extensions
 } // namespace Envoy

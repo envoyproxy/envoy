@@ -12,12 +12,13 @@ namespace ReverseConnection {
 
 class ReverseConnectionListenerConfigImpl : public Network::ReverseConnectionListenerConfig {
 public:
-  ReverseConnectionListenerConfigImpl(ReverseConnParamsPtr params, Network::RevConnRegistry& registry)
+  ReverseConnectionListenerConfigImpl(ReverseConnParamsPtr params,
+                                      Network::RevConnRegistry& registry)
       : rc_local_params_(std::move(params)), registry_(registry) {}
 
   ReverseConnParamsPtr& getReverseConnParams() override { return rc_local_params_; }
 
-  Network::RevConnRegistry& reverseConnRegistry() override { return registry_;}
+  Network::RevConnRegistry& reverseConnRegistry() override { return registry_; }
 
 private:
   // Stores the parameters identifying the local envoy.

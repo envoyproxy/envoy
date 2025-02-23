@@ -4,10 +4,6 @@
 #include <list>
 #include <memory>
 
-#include "contrib/reverse_connection/bootstrap/source/reverse_conn_thread_local_registry.h"
-#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
-#include "contrib/reverse_connection/bootstrap/source/reverse_connection_handler.h"
-
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
@@ -16,6 +12,9 @@
 #include "source/common/listener_manager/active_tcp_socket.h"
 #include "source/server/active_listener_base.h"
 
+#include "contrib/reverse_connection/bootstrap/source/reverse_conn_thread_local_registry.h"
+#include "contrib/reverse_connection/bootstrap/source/reverse_connection_handler.h"
+#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,11 +23,14 @@ class ActiveReverseConnectionListener : public Server::OwnedActiveStreamListener
                                         public Network::TcpListenerCallbacks,
                                         public Network::ReverseConnectionListener {
 public:
-  ActiveReverseConnectionListener(Network::ConnectionHandler& conn_handler,
-                                  Event::Dispatcher& dispatcher, Network::ListenerConfig& config, Bootstrap::ReverseConnection::RCThreadLocalRegistry& local_registry);
-  ActiveReverseConnectionListener(Network::ConnectionHandler& conn_handler,
-                                  Event::Dispatcher& dispatcher, Network::ListenerPtr listener,
-                                  Network::ListenerConfig& config, Bootstrap::ReverseConnection::RCThreadLocalRegistry& local_registry);
+  ActiveReverseConnectionListener(
+      Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
+      Network::ListenerConfig& config,
+      Bootstrap::ReverseConnection::RCThreadLocalRegistry& local_registry);
+  ActiveReverseConnectionListener(
+      Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
+      Network::ListenerPtr listener, Network::ListenerConfig& config,
+      Bootstrap::ReverseConnection::RCThreadLocalRegistry& local_registry);
   ~ActiveReverseConnectionListener() override;
 
   class NetworkReverseConnectionListener : public Network::Listener {
@@ -84,7 +86,8 @@ public:
     OwnedActiveStreamListenerBase::onFilterChainDraining(draining_filter_chains);
   }
 
-  void startRCWorkflow(Event::Dispatcher& dispatcher, Network::ConnectionHandler& conn_handler, Network::ListenerConfig& config) override;
+  void startRCWorkflow(Event::Dispatcher& dispatcher, Network::ConnectionHandler& conn_handler,
+                       Network::ListenerConfig& config) override;
 
   // ActiveStreamListenerBase
   void incNumConnections() override { config_->openConnections().inc(); }
@@ -93,8 +96,8 @@ public:
   void newActiveConnection(const Network::FilterChain&, Network::ServerConnectionPtr,
                            std::unique_ptr<StreamInfo::StreamInfo>) override;
 
-  private:
-    Bootstrap::ReverseConnection::RCThreadLocalRegistry& local_registry_;
+private:
+  Bootstrap::ReverseConnection::RCThreadLocalRegistry& local_registry_;
 };
 } // namespace ReverseConnection
 } // namespace Extensions
