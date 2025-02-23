@@ -642,6 +642,11 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
 bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& list,
                                                            const ListenerImpl& listener) {
   for (const auto& existing_listener : list) {
+    // Skip if the listener is the same. It's because that the listener
+    // with same name was proven to be incompatible.
+    if (existing_listener->name() == listener.name()) {
+      continue;
+    }
     if (existing_listener->hasDuplicatedAddress(listener)) {
       return true;
     }
