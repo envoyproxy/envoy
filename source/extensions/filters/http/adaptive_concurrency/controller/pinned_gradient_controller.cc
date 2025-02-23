@@ -27,11 +27,9 @@ PinnedGradientControllerConfig::PinnedGradientControllerConfig(
 PinnedGradientController::PinnedGradientController(PinnedGradientControllerConfig config,
                                                    Event::Dispatcher& dispatcher, Runtime::Loader&,
                                                    const std::string& stats_prefix,
-                                                   Stats::Scope& scope,
-                                                   Random::RandomGenerator& random,
-                                                   TimeSource& time_source)
+                                                   Stats::Scope& scope, TimeSource& time_source)
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
-      stats_(GradientControllerStats::generateStats(scope_, stats_prefix)), random_(random),
+      stats_(GradientControllerStats::generateStats(scope_, stats_prefix)),
       time_source_(time_source), num_rq_outstanding_(0),
       concurrency_limit_(config_.minConcurrency()),
       latency_sample_hist_(hist_fast_alloc(), hist_free) {

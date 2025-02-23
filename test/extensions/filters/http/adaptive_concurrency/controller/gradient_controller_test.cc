@@ -73,7 +73,7 @@ public:
   PinnedGradientControllerSharedPtr makePinnedController(const std::string& yaml_config) {
     const auto controller = std::make_shared<PinnedGradientController>(
         makePinnedConfig(yaml_config, runtime_), *dispatcher_, runtime_, "test_prefix.",
-        *stats_.rootScope(), random_, time_system_);
+        *stats_.rootScope(), time_system_);
 
     // Advance time so that the latency sample calculations don't underflow if monotonic time is 0.
     time_system_.advanceTimeAndRun(std::chrono::hours(42), *dispatcher_,

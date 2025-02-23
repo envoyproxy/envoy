@@ -330,8 +330,7 @@ class PinnedGradientController : public ConcurrencyController {
 public:
   PinnedGradientController(PinnedGradientControllerConfig config, Event::Dispatcher& dispatcher,
                            Runtime::Loader& runtime, const std::string& stats_prefix,
-                           Stats::Scope& scope, Random::RandomGenerator& random,
-                           TimeSource& time_source);
+                           Stats::Scope& scope, TimeSource& time_source);
 
   // Used in unit tests to validate worker thread interactions.
   Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
@@ -343,8 +342,6 @@ public:
   uint32_t concurrencyLimit() const override { return concurrency_limit_.load(); }
 
 private:
-  static GradientControllerStats generateStats(Stats::Scope& scope,
-                                               const std::string& stats_prefix);
   std::chrono::microseconds processLatencySamplesAndClear()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
@@ -356,7 +353,6 @@ private:
   Event::Dispatcher& dispatcher_;
   Stats::Scope& scope_;
   GradientControllerStats stats_;
-  Random::RandomGenerator& random_;
   TimeSource& time_source_;
 
   // Protects data related to latency sampling and RTT values. In addition to protecting the latency
@@ -380,11 +376,6 @@ private:
   // calculate a new concurrency limit.
   std::unique_ptr<histogram_t, decltype(&hist_free)>
       latency_sample_hist_ ABSL_GUARDED_BY(sample_mutation_mtx_);
-
-  // Tracks the number of consecutive times that the concurrency limit is set to the minimum. This
-  // is used to determine whether the controller should trigger an additional minRTT measurement
-  // after remaining at the minimum limit for too long.
-  uint32_t consecutive_min_concurrency_set_ ABSL_GUARDED_BY(sample_mutation_mtx_);
 
   Event::TimerPtr sample_reset_timer_;
 

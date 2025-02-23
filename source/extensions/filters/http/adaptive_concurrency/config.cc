@@ -36,8 +36,7 @@ Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromP
         config.pinned_gradient_controller_config(), server_context.runtime());
     controller = std::make_shared<Controller::PinnedGradientController>(
         std::move(gradient_controller_config), server_context.mainThreadDispatcher(),
-        server_context.runtime(), acc_stats_prefix + "gradient_controller.", context.scope(),
-        server_context.api().randomGenerator(), server_context.timeSource());
+        server_context.runtime(), acc_stats_prefix + "gradient_controller.", context.scope(), server_context.timeSource());
   }
   AdaptiveConcurrencyFilterConfigSharedPtr filter_config(new AdaptiveConcurrencyFilterConfig(
       config, server_context.runtime(), std::move(acc_stats_prefix), context.scope(),
