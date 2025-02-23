@@ -74,7 +74,7 @@ void benchmarkRingHashLoadBalancerChooseHost(::benchmark::State& state) {
     //                     other test.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);
-      hit_counter[lb->chooseHost(&context)->address()->asString()] += 1;
+      hit_counter[lb->chooseHost(&context).host->address()->asString()] += 1;
     }
 
     // Do not time computation of mean, standard deviation, and relative standard deviation.
@@ -111,7 +111,7 @@ void benchmarkRingHashLoadBalancerHostLoss(::benchmark::State& state) {
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);
-      hosts.push_back(lb->chooseHost(&context));
+      hosts.push_back(lb->chooseHost(&context).host);
     }
 
     RingHashTester tester2(num_hosts - hosts_to_lose, min_ring_size);
@@ -120,7 +120,7 @@ void benchmarkRingHashLoadBalancerHostLoss(::benchmark::State& state) {
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);
-      hosts2.push_back(lb->chooseHost(&context));
+      hosts2.push_back(lb->chooseHost(&context).host);
     }
 
     ASSERT(hosts.size() == hosts2.size());

@@ -57,6 +57,9 @@ public:
         .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
     HttpTestUtility::addDefaultHeaders(headers_);
+    ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
+      return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+    }));
   }
 
   virtual void expectSuccess(AsyncClient::Request* sent_request, uint64_t code) {
@@ -497,7 +500,6 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   EXPECT_NE(request, nullptr);
 
   StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
-  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
 
   // Registering a new watermark callback should note that the high watermark has already been hit.
   EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
@@ -558,7 +560,6 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
 
   StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
   request->setWatermarkCallbacks(watermark_callbacks);
-  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks(_));
 
   EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(&data_copy), false));
   request->sendData(data, false);
@@ -785,14 +786,14 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
             response_decoder_ = &decoder;
             return nullptr;
           }));
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(
-          Invoke([&](Upstream::ResourcePriority, auto, Upstream::LoadBalancerContext* context) {
-            // this is the hash of :path header value "/"
-            // the hash stability across releases is expected, so test the hash value directly here.
-            EXPECT_EQ(16761507700594825962UL, context->computeHashKey().value());
-            return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
-          }));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority, auto,
+                           Upstream::LoadBalancerContext* context) {
+        // this is the hash of :path header value "/"
+        // the hash stability across releases is expected, so test the hash value directly here.
+        EXPECT_EQ(16761507700594825962UL, context->computeHashKey().value());
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
 
   TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
@@ -831,9 +832,9 @@ TEST_F(AsyncClientImplTest, WithoutMetadata) {
             return nullptr;
           }));
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -875,9 +876,9 @@ TEST_F(AsyncClientImplTest, WithMetadata) {
             return nullptr;
           }));
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_NE(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->metadataMatchCriteria()->metadataMatchCriteria().at(0)->name(),
                   "fake_test_key");
@@ -932,9 +933,9 @@ TEST_F(AsyncClientImplTest, WithFilterState) {
             return nullptr;
           }));
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         StreamInfo::FilterStateSharedPtr filter_state = context->requestStreamInfo()->filterState();
         const TestStateObject* state =
             filter_state->getDataReadOnly<TestStateObject>("test-filter");
@@ -2353,6 +2354,24 @@ retry_back_off:
 
   EXPECT_EQ(route_entry.retryPolicy().baseInterval(), std::chrono::milliseconds(10));
   EXPECT_EQ(route_entry.retryPolicy().maxInterval(), std::chrono::seconds(30));
+}
+
+TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithInvalidRetryPolicy) {
+  // Set an invalid retry back off.
+  const std::string yaml = R"EOF(
+per_try_timeout: 30s
+num_retries: 10
+retry_on: 5xx,gateway-error,connect-failure,reset
+retry_back_off:
+  base_interval: 10s
+  max_interval: 3s
+)EOF";
+  envoy::config::route::v3::RetryPolicy retry_policy;
+  TestUtility::loadFromYaml(yaml, retry_policy);
+
+  absl::StatusOr<std::unique_ptr<AsyncStreamImpl>> stream_or_error = Http::AsyncStreamImpl::create(
+      client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy));
+  EXPECT_FALSE(stream_or_error.ok());
 }
 
 TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithRetryPolicy) {

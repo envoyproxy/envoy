@@ -1,5 +1,7 @@
 #include "source/common/config/xds_manager_impl.h"
 
+#include "test/mocks/api/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/status_utility.h"
@@ -17,19 +19,34 @@ using testing::Return;
 
 class XdsManagerImplTest : public testing::Test {
 public:
-  XdsManagerImplTest() : xds_manager_impl_(cm_, validation_context_) {
+  XdsManagerImplTest() : xds_manager_impl_(dispatcher_, api_, validation_context_) {
     ON_CALL(validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor_));
   }
 
+  void initialize() {
+    const envoy::config::bootstrap::v3::Bootstrap bootstrap;
+    ASSERT_OK(xds_manager_impl_.initialize(bootstrap, &cm_));
+  }
+
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Api::MockApi> api_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   XdsManagerImpl xds_manager_impl_;
 };
 
-// Validates that setAdsConfigSource invokes the correct method in the cm_.
+// Validates that a call to shutdown succeeds.
+TEST_F(XdsManagerImplTest, ShutdownSuccessful) {
+  initialize();
+  xds_manager_impl_.shutdown();
+}
+
+// Validates that setAdsConfigSource invokes the correct method in the
+// cluster-manager.
 TEST_F(XdsManagerImplTest, AdsConfigSourceSetterSuccess) {
+  initialize();
   envoy::config::core::v3::ApiConfigSource config_source;
   config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   EXPECT_CALL(cm_, replaceAdsMux(ProtoEq(config_source))).WillOnce(Return(absl::OkStatus()));
@@ -37,9 +54,10 @@ TEST_F(XdsManagerImplTest, AdsConfigSourceSetterSuccess) {
   EXPECT_TRUE(res.ok());
 }
 
-// Validates that setAdsConfigSource invokes the correct method in the cm_,
-// and fails if needed.
+// Validates that setAdsConfigSource invokes the correct method in the
+// cluster-manager, and fails if needed.
 TEST_F(XdsManagerImplTest, AdsConfigSourceSetterFailure) {
+  initialize();
   envoy::config::core::v3::ApiConfigSource config_source;
   config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   EXPECT_CALL(cm_, replaceAdsMux(ProtoEq(config_source)))
@@ -51,6 +69,7 @@ TEST_F(XdsManagerImplTest, AdsConfigSourceSetterFailure) {
 
 // Validates that setAdsConfigSource validation failure is detected.
 TEST_F(XdsManagerImplTest, AdsConfigSourceSetterInvalidConfig) {
+  initialize();
   envoy::config::core::v3::ApiConfigSource config_source;
   config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
   // Add an empty gRPC service (without EnvoyGrpc/GoogleGrpc) which should be

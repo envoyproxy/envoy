@@ -56,7 +56,7 @@ ThreadLocalGenericSecretProvider::ThreadLocalGenericSecretProvider(
   if (const auto* secret = provider_->secret(); secret != nullptr) {
     auto value_or_error = Config::DataSource::read(secret->secret(), true, api_);
     SET_AND_RETURN_IF_NOT_OK(value_or_error.status(), creation_status);
-    value = *value_or_error;
+    value = std::move(value_or_error.value());
   }
   tls_->set([value = std::move(value)](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalSecret>(value);
@@ -65,13 +65,14 @@ ThreadLocalGenericSecretProvider::ThreadLocalGenericSecretProvider(
 
 const std::string& ThreadLocalGenericSecretProvider::secret() const { return (*tls_)->value_; }
 
-// This function is executed on the main during xDS update and can throw.
+// This function is executed on the main during xDS update.
 absl::Status ThreadLocalGenericSecretProvider::update() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   std::string value;
   if (const auto* secret = provider_->secret(); secret != nullptr) {
     auto value_or_error = Config::DataSource::read(secret->secret(), true, api_);
     RETURN_IF_NOT_OK_REF(value_or_error.status());
-    value = *value_or_error;
+    value = std::move(value_or_error.value());
   }
   tls_->runOnAllThreads(
       [value = std::move(value)](OptRef<ThreadLocalSecret> tls) { tls->value_ = value; });

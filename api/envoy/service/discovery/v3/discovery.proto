@@ -41,6 +41,17 @@ message ResourceName {
   DynamicParameterConstraints dynamic_parameter_constraints = 2;
 }
 
+// [#not-implemented-hide:]
+// An error associated with a specific resource name, returned to the
+// client by the server.
+message ResourceError {
+  // The name of the resource.
+  ResourceName resource_name = 1;
+
+  // The error reported for the resource.
+  google.rpc.Status error_detail = 2;
+}
+
 // A DiscoveryRequest requests a set of versioned resources of the same type for
 // a given Envoy node on some API.
 // [#next-free-field: 8]
@@ -96,7 +107,7 @@ message DiscoveryRequest {
   google.rpc.Status error_detail = 6;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message DiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryResponse";
 
@@ -138,6 +149,13 @@ message DiscoveryResponse {
 
   // The control plane instance that sent the response.
   config.core.v3.ControlPlane control_plane = 6;
+
+  // [#not-implemented-hide:]
+  // Errors associated with specific resources. Clients are expected to
+  // remember the most recent error for a given resource across responses;
+  // the error condition is not considered to be cleared until a response is
+  // received that contains the resource in the 'resources' field.
+  repeated ResourceError resource_errors = 7;
 }
 
 // DeltaDiscoveryRequest and DeltaDiscoveryResponse are used in a new gRPC
@@ -247,7 +265,7 @@ message DeltaDiscoveryRequest {
   google.rpc.Status error_detail = 7;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message DeltaDiscoveryResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.DeltaDiscoveryResponse";
@@ -281,6 +299,13 @@ message DeltaDiscoveryResponse {
   // [#not-implemented-hide:]
   // The control plane instance that sent the response.
   config.core.v3.ControlPlane control_plane = 7;
+
+  // [#not-implemented-hide:]
+  // Errors associated with specific resources. Note that a resource in
+  // this field with a status of NOT_FOUND should be treated the same as
+  // a resource listed in the 'removed_resources' or 'removed_resource_names'
+  // fields.
+  repeated ResourceError resource_errors = 9;
 }
 
 // A set of dynamic parameter constraints associated with a variant of an individual xDS resource.

@@ -24,19 +24,25 @@
     {
       "label": "Refresh Compilation Database",
       "type": "shell",
-      "command": "tools/vscode/refresh_compdb.sh",
+      "command": "ENVOY_GEN_COMPDB_OPTIONS=\"--vscode\" ./ci/do_ci.sh refresh_compdb",
       "problemMatcher": []
     },
     {
       "label": "Refresh Compilation Database Exclude Contrib",
       "type": "shell",
-      "command": "EXCLUDE_CONTRIB=true tools/vscode/refresh_compdb.sh",
+      "command": "ENVOY_GEN_COMPDB_OPTIONS=\"--vscode --exclude_contrib\" ./ci/do_ci.sh refresh_compdb",
       "problemMatcher": []
     },
     {
-      "label": "Local Fix Format",
+      "label": "Local Fix Format (All)",
       "type": "shell",
       "command": "tools/local_fix_format.sh -all",
+      "problemMatcher": []
+    },
+    {
+      "label": "Local Fix Format (Changes Only)",
+      "type": "shell",
+      "command": "tools/local_fix_format.sh $(git diff --name-only | grep -E '.(h|c|cc|proto)$')",
       "problemMatcher": []
     }
   ]

@@ -1,3 +1,4 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 load("@rules_foreign_cc//foreign_cc:make.bzl", "make")
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cmake", "envoy_package")
@@ -96,7 +97,7 @@ configure_make(
     ],
     tags = ["skip_on_windows"],
     targets = [
-        "ARFLAGS='' libs install-subdirs",
+        "ARFLAGS='' WITH_LDS='n' libs install-subdirs",
     ],
     deps = [":lz4"],
     alwayslink = True,
@@ -267,6 +268,7 @@ envoy_cmake(
     cache_entries = {
         "BUILD_CURL_EXE": "off",
         "BUILD_TESTING": "off",
+        "BUILD_LIBCURL_DOCS": "off",
         "BUILD_SHARED_LIBS": "off",
         "CURL_HIDDEN_SYMBOLS": "off",
         "CURL_USE_LIBSSH2": "off",
@@ -281,24 +283,24 @@ envoy_cmake(
         "CURL_DISABLE_CRYPTO_AUTH": "on",
         # C-Ares.
         "ENABLE_ARES": "on",
-        "CARES_LIBRARY": "$EXT_BUILD_DEPS/ares",
-        "CARES_INCLUDE_DIR": "$EXT_BUILD_DEPS/ares/include",
+        "CARES_LIBRARY": "$$EXT_BUILD_DEPS/ares",
+        "CARES_INCLUDE_DIR": "$$EXT_BUILD_DEPS/ares/include",
         # SSL (via Envoy's SSL dependency) is disabled, curl's CMake uses
         # FindOpenSSL.cmake which fails at what looks like version parsing
         # (the libraries are found ok).
         "CURL_CA_PATH": "none",
         "CURL_USE_OPENSSL": "off",
-        "OPENSSL_ROOT_DIR": "$EXT_BUILD_DEPS",
+        "OPENSSL_ROOT_DIR": "$$EXT_BUILD_DEPS",
         # Avoid libidn2
         "USE_LIBIDN2": "off",
         # NGHTTP2.
         "USE_NGHTTP2": "on",
-        "NGHTTP2_LIBRARY": "$EXT_BUILD_DEPS/nghttp2",
-        "NGHTTP2_INCLUDE_DIR": "$EXT_BUILD_DEPS/nghttp2/include",
+        "NGHTTP2_LIBRARY": "$$EXT_BUILD_DEPS/nghttp2",
+        "NGHTTP2_INCLUDE_DIR": "$$EXT_BUILD_DEPS/nghttp2/include",
         # ZLIB.
         "CURL_ZLIB": "on",
-        "ZLIB_LIBRARY": "$EXT_BUILD_DEPS/zlib",
-        "ZLIB_INCLUDE_DIR": "$EXT_BUILD_DEPS/zlib/include",
+        "ZLIB_LIBRARY": "$$EXT_BUILD_DEPS/zlib",
+        "ZLIB_INCLUDE_DIR": "$$EXT_BUILD_DEPS/zlib/include",
         "CMAKE_CXX_COMPILER_FORCED": "on",
     },
     defines = ["CURL_STATICLIB"],

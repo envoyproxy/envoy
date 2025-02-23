@@ -12,12 +12,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
 
-class OAuth2Config : public Extensions::HttpFilters::Common::FactoryBase<
+class OAuth2Config : public Extensions::HttpFilters::Common::ExceptionFreeFactoryBase<
                          envoy::extensions::filters::http::oauth2::v3::OAuth2> {
 public:
-  OAuth2Config() : FactoryBase("envoy.filters.http.oauth2") {}
+  OAuth2Config() : ExceptionFreeFactoryBase("envoy.filters.http.oauth2") {}
 
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::oauth2::v3::OAuth2&,
                                     const std::string&,
                                     Server::Configuration::FactoryContext&) override;

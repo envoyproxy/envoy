@@ -44,8 +44,8 @@ public:
 
   bool allowCoalescedConnections() const { return allow_coalesced_connections_; }
   bool enableSubCluster() const override { return enable_sub_cluster_; }
-  Upstream::HostConstSharedPtr chooseHost(absl::string_view host,
-                                          Upstream::LoadBalancerContext* context) const;
+  Upstream::HostSelectionResponse chooseHost(absl::string_view host,
+                                             Upstream::LoadBalancerContext* context) const;
 
   // Extensions::Common::DynamicForwardProxy::DfpCluster
   std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
@@ -53,6 +53,7 @@ public:
                          const int port) override;
   bool touch(const std::string& cluster_name) override;
   void checkIdleSubCluster();
+  Upstream::HostConstSharedPtr findHostByName(const std::string& host) const;
 
 protected:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
@@ -98,7 +99,7 @@ private:
     // DfpLb
     Upstream::HostConstSharedPtr findHostByName(const std::string& host) const override;
     // Upstream::LoadBalancer
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+    Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
     // Preconnecting not implemented.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
@@ -138,6 +139,44 @@ private:
     absl::flat_hash_map<LookupKey, std::vector<ConnectionInfo>, LookupKeyHash> connection_info_map_;
 
     const Cluster& cluster_;
+  };
+
+  // This acts as the bridge for asynchronous host lookup. If the host is not
+  // present in the DFP cluster, the DFPHostSelectionHandle will receive a onLoadDnsCacheComplete
+  // call unless the LoadDnsCacheEntryHandlePtr is destroyed. Destruction of the
+  // LoadDnsCacheEntryHandlePtr ensures that no callback will occur, at which
+  // point it is safe to delete the DFPHostSelectionHandle.
+  class DFPHostSelectionHandle
+      : public Upstream::AsyncHostSelectionHandle,
+        public Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks {
+  public:
+    DFPHostSelectionHandle(Upstream::LoadBalancerContext* context, const Cluster& cluster,
+                           std::string hostname)
+        : context_(context), cluster_(cluster), hostname_(hostname){};
+
+    virtual void cancel() {
+      // Cancels the DNS callback.
+      handle_.reset();
+    }
+
+    virtual void
+    onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) {
+      Upstream::HostConstSharedPtr host = cluster_.findHostByName(hostname_);
+      std::string details = info->details();
+      context_->onAsyncHostSelection(std::move(host), std::move(details));
+    }
+
+    void setHandle(Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr&& handle) {
+      handle_ = std::move(handle);
+    }
+    void setAutoDec(Upstream::ResourceAutoIncDecPtr&& dec) { auto_dec_ = std::move(dec); }
+
+  private:
+    Upstream::LoadBalancerContext* context_;
+    Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr handle_;
+    Upstream::ResourceAutoIncDecPtr auto_dec_;
+    const Cluster& cluster_;
+    std::string hostname_;
   };
 
   class LoadBalancerFactory : public Upstream::LoadBalancerFactory {

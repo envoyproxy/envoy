@@ -33,5 +33,5 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" \
 if [[ -n "$CI_BRANCH" ]] || [[ "${FORCE_PROTO_FORMAT}" == "yes" ]]; then
     echo "Run buf tests"
     cd api/ || exit 1
-    bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" @com_github_bufbuild_buf//:bin/buf lint
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" @rules_buf_toolchains//:buf lint
 fi

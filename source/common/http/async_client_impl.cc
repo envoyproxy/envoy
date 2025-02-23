@@ -126,20 +126,32 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_, creation_status)),
       account_(options.account_), buffer_limit_(options.buffer_limit_), send_xff_(options.send_xff),
       send_internal_(options.send_internal) {
+  // A field initialization may set the creation-status as unsuccessful.
+  // In that case return immediately.
+  if (!creation_status.ok()) {
+    return;
+  }
+
+  const Router::MetadataMatchCriteria* metadata_matching_criteria = nullptr;
+  if (options.parent_context.stream_info != nullptr) {
+    stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
+    metadata_matching_criteria =
+        options.parent_context.stream_info->route()
+            ? options.parent_context.stream_info->route()->routeEntry()->metadataMatchCriteria()
+            : nullptr;
+  }
+
   auto route_or_error = NullRouteImpl::create(
       parent_.cluster_->name(),
       retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
-      parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy);
+      parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy,
+      metadata_matching_criteria);
   SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
   route_ = std::move(*route_or_error);
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
   stream_info_.setIsShadow(options.is_shadow);
   stream_info_.setUpstreamClusterInfo(parent_.cluster_);
   stream_info_.route_ = route_;
-
-  if (options.parent_context.stream_info != nullptr) {
-    stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
-  }
 
   if (options.buffer_body_for_retry) {
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>(account_);
@@ -259,6 +271,12 @@ void AsyncStreamImpl::sendData(Buffer::Instance& data, bool end_stream) {
     } else {
       buffered_body_->add(data);
     }
+  }
+  if (router_.awaitingHost()) {
+    ENVOY_LOG_EVERY_POW_2(warn, "the buffer limit for the async client has been exceeded "
+                                "due to async host selection");
+    reset();
+    return;
   }
 
   router_.decodeData(data, end_stream);

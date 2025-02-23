@@ -16,10 +16,7 @@ namespace ThreadLocal {
 
 thread_local InstanceImpl::ThreadLocalData InstanceImpl::thread_local_data_;
 
-InstanceImpl::InstanceImpl() {
-  allow_slot_destroy_on_worker_threads_ =
-      Runtime::runtimeFeatureEnabled("envoy.restart_features.allow_slot_destroy_on_worker_threads");
-}
+InstanceImpl::InstanceImpl() = default;
 
 InstanceImpl::~InstanceImpl() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -48,14 +45,6 @@ InstanceImpl::SlotImpl::SlotImpl(InstanceImpl& parent, uint32_t index)
     : parent_(parent), index_(index), still_alive_guard_(std::make_shared<bool>(true)) {}
 
 InstanceImpl::SlotImpl::~SlotImpl() {
-  // If the runtime feature is disabled then keep the original behavior. This should
-  // be cleaned up when the runtime feature
-  // "envoy.restart_features.allow_slot_destroy_on_worker_threads" is deprecated.
-  if (!parent_.allow_slot_destroy_on_worker_threads_) {
-    parent_.removeSlot(index_);
-    return;
-  }
-
   // Do nothing if the parent is already shutdown. Return early here to avoid accessing the main
   // thread dispatcher because it may have been destroyed.
   if (isShutdown()) {
@@ -65,8 +54,7 @@ InstanceImpl::SlotImpl::~SlotImpl() {
   auto* main_thread_dispatcher = parent_.main_thread_dispatcher_;
   // Main thread dispatcher may be nullptr if the slot is being created and destroyed during
   // server initialization.
-  if (!parent_.allow_slot_destroy_on_worker_threads_ || main_thread_dispatcher == nullptr ||
-      main_thread_dispatcher->isThreadSafe()) {
+  if (main_thread_dispatcher == nullptr || main_thread_dispatcher->isThreadSafe()) {
     // If the slot is being destroyed on the main thread, we can remove it immediately.
     parent_.removeSlot(index_);
   } else {

@@ -12,7 +12,7 @@ set -e
 export HOMEBREW_NO_AUTO_UPDATE=1
 RETRY_ATTEMPTS=10
 RETRY_INTERVAL=3
-
+XCODE_VERSION=15.3
 
 function retry () {
     local returns=1 i=1
@@ -54,8 +54,8 @@ do
     install "${DEP}"
 done
 
-# https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md#xcode
-sudo xcode-select --switch /Applications/Xcode_14.1.app
+# https://github.com/actions/runner-images/blob/main/images/macos/macos-14-Readme.md#xcode
+sudo xcode-select --switch "/Applications/Xcode_${XCODE_VERSION}.app"
 
 retry ./bazelw version
 

@@ -30,7 +30,8 @@ public:
    */
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
-                 absl::optional<int> thread_priority = absl::nullopt);
+                 absl::optional<int> thread_priority = absl::nullopt,
+                 bool disable_dns_refresh_on_network_change = false);
 
   /**
    * InternalEngine destructor.
@@ -41,7 +42,7 @@ public:
    * Run the engine with the provided options.
    * @param options, the Envoy options, including the Bootstrap configuration and log level.
    */
-  envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options);
+  envoy_status_t run(std::shared_ptr<OptionsImplBase> options);
 
   /**
    * Immediately terminate the engine, if running. Calling this function when
@@ -128,7 +129,7 @@ public:
    * - Force refresh the hosts in the DNS cache (will take `setIpVersionToRemove` into account).
    * - Optionally (if configured) clear HTTP/3 broken status.
    */
-  void onDefaultNetworkChanged(NetworkType network);
+  void onDefaultNetworkChanged(int network);
 
   /**
    * This functions does the following when the default network is unavailable.
@@ -168,9 +169,10 @@ private:
 
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
-                 absl::optional<int> thread_priority, Thread::PosixThreadFactoryPtr thread_factory);
+                 absl::optional<int> thread_priority, bool disable_dns_refresh_on_network_change,
+                 Thread::PosixThreadFactoryPtr thread_factory);
 
-  envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
+  envoy_status_t main(std::shared_ptr<OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
   /** Returns true if there is IPv6 connectivity. */
@@ -201,6 +203,7 @@ private:
   Thread::PosixThreadPtr main_thread_{nullptr}; // Empty placeholder to be populated later.
   bool terminated_{false};
   absl::Notification engine_running_;
+  bool disable_dns_refresh_on_network_change_;
 };
 
 } // namespace Envoy

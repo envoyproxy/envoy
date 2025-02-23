@@ -33,7 +33,7 @@ message DnsCacheCircuitBreakers {
 
 // Configuration for the dynamic forward proxy DNS cache. See the :ref:`architecture overview
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message DnsCacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig";
@@ -94,6 +94,12 @@ message DnsCacheConfig {
   //   value depending on timing. This is similar to how other circuit breakers work.
   google.protobuf.UInt32Value max_hosts = 5 [(validate.rules).uint32 = {gt: 0}];
 
+  // Disable the DNS refresh on failure. If this field is set to true, it will ignore the
+  // :ref:`typed_dns_resolver_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_failure_refresh_rate>`.
+  // If not specified, it defaults to false. By enabling this feature, the failed hosts will now be treated as a cache miss,
+  // allowing the failed hosts to be resolved on demand.
+  bool disable_dns_refresh_on_failure = 15;
+
   // If the DNS failure refresh rate is specified,
   // this is used as the cache's DNS refresh rate when DNS requests are failing. If this setting is
   // not specified, the failure refresh rate defaults to the dns_refresh_rate.
@@ -136,8 +142,9 @@ message DnsCacheConfig {
   // The timeout used for DNS queries. This timeout is independent of any timeout and retry policy
   // used by the underlying DNS implementation (e.g., c-areas and Apple DNS) which are opaque.
   // Setting this timeout will ensure that queries succeed or fail within the specified time frame
-  // and are then retried using the standard refresh rates. Defaults to 5s if not set.
-  google.protobuf.Duration dns_query_timeout = 11 [(validate.rules).duration = {gt {}}];
+  // and are then retried using the standard refresh rates. Setting it to 0 will disable the Envoy DNS
+  // query timeout and use the underlying DNS implementation timeout. Defaults to 5s if not set.
+  google.protobuf.Duration dns_query_timeout = 11 [(validate.rules).duration = {gte {}}];
 
   // Configuration to flush the DNS cache to long term storage.
   config.common.key_value.v3.KeyValueStoreConfig key_value_config = 13;
