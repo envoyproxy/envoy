@@ -2,10 +2,13 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
+    "envoy_contrib_package",
     "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
+
+envoy_contrib_package()
 
 # L7 HTTP filter that implements the reverse_conn microservice debugger
 # Public docs: docs/root/configuration/http_filters/reverse_conn_filter.rst
@@ -17,6 +20,7 @@ envoy_cc_library(
     srcs = ["reverse_conn_filter.cc"],
     hdrs = ["reverse_conn_filter.h"],
     deps = [
+        "//contrib/reverse_connection/bootstrap/source:reverse_conn_global_registry",
         "//envoy/event:timer_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
@@ -31,7 +35,6 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
-        "//contrib/reverse_connection/bootstrap/source:reverse_conn_global_registry",
         "@envoy_api//contrib/envoy/extensions/filters/http/reverse_conn/v3alpha:pkg_cc_proto",
     ],
 )
@@ -52,5 +55,6 @@ envoy_cc_extension(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@envoy_api//contrib/envoy/extensions/filters/http/reverse_conn/v3alpha:pkg_cc_proto",
     ],
 )

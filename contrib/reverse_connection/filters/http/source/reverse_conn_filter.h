@@ -1,9 +1,5 @@
 #pragma once
 
-#include "contrib/envoy/extensions/filters/http/reverse_conn/v3alpha/reverse_conn.pb.h"
-#include "contrib/reverse_connection/bootstrap/source/reverse_conn_global_registry.h"
-#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
-#include "contrib/reverse_connection/bootstrap/source/reverse_connection_handler.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -16,6 +12,10 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
+#include "contrib/envoy/extensions/filters/http/reverse_conn/v3alpha/reverse_conn.pb.h"
+#include "contrib/reverse_connection/bootstrap/source/reverse_conn_global_registry.h"
+#include "contrib/reverse_connection/bootstrap/source/reverse_connection_handler.h"
+#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
 
 namespace Envoy {
 
@@ -56,7 +56,8 @@ static const char DOUBLE_CRLF[] = "\r\n\r\n";
 
 class ReverseConnFilter : Logger::Loggable<Logger::Id::filter>, public Http::StreamDecoderFilter {
 public:
-  ReverseConnFilter(ReverseConnFilterConfigSharedPtr config, std::shared_ptr<ReverseConnection::ReverseConnRegistry> reverse_conn_registry);
+  ReverseConnFilter(ReverseConnFilterConfigSharedPtr config,
+                    std::shared_ptr<ReverseConnection::ReverseConnRegistry> reverse_conn_registry);
   ~ReverseConnFilter();
 
   // Http::StreamFilterBase
@@ -120,17 +121,21 @@ private:
   bool matchRequestPath(const absl::string_view& request_path, const std::string& api_path);
 
   ReverseConnection::ReverseConnectionHandler& reverseConnectionHandler() {
-    ReverseConnection::RCThreadLocalRegistry* thread_local_registry = reverse_conn_registry_->getLocalRegistry();
+    ReverseConnection::RCThreadLocalRegistry* thread_local_registry =
+        reverse_conn_registry_->getLocalRegistry();
     if (thread_local_registry == nullptr) {
-      throw EnvoyException("Cannot get ReverseConnectionHandler. Thread local reverse connection registry is null");
+      throw EnvoyException(
+          "Cannot get ReverseConnectionHandler. Thread local reverse connection registry is null");
     }
     return thread_local_registry->getRCHandler();
   }
 
   ReverseConnection::ReverseConnectionManager& reverseConnectionManager() {
-    ReverseConnection::RCThreadLocalRegistry* thread_local_registry = reverse_conn_registry_->getLocalRegistry();
+    ReverseConnection::RCThreadLocalRegistry* thread_local_registry =
+        reverse_conn_registry_->getLocalRegistry();
     if (thread_local_registry == nullptr) {
-      throw EnvoyException("Cannot get ReverseConnectionManager. Thread local reverse connection registry is null");
+      throw EnvoyException(
+          "Cannot get ReverseConnectionManager. Thread local reverse connection registry is null");
     }
     return thread_local_registry->getRCManager();
   }

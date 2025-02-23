@@ -1,9 +1,10 @@
 #pragma once
 
-#include "contrib/envoy/extensions/filters/http/reverse_conn/v3alpha/reverse_conn.pb.h"
-#include "contrib/envoy/extensions/filters/http/reverse_conn/v3alpha/reverse_conn.pb.validate.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/well_known_names.h"
+
+#include "contrib/envoy/extensions/filters/http/reverse_conn/v3alpha/reverse_conn.pb.h"
+#include "contrib/envoy/extensions/filters/http/reverse_conn/v3alpha/reverse_conn.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +15,8 @@ namespace ReverseConn {
  * Config registration for the reverse_conn filter. @see NamedHttpFilterConfigFactory.
  */
 class ReverseConnFilterConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::reverse_conn::v3alpha::ReverseConn> {
+    : public Common::FactoryBase<
+          envoy::extensions::filters::http::reverse_conn::v3alpha::ReverseConn> {
 public:
   ReverseConnFilterConfigFactory() : FactoryBase("reverse_conn") {}
 

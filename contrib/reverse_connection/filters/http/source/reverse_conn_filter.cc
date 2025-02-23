@@ -25,8 +25,11 @@ const std::string ReverseConnFilter::tenant_id_param = "tenant_id";
 const std::string ReverseConnFilter::role_param = "role";
 const std::string ReverseConnFilter::rc_accepted_response = "reverse connection accepted";
 
-ReverseConnFilter::ReverseConnFilter(ReverseConnFilterConfigSharedPtr config, std::shared_ptr<ReverseConnection::ReverseConnRegistry> reverse_conn_registry)
-    : config_(config), reverse_conn_registry_(reverse_conn_registry), expects_proxy_protocol_(false), is_accept_request_(false),
+ReverseConnFilter::ReverseConnFilter(
+    ReverseConnFilterConfigSharedPtr config,
+    std::shared_ptr<ReverseConnection::ReverseConnRegistry> reverse_conn_registry)
+    : config_(config), reverse_conn_registry_(reverse_conn_registry),
+      expects_proxy_protocol_(false), is_accept_request_(false),
       accept_rev_conn_proto_(Buffer::OwnedImpl()) {}
 
 ReverseConnFilter::~ReverseConnFilter() {}
@@ -99,8 +102,8 @@ Http::FilterDataStatus ReverseConnFilter::acceptReverseConnection() {
   } else {
     getClusterDetailsUsingProtobuf(&node_uuid, &cluster_uuid, &tenant_uuid);
     if (node_uuid.empty()) {
-      ret.set_status(
-          envoy::extensions::filters::http::reverse_conn::v3alpha::ReverseConnHandshakeRet::REJECTED);
+      ret.set_status(envoy::extensions::filters::http::reverse_conn::v3alpha::
+                         ReverseConnHandshakeRet::REJECTED);
       ret.set_status_message("Failed to parse request message or required fields missing");
       decoder_callbacks_->sendLocalReply(Http::Code::BadGateway, ret.SerializeAsString(), nullptr,
                                          absl::nullopt, "");
@@ -199,7 +202,8 @@ Http::FilterHeadersStatus ReverseConnFilter::getReverseConnectionInfo() {
   // Send the reverse connection count filtered by node or cluster ID.
   if (!send_all_rc_info) {
     std::string response = fmt::format("{{\"available_connections\":{}}}", num_sockets);
-    absl::StatusOr<Json::ObjectSharedPtr> response_or_error= Json::Factory::loadFromString(response);
+    absl::StatusOr<Json::ObjectSharedPtr> response_or_error =
+        Json::Factory::loadFromString(response);
     if (!response_or_error.ok()) {
       decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError,
                                          "failed to form valid json response", nullptr,
