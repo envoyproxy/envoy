@@ -1,5 +1,3 @@
-#include "contrib/reverse_connection//filters/listener/source/reverse_connection.h"
-
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -14,6 +12,8 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 
+#include "contrib/reverse_connection//filters/listener/source/reverse_connection.h"
+
 // #include "source/common/network/io_socket_handle_impl.h"
 
 namespace Envoy {
@@ -24,7 +24,9 @@ namespace ReverseConnection {
 const absl::string_view Filter::RPING_MSG = "RPING";
 const absl::string_view Filter::PROXY_MSG = "PROXY";
 
-Filter::Filter(const Config& config, std::shared_ptr<ReverseConnection::ReverseConnRegistry> reverse_conn_registry) : config_(config), reverse_conn_registry_(reverse_conn_registry) {
+Filter::Filter(const Config& config,
+               std::shared_ptr<ReverseConnection::ReverseConnRegistry> reverse_conn_registry)
+    : config_(config), reverse_conn_registry_(reverse_conn_registry) {
   ENVOY_LOG(debug, "reverse_connection: ping_wait_timeout is {}",
             config_.pingWaitTimeout().count());
 }
@@ -32,7 +34,8 @@ Filter::Filter(const Config& config, std::shared_ptr<ReverseConnection::ReverseC
 int Filter::fd() { return cb_->socket().ioHandle().fdDoNotUse(); }
 
 Filter::~Filter() {
-  ENVOY_LOG(debug, "reverse_connection: filter destroyed socket().isOpen(): {}", cb_->socket().isOpen());
+  ENVOY_LOG(debug, "reverse_connection: filter destroyed socket().isOpen(): {}",
+            cb_->socket().isOpen());
   if (!connection_used_ && cb_->socket().isOpen()) {
     cb_->socket().close();
   }
@@ -46,8 +49,7 @@ void Filter::onClose() {
 
   // The rc filter responds to pings until data is received, so if onClose() is invoked,
   // then an idle reverse connection has been closed.
-  reverseConnectionManager().notifyConnectionClose(
-      connectionKey, false /* is_used */);
+  reverseConnectionManager().notifyConnectionClose(connectionKey, false /* is_used */);
   // If a connection is closed before data is received, mark the socket dead.
   if (!connection_used_) {
     ENVOY_LOG(debug, "reverse_connection: marking the socket dead, fd {}", fd());
@@ -77,8 +79,7 @@ void Filter::onPingWaitTimeout() {
             "RCManager.",
             fd(), connectionKey,
             cb_->socket().connectionInfoProvider().remoteAddress()->asStringView());
-  reverseConnectionManager().notifyConnectionClose(
-      connectionKey, false);
+  reverseConnectionManager().notifyConnectionClose(connectionKey, false);
   cb_->continueFilterChain(false);
 }
 

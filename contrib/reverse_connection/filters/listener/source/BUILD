@@ -2,10 +2,13 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_extension",
     "envoy_cc_library",
+    "envoy_contrib_package",
     "envoy_extension_package",
 )
 
 licenses(["notice"])  # Apache 2
+
+envoy_contrib_package()
 
 envoy_extension_package()
 
@@ -15,6 +18,7 @@ envoy_cc_library(
     hdrs = ["reverse_connection.h"],
     deps = [
         ":config_lib",
+        "//contrib/reverse_connection/bootstrap/source:reverse_conn_global_registry",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
@@ -22,7 +26,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//contrib/reverse_connection/bootstrap/source:reverse_conn_global_registry",
     ],
 )
 

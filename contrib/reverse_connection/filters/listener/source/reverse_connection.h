@@ -5,11 +5,11 @@
 #include "envoy/network/filter.h"
 
 #include "source/common/common/logger.h"
-#include "contrib/reverse_connection/filters/listener/source/config.h"
-#include "contrib/reverse_connection/bootstrap/source/reverse_conn_global_registry.h"
-#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
 
 #include "absl/strings/string_view.h"
+#include "contrib/reverse_connection/bootstrap/source/reverse_conn_global_registry.h"
+#include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
+#include "contrib/reverse_connection/filters/listener/source/config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,7 +25,8 @@ enum class ReadOrParseState { Done, TryAgainLater, Error };
  */
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(const Config& config, std::shared_ptr<ReverseConnection::ReverseConnRegistry> reverse_conn_registry);
+  Filter(const Config& config,
+         std::shared_ptr<ReverseConnection::ReverseConnRegistry> reverse_conn_registry);
   ~Filter();
 
   // Network::ListenerFilter
@@ -34,9 +35,11 @@ public:
   Network::FilterStatus onData(Network::ListenerFilterBuffer&) override;
   void onClose() override;
   ReverseConnection::ReverseConnectionManager& reverseConnectionManager() {
-    ReverseConnection::RCThreadLocalRegistry* thread_local_registry = reverse_conn_registry_->getLocalRegistry();
+    ReverseConnection::RCThreadLocalRegistry* thread_local_registry =
+        reverse_conn_registry_->getLocalRegistry();
     if (thread_local_registry == nullptr) {
-      throw EnvoyException("Cannot get ReverseConnectionManager. Thread local reverse connection registry is null");
+      throw EnvoyException(
+          "Cannot get ReverseConnectionManager. Thread local reverse connection registry is null");
     }
     return thread_local_registry->getRCManager();
   }
