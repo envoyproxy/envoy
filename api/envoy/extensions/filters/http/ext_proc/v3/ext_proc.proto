@@ -4,6 +4,7 @@ package envoy.extensions.filters.http.ext_proc.v3;
 
 import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/core/v3/http_service.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
@@ -96,7 +97,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -328,6 +329,11 @@ message ExternalProcessor {
   // the ``allowed_override_modes`` allow-list below.
   // Since request_header_mode is not applicable in any way, it's ignored in comparison.
   repeated ProcessingMode allowed_override_modes = 22;
+
+  // Decorator to introduce custom logic that runs after a message received from
+  // the External Processor is processed.
+  // [#extension-category: envoy.http.ext_proc.response_processors]
+  config.core.v3.TypedExtensionConfig on_processing_response = 23;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.
