@@ -60,6 +60,7 @@ envoy_cc_test(
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "//source/common/access_log:access_log_lib",
     ],
 )
 
