@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/common/network/connection_impl.h"
+
 #include "contrib/reverse_connection/bootstrap/source/reverse_conn_global_registry.h"
 #include "contrib/reverse_connection/bootstrap/source/reverse_connection_handler.h"
 
@@ -16,12 +17,14 @@ public:
       Event::Dispatcher& dispatcher,
       Network::TransportSocketPtr&& transport_socket /* transport socket for TLS */,
       Network::ConnectionSocketPtr&& downstream_socket /* client socket to use */,
-      Envoy::Extensions::Bootstrap::ReverseConnection::RCThreadLocalRegistry& registry, bool expects_proxy_protocol);
+      Envoy::Extensions::Bootstrap::ReverseConnection::RCThreadLocalRegistry& registry,
+      bool expects_proxy_protocol);
 
   // Network::ClientConnection
   void connect() override;
 
-  Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionHandler& reverseConnectionHandler() {
+  Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionHandler&
+  reverseConnectionHandler() {
     return registry_.getRCHandler();
   }
 

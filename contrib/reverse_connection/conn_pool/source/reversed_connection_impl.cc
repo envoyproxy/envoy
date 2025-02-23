@@ -11,10 +11,11 @@ ReversedClientConnectionImpl::ReversedClientConnectionImpl(
     Network::Address::InstanceConstSharedPtr source_address, Event::Dispatcher& dispatcher,
     Network::TransportSocketPtr&& transport_socket,
     Network::ConnectionSocketPtr&& downstream_socket,
-    Envoy::Extensions::Bootstrap::ReverseConnection::RCThreadLocalRegistry& registry, const bool expects_proxy_protocol)
+    Envoy::Extensions::Bootstrap::ReverseConnection::RCThreadLocalRegistry& registry,
+    const bool expects_proxy_protocol)
     : ClientConnectionImpl(dispatcher, std::move(transport_socket), std::move(downstream_socket)),
-      remote_address_(address), source_address_(source_address),
-      registry_(registry), expects_proxy_protocol_(expects_proxy_protocol) {}
+      remote_address_(address), source_address_(source_address), registry_(registry),
+      expects_proxy_protocol_(expects_proxy_protocol) {}
 
 void ReversedClientConnectionImpl::connect() {
   ENVOY_LOG(debug, "ReversedClientConnectionImpl::connect");
@@ -43,9 +44,9 @@ void ReversedClientConnectionImpl::SendProxyProtocolHeader() {
   }
 }
 
-void ReversedClientConnectionImpl::close(Network::ConnectionCloseType type, absl::string_view details) {
-  reverseConnectionHandler().markSocketDead(
-      socket_->ioHandle().fdDoNotUse(), true /* used */);
+void ReversedClientConnectionImpl::close(Network::ConnectionCloseType type,
+                                         absl::string_view details) {
+  reverseConnectionHandler().markSocketDead(socket_->ioHandle().fdDoNotUse(), true /* used */);
   Network::ClientConnectionImpl::close(type, details);
 }
 

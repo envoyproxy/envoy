@@ -34,4 +34,4 @@ envoy_cc_library(
         "//contrib/reverse_connection/bootstrap/source:reverse_conn_global_registry",
         "//source/common/network:connection_impl",
     ],
-)
+

@@ -1,11 +1,12 @@
 #pragma once
 
 #include <cstdint>
-#include "envoy/registry/registry.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/upstream/upstream.h"
-#include "source/common/http/http2/conn_pool.h"
 
+#include "envoy/event/dispatcher.h"
+#include "envoy/registry/registry.h"
+#include "envoy/upstream/upstream.h"
+
+#include "source/common/http/http2/conn_pool.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,13 +27,14 @@ public:
   Http::ConnectionPool::InstancePtr allocateConnPool(
       Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
       Singleton::Manager& singleton_manager, Upstream::HostConstSharedPtr host,
-      Upstream::ResourcePriority priority, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      Upstream::ResourcePriority priority,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
       Upstream::ClusterConnectivityState& state,
       absl::optional<Http::HttpServerPropertiesCache::Origin> origin = absl::nullopt,
       Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache = nullptr) override;
 
-      std::string name() const override { return "envoy.http.reverse_conn.default"; }
+  std::string name() const override { return "envoy.http.reverse_conn.default"; }
 };
 
 DECLARE_FACTORY(ReverseConnPoolFactoryImpl);
