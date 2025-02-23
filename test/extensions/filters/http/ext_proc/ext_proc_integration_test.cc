@@ -24,7 +24,6 @@
 
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
-#include <string_view>
 #include "ocpdiag/core/testing/status_matchers.h"
 
 namespace Envoy {
