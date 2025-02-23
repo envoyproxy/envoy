@@ -176,6 +176,82 @@ private:
 };
 using PinnedGradientControllerConfigSharedPtr = std::shared_ptr<PinnedGradientControllerConfig>;
 
+class GradientController : public ConcurrencyController {
+public:
+  GradientController(GradientControllerConfig& config, Event::Dispatcher& dispatcher,
+                     const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source);
+
+  // ConcurrencyController
+  RequestForwardingAction forwardingDecision() override;
+  void recordLatencySample(MonotonicTime rq_send_time) override;
+  void cancelLatencySample() override;
+  uint32_t concurrencyLimit() const override { return concurrency_limit_.load(); }
+
+  // Used in unit tests to validate worker thread interactions.
+  Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
+
+protected:
+  virtual bool shouldSampleRTT() const { return true; }
+  virtual bool shouldRecordSample(MonotonicTime /*MonotonicTime*/) const { return true; }
+  virtual void recalculateAfterSample() {}
+  virtual std::chrono::nanoseconds minRTT() const = 0;
+  virtual void processConcurrencyLimitUpdate(int /*consecutive_min_concurrency_set*/) {}
+
+  absl::Mutex& sampleMutationMutex() { return sample_mutation_mtx_; }
+  Event::Dispatcher& dispatcher() { return dispatcher_; }
+  GradientControllerStats& stats() { return stats_; }
+  TimeSource& timeSource() { return time_source_; }
+  void updateConcurrencyLimit(const uint32_t new_limit)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+  std::chrono::microseconds processLatencySamplesAndClear()
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+  uint32_t numSamples() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+  void clearSamples() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+  void enableSamplingTimer() { sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval()); }
+
+private:
+  uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+  void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
+
+  GradientControllerConfig config_;
+  Event::Dispatcher& dispatcher_;
+  Stats::Scope& scope_;
+  GradientControllerStats stats_;
+  TimeSource& time_source_;
+
+  // Protects data related to latency sampling and RTT values. In addition to protecting the latency
+  // sample histogram, the mutex ensures that the minRTT calculation window and the sample window
+  // (where the new concurrency limit is determined) do not overlap.
+  absl::Mutex sample_mutation_mtx_;
+
+  // Stores the aggregated sampled latencies for use in the gradient calculation.
+  std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(sample_mutation_mtx_);
+
+  // Tracks the count of requests that have been forwarded whose replies have
+  // not been sampled yet. Atomicity is required because this variable is used to make the
+  // forwarding decision without locking.
+  std::atomic<uint32_t> num_rq_outstanding_;
+
+  // Stores the current concurrency limit. Atomicity is required because this variable is used to
+  // make the forwarding decision without locking.
+  std::atomic<uint32_t> concurrency_limit_;
+
+  // Tracks the number of consecutive times that the concurrency limit is set to the minimum. This
+  // is used to determine whether the controller should trigger an additional minRTT measurement
+  // after remaining at the minimum limit for too long.
+  uint32_t consecutive_min_concurrency_set_ ABSL_GUARDED_BY(sample_mutation_mtx_);
+
+  // Stores all sampled latencies and provides percentile estimations when using the sampled data to
+  // calculate a new concurrency limit.
+  std::unique_ptr<histogram_t, decltype(&hist_free)>
+      latency_sample_hist_ ABSL_GUARDED_BY(sample_mutation_mtx_);
+
+  Event::TimerPtr sample_reset_timer_;
+
+  // Used for testing only.
+  Thread::ThreadSynchronizer synchronizer_;
+};
+
 /**
  * A concurrency controller that implements a variation of the Gradient algorithm described in:
  *
@@ -238,48 +314,38 @@ using PinnedGradientControllerConfigSharedPtr = std::shared_ptr<PinnedGradientCo
  * the controller is inside of a minRTT recalculation window during the recording of a latency
  * sample, so this extra bit of information is stored in inMinRTTSamplingWindow().
  */
-class DynamicGradientController : public ConcurrencyController {
+class DynamicGradientController : public GradientController {
 public:
   DynamicGradientController(DynamicGradientControllerConfig config, Event::Dispatcher& dispatcher,
-                            Runtime::Loader& runtime, const std::string& stats_prefix,
-                            Stats::Scope& scope, Random::RandomGenerator& random,
-                            TimeSource& time_source);
-
-  // Used in unit tests to validate worker thread interactions.
-  Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
+                            const std::string& stats_prefix, Stats::Scope& scope,
+                            Random::RandomGenerator& random, TimeSource& time_source);
 
   // True if there is a minRTT sampling window active.
   bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
 
-  // ConcurrencyController.
-  RequestForwardingAction forwardingDecision() override;
-  void recordLatencySample(MonotonicTime rq_send_time) override;
-  void cancelLatencySample() override;
-  uint32_t concurrencyLimit() const override { return concurrency_limit_.load(); }
+  // GradientController.
+  bool shouldSampleRTT() const override {
+    // The minRTT sampling window started since the sample reset timer was enabled last. Since the
+    // minRTT value is being calculated, let's not initiate a new sample to avoid blocking the
+    // dispatcher thread and rely on it being re-triggered again as part of the minRTT calculation.
+    return !inMinRTTSamplingWindow();
+  }
+  bool shouldRecordSample(MonotonicTime rq_send_time) const override {
+    // Disregard samples from requests started in the previous minRTT window
+    // by only sampling requests after the window finished.
+    return rq_send_time >= min_rtt_epoch_;
+  }
+  void processConcurrencyLimitUpdate(int consecutive_min_concurrency_set) override;
+  std::chrono::nanoseconds minRTT() const override { return min_rtt_; }
+  void recalculateAfterSample();
 
 private:
-  void updateMinRTT() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
-  std::chrono::microseconds processLatencySamplesAndClear()
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
-  uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void enterMinRTTSamplingWindow();
-  void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
-  void updateConcurrencyLimit(const uint32_t new_limit)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   std::chrono::milliseconds applyJitter(std::chrono::milliseconds interval,
                                         double jitter_pct) const;
 
   const DynamicGradientControllerConfig config_;
-  Event::Dispatcher& dispatcher_;
-  Stats::Scope& scope_;
-  GradientControllerStats stats_;
   Random::RandomGenerator& random_;
-  TimeSource& time_source_;
-
-  // Protects data related to latency sampling and RTT values. In addition to protecting the latency
-  // sample histogram, the mutex ensures that the minRTT calculation window and the sample window
-  // (where the new concurrency limit is determined) do not overlap.
-  absl::Mutex sample_mutation_mtx_;
 
   // Stores the value of the concurrency limit prior to entering the minRTT update window. If this
   // is non-zero, then we are actively in the minRTT sampling window.
@@ -289,106 +355,30 @@ private:
   // account for variable latencies. This is the numerator in the gradient value.
   std::chrono::nanoseconds min_rtt_;
 
-  // Stores the aggregated sampled latencies for use in the gradient calculation.
-  std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(sample_mutation_mtx_);
-
-  // Tracks the count of requests that have been forwarded whose replies have
-  // not been sampled yet. Atomicity is required because this variable is used to make the
-  // forwarding decision without locking.
-  std::atomic<uint32_t> num_rq_outstanding_;
-
-  // Stores the current concurrency limit. Atomicity is required because this variable is used to
-  // make the forwarding decision without locking.
-  std::atomic<uint32_t> concurrency_limit_;
-
-  // Stores all sampled latencies and provides percentile estimations when using the sampled data to
-  // calculate a new concurrency limit.
-  std::unique_ptr<histogram_t, decltype(&hist_free)>
-      latency_sample_hist_ ABSL_GUARDED_BY(sample_mutation_mtx_);
-
-  // Tracks the number of consecutive times that the concurrency limit is set to the minimum. This
-  // is used to determine whether the controller should trigger an additional minRTT measurement
-  // after remaining at the minimum limit for too long.
-  uint32_t consecutive_min_concurrency_set_ ABSL_GUARDED_BY(sample_mutation_mtx_);
-
   // We will disregard sampling any requests admitted before this timestamp to prevent sampling
   // requests admitted before the start of a minRTT window and potentially skewing the minRTT.
   MonotonicTime min_rtt_epoch_;
 
   Event::TimerPtr min_rtt_calc_timer_;
-  Event::TimerPtr sample_reset_timer_;
-
-  // Used for testing only.
-  Thread::ThreadSynchronizer synchronizer_;
 };
 using DynamicGradientControllerSharedPtr = std::shared_ptr<DynamicGradientController>;
 
 /**
  * A concurrency controller similar to `DynamicGradientController`, except minRTT is fixed.
  */
-class PinnedGradientController : public ConcurrencyController {
+class PinnedGradientController : public GradientController {
 public:
   PinnedGradientController(PinnedGradientControllerConfig config, Event::Dispatcher& dispatcher,
-                           Runtime::Loader& runtime, const std::string& stats_prefix,
-                           Stats::Scope& scope, TimeSource& time_source);
+                           const std::string& stats_prefix, Stats::Scope& scope,
+                           TimeSource& time_source);
 
-  // Used in unit tests to validate worker thread interactions.
-  Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
-
-  // ConcurrencyController.
-  RequestForwardingAction forwardingDecision() override;
-  void recordLatencySample(MonotonicTime rq_send_time) override;
-  void cancelLatencySample() override;
-  uint32_t concurrencyLimit() const override { return concurrency_limit_.load(); }
+  // GradientController.
+  std::chrono::nanoseconds minRTT() const override { return config_.minRTT(); }
 
 private:
-  std::chrono::microseconds processLatencySamplesAndClear()
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
-  uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
-  void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
-  void updateConcurrencyLimit(const uint32_t new_limit)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
-
   const PinnedGradientControllerConfig config_;
-  Event::Dispatcher& dispatcher_;
-  Stats::Scope& scope_;
-  GradientControllerStats stats_;
-  TimeSource& time_source_;
-
-  // Protects data related to latency sampling and RTT values. In addition to protecting the latency
-  // sample histogram, the mutex ensures that the minRTT calculation window and the sample window
-  // (where the new concurrency limit is determined) do not overlap.
-  absl::Mutex sample_mutation_mtx_;
-
-  // Stores the aggregated sampled latencies for use in the gradient calculation.
-  std::chrono::nanoseconds sample_rtt_ ABSL_GUARDED_BY(sample_mutation_mtx_);
-
-  // Tracks the count of requests that have been forwarded whose replies have
-  // not been sampled yet. Atomicity is required because this variable is used to make the
-  // forwarding decision without locking.
-  std::atomic<uint32_t> num_rq_outstanding_;
-
-  // Stores the current concurrency limit. Atomicity is required because this variable is used to
-  // make the forwarding decision without locking.
-  std::atomic<uint32_t> concurrency_limit_;
-
-  // Stores all sampled latencies and provides percentile estimations when using the sampled data to
-  // calculate a new concurrency limit.
-  std::unique_ptr<histogram_t, decltype(&hist_free)>
-      latency_sample_hist_ ABSL_GUARDED_BY(sample_mutation_mtx_);
-
-  Event::TimerPtr sample_reset_timer_;
-
-  // Used for testing only.
-  Thread::ThreadSynchronizer synchronizer_;
 };
 using PinnedGradientControllerSharedPtr = std::shared_ptr<PinnedGradientController>;
-
-uint32_t calculateNewConcurrencyLimit(std::chrono::nanoseconds min_rtt,
-                                      std::chrono::nanoseconds sample_rtt,
-                                      uint32_t concurrency_limit,
-                                      const GradientControllerConfig& config,
-                                      GradientControllerStats& stats);
 
 } // namespace Controller
 } // namespace AdaptiveConcurrency

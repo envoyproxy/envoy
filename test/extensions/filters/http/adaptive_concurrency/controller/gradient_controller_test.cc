@@ -60,8 +60,8 @@ public:
 
   DynamicGradientControllerSharedPtr makeDynamicController(const std::string& yaml_config) {
     const auto controller = std::make_shared<DynamicGradientController>(
-        makeDynamicConfig(yaml_config, runtime_), *dispatcher_, runtime_, "test_prefix.",
-        *stats_.rootScope(), random_, time_system_);
+        makeDynamicConfig(yaml_config, runtime_), *dispatcher_, "test_prefix.", *stats_.rootScope(),
+        random_, time_system_);
 
     // Advance time so that the latency sample calculations don't underflow if monotonic time is 0.
     time_system_.advanceTimeAndRun(std::chrono::hours(42), *dispatcher_,
@@ -72,8 +72,8 @@ public:
 
   PinnedGradientControllerSharedPtr makePinnedController(const std::string& yaml_config) {
     const auto controller = std::make_shared<PinnedGradientController>(
-        makePinnedConfig(yaml_config, runtime_), *dispatcher_, runtime_, "test_prefix.",
-        *stats_.rootScope(), time_system_);
+        makePinnedConfig(yaml_config, runtime_), *dispatcher_, "test_prefix.", *stats_.rootScope(),
+        time_system_);
 
     // Advance time so that the latency sample calculations don't underflow if monotonic time is 0.
     time_system_.advanceTimeAndRun(std::chrono::hours(42), *dispatcher_,
@@ -680,12 +680,12 @@ min_rtt_calc_params:
   // Expect the sample timer to trigger start immediately upon controller creation.
   EXPECT_CALL(fake_dispatcher, createTimer_(_))
       .Times(2)
-      .WillOnce(Return(rtt_timer))
-      .WillOnce(Return(sample_timer));
+      .WillOnce(Return(sample_timer))
+      .WillOnce(Return(rtt_timer));
   EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
   auto controller = std::make_shared<DynamicGradientController>(
-      makeDynamicConfig(yaml, runtime_), fake_dispatcher, runtime_, "test_prefix.",
-      *stats_.rootScope(), random_, time_system_);
+      makeDynamicConfig(yaml, runtime_), fake_dispatcher, "test_prefix.", *stats_.rootScope(),
+      random_, time_system_);
 
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
 
@@ -725,12 +725,12 @@ min_rtt_calc_params:
   // Expect the sample timer to trigger start immediately upon controller creation.
   EXPECT_CALL(fake_dispatcher, createTimer_(_))
       .Times(2)
-      .WillOnce(Return(rtt_timer))
-      .WillOnce(Return(sample_timer));
+      .WillOnce(Return(sample_timer))
+      .WillOnce(Return(rtt_timer));
   EXPECT_CALL(*sample_timer, enableTimer(std::chrono::milliseconds(123), _));
   auto controller = std::make_shared<DynamicGradientController>(
-      makeDynamicConfig(yaml, runtime_), fake_dispatcher, runtime_, "test_prefix.",
-      *stats_.rootScope(), random_, time_system_);
+      makeDynamicConfig(yaml, runtime_), fake_dispatcher, "test_prefix.", *stats_.rootScope(),
+      random_, time_system_);
 
   // Set the minRTT- this will trigger the timer for the next minRTT calculation.
   EXPECT_CALL(*rtt_timer, enableTimer(std::chrono::milliseconds(45000), _));
