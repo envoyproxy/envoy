@@ -2,10 +2,9 @@
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/tracing/tracer_manager_impl.h"
+#include "source/extensions/filters/network/generic_proxy/access_log.h"
 #include "source/extensions/filters/network/generic_proxy/rds.h"
 #include "source/extensions/filters/network/generic_proxy/rds_impl.h"
-
-#include "source/extensions/filters/network/generic_proxy/access_log.h"
 
 namespace Envoy {
 namespace Extensions {

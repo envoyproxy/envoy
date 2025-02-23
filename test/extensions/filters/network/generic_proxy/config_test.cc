@@ -496,10 +496,11 @@ TEST(BasicFilterConfigTest, TestConfigurationWithAccessLogAndLogFilter1) {
   EXPECT_CALL(codec_factory_config, createCodecFactory(_, _))
       .WillOnce(Return(testing::ByMove(std::move(mock_codec_factory))));
 
-  EXPECT_THROW_WITH_MESSAGE(
-      { auto status_or = factory.createFilterFactoryFromProto(config, factory_context); },
-      EnvoyException,
-      "Access log filter: only extension filter is supported by non-HTTP access loggers.");
+  Network::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(config, factory_context).value();
+  EXPECT_NE(nullptr, cb);
+  NiceMock<Network::MockFilterManager> filter_manager;
+  cb(filter_manager);
 }
 
 TEST(BasicFilterConfigTest, TestConfigurationWithAccessLogAndLogFilter2) {

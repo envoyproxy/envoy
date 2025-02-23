@@ -2,11 +2,11 @@
 #include <string>
 #include <utility>
 
+#include "source/common/access_log/access_log_impl.h"
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/tracing/tracer_manager_impl.h"
 #include "source/extensions/access_loggers/common/file_access_log_impl.h"
 #include "source/extensions/filters/network/generic_proxy/proxy.h"
-#include "source/common/access_log/access_log_impl.h"
 
 #include "test/extensions/filters/network/generic_proxy/fake_codec.h"
 #include "test/extensions/filters/network/generic_proxy/mocks/codec.h"
@@ -114,7 +114,11 @@ public:
     envoy::config::accesslog::v3::AccessLog config;
     config.mutable_typed_config()->PackFrom(file_log_config);
     config.set_name("file");
-    return AccessLog::AccessLogFactory::fromProto(config, factory_context_);
+
+    std::vector<Formatter::CommandParserPtr> command_parsers;
+    command_parsers.push_back(createGenericProxyCommandParser());
+    return AccessLog::AccessLogFactory::fromProto(config, factory_context_,
+                                                  std::move(command_parsers));
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
