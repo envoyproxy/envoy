@@ -864,8 +864,7 @@ TEST_F(AwsLambdaFilterTest, DecodeHeadersCredentialsPending) {
       .WillOnce(testing::DoAll(testing::SaveArg<0>(&capture), testing::Return(true)));
 
   Http::TestRequestHeaderMapImpl headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
   // We should see continueDecoding called when the captured callback is triggered
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   capture();

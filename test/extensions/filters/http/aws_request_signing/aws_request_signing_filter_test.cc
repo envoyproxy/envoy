@@ -260,8 +260,7 @@ TEST_F(AwsRequestSigningFilterTest, DecodeHeadersCredentialsPending) {
       .WillOnce(testing::DoAll(testing::SaveArg<0>(&capture), testing::Return(true)));
 
   Http::TestRequestHeaderMapImpl headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
   // We should see continueDecoding called when the captured callback is triggered
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   capture();
