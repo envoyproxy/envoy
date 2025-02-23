@@ -114,7 +114,9 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       THROW_IF_NOT_OK_REF(auth_client_factory_or_error.status());
 
       auth_client = std::make_unique<ExternalAuth::GrpcExternalAuthClient>(
-          auth_client_factory_or_error.value()->createUncachedRawAsyncClient(),
+          THROW_OR_RETURN_VALUE(
+              auth_client_factory_or_error.value()->createUncachedRawAsyncClient(),
+              Grpc::RawAsyncClientPtr),
           std::chrono::milliseconds(timeout_ms));
     }
 

@@ -44,6 +44,10 @@ std::ostream& operator<<(std::ostream& os, Connection::State connection_state) {
   return os;
 }
 
+absl::string_view ipVersionAsString(Network::Address::IpVersion ip_version) {
+  return ip_version == Network::Address::IpVersion::v4 ? "v4" : "v6";
+}
+
 } // namespace
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
@@ -1037,9 +1041,27 @@ void ClientConnectionImpl::connect() {
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
     connecting_ = false;
-    setFailureReason(absl::StrCat(
-        "immediate connect error: ", errorDetails(result.errno_),
-        "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString()));
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.log_ip_families_on_network_error")) {
+      absl::string_view remote_address_family =
+          socket_->connectionInfoProvider().remoteAddress()->type() == Address::Type::Ip
+              ? ipVersionAsString(
+                    socket_->connectionInfoProvider().remoteAddress()->ip()->version())
+              : "";
+      absl::string_view local_address_family =
+          socket_->connectionInfoProvider().remoteAddress()->type() == Address::Type::Ip
+              ? ipVersionAsString(socket_->connectionInfoProvider().localAddress()->ip()->version())
+              : "";
+      setFailureReason(absl::StrCat(
+          "immediate connect error: ", errorDetails(result.errno_),
+          "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString(),
+          "|remote address family:", remote_address_family,
+          "|local address family:", local_address_family));
+    } else {
+      setFailureReason(absl::StrCat(
+          "immediate connect error: ", errorDetails(result.errno_),
+          "|remote address:", socket_->connectionInfoProvider().remoteAddress()->asString()));
+    }
     ENVOY_CONN_LOG_EVENT(debug, "connection_immediate_error", "{}", *this, failureReason());
 
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.

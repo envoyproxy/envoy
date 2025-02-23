@@ -730,23 +730,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.upstream_remote_address_use_connection", "false"}});
-
-    StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS");
-
-    // Has valid upstream remote address but it would not be used because of the runtime feature.
-    stream_info.upstreamInfo()->setUpstreamRemoteAddress(test_upstream_remote_address);
-    EXPECT_EQ("10.0.0.1:443", upstream_format.formatWithContext({}, stream_info));
-    EXPECT_THAT(upstream_format.formatValueWithContext({}, stream_info),
-                ProtoEq(ValueUtil::stringValue("10.0.0.1:443")));
-
-    // Reset to default one.
-    stream_info.upstreamInfo()->setUpstreamRemoteAddress(default_upstream_remote_address);
-  }
-
-  {
     StreamInfoFormatter upstream_format("UPSTREAM_REMOTE_ADDRESS_WITHOUT_PORT");
 
     // Has valid upstream remote address and it will be used as priority.
@@ -2711,6 +2694,34 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
     EXPECT_EQ("GE", formatter.formatWithContext(formatter_context, stream_info));
     EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("GE")));
+  }
+}
+
+TEST(SubstitutionFormatterTest, QueryPraameterFormatter) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestRequestHeaderMapImpl request_header{{":method", "GET"}, {":path", "/path?x=xxxxxx"}};
+
+  HttpFormatterContext formatter_context(&request_header);
+
+  {
+    QueryParameterFormatter formatter("x", absl::optional<size_t>());
+    EXPECT_EQ("xxxxxx", formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("xxxxxx")));
+  }
+
+  {
+    QueryParameterFormatter formatter("y", absl::optional<size_t>());
+    EXPECT_EQ(absl::nullopt, formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    QueryParameterFormatter formatter("x", absl::optional<size_t>(2));
+    EXPECT_EQ("xx", formatter.formatWithContext(formatter_context, stream_info));
+    EXPECT_THAT(formatter.formatValueWithContext(formatter_context, stream_info),
+                ProtoEq(ValueUtil::stringValue("xx")));
   }
 }
 

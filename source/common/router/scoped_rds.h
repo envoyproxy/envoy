@@ -316,10 +316,9 @@ public:
 class SrdsFactoryDefault : public SrdsFactory {
 public:
   // UntypedFactory
-  virtual std::string name() const override { return "envoy.srds_factory.default"; }
+  std::string name() const override { return "envoy.srds_factory.default"; }
 
-  virtual std::unique_ptr<Envoy::Config::ConfigProviderManager>
-  createScopedRoutesConfigProviderManager(
+  std::unique_ptr<Envoy::Config::ConfigProviderManager> createScopedRoutesConfigProviderManager(
       Server::Configuration::ServerFactoryContext& factory_context,
       RouteConfigProviderManager& route_config_provider_manager) override {
     return std::make_unique<Router::ScopedRoutesConfigProviderManager>(

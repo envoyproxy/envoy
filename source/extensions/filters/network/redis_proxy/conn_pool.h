@@ -52,6 +52,7 @@ class Instance {
 public:
   virtual ~Instance() = default;
 
+  virtual uint16_t shardSize() PURE;
   /**
    * Makes a redis request.
    * @param hash_key supplies the key to use for consistent hashing.
@@ -64,6 +65,18 @@ public:
   virtual Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& hash_key, RespVariant&& request, PoolCallbacks& callbacks,
               Common::Redis::Client::Transaction& transaction) PURE;
+  /**
+   * Makes a redis request.
+   * @param shard_index supplies the key to use for consistent hashing.
+   * @param request supplies the request to make.
+   * @param callbacks supplies the request completion callbacks.
+   * @param transaction supplies the transaction info of the current connection.
+   * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
+   *         for some reason.
+   */
+  virtual Common::Redis::Client::PoolRequest*
+  makeRequestToShard(uint16_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
+                     Common::Redis::Client::Transaction& transaction) PURE;
 };
 
 using InstanceSharedPtr = std::shared_ptr<Instance>;

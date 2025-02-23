@@ -27,8 +27,8 @@ project-lifecycle:
   - github:keith
   - github:kyessenov
   - github:ravenblackx
-  - github:soulxu
   - github:nezdolik
+  - github:tonya11en
   - github:tyxia
 contribution-policy:
   accepts-pull-requests: true

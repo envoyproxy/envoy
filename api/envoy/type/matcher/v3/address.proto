@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.type.matcher.v3;
+
+import "xds/core/v3/cidr.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.type.matcher.v3";
+option java_outer_classname = "AddressProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3;matcherv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Address Matcher]
+
+// Match an IP against a repeated CIDR range. This matcher is intended to be
+// used in other matchers, for example in the filter state matcher to match a
+// filter state object as an IP.
+message AddressMatcher {
+  repeated xds.core.v3.CidrRange ranges = 1;
+}

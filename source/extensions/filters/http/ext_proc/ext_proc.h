@@ -26,6 +26,7 @@
 #include "source/extensions/filters/http/ext_proc/client.h"
 #include "source/extensions/filters/http/ext_proc/client_base.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
+#include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
 namespace Envoy {
@@ -161,10 +162,7 @@ struct DeferredDeletableStream : public Logger::Loggable<Logger::Id::ext_proc> {
         deferred_close_timeout(timeout) {}
 
   void deferredClose(Envoy::Event::Dispatcher& dispatcher);
-  // After a timer timeouts, reset the stream, this essentially reset the
-  // underlying gRPC stream. Gives remote grpc server a CANCELED signal, and
-  // ignored any further messages/callbacks from the server.
-  void cleanupStreamOnTimer();
+  void closeStreamOnTimer();
 
   ExternalProcessorStreamPtr stream_;
   ThreadLocalStreamManager& parent;
@@ -194,6 +192,7 @@ public:
     if (it == stream_manager_.end()) {
       return;
     }
+
     it->second->deferredClose(dispatcher);
   }
 
@@ -282,12 +281,17 @@ public:
     return grpc_service_;
   }
 
+  std::unique_ptr<OnProcessingResponse> createOnProcessingResponse() const;
+
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
     return {ALL_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
+  static std::function<std::unique_ptr<OnProcessingResponse>()> createOnProcessingResponseCb(
+      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
+      Envoy::Server::Configuration::CommonFactoryContext& context, const std::string& stats_prefix);
   const bool failure_mode_allow_;
   const bool observability_mode_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
@@ -321,6 +325,9 @@ private:
   const ExpressionManager expression_manager_;
 
   const ImmediateMutationChecker immediate_mutation_checker_;
+
+  const std::function<std::unique_ptr<OnProcessingResponse>()> on_processing_response_factory_cb_;
+
   ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
 };
 
@@ -400,10 +407,11 @@ public:
         encoding_state_(*this, config->processingMode(),
                         config->untypedForwardingMetadataNamespaces(),
                         config->typedForwardingMetadataNamespaces(),
-                        config->untypedReceivingMetadataNamespaces()) {}
+                        config->untypedReceivingMetadataNamespaces()),
+        on_processing_response_(config->createOnProcessingResponse()) {}
 
   const FilterConfig& config() const { return *config_; }
-  const envoy::config::core::v3::GrpcService& grpc_service_config() const {
+  const envoy::config::core::v3::GrpcService& grpcServiceConfig() const {
     return config_with_hash_key_.config();
   }
 
@@ -426,16 +434,17 @@ public:
 
   void encodeComplete() override {
     if (config_->observabilityMode()) {
-      logGrpcStreamInfo();
+      logStreamInfo();
     }
   }
 
   // ExternalProcessorCallbacks
   void onReceiveMessage(
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
-  void onGrpcError(Grpc::Status::GrpcStatus error) override;
+  void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
   void onGrpcClose() override;
-  void logGrpcStreamInfo() override;
+  void logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info);
+  void logStreamInfo() override;
 
   void onMessageTimeout();
   void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
@@ -461,11 +470,6 @@ private:
   void mergePerRouteConfig();
   StreamOpenState openStream();
   void closeStream();
-  // Erases the stream from the threadLocalStreamManager, and reset the
-  // stream_ pointer and the underlying gRPC stream.
-  // This is called when the stream needs to be cleaned up, due to remote close
-  // event, or local stream timeouts.
-  void cleanupStream();
 
   void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
   void clearAsyncState();
@@ -503,7 +507,7 @@ private:
                                  bool end_stream);
   Http::FilterDataStatus sendDataInObservabilityMode(Buffer::Instance& data, ProcessorState& state,
                                                      bool end_stream);
-  void deferredResetStream();
+  void deferredCloseStream();
 
   envoy::service::ext_proc::v3::ProcessingRequest
   buildHeaderRequest(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
@@ -522,9 +526,17 @@ private:
   DecodingProcessorState decoding_state_;
   EncodingProcessorState encoding_state_;
 
+  std::vector<std::string> untyped_forwarding_namespaces_{};
+  std::vector<std::string> typed_forwarding_namespaces_{};
+  std::vector<std::string> untyped_receiving_namespaces_{};
+  Http::StreamFilterCallbacks* filter_callbacks_;
+  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
+
   // The gRPC stream to the external processor, which will be opened
   // when it's time to send the first message.
   ExternalProcessorStream* stream_ = nullptr;
+
+  std::unique_ptr<OnProcessingResponse> on_processing_response_;
 
   // Set to true when no more messages need to be sent to the processor.
   // This happens when the processor has closed the stream, or when it has
@@ -537,12 +549,6 @@ private:
 
   // Set to true when the mergePerRouteConfig() method has been called.
   bool route_config_merged_ = false;
-
-  std::vector<std::string> untyped_forwarding_namespaces_{};
-  std::vector<std::string> typed_forwarding_namespaces_{};
-  std::vector<std::string> untyped_receiving_namespaces_{};
-  Http::StreamFilterCallbacks* filter_callbacks_;
-  Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_;
 };
 
 extern std::string responseCaseToString(

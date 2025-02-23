@@ -37,7 +37,7 @@ public:
   // Upstream::ClusterManager
   MOCK_METHOD(absl::Status, initialize, (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(bool, initialized, ());
-  MOCK_METHOD(bool, addOrUpdateCluster,
+  MOCK_METHOD(absl::StatusOr<bool>, addOrUpdateCluster,
               (const envoy::config::cluster::v3::Cluster& cluster, const std::string& version_info,
                const bool avoid_cds_removal));
   MOCK_METHOD(void, setPrimaryClustersInitializedCb, (PrimaryClustersReadyCallback));
@@ -85,7 +85,7 @@ public:
               (const std::string& cluster, DrainConnectionsHostPredicate predicate));
   MOCK_METHOD(void, drainConnections, (DrainConnectionsHostPredicate predicate));
   MOCK_METHOD(absl::Status, checkActiveStaticCluster, (const std::string& cluster));
-  MOCK_METHOD(OdCdsApiHandlePtr, allocateOdCdsApi,
+  MOCK_METHOD(absl::StatusOr<OdCdsApiHandlePtr>, allocateOdCdsApi,
               (OdCdsCreationFunction creation_function,
                const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
