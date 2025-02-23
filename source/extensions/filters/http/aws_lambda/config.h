@@ -20,7 +20,7 @@ public:
   AwsLambdaFilterFactory() : DualFactoryBase("envoy.filters.http.aws_lambda") {}
 
 protected:
-  Extensions::Common::Aws::CredentialsProviderSharedPtr getCredentialsProvider(
+  Extensions::Common::Aws::CredentialsProviderChainSharedPtr getCredentialsProvider(
       const envoy::extensions::filters::http::aws_lambda::v3::Config& proto_config,
       Server::Configuration::ServerFactoryContext& server_context, const std::string& region) const;
 
@@ -30,7 +30,8 @@ private:
       const std::string& stats_prefix, DualInfo dual_info,
       Server::Configuration::ServerFactoryContext& context) override;
 
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::aws_lambda::v3::PerRouteConfig&,
       Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };

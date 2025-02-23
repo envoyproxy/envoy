@@ -48,7 +48,8 @@ public:
           }
           // Add a dummy trace for test coverage.
           query->addTrace(100);
-          pending_queries_.push_back(PendingQueryInfo{std::move(query), absl::nullopt});
+          pending_queries_.push_back(
+              PendingQueryInfo{std::move(query), config_.num_retries().value() + 1});
         });
     return raw_new_query;
   }

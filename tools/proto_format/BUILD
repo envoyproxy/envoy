@@ -2,6 +2,7 @@ load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data", "envoy_pytool_binary")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 

@@ -20,6 +20,10 @@ on:
         options:
         - create-release
         - sync-version-histories
+        - deprecate-guards
+      dry-run:
+        type: boolean
+        default: false
       pr:
         type: boolean
         default: true
@@ -49,20 +53,20 @@ jobs:
 
   # Create a release commit, when landed this will publish.
   create_release:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'create-release'
     name: Create release
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.11
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.15
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.11
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.15
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
@@ -83,10 +87,10 @@ jobs:
       name: Check changelog summary
     - if: ${{ inputs.author }}
       name: Validate signoff email
-      uses: envoyproxy/toolshed/gh-actions/email/validate@actions-v0.3.11
+      uses: envoyproxy/toolshed/gh-actions/email/validate@actions-v0.3.15
       with:
         email: ${{ inputs.author }}
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.11
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.15
       name: Create release
       with:
         source: |
@@ -111,7 +115,7 @@ jobs:
       name: Release version
       id: release
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.11
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.15
       with:
         base: ${{ github.ref_name }}
         commit: false
@@ -130,26 +134,26 @@ jobs:
         GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
 
   sync_version_histories:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.event_name == 'workflow_dispatch' && inputs.task == 'sync-version-histories'
     name: Sync version histories
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.11
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.15
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
     - id: checkout
       name: Checkout Envoy repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.11
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.15
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
         strip-prefix: release/
         token: ${{ steps.appauth.outputs.token }}
-    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.11
+    - uses: envoyproxy/toolshed/gh-actions/github/run@actions-v0.3.15
       name: Sync version histories
       with:
         command: >-
@@ -159,7 +163,7 @@ jobs:
           --
           --signoff="${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>"
     - name: Create a PR
-      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.11
+      uses: envoyproxy/toolshed/gh-actions/github/pr@actions-v0.3.15
       with:
         append-commit-message: true
         base: ${{ github.ref_name }}
@@ -175,6 +179,39 @@ jobs:
           ${{ steps.checkout.outputs.branch-name != 'main' && format('[{0}]', steps.checkout.outputs.branch-name) || '' }}
           repo: Sync version histories
 
+  deprecate_guards:
+    runs-on: ubuntu-24.04
+    if: >-
+      ${{ (github.event_name == 'workflow_dispatch'
+           && inputs.task == 'deprecate-guards')
+          || (github.event_name == 'release'
+              && endsWith(github.ref, '.0')) }}
+    name: Deprecate guards
+    steps:
+    - id: appauth
+      name: App auth
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.15
+      with:
+        app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+        key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+    - id: checkout
+      name: Checkout Envoy repository
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.15
+      with:
+        config: |
+          fetch-depth: 0
+    - name: Run deprecation tool
+      run: |
+        bazel run --config=ci \
+            //tools/deprecate_guards \
+            -- \
+            ${{ ! inputs.dry-run && ' --create-issues' || '' }} \
+            ${{ github.repository != 'envoyproxy/envoy'
+                && format('--staging-repo {0}', github.repository)
+                || '' }}
+      env:
+        GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
+
   ## Triggered actions
 
   # On release to `main`:
@@ -183,19 +220,19 @@ jobs:
   # - remove anything unwanted
   # - push branch
   create_release_branch:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.event_name == 'release' && endsWith(github.ref, '.0')
     name: Create release branch
     steps:
     - id: appauth
       name: App auth
-      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.11
+      uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.15
       with:
         app_id: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
         key: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
 
     - name: Checkout repository
-      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.11
+      uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.15
       with:
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}

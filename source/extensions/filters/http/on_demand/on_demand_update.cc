@@ -60,14 +60,18 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
   }
   Upstream::OdCdsApiHandlePtr odcds;
   if (odcds_config->resources_locator().empty()) {
-    odcds = cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create, odcds_config->source(),
-                                absl::nullopt, validation_visitor);
+    odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
+                                                      odcds_config->source(), absl::nullopt,
+                                                      validation_visitor),
+                                  Upstream::OdCdsApiHandlePtr);
   } else {
     auto locator = THROW_OR_RETURN_VALUE(
         Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator()),
         xds::core::v3::ResourceLocator);
-    odcds = cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create, odcds_config->source(), locator,
-                                validation_visitor);
+    odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
+                                                      odcds_config->source(), locator,
+                                                      validation_visitor),
+                                  Upstream::OdCdsApiHandlePtr);
   }
   // If changing the default timeout, please update the documentation in on_demand.proto too.
   auto timeout =

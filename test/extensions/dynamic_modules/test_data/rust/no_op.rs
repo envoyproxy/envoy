@@ -1,4 +1,4 @@
-use envoy_proxy_dynamic_modules_rust_sdk::declare_init_functions;
+use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 declare_init_functions!(init, new_nop_http_filter_config_fn);
@@ -17,11 +17,11 @@ pub extern "C" fn getSomeVariable() -> i32 {
 
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewHttpFilterConfigFunction`]
 /// signature.
-fn new_nop_http_filter_config_fn(
-  _envoy_filter_factory: envoy_proxy_dynamic_modules_rust_sdk::EnvoyHttpFilterConfig,
+fn new_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
+  _envoy_filter_config: &mut EC,
   name: &str,
   config: &str,
-) -> Option<Box<dyn envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig>> {
+) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
   let name = name.to_string();
   let config = config.to_string();
   Some(Box::new(NopHttpFilterConfig { name, config }))
@@ -35,11 +35,100 @@ struct NopHttpFilterConfig {
   config: String,
 }
 
-impl envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig for NopHttpFilterConfig {}
+impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
+  for NopHttpFilterConfig
+{
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(NopHttpFilter {
+      on_request_headers_called: false,
+      on_request_body_called: false,
+      on_request_trailers_called: false,
+      on_response_headers_called: false,
+      on_response_body_called: false,
+      on_response_trailers_called: false,
+    })
+  }
+}
 
 impl Drop for NopHttpFilterConfig {
   fn drop(&mut self) {
     assert_eq!(self.name, "foo");
     assert_eq!(self.config, "bar");
+  }
+}
+
+/// A no-op HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`]
+/// as well as the [`Drop`] to test the cleanup of the filter.
+struct NopHttpFilter {
+  on_request_headers_called: bool,
+  on_request_body_called: bool,
+  on_request_trailers_called: bool,
+  on_response_headers_called: bool,
+  on_response_body_called: bool,
+  on_response_trailers_called: bool,
+}
+
+impl Drop for NopHttpFilter {
+  fn drop(&mut self) {
+    assert!(self.on_request_headers_called);
+    assert!(self.on_request_body_called);
+    assert!(self.on_request_trailers_called);
+    assert!(self.on_response_headers_called);
+    assert!(self.on_response_body_called);
+    assert!(self.on_response_trailers_called);
+  }
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for NopHttpFilter {
+  fn on_request_headers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    self.on_request_headers_called = true;
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_request_body(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
+    self.on_request_body_called = true;
+    abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+  }
+
+  fn on_request_trailers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status {
+    self.on_request_trailers_called = true;
+    abi::envoy_dynamic_module_type_on_http_filter_request_trailers_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    self.on_response_headers_called = true;
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+
+  fn on_response_body(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
+    self.on_response_body_called = true;
+    abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
+  }
+
+  fn on_response_trailers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status {
+    self.on_response_trailers_called = true;
+    abi::envoy_dynamic_module_type_on_http_filter_response_trailers_status::Continue
   }
 }

@@ -12,6 +12,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -252,6 +253,9 @@ HostSharedPtr makeTestHost(const std::string& hostname,
 }
 
 void addStats(const HostSharedPtr& host, double a, double b = 0, double c = 0, double d = 0) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_load_with_rq_issued")) {
+    host->stats().rq_total_.inc();
+  }
   host->stats().rq_success_.inc();
   host->loadMetricStats().add("metric_a", a);
   if (b != 0) {
@@ -274,8 +278,22 @@ void addStatExpectation(envoy::config::endpoint::v3::UpstreamLocalityStats* stat
   metric->set_total_metric_value(total_metric_value);
 }
 
+class LoadStatsReporterTestWithRqTotal : public LoadStatsReporterTest,
+                                         public testing::WithParamInterface<bool> {
+public:
+  LoadStatsReporterTestWithRqTotal() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.report_load_with_rq_issued", GetParam() ? "true" : "false"}});
+  }
+  TestScopedRuntime scoped_runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(LoadStatsReporterTestWithRqTotal, LoadStatsReporterTestWithRqTotal,
+                         ::testing::Bool());
+
 // Validate that per-locality metrics are aggregated across hosts and included in the load report.
-TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
+TEST_P(LoadStatsReporterTestWithRqTotal, UpstreamLocalityStats) {
+  bool expects_rq_total = GetParam();
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
@@ -313,6 +331,9 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
     auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality0_stats->mutable_locality()->set_region("mars");
     expected_locality0_stats->set_total_successful_requests(3);
+    if (expects_rq_total) {
+      expected_locality0_stats->set_total_issued_requests(3);
+    }
     addStatExpectation(expected_locality0_stats, "metric_a", 3, 0.88888);
     addStatExpectation(expected_locality0_stats, "metric_b", 2, 1.12345);
     addStatExpectation(expected_locality0_stats, "metric_c", 1, 3.14159);
@@ -320,6 +341,9 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
     auto expected_locality1_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality1_stats->mutable_locality()->set_region("jupiter");
     expected_locality1_stats->set_total_successful_requests(1);
+    if (expects_rq_total) {
+      expected_locality1_stats->set_total_issued_requests(1);
+    }
     addStatExpectation(expected_locality1_stats, "metric_a", 1, 10.01);
     addStatExpectation(expected_locality1_stats, "metric_c", 1, 20.02);
     addStatExpectation(expected_locality1_stats, "metric_d", 1, 30.03);
@@ -331,6 +355,10 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
 
   // Traffic between previous request and next response. Previous latched metrics are cleared.
   host1->stats().rq_success_.inc();
+
+  if (expects_rq_total) {
+    host1->stats().rq_total_.inc();
+  }
   host1->loadMetricStats().add("metric_a", 1.41421);
   host1->loadMetricStats().add("metric_e", 2.71828);
 
@@ -348,6 +376,9 @@ TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
     auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality0_stats->mutable_locality()->set_region("mars");
     expected_locality0_stats->set_total_successful_requests(1);
+    if (expects_rq_total) {
+      expected_locality0_stats->set_total_issued_requests(1);
+    }
     addStatExpectation(expected_locality0_stats, "metric_a", 1, 1.41421);
     addStatExpectation(expected_locality0_stats, "metric_e", 1, 2.71828);
 

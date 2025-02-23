@@ -359,6 +359,7 @@ public:
     bool propagate_response_headers_ = false;
     bool propagate_response_trailers_ = false;
     std::string session_filters_ = "";
+    std::string backoff_options_ = "";
   };
 
   void setup(const TestConfig& config) {
@@ -385,14 +386,16 @@ typed_config:
     proxy_host: {}
     target_host: {}
     default_target_port: {}
-    retry_options:
-      max_connect_attempts: {}
     propagate_response_headers: {}
     propagate_response_trailers: {}
+    retry_options:
+      max_connect_attempts: {}
 )EOF",
                     config.session_filters_, config.proxy_host_, config.target_host_,
-                    config.default_target_port_, config.max_connect_attempts_,
-                    config.propagate_response_headers_, config.propagate_response_trailers_);
+                    config.default_target_port_, config.propagate_response_headers_,
+                    config.propagate_response_trailers_, config.max_connect_attempts_);
+
+    filter_config += config.backoff_options_;
 
     if (config.buffer_options_.has_value()) {
       filter_config += fmt::format(R"EOF(
@@ -801,8 +804,7 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionReuse) {
   expectRequestHeaders(upstream_request2->headers());
 
   // Send upgrade headers downstream, fully establishing the connection.
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"capsule-protocol", "?1"}};
-  upstream_request2->encodeHeaders(response_headers, false);
+  upstream_request2->encodeHeaders(response_headers_, false);
 
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 2);
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 2);
@@ -872,7 +874,8 @@ TEST_P(UdpTunnelingIntegrationTest, FailureOnBadResponseHeaders) {
   EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
 }
 
-TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
+TEST_P(UdpTunnelingIntegrationTest,
+       ConnectionAttemptRetryOnInvalidResponseHeadersNoBackoffOptions) {
   const std::string access_log_filename =
       TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
 
@@ -918,11 +921,216 @@ TEST_P(UdpTunnelingIntegrationTest, ConnectionAttemptRetry) {
   expectRequestHeaders(upstream_request_->headers());
 
   // Send upgrade headers downstream, fully establishing the connection.
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"capsule-protocol", "?1"}};
-  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeHeaders(response_headers_, false);
 
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
   sendCapsuleDownstream("response", true);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  const std::string expected_log =
+      "2 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE);
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
+}
+
+TEST_P(UdpTunnelingIntegrationTest,
+       ConnectionAttemptRetryOnInvalidResponseHeadersWithBackoffOptions) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%UPSTREAM_REQUEST_ATTEMPT_COUNT% %RESPONSE_FLAGS%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const std::string backoff_options = R"EOF(
+      backoff_options:
+        base_interval: 0.1s
+        max_interval: 1s
+)EOF";
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          2,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          "",
+                          false,
+                          false,
+                          "",
+                          backoff_options};
+  setup(config);
+
+  // Initial datagram will create a session and a tunnel request.
+  client_->write("hello", *listener_address_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  Http::TestResponseHeaderMapImpl fail_response_headers{{":status", "404"}};
+  upstream_request_->encodeHeaders(fail_response_headers, true);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+
+  // The request is retried, expect new downstream headers
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  // Send upgrade headers downstream, fully establishing the connection.
+  upstream_request_->encodeHeaders(response_headers_, false);
+
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
+  sendCapsuleDownstream("response", true);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  const std::string expected_log =
+      "2 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE);
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
+}
+
+TEST_P(UdpTunnelingIntegrationTest,
+       ConnectionAttemptRetryOnUpstreamConnectionCloseBeforeResponseHeadersNoBackoffOptions) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%UPSTREAM_REQUEST_ATTEMPT_COUNT% %RESPONSE_FLAGS%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          2,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config};
+
+  setup(config);
+
+  const std::string datagram = "hello";
+  client_->write(datagram, *listener_address_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+
+  // Close the upstream connection before sending response headers.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Retry to create a new stream on new connection and not the closed one.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  upstream_request_->encodeHeaders(response_headers_, false);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
+
+  // Wait for datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
+  sendCapsuleDownstream("response", true);
+
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+
+  const std::string expected_log =
+      "2 " + std::string(StreamInfo::ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE);
+  EXPECT_THAT(waitForAccessLog(access_log_filename), testing::HasSubstr(expected_log));
+}
+
+TEST_P(UdpTunnelingIntegrationTest,
+       ConnectionAttemptRetryOnUpstreamConnectionCloseBeforeResponseHeadersWithBackoffOptions) {
+  const std::string access_log_filename =
+      TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+
+  const std::string session_access_log_config = fmt::format(R"EOF(
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: {}
+      log_format:
+        text_format_source:
+          inline_string: "%UPSTREAM_REQUEST_ATTEMPT_COUNT% %RESPONSE_FLAGS%\n"
+)EOF",
+                                                            access_log_filename);
+
+  const std::string backoff_options = R"EOF(
+      backoff_options:
+        base_interval: 0.1s
+        max_interval: 1s
+)EOF";
+
+  const TestConfig config{"host.com",
+                          "target.com",
+                          2,
+                          30,
+                          false,
+                          "",
+                          BufferOptions{1, 30},
+                          absl::nullopt,
+                          session_access_log_config,
+                          "",
+                          false,
+                          false,
+                          "",
+                          backoff_options};
+
+  setup(config);
+
+  const std::string datagram = "hello";
+  client_->write(datagram, *listener_address_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+
+  // Close the upstream connection before sending response headers.
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+
+  // Retry to create a new stream on new connection and not the closed one.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_retry", 1);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  expectRequestHeaders(upstream_request_->headers());
+
+  upstream_request_->encodeHeaders(response_headers_, false);
+  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_tunnel_success", 1);
+
+  // Wait for datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
+  sendCapsuleDownstream("response", true);
+
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 
   const std::string expected_log =

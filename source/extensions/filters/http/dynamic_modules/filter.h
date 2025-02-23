@@ -17,9 +17,13 @@ using namespace Envoy::Http;
 class DynamicModuleHttpFilter : public Http::StreamFilter,
                                 public std::enable_shared_from_this<DynamicModuleHttpFilter> {
 public:
-  DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr dynamic_module)
-      : dynamic_module_(dynamic_module){};
-  ~DynamicModuleHttpFilter() override = default;
+  DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config) : config_(config) {}
+  ~DynamicModuleHttpFilter() override;
+
+  /**
+   * Initializes the in-module filter.
+   */
+  void initializeInModuleFilter();
 
   // ---------- Http::StreamFilterBase ------------
   void onStreamComplete() override;
@@ -46,12 +50,55 @@ public:
   }
   void encodeComplete() override;
 
+  void sendLocalReply(Code code, absl::string_view body,
+                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details);
+
   // The callbacks for the filter. They are only valid until onDestroy() is called.
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
 
+  RequestHeaderMap* request_headers_ = nullptr;
+  RequestTrailerMap* request_trailers_ = nullptr;
+  ResponseHeaderMap* response_headers_ = nullptr;
+  ResponseTrailerMap* response_trailers_ = nullptr;
+
+  // These are used to hold the current chunk of the request/response body during the decodeData and
+  // encodeData callbacks. It is only valid during the call and should not be used outside of the
+  // call.
+  Buffer::Instance* current_request_body_ = nullptr;
+  Buffer::Instance* current_response_body_ = nullptr;
+
+  /**
+   * Helper to get the downstream information of the stream.
+   */
+  StreamInfo::StreamInfo* streamInfo() {
+    if (decoder_callbacks_) {
+      return &decoder_callbacks_->streamInfo();
+    } else if (encoder_callbacks_) {
+      return &encoder_callbacks_->streamInfo();
+    } else {
+      return nullptr;
+    }
+  }
+
 private:
-  const DynamicModuleHttpFilterConfigSharedPtr dynamic_module_ = nullptr;
+  /**
+   * This is a helper function to get the `this` pointer as a void pointer which is passed to the
+   * various event hooks.
+   */
+  void* thisAsVoidPtr() { return static_cast<void*>(this); }
+
+  /**
+   * Called when filter is destroyed via onDestroy() or destructor. Forwards the call to the
+   * module via on_http_filter_destroy_ and resets in_module_filter_ to null. Subsequent calls are a
+   * no-op.
+   */
+  void destroy();
+
+  const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
+  envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
 };
 
 } // namespace HttpFilters

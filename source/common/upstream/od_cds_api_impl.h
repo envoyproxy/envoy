@@ -34,11 +34,11 @@ class OdCdsApiImpl : public OdCdsApi,
                      Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>,
                      Logger::Loggable<Logger::Id::upstream> {
 public:
-  static OdCdsApiSharedPtr create(const envoy::config::core::v3::ConfigSource& odcds_config,
-                                  OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                                  ClusterManager& cm, MissingClusterNotifier& notifier,
-                                  Stats::Scope& scope,
-                                  ProtobufMessage::ValidationVisitor& validation_visitor);
+  static absl::StatusOr<OdCdsApiSharedPtr>
+  create(const envoy::config::core::v3::ConfigSource& odcds_config,
+         OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
+         MissingClusterNotifier& notifier, Stats::Scope& scope,
+         ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Upstream::OdCdsApi
   void updateOnDemand(std::string cluster_name) override;
@@ -56,7 +56,8 @@ private:
   OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
                MissingClusterNotifier& notifier, Stats::Scope& scope,
-               ProtobufMessage::ValidationVisitor& validation_visitor);
+               ProtobufMessage::ValidationVisitor& validation_visitor,
+               absl::Status& creation_status);
   void sendAwaiting();
 
   CdsApiHelper helper_;
