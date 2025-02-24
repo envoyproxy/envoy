@@ -16,13 +16,13 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/test_random_generator.h"
 
+#include "absl/synchronization/notification.h"
 #include "extension_registry.h"
 #include "library/common/bridge/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
-#include "absl/synchronization/notification.h"
 
 using testing::_;
 using testing::AnyNumber;
