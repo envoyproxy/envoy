@@ -61,24 +61,20 @@ service ExternalProcessor {
 // If the server does not support these protocol configurations, it may choose to close the gRPC stream.
 // If the server supports these protocol configurations, it should respond based on the API specifications.
 message ProtocolConfiguration {
-  // Specify whether the filter
-  // :ref:`request_body_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ProcessingMode.request_body_mode>`
-  // is set to ``FULL_DUPLEX_STREAMED``. Setting ``true`` means Envoy is operating in the ``FULL_DUPLEX_STREAMED``
-  // body mode in the request direction. The server needs to operate in that mode as well.
-  // Setting ``false`` means Envoy is expecting a response for each request it sends.
-  bool is_request_body_mode_full_duplex = 1;
+  // Specify the filter configuration :ref:`request_body_mode
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ProcessingMode.request_body_mode>`
+  envoy.extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode request_body_mode = 1
+      [(validate.rules).enum = {defined_only: true}];
 
-  // Specify whether the filter
-  // :ref:`response_body_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ProcessingMode.response_body_mode>`
-  // is set to ``FULL_DUPLEX_STREAMED``. Setting ``true`` means Envoy is operating in the ``FULL_DUPLEX_STREAMED``
-  // body mode in the response direction. The server needs to operate in that mode as well.
-  // Setting ``false`` means Envoy is expecting a response for each request it sends.
-  bool is_response_body_mode_full_duplex = 2;
+  // Specify the filter configuration :ref:`response_body_mode
+  // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ProcessingMode.response_body_mode>`
+  envoy.extensions.filters.http.ext_proc.v3.ProcessingMode.BodySendMode response_body_mode = 2
+      [(validate.rules).enum = {defined_only: true}];
 
-  // Specify whether the filter :ref:`send_body_without_waiting_for_header_response
+  // Specify the filter configuration :ref:`send_body_without_waiting_for_header_response
   // <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.send_body_without_waiting_for_header_response>`
-  // flag is set. If Envoy is waiting for a header response from the server, setting ``true`` means Envoy will send body to
-  // the server as they arrive. Setting ``false`` means Envoy will buffer the arrived data and not send it to the server.
+  // If Envoy is waiting for a header response from the server, setting ``true`` means Envoy will send body to the server
+  // as they arrive. Setting ``false`` means Envoy will buffer the arrived data and not send it to the server immediately.
   bool send_body_without_waiting_for_header_response = 3;
 }
 
@@ -152,7 +148,8 @@ message ProcessingRequest {
   bool observability_mode = 10;
 
   // [#not-implemented-hide:]
-  // The filter protocol configurations to be sent to the server.
+  // Specify the filter protocol configurations to be sent to the server.
+  // ``protocol_config`` is only encoded in the first ``ProcessingRequest`` message from Envoy to the server.
   ProtocolConfiguration protocol_config = 11;
 }
 
