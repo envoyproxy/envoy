@@ -1026,13 +1026,13 @@ void Utility::extractSchemeHostPathFromUri(const absl::string_view& uri, absl::s
    *  path = "/certs"
    */
 
-  // Find end of scheme
+  // Find end of scheme.
   const auto pos = uri.find("://");
   scheme = uri.substr(0, (pos == std::string::npos) ? 0 : pos);
 
-  // Start position of the host
+  // Start position of the host.
   const auto host_pos = (pos == std::string::npos) ? 0 : pos + 3;
-  // Start position of the path
+  // Start position of the path.
   const auto path_pos = uri.find('/', host_pos);
   if (path_pos == std::string::npos) {
     // If uri doesn't have "/", the whole string is treated as host.
