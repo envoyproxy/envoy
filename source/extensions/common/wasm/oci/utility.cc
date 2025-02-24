@@ -46,7 +46,7 @@ absl::StatusOr<std::string> prepareAuthorizationHeader(std::string image_pull_se
 
   Json::ObjectSharedPtr image_pull_secret;
   TRY_ASSERT_MAIN_THREAD {
-    Json::ObjectSharedPtr image_pull_secret = THROW_OR_RETURN_VALUE(
+    image_pull_secret = THROW_OR_RETURN_VALUE(
         Json::Factory::loadFromString(image_pull_secret_raw), Json::ObjectSharedPtr);
   }
   END_TRY
