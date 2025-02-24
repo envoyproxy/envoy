@@ -15,7 +15,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   match name {
     "passthrough" => Some(Box::new(PassthroughHttpFilterConfig {})),
     "header_callbacks" => Some(Box::new(HeadersHttpFilterConfig {
-      headers_to_add: String::from_utf8(config.to_owned()).unwrap_or_default(),
+      headers_to_add: String::from_utf8(config.to_owned()).unwrap(),
     })),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {
       immediate_end_of_stream: config == b"immediate_end_of_stream",
