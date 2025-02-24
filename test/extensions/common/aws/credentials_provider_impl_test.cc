@@ -2357,6 +2357,43 @@ TEST_F(WebIdentityCredentialsProviderTest, CredentialsWithWrongFormat) {
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
+TEST_F(WebIdentityCredentialsProviderTest, ExpiredTokenException) {
+  // Setup timer.
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  expectDocument(400, std::move(R"EOF(
+{
+    "Error": {
+        "Code": "ExpiredTokenException",
+        "Message": "Token expired: current date/time 1740387458 must be before the expiration date/time 1740319004",
+        "Type": "Sender"
+    },
+    "RequestId": "989dcb5c-a58e-492b-92eb-d9b8c836d254"
+}
+)EOF"));
+
+  // No need to restart timer since credentials are fetched from cache.
+  // Even though as per `Expiration` field (in wrong format) the credentials are expired
+  // the credentials won't be refreshed until the next refresh period (1hr) or new expiration
+  // value implicitly set to a value same as refresh interval.
+
+  setupProvider();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // bad expiration format will cause a refresh of 1 hour - 5s (3595 seconds) by default
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(3595)), nullptr));
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
+  EXPECT_FALSE(credentials.secretAccessKey().has_value());
+  EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
 TEST_F(WebIdentityCredentialsProviderTest, BadExpirationFormat) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);

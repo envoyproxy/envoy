@@ -211,8 +211,8 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
         }
       } else {
         // If our returned token had an expiration time, use that to set the cache duration
-        if (expiration_time_.has_value()) {
-          const auto now = api_.timeSource().systemTime();
+        const auto now = api_.timeSource().systemTime();
+        if (expiration_time_.has_value() && (expiration_time_.value() > now)) {
           cache_duration_ =
               std::chrono::duration_cast<std::chrono::seconds>(expiration_time_.value() - now);
           ENVOY_LOG(debug,
