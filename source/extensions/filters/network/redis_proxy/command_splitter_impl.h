@@ -389,7 +389,8 @@ public:
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
                               Event::Dispatcher& dispatcher,
-                              const StreamInfo::StreamInfo& stream_info) override;
+                              const StreamInfo::StreamInfo& stream_info,
+                              absl::flat_hash_set<std::string> redis_custom_command_names) override;
 
 private:
   friend class RedisCommandSplitterImplTest;
