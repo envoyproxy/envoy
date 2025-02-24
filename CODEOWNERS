@@ -51,7 +51,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # proxy protocol socket extension
 /*/extensions/transport_sockets/proxy_protocol @botengyao @wez470
 # common transport socket
-/*/extensions/transport_sockets/common @tyxia @wez470
+/*/extensions/transport_sockets/common @botengyao @wez470
 # starttls transport socket
 /*/extensions/transport_sockets/starttls @cpakulski @botengyao @ggreenway
 # proxy transport socket
@@ -165,7 +165,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # Watchdog Extensions
 /*/extensions/watchdog/profile_action @kbaichoo @nezdolik
 # Core upstream code
-extensions/upstreams/http @ayanavlasov @mattklein123
+extensions/upstreams/http @yanavlasov @mattklein123
 extensions/upstreams/tcp @ggreenway @mattklein123
 # OAuth2
 extensions/filters/http/oauth2 @derekargueta @mattklein123
