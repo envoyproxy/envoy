@@ -50,15 +50,6 @@ void OciImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
     return;
   }
 
-  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  const auto content_hash = Hex::encode(crypto_util.getSha256Digest(response->body()));
-  if (content_hash_ != content_hash) {
-    onInvalidData(
-        fmt::format("failed to verify content hash [uri = {}, body = {}, content hash = {}]",
-                    uri_.uri(), response->body().toString(), content_hash));
-    return;
-  }
-
   auto json_body = Json::Factory::loadFromString(response->bodyAsString());
   if (!json_body.ok()) {
     onInvalidData(fmt::format("failed to parse OCI manifest [uri = {}, response body = {}]: {}",
