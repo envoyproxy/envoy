@@ -176,6 +176,53 @@ private:
 };
 using PinnedGradientControllerConfigSharedPtr = std::shared_ptr<PinnedGradientControllerConfig>;
 
+/**
+ * Concurrency controllers that implement variations of the Gradient algorithm described in:
+ *
+ * https://medium.com/@NetflixTechBlog/performance-under-load-3e6fa9a60581
+ *
+ * This is used to control the allowed request concurrency limit in the adaptive concurrency control
+ * filter.
+ *
+ * The algorithm:
+ * ==============
+ * An ideal round-trip time (minRTT) is used in the calculation of a number called the gradient,
+ * using time-sampled latencies (sampleRTT):
+ *
+ *     gradient = minRTT / sampleRTT
+ *
+ * This gradient value has a useful property, such that it decreases as the sampled latencies
+ * increase. The value is then used to periodically update the concurrency limit via:
+ *
+ *     limit = old_limit * gradient
+ *     new_limit = limit + headroom
+ *
+ * The headroom value allows for request bursts and is also the driving factor behind increasing the
+ * concurrency limit when the sampleRTT is in the same ballpark as the minRTT. This value must be
+ * present in the calculation, since it forces the concurrency limit to increase until there is a
+ * deviation from the minRTT latency. In its absence, the concurrency limit could remain stagnant at
+ * an unnecessarily small value if sampleRTT ~= minRTT. Therefore, the headroom value is
+ * unconfigurable and is set to the square-root of the new limit.
+ *
+ * Sampling:
+ * =========
+ * The controller makes use of latency samples to determine the sampleRTT which
+ * is used to periodically update the concurrency limit.
+ *
+ * When the controller is in a sampleRTT calculation window, all of the latency samples are
+ * consolidated into a configurable quantile value to represent the measured latencies. This
+ * quantile value sets sampleRTT and the concurrency limit is updated as described in the algorithm
+ * section above.
+ *
+ * When not in a sampling window, the controller is simply servicing the adaptive concurrency filter
+ * via the public functions.
+ *
+ * Locking:
+ * ========
+ * A background timer runs and updates the concurrency limit at the end of a sampling window. The
+ * sample mutation mutex is used to ensure no race occurs between this recalculation and the
+ * recording of samples.
+ */
 class GradientController : public ConcurrencyController {
 public:
   GradientController(GradientControllerConfig& config, Event::Dispatcher& dispatcher,
@@ -252,41 +299,16 @@ private:
 };
 
 /**
- * A concurrency controller that implements a variation of the Gradient algorithm described in:
- *
- * https://medium.com/@NetflixTechBlog/performance-under-load-3e6fa9a60581
- *
- * This is used to control the allowed request concurrency limit in the adaptive concurrency control
- * filter.
- *
  * The algorithm:
  * ==============
- * An ideal round-trip time (minRTT) is measured periodically by only allowing a small number of
- * outstanding requests at a time and measuring the round-trip time to the upstream. This
- * information is then used in the calculation of a number called the gradient, using time-sampled
- * latencies (sampleRTT):
- *
- *     gradient = minRTT / sampleRTT
- *
- * This gradient value has a useful property, such that it decreases as the sampled latencies
- * increase. The value is then used to periodically update the concurrency limit via:
- *
- *     limit = old_limit * gradient
- *     new_limit = limit + headroom
- *
- * The headroom value allows for request bursts and is also the driving factor behind increasing the
- * concurrency limit when the sampleRTT is in the same ballpark as the minRTT. This value must be
- * present in the calculation, since it forces the concurrency limit to increase until there is a
- * deviation from the minRTT latency. In its absence, the concurrency limit could remain stagnant at
- * an unnecessarily small value if sampleRTT ~= minRTT. Therefore, the headroom value is
- * unconfigurable and is set to the square-root of the new limit.
+ * The minRTT used in the gradient calculation is measured periodically by only allowing a small
+ * number of outstanding requests at a time and measuring the round-trip time to the upstream.
  *
  * Sampling:
  * =========
- * The controller makes use of latency samples to either determine the minRTT or the sampleRTT which
- * is used to periodically update the concurrency limit. Each calculation occurs at separate
- * configurable frequencies and they may not occur at the same time. To prevent this, there exists a
- * concept of mutually exclusive sampling windows.
+ * The controller makes use of latency samples to also determine the minRTT in addition to the
+ * sampleRTT. Each calculation occurs at separate configurable frequencies and they may not occur at
+ * the same time. To prevent this, there exists a concept of mutually exclusive sampling windows.
  *
  * When the gradient controller is instantiated, it starts inside of a minRTT calculation window
  * (indicated by inMinRTTSamplingWindow() returning true) and the concurrency limit is pinned to the
@@ -308,7 +330,7 @@ private:
  *
  * Locking:
  * ========
- * There are 2 mutually exclusive calculation windows, so the sample mutation mutex is held to
+ * There are 2 mutually exclusive calculation windows, so the sample mutation mutex is reused to
  * prevent the overlap of these windows. It is necessary for a worker thread to know specifically if
  * the controller is inside of a minRTT recalculation window during the recording of a latency
  * sample, so this extra bit of information is stored in inMinRTTSamplingWindow().
@@ -363,7 +385,7 @@ private:
 using DynamicGradientControllerSharedPtr = std::shared_ptr<DynamicGradientController>;
 
 /**
- * A concurrency controller similar to `DynamicGradientController`, except minRTT is fixed.
+ * A gradient controller with a pinned minRTT provided by the user.
  */
 class PinnedGradientController : public GradientController {
 public:
