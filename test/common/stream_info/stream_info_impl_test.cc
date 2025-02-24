@@ -196,7 +196,7 @@ enum LegacyResponseFlag {
   // Downstream remote codec level reset was received on the stream.
   DownstreamRemoteReset = 0x10000000,
   // Unconditionally drop all traffic due to drop_overload is set to 100%.
-  UnconditionalDropOverload = 0x20000000 ,
+  UnconditionalDropOverload = 0x20000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
   LastFlag = UnconditionalDropOverload,
 };
