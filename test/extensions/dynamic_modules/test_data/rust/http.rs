@@ -16,7 +16,7 @@ fn init() -> bool {
 fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   _envoy_filter_config: &mut EC,
   name: &str,
-  _config: &str,
+  _config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
   match name {
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
@@ -467,7 +467,6 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
         .get_response_body()
         .expect("response body is None")
     };
-
 
     let buffer_bytes = current_vec
       .iter()
