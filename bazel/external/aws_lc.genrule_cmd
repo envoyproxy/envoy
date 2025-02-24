@@ -63,8 +63,8 @@ if [[ "$ARCH" == "x86_64" ]]; then
   PLATFORM="linux-amd64"
   SHA256=b3b815f47ababac13810fc6021eb73d65478e0b2db4b09d348eefad9581a2334
 elif [[ "$ARCH" == "ppc64le" ]]; then
-	PLATFORM="linux-ppc64le"
-	SHA256=33db623d1eecf362fe365107c12efc90eff0b9609e0b3345e258388019cb552a
+  PLATFORM="linux-ppc64le"
+  SHA256=33db623d1eecf362fe365107c12efc90eff0b9609e0b3345e258388019cb552a
 else
   PLATFORM="linux-arm64"
   SHA256=56a91851c97fb4697077abbca38860f735c32b38993ff79b088dac46e4735633
@@ -103,24 +103,24 @@ cd ..
 # CMake
 VERSION=3.22.1
 if [[ "$ARCH" != "ppc64le" ]]; then
-	if [[ "$ARCH" == "x86_64" ]]; then
-		PLATFORM="linux-x86_64"
-		SHA256=73565c72355c6652e9db149249af36bcab44d9d478c5546fd926e69ad6b43640
-	else
-		PLATFORM="linux-aarch64"
-		SHA256=601443375aa1a48a1a076bda7e3cca73af88400463e166fffc3e1da3ce03540b
-	fi
+  if [[ "$ARCH" == "x86_64" ]]; then
+    PLATFORM="linux-x86_64"
+    SHA256=73565c72355c6652e9db149249af36bcab44d9d478c5546fd926e69ad6b43640
+  else
+    PLATFORM="linux-aarch64"
+    SHA256=601443375aa1a48a1a076bda7e3cca73af88400463e166fffc3e1da3ce03540b
+  fi
 
-	curl -sLO https://github.com/Kitware/CMake/releases/download/v"$VERSION"/cmake-"$VERSION"-"$PLATFORM".tar.gz \
-		&& echo "$SHA256" cmake-"$VERSION"-"$PLATFORM".tar.gz | sha256sum --check
-	tar xf cmake-"$VERSION"-"$PLATFORM".tar.gz
-	export PATH="$PWD/cmake-$VERSION-$PLATFORM/bin:$PATH"
+  curl -sLO https://github.com/Kitware/CMake/releases/download/v"$VERSION"/cmake-"$VERSION"-"$PLATFORM".tar.gz \
+    && echo "$SHA256" cmake-"$VERSION"-"$PLATFORM".tar.gz | sha256sum --check
+  tar xf cmake-"$VERSION"-"$PLATFORM".tar.gz
+  export PATH="$PWD/cmake-$VERSION-$PLATFORM/bin:$PATH"
 else
-	PLATFORM="linux-ppc64le"
-	echo "Building cmake for ppc64le"
+  PLATFORM="linux-ppc64le"
+  echo "Building cmake for ppc64le"
 
-	curl -sL -o cmake-$VERSION-$PLATFORM.tar.gz https://github.com/Kitware/CMake/releases/download/v"$VERSION"/cmake-"$VERSION".tar.gz
-	tar xf cmake-"$VERSION"-"$PLATFORM".tar.gz
+  curl -sL -o cmake-$VERSION-$PLATFORM.tar.gz https://github.com/Kitware/CMake/releases/download/v"$VERSION"/cmake-"$VERSION".tar.gz
+  tar xf cmake-"$VERSION"-"$PLATFORM".tar.gz
 
   cd cmake-"$VERSION"
   ./bootstrap && make
