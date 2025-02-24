@@ -25,6 +25,11 @@ minor_behavior_changes:
 - area: cel
   change: |
     Support extension regex fuctions(e.g. ``re.extract``, ``re.capture`, ``re.captureN``) in CEL.
+- area: http
+  change: |
+    :ref:`generate_request_id
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.generate_request_id>`
+    will generate a request id on non-present and now on empty ``x-request-id`` header.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -165,6 +170,10 @@ new_features:
   change: |
     Reporting a locality_stats to LRS server when ``rq_issued > 0``, disable by setting runtime guard
     ``envoy.reloadable_features.report_load_with_rq_issued`` to ``false``.
+- area: lua
+  change: |
+    Added support for clearing the route cache explicitly in the Lua filter.
+    See :ref:`clearRouteCache() <config_http_filters_lua_stream_handle_api_clear_route_cache>` for more details.
 - area: local_rate_limit
   change: |
     Added support for dynamic token buckets in local rate limit filter for http requests.
@@ -184,6 +193,7 @@ new_features:
   change: |
     Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
     work as an upstream filter.
+
 - area: tcp_proxy
   change: |
     added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
