@@ -35,7 +35,7 @@ struct HeaderCallbacksFilterConfig {}
 impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
   for HeaderCallbacksFilterConfig
 {
-  fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HeaderCallbacksFilter {})
   }
 }
@@ -49,6 +49,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter.clear_route_cache();
+
     // Test single getter API.
     let single_value = envoy_filter
       .get_request_header_value("single")
@@ -71,6 +73,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       .get_request_header_value("new")
       .expect("header new not found");
     assert_eq!(new_value.as_slice(), b"value");
+    envoy_filter.remove_request_header("to-be-deleted");
 
     // Test all getter API.
     let all_headers = envoy_filter.get_request_headers();
@@ -121,6 +124,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       .get_request_trailer_value("new")
       .expect("trailer new not found");
     assert_eq!(&new_value.as_slice(), b"value");
+    envoy_filter.remove_request_trailer("to-be-deleted");
 
     // Test all getter API.
     let all_trailers = envoy_filter.get_request_trailers();
@@ -164,6 +168,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       .get_response_header_value("new")
       .expect("header new not found");
     assert_eq!(&new_value.as_slice(), b"value");
+    envoy_filter.remove_response_header("to-be-deleted");
 
     // Test all getter API.
     let all_headers = envoy_filter.get_response_headers();
@@ -214,6 +219,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       .get_response_trailer_value("new")
       .expect("trailer new not found");
     assert_eq!(&new_value.as_slice(), b"value");
+    envoy_filter.remove_response_trailer("to-be-deleted");
 
     // Test all getter API.
     let all_trailers = envoy_filter.get_response_trailers();
@@ -239,7 +245,7 @@ struct SendResponseFilterConfig {}
 impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
   for SendResponseFilterConfig
 {
-  fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
     Box::new(SendResponseFilter {})
   }
 }
@@ -274,7 +280,7 @@ struct DynamicMetadataCallbacksFilterConfig {}
 impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
   for DynamicMetadataCallbacksFilterConfig
 {
-  fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
     Box::new(DynamicMetadataCallbacksFilter {})
   }
 }
@@ -365,7 +371,7 @@ struct BodyCallbacksFilterConfig {}
 impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
   for BodyCallbacksFilterConfig
 {
-  fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BodyCallbacksFilter::default())
   }
 }

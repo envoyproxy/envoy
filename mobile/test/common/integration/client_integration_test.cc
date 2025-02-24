@@ -78,6 +78,7 @@ public:
   }
 
   void initialize() override {
+    builder_.setLogLevel(Logger::Logger::debug);
     builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
     builder_.addRuntimeGuard("quic_no_tcp_delay", true);
 
@@ -294,6 +295,24 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
   EXPECT_TRUE(found_cache_miss);
 }
 #endif
+
+TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
+  builder_.setLogLevel(Logger::Logger::debug);
+  std::atomic<bool> found_force_dns_refresh{false};
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
+    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+      found_force_dns_refresh = true;
+    }
+  };
+  builder_.setLogger(std::move(logger));
+  builder_.setDisableDnsRefreshOnNetworkChange(true);
+  initialize();
+
+  internalEngine()->onDefaultNetworkChanged(1);
+
+  EXPECT_FALSE(found_force_dns_refresh);
+}
 
 TEST_P(ClientIntegrationTest, LargeResponse) {
   initialize();

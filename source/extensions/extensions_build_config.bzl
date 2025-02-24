@@ -411,6 +411,11 @@ EXTENSIONS = {
     "envoy.http.custom_response.local_response_policy":       "//source/extensions/http/custom_response/local_response_policy:local_response_policy_lib",
 
     #
+    # External Processing Response Processors
+    #
+    "envoy.http.ext_proc.response_processors.save_processing_response":         "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
+
+    #
     # Injected credentials
     #
 
@@ -537,6 +542,9 @@ EXTENSIONS = {
     "envoy.filters.generic.router":                             "//source/extensions/filters/network/generic_proxy/router:config",
     "envoy.generic_proxy.codecs.dubbo":                         "//source/extensions/filters/network/generic_proxy/codecs/dubbo:config",
     "envoy.generic_proxy.codecs.http1":                         "//source/extensions/filters/network/generic_proxy/codecs/http1:config",
+
+    # Dynamic mocules
+    "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

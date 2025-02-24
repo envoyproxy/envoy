@@ -20,7 +20,48 @@ namespace Filters {
 namespace Common {
 namespace LocalRateLimit {
 
+class LocalRateLimiterImpl;
+class RateLimitTokenBucket;
+using RateLimitTokenBucketSharedPtr = std::shared_ptr<RateLimitTokenBucket>;
 using ProtoLocalClusterRateLimit = envoy::extensions::common::ratelimit::v3::LocalClusterRateLimit;
+
+class DynamicDescriptor : public Logger::Loggable<Logger::Id::rate_limit_quota> {
+public:
+  DynamicDescriptor(uint64_t max_tokens, uint64_t tokens_per_fill,
+                    std::chrono::milliseconds fill_interval, uint32_t lru_size, TimeSource&);
+  // add a new user configured descriptor to the set.
+  RateLimitTokenBucketSharedPtr addOrGetDescriptor(const RateLimit::Descriptor& request_descriptor);
+
+private:
+  using LruList = std::list<RateLimit::Descriptor>;
+
+  mutable absl::Mutex dyn_desc_lock_;
+  RateLimit::Descriptor::Map<std::pair<RateLimitTokenBucketSharedPtr, LruList::iterator>>
+      dynamic_descriptors_ ABSL_GUARDED_BY(dyn_desc_lock_);
+
+  uint64_t max_tokens_;
+  uint64_t tokens_per_fill_;
+  const std::chrono::milliseconds fill_interval_;
+  LruList lru_list_;
+  uint32_t lru_size_;
+  TimeSource& time_source_;
+};
+
+using DynamicDescriptorSharedPtr = std::shared_ptr<DynamicDescriptor>;
+
+class DynamicDescriptorMap : public Logger::Loggable<Logger::Id::rate_limit_quota> {
+public:
+  // add a new user configured descriptor to the set.
+  void addDescriptor(const RateLimit::LocalDescriptor& descriptor,
+                     DynamicDescriptorSharedPtr dynamic_descriptor);
+  // pass request_descriptors to the dynamic descriptor set to get the token bucket.
+  RateLimitTokenBucketSharedPtr getBucket(const RateLimit::Descriptor);
+
+private:
+  bool matchDescriptorEntries(const std::vector<RateLimit::DescriptorEntry>& request_entries,
+                              const std::vector<RateLimit::DescriptorEntry>& user_entries);
+  RateLimit::LocalDescriptor::Map<DynamicDescriptorSharedPtr> config_descriptors_;
+};
 
 class ShareProvider {
 public:
@@ -66,9 +107,8 @@ public:
   virtual uint64_t remainingTokens() const PURE;
 };
 
-class LocalRateLimiterImpl;
-
-class RateLimitTokenBucket : public TokenBucketContext {
+class RateLimitTokenBucket : public TokenBucketContext,
+                             public Logger::Loggable<Logger::Id::local_rate_limit> {
 public:
   RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_per_fill,
                        std::chrono::milliseconds fill_interval, TimeSource& time_source);
@@ -76,6 +116,7 @@ public:
   // RateLimitTokenBucket
   bool consume(double factor = 1.0, uint64_t tokens = 1);
   double fillRate() const { return token_bucket_.fillRate(); }
+  std::chrono::milliseconds fillInterval() const { return fill_interval_; }
 
   uint64_t maxTokens() const override { return static_cast<uint64_t>(token_bucket_.maxTokens()); }
   uint64_t remainingTokens() const override {
@@ -84,14 +125,15 @@ public:
 
 private:
   AtomicTokenBucketImpl token_bucket_;
+  const std::chrono::milliseconds fill_interval_;
 };
 using RateLimitTokenBucketSharedPtr = std::shared_ptr<RateLimitTokenBucket>;
 
-class LocalRateLimiterImpl {
+class LocalRateLimiterImpl : public Logger::Loggable<Logger::Id::local_rate_limit> {
 public:
   struct Result {
     bool allowed{};
-    OptRef<const TokenBucketContext> token_bucket_context{};
+    std::shared_ptr<const TokenBucketContext> token_bucket_context{};
   };
 
   LocalRateLimiterImpl(
@@ -100,10 +142,10 @@ public:
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
       bool always_consume_default_token_bucket = true,
-      ShareProviderSharedPtr shared_provider = nullptr);
+      ShareProviderSharedPtr shared_provider = nullptr, const uint32_t lru_size = 20);
   ~LocalRateLimiterImpl();
 
-  Result requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) const;
+  Result requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors);
 
 private:
   RateLimitTokenBucketSharedPtr default_token_bucket_;
@@ -111,6 +153,7 @@ private:
   TimeSource& time_source_;
   RateLimit::LocalDescriptor::Map<RateLimitTokenBucketSharedPtr> descriptors_;
 
+  DynamicDescriptorMap dynamic_descriptors_{};
   ShareProviderSharedPtr share_provider_;
 
   mutable Thread::ThreadSynchronizer synchronizer_; // Used for testing only.

@@ -379,7 +379,6 @@ public:
       sampled_ = sampled;
       return *this;
     }
-
     StreamOptions& setSidestreamWatermarkCallbacks(SidestreamWatermarkCallbacks* callbacks) {
       sidestream_watermark_callbacks = callbacks;
       return *this;

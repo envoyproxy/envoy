@@ -324,6 +324,17 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
   return AssertionSuccess();
 }
 
+AssertionResult FakeStream::waitForReset(Event::Dispatcher& client_dispatcher,
+                                         std::chrono::milliseconds timeout) {
+  absl::MutexLock lock(&lock_);
+  if (!waitForWithDispatcherRun(
+          time_system_, lock_, [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return saw_reset_; },
+          client_dispatcher, timeout)) {
+    return AssertionFailure() << "Timed out waiting for reset of stream.";
+  }
+  return AssertionSuccess();
+}
+
 void FakeStream::startGrpcStream(bool send_headers) {
   ASSERT(!grpc_stream_started_, "gRPC stream should not be started more than once");
   grpc_stream_started_ = true;
@@ -969,7 +980,7 @@ AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<Asserti
 
 void FakeUpstream::runOnDispatcherThread(std::function<void()> cb) {
   ASSERT(!dispatcher_->isThreadSafe());
-  dispatcher_->post([&]() { cb(); });
+  dispatcher_->post([cb = std::move(cb)]() { cb(); });
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,
@@ -1043,7 +1054,8 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
   ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
   if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
     return AssertionFailure() << fmt::format(
-               "Timed out waiting for data. Got '{}', waiting for {} bytes.", data_, num_bytes);
+               "Timed out waiting for data. Got '{}', expected {} bytes, waiting for {} bytes.",
+               data_, data_.size(), num_bytes);
   }
   if (data != nullptr) {
     *data = data_;

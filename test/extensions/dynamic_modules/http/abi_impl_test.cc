@@ -225,6 +225,14 @@ TEST_P(DynamicModuleHttpFilterSetHeaderValueTest, SetHeaderValue) {
   auto values3 = header_map->get(Envoy::Http::LowerCaseString(key3));
   EXPECT_EQ(values3.size(), 1);
   EXPECT_EQ(values3[0]->value().getStringView(), value3);
+
+  // Remove the key by passing null value.
+  const std::string remove_key = "single";
+  envoy_dynamic_module_type_buffer_envoy_ptr remove_key_ptr = const_cast<char*>(remove_key.data());
+  size_t remove_key_length = remove_key.size();
+  EXPECT_TRUE(callback(filter_.get(), remove_key_ptr, remove_key_length, nullptr, 0));
+  auto removed_values = header_map->get(Envoy::Http::LowerCaseString(remove_key));
+  EXPECT_EQ(removed_values.size(), 0);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -612,6 +620,19 @@ TEST(ABIImpl, ResponseBody) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_response_body_vector(
       &filter, result_buffer_vector3.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector3), "rbaz");
+}
+
+TEST(ABIImpl, ClearRouteCache) {
+  DynamicModuleHttpFilter filter{nullptr};
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter.setDecoderFilterCallbacks(callbacks);
+  Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
+  EXPECT_CALL(downstream_callbacks, clearRouteCache());
+  EXPECT_CALL(callbacks, downstreamCallbacks())
+      .WillOnce(testing::Return(OptRef(downstream_callbacks)));
+  envoy_dynamic_module_callback_http_clear_route_cache(&filter);
 }
 
 } // namespace HttpFilters

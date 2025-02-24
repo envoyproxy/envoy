@@ -191,6 +191,8 @@ type FilterProcessCallbacks interface {
 	// For example, turn a headers only request into a request with a body, add more body when processing trailers, and so on.
 	// The second argument isStreaming supplies if this caller streams data or buffers the full body.
 	AddData(data []byte, isStreaming bool)
+	// InjectData inject the content of slice data via Envoy StreamXXFilterCallbacks's injectXXDataToFilterChaininjectData.
+	InjectData(data []byte)
 }
 
 type DecoderFilterCallbacks interface {

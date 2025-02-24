@@ -171,6 +171,10 @@ func (s *processState) AddData(data []byte, isStreaming bool) {
 	cAPI.HttpAddData(unsafe.Pointer(s), data, isStreaming)
 }
 
+func (s *processState) InjectData(data []byte) {
+	cAPI.HttpInjectData(unsafe.Pointer(s), data)
+}
+
 func (r *httpRequest) StreamInfo() api.StreamInfo {
 	return &r.streamInfo
 }
