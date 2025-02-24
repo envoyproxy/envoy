@@ -112,7 +112,7 @@ public:
                               Config::ConfigAppliedCb applied_on_all_threads) override {
     const absl::StatusOr<FactoryCb> config_or_error = instantiateFilterFactory(message);
     RETURN_IF_NOT_OK_REF(config_or_error.status());
-    update(config_or_error.value(), applied_on_all_threads);
+    update(std::move(config_or_error.value()), applied_on_all_threads);
     return absl::OkStatus();
   }
 
@@ -121,7 +121,7 @@ public:
     if (default_configuration_) {
       auto cb_or_error = instantiateFilterFactory(*default_configuration_);
       RETURN_IF_NOT_OK_REF(cb_or_error.status());
-      cb = cb_or_error.value();
+      cb = std::move(cb_or_error.value());
     }
     update(cb, applied_on_all_threads);
     return absl::OkStatus();

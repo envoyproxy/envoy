@@ -42,7 +42,7 @@ public:
    * Run the engine with the provided options.
    * @param options, the Envoy options, including the Bootstrap configuration and log level.
    */
-  envoy_status_t run(std::shared_ptr<Envoy::OptionsImplBase> options);
+  envoy_status_t run(std::shared_ptr<OptionsImplBase> options);
 
   /**
    * Immediately terminate the engine, if running. Calling this function when
@@ -172,7 +172,7 @@ private:
                  absl::optional<int> thread_priority, bool disable_dns_refresh_on_network_change,
                  Thread::PosixThreadFactoryPtr thread_factory);
 
-  envoy_status_t main(std::shared_ptr<Envoy::OptionsImplBase> options);
+  envoy_status_t main(std::shared_ptr<OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
                             std::vector<Network::InterfacePair>& interfaces);
   /** Returns true if there is IPv6 connectivity. */

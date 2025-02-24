@@ -428,10 +428,15 @@ public:
                          MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    aws_cluster_manager_ = std::make_shared<AwsClusterManager>(context_);
+    mock_manager_ = std::make_shared<MockAwsClusterManager>();
+    base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
+
+    manager_optref_.emplace(base_manager_);
+    EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
+        .WillRepeatedly(Return("169.254.170.2:80/path/to/doc"));
 
     provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
-        *api_, context_, aws_cluster_manager_, nullptr,
+        *api_, context_, manager_optref_, nullptr,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -600,7 +605,9 @@ public:
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
-  AwsClusterManagerPtr aws_cluster_manager_;
+  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
+  std::shared_ptr<MockAwsClusterManager> mock_manager_;
+  std::shared_ptr<AwsClusterManager> base_manager_;
 };
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1) {
@@ -1475,14 +1482,20 @@ public:
                          MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    aws_cluster_manager_ = std::make_shared<AwsClusterManager>(context_);
+
+    mock_manager_ = std::make_shared<MockAwsClusterManager>();
+    base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
+
+    manager_optref_.emplace(base_manager_);
+
+    EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
+        .WillRepeatedly(Return("169.254.170.23:80/v1/credentials"));
+
     auto cluster_name = "credentials_provider_cluster";
     auto credential_uri = "169.254.170.2:80/path/to/doc";
-    auto status = aws_cluster_manager_->addManagedCluster(
-        cluster_name, envoy::config::cluster::v3::Cluster::STATIC, credential_uri);
 
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, aws_cluster_manager_, nullptr,
+        *api_, context_, manager_optref_, nullptr,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -1532,7 +1545,9 @@ public:
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
   MetadataFetcher::MetadataReceiver::RefreshState refresh_state_;
-  std::shared_ptr<AwsClusterManager> aws_cluster_manager_;
+  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
+  std::shared_ptr<MockAwsClusterManager> mock_manager_;
+  std::shared_ptr<AwsClusterManager> base_manager_;
 };
 
 TEST_F(ContainerCredentialsProviderTest, FailedFetchingDocument) {
@@ -1905,15 +1920,21 @@ public:
   void setupProvider(MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
                          MetadataFetcher::MetadataReceiver::RefreshState::Ready,
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
-    aws_cluster_manager_ = std::make_shared<AwsClusterManager>(context_);
+
+    mock_manager_ = std::make_shared<MockAwsClusterManager>();
+    base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
+
+    manager_optref_.emplace(base_manager_);
+    EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
+        .WillRepeatedly(Return("169.254.170.23:80/v1/credentials"));
+
     auto cluster_name = "credentials_provider_cluster";
     auto credential_uri = "169.254.170.23:80/v1/credentials";
-    auto status = aws_cluster_manager_->addManagedCluster(
-        cluster_name, envoy::config::cluster::v3::Cluster::STATIC, credential_uri);
 
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, aws_cluster_manager_, nullptr,
+        *api_, context_, manager_optref_, nullptr,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -1963,7 +1984,9 @@ public:
   Init::TargetHandlePtr init_target_handle_;
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
-  AwsClusterManagerPtr aws_cluster_manager_;
+  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
+  std::shared_ptr<MockAwsClusterManager> mock_manager_;
+  std::shared_ptr<AwsClusterManager> base_manager_;
 };
 
 TEST_F(ContainerEKSPodIdentityCredentialsProviderTest, AuthTokenFromFile) {
@@ -2032,15 +2055,19 @@ public:
     cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
     cred_provider.set_role_session_name("role-session-name");
 
-    aws_cluster_manager_ = std::make_shared<AwsClusterManager>(context_);
+    mock_manager_ = std::make_shared<MockAwsClusterManager>();
+    base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
+
+    manager_optref_.emplace(base_manager_);
+
+    EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
+        .WillRepeatedly(Return("sts.region.amazonaws.com:443"));
+
     auto cluster_name = "credentials_provider_cluster";
-    auto credential_uri = "sts.region.amazonaws.com:443";
-    auto status = aws_cluster_manager_->addManagedCluster(
-        cluster_name, envoy::config::cluster::v3::Cluster::STATIC, credential_uri);
 
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     provider_ = std::make_shared<WebIdentityCredentialsProvider>(
-        context_, aws_cluster_manager_, cluster_name,
+        context_, manager_optref_, cluster_name,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -2126,7 +2153,9 @@ public:
   testing::NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<Upstream::MockThreadLocalCluster> test_cluster{};
   std::string token_ = "";
-  std::shared_ptr<AwsClusterManager> aws_cluster_manager_;
+  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
+  std::shared_ptr<MockAwsClusterManager> mock_manager_;
+  std::shared_ptr<AwsClusterManager> base_manager_;
 };
 
 TEST_F(WebIdentityCredentialsProviderTest, FailedFetchingDocument) {
@@ -2640,9 +2669,8 @@ TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
@@ -2652,9 +2680,8 @@ TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
       .Times(0);
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
@@ -2664,9 +2691,8 @@ TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
@@ -2677,9 +2703,8 @@ TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
                                                  "169.254.170.2:80/path/to/creds", _, _, ""));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
@@ -2689,9 +2714,8 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
                               Ref(*api_), _, _, _, _, _, "http://host/path/to/creds", _, _, ""));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
@@ -2703,9 +2727,8 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
                                                  "http://host/path/to/creds", _, _, "auth_token"));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
@@ -2715,9 +2738,8 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
@@ -2730,9 +2752,8 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
               createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
@@ -2746,9 +2767,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityWithBlankConfig) {
@@ -2761,9 +2781,8 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityWithBlankConfig) {
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
 }
 // These tests validate override of default credential provider with custom credential provider
 // settings
@@ -2791,9 +2810,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomSessionName) {
   credential_provider_config.mutable_assume_role_with_web_identity_provider()
       ->set_role_session_name("custom-role-session-name");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
   EXPECT_EQ(role_session_name, "custom-role-session-name");
 }
 
@@ -2820,9 +2838,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomRoleArn) {
   credential_provider_config.mutable_assume_role_with_web_identity_provider()->set_role_arn(
       "custom-role-arn");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
   EXPECT_EQ(role_arn, "custom-role-arn");
 }
 
@@ -2850,9 +2867,8 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomDataSource) {
       ->mutable_web_identity_token_data_source()
       ->set_inline_string("custom_token_string");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
   EXPECT_EQ(inline_string, "custom_token_string");
 }
 
@@ -2882,9 +2898,8 @@ TEST_F(DefaultCredentialsProviderChainTest, CredentialsFileWithCustomDataSource)
       ->mutable_credentials_data_source()
       ->set_inline_string("custom_inline_string");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, context_.singletonManager(), "region",
-                                        DummyMetadataFetcher(), credential_provider_config,
-                                        factories_);
+  DefaultCredentialsProviderChain chain(*api_, context_, "region", DummyMetadataFetcher(),
+                                        credential_provider_config, factories_);
   EXPECT_EQ(inline_string, "custom_inline_string");
 }
 

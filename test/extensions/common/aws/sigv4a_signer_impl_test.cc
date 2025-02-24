@@ -25,12 +25,17 @@ namespace {
 class SigV4ASignerImplTest : public testing::Test {
 public:
   SigV4ASignerImplTest()
-      : credentials_provider_(new NiceMock<MockCredentialsProvider>()),
-        message_(new Http::RequestMessageImpl()), credentials_("akid", "secret"),
+      : message_(new Http::RequestMessageImpl()), credentials_("akid", "secret"),
         token_credentials_("akid", "secret", "token") {
     // 20180102T030405Z
     time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
     ON_CALL(context_, timeSystem()).WillByDefault(ReturnRef(time_system_));
+    chain_ = std::make_shared<CredentialsProviderChain>();
+    credentials_provider_ = std::make_shared<NiceMock<MockCredentialsProvider>>();
+    chain_->add(credentials_provider_);
+    signer_ = std::make_shared<SigV4ASignerImpl>(
+        "service", "region", chain_, context_,
+        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
   }
 
   void addMethod(const std::string& method) { message_->headers().setMethod(method); }
@@ -43,10 +48,6 @@ public:
 
   void setBody(const std::string& body) { message_->body().add(body); }
 
-  CredentialsProviderSharedPtr getTestCredentialsProvider() {
-    return CredentialsProviderSharedPtr(credentials_provider_);
-  }
-
   enum SigningType { NormalSign, EmptyPayload, UnsignedPayload };
 
   SigV4ASignerImpl getTestSigner(const bool query_string, uint16_t expiration_time = 0) {
@@ -56,7 +57,7 @@ public:
     }
     return SigV4ASignerImpl{"service",
                             "region",
-                            getTestCredentialsProvider(),
+                            chain_,
                             context_,
                             Extensions::Common::Aws::AwsSigningHeaderExclusionVector{},
                             query_string,
@@ -136,13 +137,15 @@ public:
         1, ECDSA_verify(0, hash.data(), hash.size(), signature.data(), signature.size(), ec_key));
     EC_KEY_free(ec_key);
   }
-  NiceMock<MockCredentialsProvider>* credentials_provider_;
+  std::shared_ptr<NiceMock<MockCredentialsProvider>> credentials_provider_;
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Http::RequestMessagePtr message_;
   Credentials credentials_;
   Credentials token_credentials_;
   absl::optional<std::string> region_;
+  CredentialsProviderChainSharedPtr chain_;
+  std::shared_ptr<SigV4ASignerImpl> signer_;
 };
 
 // No authorization header should be present when the credentials are empty
@@ -531,7 +534,7 @@ TEST_F(SigV4ASignerImplTest, QueryStringDefault5s) {
   headers.setPath("/example/path");
   headers.addCopy(Http::LowerCaseString("host"), "example.service.zz");
   headers.addCopy("testheader", "value1");
-  SigV4ASignerImpl querysigner("service", "region", getTestCredentialsProvider(), context_,
+  SigV4ASignerImpl querysigner("service", "region", chain_, context_,
                                Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true);
 
   auto status = querysigner.signUnsignedPayload(headers);
