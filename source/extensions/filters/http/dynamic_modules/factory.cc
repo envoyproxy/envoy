@@ -22,7 +22,7 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
   }
 
   auto config_or_error = MessageUtil::anyToBytes(proto_config.filter_config());
-  RETURN_IF_NOT_OK(config_or_error.status());
+  RETURN_IF_NOT_OK_REF(config_or_error.status());
   absl::StatusOr<
       Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr>
       filter_config =
