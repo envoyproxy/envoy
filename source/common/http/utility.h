@@ -483,7 +483,7 @@ std::string localPathFromFilePath(const absl::string_view& file_path);
  * Prepare headers for a HttpUri.
  * @param the input URI
  * @param flag whether the :scheme header shall be generated according to the input URI
- * @return RequestMessage with headers set accoding to the input URI
+ * @return RequestMessage with headers set according to the input URI
  */
 RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri,
                                  bool include_scheme = false);
