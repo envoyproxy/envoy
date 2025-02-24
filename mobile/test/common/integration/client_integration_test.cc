@@ -370,6 +370,7 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
   internalEngine()->onDefaultNetworkChangeEvent(network);
   handled_network_changes[current_change_event].WaitForNotification();
   EXPECT_TRUE(found_force_dns_refresh);
+  EXPECT_EQ(4, current_change_event);
 }
 
 TEST_P(ClientIntegrationTest, LargeResponse) {

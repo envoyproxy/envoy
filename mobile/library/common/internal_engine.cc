@@ -66,11 +66,9 @@ bool areIpAddressesDifferent(const Network::Address::InstanceConstSharedPtr& add
   if (addr->ip()->version() == Network::Address::IpVersion::v6) {
     // Both are IPv6 but the addresses are different.
     return addr->ip()->ipv6()->address() != prev_addr->ip()->ipv6()->address();
-  } else {
-    // Both are IPv4 but the addresses are different.
-    return addr->ip()->ipv4()->address() != prev_addr->ip()->ipv4()->address();
   }
-  return false;
+  // Both are IPv4 but the addresses are different.
+  return addr->ip()->ipv4()->address() != prev_addr->ip()->ipv4()->address();
 }
 } // namespace
 
@@ -542,11 +540,10 @@ Network::Address::InstanceConstSharedPtr InternalEngine::probeAndGetLocalAddr(in
     }
     ENVOY_LOG(trace, "Found {} connectivity.", domain == AF_INET6 ? "IPv6" : "IPv4");
     return *address_or_error;
-  } else {
-    ENVOY_LOG(trace, "No {} connectivity found with errno: {}.",
-              domain == AF_INET6 ? "IPv6" : "IPv4", connect_result.errno_);
-    return nullptr;
   }
+  ENVOY_LOG(trace, "No {} connectivity found with errno: {}.", domain == AF_INET6 ? "IPv6" : "IPv4",
+            connect_result.errno_);
+  return nullptr;
 }
 
 } // namespace Envoy
