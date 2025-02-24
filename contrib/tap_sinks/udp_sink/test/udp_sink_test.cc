@@ -144,7 +144,7 @@ public:
   }
 };
 
-TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJSON_BODY_AS_STRING) {
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsString) {
   // Construct UdpTapSink object
   envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
@@ -167,7 +167,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJSON_BODY_AS_STRING) {
                             envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
 }
 
-TEST_F(UdpTapSinkTest, TestSubmitTraceSendNotOkForJSON_BODY_AS_STRING) {
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendNotOkForJsonBodyAsString) {
   // Construct UdpTapSink object
   envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
@@ -190,7 +190,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendNotOkForJSON_BODY_AS_STRING) {
                             envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
 }
 
-TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkforPROTOTEXT) {
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkforProtoText) {
   // Construct UdpTapSink object
   envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
