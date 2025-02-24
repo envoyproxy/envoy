@@ -76,7 +76,7 @@ A sample filter configuration for a raw HTTP authorization server:
 
 .. literalinclude:: _include/ext-authz-http-filter.yaml
     :language: yaml
-    :lines: 41-54
+    :lines: 41-53
     :lineno-start: 41
     :linenos:
     :caption: :download:`ext-authz-http-filter.yaml <_include/ext-authz-http-filter.yaml>`
