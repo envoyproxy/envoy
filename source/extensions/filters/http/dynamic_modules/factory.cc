@@ -21,13 +21,13 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
                                       std::string(dynamic_module.status().message()));
   }
 
+  auto config_or_error = MessageUtil::anyToBytes(proto_config.filter_config());
+  RETURN_IF_NOT_OK(config_or_error.status());
   absl::StatusOr<
       Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-              proto_config.filter_name(),
-              THROW_OR_RETURN_VALUE(MessageUtil::anyToBytes(proto_config.filter_config()),
-                                    std::string),
+              proto_config.filter_name(), config_or_error.value(),
               std::move(dynamic_module.value()));
 
   if (!filter_config.ok()) {
