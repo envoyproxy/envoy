@@ -19,10 +19,11 @@ namespace {
 const char* TRACEPARENT_VALUE = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01";
 const char* TRACEPARENT_VALUE_START = "00-0af7651916cd43dd8448eb211c80319c";
 
-class AlwaysOnSamplerIntegrationTest : public Envoy::HttpIntegrationTest,
-                                       public testing::TestWithParam<Network::Address::IpVersion> {
+class ParentBasedSamplerIntegrationTest
+    : public Envoy::HttpIntegrationTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  AlwaysOnSamplerIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+  ParentBasedSamplerIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
 
     const std::string yaml_string = R"EOF(
   provider:
@@ -35,9 +36,14 @@ public:
         timeout: 0.250s
       service_name: "a_service_name"
       sampler:
-        name: envoy.tracers.opentelemetry.samplers.always_on
+        name: envoy.tracers.opentelemetry.samplers.parent_based
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
+          "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.ParentBasedSamplerConfig
+          wrapped_sampler:
+            name: envoy.tracers.opentelemetry.samplers.trace_id_ratio_based
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig
+          ratio: 0.5
   )EOF";
 
     auto tracing_config =
@@ -53,12 +59,12 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, AlwaysOnSamplerIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, ParentBasedSamplerIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
 // Sends a request with traceparent and tracestate header.
-TEST_P(AlwaysOnSamplerIntegrationTest, TestWithTraceparentAndTracestate) {
+TEST_P(ParentBasedSamplerIntegrationTest, TestWithTraceparentAndTracestate) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},     {":path", "/test/long/url"}, {":scheme", "http"},
       {":authority", "host"}, {"tracestate", "key=value"}, {"traceparent", TRACEPARENT_VALUE}};
@@ -85,7 +91,7 @@ TEST_P(AlwaysOnSamplerIntegrationTest, TestWithTraceparentAndTracestate) {
 }
 
 // Sends a request with traceparent but no tracestate header.
-TEST_P(AlwaysOnSamplerIntegrationTest, TestWithTraceparentOnly) {
+TEST_P(ParentBasedSamplerIntegrationTest, TestWithTraceparentOnly) {
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
@@ -113,7 +119,7 @@ TEST_P(AlwaysOnSamplerIntegrationTest, TestWithTraceparentOnly) {
 }
 
 // Sends a request without traceparent and tracestate header.
-TEST_P(AlwaysOnSamplerIntegrationTest, TestWithoutTraceparentAndTracestate) {
+TEST_P(ParentBasedSamplerIntegrationTest, TestWithoutTraceparentAndTracestate) {
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
