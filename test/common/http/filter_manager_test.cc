@@ -815,7 +815,7 @@ TEST_F(FilterManagerTest, ConsumeEndStreamOnDecode) {
         return true;
       }));
 
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
   filter_manager_->requestHeadersInitialized();
   filter_manager_->decodeHeaders(*request_headers, false);
   filter_manager_->decodeData(request_data, true);
@@ -874,7 +874,7 @@ TEST_F(FilterManagerTest, ConsumeEndStreamOnEncode) {
         return true;
       }));
 
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
   filter2->encodeHeaders(*response_headers, false);
   filter2->encodeData(response_data, true);
   filter_manager_->destroyFilters();
@@ -935,7 +935,7 @@ TEST_F(FilterManagerTest, InjectEndStreamOnDecode) {
         return true;
       }));
 
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
   filter_manager_->requestHeadersInitialized();
   filter_manager_->decodeHeaders(*request_headers, false);
   filter_manager_->decodeData(request_data, true);
@@ -993,7 +993,7 @@ TEST_F(FilterManagerTest, InjectEndStreamOnEncode) {
         return true;
       }));
 
-  filter_manager_->createFilterChain();
+  filter_manager_->createDownstreamFilterChain();
   filter2->encodeHeaders(*response_headers, false);
   filter2->encodeData(response_data, true);
   filter_manager_->destroyFilters();
