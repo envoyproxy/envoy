@@ -93,7 +93,7 @@ dynamic_module_config:
 filter_name: foo
 filter_config:
     "@type": "type.googleapis.com/google.protobuf.BytesValue"
-    value: "YmFyCg==" # echo "bar" | base64
+    value: "YmFy" # echo -n "bar" | base64
 )EOF";
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;

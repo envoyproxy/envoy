@@ -1,12 +1,16 @@
+#include "source/common/common/base64.h"
+
 #include "test/integration/http_integration.h"
 
 namespace Envoy {
 class DynamicModulesIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public HttpIntegrationTest {
 public:
-  DynamicModulesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()){};
+  DynamicModulesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {};
 
-  void initializeFilter(const std::string& filter_name, const std::string& config = "") {
+  void initializeFilter(
+      const std::string& filter_name, const std::string& config = "",
+      const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue") {
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
         TestEnvironment::substitute(
@@ -21,13 +25,13 @@ typed_config:
     name: http_integration_test
   filter_name: {}
   filter_config:
-    "@type": "type.googleapis.com/google.protobuf.StringValue"
+    "@type": {}
     value: {}
 )EOF";
 
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
-    config_helper_.prependFilter(fmt::format(filter_config, filter_name, config));
+    config_helper_.prependFilter(fmt::format(filter_config, filter_name, type_url, config));
     initialize();
   }
 };
@@ -107,6 +111,41 @@ TEST_P(DynamicModulesIntegrationTest, HeaderCallbacks) {
   EXPECT_EQ(
       "cat",
       response->trailers().get()->get(Http::LowerCaseString("dog"))[0]->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, BytesConfig) {
+  initializeFilter("header_callbacks", "ZG9nOmNhdA==" /* echo -n "dog:cat" | base64 */,
+                   "type.googleapis.com/google.protobuf.BytesValue");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  Http::TestResponseTrailerMapImpl response_trailers{{"foo", "bar"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder_decoder.first, 10, false);
+  codec_client_->sendTrailers(encoder_decoder.first, request_trailers);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(10, false);
+  upstream_request_->encodeTrailers(response_trailers);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  // Verify the proxied request was received upstream, as expected.
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(10U, upstream_request_->bodyLength());
+  // Verify that the headers/trailers are added as expected.
+  EXPECT_EQ(
+      "cat",
+      upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, BodyCallbacks) {

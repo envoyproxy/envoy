@@ -60,7 +60,7 @@ message DynamicModuleFilter {
   //  # Passing in raw bytes
   //  filter_config:
   //    "@type": "type.googleapis.com/google.protobuf.BytesValue"
-  //    value: aGVsbG8K # echo "hello" | base64
+  //    value: aGVsbG8= # echo -n "hello" | base64
   //
   google.protobuf.Any filter_config = 3;
 }
