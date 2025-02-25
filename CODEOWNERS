@@ -181,7 +181,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # runtime fraction input matcher
 /*/extensions/matching/input_matchers/runtime_fraction @ravenblackx @sergkir85
 # CEL input matcher
-/*/extensions/matching/input_matchers/cel_matcher @yanavlasov
+/*/extensions/matching/input_matchers/cel_matcher @yanavlasov @UNOWNED
 # dynamic metadata input matcher
 /*/extensions/matching/input_matchers/metadata @vikaschoudhary16 @kyessenov
 # environment generic input
@@ -189,7 +189,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @cpakulski
 # CEL data input
-/*/extensions/matching/http/cel_input @yanavlasov
+/*/extensions/matching/http/cel_input @yanavlasov @UNOWNED
 # dynamic metadata input
 /*/extensions/matching/http/metadata_input @vikaschoudhary16 @kyessenov
 # user space socket pair, event, connection and listener
@@ -234,7 +234,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
 /*/extensions/http/cache/file_system_http_cache @jmarantz @ravenblackx
 # Google Cloud Platform Authentication Filter
-/*/extensions/filters/http/gcp_authn @yanavlasov
+/*/extensions/filters/http/gcp_authn @yanavlasov @UNOWNED
 # DNS resolution
 /*/extensions/network/dns_resolver/cares @yanavlasov @mattklein123
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
@@ -334,7 +334,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
 /*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
 # Early header mutation
-/*/extensions/http/early_header_mutation/header_mutation @wbpcode
+/*/extensions/http/early_header_mutation/header_mutation @wbpcode @UNOWNED
 # Network matching extensions
 /*/extensions/matching/network/ @kyessenov @mattklein123
 # String matching extensions
