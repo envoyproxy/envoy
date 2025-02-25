@@ -20,7 +20,7 @@ ManifestProvider::ManifestProvider(Upstream::ClusterManager& cm, Init::Manager& 
             return std::make_unique<Extensions::Common::Wasm::Oci::ImageManifestFetcher>(
                 cm, uri, sha256, *this, token);
           },
-          source, manager, dispatcher, random, allow_empty, std::move(callback)){};
+          manager, source, dispatcher, random, allow_empty, std::move(callback)){};
 
 BlobProvider::BlobProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
                            const envoy::config::core::v3::RemoteDataSource& source,
@@ -33,7 +33,7 @@ BlobProvider::BlobProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
             return std::make_unique<Extensions::Common::Wasm::Oci::ImageBlobFetcher>(
                 cm, uri, sha256, *this, authz_header_value, digest);
           },
-          source, manager, dispatcher, random, allow_empty, std::move(callback)){};
+          manager, source, dispatcher, random, allow_empty, std::move(callback)){};
 
 } // namespace Oci
 } // namespace Wasm
