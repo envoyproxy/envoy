@@ -9,6 +9,26 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "oci_async_datasource_lib",
+    srcs = ["oci_async_datasource.cc"],
+    hdrs = ["oci_async_datasource.h"],
+    deps = [
+        "//envoy/api:api_interface",
+        "//envoy/init:manager_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:backoff_lib",
+        "//source/common/common:empty_string",
+        "//source/common/config:utility_lib",
+        "//source/common/init:target_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/common/wasm:remote_async_datasource_lib",
+        "//source/extensions/common/wasm/oci:image_fetcher_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+# TODO(jewertow): remove
+envoy_cc_library(
     name = "image_fetcher_lib",
     srcs = [
         "oci_image_blob_fetcher.cc",

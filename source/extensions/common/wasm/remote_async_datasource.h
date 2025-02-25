@@ -23,6 +23,8 @@ namespace Envoy {
  */
 using AsyncDataSourceCb = std::function<void(const std::string&)>;
 
+using FetcherFactoryFn = std::function<Config::DataFetcher::RemoteDataFetcherPtr()>;
+
 class RemoteAsyncDataProvider : public Event::DeferredDeletable,
                                 public Config::DataFetcher::RemoteDataFetcherCallback,
                                 public Logger::Loggable<Logger::Id::config> {
@@ -31,6 +33,12 @@ public:
                           const envoy::config::core::v3::RemoteDataSource& source,
                           Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                           bool allow_empty, AsyncDataSourceCb&& callback);
+
+  RemoteAsyncDataProvider(FetcherFactoryFn&& fetcherFactoryFn,
+                          const envoy::config::core::v3::RemoteDataSource& source,
+                          Init::Manager& manager, Event::Dispatcher& dispatcher,
+                          Random::RandomGenerator& random, bool allow_empty,
+                          AsyncDataSourceCb&& callback);
 
   ~RemoteAsyncDataProvider() override {
     init_target_.ready();
@@ -64,8 +72,6 @@ public:
   }
 
 private:
-  void start() { fetcher_->fetch(); }
-
   bool allow_empty_;
   AsyncDataSourceCb callback_;
   const Config::DataFetcher::RemoteDataFetcherPtr fetcher_;

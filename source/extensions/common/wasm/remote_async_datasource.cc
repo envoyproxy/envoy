@@ -20,7 +20,7 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     : allow_empty_(allow_empty), callback_(std::move(callback)),
       fetcher_(std::make_unique<Config::DataFetcher::RemoteDataFetcher>(cm, source.http_uri(),
                                                                         source.sha256(), *this)),
-      init_target_("RemoteAsyncDataProvider", [this]() { start(); }),
+      init_target_("RemoteAsyncDataProvider", [this]() { fetcher_->fetch(); }),
       retries_remaining_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(source.retry_policy(), num_retries, RetryCount)) {
 
@@ -29,7 +29,26 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
   THROW_IF_NOT_OK_REF(strategy_or_error.status());
   backoff_strategy_ = std::move(strategy_or_error.value());
 
-  retry_timer_ = dispatcher.createTimer([this]() -> void { start(); });
+  retry_timer_ = dispatcher.createTimer([this]() -> void { fetcher_->fetch(); });
+
+  manager.add(init_target_);
+}
+
+RemoteAsyncDataProvider::RemoteAsyncDataProvider(
+    FetcherFactoryFn&& fetcherFactoryFn, const envoy::config::core::v3::RemoteDataSource& source,
+    Init::Manager& manager, Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+    bool allow_empty, AsyncDataSourceCb&& callback)
+    : allow_empty_(allow_empty), callback_(std::move(callback)), fetcher_(fetcherFactoryFn()),
+      init_target_("RemoteAsyncDataProvider", [this]() { fetcher_->fetch(); }),
+      retries_remaining_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(source.retry_policy(), num_retries, RetryCount)) {
+
+  auto strategy_or_error = Config::Utility::prepareJitteredExponentialBackOffStrategy(
+      source, random, RetryInitialDelayMilliseconds, RetryMaxDelayMilliseconds);
+  THROW_IF_NOT_OK_REF(strategy_or_error.status());
+  backoff_strategy_ = std::move(strategy_or_error.value());
+
+  retry_timer_ = dispatcher.createTimer([this]() -> void { fetcher_->fetch(); });
 
   manager.add(init_target_);
 }

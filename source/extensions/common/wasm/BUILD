@@ -74,24 +74,6 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "oci_async_datasource_lib",
-    srcs = ["oci_async_datasource.cc"],
-    hdrs = ["oci_async_datasource.h"],
-    deps = [
-        "//envoy/api:api_interface",
-        "//envoy/init:manager_interface",
-        "//envoy/upstream:cluster_manager_interface",
-        "//source/common/common:backoff_lib",
-        "//source/common/common:empty_string",
-        "//source/common/config:utility_lib",
-        "//source/common/init:target_lib",
-        "//source/common/protobuf:utility_lib",
-        "//source/extensions/common/wasm/oci:image_fetcher_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-    ],
-)
-
 envoy_cc_extension(
     name = "wasm_lib",
     srcs = [
@@ -126,12 +108,12 @@ envoy_cc_extension(
         "//source/common/http:utility_lib",
         "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/tracing:http_tracer_lib",
-        "//source/extensions/common/wasm:oci_async_datasource_lib",
         "//source/extensions/common/wasm:remote_async_datasource_lib",
         "//source/extensions/common/wasm/ext:declare_property_cc_proto",
         "//source/extensions/common/wasm/ext:envoy_null_vm_wasm_api",
         "//source/extensions/common/wasm/ext:set_envoy_filter_state_cc_proto",
         "//source/extensions/common/wasm/ext:verify_signature_cc_proto",
+        "//source/extensions/common/wasm/oci:oci_async_datasource_lib",
         "//source/extensions/common/wasm/oci:utility_lib",
         "//source/extensions/filters/common/expr:context_lib",
         "@com_google_absl//absl/base",

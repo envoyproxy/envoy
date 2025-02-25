@@ -22,7 +22,7 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/version/version.h"
 #include "source/extensions/common/wasm/context.h"
-#include "source/extensions/common/wasm/oci_async_datasource.h"
+#include "source/extensions/common/wasm/oci/oci_async_datasource.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/common/wasm/stats_handler.h"
@@ -176,8 +176,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                 Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc,
                 Api::Api& api, Server::ServerLifecycleNotifier& lifecycle_notifier,
                 RemoteAsyncDataProviderPtr& remote_data_provider,
-                OciManifestProviderPtr& oci_manifest_provider,
-                OciBlobProviderPtr& oci_blob_provider, CreateWasmCallback&& callback,
+                Oci::OciManifestProviderPtr& oci_manifest_provider,
+                Oci::OciBlobProviderPtr& oci_blob_provider, CreateWasmCallback&& callback,
                 CreateContextFn create_root_context_for_testing = nullptr);
 
 void parseOCIImageURI(const std::string& uri, std::string& registry, std::string& image_name,
@@ -231,8 +231,8 @@ private:
   std::unique_ptr<JitteredLowerBoundBackOffStrategy> reload_backoff_;
   PluginSharedPtr plugin_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
-  OciManifestProviderPtr oci_manifest_provider_;
-  OciBlobProviderPtr oci_blob_provider_;
+  Oci::OciManifestProviderPtr oci_manifest_provider_;
+  Oci::OciBlobProviderPtr oci_blob_provider_;
   const bool is_singleton_handle_{};
   WasmHandleSharedPtr base_wasm_{};
   absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;

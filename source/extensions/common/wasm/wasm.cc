@@ -13,8 +13,8 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/secret/secret_provider_impl.h"
+#include "source/extensions/common/wasm/oci/oci_async_datasource.h"
 #include "source/extensions/common/wasm/oci/utility.h"
-#include "source/extensions/common/wasm/oci_async_datasource.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/remote_async_datasource.h"
 #include "source/extensions/common/wasm/stats_handler.h"
@@ -325,8 +325,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                 Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc,
                 Api::Api& api, Server::ServerLifecycleNotifier& lifecycle_notifier,
                 RemoteAsyncDataProviderPtr& remote_data_provider,
-                OciManifestProviderPtr& oci_manifest_provider,
-                OciBlobProviderPtr& oci_blob_provider, CreateWasmCallback&& cb,
+                Oci::OciManifestProviderPtr& oci_manifest_provider,
+                Oci::OciBlobProviderPtr& oci_blob_provider, CreateWasmCallback&& cb,
                 CreateContextFn create_root_context_for_testing) {
   auto& stats_handler = getCreateStatsHandler();
   std::string source, code;
@@ -514,8 +514,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                                             basic_authz_header.status().message()));
         }
 
-        auto get_blob_cb = [&oci_blob_provider, &cluster_manager, &init_manager, vm_config,
-                            basic_authz_header, fetch_callback, registry,
+        auto get_blob_cb = [&oci_blob_provider, &cluster_manager, &init_manager, &dispatcher, &api,
+                            vm_config, basic_authz_header, fetch_callback, registry,
                             image_name](const std::string& digest) {
           if (digest.empty()) {
             ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), error,
@@ -530,13 +530,15 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
           blob_uri.mutable_timeout()->set_seconds(
               vm_config.code().remote().http_uri().timeout().seconds());
 
-          oci_blob_provider = std::make_unique<OciBlobProvider>(
-              cluster_manager, init_manager, blob_uri, basic_authz_header.value(), digest, "",
-              false, fetch_callback);
+          oci_blob_provider = std::make_unique<Oci::OciBlobProvider>(
+              cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
+              api.randomGenerator(), blob_uri, basic_authz_header.value(), digest, "", true,
+              fetch_callback);
         };
 
-        oci_manifest_provider = std::make_unique<OciManifestProvider>(
-            cluster_manager, init_manager, manifest_uri, basic_authz_header.value(),
+        oci_manifest_provider = std::make_unique<Oci::OciManifestProvider>(
+            cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
+            api.randomGenerator(), manifest_uri, basic_authz_header.value(),
             vm_config.code().remote().sha256(), true, get_blob_cb);
       } else {
         remote_data_provider = std::make_unique<RemoteAsyncDataProvider>(
