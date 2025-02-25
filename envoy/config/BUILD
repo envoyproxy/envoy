@@ -161,6 +161,7 @@ envoy_cc_library(
     hdrs = ["xds_manager.h"],
     deps = [
         ":xds_config_tracker_interface",
+        ":xds_resources_delegate_interface",
         "//envoy/upstream:cluster_manager_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

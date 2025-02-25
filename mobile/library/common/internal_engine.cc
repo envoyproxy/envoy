@@ -218,7 +218,7 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
           connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
           if (Runtime::runtimeFeatureEnabled(
                   "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
-            if (probeAndGetLocalAddr(AF_INET6) != nullptr) {
+            if (probeAndGetLocalAddr(AF_INET6) == nullptr) {
               connectivity_manager_->dnsCache()->setIpVersionToRemove(
                   {Network::Address::IpVersion::v6});
             }
@@ -384,7 +384,7 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
     // The IP version to remove flag must be set first before refreshing the DNS cache so that
     // the DNS cache will be updated with whether or not the IPv6 addresses will need to be
     // removed.
-    if (has_ipv6_connectivity) {
+    if (!has_ipv6_connectivity) {
       connectivity_manager_->dnsCache()->setIpVersionToRemove({Network::Address::IpVersion::v6});
     } else {
       connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
