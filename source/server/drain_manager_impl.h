@@ -37,7 +37,8 @@ public:
   void startDrainSequence(Network::DrainDirection direction,
                           std::function<void()> drain_complete_cb) override;
   bool draining(Network::DrainDirection direction) const override {
-    return draining_.load().first && direction <= draining_.load().second;
+    auto drain_pair = draining_.load();
+    return drain_pair.first && direction <= drain_pair.second;
   }
   void startParentShutdownSequence() override;
   DrainManagerPtr
