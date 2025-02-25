@@ -180,9 +180,6 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                 Oci::BlobProviderPtr& oci_blob_provider, CreateWasmCallback&& callback,
                 CreateContextFn create_root_context_for_testing = nullptr);
 
-void parseOCIImageURI(const std::string& uri, std::string& registry, std::string& image_name,
-                      std::string& tag);
-
 PluginHandleSharedPtr
 getOrCreateThreadLocalPlugin(const WasmHandleSharedPtr& base_wasm, const PluginSharedPtr& plugin,
                              Event::Dispatcher& dispatcher,
