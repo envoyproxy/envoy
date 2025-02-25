@@ -90,8 +90,8 @@ public:
       transport_socket_factory_context_;
   NiceMock<ThreadLocal::MockInstance> slot_alloc_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
-  OciManifestProviderPtr oci_manifest_provider_;
-  OciBlobProviderPtr oci_blob_provider_;
+  Oci::ManifestProviderPtr oci_manifest_provider_;
+  Oci::BlobProviderPtr oci_blob_provider_;
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest,

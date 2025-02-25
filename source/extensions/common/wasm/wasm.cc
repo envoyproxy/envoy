@@ -325,8 +325,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                 Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc,
                 Api::Api& api, Server::ServerLifecycleNotifier& lifecycle_notifier,
                 RemoteAsyncDataProviderPtr& remote_data_provider,
-                Oci::OciManifestProviderPtr& oci_manifest_provider,
-                Oci::OciBlobProviderPtr& oci_blob_provider, CreateWasmCallback&& cb,
+                Oci::ManifestProviderPtr& oci_manifest_provider,
+                Oci::BlobProviderPtr& oci_blob_provider, CreateWasmCallback&& cb,
                 CreateContextFn create_root_context_for_testing) {
   auto& stats_handler = getCreateStatsHandler();
   std::string source, code;
@@ -530,13 +530,13 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
           blob_uri.mutable_timeout()->set_seconds(
               vm_config.code().remote().http_uri().timeout().seconds());
 
-          oci_blob_provider = std::make_unique<Oci::OciBlobProvider>(
+          oci_blob_provider = std::make_unique<Oci::BlobProvider>(
               cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
               api.randomGenerator(), blob_uri, basic_authz_header.value(), digest, "", true,
               fetch_callback);
         };
 
-        oci_manifest_provider = std::make_unique<Oci::OciManifestProvider>(
+        oci_manifest_provider = std::make_unique<Oci::ManifestProvider>(
             cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
             api.randomGenerator(), manifest_uri, basic_authz_header.value(),
             vm_config.code().remote().sha256(), true, get_blob_cb);

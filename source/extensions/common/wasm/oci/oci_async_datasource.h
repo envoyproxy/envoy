@@ -10,27 +10,27 @@ namespace Common {
 namespace Wasm {
 namespace Oci {
 
-class OciManifestProvider : public RemoteAsyncDataProvider {
+class ManifestProvider : public RemoteAsyncDataProvider {
 public:
-  OciManifestProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
-                      const envoy::config::core::v3::RemoteDataSource& source,
-                      Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
-                      const envoy::config::core::v3::HttpUri uri, std::string token,
-                      std::string sha256, bool allow_empty, AsyncDataSourceCb&& callback);
+  ManifestProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
+                   const envoy::config::core::v3::RemoteDataSource& source,
+                   Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+                   const envoy::config::core::v3::HttpUri uri, std::string token,
+                   std::string sha256, bool allow_empty, AsyncDataSourceCb&& callback);
 };
 
-using OciManifestProviderPtr = std::unique_ptr<OciManifestProvider>;
+using ManifestProviderPtr = std::unique_ptr<ManifestProvider>;
 
-class OciBlobProvider : public RemoteAsyncDataProvider {
+class BlobProvider : public RemoteAsyncDataProvider {
 public:
-  OciBlobProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
-                  const envoy::config::core::v3::RemoteDataSource& source,
-                  Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
-                  const envoy::config::core::v3::HttpUri uri, std::string token, std::string digest,
-                  std::string sha256, bool allow_empty, AsyncDataSourceCb&& callback);
+  BlobProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
+               const envoy::config::core::v3::RemoteDataSource& source,
+               Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+               const envoy::config::core::v3::HttpUri uri, std::string token, std::string digest,
+               std::string sha256, bool allow_empty, AsyncDataSourceCb&& callback);
 };
 
-using OciBlobProviderPtr = std::unique_ptr<OciBlobProvider>;
+using BlobProviderPtr = std::unique_ptr<BlobProvider>;
 
 } // namespace Oci
 } // namespace Wasm

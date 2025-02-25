@@ -14,16 +14,15 @@ namespace Common {
 namespace Wasm {
 namespace Oci {
 
-OciImageBlobFetcher::OciImageBlobFetcher(Upstream::ClusterManager& cm,
-                                         const envoy::config::core::v3::HttpUri& uri,
-                                         const std::string& content_hash,
-                                         Config::DataFetcher::RemoteDataFetcherCallback& callback,
-                                         const std::string& authz_header_value,
-                                         const std::string& digest)
+ImageBlobFetcher::ImageBlobFetcher(Upstream::ClusterManager& cm,
+                                   const envoy::config::core::v3::HttpUri& uri,
+                                   const std::string& content_hash,
+                                   Config::DataFetcher::RemoteDataFetcherCallback& callback,
+                                   const std::string& authz_header_value, const std::string& digest)
     : RemoteDataFetcher(cm, uri, content_hash, callback), authz_header_value_(authz_header_value),
       digest_(digest) {}
 
-void OciImageBlobFetcher::fetch() {
+void ImageBlobFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   message->headers().setAuthorization(authz_header_value_);
@@ -41,8 +40,8 @@ void OciImageBlobFetcher::fetch() {
   }
 }
 
-void OciImageBlobFetcher::onSuccess(const Http::AsyncClient::Request&,
-                                    Http::ResponseMessagePtr&& response) {
+void ImageBlobFetcher::onSuccess(const Http::AsyncClient::Request&,
+                                 Http::ResponseMessagePtr&& response) {
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code == enumToInt(Http::Code::OK)) {
     ENVOY_LOG(info, "fetch oci image blob [uri = {}, body = {}]: success", uri_.uri(),

@@ -15,13 +15,14 @@ namespace Common {
 namespace Wasm {
 namespace Oci {
 
-OciImageManifestFetcher::OciImageManifestFetcher(
-    Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
-    const std::string& content_hash, Config::DataFetcher::RemoteDataFetcherCallback& callback,
-    const std::string& authz_header_value)
+ImageManifestFetcher::ImageManifestFetcher(Upstream::ClusterManager& cm,
+                                           const envoy::config::core::v3::HttpUri& uri,
+                                           const std::string& content_hash,
+                                           Config::DataFetcher::RemoteDataFetcherCallback& callback,
+                                           const std::string& authz_header_value)
     : RemoteDataFetcher(cm, uri, content_hash, callback), authz_header_value_(authz_header_value) {}
 
-void OciImageManifestFetcher::fetch() {
+void ImageManifestFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   message->headers().setAuthorization(authz_header_value_);
@@ -40,8 +41,8 @@ void OciImageManifestFetcher::fetch() {
   }
 }
 
-void OciImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
-                                        Http::ResponseMessagePtr&& response) {
+void ImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
+                                     Http::ResponseMessagePtr&& response) {
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code != enumToInt(Http::Code::OK)) {
     onInvalidData(fmt::format("failed to fetch oci image [uri = {}, status code {}, body = {}]",
@@ -87,7 +88,7 @@ void OciImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
   request_ = nullptr;
 }
 
-void OciImageManifestFetcher::onInvalidData(std::string error_message) {
+void ImageManifestFetcher::onInvalidData(std::string error_message) {
   ENVOY_LOG(error, error_message);
   callback_.onFailure(Config::DataFetcher::FailureReason::InvalidData);
   request_ = nullptr;

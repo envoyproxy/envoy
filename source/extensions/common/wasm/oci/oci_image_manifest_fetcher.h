@@ -16,12 +16,12 @@ namespace Oci {
 /**
  * OCI image manifest fetcher.
  */
-class OciImageManifestFetcher : public Config::DataFetcher::RemoteDataFetcher {
+class ImageManifestFetcher : public Config::DataFetcher::RemoteDataFetcher {
 public:
-  OciImageManifestFetcher(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
-                          const std::string& content_hash,
-                          Config::DataFetcher::RemoteDataFetcherCallback& callback,
-                          const std::string& authz_header_value);
+  ImageManifestFetcher(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
+                       const std::string& content_hash,
+                       Config::DataFetcher::RemoteDataFetcherCallback& callback,
+                       const std::string& authz_header_value);
 
   // Config::DataFetcher::RemoteDataFetcher
   void fetch() override;
@@ -35,10 +35,10 @@ private:
   const std::string authz_header_value_;
 
   Http::AsyncClient::Request* request_{};
-  OciImageBlobFetcherPtr blob_fetcher_;
+  ImageBlobFetcherPtr blob_fetcher_;
 };
 
-using OciImageManifestFetcherPtr = std::unique_ptr<OciImageManifestFetcher>;
+using ImageManifestFetcherPtr = std::unique_ptr<ImageManifestFetcher>;
 
 } // namespace Oci
 } // namespace Wasm

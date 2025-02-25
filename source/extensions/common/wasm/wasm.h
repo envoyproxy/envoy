@@ -176,8 +176,8 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
                 Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc,
                 Api::Api& api, Server::ServerLifecycleNotifier& lifecycle_notifier,
                 RemoteAsyncDataProviderPtr& remote_data_provider,
-                Oci::OciManifestProviderPtr& oci_manifest_provider,
-                Oci::OciBlobProviderPtr& oci_blob_provider, CreateWasmCallback&& callback,
+                Oci::ManifestProviderPtr& oci_manifest_provider,
+                Oci::BlobProviderPtr& oci_blob_provider, CreateWasmCallback&& callback,
                 CreateContextFn create_root_context_for_testing = nullptr);
 
 void parseOCIImageURI(const std::string& uri, std::string& registry, std::string& image_name,
@@ -231,8 +231,8 @@ private:
   std::unique_ptr<JitteredLowerBoundBackOffStrategy> reload_backoff_;
   PluginSharedPtr plugin_;
   RemoteAsyncDataProviderPtr remote_data_provider_;
-  Oci::OciManifestProviderPtr oci_manifest_provider_;
-  Oci::OciBlobProviderPtr oci_blob_provider_;
+  Oci::ManifestProviderPtr oci_manifest_provider_;
+  Oci::BlobProviderPtr oci_blob_provider_;
   const bool is_singleton_handle_{};
   WasmHandleSharedPtr base_wasm_{};
   absl::variant<absl::monostate, SinglePluginHandle, ThreadLocalPluginHandle> plugin_handle_;

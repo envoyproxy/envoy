@@ -118,8 +118,8 @@ public:
   envoy::config::core::v3::Metadata listener_metadata_;
   Context* root_context_ = nullptr; // Unowned.
   RemoteAsyncDataProviderPtr remote_data_provider_;
-  OciManifestProviderPtr oci_manifest_provider_;
-  OciBlobProviderPtr oci_blob_provider_;
+  Oci::ManifestProviderPtr oci_manifest_provider_;
+  Oci::BlobProviderPtr oci_blob_provider_;
 
   void setRootId(std::string root_id) { root_id_ = root_id; }
   void setVmConfiguration(std::string vm_configuration) { vm_configuration_ = vm_configuration; }
