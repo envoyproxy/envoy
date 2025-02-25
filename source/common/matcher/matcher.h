@@ -42,10 +42,12 @@ struct MaybeMatchResult {
 };
 
 // TODO(snowp): Make this a class that tracks the progress to speed up subsequent traversals.
+// Match evaluation that supports re-entry into the match tree.
 template <class DataType>
-static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
-                                             const DataType& data) {
-  const auto result = match_tree.match(data);
+static inline MaybeMatchResult
+evaluateMatch(MatchTree<DataType>& match_tree, const DataType& data,
+              std::unique_ptr<MatchTree<DataType>>* matcher_reentrant_out) {
+  auto result = match_tree.match(data);
   if (result.match_state_ == MatchState::UnableToMatch) {
     return MaybeMatchResult{nullptr, MatchState::UnableToMatch};
   }
@@ -54,11 +56,21 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
     return {nullptr, MatchState::MatchComplete};
   }
 
+  if (result.matcher_reentrant_ && matcher_reentrant_out) {
+    *matcher_reentrant_out = std::move(result.matcher_reentrant_);
+  }
+
   if (result.on_match_->matcher_) {
     return evaluateMatch(*result.on_match_->matcher_, data);
   }
 
   return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
+}
+// Match evaluation without providing the re-entry option.
+template <class DataType>
+static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
+                                             const DataType& data) {
+  return evaluateMatch<DataType>(match_tree, data, nullptr);
 }
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
