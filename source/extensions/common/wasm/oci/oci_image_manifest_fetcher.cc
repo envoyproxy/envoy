@@ -1,4 +1,4 @@
-#include "source/common/config/oci_image_manifest_fetcher.h"
+#include "source/extensions/common/wasm/oci/oci_image_manifest_fetcher.h"
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 
@@ -9,17 +9,16 @@
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
 
-#include "remote_data_fetcher.h"
-
 namespace Envoy {
-namespace Config {
-namespace DataFetcher {
+namespace Extensions {
+namespace Common {
+namespace Wasm {
+namespace Oci {
 
-OciImageManifestFetcher::OciImageManifestFetcher(Upstream::ClusterManager& cm,
-                                                 const envoy::config::core::v3::HttpUri& uri,
-                                                 const std::string& content_hash,
-                                                 RemoteDataFetcherCallback& callback,
-                                                 const std::string& authz_header_value)
+OciImageManifestFetcher::OciImageManifestFetcher(
+    Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
+    const std::string& content_hash, Config::DataFetcher::RemoteDataFetcherCallback& callback,
+    const std::string& authz_header_value)
     : RemoteDataFetcher(cm, uri, content_hash, callback), authz_header_value_(authz_header_value) {}
 
 void OciImageManifestFetcher::fetch() {
@@ -37,7 +36,7 @@ void OciImageManifestFetcher::fetch() {
             std::chrono::milliseconds(DurationUtil::durationToMilliseconds(uri_.timeout()))));
   } else {
     ENVOY_LOG(info, "fetch oci image [uri = {}]: no cluster {}", uri_.uri(), uri_.cluster());
-    callback_.onFailure(FailureReason::Network);
+    callback_.onFailure(Config::DataFetcher::FailureReason::Network);
   }
 }
 
@@ -90,10 +89,12 @@ void OciImageManifestFetcher::onSuccess(const Http::AsyncClient::Request&,
 
 void OciImageManifestFetcher::onInvalidData(std::string error_message) {
   ENVOY_LOG(error, error_message);
-  callback_.onFailure(FailureReason::InvalidData);
+  callback_.onFailure(Config::DataFetcher::FailureReason::InvalidData);
   request_ = nullptr;
 }
 
-} // namespace DataFetcher
-} // namespace Config
+} // namespace Oci
+} // namespace Wasm
+} // namespace Common
+} // namespace Extensions
 } // namespace Envoy

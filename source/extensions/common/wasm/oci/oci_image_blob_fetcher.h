@@ -8,19 +8,22 @@
 #include "source/common/config/remote_data_fetcher.h"
 
 namespace Envoy {
-namespace Config {
-namespace DataFetcher {
+namespace Extensions {
+namespace Common {
+namespace Wasm {
+namespace Oci {
 
 /**
  * OCI image blob fetcher.
  */
-class OciImageBlobFetcher : public RemoteDataFetcher {
+class OciImageBlobFetcher : public Config::DataFetcher::RemoteDataFetcher {
 public:
   OciImageBlobFetcher(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
-                      const std::string& content_hash, RemoteDataFetcherCallback& callback,
+                      const std::string& content_hash,
+                      Config::DataFetcher::RemoteDataFetcherCallback& callback,
                       const std::string& authz_header_value, const std::string& digest);
 
-  // RemoteDataFetcher
+  // Config::DataFetcher::RemoteDataFetcher
   void fetch() override;
 
   // Http::AsyncClient::Callbacks
@@ -35,6 +38,8 @@ private:
 
 using OciImageBlobFetcherPtr = std::unique_ptr<OciImageBlobFetcher>;
 
-} // namespace DataFetcher
-} // namespace Config
+} // namespace Oci
+} // namespace Wasm
+} // namespace Common
+} // namespace Extensions
 } // namespace Envoy

@@ -84,10 +84,10 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:backoff_lib",
         "//source/common/common:empty_string",
-        "//source/common/config:oci_image_fetcher_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/common/wasm/oci:image_fetcher_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

@@ -13,9 +13,9 @@
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
-#include "source/common/config/oci_image_blob_fetcher.h"
-#include "source/common/config/oci_image_manifest_fetcher.h"
 #include "source/common/init/target_impl.h"
+#include "source/extensions/common/wasm/oci/oci_image_blob_fetcher.h"
+#include "source/extensions/common/wasm/oci/oci_image_manifest_fetcher.h"
 
 #include "absl/types/optional.h"
 
@@ -70,7 +70,7 @@ private:
 
   bool allow_empty_;
   OciManifestCb callback_;
-  const Config::DataFetcher::OciImageManifestFetcherPtr fetcher_;
+  const Extensions::Common::Wasm::Oci::OciImageManifestFetcherPtr fetcher_;
   Init::TargetImpl init_target_;
 
   Event::TimerPtr retry_timer_;
@@ -129,7 +129,7 @@ private:
 
   bool allow_empty_;
   OciBlobCb callback_;
-  const Config::DataFetcher::OciImageBlobFetcherPtr fetcher_;
+  const Extensions::Common::Wasm::Oci::OciImageBlobFetcherPtr fetcher_;
   Init::TargetImpl init_target_;
 
   Event::TimerPtr retry_timer_;

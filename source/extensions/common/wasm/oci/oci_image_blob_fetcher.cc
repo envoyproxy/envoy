@@ -2,22 +2,22 @@
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/hex.h"
-#include "source/common/config/oci_image_manifest_fetcher.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
-
-#include "remote_data_fetcher.h"
+#include "source/extensions/common/wasm/oci/oci_image_manifest_fetcher.h"
 
 namespace Envoy {
-namespace Config {
-namespace DataFetcher {
+namespace Extensions {
+namespace Common {
+namespace Wasm {
+namespace Oci {
 
 OciImageBlobFetcher::OciImageBlobFetcher(Upstream::ClusterManager& cm,
                                          const envoy::config::core::v3::HttpUri& uri,
                                          const std::string& content_hash,
-                                         RemoteDataFetcherCallback& callback,
+                                         Config::DataFetcher::RemoteDataFetcherCallback& callback,
                                          const std::string& authz_header_value,
                                          const std::string& digest)
     : RemoteDataFetcher(cm, uri, content_hash, callback), authz_header_value_(authz_header_value),
@@ -37,7 +37,7 @@ void OciImageBlobFetcher::fetch() {
             std::chrono::milliseconds(DurationUtil::durationToMilliseconds(uri_.timeout()))));
   } else {
     ENVOY_LOG(info, "fetch oci image blob [uri = {}]: no cluster {}", uri_.uri(), uri_.cluster());
-    callback_.onFailure(FailureReason::Network);
+    callback_.onFailure(Config::DataFetcher::FailureReason::Network);
   }
 }
 
@@ -60,14 +60,14 @@ void OciImageBlobFetcher::onSuccess(const Http::AsyncClient::Request&,
       callback_.onSuccess(response->bodyAsString());
     } else {
       ENVOY_LOG(info, "fetch oci image blob [uri = {}]: body is empty", uri_.uri());
-      callback_.onFailure(FailureReason::Network);
+      callback_.onFailure(Config::DataFetcher::FailureReason::Network);
     }
   } else if (status_code == enumToInt(Http::Code::TemporaryRedirect)) {
     auto location = response->headers().get(Http::Headers::get().Location);
     if (location.empty()) {
       ENVOY_LOG(error, "fetch oci image blob [uri = {}, status code = {}]: location empty",
                 uri_.uri(), status_code);
-      callback_.onFailure(FailureReason::Network);
+      callback_.onFailure(Config::DataFetcher::FailureReason::Network);
     } else {
       auto location_value = location[0]->value().getStringView();
       ENVOY_LOG(error, "fetch oci image blob [uri = {}, status code = {}]: redirected to {}",
@@ -91,18 +91,20 @@ void OciImageBlobFetcher::onSuccess(const Http::AsyncClient::Request&,
       } else {
         ENVOY_LOG(info, "fetch oci image blob [uri = {}]: no cluster {}", uri_.uri(),
                   uri_.cluster());
-        callback_.onFailure(FailureReason::Network);
+        callback_.onFailure(Config::DataFetcher::FailureReason::Network);
       }
     }
   } else {
     ENVOY_LOG(info, "fetch oci image blob [uri = {}, body = {}]: response status code {}",
               uri_.uri(), response->body().toString(), status_code);
-    callback_.onFailure(FailureReason::Network);
+    callback_.onFailure(Config::DataFetcher::FailureReason::Network);
   }
 
   request_ = nullptr;
 }
 
-} // namespace DataFetcher
-} // namespace Config
+} // namespace Oci
+} // namespace Wasm
+} // namespace Common
+} // namespace Extensions
 } // namespace Envoy

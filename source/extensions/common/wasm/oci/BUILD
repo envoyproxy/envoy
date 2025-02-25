@@ -9,6 +9,27 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "image_fetcher_lib",
+    srcs = [
+        "oci_image_blob_fetcher.cc",
+        "oci_image_manifest_fetcher.cc",
+    ],
+    hdrs = [
+        "oci_image_blob_fetcher.h",
+        "oci_image_manifest_fetcher.h",
+    ],
+    deps = [
+        "//envoy/upstream:cluster_manager_interface",
+        "//source/common/common:hex_lib",
+        "//source/common/config:remote_data_fetcher_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/json:json_loader_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

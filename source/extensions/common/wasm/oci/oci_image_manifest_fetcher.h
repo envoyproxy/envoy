@@ -5,22 +5,25 @@
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/config/oci_image_blob_fetcher.h"
+#include "source/extensions/common/wasm/oci/oci_image_blob_fetcher.h"
 
 namespace Envoy {
-namespace Config {
-namespace DataFetcher {
+namespace Extensions {
+namespace Common {
+namespace Wasm {
+namespace Oci {
 
 /**
  * OCI image manifest fetcher.
  */
-class OciImageManifestFetcher : public RemoteDataFetcher {
+class OciImageManifestFetcher : public Config::DataFetcher::RemoteDataFetcher {
 public:
   OciImageManifestFetcher(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
-                          const std::string& content_hash, RemoteDataFetcherCallback& callback,
+                          const std::string& content_hash,
+                          Config::DataFetcher::RemoteDataFetcherCallback& callback,
                           const std::string& authz_header_value);
 
-  // RemoteDataFetcher
+  // Config::DataFetcher::RemoteDataFetcher
   void fetch() override;
 
   // Http::AsyncClient::Callbacks
@@ -37,6 +40,8 @@ private:
 
 using OciImageManifestFetcherPtr = std::unique_ptr<OciImageManifestFetcher>;
 
-} // namespace DataFetcher
-} // namespace Config
+} // namespace Oci
+} // namespace Wasm
+} // namespace Common
+} // namespace Extensions
 } // namespace Envoy
