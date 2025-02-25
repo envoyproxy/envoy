@@ -29,11 +29,11 @@ extensions/filters/common/original_src @klarose @mattklein123
 # cdn_loop extension
 /*/extensions/filters/http/cdn_loop @justin-mp @penguingao @botengyao
 # external processing filter
-/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov @yanjunxiang-google
-/*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov
+/*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @mattklein123 @yanavlasov @yanjunxiang-google
+/*/extensions/filters/common/mutation_rules @gbrail @mattklein123 @yanavlasov
 /*/extensions/http/ext_proc/response_processors/save_processing_response @pradeepcrao @botengyao @yanjunxiang-google
 # jwt_authn http filter extension
-/*/extensions/filters/http/jwt_authn @taoxuy @lizan @tyxia @yanavlasov
+/*/extensions/filters/http/jwt_authn @taoxuy @lizan @yanavlasov
 # grpc_field_extraction http filter extension
 /*/extensions/filters/http/grpc_field_extraction @taoxuy @nareddyt @yanavlasov
 # proto_message_extraction http filter extension
@@ -47,7 +47,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tls transport socket extension
 /*/extensions/transport_sockets/tls @RyanTheOptimist @ggreenway @botengyao
 # tls SPIFFE certificate validator extension
-/*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @botengyao @tyxia
+/*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @botengyao
 # proxy protocol socket extension
 /*/extensions/transport_sockets/proxy_protocol @botengyao @wez470
 # common transport socket
@@ -84,7 +84,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/clusters/dynamic_forward_proxy @mattklein123 @ryantheoptimist
 /*/extensions/common/dynamic_forward_proxy @mattklein123 @ryantheoptimist
 /*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @ryantheoptimist
-/*/extensions/filters/http/composite @mattklein123 @tyxia @yanavlasov
+/*/extensions/filters/http/composite @mattklein123 @yanavlasov
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @mattklein123
 # previous hosts
@@ -102,7 +102,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # http inspector
 /*/extensions/filters/listener/http_inspector @yxue @wbpcode
 # attribute context
-/*/extensions/filters/common/expr @kyessenov @yangminzhu @tyxia
+/*/extensions/filters/common/expr @kyessenov @yangminzhu
 # webassembly access logger extensions
 /*/extensions/access_loggers/wasm @mpwarres @kyessenov @lizan
 # webassembly bootstrap extensions
@@ -181,7 +181,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # runtime fraction input matcher
 /*/extensions/matching/input_matchers/runtime_fraction @ravenblackx @sergkir85
 # CEL input matcher
-/*/extensions/matching/input_matchers/cel_matcher @tyxia @yanavlasov
+/*/extensions/matching/input_matchers/cel_matcher @yanavlasov
 # dynamic metadata input matcher
 /*/extensions/matching/input_matchers/metadata @vikaschoudhary16 @kyessenov
 # environment generic input
@@ -189,7 +189,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @cpakulski
 # CEL data input
-/*/extensions/matching/http/cel_input @tyxia @yanavlasov
+/*/extensions/matching/http/cel_input @yanavlasov
 # dynamic metadata input
 /*/extensions/matching/http/metadata_input @vikaschoudhary16 @kyessenov
 # user space socket pair, event, connection and listener
@@ -204,7 +204,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/ratelimit @esmet @mattklein123
 /*/extensions/filters/network/ratelimit @esmet @mattklein123
 # HTTP Quota Based Rate Limit
-/*/extensions/filters/http/rate_limit_quota @tyxia @yanavlasov @bsurber
+/*/extensions/filters/http/rate_limit_quota @yanavlasov @bsurber
 # HTTP Bandwidth Limit
 /*/extensions/filters/http/bandwidth_limit @nitgoy @mattklein123 @yanavlasov @tonya11en
 # HTTP Basic Auth
@@ -234,7 +234,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
 /*/extensions/http/cache/file_system_http_cache @jmarantz @ravenblackx
 # Google Cloud Platform Authentication Filter
-/*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
+/*/extensions/filters/http/gcp_authn @yanavlasov
 # DNS resolution
 /*/extensions/network/dns_resolver/cares @yanavlasov @mattklein123
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
@@ -287,9 +287,9 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/tracers/common @wbpcode @Shikugawa @basvanbeek
 /*/extensions/tracers/common/ot @wbpcode @Shikugawa @basvanbeek
 # ext_authz
-/*/extensions/filters/common/ext_authz @esmet @tyxia @ggreenway
-/*/extensions/filters/http/ext_authz @esmet @tyxia @ggreenway
-/*/extensions/filters/network/ext_authz @esmet @tyxia @ggreenway
+/*/extensions/filters/common/ext_authz @esmet @ggreenway
+/*/extensions/filters/http/ext_authz @esmet @ggreenway
+/*/extensions/filters/network/ext_authz @esmet @ggreenway
 # original dst
 /*/extensions/filters/listener/original_dst @kyessenov @cpakulski @lambdai @nezdolik
 # mongo proxy
@@ -334,7 +334,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
 /*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
 # Early header mutation
-/*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
+/*/extensions/http/early_header_mutation/header_mutation @wbpcode
 # Network matching extensions
 /*/extensions/matching/network/ @kyessenov @mattklein123
 # String matching extensions
@@ -354,7 +354,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # Maxmind geolocation provider
 /*/extensions/geoip_providers/maxmind @nezdolik @ravenblackx
 # Match delegate extension
-/*/extensions/filters/http/match_delegate @wbpcode @jstraceski @tyxia
+/*/extensions/filters/http/match_delegate @wbpcode @jstraceski
 # Generic proxy and related extensions
 /*/extensions/filters/network/generic_proxy/ @wbpcode @UNOWNED
 # Dynamic Modules
