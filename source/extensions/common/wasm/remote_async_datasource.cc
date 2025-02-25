@@ -35,10 +35,10 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
 }
 
 RemoteAsyncDataProvider::RemoteAsyncDataProvider(
-    FetcherFactoryFn&& fetcherFactoryFn, const envoy::config::core::v3::RemoteDataSource& source,
+    CreateFetcherFn&& create_fetcher_fn, const envoy::config::core::v3::RemoteDataSource& source,
     Init::Manager& manager, Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
     bool allow_empty, AsyncDataSourceCb&& callback)
-    : allow_empty_(allow_empty), callback_(std::move(callback)), fetcher_(fetcherFactoryFn()),
+    : allow_empty_(allow_empty), callback_(std::move(callback)), fetcher_(create_fetcher_fn()),
       init_target_("RemoteAsyncDataProvider", [this]() { fetcher_->fetch(); }),
       retries_remaining_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(source.retry_policy(), num_retries, RetryCount)) {
