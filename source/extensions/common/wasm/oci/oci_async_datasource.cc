@@ -1,12 +1,7 @@
 #include "source/extensions/common/wasm/oci/oci_async_datasource.h"
 
-#include <string>
-
-#include "envoy/config/core/v3/base.pb.h"
-
-#include "source/common/config/utility.h"
-
-#include "fmt/format.h"
+#include "source/extensions/common/wasm/oci/oci_image_blob_fetcher.h"
+#include "source/extensions/common/wasm/oci/oci_image_manifest_fetcher.h"
 
 namespace Envoy {
 namespace Extensions {
