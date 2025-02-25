@@ -37,7 +37,8 @@ public:
                           Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                           bool allow_empty, AsyncDataSourceCb&& callback);
 
-  RemoteAsyncDataProvider(CreateFetcherFn&& create_fetcher_fn, Init::Manager& manager,
+  RemoteAsyncDataProvider(CreateFetcherFn&& create_fetcher_fn, absl::string_view target_name,
+                          Init::Manager& manager,
                           const envoy::config::core::v3::RemoteDataSource& source,
                           Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                           bool allow_empty, AsyncDataSourceCb&& callback);

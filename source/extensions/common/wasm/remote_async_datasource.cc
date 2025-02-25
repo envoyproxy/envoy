@@ -22,14 +22,15 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
             return std::make_unique<Config::DataFetcher::RemoteDataFetcher>(cm, source.http_uri(),
                                                                             source.sha256(), *this);
           },
-          manager, source, dispatcher, random, allow_empty, std::move(callback)){};
+          "RemoteAsyncDataProvider", manager, source, dispatcher, random, allow_empty,
+          std::move(callback)){};
 
 RemoteAsyncDataProvider::RemoteAsyncDataProvider(
-    CreateFetcherFn&& create_fetcher_fn, Init::Manager& manager,
+    CreateFetcherFn&& create_fetcher_fn, absl::string_view target_name, Init::Manager& manager,
     const envoy::config::core::v3::RemoteDataSource& source, Event::Dispatcher& dispatcher,
     Random::RandomGenerator& random, bool allow_empty, AsyncDataSourceCb&& callback)
     : allow_empty_(allow_empty), callback_(std::move(callback)), fetcher_(create_fetcher_fn()),
-      init_target_("RemoteAsyncDataProvider", [this]() { fetcher_->fetch(); }),
+      init_target_(target_name, [this]() { fetcher_->fetch(); }),
       retries_remaining_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(source.retry_policy(), num_retries, RetryCount)) {
 
