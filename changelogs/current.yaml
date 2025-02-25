@@ -268,7 +268,7 @@ new_features:
     default socket interface to support io_uring.
 - area: dns
   change: |
-    Update c-ares to version 1.34.4. This upgrade exposes ``ares_reinit()`` which allows the reinitialization of c-ares channels, 
+    Update c-ares to version 1.34.4. This upgrade exposes ``ares_reinit()`` which allows the reinitialization of c-ares channels,
     among several other new features, bug-fixes, etc.
 
 deprecated:
