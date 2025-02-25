@@ -28,6 +28,8 @@ class WasmNetworkFilterConfigTest
 protected:
   WasmNetworkFilterConfigTest() : api_(Api::createApiForTest(stats_store_)) {
     ON_CALL(context_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
+    ON_CALL(context_.server_factory_context_, getTransportSocketFactoryContext())
+        .WillByDefault(ReturnRef(transport_socket_factory_context_));
     ON_CALL(context_, scope()).WillByDefault(ReturnRef(stats_scope_));
     ON_CALL(context_, listenerInfo()).WillByDefault(ReturnRef(listener_info_));
     ON_CALL(listener_info_, metadata()).WillByDefault(ReturnRef(listener_metadata_));
@@ -53,6 +55,8 @@ protected:
   // This is necessary to ensure only one time source is initialized for tests.
   Event::SimulatedTimeSystem time_system_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
   Stats::IsolatedStoreImpl stats_store_;
   Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   Api::ApiPtr api_;
@@ -490,7 +494,8 @@ TEST_P(WasmNetworkFilterConfigTest, FailedToGetThreadLocalPlugin) {
 
   envoy::extensions::filters::network::wasm::v3::Wasm proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
-  EXPECT_CALL(context_.server_factory_context_, threadLocal()).WillOnce(ReturnRef(threadlocal));
+  EXPECT_CALL(context_.server_factory_context_, threadLocal())
+      .WillRepeatedly(ReturnRef(threadlocal));
   threadlocal.registered_ = true;
   auto filter_config = std::make_unique<FilterConfig>(proto_config, context_);
   ASSERT_EQ(threadlocal.current_slot_, 1);
