@@ -14,7 +14,10 @@ envoy_extension_package()
 
 envoy_cc_library(
     name = "controller_lib",
-    srcs = ["gradient_controller.cc"],
+    srcs = [
+        "gradient_controller.cc",
+        "pinned_gradient_controller.cc",
+    ],
     hdrs = [
         "controller.h",
         "gradient_controller.h",

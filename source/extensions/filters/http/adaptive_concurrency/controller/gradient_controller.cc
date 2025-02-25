@@ -22,43 +22,37 @@ namespace HttpFilters {
 namespace AdaptiveConcurrency {
 namespace Controller {
 
-GradientControllerConfig::GradientControllerConfig(
+DynamicGradientControllerConfig::DynamicGradientControllerConfig(
     const envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig&
         proto_config,
     Runtime::Loader& runtime)
-    : runtime_(runtime),
+    : GradientControllerConfig::GradientControllerConfig(
+          std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+              proto_config.concurrency_limit_params().concurrency_update_interval())),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.concurrency_limit_params(),
+                                          max_concurrency_limit, 1000),
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(), min_concurrency, 3),
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), buffer, 25),
+          runtime),
       min_rtt_calc_interval_(std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().interval()))),
-      sample_rtt_calc_interval_(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
-          proto_config.concurrency_limit_params().concurrency_update_interval()))),
       jitter_pct_(
           PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), jitter, 15)),
-      max_concurrency_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          proto_config.concurrency_limit_params(), max_concurrency_limit, 1000)),
       min_rtt_aggregate_request_count_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(), request_count, 50)),
-      sample_aggregate_percentile_(
-          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50)),
-      min_concurrency_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(), min_concurrency, 3)),
-      min_rtt_buffer_pct_(
-          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), buffer, 25)) {}
-GradientController::GradientController(GradientControllerConfig config,
-                                       Event::Dispatcher& dispatcher, Runtime::Loader&,
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(), request_count, 50)) {}
+
+GradientController::GradientController(GradientControllerConfig& config,
+                                       Event::Dispatcher& dispatcher,
                                        const std::string& stats_prefix, Stats::Scope& scope,
-                                       Random::RandomGenerator& random, TimeSource& time_source)
-    : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
-      stats_(generateStats(scope_, stats_prefix)), random_(random), time_source_(time_source),
-      deferred_limit_value_(0), num_rq_outstanding_(0),
+                                       TimeSource& time_source)
+    : config_(config), dispatcher_(dispatcher), scope_(scope),
+      stats_(GradientControllerStats::generateStats(scope_, stats_prefix)),
+      time_source_(time_source), num_rq_outstanding_(0),
       concurrency_limit_(config_.minConcurrency()),
       latency_sample_hist_(hist_fast_alloc(), hist_free) {
-  min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
-
   sample_reset_timer_ = dispatcher_.createTimer([this]() -> void {
-    if (inMinRTTSamplingWindow()) {
-      // The minRTT sampling window started since the sample reset timer was enabled last. Since the
-      // minRTT value is being calculated, let's give up on this timer to avoid blocking the
-      // dispatcher thread and rely on it being enabled again as part of the minRTT calculation.
+    if (!shouldSampleRTT()) {
       return;
     }
 
@@ -67,21 +61,35 @@ GradientController::GradientController(GradientControllerConfig config,
       resetSampleWindow();
     }
 
-    sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
+    enableSamplingTimer();
   });
-
-  enterMinRTTSamplingWindow();
-  sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
-  stats_.concurrency_limit_.set(concurrency_limit_.load());
+  stats_.concurrency_limit_.set(config_.minConcurrency());
 }
 
-GradientControllerStats GradientController::generateStats(Stats::Scope& scope,
-                                                          const std::string& stats_prefix) {
+DynamicGradientController::DynamicGradientController(DynamicGradientControllerConfig config,
+                                                     Event::Dispatcher& dispatcher,
+                                                     const std::string& stats_prefix,
+                                                     Stats::Scope& scope,
+                                                     Random::RandomGenerator& random,
+                                                     TimeSource& time_source)
+    : GradientController(config, dispatcher, stats_prefix, scope, time_source),
+      config_(std::move(config)), random_(random), deferred_limit_value_(0) {
+  min_rtt_calc_timer_ =
+      this->dispatcher().createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
+
+  enterMinRTTSamplingWindow();
+  enableSamplingTimer();
+}
+
+GradientControllerStats GradientControllerStats::generateStats(Stats::Scope& scope,
+                                                               const std::string& stats_prefix) {
   return {ALL_GRADIENT_CONTROLLER_STATS(POOL_COUNTER_PREFIX(scope, stats_prefix),
                                         POOL_GAUGE_PREFIX(scope, stats_prefix))};
 }
 
-void GradientController::enterMinRTTSamplingWindow() {
+void GradientController::clearSamples() { hist_clear(latency_sample_hist_.get()); }
+
+void DynamicGradientController::enterMinRTTSamplingWindow() {
   // There a potential race condition where setting the minimum concurrency multiple times in a row
   // resets the minRTT sampling timer and triggers the calculation immediately. This could occur
   // after the minRTT sampling window has already been entered, so we can simply return here knowing
@@ -92,43 +100,44 @@ void GradientController::enterMinRTTSamplingWindow() {
 
   absl::MutexLock ml(&sample_mutation_mtx_);
 
-  stats_.min_rtt_calculation_active_.set(1);
+  stats().min_rtt_calculation_active_.set(1);
 
   // Set the minRTT flag to indicate we're gathering samples to update the value. This will
   // prevent the sample window from resetting until enough requests are gathered to complete the
   // recalculation.
-  deferred_limit_value_.store(GradientController::concurrencyLimit());
+  deferred_limit_value_.store(DynamicGradientController::concurrencyLimit());
   updateConcurrencyLimit(config_.minConcurrency());
 
   // Throw away any latency samples from before the recalculation window as it may not represent
   // the minRTT.
-  hist_clear(latency_sample_hist_.get());
+  clearSamples();
 
-  min_rtt_epoch_ = time_source_.monotonicTime();
+  min_rtt_epoch_ = timeSource().monotonicTime();
 }
 
-void GradientController::updateMinRTT() {
-  // Only update minRTT when it is in minRTT sampling window and
+uint32_t GradientController::numSamples() { return hist_sample_count(latency_sample_hist_.get()); }
+
+void DynamicGradientController::recalculateAfterSample() {
+  // Here, we recalculate the minRTT when it is in minRTT sampling window and
   // number of samples is greater than or equal to the minRTTAggregateRequestCount.
-  if (!inMinRTTSamplingWindow() ||
-      hist_sample_count(latency_sample_hist_.get()) < config_.minRTTAggregateRequestCount()) {
+  if (!inMinRTTSamplingWindow() || numSamples() < config_.minRTTAggregateRequestCount()) {
     return;
   }
 
   min_rtt_ = processLatencySamplesAndClear();
-  stats_.min_rtt_msecs_.set(
+  stats().min_rtt_msecs_.set(
       std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
   updateConcurrencyLimit(deferred_limit_value_.load());
   deferred_limit_value_.store(0);
-  stats_.min_rtt_calculation_active_.set(0);
+  stats().min_rtt_calculation_active_.set(0);
 
   min_rtt_calc_timer_->enableTimer(
       applyJitter(config_.minRTTCalcInterval(), config_.jitterPercent()));
-  sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
+  enableSamplingTimer();
 }
 
-std::chrono::milliseconds GradientController::applyJitter(std::chrono::milliseconds interval,
-                                                          double jitter_pct) const {
+std::chrono::milliseconds DynamicGradientController::applyJitter(std::chrono::milliseconds interval,
+                                                                 double jitter_pct) const {
   if (jitter_pct == 0) {
     return interval;
   }
@@ -139,7 +148,7 @@ std::chrono::milliseconds GradientController::applyJitter(std::chrono::milliseco
 
 void GradientController::resetSampleWindow() {
   // The sampling window must not be reset while sampling for the new minRTT value.
-  ASSERT(!inMinRTTSamplingWindow());
+  ASSERT(shouldSampleRTT());
 
   if (hist_sample_count(latency_sample_hist_.get()) == 0) {
     return;
@@ -165,7 +174,8 @@ uint32_t GradientController::calculateNewLimit() {
   // Calculate the gradient value, ensuring it's clamped between 0.5 and 2.0.
   // This prevents extreme changes in the concurrency limit between each sample
   // window.
-  const auto buffered_min_rtt = min_rtt_.count() + min_rtt_.count() * config_.minRTTBufferPercent();
+  const auto min_rtt = minRTT();
+  const auto buffered_min_rtt = min_rtt.count() + min_rtt.count() * config_.minRTTBufferPercent();
   const double raw_gradient = static_cast<double>(buffered_min_rtt) / sample_rtt_.count();
   const double gradient = std::max<double>(0.5, std::min<double>(2.0, raw_gradient));
 
@@ -204,8 +214,7 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   ASSERT(num_rq_outstanding_.load() > 0);
   --num_rq_outstanding_;
 
-  if (rq_send_time < min_rtt_epoch_) {
-    // Disregard samples from requests started in the previous minRTT window.
+  if (!shouldRecordSample(rq_send_time)) {
     return;
   }
 
@@ -216,7 +225,7 @@ void GradientController::recordLatencySample(MonotonicTime rq_send_time) {
   {
     absl::MutexLock ml(&sample_mutation_mtx_);
     hist_insert(latency_sample_hist_.get(), rq_latency.count(), 1);
-    updateMinRTT();
+    recalculateAfterSample();
   }
 }
 
@@ -230,13 +239,16 @@ void GradientController::updateConcurrencyLimit(const uint32_t new_limit) {
   concurrency_limit_.store(new_limit);
   stats_.concurrency_limit_.set(concurrency_limit_.load());
 
-  if (!inMinRTTSamplingWindow() && old_limit == config_.minConcurrency() &&
+  if (shouldSampleRTT() && old_limit == config_.minConcurrency() &&
       new_limit == config_.minConcurrency()) {
     ++consecutive_min_concurrency_set_;
   } else {
     consecutive_min_concurrency_set_ = 0;
   }
+  processConcurrencyLimitUpdate(consecutive_min_concurrency_set_);
+}
 
+void DynamicGradientController::processConcurrencyLimitUpdate(int consecutive_min_concurrency_set) {
   // If the concurrency limit is being set to the minimum value for the 5th consecutive sample
   // window while not in the middle of a minRTT measurement, this might be indicative of an
   // inaccurate minRTT measurement. Since the limit is already where it needs to be for a minRTT
@@ -246,7 +258,7 @@ void GradientController::updateConcurrencyLimit(const uint32_t new_limit) {
   // cancel/re-enable the timer below and triggers overlapping minRTT windows. To protect against
   // this, there is an explicit check when entering the minRTT measurement that ensures there is
   // only a single minRTT measurement active at a time.
-  if (consecutive_min_concurrency_set_ >= 5) {
+  if (consecutive_min_concurrency_set >= 5) {
     min_rtt_calc_timer_->enableTimer(std::chrono::milliseconds(0));
   }
 }
