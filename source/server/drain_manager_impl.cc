@@ -28,6 +28,7 @@ DrainManagerImpl::createChildManager(Event::Dispatcher& dispatcher,
   // Wire up the child so that when the parent starts draining, the child also sees the
   // state-change
   auto child_cb = children_->add(dispatcher, [this, child = child.get()] {
+    // Not a double load since we first check the child drain pair and then this.draining_
     if (!child->draining_.load().first) {
       child->startDrainSequence(this->draining_.load().second, [] {});
     }
@@ -131,7 +132,8 @@ Common::CallbackHandlePtr DrainManagerImpl::addOnDrainCloseCb(Network::DrainDire
 void DrainManagerImpl::addDrainCompleteCallback(Network::DrainDirection direction,
                                                 std::function<void()> cb) {
   ASSERT(dispatcher_.isThreadSafe());
-  ASSERT(draining_.load().first && direction <= draining_.load().second);
+  auto drain_pair = draining_.load();
+  ASSERT(drain_pair.first && direction <= drain_pair.second);
 
   // If the drain-tick-timer is active, add the callback to the queue. If not defined
   // then it must have already expired, invoke the callback immediately.
