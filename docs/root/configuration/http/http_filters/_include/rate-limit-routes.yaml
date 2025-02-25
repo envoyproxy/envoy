@@ -24,7 +24,7 @@ static_resources:
                   host_rewrite_literal: upstream.com
                   cluster: upstream_com
                   rate_limits:
-                    actions:
+                  - actions:
                     - source_cluster: {}
                     - generic_key:
                         descriptor_value: some_value0
@@ -34,7 +34,7 @@ static_resources:
                   host_rewrite_literal: upstream.com
                   cluster: upstream_com
                   rate_limits:
-                    actions:
+                  - actions:
                     - source_cluster: {}
                     - remote_address: {}
                     - generic_key:
@@ -45,7 +45,7 @@ static_resources:
                   host_rewrite_literal: upstream.com
                   cluster: upstream_com
                   rate_limits:
-                    actions:
+                  - actions:
                     - generic_key:
                         descriptor_value: some_value2
                     limit:
@@ -60,7 +60,7 @@ static_resources:
                   host_rewrite_literal: upstream.com
                   cluster: upstream_com
                   rate_limits:
-                    actions:
+                  - actions:
                     - extension:
                         name: custom
                         typed_config:
@@ -73,13 +73,12 @@ static_resources:
                   host_rewrite_literal: upstream.com
                   cluster: upstream_com
                   rate_limits:
-                    actions:
+                  - actions:
                     - extension:
                         name: custom
                         typed_config:
                           "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
                           header_name: x-header-name
-
           http_filters:
           - name: envoy.filters.http.router
             typed_config:
