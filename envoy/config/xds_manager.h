@@ -3,6 +3,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/xds_config_tracker.h"
+#include "envoy/config/xds_resources_delegate.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "absl/status/status.h"
@@ -58,6 +59,15 @@ public:
    * @return the XdsConfigTracker if defined, or nullopt if not.
    */
   virtual OptRef<Config::XdsConfigTracker> xdsConfigTracker() PURE;
+
+  /**
+   * Returns the XdsResourcesDelegate if defined by the bootstrap.
+   * The object will be initialized (if configured) after the call to initialize().
+   * TODO(adisuissa): this method will be removed once all the ADS-related objects
+   * are moved out of the cluster-manager to the xds-manager.
+   * @return the XdsResourcesDelegate if defined, or nullopt if not.
+   */
+  virtual XdsResourcesDelegateOptRef xdsResourcesDelegate() PURE;
 };
 
 using XdsManagerPtr = std::unique_ptr<XdsManager>;
