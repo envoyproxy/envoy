@@ -176,6 +176,66 @@ public:
   std::string node_id_;
 };
 
+struct ExampleParameters {
+  bool use_remote_address{false};
+  uint32_t xff_num_trusted_hops{0};
+  std::string downstream_ip_address;
+  std::string received_xff_header;
+  std::string trusted_client_address;
+  std::string x_envoy_external_address;
+  std::string modified_xff_header;
+  std::vector<std::pair<std::string, unsigned char>> xff_trusted_cidrs;
+  bool envoy_internal{false};
+
+  ExampleParameters& useRemoteAddress(bool value) {
+    use_remote_address = value;
+    return *this;
+  }
+
+  ExampleParameters& xffNumTrustedHops(uint32_t value) {
+    xff_num_trusted_hops = value;
+    return *this;
+  }
+
+  ExampleParameters& downstreamIPAddress(const std::string& value) {
+    downstream_ip_address = value;
+    return *this;
+  }
+
+  ExampleParameters& receivedXFFHeader(const std::string& value) {
+    received_xff_header = value;
+    return *this;
+  }
+
+  ExampleParameters& trustedClientAddress(const std::string& value) {
+    trusted_client_address = value;
+    return *this;
+  }
+
+  ExampleParameters& xEnvoyExternalAddress(const std::string& value) {
+    x_envoy_external_address = value;
+    return *this;
+  }
+
+  ExampleParameters& modifiedXFFHeader(const std::string& value) {
+    modified_xff_header = value;
+    return *this;
+  }
+
+  ExampleParameters& envoyInternal(bool value) {
+    envoy_internal = value;
+    return *this;
+  }
+
+  ExampleParameters& addTrustedCidr(const std::string& cidr, unsigned char prefix_len) {
+    xff_trusted_cidrs.push_back(std::make_pair(cidr, prefix_len));
+    return *this;
+  }
+};
+
+class DocumentationExamples : public ConnectionManagerUtilityTest,
+                              public testing::WithParamInterface<ExampleParameters> {};
+
 // Tests for ConnectionManagerUtility::determineNextProtocol.
 TEST_F(ConnectionManagerUtilityTest, DetermineNextProtocol) {
   {
@@ -621,67 +681,9 @@ TEST_F(ConnectionManagerUtilityTest, UseXFFTrustedCIDRsEmptyXFFHeader) {
   EXPECT_EQ(headers.getForwardedForValue(), "10.3.2.1");
 }
 
-struct ExampleParameters {
-  bool use_remote_address{false};
-  uint32_t xff_num_trusted_hops{0};
-  std::string downstream_ip_address;
-  std::string received_xff_header;
-  std::string trusted_client_address;
-  std::string x_envoy_external_address;
-  std::string modified_xff_header;
-  std::vector<std::pair<std::string, unsigned char>> xff_trusted_cidrs;
-  bool envoy_internal{false};
-
-  ExampleParameters& useRemoteAddress(bool value) {
-    use_remote_address = value;
-    return *this;
-  }
-
-  ExampleParameters& xffNumTrustedHops(uint32_t value) {
-    xff_num_trusted_hops = value;
-    return *this;
-  }
-
-  ExampleParameters& downstreamIPAddress(const std::string& value) {
-    downstream_ip_address = value;
-    return *this;
-  }
-
-  ExampleParameters& receivedXFFHeader(const std::string& value) {
-    received_xff_header = value;
-    return *this;
-  }
-
-  ExampleParameters& trustedClientAddress(const std::string& value) {
-    trusted_client_address = value;
-    return *this;
-  }
-
-  ExampleParameters& xEnvoyExternalAddress(const std::string& value) {
-    x_envoy_external_address = value;
-    return *this;
-  }
-
-  ExampleParameters& modifiedXFFHeader(const std::string& value) {
-    modified_xff_header = value;
-    return *this;
-  }
-
-  ExampleParameters& envoyInternal(bool value) {
-    envoy_internal = value;
-    return *this;
-  }
-
-  ExampleParameters& addTrustedCidr(const std::string& cidr, unsigned char prefix_len) {
-    xff_trusted_cidrs.push_back(std::make_pair(cidr, prefix_len));
-    return *this;
-  }
-};
-
-class DocumentationExamples : public ConnectionManagerUtilityTest,
-                              public testing::WithParamInterface<ExampleParameters> {};
-
-// Verify that we use the first address in XFF and XFF is appended to.
+// This is a generic test to exercise the examples found in
+// https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_conn_man/headers.html#x-forwarded-for
+// The parameters for each example are defined below this test case.
 TEST_P(DocumentationExamples, Example) {
   const auto params = GetParam();
 
@@ -722,6 +724,7 @@ TEST_P(DocumentationExamples, Example) {
   }
 }
 
+// This defines instances of the test above for each example in the documentation.
 INSTANTIATE_TEST_SUITE_P(
     ConnectionManagerUtilityTest, DocumentationExamples,
     testing::Values(
