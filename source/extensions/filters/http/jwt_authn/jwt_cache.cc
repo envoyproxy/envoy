@@ -63,7 +63,7 @@ public:
     if (!jwt_lru_cache_ || token.size() > std::numeric_limits<uint32_t>::max()) {
       return;
     }
-    if (static_cast<unsigned int>(token.size()) <= max_jwt_size_for_cache_) {
+    if (static_cast<uint32_t>(token.size()) <= max_jwt_size_for_cache_) {
       // pass the ownership of jwt to cache
       jwt_lru_cache_->insert(token, jwt.release(), 1);
     }
