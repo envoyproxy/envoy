@@ -82,8 +82,8 @@ public:
     plugin_->wasmConfig().allowedCapabilities() = allowed_capabilities_;
     // Passes ownership of root_context_.
     Extensions::Common::Wasm::createWasm(
-        plugin_, scope_, cluster_manager_, init_manager_, transport_socket_factory_context_,
-        dispatcher_, tls_, *api, lifecycle_notifier_, remote_data_provider_, oci_manifest_provider_,
+        plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api, lifecycle_notifier_,
+        transport_socket_factory_context_, tls_, remote_data_provider_, oci_manifest_provider_,
         oci_blob_provider_, [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
     plugin_handle_ = getOrCreateThreadLocalPlugin(
         wasm_, plugin_, dispatcher_,

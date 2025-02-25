@@ -172,9 +172,10 @@ using CreateWasmCallback = std::function<void(WasmHandleSharedPtr)>;
 // because that is the mechanism for reporting configuration errors.
 bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
+                Event::Dispatcher& dispatcher, Api::Api& api,
+                Server::ServerLifecycleNotifier& lifecycle_notifier,
                 Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
-                Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc,
-                Api::Api& api, Server::ServerLifecycleNotifier& lifecycle_notifier,
+                ThreadLocal::SlotAllocator& slot_alloc,
                 RemoteAsyncDataProviderPtr& remote_data_provider,
                 Oci::ManifestProviderPtr& oci_manifest_provider,
                 Oci::BlobProviderPtr& oci_blob_provider, CreateWasmCallback&& callback,

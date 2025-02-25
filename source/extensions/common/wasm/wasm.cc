@@ -321,9 +321,10 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
 
 bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,
                 Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
+                Event::Dispatcher& dispatcher, Api::Api& api,
+                Server::ServerLifecycleNotifier& lifecycle_notifier,
                 Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
-                Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& slot_alloc,
-                Api::Api& api, Server::ServerLifecycleNotifier& lifecycle_notifier,
+                ThreadLocal::SlotAllocator& slot_alloc,
                 RemoteAsyncDataProviderPtr& remote_data_provider,
                 Oci::ManifestProviderPtr& oci_manifest_provider,
                 Oci::BlobProviderPtr& oci_blob_provider, CreateWasmCallback&& cb,
@@ -728,11 +729,11 @@ PluginConfig::PluginConfig(const envoy::extensions::wasm::v3::PluginConfig& conf
     plugin_handle_ = std::move(thread_local_handle);
   };
 
-  if (!Common::Wasm::createWasm(plugin_, scope.createScope(""), context.clusterManager(),
-                                init_manager, context.getTransportSocketFactoryContext(),
-                                context.mainThreadDispatcher(), context.threadLocal(),
-                                context.api(), context.lifecycleNotifier(), remote_data_provider_,
-                                oci_manifest_provider_, oci_blob_provider_, std::move(callback))) {
+  if (!Common::Wasm::createWasm(
+          plugin_, scope.createScope(""), context.clusterManager(), init_manager,
+          context.mainThreadDispatcher(), context.api(), context.lifecycleNotifier(),
+          context.getTransportSocketFactoryContext(), context.threadLocal(), remote_data_provider_,
+          oci_manifest_provider_, oci_blob_provider_, std::move(callback))) {
     // TODO(wbpcode): use absl::Status to return error rather than throw.
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm plugin {}", plugin_->name_));

@@ -602,16 +602,16 @@ TEST_P(WasmCommonTest, VmCache) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_, nullptr);
 
   WasmHandleSharedPtr wasm_handle;
-  createWasm(plugin, scope_, cluster_manager_, init_manager, transport_socket_factory_context_,
-             *dispatcher_, slot_alloc_, *api_, lifecycle_notifier_, remote_data_provider_,
-             oci_manifest_provider_, oci_blob_provider_,
+  createWasm(plugin, scope_, cluster_manager_, init_manager, *dispatcher_, *api_,
+             lifecycle_notifier_, transport_socket_factory_context_, slot_alloc_,
+             remote_data_provider_, oci_manifest_provider_, oci_blob_provider_,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
   EXPECT_NE(wasm_handle, nullptr);
 
   WasmHandleSharedPtr wasm_handle2;
-  createWasm(plugin, scope_, cluster_manager_, init_manager, transport_socket_factory_context_,
-             *dispatcher_, slot_alloc_, *api_, lifecycle_notifier_, remote_data_provider_,
-             oci_manifest_provider_, oci_blob_provider_,
+  createWasm(plugin, scope_, cluster_manager_, init_manager, *dispatcher_, *api_,
+             lifecycle_notifier_, transport_socket_factory_context_, slot_alloc_,
+             remote_data_provider_, oci_manifest_provider_, oci_blob_provider_,
              [&wasm_handle2](const WasmHandleSharedPtr& w) { wasm_handle2 = w; });
   EXPECT_NE(wasm_handle2, nullptr);
   EXPECT_EQ(wasm_handle, wasm_handle2);
@@ -717,9 +717,9 @@ TEST_P(WasmCommonTest, RemoteCode) {
   EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
     init_target_handle = target.createHandle("test");
   }));
-  createWasm(plugin, scope_, cluster_manager, init_manager, transport_socket_factory_context_,
-             *dispatcher_, slot_alloc_, *api_, lifecycle_notifier_, remote_data_provider_,
-             oci_manifest_provider_, oci_blob_provider_,
+  createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
+             lifecycle_notifier_, transport_socket_factory_context_, slot_alloc_,
+             remote_data_provider_, oci_manifest_provider_, oci_blob_provider_,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
 
   EXPECT_CALL(init_watcher, ready());
@@ -831,9 +831,9 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
     init_target_handle = target.createHandle("test");
   }));
-  createWasm(plugin, scope_, cluster_manager, init_manager, transport_socket_factory_context_,
-             *dispatcher_, slot_alloc_, *api_, lifecycle_notifier_, remote_data_provider_,
-             oci_manifest_provider_, oci_blob_provider_,
+  createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
+             lifecycle_notifier_, transport_socket_factory_context_, slot_alloc_,
+             remote_data_provider_, oci_manifest_provider_, oci_blob_provider_,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
 
   EXPECT_CALL(init_watcher, ready());
