@@ -38,7 +38,7 @@ For example, to generate the following descriptor:
 
 .. code-block:: cpp
 
-  ("generic_key", "some_value")
+  ("generic_key", "some_value0")
   ("source_cluster", "from_cluster")
 
 The configuration would be:
@@ -73,7 +73,7 @@ the following descriptor is generated:
 
 .. code-block:: cpp
 
-  ("generic_key", "some_value")
+  ("generic_key", "some_value1")
   ("remote_address", "<trusted address from x-forwarded-for>")
   ("source_cluster", "from_cluster")
 
