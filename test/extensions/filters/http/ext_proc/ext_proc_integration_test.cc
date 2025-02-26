@@ -2216,6 +2216,63 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnResponse) {
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
 
+// Test immediate_response behavior with STREAMED request body. Even though the
+// headers have been processed, an immediate response on a request body chunk
+// should still be seen by the downstream.
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnStreamedRequestBody) {
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequestWithBody("Evil content!", absl::nullopt);
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& resp) {
+        auto* hdr = resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_header()->set_key("foo");
+        hdr->mutable_header()->set_raw_value("bar");
+        return true;
+      });
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
+    immediate.set_body("{\"reason\": \"Request too evil\"}");
+    immediate.set_details("Failed because I don't like this payload");
+  });
+  verifyDownstreamResponse(*response, 400);
+  EXPECT_EQ("{\"reason\": \"Request too evil\"}", response->body());
+  // The previously added request header is not sent to the client.
+  EXPECT_THAT(response->headers(), HasNoHeader("foo"));
+}
+
+// Test immediate_response behavior with STREAMED response body.
+//
+// In this test the client sees the immediate response, but that may not always
+// be the case: "If a response has already started -- for example, if this
+// message is sent response to a ``response_body`` message -- then this will
+// either ship the reply directly to the downstream codec, or reset the stream."
+TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyOnStreamedResponseBody) {
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  handleUpstreamRequest();
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders&, HeadersResponse& resp) {
+        auto* hdr = resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_header()->set_key("foo");
+        hdr->mutable_header()->set_raw_value("bar");
+        return true;
+      });
+  processAndRespondImmediately(*grpc_upstreams_[0], false, [](ImmediateResponse& immediate) {
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
+    immediate.set_body("{\"reason\": \"Response too evil\"}");
+    immediate.set_details("Failed because I don't like this payload");
+  });
+  verifyDownstreamResponse(*response, 400);
+  EXPECT_EQ("{\"reason\": \"Response too evil\"}", response->body());
+  // The previously added response header is not sent to the client.
+  EXPECT_THAT(response->headers(), HasNoHeader("foo"));
+}
+
 // Test the filter with request body buffering enabled using
 // an ext_proc server that responds to the request_body message
 // by sending back an immediate_response message

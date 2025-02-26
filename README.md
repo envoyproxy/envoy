@@ -94,6 +94,10 @@ positively or negatively.
 
 For further details please see our complete [security release process](SECURITY.md).
 
+### ppc64le builds
+
+Builds for the ppc64le architecture or using aws-lc are not covered by the envoy security policy. The ppc64le architecture is currently best-effort and not maintained by the Envoy maintainers.
+
 ## Releases
 
 For further details please see our [release process](https://github.com/envoyproxy/envoy/blob/main/RELEASES.md).
