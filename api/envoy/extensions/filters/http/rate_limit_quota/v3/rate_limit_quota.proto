@@ -165,7 +165,7 @@ message RateLimitQuotaOverride {
 // ``bucket_matchers`` matcher tree to assign the matched requests to the Quota Bucket.
 // Usage example: :ref:`RateLimitQuotaFilterConfig.bucket_matchers
 // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaFilterConfig.bucket_matchers>`.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message RateLimitQuotaBucketSettings {
   // Configures the behavior after the first request has been matched to the bucket, and before the
   // the RLQS server returns the first quota assignment.
@@ -420,4 +420,11 @@ message RateLimitQuotaBucketSettings {
   // :ref:`AbandonAction <envoy_v3_api_msg_service.rate_limit_quota.v3.RateLimitQuotaResponse.BucketAction.AbandonAction>`
   // message.
   ExpiredAssignmentBehavior expired_assignment_behavior = 5;
+
+  // If set, the filter will not enforce the resulting rate limiting decision
+  // from this action, but will still record & log the bucket's usage. The
+  // filter will continue matching evluations for the request, if possible. The
+  // first matched, non-preview action or the no-match-action will then be
+  // enforced as normal.
+  bool preview_mode = 6;
 }

@@ -51,6 +51,7 @@ using ::testing::NiceMock;
 
 enum class MatcherConfigType {
   Valid,
+  ValidPreview,
   Invalid,
   Empty,
   NoMatcher,
@@ -76,6 +77,10 @@ public:
     switch (config_type) {
     case MatcherConfigType::Valid: {
       TestUtility::loadFromYaml(std::string(ValidMatcherConfig), matcher);
+      break;
+    }
+    case MatcherConfigType::ValidPreview: {
+      TestUtility::loadFromYaml(std::string(ValidPreviewMatcherConfig), matcher);
       break;
     }
     case MatcherConfigType::ValidOnNoMatchConfig: {
@@ -143,7 +148,8 @@ public:
   void verifyRequestMatchingSucceeded(
       const absl::flat_hash_map<std::string, std::string>& expected_bucket_ids) {
     // Perform request matching.
-    auto match_result = filter_->requestMatching(default_headers_);
+    Matcher::ReenterableMatchEvaluator<Http::HttpMatchingData> reenterable_matcher(match_tree_);
+    auto match_result = filter_->requestMatching(reenterable_matcher, default_headers_);
     // Asserts that the request matching succeeded.
     // OK status is expected to be returned even if the exact request matching
     // failed. It is because `on_no_match` field is configured.
@@ -189,10 +195,11 @@ public:
 TEST_F(FilterTest, EmptyMatcherConfig) {
   addMatcherConfig(MatcherConfigType::Empty);
   createFilter();
-  auto match_result = filter_->requestMatching(default_headers_);
-  EXPECT_FALSE(match_result.ok());
-  EXPECT_THAT(match_result, StatusIs(absl::StatusCode::kInternal));
-  EXPECT_EQ(match_result.status().message(), "Matcher tree has not been initialized yet.");
+
+  Http::FilterHeadersStatus status;
+  EXPECT_LOG_CONTAINS("error", "matcher tree is null.",
+                      { status = filter_->decodeHeaders(default_headers_, false); });
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::Continue);
 }
 
 TEST_F(FilterTest, RequestMatchingSucceeded) {
@@ -218,12 +225,12 @@ TEST_F(FilterTest, RequestMatchingFailed) {
   constructMismatchedRequestHeader();
 
   // Perform request matching.
-  auto match = filter_->requestMatching(default_headers_);
-  // Not_OK status is expected to be returned because the matching failed due to
-  // mismatched inputs.
-  EXPECT_FALSE(match.ok());
-  EXPECT_THAT(match, StatusIs(absl::StatusCode::kNotFound));
-  EXPECT_EQ(match.status().message(), "Matching completed but no match result was found.");
+  Matcher::ReenterableMatchEvaluator<Http::HttpMatchingData> reenterable_matcher(match_tree_);
+  absl::StatusOr<Matcher::ActionPtr> match_result =
+      filter_->requestMatching(reenterable_matcher, default_headers_);
+  // Expect a nil action given when no matchers hit and on_no_match isn't set.
+  EXPECT_TRUE(match_result.ok());
+  EXPECT_EQ(match_result.value(), nullptr);
 }
 
 TEST_F(FilterTest, RequestMatchingFailedWithEmptyHeader) {
@@ -231,7 +238,8 @@ TEST_F(FilterTest, RequestMatchingFailedWithEmptyHeader) {
   createFilter();
   Http::TestRequestHeaderMapImpl empty_header = {};
   // Perform request matching.
-  auto match = filter_->requestMatching(empty_header);
+  Matcher::ReenterableMatchEvaluator<Http::HttpMatchingData> reenterable_matcher(match_tree_);
+  auto match = filter_->requestMatching(reenterable_matcher, empty_header);
   // Not_OK status is expected to be returned because the matching failed due to
   // empty headers.
   EXPECT_FALSE(match.ok());
@@ -243,10 +251,13 @@ TEST_F(FilterTest, RequestMatchingFailedWithNoCallback) {
   addMatcherConfig(MatcherConfigType::Valid);
   createFilter(/*set_callback*/ false);
 
-  auto match = filter_->requestMatching(default_headers_);
-  EXPECT_FALSE(match.ok());
-  EXPECT_THAT(match, StatusIs(absl::StatusCode::kInternal));
-  EXPECT_EQ(match.status().message(), "Filter callback has not been initialized successfully yet.");
+  Matcher::ReenterableMatchEvaluator<Http::HttpMatchingData> reenterable_matcher(match_tree_);
+  absl::StatusOr<Matcher::ActionPtr> match_result =
+      filter_->requestMatching(reenterable_matcher, default_headers_);
+  EXPECT_FALSE(match_result.ok());
+  EXPECT_THAT(match_result, StatusIs(absl::StatusCode::kInternal));
+  EXPECT_EQ(match_result.status().message(),
+            "Filter callback has not been initialized successfully yet.");
 }
 
 TEST_F(FilterTest, RequestMatchingWithOnNoMatch) {
@@ -270,7 +281,8 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   createFilter();
 
   // Perform request matching.
-  auto match_result = filter_->requestMatching(default_headers_);
+  Matcher::ReenterableMatchEvaluator<Http::HttpMatchingData> reenterable_matcher(match_tree_);
+  auto match_result = filter_->requestMatching(reenterable_matcher, default_headers_);
   // Asserts that the request matching succeeded.
   // OK status is expected to be returned even if the exact request matching
   // failed. It is because `on_no_match` field is configured.
@@ -570,6 +582,64 @@ TEST_F(FilterTest, DecodeHeaderWithCachedDeny) {
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
   EXPECT_EQ(bucket->quota_usage->num_requests_allowed.load(std::memory_order_relaxed), 1);
   EXPECT_EQ(bucket->quota_usage->num_requests_denied.load(std::memory_order_relaxed), 1);
+}
+
+TEST_F(FilterTest, DecodeHeaderWithPreviewBucket) {
+  addMatcherConfig(MatcherConfigType::ValidPreview);
+  createFilter();
+  // Define the key value pairs that is used to build the bucket_id dynamically
+  // via `custom_value` in the config.
+  absl::flat_hash_map<std::string, std::string> custom_value_pairs = {{"environment", "staging"},
+                                                                      {"group", "envoy"}};
+  buildCustomHeader(custom_value_pairs);
+
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids = custom_value_pairs;
+  expected_bucket_ids.insert({{"name", "prod"}});
+  absl::flat_hash_map<std::string, std::string> expected_preview_bucket_ids(expected_bucket_ids);
+  // The low priority config has a different bucket id intentionally.
+  expected_preview_bucket_ids.insert({{"preview_name", "preview_test"}});
+
+  // Expect the preview bucket to match first off.
+  verifyRequestMatchingSucceeded(expected_preview_bucket_ids);
+
+  // Expect request processing to check for an existing bucket, find none, and
+  // go through bucket creation for the preview bucket.
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  BucketId preview_bucket_id = bucketIdFromMap(expected_preview_bucket_ids);
+  size_t preview_bucket_id_hash = MessageUtil::hash(preview_bucket_id);
+
+  // Expect the new actionable bucket to fallback to DENY_ALL without a
+  // configured no_assignment_behavior & the preview bucket to fallback to
+  // ALLOW_ALL.
+  BucketAction expected_action;
+  expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::DENY_ALL);
+  *expected_action.mutable_bucket_id() = bucket_id;
+  BucketAction preview_expected_action;
+  preview_expected_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::ALLOW_ALL);
+  *preview_expected_action.mutable_bucket_id() = preview_bucket_id;
+
+  // The bucket creation shouldn't try to include a fallback or
+  // no-assignment-default action as neither is set in the BucketMatcher.
+  EXPECT_CALL(*mock_local_client_, getBucket(preview_bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(preview_bucket_id),
+                           preview_bucket_id_hash, ProtoEq(preview_expected_action),
+                           testing::IsNull(), std::chrono::milliseconds::zero(), true))
+      .WillOnce(Return());
+  EXPECT_CALL(*mock_local_client_,
+              createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id), bucket_id_hash,
+                           ProtoEq(expected_action), testing::IsNull(),
+                           std::chrono::milliseconds::zero(), false))
+      .WillOnce(Return());
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
 }
 
 TEST_F(FilterTest, DecodeHeaderWithTokenBucketAllow) {
