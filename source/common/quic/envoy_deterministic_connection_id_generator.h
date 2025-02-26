@@ -30,7 +30,6 @@ public:
 class EnvoyDeterministicConnectionIdGeneratorFactory
     : public EnvoyQuicConnectionIdGeneratorFactory {
 public:
-  EnvoyDeterministicConnectionIdGeneratorFactory();
   // EnvoyQuicConnectionIdGeneratorFactory.
   QuicConnectionIdGeneratorPtr createQuicConnectionIdGenerator(uint32_t worker_index) override;
   Network::Socket::OptionConstSharedPtr

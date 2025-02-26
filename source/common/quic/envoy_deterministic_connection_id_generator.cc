@@ -26,10 +26,6 @@ void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
 absl::optional<quic::QuicConnectionId>
 EnvoyDeterministicConnectionIdGenerator::GenerateNextConnectionId(
     const quic::QuicConnectionId& original) {
-  Envoy::Assert::EnvoyBugStackTrace st;
-  st.capture();
-  st.logStackTrace();
-
   auto new_cid = DeterministicConnectionIdGenerator::GenerateNextConnectionId(original);
   if (new_cid.has_value()) {
     adjustNewConnectionIdForRouting(new_cid.value(), original);
@@ -40,10 +36,6 @@ EnvoyDeterministicConnectionIdGenerator::GenerateNextConnectionId(
 absl::optional<quic::QuicConnectionId>
 EnvoyDeterministicConnectionIdGenerator::MaybeReplaceConnectionId(
     const quic::QuicConnectionId& original, const quic::ParsedQuicVersion& version) {
-  Envoy::Assert::EnvoyBugStackTrace st;
-  st.capture();
-  st.logStackTrace();
-
   auto new_cid = DeterministicConnectionIdGenerator::MaybeReplaceConnectionId(original, version);
   if (new_cid.has_value()) {
     adjustNewConnectionIdForRouting(new_cid.value(), original);
@@ -143,12 +135,6 @@ EnvoyDeterministicConnectionIdGeneratorFactory::getCompatibleConnectionIdWorkerS
   return [concurrency](const Buffer::Instance& packet, uint32_t default_value) {
     return bpfEquivalentFunction(packet, concurrency, default_value);
   };
-}
-
-EnvoyDeterministicConnectionIdGeneratorFactory::EnvoyDeterministicConnectionIdGeneratorFactory() {
-  Envoy::Assert::EnvoyBugStackTrace st;
-  st.capture();
-  st.logStackTrace();
 }
 
 } // namespace Quic
