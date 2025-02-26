@@ -25,7 +25,7 @@ ImageBlobFetcher::ImageBlobFetcher(Upstream::ClusterManager& cm,
 void ImageBlobFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
-  message->headers().setAuthorization(authz_header_value_);
+  message->headers().setCopy(Http::CustomHeaders::get().Authorization, authz_header_value_);
   // TODO: add "accept: application/vnd.oci.image.manifest.v1+json"
   ENVOY_LOG(info, "fetch oci image blob from [uri = {}]: start", uri_.uri());
   const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());

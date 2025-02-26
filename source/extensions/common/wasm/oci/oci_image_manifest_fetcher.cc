@@ -25,7 +25,7 @@ ImageManifestFetcher::ImageManifestFetcher(Upstream::ClusterManager& cm,
 void ImageManifestFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
-  message->headers().setAuthorization(authz_header_value_);
+  message->headers().setCopy(Http::CustomHeaders::get().Authorization, authz_header_value_);
 
   // TODO: set "Accept: application/vnd.oci.image.manifest.v1+json"
   ENVOY_LOG(info, "fetch oci image from [uri = {}]: start", uri_.uri());
