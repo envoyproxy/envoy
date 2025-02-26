@@ -336,8 +336,8 @@ static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint8_t co
     // The connection id length is the 6th byte.
     // The connection id starts from 7th byte.
     // Minimum length of a long header packet is 14.
-    constexpr uint8_t kCIDLenOffset = 5;
-    constexpr uint8_t kCIDOffset = 6;
+    constexpr size_t kCIDLenOffset = 5;
+    constexpr size_t kCIDOffset = 6;
 
     if (packet_length < 14) {
       return default_value;
@@ -359,7 +359,7 @@ static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint8_t co
   } else {
     // IETF QUIC short header, or gQUIC.
     // The connection id starts from 2nd byte.
-    constexpr uint8_t kCIDOffset = 1;
+    constexpr size_t kCIDOffset = 1;
 
     WorkerRoutingIdValue worker_id;
     if (packet_length < (kCIDOffset + connection_id_length)) {
