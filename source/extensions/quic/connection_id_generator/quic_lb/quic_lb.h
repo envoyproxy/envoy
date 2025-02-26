@@ -15,6 +15,8 @@ namespace Extensions {
 namespace ConnectionIdGenerator {
 namespace QuicLb {
 
+using WorkerRoutingIdValue = uint8_t;
+
 class QuicLbConnectionIdGenerator : public quic::ConnectionIdGeneratorInterface {
 public:
   class ThreadLocalData : public ThreadLocal::ThreadLocalObject {
@@ -37,7 +39,7 @@ public:
     const quic::LoadBalancerServerId server_id_;
   };
 
-  QuicLbConnectionIdGenerator(ThreadLocal::TypedSlot<ThreadLocalData>& tls);
+  QuicLbConnectionIdGenerator(ThreadLocal::TypedSlot<ThreadLocalData>& tls, uint32_t worker_id);
 
   // quic::ConnectionIdGeneratorInterface
   absl::optional<quic::QuicConnectionId>
@@ -47,14 +49,17 @@ public:
                            const quic::ParsedQuicVersion& version) override;
   uint8_t ConnectionIdLength(uint8_t first_byte) const override;
 
-  static constexpr uint8_t kRoutingInfoSize = sizeof(uint16_t);
+  // Returns the additional length of the connection ID beyond what the `LoadBalancerEncoder`
+  // creates.
+  static uint8_t connectionIdLengthAddition() { return sizeof(WorkerRoutingIdValue); }
 
-  static absl::optional<quic::QuicConnectionId>
+  absl::optional<quic::QuicConnectionId>
   appendRoutingId(quic::QuicConnectionId& new_connection_id,
                   const quic::QuicConnectionId& old_connection_id);
 
 private:
   ThreadLocal::TypedSlot<ThreadLocalData>& tls_slot_;
+  const WorkerRoutingIdValue worker_id_;
 };
 
 class Factory : public EnvoyQuicConnectionIdGeneratorFactory {
@@ -78,7 +83,7 @@ private:
   Common::CallbackHandlePtr secrets_provider_validation_callback_handle_;
   Common::CallbackHandlePtr secrets_provider_update_callback_handle_;
   ThreadLocal::TypedSlotPtr<QuicLbConnectionIdGenerator::ThreadLocalData> tls_slot_;
-  uint8_t encoder_connection_id_length_;
+  uint8_t connection_id_length_;
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   sock_fprog prog_;

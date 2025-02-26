@@ -34,6 +34,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/quic/connection_id_generator/quic_lb:quic_lb_config",
         "//test/integration:http_integration_lib",
+        "//test/integration:quic_http_integration_test_lib",
         "@envoy_api//envoy/extensions/quic/connection_id_generator/quic_lb/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
     ],
