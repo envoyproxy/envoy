@@ -13,6 +13,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/cidr_range.h"
+#include "source/common/tls/cert_validator/san_matcher.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
 
@@ -214,6 +215,18 @@ public:
 
 private:
   const absl::optional<Matchers::StringMatcherImpl> matcher_;
+};
+
+class MtlsAuthenticatedMatcher : public Matcher {
+public:
+  MtlsAuthenticatedMatcher(const envoy::config::rbac::v3::Principal::MTlsAuthenticated& auth,
+                           Server::Configuration::CommonFactoryContext& context);
+
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo&) const override;
+
+private:
+  const Extensions::TransportSockets::Tls::SanMatcherPtr matcher_;
 };
 
 /**
