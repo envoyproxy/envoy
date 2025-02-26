@@ -7,7 +7,6 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"
-#include "source/extensions/tracers/fluentd/fluentd_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -32,6 +32,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:trace_context_lib",
+        "//source/extensions/common/fluentd:fluentd_base_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "@com_github_msgpack_cpp//:msgpack",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",

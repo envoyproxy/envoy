@@ -11,6 +11,7 @@
 #include "source/common/common/statusor.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/tracing/trace_context_impl.h"
+#include "source/extensions/common/fluentd/fluentd_base.h"
 #include "source/extensions/tracers/common/factory_base.h"
 
 #include "absl/strings/string_view.h"
@@ -20,28 +21,9 @@ namespace Extensions {
 namespace Tracers {
 namespace Fluentd {
 
+using namespace Envoy::Extensions::Common::Fluentd;
 using FluentdConfig = envoy::config::trace::v3::FluentdConfig;
 using FluentdConfigSharedPtr = std::shared_ptr<FluentdConfig>;
-
-static constexpr uint64_t DefaultBaseBackoffIntervalMs = 500;
-static constexpr uint64_t DefaultMaxBackoffIntervalFactor = 10;
-static constexpr uint64_t DefaultBufferFlushIntervalMs = 1000;
-static constexpr uint64_t DefaultMaxBufferSize = 16384;
-
-// Entry represents a single Fluentd message, msgpack format based, as specified in:
-// https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#entry
-class Entry {
-public:
-  Entry(const Entry&) = delete;
-  Entry& operator=(const Entry&) = delete;
-  Entry(uint64_t time, std::map<std::string, std::string>&& record)
-      : time_(time), record_(std::move(record)) {}
-
-  const uint64_t time_;
-  const std::map<std::string, std::string> record_;
-};
-
-using EntryPtr = std::unique_ptr<Entry>;
 
 // Span context definitions
 class SpanContext {
@@ -91,45 +73,14 @@ private:
   const Tracing::TraceContext& trace_context_;
 };
 
-// Template for a Fluentd tracer
-class FluentdTracer {
-public:
-  virtual ~FluentdTracer() = default;
-
-  /**
-   * Send the Fluentd formatted message over the upstream TCP connection.
-   */
-  virtual void trace(EntryPtr&& entry) PURE;
-};
-
-// Fluentd tracer stats
-#define TRACER_FLUENTD_STATS(COUNTER, GAUGE)                                                       \
-  COUNTER(entries_lost)                                                                            \
-  COUNTER(entries_buffered)                                                                        \
-  COUNTER(events_sent)                                                                             \
-  COUNTER(reconnect_attempts)                                                                      \
-  COUNTER(connections_closed)
-
-struct TracerFluentdStats {
-  TRACER_FLUENTD_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
-};
-
 // FluentdTracerImpl implements a FluentdTracer, handling tracing and buffer/connection logic
-class FluentdTracerImpl : public Tcp::AsyncTcpClientCallbacks,
-                          public FluentdTracer,
-                          public std::enable_shared_from_this<FluentdTracerImpl>,
-                          public Logger::Loggable<Logger::Id::tracing> {
+class FluentdTracerImpl : public FluentdBase,
+                          public std::enable_shared_from_this<FluentdTracerImpl> {
 public:
   FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster, Tcp::AsyncTcpClientPtr client,
                     Event::Dispatcher& dispatcher, const FluentdConfig& config,
                     BackOffStrategyPtr backoff_strategy, Stats::Scope& parent_scope,
                     Random::RandomGenerator& random, TimeSource& time_source);
-
-  // Tcp::AsyncTcpClientCallbacks
-  void onEvent(Network::ConnectionEvent event) override;
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
-  void onData(Buffer::Instance&, bool) override {}
 
   Tracing::SpanPtr startSpan(Tracing::TraceContext& trace_context, SystemTime start_time,
                              const std::string& operation_name, Tracing::Decision tracing_decision);
@@ -138,34 +89,9 @@ public:
                              const std::string& operation_name, Tracing::Decision tracing_decision,
                              const SpanContext& previous_span_context);
 
-  // FluentdTracer
-  void trace(EntryPtr&& entry) override;
+  MessagePackBuffer packMessage();
 
 private:
-  void flush();
-  void connect();
-  void maybeReconnect();
-  void onBackoffCallback();
-  void setDisconnected();
-  void clearBuffer();
-
-  bool disconnected_ = false;
-  bool connecting_ = false;
-  std::string tag_;
-  std::string id_;
-  uint32_t connect_attempts_{0};
-  absl::optional<uint32_t> max_connect_attempts_{};
-  const Stats::ScopeSharedPtr stats_scope_;
-  TracerFluentdStats fluentd_stats_;
-  std::vector<EntryPtr> entries_;
-  uint64_t approximate_message_size_bytes_ = 0;
-  Upstream::ThreadLocalCluster& cluster_;
-  const BackOffStrategyPtr backoff_strategy_;
-  const Tcp::AsyncTcpClientPtr client_;
-  const std::chrono::milliseconds buffer_flush_interval_msec_;
-  const uint64_t max_buffer_size_bytes_;
-  const Event::TimerPtr retry_timer_;
-  const Event::TimerPtr flush_timer_;
   std::map<std::string, std::string> option_;
   Random::RandomGenerator& random_;
   TimeSource& time_source_;
@@ -175,48 +101,29 @@ using FluentdTracerWeakPtr = std::weak_ptr<FluentdTracerImpl>;
 using FluentdTracerSharedPtr = std::shared_ptr<FluentdTracerImpl>;
 
 // FluentdTracerCache is used to cache entries before they are sent to the Fluentd server
-class FluentdTracerCache {
-public:
-  virtual ~FluentdTracerCache() = default;
-
-  /**
-   * Get existing tracer or create a new one for the given configuration.
-   * @return FluentdTracerSharedPtr ready for logging requests.
-   */
-  virtual FluentdTracerSharedPtr getOrCreateTracer(const FluentdConfigSharedPtr config,
-                                                   Random::RandomGenerator& random,
-                                                   TimeSource& time_source) PURE;
-};
-
-using FluentdTracerCacheSharedPtr = std::shared_ptr<FluentdTracerCache>;
-
-// Implementation of the FluentdTracerCache as a thread-local cache
-class FluentdTracerCacheImpl : public Singleton::Instance, public FluentdTracerCache {
+class FluentdTracerCacheImpl
+    : public FluentdCacheBase<FluentdTracerImpl, FluentdConfig, FluentdTracerSharedPtr,
+                              FluentdTracerWeakPtr>,
+      public Singleton::Instance {
 public:
   FluentdTracerCacheImpl(Upstream::ClusterManager& cluster_manager, Stats::Scope& parent_scope,
-                         ThreadLocal::SlotAllocator& tls);
+                         ThreadLocal::SlotAllocator& tls)
+      : FluentdCacheBase(cluster_manager, parent_scope, tls, "tracing.fluentd") {}
 
-  // FluentdTracerCache
-  FluentdTracerSharedPtr getOrCreateTracer(const FluentdConfigSharedPtr config,
-                                           Random::RandomGenerator& random,
-                                           TimeSource& time_source) override;
-
-private:
-  /**
-   * Per-thread cache.
-   */
-  struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalCache(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-
-    Event::Dispatcher& dispatcher_;
-    // Tracers indexed by the hash of tracer's configuration.
-    absl::flat_hash_map<std::size_t, FluentdTracerWeakPtr> tracers_;
-  };
-
-  Upstream::ClusterManager& cluster_manager_;
-  Stats::ScopeSharedPtr stats_scope_;
-  ThreadLocal::SlotPtr tls_slot_;
+protected:
+  FluentdTracerSharedPtr createInstance(Upstream::ThreadLocalCluster& cluster,
+                                        Tcp::AsyncTcpClientPtr client,
+                                        Event::Dispatcher& dispatcher, const FluentdConfig& config,
+                                        BackOffStrategyPtr backoff_strategy,
+                                        Random::RandomGenerator& random,
+                                        TimeSource& time_source) override {
+    return std::make_shared<FluentdTracerImpl>(cluster, std::move(client), dispatcher, config,
+                                               std::move(backoff_strategy), *stats_scope_, random,
+                                               time_source);
+  }
 };
+
+using FluentdTracerCacheSharedPtr = std::shared_ptr<FluentdTracerCacheImpl>;
 
 using TracerPtr = std::unique_ptr<FluentdTracerImpl>;
 

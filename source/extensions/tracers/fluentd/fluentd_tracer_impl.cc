@@ -1,4 +1,3 @@
-#include "fluentd_tracer_impl.h"
 #include "source/extensions/tracers/fluentd/fluentd_tracer_impl.h"
 
 #include <cstdint>
@@ -135,7 +134,7 @@ Driver::Driver(const FluentdConfigSharedPtr fluentd_config,
   tls_slot_->set([fluentd_config = fluentd_config_, &random, &time_source,
                   tracer_cache = tracer_cache_](Event::Dispatcher&) {
     return std::make_shared<ThreadLocalTracer>(
-        tracer_cache->getOrCreateTracer(fluentd_config, random, time_source));
+        tracer_cache->getOrCreate(fluentd_config, random, time_source));
   });
 }
 
@@ -177,29 +176,16 @@ FluentdTracerImpl::FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster,
                                      BackOffStrategyPtr backoff_strategy,
                                      Stats::Scope& parent_scope, Random::RandomGenerator& random,
                                      TimeSource& time_source)
-    : tag_(config.tag()), id_(dispatcher.name()),
-      max_connect_attempts_(
+    : FluentdBase(
+          cluster, std::move(client), dispatcher, config.tag(),
           config.has_retry_options() && config.retry_options().has_max_connect_attempts()
               ? absl::optional<uint32_t>(config.retry_options().max_connect_attempts().value())
-              : absl::nullopt),
-      stats_scope_(parent_scope.createScope(config.stat_prefix())),
-      fluentd_stats_(
-          {TRACER_FLUENTD_STATS(POOL_COUNTER(*stats_scope_), POOL_GAUGE(*stats_scope_))}),
-      cluster_(cluster), backoff_strategy_(std::move(backoff_strategy)), client_(std::move(client)),
-      buffer_flush_interval_msec_(
-          PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, DefaultBufferFlushIntervalMs)),
-      max_buffer_size_bytes_(
+              : absl::nullopt,
+          parent_scope, config.stat_prefix(), std::move(backoff_strategy),
+          PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, DefaultBufferFlushIntervalMs),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, DefaultMaxBufferSize)),
-      retry_timer_(dispatcher.createTimer([this]() -> void { onBackoffCallback(); })),
-      flush_timer_(dispatcher.createTimer([this]() {
-        flush();
-        flush_timer_->enableTimer(buffer_flush_interval_msec_);
-      })),
       option_({{"fluent_signal", "2"}, {"TimeFormat", "DateTime"}}), random_(random),
-      time_source_(time_source) {
-  client_->setAsyncTcpClientCallbacks(*this);
-  flush_timer_->enableTimer(buffer_flush_interval_msec_);
-}
+      time_source_(time_source) {}
 
 // Initialize a span object
 Span::Span(Tracing::TraceContext& trace_context, SystemTime start_time,
@@ -226,7 +212,7 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
   EntryPtr entry =
       std::make_unique<Entry>(time, std::map<std::string, std::string>{{"event", event}});
 
-  tracer_->trace(std::move(entry));
+  tracer_->log(std::move(entry));
 }
 
 // Finish and log a span as a Fluentd entry
@@ -251,7 +237,7 @@ void Span::finishSpan() {
 
   EntryPtr entry = std::make_unique<Entry>(time, std::move(record_map));
 
-  tracer_->trace(std::move(entry));
+  tracer_->log(std::move(entry));
 }
 
 // Inject the span context into the trace context
@@ -336,70 +322,17 @@ Tracing::SpanPtr FluentdTracerImpl::startSpan(Tracing::TraceContext& trace_conte
   return std::make_unique<Span>(new_span);
 }
 
-// Handle network connection events
-void FluentdTracerImpl::onEvent(Network::ConnectionEvent event) {
-  connecting_ = false;
-
-  if (event == Network::ConnectionEvent::Connected) {
-    backoff_strategy_->reset();
-    retry_timer_->disableTimer();
-    flush();
-  } else if (event == Network::ConnectionEvent::LocalClose ||
-             event == Network::ConnectionEvent::RemoteClose) {
-    ENVOY_LOG(debug, "upstream connection was closed");
-    fluentd_stats_.connections_closed_.inc();
-    maybeReconnect();
-  }
-}
-
-// Add Fluentd entry to the buffer
-void FluentdTracerImpl::trace(EntryPtr&& entry) {
-  if (disconnected_ || approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
-    fluentd_stats_.entries_lost_.inc();
-    // We will lose the data deliberately so the buffer doesn't grow infinitely.
-    ENVOY_LOG(debug, "Fluentd tracer buffer full, dropping log entry");
-    return;
-  }
-
-  approximate_message_size_bytes_ += sizeof(entry->time_) + entry->record_.size();
-  entries_.push_back(std::move(entry));
-
-  fluentd_stats_.entries_buffered_.inc();
-  if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
-    // If we exceeded the buffer limit, immediately flush the logs instead of waiting for
-    // the next flush interval, to allow new logs to be buffered.
-    flush();
-  }
-}
-
-// Flush the buffer to the Fluentd server
-void FluentdTracerImpl::flush() {
-  ASSERT(!disconnected_);
-
-  if (entries_.empty() || connecting_) {
-    // nothing to send, or we're still waiting for an upstream connection.
-    return;
-  }
-
-  if (!client_->connected()) {
-    // try to reconnect
-    connect();
-    return;
-  }
-
-  // Creating a Fluentd Forward Protocol Specification (v1) forward mode event as specified in:
-  // https://github.com/fluent/fluentd/wiki/Forward-Protocol-Specification-v1#forward-mode
-
+MessagePackBuffer FluentdTracerImpl::packMessage() {
   MessagePackBuffer buffer;
   MessagePackPacker packer(buffer);
-  packer.pack_array(3); // 1 - tag field, 2 - entries array, 3 - options map
+  packer.pack_array(3); // 1 - tag field, 2 - entries array, 3 - options map.
   packer.pack(tag_);
   packer.pack_array(entries_.size());
 
   for (auto& entry : entries_) {
     packer.pack_array(2); // 1 - time, 2 - record.
     packer.pack(entry->time_);
-    packer.pack_map(entry->record_.size()); // the number of key-value pairs in the map
+    packer.pack_map(entry->record_.size());
     for (const auto& pair : entry->record_) {
       packer.pack(pair.first);
       packer.pack(pair.second);
@@ -407,103 +340,7 @@ void FluentdTracerImpl::flush() {
   }
 
   packer.pack(option_);
-  Buffer::OwnedImpl data(buffer.data(), buffer.size());
-  client_->write(data, false);
-  fluentd_stats_.events_sent_.inc();
-  clearBuffer();
-}
-
-// Connect to the Fluentd server
-void FluentdTracerImpl::connect() {
-  connect_attempts_++;
-  if (!client_->connect()) {
-    maybeReconnect();
-    return;
-  }
-
-  connecting_ = true;
-}
-
-// Handle reconnection attempts
-void FluentdTracerImpl::maybeReconnect() {
-  if (max_connect_attempts_.has_value() && connect_attempts_ >= max_connect_attempts_) {
-    ENVOY_LOG(debug, "max connection attempts reached");
-    cluster_.info()->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
-    setDisconnected();
-    return;
-  }
-
-  uint64_t next_backoff_ms = backoff_strategy_->nextBackOffMs();
-  retry_timer_->enableTimer(std::chrono::milliseconds(next_backoff_ms));
-}
-
-// Handle backoff callback
-void FluentdTracerImpl::onBackoffCallback() {
-  fluentd_stats_.reconnect_attempts_.inc();
-  this->connect();
-}
-
-// Handle disconnection
-void FluentdTracerImpl::setDisconnected() {
-  disconnected_ = true;
-  clearBuffer();
-  ASSERT(flush_timer_ != nullptr);
-  flush_timer_->disableTimer();
-}
-
-// Clear the buffer
-void FluentdTracerImpl::clearBuffer() {
-  entries_.clear();
-  approximate_message_size_bytes_ = 0;
-}
-
-// Initialize a Fluentd tracer cache
-FluentdTracerCacheImpl::FluentdTracerCacheImpl(Upstream::ClusterManager& cluster_manager,
-                                               Stats::Scope& parent_scope,
-                                               ThreadLocal::SlotAllocator& tls)
-    : cluster_manager_(cluster_manager), stats_scope_(parent_scope.createScope("tracing.fluentd")),
-      tls_slot_(tls.allocateSlot()) {
-  tls_slot_->set(
-      [](Event::Dispatcher& dispatcher) { return std::make_shared<ThreadLocalCache>(dispatcher); });
-}
-
-// Handle Fluentd tracer retrieval or creation
-FluentdTracerSharedPtr FluentdTracerCacheImpl::getOrCreateTracer(
-    const FluentdConfigSharedPtr config, Random::RandomGenerator& random, TimeSource& time_source) {
-  auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
-  const auto cache_key = MessageUtil::hash(*config);
-  const auto it = cache.tracers_.find(cache_key);
-  if (it != cache.tracers_.end() && !it->second.expired()) {
-    return it->second.lock();
-  }
-
-  auto* cluster = cluster_manager_.getThreadLocalCluster(config->cluster());
-  if (!cluster) {
-    return nullptr;
-  }
-
-  auto client =
-      cluster->tcpAsyncClient(nullptr, std::make_shared<const Tcp::AsyncTcpClientOptions>(false));
-
-  uint64_t base_interval_ms = DefaultBaseBackoffIntervalMs;
-  uint64_t max_interval_ms = base_interval_ms * DefaultMaxBackoffIntervalFactor;
-
-  if (config->has_retry_options() && config->retry_options().has_backoff_options()) {
-    base_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options().backoff_options(),
-                                                  base_interval, DefaultBaseBackoffIntervalMs);
-    max_interval_ms =
-        PROTOBUF_GET_MS_OR_DEFAULT(config->retry_options().backoff_options(), max_interval,
-                                   base_interval_ms * DefaultMaxBackoffIntervalFactor);
-  }
-
-  BackOffStrategyPtr backoff_strategy = std::make_unique<JitteredExponentialBackOffStrategy>(
-      base_interval_ms, max_interval_ms, random);
-
-  const auto tracer = std::make_shared<FluentdTracerImpl>(
-      *cluster, std::move(client), cache.dispatcher_, *config, std::move(backoff_strategy),
-      *stats_scope_, random, time_source);
-  cache.tracers_.emplace(cache_key, tracer);
-  return tracer;
+  return buffer;
 }
 
 } // namespace Fluentd

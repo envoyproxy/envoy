@@ -95,7 +95,7 @@ TEST_F(FluentdTracerImplTest, NoWriteOnTraceIfNotConnectedToUpstream) {
   EXPECT_CALL(*async_client_, connect()).WillOnce(Return(true));
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
 }
 
@@ -105,7 +105,7 @@ TEST_F(FluentdTracerImplTest, NoWriteOnTraceIfBufferLimitNotPassed) {
   EXPECT_CALL(*async_client_, connect()).Times(0);
   EXPECT_CALL(*async_client_, connected()).Times(0);
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
 }
 
@@ -120,7 +120,7 @@ TEST_F(FluentdTracerImplTest, NoWriteOnTraceIfDisconnectedByRemote) {
     return true;
   }));
 
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
 }
 
@@ -135,7 +135,7 @@ TEST_F(FluentdTracerImplTest, NoWriteOnTraceIfDisconnectedByLocal) {
     return true;
   }));
 
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
 }
 
@@ -156,7 +156,7 @@ TEST_F(FluentdTracerImplTest, TraceSingleEntry) {
         EXPECT_EQ(expected_payload, buffer.toString());
       }));
 
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
 }
 
@@ -169,7 +169,7 @@ TEST_F(FluentdTracerImplTest, TraceTwoEntries) {
   EXPECT_CALL(*retry_timer_, disableTimer());
   EXPECT_CALL(*async_client_, connected()).Times(0);
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
 
   // Expect second entry to cause all entries to flush.
@@ -184,7 +184,7 @@ TEST_F(FluentdTracerImplTest, TraceTwoEntries) {
         std::string expected_payload = getExpectedMsgpackPayload(2);
         EXPECT_EQ(expected_payload, buffer.toString());
       }));
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
 }
 
@@ -194,7 +194,7 @@ TEST_F(FluentdTracerImplTest, CallbacksTest) {
   EXPECT_CALL(*async_client_, connect()).WillOnce(Return(true));
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
   EXPECT_NO_THROW(tracer_->onAboveWriteBufferHighWatermark());
   EXPECT_NO_THROW(tracer_->onBelowWriteBufferLowWatermark());
@@ -230,7 +230,7 @@ TEST_F(FluentdTracerImplTest, SuccessfulReconnect) {
         EXPECT_EQ(expected_payload, buffer.toString());
       }));
 
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
   retry_timer_->invokeCallback();
 }
@@ -257,7 +257,7 @@ TEST_F(FluentdTracerImplTest, ReconnectFailure) {
         return true;
       }));
 
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
   retry_timer_->invokeCallback();
 }
@@ -288,7 +288,7 @@ TEST_F(FluentdTracerImplTest, TwoReconnects) {
         return true;
       }));
 
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
   retry_timer_->invokeCallback();
   retry_timer_->invokeCallback();
@@ -306,7 +306,7 @@ TEST_F(FluentdTracerImplTest, RetryOnNoHealthyUpstream) {
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false));
   EXPECT_CALL(*async_client_, connect()).WillOnce(Return(false));
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
 }
 
@@ -317,48 +317,8 @@ TEST_F(FluentdTracerImplTest, NoWriteOnBufferFull) {
   EXPECT_CALL(*async_client_, write(_, _)).Times(0);
   EXPECT_CALL(*async_client_, connect()).Times(0);
   EXPECT_CALL(*async_client_, connected()).Times(0);
-  tracer_->trace(
+  tracer_->log(
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
-}
-
-// Fluentd tracer flushes the buffer on timer
-TEST_F(FluentdTracerImplTest, TimerFlush) {
-  // Set expected flush timer calls
-  int buffer_size_bytes = 100;
-  EXPECT_CALL(*async_client_, setAsyncTcpClientCallbacks(_));
-  EXPECT_CALL(*flush_timer_, enableTimer(_, _)).Times(3);
-
-  config_.set_tag(tag_);
-
-  config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
-  tracer_ = std::make_unique<FluentdTracerImpl>(
-      cluster_, Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_,
-      BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_, time_system_);
-
-  // Traced event will be logged on timer flush
-  EXPECT_CALL(*backoff_strategy_, reset());
-  EXPECT_CALL(*retry_timer_, disableTimer());
-  EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
-  EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
-    tracer_->onEvent(Network::ConnectionEvent::Connected);
-    return true;
-  }));
-  EXPECT_CALL(*async_client_, write(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool end_stream) {
-        EXPECT_FALSE(end_stream);
-        std::string expected_payload = getExpectedMsgpackPayload(1);
-        EXPECT_EQ(expected_payload, buffer.toString());
-      }));
-
-  tracer_->trace(
-      std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
-
-  flush_timer_->invokeCallback();
-
-  // No events to log on timer flush
-  EXPECT_CALL(*async_client_, write(_, _)).Times(0);
-
-  flush_timer_->invokeCallback();
 }
 
 // Testing cache and and tracer creation
@@ -396,10 +356,10 @@ TEST_F(FluentdTracerCacheImplTest, CreateTracerWhenClusterNotFound) {
   config.set_cluster("test_cluster");
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
-  auto tracer = tracer_cache_->getOrCreateTracer(
-      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
-      context.serverFactoryContext().api().randomGenerator(),
-      context.serverFactoryContext().timeSource());
+  auto tracer =
+      tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+                                 context.serverFactoryContext().api().randomGenerator(),
+                                 context.serverFactoryContext().timeSource());
   EXPECT_EQ(tracer, nullptr);
 }
 
@@ -409,10 +369,10 @@ TEST_F(FluentdTracerCacheImplTest, CreateNonExistingLogger) {
   config.set_cluster("test_cluster");
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
-  auto tracer = tracer_cache_->getOrCreateTracer(
-      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
-      context.serverFactoryContext().api().randomGenerator(),
-      context.serverFactoryContext().timeSource());
+  auto tracer =
+      tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+                                 context.serverFactoryContext().api().randomGenerator(),
+                                 context.serverFactoryContext().timeSource());
   EXPECT_NE(tracer, nullptr);
 }
 
@@ -423,15 +383,15 @@ TEST_F(FluentdTracerCacheImplTest, CreateTwoTracersSameHash) {
   config.set_tag("test.tag");
   config.mutable_buffer_size_bytes()->set_value(123);
 
-  auto tracer1 = tracer_cache_->getOrCreateTracer(
-      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
-      context.serverFactoryContext().api().randomGenerator(),
-      context.serverFactoryContext().timeSource());
+  auto tracer1 =
+      tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+                                 context.serverFactoryContext().api().randomGenerator(),
+                                 context.serverFactoryContext().timeSource());
 
-  auto tracer2 = tracer_cache_->getOrCreateTracer(
-      std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
-      context.serverFactoryContext().api().randomGenerator(),
-      context.serverFactoryContext().timeSource());
+  auto tracer2 =
+      tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
+                                 context.serverFactoryContext().api().randomGenerator(),
+                                 context.serverFactoryContext().timeSource());
 
   EXPECT_EQ(tracer1, tracer2);
 }
@@ -610,17 +570,6 @@ TEST(SpanContextExtractorTest, ExtractSpanContextWithMultipleTracestateEntries) 
 
   EXPECT_OK(span_context);
   EXPECT_EQ(span_context->tracestate(), "sample-tracestate,sample-tracestate-2");
-}
-
-TEST(SpanContextExtractorTest, ThrowExceptionWithInvalidHyphenation) {
-  Tracing::TestTraceContextImpl request_headers{
-      {"traceparent", fmt::format("{}-{}-{}---", version, trace_id, parent_id)}};
-  SpanContextExtractor span_context_extractor(request_headers);
-
-  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
-
-  EXPECT_FALSE(span_context.ok());
-  EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent hyphenation"));
 }
 
 } // namespace Fluentd
