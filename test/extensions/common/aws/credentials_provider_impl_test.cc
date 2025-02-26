@@ -99,15 +99,6 @@ MATCHER_P(WithAttribute, expectedCluster, "") {
                             result_listener);
 }
 
-// Friend class for testing callbacks
-class MetadataCredentialsProviderBaseFriend {
-public:
-  MetadataCredentialsProviderBaseFriend(std::shared_ptr<MetadataCredentialsProviderBase> provider)
-      : provider_(provider) {}
-
-  void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
-  std::shared_ptr<MetadataCredentialsProviderBase> provider_;
-};
 
 class ConfigCredentialsProviderTest : public testing::Test {
 public:
@@ -2612,6 +2603,13 @@ public:
                MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
                absl::string_view),
               (const));
+
+              MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider, (
+                Server::Configuration::ServerFactoryContext& context,
+                AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+                const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+                    iam_roles_anywhere_config), (const));
+            
 };
 
 class MockCustomCredentialsProviderChainFactories : public CustomCredentialsProviderChainFactories {
@@ -2634,6 +2632,13 @@ public:
       (Server::Configuration::ServerFactoryContext&, AwsClusterManagerOptRef, absl::string_view,
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&),
       (const));
+  
+  MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider, (
+    Server::Configuration::ServerFactoryContext& context,
+    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+        iam_roles_anywhere_config), (const));
+
 };
 
 class DefaultCredentialsProviderChainTest : public testing::Test {
