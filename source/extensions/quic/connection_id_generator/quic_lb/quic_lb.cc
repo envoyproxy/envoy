@@ -322,7 +322,8 @@ Factory::createCompatibleLinuxBpfSocketOption(uint32_t concurrency) {
 }
 
 static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint8_t concurrency,
-                                      uint32_t default_value, uint8_t connection_id_length) {
+                                      uint32_t default_value,
+                                      uint8_t short_header_connection_id_length) {
   const uint64_t packet_length = packet.length();
   if (packet_length < 9) {
     return default_value;
@@ -362,13 +363,13 @@ static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint8_t co
     constexpr size_t kCIDOffset = 1;
 
     WorkerRoutingIdValue worker_id;
-    if (packet_length < (kCIDOffset + connection_id_length)) {
+    if (packet_length < (kCIDOffset + short_header_connection_id_length)) {
       ENVOY_LOG_MISC(debug, "short header too short");
       return default_value;
     }
 
-    packet.copyOut(kCIDOffset + connection_id_length - sizeof(worker_id), sizeof(worker_id),
-                   &worker_id);
+    packet.copyOut(kCIDOffset + short_header_connection_id_length - sizeof(worker_id),
+                   sizeof(worker_id), &worker_id);
     if (worker_id >= concurrency) {
       ENVOY_LOG_MISC(debug, "short header unexpected value {} >= {}", worker_id, concurrency);
       return default_value;
