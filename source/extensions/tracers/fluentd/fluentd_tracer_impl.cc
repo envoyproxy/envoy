@@ -206,7 +206,7 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
 // Log an event as a Fluentd entry
 void Span::log(SystemTime /*timestamp*/, const std::string& event) {
   uint64_t time = std::chrono::duration_cast<std::chrono::seconds>(
-                      time_source_->systemTime().time_since_epoch())    
+                      time_source_->systemTime().time_since_epoch())
                       .count();
 
   EntryPtr entry =
@@ -218,7 +218,7 @@ void Span::log(SystemTime /*timestamp*/, const std::string& event) {
 // Finish and log a span as a Fluentd entry
 void Span::finishSpan() {
   uint64_t time = std::chrono::duration_cast<std::chrono::seconds>(
-                      time_source_->systemTime().time_since_epoch())    
+                      time_source_->systemTime().time_since_epoch())
                       .count();
 
   // Make the record map
