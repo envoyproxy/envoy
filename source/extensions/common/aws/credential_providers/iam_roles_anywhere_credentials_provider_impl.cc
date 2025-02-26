@@ -302,12 +302,9 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
       server_factory_context_(context) {
 
 
-    absl::optional<uint16_t> session_duration;
-    if (iam_roles_anywhere_config.has_session_duration()) {
-      session_duration = PROTOBUF_GET_SECONDS_OR_DEFAULT(
-          iam_roles_anywhere_config, session_duration,
-          Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration);
-    }
+  session_duration_ = PROTOBUF_GET_SECONDS_OR_DEFAULT(
+      iam_roles_anywhere_config, session_duration,
+      Extensions::Common::Aws::IAMRolesAnywhereSignatureConstants::DefaultExpiration);
 
   auto roles_anywhere_certificate_provider =
       std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
