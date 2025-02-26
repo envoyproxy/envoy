@@ -321,6 +321,45 @@ TEST_F(FluentdTracerImplTest, NoWriteOnBufferFull) {
       std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
 }
 
+TEST_F(FluentdTracerImplTest, TimerFlush) {
+  // Set expected flush timer calls
+  int buffer_size_bytes = 100;
+  EXPECT_CALL(*async_client_, setAsyncTcpClientCallbacks(_));
+  EXPECT_CALL(*flush_timer_, enableTimer(_, _)).Times(3);
+
+  config_.set_tag(tag_);
+
+  config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
+  tracer_ = std::make_unique<FluentdTracerImpl>(
+      cluster_, Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_,
+      BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_, &time_system_);
+
+  // Traced event will be logged on timer flush
+  EXPECT_CALL(*backoff_strategy_, reset());
+  EXPECT_CALL(*retry_timer_, disableTimer());
+  EXPECT_CALL(*async_client_, connected()).WillOnce(Return(false)).WillOnce(Return(true));
+  EXPECT_CALL(*async_client_, connect()).WillOnce(Invoke([this]() -> bool {
+    tracer_->onEvent(Network::ConnectionEvent::Connected);
+    return true;
+  }));
+  EXPECT_CALL(*async_client_, write(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool end_stream) {
+        EXPECT_FALSE(end_stream);
+        std::string expected_payload = getExpectedMsgpackPayload(1);
+        EXPECT_EQ(expected_payload, buffer.toString());
+      }));
+
+  tracer_->log(
+      std::make_unique<Entry>(time_, std::map<std::string, std::string>{{"event", "test"}}));
+
+  flush_timer_->invokeCallback();
+
+  // No events to log on timer flush
+  EXPECT_CALL(*async_client_, write(_, _)).Times(0);
+
+  flush_timer_->invokeCallback();
+}
+
 // Testing cache and and tracer creation
 class FluentdTracerCacheImplTest : public testing::Test {
 public:
@@ -474,6 +513,17 @@ TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidHyphenation) {
 
   EXPECT_FALSE(span_context.ok());
   EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent header length"));
+}
+
+TEST(SpanContextExtractorTest, ThrowExceptionWithInvalidHyphenation) {
+  Tracing::TestTraceContextImpl request_headers{
+      {"traceparent", fmt::format("{}-{}-{}---", version, trace_id, parent_id)}};
+  SpanContextExtractor span_context_extractor(request_headers);
+
+  absl::StatusOr<SpanContext> span_context = span_context_extractor.extractSpanContext();
+
+  EXPECT_FALSE(span_context.ok());
+  EXPECT_THAT(span_context, HasStatusMessage("Invalid traceparent hyphenation"));
 }
 
 TEST(SpanContextExtractorTest, ThrowsExceptionWithInvalidSizes) {
