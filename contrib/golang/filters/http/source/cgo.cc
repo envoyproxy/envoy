@@ -151,6 +151,14 @@ CAPIStatus envoyGoFilterHttpAddData(void* s, void* data, int data_len, bool is_s
       });
 }
 
+CAPIStatus envoyGoFilterHttpInjectData(void* s, void* data, int data_length) {
+  return envoyGoFilterProcessStateHandlerWrapper(
+      s, [data, data_length](std::shared_ptr<Filter>& filter, ProcessorState& state) -> CAPIStatus {
+        auto value = stringViewFromGoPointer(data, data_length);
+        return filter->injectData(state, value);
+      });
+}
+
 // unsafe API, without copy memory from c to go.
 CAPIStatus envoyGoFilterHttpGetHeader(void* s, void* key_data, int key_len, uint64_t* value_data,
                                       int* value_len) {

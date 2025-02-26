@@ -4,6 +4,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/formatter/substitution_formatter.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/common/protobuf/protobuf.h"
@@ -70,11 +71,13 @@ public:
    * @param filter filter to determine whether a particular request should be logged. If no filter
    * was specified in the configuration, argument will be nullptr.
    * @param context access log context through which persistent resources can be accessed.
+   * @param command_parsers vector of command parsers that provide by the caller to be used for
+   * parsing custom substitution commands.
    */
-  virtual AccessLog::InstanceBaseSharedPtr<Context>
-  createAccessLogInstance(const Protobuf::Message& config,
-                          AccessLog::FilterBasePtr<Context>&& filter,
-                          Server::Configuration::FactoryContext& context) PURE;
+  virtual AccessLog::InstanceBaseSharedPtr<Context> createAccessLogInstance(
+      const Protobuf::Message& config, AccessLog::FilterBasePtr<Context>&& filter,
+      Server::Configuration::FactoryContext& context,
+      std::vector<Formatter::CommandParserBasePtr<Context>>&& command_parsers = {}) PURE;
 
   std::string category() const override { return category_; }
 
