@@ -21,12 +21,17 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
                                       std::string(dynamic_module.status().message()));
   }
 
+  std::string config;
+  if (proto_config.has_filter_config()) {
+    auto config_or_error = MessageUtil::anyToBytes(proto_config.filter_config());
+    RETURN_IF_NOT_OK_REF(config_or_error.status());
+    config = std::move(config_or_error.value());
+  }
   absl::StatusOr<
       Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-              proto_config.filter_name(), proto_config.filter_config(),
-              std::move(dynamic_module.value()));
+              proto_config.filter_name(), config, std::move(dynamic_module.value()));
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create filter config: " +

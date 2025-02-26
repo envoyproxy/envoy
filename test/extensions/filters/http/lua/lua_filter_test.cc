@@ -26,12 +26,10 @@
 using testing::_;
 using testing::AtLeast;
 using testing::Eq;
-using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
-using testing::StrEq;
 
 namespace Envoy {
 namespace Extensions {
@@ -3128,6 +3126,22 @@ TEST_F(LuaHttpFilterTest, StatsWithPerFilterPrefix) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   });
   EXPECT_EQ(2, stats_store_.counter("test.lua.my_script.errors").value());
+}
+
+// Test clear route cache.
+TEST_F(LuaHttpFilterTest, ClearRouteCache) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:clearRouteCache()
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
 // Test successful upstream host override

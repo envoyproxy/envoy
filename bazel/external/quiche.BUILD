@@ -3014,6 +3014,7 @@ envoy_cc_library(
         ":quic_platform_base",
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_ip_address",
+        ":quiche_common_socket_address",
         ":quiche_common_wire_serialization",
         ":quiche_web_transport_web_transport_lib",
     ],

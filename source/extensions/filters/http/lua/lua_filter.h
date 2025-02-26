@@ -117,6 +117,11 @@ public:
    * @param host_and_strict supplies the host and whether the host should be treated as strict.
    */
   virtual void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) PURE;
+
+  /**
+   * Clear the route cache explicitly.
+   */
+  virtual void clearRouteCache() PURE;
 };
 
 class Filter;
@@ -188,7 +193,8 @@ public:
             {"timestamp", static_luaTimestamp},
             {"timestampString", static_luaTimestampString},
             {"connectionStreamInfo", static_luaConnectionStreamInfo},
-            {"setUpstreamOverrideHost", static_luaSetUpstreamOverrideHost}};
+            {"setUpstreamOverrideHost", static_luaSetUpstreamOverrideHost},
+            {"clearRouteCache", static_luaClearRouteCache}};
   }
 
 private:
@@ -314,6 +320,11 @@ private:
    * @param 2 (bool): Optional strict flag. Defaults to false.
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaSetUpstreamOverrideHost);
+
+  /**
+   * Clear the route cache explicitly.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaClearRouteCache);
 
   enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
@@ -549,6 +560,11 @@ private:
     void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
       callbacks_->setUpstreamOverrideHost(std::move(host_and_strict));
     }
+    void clearRouteCache() override {
+      if (auto cb = callbacks_->downstreamCallbacks(); cb.has_value()) {
+        cb->clearRouteCache();
+      }
+    }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -576,6 +592,7 @@ private:
     void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) override {
       UNREFERENCED_PARAMETER(host_and_strict);
     }
+    void clearRouteCache() override {}
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
