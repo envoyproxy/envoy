@@ -26,9 +26,7 @@ void ImageManifestFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   message->headers().setCopy(Http::CustomHeaders::get().Authorization, authz_header_value_);
-
-  // TODO: set "Accept: application/vnd.oci.image.manifest.v1+json"
-  ENVOY_LOG(info, "fetch oci image from [uri = {}]: start", uri_.uri());
+  ENVOY_LOG(debug, "fetch oci image from [uri = {}]: start", uri_.uri());
   const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
   if (thread_local_cluster != nullptr) {
     request_ = thread_local_cluster->httpAsyncClient().send(
@@ -36,7 +34,7 @@ void ImageManifestFetcher::fetch() {
         Http::AsyncClient::RequestOptions().setTimeout(
             std::chrono::milliseconds(DurationUtil::durationToMilliseconds(uri_.timeout()))));
   } else {
-    ENVOY_LOG(info, "fetch oci image [uri = {}]: no cluster {}", uri_.uri(), uri_.cluster());
+    ENVOY_LOG(debug, "fetch oci image [uri = {}]: no cluster {}", uri_.uri(), uri_.cluster());
     callback_.onFailure(Config::DataFetcher::FailureReason::Network);
   }
 }
