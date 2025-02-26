@@ -23,9 +23,9 @@ resources:
     name: quic_lb
     generic_secret:
       secrets:
-        key:
+        encryption_key:
           inline_string: "0000000000000000"
-        version:
+        configuration_version:
           inline_bytes: )EOF",
                      Base64::encode(&version, sizeof(version)), "\n"),
         false);

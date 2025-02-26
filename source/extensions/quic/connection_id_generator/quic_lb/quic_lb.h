@@ -15,6 +15,8 @@ namespace Extensions {
 namespace ConnectionIdGenerator {
 namespace QuicLb {
 
+// If this type changes such that more bytes are required, update the docs in quic_lb.proto which
+// specifies the maximum length of the server_id and nonce combined.
 using WorkerRoutingIdValue = uint8_t;
 
 class QuicLbConnectionIdGenerator : public quic::ConnectionIdGeneratorInterface {

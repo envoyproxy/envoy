@@ -156,9 +156,9 @@ absl::StatusOr<std::pair<std::string, uint8_t>> getAndValidateKeyAndVersion(
     const envoy::extensions::transport_sockets::tls::v3::GenericSecret& secret, Api::Api& api) {
   const auto& secrets = secret.secrets();
 
-  auto key_it = secrets.find("key");
+  auto key_it = secrets.find("encryption_key");
   if (key_it == secrets.end()) {
-    return absl::InvalidArgumentError("Missing 'key'");
+    return absl::InvalidArgumentError("Missing 'encryption_key'");
   }
 
   auto key_or_result = Config::DataSource::read(key_it->second, false, api);
@@ -166,26 +166,28 @@ absl::StatusOr<std::pair<std::string, uint8_t>> getAndValidateKeyAndVersion(
 
   std::string key = key_or_result.value();
   if (key.size() != quic::kLoadBalancerKeyLen) {
-    return absl::InvalidArgumentError(fmt::format("'key' length was {}, but it must be length {}",
-                                                  key.size(), quic::kLoadBalancerKeyLen));
+    return absl::InvalidArgumentError(
+        fmt::format("'encryption_key' length was {}, but it must be length {}", key.size(),
+                    quic::kLoadBalancerKeyLen));
   }
 
-  auto version_it = secrets.find("version");
+  auto version_it = secrets.find("configuration_version");
   if (version_it == secrets.end()) {
-    return absl::InvalidArgumentError("Missing 'version'");
+    return absl::InvalidArgumentError("Missing 'configuration_version'");
   }
 
   auto version_or_result = Config::DataSource::read(version_it->second, false, api);
   RETURN_IF_NOT_OK_REF(version_or_result.status());
 
   if (version_or_result.value().size() != sizeof(uint8_t)) {
-    return absl::InvalidArgumentError(fmt::format(
-        "'version' length was {}, but it must be length 1 byte", version_or_result.value().size()));
+    return absl::InvalidArgumentError(
+        fmt::format("'configuration_version' length was {}, but it must be length 1 byte",
+                    version_or_result.value().size()));
   }
   uint8_t version = version_or_result.value().data()[0];
   if (version > quic::kNumLoadBalancerConfigs) {
     return absl::InvalidArgumentError(
-        fmt::format("'version' was {}, but must be less than or equal to {}", version,
+        fmt::format("'configuration_version' was {}, but must be less than or equal to {}", version,
                     quic::kNumLoadBalancerConfigs));
   }
 

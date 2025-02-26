@@ -32,22 +32,27 @@ message Config {
   bool unsafe_unencrypted_testing_mode = 1;
 
   // Must be at least 1 octet.
-  // The length of server_id and nonce_length_bytes must be 19 or less.
+  // The length of server_id and nonce_length_bytes must be 18 or less.
+  // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-server-id-allocation.
   config.core.v3.DataSource server_id = 2 [(validate.rules).message = {required: true}];
 
   // The nonce length must be at least 4 bytes.
-  // The length of server_id and nonce_length_bytes must be 19 bytes or less.
+  // The length of server_id and nonce_length_bytes must be 18 bytes or less.
   uint32 nonce_length_bytes = 3 [(validate.rules).uint32 = {gte: 4, lte: 16}];
 
   // Encode the encrypted connection ID component into the first byte of the connection ID,
   // as defined in the RFC.
+  // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-length-self-description.
   bool self_encode_length = 4;
 
   // Configuration to fetch the encryption key and configuration version.
   //
   // The SDS service is for a :ref:`GenericSecret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.GenericSecret>`.
-  // The data should populate :ref:`secrets <envoy_v3_api_field_extensions.transport_sockets.tls.v3.GenericSecret.secrets>`
-  // with "key" containing the 16 byte encryption key, and "version" containing a 1 byte unsigned integer of value
-  // less than 8.
+  // The data should populate :ref:`secrets <envoy_v3_api_field_extensions.transport_sockets.tls.v3.GenericSecret.secrets>`:
+  //
+  // "encryption_key" must contain the 16 byte encryption key.
+  //
+  // "configuration_version" must contain a 1 byte unsigned integer of value less than 8.
+  // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-config-rotation.
   transport_sockets.tls.v3.SdsSecretConfig encryption_parmeters = 5 [(validate.rules).message = {required: true}];
 }
