@@ -45,6 +45,8 @@ protected:
         Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(WasmName);
     ASSERT_NE(factory, nullptr);
     api_ = Api::createApiForTest(stats_store_);
+    EXPECT_CALL(context_, getTransportSocketFactoryContext())
+        .WillRepeatedly(testing::ReturnRef(transport_socket_factory_context_));
     EXPECT_CALL(context_, api()).WillRepeatedly(testing::ReturnRef(*api_));
     EXPECT_CALL(context_, initManager()).WillRepeatedly(testing::ReturnRef(init_manager_));
     EXPECT_CALL(context_, lifecycleNotifier())
@@ -56,6 +58,8 @@ protected:
 
   envoy::extensions::stat_sinks::wasm::v3::Wasm config_;
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
   testing::NiceMock<Server::MockServerLifecycleNotifier> lifecycle_notifier_;
   Init::ExpectableWatcherImpl init_watcher_;
   Stats::IsolatedStoreImpl stats_store_;
