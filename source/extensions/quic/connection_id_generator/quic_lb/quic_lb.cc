@@ -61,17 +61,12 @@ uint8_t QuicLbConnectionIdGenerator::ConnectionIdLength(uint8_t first_byte) cons
 
 absl::optional<quic::QuicConnectionId>
 QuicLbConnectionIdGenerator::appendRoutingId(quic::QuicConnectionId& new_connection_id,
-                                             const quic::QuicConnectionId& old_connection_id) {
+                                             const quic::QuicConnectionId&) {
   uint8_t buffer[quic::kQuicMaxConnectionIdWithLengthPrefixLength];
 
   const uint16_t new_length = new_connection_id.length() + sizeof(WorkerRoutingIdValue);
   if (new_length > sizeof(buffer)) {
     IS_ENVOY_BUG("Invalid encoder configuration led to connection id being too long");
-    return {};
-  }
-
-  if (old_connection_id.length() < sizeof(WorkerRoutingIdValue)) {
-    IS_ENVOY_BUG("Unexpected very short connection id");
     return {};
   }
 
@@ -94,6 +89,8 @@ QuicLbConnectionIdGenerator::appendRoutingId(quic::QuicConnectionId& new_connect
   ASSERT(tls_slot_->encoder_.IsEncoding());
   return quic::QuicConnectionId(absl::Span<const uint8_t>(buffer, new_length));
 }
+
+bool QuicLbConnectionIdGenerator::ready() const { return tls_slot_->encoder_.IsEncoding(); }
 
 QuicLbConnectionIdGenerator::ThreadLocalData::ThreadLocalData(
     const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config,
@@ -190,9 +187,9 @@ absl::StatusOr<KeyAndVersion> getAndValidateKeyAndVersion(
                     version_or_result.value().size()));
   }
   const uint8_t version = version_or_result.value().data()[0];
-  if (version > quic::kNumLoadBalancerConfigs) {
+  if (version >= quic::kNumLoadBalancerConfigs) {
     return absl::InvalidArgumentError(
-        fmt::format("'configuration_version' was {}, but must be less than or equal to {}", version,
+        fmt::format("'configuration_version' was {}, but must be less than {}", version,
                     quic::kNumLoadBalancerConfigs));
   }
 
@@ -241,6 +238,17 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
         QuicLbConnectionIdGenerator::connectionIdLengthAddition();
   }
 
+  ret->tls_slot_ = ThreadLocal::TypedSlot<QuicLbConnectionIdGenerator::ThreadLocalData>::makeUnique(
+      context.serverFactoryContext().threadLocal());
+
+  // using InitializeCb = std::function<std::shared_ptr<T>(Event::Dispatcher & dispatcher)>;
+  ret->tls_slot_->set(
+      [=](Event::Dispatcher&) -> std::shared_ptr<QuicLbConnectionIdGenerator::ThreadLocalData> {
+        auto result = QuicLbConnectionIdGenerator::ThreadLocalData::create(config, server_id);
+        ASSERT(result.status().ok()); // Configuration was validated above.
+        return result.value();
+      });
+
   ret->secrets_provider_ =
       secretsProvider(config.encryption_parameters(), context.getTransportSocketFactoryContext(),
                       context.initManager());
@@ -255,50 +263,41 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
 
   ret->secrets_provider_update_callback_handle_ = ret->secrets_provider_->addUpdateCallback(
       [&factory = *ret, &api = context.serverFactoryContext().api()]() -> absl::Status {
-        const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret =
-            factory.secrets_provider_->secret();
-        if (secret == nullptr) {
-          return absl::NotFoundError("secret update callback called with empty secret");
-        }
-
-        auto data_or_result = getAndValidateKeyAndVersion(*secret, api);
-
-        // `getAndValidateKeyAndVersion` was called via `addValidationCallback` already, so this
-        // should not be able to fail.
-        ENVOY_BUG(data_or_result.ok(), "quic_lb unexpected error in updating configuration; old "
-                                       "configuration will still be used");
-        RETURN_IF_NOT_OK_REF(data_or_result.status());
-
-        factory.tls_slot_->runOnAllThreads(
-            [data =
-                 data_or_result.value()](OptRef<QuicLbConnectionIdGenerator::ThreadLocalData> obj) {
-              ASSERT(obj.has_value(),
-                     "Guaranteed if `set()` was previously called on the tls slot");
-
-              auto result =
-                  obj->updateKeyAndVersion(data.encryption_key_, data.configuration_version_);
-
-              // Because all parameters were validated earlier, it should not be possible for this
-              // to fail.
-              ENVOY_BUG(result.ok(), "quic_lb unexpected error in updating configuration; old "
-                                     "configuration will still be used");
-            });
-
-        return absl::OkStatus();
+        return factory.updateSecret(api);
       });
 
-  ret->tls_slot_ = ThreadLocal::TypedSlot<QuicLbConnectionIdGenerator::ThreadLocalData>::makeUnique(
-      context.serverFactoryContext().threadLocal());
-
-  // using InitializeCb = std::function<std::shared_ptr<T>(Event::Dispatcher & dispatcher)>;
-  ret->tls_slot_->set(
-      [=](Event::Dispatcher&) -> std::shared_ptr<QuicLbConnectionIdGenerator::ThreadLocalData> {
-        auto result = QuicLbConnectionIdGenerator::ThreadLocalData::create(config, server_id);
-        ASSERT(result.status().ok()); // Configuration was validated above.
-        return result.value();
-      });
+  if (ret->secrets_provider_->secret()) {
+    auto status = ret->updateSecret(context.serverFactoryContext().api());
+    RETURN_IF_NOT_OK_REF(status);
+  }
 
   return ret;
+}
+
+absl::Status Factory::updateSecret(Api::Api& api) {
+  const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret =
+      secrets_provider_->secret();
+  if (secret == nullptr) {
+    return absl::NotFoundError("secret update callback called with empty secret");
+  }
+
+  auto data_or_result = getAndValidateKeyAndVersion(*secret, api);
+
+  RETURN_IF_NOT_OK_REF(data_or_result.status());
+
+  tls_slot_->runOnAllThreads(
+      [data = data_or_result.value()](OptRef<QuicLbConnectionIdGenerator::ThreadLocalData> obj) {
+        ASSERT(obj.has_value(), "Guaranteed if `set()` was previously called on the tls slot");
+
+        auto result = obj->updateKeyAndVersion(data.encryption_key_, data.configuration_version_);
+
+        // Because all parameters were validated earlier, it should not be possible for this
+        // to fail.
+        ENVOY_BUG(result.ok(), "quic_lb unexpected error in updating configuration; old "
+                               "configuration will still be used");
+      });
+
+  return absl::OkStatus();
 }
 
 QuicConnectionIdGeneratorPtr Factory::createQuicConnectionIdGenerator(uint32_t worker_id) {

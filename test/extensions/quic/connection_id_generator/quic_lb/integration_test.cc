@@ -40,7 +40,7 @@ resources:
           envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config config;
           *config.mutable_server_id()->mutable_inline_string() = "myid";
           config.set_nonce_length_bytes(12);
-          auto* sds = config.mutable_encryption_parmeters();
+          auto* sds = config.mutable_encryption_parameters();
           sds->set_name("quic_lb");
           sds->mutable_sds_config()->mutable_path_config_source()->set_path(
               TestEnvironment::substitute("{{ test_tmpdir }}/quic_lb.yaml"));

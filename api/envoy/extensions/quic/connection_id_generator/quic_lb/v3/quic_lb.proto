@@ -56,7 +56,7 @@ message Config {
   //
   // "encryption_key" must contain the 16 byte encryption key.
   //
-  // "configuration_version" must contain a 1 byte unsigned integer of value less than 8.
+  // "configuration_version" must contain a 1 byte unsigned integer of value less than 7.
   // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-config-rotation.
   transport_sockets.tls.v3.SdsSecretConfig encryption_parameters = 5 [(validate.rules).message = {required: true}];
 }

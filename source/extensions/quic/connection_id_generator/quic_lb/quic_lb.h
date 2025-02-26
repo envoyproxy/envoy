@@ -55,6 +55,9 @@ public:
   // creates.
   static uint8_t connectionIdLengthAddition() { return sizeof(WorkerRoutingIdValue); }
 
+  // Returns true if all configuration and secrets are valid and configured.
+  bool ready() const;
+
   absl::optional<quic::QuicConnectionId>
   appendRoutingId(quic::QuicConnectionId& new_connection_id,
                   const quic::QuicConnectionId& old_connection_id);
@@ -79,6 +82,7 @@ public:
 
 private:
   Factory(const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config);
+  absl::Status updateSecret(Api::Api& api);
 
   const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config config_;
   Secret::GenericSecretConfigProviderSharedPtr secrets_provider_;
