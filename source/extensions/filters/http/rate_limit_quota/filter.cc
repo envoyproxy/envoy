@@ -31,11 +31,15 @@ namespace HttpFilters {
 namespace RateLimitQuota {
 
 const char kBucketMetadataNamespace[] = "envoy.extensions.http_filters.rate_limit_quota.bucket";
+const char kPreviewBucketMetadataNamespace[] =
+    "envoy.extensions.http_filters.rate_limit_quota.preview_bucket";
 
 using envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaBucketSettings;
 using envoy::type::v3::RateLimitStrategy;
 using NoAssignmentBehavior = RateLimitQuotaBucketSettings::NoAssignmentBehavior;
 using DenyResponseSettings = RateLimitQuotaBucketSettings::DenyResponseSettings;
+using MatchTree = Matcher::MatchTree<Http::HttpMatchingData>;
+using MatchTreePtr = std::unique_ptr<MatchTree>;
 
 // Returns whether or not to allow a request based on the no-assignment-behavior
 // & populates an action.
@@ -68,33 +72,20 @@ addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
 
 Http::FilterHeadersStatus sendDenyResponse(Http::StreamDecoderFilterCallbacks* cb,
                                            const DenyResponseSettings& settings,
-                                           StreamInfo::CoreResponseFlag flag) {
-  cb->sendLocalReply(getDenyResponseCode(settings), settings.http_body().value(),
-                     addDenyResponseHeadersCb(settings), absl::nullopt, "");
-  cb->streamInfo().setResponseFlag(flag);
+                                           StreamInfo::CoreResponseFlag flag, bool preview) {
+  if (!preview) {
+    // Only set deny response details from non-preview actions.
+    cb->sendLocalReply(getDenyResponseCode(settings), settings.http_body().value(),
+                       addDenyResponseHeadersCb(settings), absl::nullopt, "");
+    cb->streamInfo().setResponseFlag(flag);
+  }
   return Envoy::Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
-                                                              bool end_stream) {
-  ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
-  // First, perform the request matching.
-  absl::StatusOr<Matcher::ActionPtr> match_result = requestMatching(headers);
-  if (!match_result.ok()) {
-    // When the request is not matched by any matchers, it is ALLOWED by default
-    // (i.e., fail-open) and its quota usage will not be reported to RLQS
-    // server.
-    // TODO(tyxia) Add stats here and other places throughout the filter. e.g.
-    // request allowed/denied, matching succeed/fail and so on.
-    ENVOY_LOG(debug,
-              "The request is not matched by any matchers: ", match_result.status().message());
-    return Envoy::Http::FilterHeadersStatus::Continue;
-  }
-
-  // Second, generate the bucket id for this request based on match action when
-  // the request matching succeeds.
-  const RateLimitOnMatchAction& match_action =
-      match_result.value()->getTyped<RateLimitOnMatchAction>();
+Http::FilterHeadersStatus
+RateLimitQuotaFilter::executeMatchedAction(const RateLimitOnMatchAction& match_action,
+                                           bool preview) {
+  // Generate the bucket id for this request based on matched action.
   absl::StatusOr<BucketId> ret =
       match_action.generateBucketId(*data_ptr_, factory_context_, visitor_);
   if (!ret.ok()) {
@@ -115,7 +106,8 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   for (const auto& bucket : bucket_id_proto.bucket()) {
     (*bucket_log_fields)[bucket.first] = ValueUtil::stringValue(bucket.second);
   }
-  callbacks_->streamInfo().setDynamicMetadata(kBucketMetadataNamespace, bucket_log);
+  callbacks_->streamInfo().setDynamicMetadata(
+      (preview) ? kPreviewBucketMetadataNamespace : kBucketMetadataNamespace, bucket_log);
 
   // Settings needed if a cached bucket or default behavior decides to deny.
   const DenyResponseSettings& deny_response_settings =
@@ -124,7 +116,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   std::shared_ptr<CachedBucket> cached_bucket = client_->getBucket(bucket_id);
   if (cached_bucket != nullptr) {
     // Found the cached bucket entry.
-    return processCachedBucket(deny_response_settings, *cached_bucket);
+    return processCachedBucket(deny_response_settings, *cached_bucket, preview);
   }
 
   // New buckets should have a configured default action pulled from
@@ -171,7 +163,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   client_->createBucket(bucket_id_proto, bucket_id, default_bucket_action,
                         std::move(expiration_fallback_action), expiration_fallback_ttl,
                         shouldAllowInitialRequest);
-  ENVOY_LOG(debug, "Requesting addition to the global RLQS bucket cache: ",
+  ENVOY_LOG(debug, "Requesting addition to the global RLQS bucket cache: {}",
             bucket_id_proto.ShortDebugString());
 
   if (shouldAllowInitialRequest) {
@@ -179,13 +171,84 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   }
 
   return sendDenyResponse(callbacks_, deny_response_settings,
-                          StreamInfo::CoreResponseFlag::ResponseFromCacheFilter);
+                          StreamInfo::CoreResponseFlag::ResponseFromCacheFilter, preview);
+}
+
+// Search through re-entry points until the request matches a non-preview action.
+absl::optional<RateLimitOnMatchAction>
+RateLimitQuotaFilter::findNonPreviewAction(Http::RequestHeaderMap& headers,
+                                           MatchTreePtr matcher_reentrant) {
+  MatchTreePtr current_reentrant = std::move(matcher_reentrant);
+  MatchTreePtr next_reentrant = nullptr;
+
+  // Loop until we find a non-preview action, matching fails or we run out of re-entry points.
+  for (; current_reentrant != nullptr; current_reentrant = std::move(next_reentrant)) {
+    absl::StatusOr<Matcher::ActionPtr> reentry_match_result =
+        requestMatching(current_reentrant.get(), headers, &next_reentrant);
+    // Exit if re-entry failed to find another action.
+    if (!reentry_match_result.ok()) {
+      ENVOY_LOG(debug, "findNonPreviewAction: matching failed during re-entry: {}",
+                reentry_match_result.status().message());
+      return absl::nullopt;
+    }
+    RateLimitOnMatchAction next_match_action =
+        reentry_match_result.value()->getTyped<RateLimitOnMatchAction>();
+    // Skip any matched, preview actions after the first.
+    if (!next_match_action.bucketSettings().preview_mode()) {
+      ENVOY_LOG(debug, "findNonPreviewAction: found non-preview action during MatchTree re-entry.");
+      return std::move(next_match_action);
+    }
+    ENVOY_LOG(debug,
+              "findNonPreviewAction: skipped subsequent preview action during MatchTree re-entry.");
+  }
+  return absl::nullopt;
+}
+
+Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeaderMap& headers,
+                                                              bool end_stream) {
+  ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
+  // First, perform the request matching.
+  MatchTreePtr matcher_reentrant = nullptr;
+  absl::StatusOr<Matcher::ActionPtr> match_result =
+      requestMatching(matcher_.get(), headers, &matcher_reentrant);
+  if (!match_result.ok()) {
+    // When the request is not matched by any matchers, it is ALLOWED by default
+    // (i.e., fail-open) and its quota usage will not be reported to RLQS
+    // server.
+    // TODO(tyxia) Add stats here and other places throughout the filter. e.g.
+    // request allowed/denied, matching succeed/fail and so on.
+    ENVOY_LOG(debug, "decodeHeaders: the request is not matched by any matchers: ",
+              match_result.status().message());
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+
+  RateLimitOnMatchAction match_action = match_result.value()->getTyped<RateLimitOnMatchAction>();
+  // The simplest case is when the initially matched action is non-preview & enforceable.
+  if (!match_action.bucketSettings().preview_mode()) {
+    return executeMatchedAction(match_action, false);
+  }
+  // Else we execute standard usage aggregation, bucket creation, etc for the preview action but
+  // ignore the resulting rate-limiting decision.
+  executeMatchedAction(match_action, true);
+
+  // Next, re-enter the MatcherTree, if possible, to find an enforceable action / on-no-match
+  // action.
+  absl::optional<RateLimitOnMatchAction> non_preview_action =
+      findNonPreviewAction(headers, std::move(matcher_reentrant));
+  if (!non_preview_action.has_value()) {
+    ENVOY_LOG(debug, "decodeHeaders: the request is not matched by any non-preview matchers: ",
+              match_result.status().message());
+    return Envoy::Http::FilterHeadersStatus::Continue;
+  }
+
+  return executeMatchedAction(*non_preview_action, false);
 }
 
 // TODO(tyxia) Currently request matching is only performed on the request
 // header.
 absl::StatusOr<Matcher::ActionPtr>
-RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
+RateLimitQuotaFilter::requestMatching(MatchTree* matcher, const Http::RequestHeaderMap& headers,
+                                      MatchTreePtr* matcher_reentrant_out) {
   // Initialize the data pointer on first use and reuse it for subsequent
   // requests. This avoids creating the data object for every request, which
   // is expensive.
@@ -196,8 +259,8 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
     data_ptr_ = std::make_unique<Http::Matching::HttpMatchingDataImpl>(callbacks_->streamInfo());
   }
 
-  if (matcher_ == nullptr) {
-    return absl::InternalError("Matcher tree has not been initialized yet.");
+  if (matcher == nullptr) {
+    return absl::InternalError("Matcher tree is null.");
   }
   // Populate the request header.
   if (!headers.empty()) {
@@ -205,7 +268,8 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   }
 
   // Perform the matching.
-  auto match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, *data_ptr_);
+  auto match_result =
+      Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher, *data_ptr_, matcher_reentrant_out);
   if (match_result.match_state_ != Matcher::MatchState::MatchComplete) {
     // The returned state from `evaluateMatch` function is `MatchState::UnableToMatch` here.
     return absl::InternalError("Unable to match due to the required data not being available.");
@@ -266,7 +330,7 @@ bool RateLimitQuotaFilter::shouldAllowRequest(const CachedBucket& cached_bucket)
 
 Http::FilterHeadersStatus
 RateLimitQuotaFilter::processCachedBucket(const DenyResponseSettings& deny_response_settings,
-                                          CachedBucket& cached_bucket) {
+                                          CachedBucket& cached_bucket, bool preview) {
   // The QuotaUsage of a cached bucket should never be null. If it is due to a
   // bug, this will crash.
   std::shared_ptr<QuotaUsage> quota_usage = cached_bucket.quota_usage;
@@ -280,7 +344,7 @@ RateLimitQuotaFilter::processCachedBucket(const DenyResponseSettings& deny_respo
   // TODO(tyxia) Build the customized response based on
   // `DenyResponseSettings` if it is configured.
   return sendDenyResponse(callbacks_, deny_response_settings,
-                          StreamInfo::CoreResponseFlag::ResponseFromCacheFilter);
+                          StreamInfo::CoreResponseFlag::ResponseFromCacheFilter, preview);
 }
 
 } // namespace RateLimitQuota
