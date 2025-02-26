@@ -27,7 +27,7 @@ public:
     create(const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config,
            absl::string_view server_id);
 
-    absl::Status updateKeyAndVersion(const std::string& key, uint8_t version);
+    absl::Status updateKeyAndVersion(absl::string_view key, uint8_t version);
 
     quic::LoadBalancerEncoder encoder_;
 

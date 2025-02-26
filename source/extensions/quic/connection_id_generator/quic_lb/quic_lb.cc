@@ -115,7 +115,7 @@ QuicLbConnectionIdGenerator::ThreadLocalData::create(
 }
 
 absl::Status
-QuicLbConnectionIdGenerator::ThreadLocalData::updateKeyAndVersion(const std::string& key,
+QuicLbConnectionIdGenerator::ThreadLocalData::updateKeyAndVersion(absl::string_view key,
                                                                   uint8_t version) {
   std::optional<quic::LoadBalancerConfig> lb_config;
   if (unsafe_unencrypted_testing_mode_) {
@@ -152,7 +152,12 @@ Secret::GenericSecretConfigProviderSharedPtr secretsProvider(
   }
 }
 
-absl::StatusOr<std::pair<std::string, uint8_t>> getAndValidateKeyAndVersion(
+struct KeyAndVersion {
+  std::string encryption_key_;
+  uint8_t configuration_version_;
+};
+
+absl::StatusOr<KeyAndVersion> getAndValidateKeyAndVersion(
     const envoy::extensions::transport_sockets::tls::v3::GenericSecret& secret, Api::Api& api) {
   const auto& secrets = secret.secrets();
 
@@ -164,7 +169,7 @@ absl::StatusOr<std::pair<std::string, uint8_t>> getAndValidateKeyAndVersion(
   auto key_or_result = Config::DataSource::read(key_it->second, false, api);
   RETURN_IF_NOT_OK_REF(key_or_result.status());
 
-  std::string key = key_or_result.value();
+  const std::string key = key_or_result.value();
   if (key.size() != quic::kLoadBalancerKeyLen) {
     return absl::InvalidArgumentError(
         fmt::format("'encryption_key' length was {}, but it must be length {}", key.size(),
@@ -184,14 +189,14 @@ absl::StatusOr<std::pair<std::string, uint8_t>> getAndValidateKeyAndVersion(
         fmt::format("'configuration_version' length was {}, but it must be length 1 byte",
                     version_or_result.value().size()));
   }
-  uint8_t version = version_or_result.value().data()[0];
+  const uint8_t version = version_or_result.value().data()[0];
   if (version > quic::kNumLoadBalancerConfigs) {
     return absl::InvalidArgumentError(
         fmt::format("'configuration_version' was {}, but must be less than or equal to {}", version,
                     quic::kNumLoadBalancerConfigs));
   }
 
-  return std::make_pair(key, version);
+  return KeyAndVersion{std::move(key), version};
 }
 
 } // namespace
@@ -270,7 +275,8 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
               ASSERT(obj.has_value(),
                      "Guaranteed if `set()` was previously called on the tls slot");
 
-              auto result = obj->updateKeyAndVersion(data.first, data.second);
+              auto result =
+                  obj->updateKeyAndVersion(data.encryption_key_, data.configuration_version_);
 
               // Because all parameters were validated earlier, it should not be possible for this
               // to fail.
