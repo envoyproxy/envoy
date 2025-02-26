@@ -80,7 +80,7 @@ public:
   FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster, Tcp::AsyncTcpClientPtr client,
                     Event::Dispatcher& dispatcher, const FluentdConfig& config,
                     BackOffStrategyPtr backoff_strategy, Stats::Scope& parent_scope,
-                    Random::RandomGenerator& random, TimeSource& time_source);
+                    Random::RandomGenerator& random, TimeSource* time_source);
 
   Tracing::SpanPtr startSpan(Tracing::TraceContext& trace_context, SystemTime start_time,
                              const std::string& operation_name, Tracing::Decision tracing_decision);
@@ -94,7 +94,7 @@ public:
 private:
   std::map<std::string, std::string> option_;
   Random::RandomGenerator& random_;
-  TimeSource& time_source_;
+  TimeSource* time_source_;
 };
 
 using FluentdTracerWeakPtr = std::weak_ptr<FluentdTracerImpl>;
@@ -116,7 +116,7 @@ protected:
                                         Event::Dispatcher& dispatcher, const FluentdConfig& config,
                                         BackOffStrategyPtr backoff_strategy,
                                         Random::RandomGenerator& random,
-                                        TimeSource& time_source) override {
+                                        TimeSource* time_source) override {
     return std::make_shared<FluentdTracerImpl>(cluster, std::move(client), dispatcher, config,
                                                std::move(backoff_strategy), *stats_scope_, random,
                                                time_source);
@@ -161,7 +161,7 @@ class Span : public Tracing::Span {
 public:
   Span(Tracing::TraceContext& trace_context, SystemTime start_time,
        const std::string& operation_name, Tracing::Decision tracing_decision,
-       FluentdTracerSharedPtr tracer, const SpanContext& span_context, TimeSource& time_source);
+       FluentdTracerSharedPtr tracer, const SpanContext& span_context, TimeSource* time_source);
 
   // Tracing::Span
   void setOperation(absl::string_view operation) override;
@@ -190,7 +190,7 @@ private:
   SpanContext span_context_;
   std::map<std::string, std::string> tags_;
   bool sampled_;
-  TimeSource& time_source_;
+  TimeSource* time_source_;
 };
 
 } // namespace Fluentd

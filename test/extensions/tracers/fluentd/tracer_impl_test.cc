@@ -48,7 +48,7 @@ public:
     config_.mutable_buffer_size_bytes()->set_value(buffer_size_bytes);
     tracer_ = std::make_unique<FluentdTracerImpl>(
         cluster_, Tcp::AsyncTcpClientPtr{async_client_}, dispatcher_, config_,
-        BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_, time_system_);
+        BackOffStrategyPtr{backoff_strategy_}, *stats_store_.rootScope(), random_, &time_system_);
   }
 
   std::string getExpectedMsgpackPayload(int entries_count) {
@@ -359,7 +359,7 @@ TEST_F(FluentdTracerCacheImplTest, CreateTracerWhenClusterNotFound) {
   auto tracer =
       tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
                                  context.serverFactoryContext().api().randomGenerator(),
-                                 context.serverFactoryContext().timeSource());
+                                 &context.serverFactoryContext().timeSource());
   EXPECT_EQ(tracer, nullptr);
 }
 
@@ -372,7 +372,7 @@ TEST_F(FluentdTracerCacheImplTest, CreateNonExistingLogger) {
   auto tracer =
       tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
                                  context.serverFactoryContext().api().randomGenerator(),
-                                 context.serverFactoryContext().timeSource());
+                                 &context.serverFactoryContext().timeSource());
   EXPECT_NE(tracer, nullptr);
 }
 
@@ -386,12 +386,12 @@ TEST_F(FluentdTracerCacheImplTest, CreateTwoTracersSameHash) {
   auto tracer1 =
       tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
                                  context.serverFactoryContext().api().randomGenerator(),
-                                 context.serverFactoryContext().timeSource());
+                                 &context.serverFactoryContext().timeSource());
 
   auto tracer2 =
       tracer_cache_->getOrCreate(std::make_shared<envoy::config::trace::v3::FluentdConfig>(config),
                                  context.serverFactoryContext().api().randomGenerator(),
-                                 context.serverFactoryContext().timeSource());
+                                 &context.serverFactoryContext().timeSource());
 
   EXPECT_EQ(tracer1, tracer2);
 }

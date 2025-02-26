@@ -125,7 +125,7 @@ public:
   virtual ~FluentdCacheBase() = default;
 
   SharedPtrType getOrCreate(const std::shared_ptr<ConfigType>& config,
-                            Random::RandomGenerator& random, TimeSource& time_source = nullptr) {
+                            Random::RandomGenerator& random, TimeSource* time_source = nullptr) {
     auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
     const auto cache_key = MessageUtil::hash(*config);
     auto it = cache.instances_.find(cache_key);
@@ -167,7 +167,7 @@ protected:
                                        const ConfigType& config,
                                        BackOffStrategyPtr backoff_strategy,
                                        Random::RandomGenerator& random,
-                                       TimeSource& time_source) = 0;
+                                       TimeSource* time_source) = 0;
 
   struct ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
     ThreadLocalCache(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
