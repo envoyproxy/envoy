@@ -7,7 +7,6 @@ import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
 import "xds/annotations/v3/status.proto";
 
-import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -59,5 +58,5 @@ message Config {
   //
   // "configuration_version" must contain a 1 byte unsigned integer of value less than 8.
   // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-config-rotation.
-  transport_sockets.tls.v3.SdsSecretConfig encryption_parmeters = 5 [(validate.rules).message = {required: true}];
+  transport_sockets.tls.v3.SdsSecretConfig encryption_parameters = 5 [(validate.rules).message = {required: true}];
 }

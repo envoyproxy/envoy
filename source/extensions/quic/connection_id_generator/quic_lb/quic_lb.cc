@@ -242,10 +242,10 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
   }
 
   ret->secrets_provider_ =
-      secretsProvider(config.encryption_parmeters(), context.getTransportSocketFactoryContext(),
+      secretsProvider(config.encryption_parameters(), context.getTransportSocketFactoryContext(),
                       context.initManager());
   if (ret->secrets_provider_ == nullptr) {
-    return absl::InvalidArgumentError("invalid encryption_parmeters config");
+    return absl::InvalidArgumentError("invalid encryption_parameters config");
   }
 
   ret->secrets_provider_validation_callback_handle_ = ret->secrets_provider_->addValidationCallback(
