@@ -18,9 +18,8 @@ ImageBlobFetcher::ImageBlobFetcher(Upstream::ClusterManager& cm,
                                    const envoy::config::core::v3::HttpUri& uri,
                                    const std::string& content_hash,
                                    Config::DataFetcher::RemoteDataFetcherCallback& callback,
-                                   const std::string& authz_header_value, const std::string& digest)
-    : RemoteDataFetcher(cm, uri, content_hash, callback), authz_header_value_(authz_header_value),
-      digest_(digest) {}
+                                   const std::string& authz_header_value)
+    : RemoteDataFetcher(cm, uri, content_hash, callback), authz_header_value_(authz_header_value) {}
 
 void ImageBlobFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
@@ -43,21 +42,18 @@ void ImageBlobFetcher::onSuccess(const Http::AsyncClient::Request&,
                                  Http::ResponseMessagePtr&& response) {
   const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
   if (status_code == enumToInt(Http::Code::OK)) {
-    ENVOY_LOG(debug, "fetch oci image blob [uri = {}, body = {}]: success", uri_.uri(),
-              response->body().toString());
+    ENVOY_LOG(debug, "fetch oci image blob [uri = {}]: success", uri_.uri());
     if (response->body().length() > 0) {
       auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
       const auto content_hash = Hex::encode(crypto_util.getSha256Digest(response->body()));
-
-      // TODO(jewertow)
-      // if (content_hash_ != content_hash) {
-      //   ENVOY_LOG(info, "fetch oci image [uri = {}]: data is invalid", uri_.uri());
-      //   callback_.onFailure(FailureReason::InvalidData);
-      // } else {
-
-      callback_.onSuccess(response->bodyAsString());
+      if (content_hash_ != content_hash) {
+        ENVOY_LOG(error, "fetch oci image [uri = {}]: data is invalid", uri_.uri());
+        callback_.onFailure(Config::DataFetcher::FailureReason::InvalidData);
+      } else {
+        callback_.onSuccess(response->bodyAsString());
+      }
     } else {
-      ENVOY_LOG(debug, "fetch oci image blob [uri = {}]: body is empty", uri_.uri());
+      ENVOY_LOG(error, "fetch oci image blob [uri = {}]: body is empty", uri_.uri());
       callback_.onFailure(Config::DataFetcher::FailureReason::Network);
     }
   } else if (status_code == enumToInt(Http::Code::TemporaryRedirect)) {
@@ -68,7 +64,8 @@ void ImageBlobFetcher::onSuccess(const Http::AsyncClient::Request&,
       callback_.onFailure(Config::DataFetcher::FailureReason::Network);
     } else {
       auto location_value = location[0]->value().getStringView();
-      ENVOY_LOG(error, "fetch oci image blob [uri = {}, status code = {}]: redirected to {}",
+      // TODO(jewertow): sanitize query params to avoid logging tokens
+      ENVOY_LOG(debug, "fetch oci image blob [uri = {}, status code = {}]: redirected to {}",
                 uri_.uri(), status_code, location_value);
 
       envoy::config::core::v3::HttpUri uri;
@@ -76,8 +73,8 @@ void ImageBlobFetcher::onSuccess(const Http::AsyncClient::Request&,
       uri.set_uri(location_value);
       Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri);
       message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
-      // TODO(jewertow): set Authorization header if the token is not included in the URL path, e.g.
-      // docker hub.
+      // TODO(jewertow): set Authorization header if a token is not included in the provided
+      // location, e.g. docker hub.
       ENVOY_LOG(debug, "fetch oci image blob from temporary location [uri = {}]: start", uri.uri());
 
       const auto thread_local_cluster = cm_.getThreadLocalCluster(uri.cluster());
@@ -87,13 +84,13 @@ void ImageBlobFetcher::onSuccess(const Http::AsyncClient::Request&,
             Http::AsyncClient::RequestOptions().setTimeout(
                 std::chrono::milliseconds(DurationUtil::durationToMilliseconds(uri.timeout()))));
       } else {
-        ENVOY_LOG(debug, "fetch oci image blob [uri = {}]: no cluster {}", uri_.uri(),
+        ENVOY_LOG(error, "fetch oci image blob [uri = {}]: no cluster {}", uri_.uri(),
                   uri_.cluster());
         callback_.onFailure(Config::DataFetcher::FailureReason::Network);
       }
     }
   } else {
-    ENVOY_LOG(debug, "fetch oci image blob [uri = {}, body = {}]: response status code {}",
+    ENVOY_LOG(error, "fetch oci image blob [uri = {}, body = {}]: response status code {}",
               uri_.uri(), response->body().toString(), status_code);
     callback_.onFailure(Config::DataFetcher::FailureReason::Network);
   }

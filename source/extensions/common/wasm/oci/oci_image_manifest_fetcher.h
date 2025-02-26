@@ -19,7 +19,6 @@ namespace Oci {
 class ImageManifestFetcher : public Config::DataFetcher::RemoteDataFetcher {
 public:
   ImageManifestFetcher(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
-                       const std::string& content_hash,
                        Config::DataFetcher::RemoteDataFetcherCallback& callback,
                        const std::string& authz_header_value);
 

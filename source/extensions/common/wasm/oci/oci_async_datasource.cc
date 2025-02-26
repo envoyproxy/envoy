@@ -13,12 +13,11 @@ ManifestProvider::ManifestProvider(Upstream::ClusterManager& cm, Init::Manager& 
                                    const envoy::config::core::v3::RemoteDataSource& source,
                                    Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                                    const envoy::config::core::v3::HttpUri uri, std::string token,
-                                   std::string sha256, bool allow_empty,
-                                   AsyncDataSourceCb&& callback)
+                                   bool allow_empty, AsyncDataSourceCb&& callback)
     : RemoteAsyncDataProvider(
-          [this, &cm, uri, sha256, token]() {
+          [this, &cm, uri, token]() {
             return std::make_unique<Extensions::Common::Wasm::Oci::ImageManifestFetcher>(
-                cm, uri, sha256, *this, token);
+                cm, uri, *this, token);
           },
           "ManifestProvider", manager, source, dispatcher, random, allow_empty,
           std::move(callback)){};
@@ -27,12 +26,12 @@ BlobProvider::BlobProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
                            const envoy::config::core::v3::RemoteDataSource& source,
                            Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
                            const envoy::config::core::v3::HttpUri uri,
-                           std::string authz_header_value, std::string digest, std::string sha256,
-                           bool allow_empty, AsyncDataSourceCb&& callback)
+                           std::string authz_header_value, std::string sha256, bool allow_empty,
+                           AsyncDataSourceCb&& callback)
     : RemoteAsyncDataProvider(
-          [this, &cm, uri, sha256, authz_header_value, digest]() {
+          [this, &cm, uri, sha256, authz_header_value]() {
             return std::make_unique<Extensions::Common::Wasm::Oci::ImageBlobFetcher>(
-                cm, uri, sha256, *this, authz_header_value, digest);
+                cm, uri, sha256, *this, authz_header_value);
           },
           "BlobProvider", manager, source, dispatcher, random, allow_empty, std::move(callback)){};
 

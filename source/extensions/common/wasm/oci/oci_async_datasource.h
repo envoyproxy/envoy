@@ -15,8 +15,8 @@ public:
   ManifestProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
                    const envoy::config::core::v3::RemoteDataSource& source,
                    Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
-                   const envoy::config::core::v3::HttpUri uri, std::string token,
-                   std::string sha256, bool allow_empty, AsyncDataSourceCb&& callback);
+                   const envoy::config::core::v3::HttpUri uri, std::string token, bool allow_empty,
+                   AsyncDataSourceCb&& callback);
 };
 
 using ManifestProviderPtr = std::unique_ptr<ManifestProvider>;
@@ -26,8 +26,8 @@ public:
   BlobProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
                const envoy::config::core::v3::RemoteDataSource& source,
                Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
-               const envoy::config::core::v3::HttpUri uri, std::string token, std::string digest,
-               std::string sha256, bool allow_empty, AsyncDataSourceCb&& callback);
+               const envoy::config::core::v3::HttpUri uri, std::string token, std::string sha256,
+               bool allow_empty, AsyncDataSourceCb&& callback);
 };
 
 using BlobProviderPtr = std::unique_ptr<BlobProvider>;

@@ -17,10 +17,9 @@ namespace Oci {
 
 ImageManifestFetcher::ImageManifestFetcher(Upstream::ClusterManager& cm,
                                            const envoy::config::core::v3::HttpUri& uri,
-                                           const std::string& content_hash,
                                            Config::DataFetcher::RemoteDataFetcherCallback& callback,
                                            const std::string& authz_header_value)
-    : RemoteDataFetcher(cm, uri, content_hash, callback), authz_header_value_(authz_header_value) {}
+    : RemoteDataFetcher(cm, uri, "", callback), authz_header_value_(authz_header_value) {}
 
 void ImageManifestFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
@@ -34,7 +33,7 @@ void ImageManifestFetcher::fetch() {
         Http::AsyncClient::RequestOptions().setTimeout(
             std::chrono::milliseconds(DurationUtil::durationToMilliseconds(uri_.timeout()))));
   } else {
-    ENVOY_LOG(debug, "fetch oci image [uri = {}]: no cluster {}", uri_.uri(), uri_.cluster());
+    ENVOY_LOG(error, "fetch oci image [uri = {}]: no cluster {}", uri_.uri(), uri_.cluster());
     callback_.onFailure(Config::DataFetcher::FailureReason::Network);
   }
 }

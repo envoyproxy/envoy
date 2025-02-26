@@ -518,12 +518,6 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
         auto get_blob_cb = [&oci_blob_provider, &cluster_manager, &init_manager, &dispatcher, &api,
                             vm_config, basic_authz_header, fetch_callback, registry,
                             image_name](const std::string& digest) {
-          if (digest.empty()) {
-            ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), error,
-                                "cannot get image blob - image digest is empty");
-            return;
-          }
-
           envoy::config::core::v3::HttpUri blob_uri;
           blob_uri.set_cluster(vm_config.code().remote().http_uri().cluster());
           blob_uri.set_uri(
@@ -533,14 +527,13 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
 
           oci_blob_provider = std::make_unique<Oci::BlobProvider>(
               cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
-              api.randomGenerator(), blob_uri, basic_authz_header.value(), digest, "", true,
-              fetch_callback);
+              api.randomGenerator(), blob_uri, basic_authz_header.value(),
+              vm_config.code().remote().sha256(), true, fetch_callback);
         };
 
         oci_manifest_provider = std::make_unique<Oci::ManifestProvider>(
             cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
-            api.randomGenerator(), manifest_uri, basic_authz_header.value(),
-            vm_config.code().remote().sha256(), true, get_blob_cb);
+            api.randomGenerator(), manifest_uri, basic_authz_header.value(), true, get_blob_cb);
       } else {
         remote_data_provider = std::make_unique<RemoteAsyncDataProvider>(
             cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
