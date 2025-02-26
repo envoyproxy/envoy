@@ -64,6 +64,12 @@ bug_fixes:
     :ref:`socket_options <envoy_v3_api_field_config.listener.v3.Listener.socket_options>` on the listener is set.
     Now additional address :ref:`socket_options <envoy_v3_api_field_config.listener.v3.AdditionalAddress.socket_options>` are correctly
     applied even if the listener has no socket options configured.
+- area: http
+  change: |
+    Fixed the jwks fetcher to set the :scheme pseudo header according to the uri ('http' or 'https').
+    Before the :scheme header was always 'http'.
+    This behavioral change can be temporarily reverted by setting runtime guard
+    ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -198,6 +204,10 @@ new_features:
   change: |
     Made the :ref:`credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>`
     work as an upstream filter.
+- area: jwt_authn
+  change: |
+    Added :ref:`jwt_max_token_size <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtCacheConfig.jwt_max_token_size>` to make
+    max token size configurable.
 
 - area: tcp_proxy
   change: |
