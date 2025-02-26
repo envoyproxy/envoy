@@ -17,6 +17,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   Quic::EnvoyQuicConnectionIdGeneratorFactoryPtr
   createQuicConnectionIdGeneratorFactory(const Protobuf::Message& config,
+                                         ProtobufMessage::ValidationVisitor& validation_visitor,
                                          Server::Configuration::FactoryContext&) override;
   std::string name() const override { return "envoy.quic.deterministic_connection_id_generator"; }
 };

@@ -337,7 +337,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   quic_cid_generator_factory_ = cid_generator_config_factory.createQuicConnectionIdGeneratorFactory(
       *Config::Utility::translateToFactoryConfig(cid_generator_config, validation_visitor,
                                                  cid_generator_config_factory),
-      context_);
+      validation_visitor, context_);
 
   if (config.has_server_preferred_address_config()) {
     const envoy::config::core::v3::TypedExtensionConfig& server_preferred_address_config =
