@@ -30,7 +30,7 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
     const envoy::config::core::v3::RemoteDataSource& source, Event::Dispatcher& dispatcher,
     Random::RandomGenerator& random, bool allow_empty, AsyncDataSourceCb&& callback)
     : allow_empty_(allow_empty), callback_(std::move(callback)), fetcher_(create_fetcher_fn()),
-      init_target_(target_name, [this]() { fetcher_->fetch(); }),
+      init_target_(target_name, [this]() { start(); }),
       retries_remaining_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(source.retry_policy(), num_retries, RetryCount)) {
 
@@ -39,7 +39,7 @@ RemoteAsyncDataProvider::RemoteAsyncDataProvider(
   THROW_IF_NOT_OK_REF(strategy_or_error.status());
   backoff_strategy_ = std::move(strategy_or_error.value());
 
-  retry_timer_ = dispatcher.createTimer([this]() -> void { fetcher_->fetch(); });
+  retry_timer_ = dispatcher.createTimer([this]() -> void { start(); });
 
   manager.add(init_target_);
 }

@@ -75,6 +75,8 @@ public:
   }
 
 private:
+  void start() { fetcher_->fetch(); }
+
   bool allow_empty_;
   AsyncDataSourceCb callback_;
   const Config::DataFetcher::RemoteDataFetcherPtr fetcher_;
