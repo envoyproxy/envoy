@@ -71,6 +71,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tracers.opentelemetry extension
 /*/extensions/tracers/opentelemetry @alexanderellis @yanavlasov
 # tracers.fluentd extension
+/*/extensions/common/fluentd @kevintan250 @yanavlasov
 /*/extensions/tracers/fluentd @kevintan250 @yanavlasov
 # quic extension
 /*/extensions/quic/ @ryantheoptimist @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
