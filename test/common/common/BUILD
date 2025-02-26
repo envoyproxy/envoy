@@ -63,6 +63,7 @@ envoy_cc_test(
         "//source/common/common:assert_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
+        "@com_google_absl//absl/base",
     ],
 )
 
