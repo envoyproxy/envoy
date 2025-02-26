@@ -32,6 +32,7 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
+#include "source/common/proxy_protocol/proxy_protocol.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
@@ -179,6 +180,10 @@ Config::SharedConfig::SharedConfig(
 
     backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
         base_interval_ms, max_interval_ms, context.serverFactoryContext().api().randomGenerator());
+  }
+
+  if (!config.proxy_protocol_tlvs().empty()) {
+    proxy_protocol_tlvs_ = Common::ProxyProtocol::parseTLVs(config.proxy_protocol_tlvs());
   }
 }
 
@@ -539,7 +544,8 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
         Network::ProxyProtocolFilterState::key(),
         std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             downstream_connection.connectionInfoProvider().remoteAddress(),
-            downstream_connection.connectionInfoProvider().localAddress()}),
+            downstream_connection.connectionInfoProvider().localAddress(),
+            config_->proxyProtocolTLVs()}),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
