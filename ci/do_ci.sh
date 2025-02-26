@@ -348,8 +348,7 @@ case $CI_TARGET in
             CLANG_TIDY_TARGETS=(
                 //contrib/...
                 //source/...
-                //test/...
-                @envoy_api//...)
+                //test/...)
         fi
         echo "Running clang-tidy on ${CLANG_TIDY_TARGETS[*]}"
         bazel build \
