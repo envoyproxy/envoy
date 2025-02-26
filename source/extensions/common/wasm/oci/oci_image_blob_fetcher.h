@@ -21,7 +21,7 @@ public:
   ImageBlobFetcher(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
                    const std::string& content_hash,
                    Config::DataFetcher::RemoteDataFetcherCallback& callback,
-                   const std::string& authz_header_value);
+                   const std::string& credential);
 
   // Config::DataFetcher::RemoteDataFetcher
   void fetch() override;
@@ -30,7 +30,7 @@ public:
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override;
 
 private:
-  const std::string authz_header_value_;
+  const std::string credential_;
 
   Http::AsyncClient::Request* request_{};
 };

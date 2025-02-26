@@ -18,13 +18,16 @@ namespace Oci {
 ImageManifestFetcher::ImageManifestFetcher(Upstream::ClusterManager& cm,
                                            const envoy::config::core::v3::HttpUri& uri,
                                            Config::DataFetcher::RemoteDataFetcherCallback& callback,
-                                           const std::string& authz_header_value)
-    : RemoteDataFetcher(cm, uri, "", callback), authz_header_value_(authz_header_value) {}
+                                           const std::string& credential)
+    : RemoteDataFetcher(cm, uri, "", callback), credential_(credential) {}
 
 void ImageManifestFetcher::fetch() {
   Http::RequestMessagePtr message = Http::Utility::prepareHeaders(uri_);
   message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
-  message->headers().setCopy(Http::CustomHeaders::get().Authorization, authz_header_value_);
+  if (!credential_.empty()) {
+    message->headers().setCopy(Http::CustomHeaders::get().Authorization, credential_);
+  }
+
   ENVOY_LOG(debug, "fetch oci image from [uri = {}]: start", uri_.uri());
   const auto thread_local_cluster = cm_.getThreadLocalCluster(uri_.cluster());
   if (thread_local_cluster != nullptr) {

@@ -12,12 +12,13 @@ namespace Oci {
 ManifestProvider::ManifestProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
                                    const envoy::config::core::v3::RemoteDataSource& source,
                                    Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
-                                   const envoy::config::core::v3::HttpUri uri, std::string token,
-                                   bool allow_empty, AsyncDataSourceCb&& callback)
+                                   const envoy::config::core::v3::HttpUri uri,
+                                   std::string credential, bool allow_empty,
+                                   AsyncDataSourceCb&& callback)
     : RemoteAsyncDataProvider(
-          [this, &cm, uri, token]() {
+          [this, &cm, uri, credential]() {
             return std::make_unique<Extensions::Common::Wasm::Oci::ImageManifestFetcher>(
-                cm, uri, *this, token);
+                cm, uri, *this, credential);
           },
           "ManifestProvider", manager, source, dispatcher, random, allow_empty,
           std::move(callback)){};
@@ -25,13 +26,12 @@ ManifestProvider::ManifestProvider(Upstream::ClusterManager& cm, Init::Manager& 
 BlobProvider::BlobProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
                            const envoy::config::core::v3::RemoteDataSource& source,
                            Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
-                           const envoy::config::core::v3::HttpUri uri,
-                           std::string authz_header_value, std::string sha256, bool allow_empty,
-                           AsyncDataSourceCb&& callback)
+                           const envoy::config::core::v3::HttpUri uri, std::string credential,
+                           std::string sha256, bool allow_empty, AsyncDataSourceCb&& callback)
     : RemoteAsyncDataProvider(
-          [this, &cm, uri, sha256, authz_header_value]() {
+          [this, &cm, uri, sha256, credential]() {
             return std::make_unique<Extensions::Common::Wasm::Oci::ImageBlobFetcher>(
-                cm, uri, sha256, *this, authz_header_value);
+                cm, uri, sha256, *this, credential);
           },
           "BlobProvider", manager, source, dispatcher, random, allow_empty, std::move(callback)){};
 

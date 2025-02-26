@@ -20,7 +20,7 @@ class ImageManifestFetcher : public Config::DataFetcher::RemoteDataFetcher {
 public:
   ImageManifestFetcher(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri,
                        Config::DataFetcher::RemoteDataFetcherCallback& callback,
-                       const std::string& authz_header_value);
+                       const std::string& credential);
 
   // Config::DataFetcher::RemoteDataFetcher
   void fetch() override;
@@ -31,7 +31,7 @@ public:
 private:
   void onInvalidData(std::string error_message);
 
-  const std::string authz_header_value_;
+  const std::string credential_;
 
   Http::AsyncClient::Request* request_{};
   ImageBlobFetcherPtr blob_fetcher_;

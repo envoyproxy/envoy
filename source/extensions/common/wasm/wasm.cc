@@ -46,6 +46,42 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
   }
 }
 
+absl::StatusOr<std::string> getRegistryCredential(
+    envoy::extensions::wasm::v3::VmConfig& vm_config, Upstream::ClusterManager& cluster_manager,
+    Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+    Init::Manager& init_manager, ThreadLocal::SlotAllocator& slot_alloc, Api::Api& api,
+    std::string& registry) {
+  if (!vm_config.has_image_pull_secret()) {
+    return "";
+  }
+
+  auto image_pull_secret_provider = secretsProvider(
+      vm_config.image_pull_secret(), cluster_manager.clusterManagerFactory().secretManager(),
+      transport_socket_factory, init_manager);
+  if (image_pull_secret_provider == nullptr) {
+    return absl::FailedPreconditionError("Secret provider for Wasm plugin is null");
+  }
+
+  auto secret_reader_result = Secret::ThreadLocalGenericSecretProvider::create(
+      std::move(image_pull_secret_provider), slot_alloc, api);
+  if (!secret_reader_result.ok()) {
+    return secret_reader_result.status();
+  }
+
+  auto& secret_reader = secret_reader_result.value();
+  auto& image_pull_secret_raw = secret_reader->secret();
+  if (image_pull_secret_raw.empty()) {
+    return absl::FailedPreconditionError("Invalid secret configuration - password is empty");
+  }
+
+  auto basic_authz_header = Oci::prepareAuthorizationHeader(image_pull_secret_raw, registry);
+  if (!basic_authz_header.ok()) {
+    return absl::FailedPreconditionError(
+        absl::StrCat("Failed to create credential: ", basic_authz_header.status().message()));
+  }
+  return basic_authz_header.value();
+}
+
 struct CodeCacheEntry {
   std::string code;
   bool in_progress;
@@ -477,7 +513,7 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
         auto parse_status = Oci::parseImageURI(source, registry, image_name, tag);
         if (!parse_status.ok()) {
           ENVOY_LOG_TO_LOGGER(
-              Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), info,
+              Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), error,
               fmt::format("Failed to parse Wasm image URI {}: {}", source, parse_status.message()));
         }
 
@@ -488,35 +524,18 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
         manifest_uri.mutable_timeout()->set_seconds(
             vm_config.code().remote().http_uri().timeout().seconds());
 
-        auto& image_pull_secret = vm_config.image_pull_secret();
-
-        auto image_pull_secret_provider = secretsProvider(
-            image_pull_secret, cluster_manager.clusterManagerFactory().secretManager(),
-            transport_socket_factory, init_manager);
-        if (image_pull_secret_provider == nullptr) {
-          throw EnvoyException("Secret provider for Wasm plugin is null");
-        }
-
-        auto secret_reader_result = Secret::ThreadLocalGenericSecretProvider::create(
-            std::move(image_pull_secret_provider), slot_alloc, api);
-        if (!secret_reader_result.ok()) {
-          throw EnvoyException("Failed to create secret provider");
-        }
-
-        auto& secret_reader = secret_reader_result.value();
-        auto& image_pull_secret_raw = secret_reader->secret();
-        if (image_pull_secret_raw.empty()) {
-          throw EnvoyException("Invalid secret configuration - password is empty");
-        }
-
-        auto basic_authz_header = Oci::prepareAuthorizationHeader(image_pull_secret_raw, registry);
-        if (!basic_authz_header.ok()) {
-          throw EnvoyException(absl::StrCat("Failed to create auth header: ",
-                                            basic_authz_header.status().message()));
+        auto credential =
+            getRegistryCredential(vm_config, cluster_manager, transport_socket_factory,
+                                  init_manager, slot_alloc, api, registry);
+        if (!credential.ok()) {
+          ENVOY_LOG_TO_LOGGER(
+              Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), error,
+              fmt::format("Failed to create credential from the provided secret: {}",
+                          credential.status().message()));
         }
 
         auto get_blob_cb = [&oci_blob_provider, &cluster_manager, &init_manager, &dispatcher, &api,
-                            vm_config, basic_authz_header, fetch_callback, registry,
+                            vm_config, credential, fetch_callback, registry,
                             image_name](const std::string& digest) {
           envoy::config::core::v3::HttpUri blob_uri;
           blob_uri.set_cluster(vm_config.code().remote().http_uri().cluster());
@@ -527,13 +546,13 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
 
           oci_blob_provider = std::make_unique<Oci::BlobProvider>(
               cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
-              api.randomGenerator(), blob_uri, basic_authz_header.value(),
+              api.randomGenerator(), blob_uri, credential.value(),
               vm_config.code().remote().sha256(), true, fetch_callback);
         };
 
         oci_manifest_provider = std::make_unique<Oci::ManifestProvider>(
             cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
-            api.randomGenerator(), manifest_uri, basic_authz_header.value(), true, get_blob_cb);
+            api.randomGenerator(), manifest_uri, credential.value(), true, get_blob_cb);
       } else {
         remote_data_provider = std::make_unique<RemoteAsyncDataProvider>(
             cluster_manager, init_manager, vm_config.code().remote(), dispatcher,
