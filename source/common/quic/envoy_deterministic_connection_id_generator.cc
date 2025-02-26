@@ -53,10 +53,6 @@ EnvoyDeterministicConnectionIdGenerator::MaybeReplaceConnectionId(
 
 QuicConnectionIdGeneratorPtr
 EnvoyDeterministicConnectionIdGeneratorFactory::createQuicConnectionIdGenerator(uint32_t) {
-  Envoy::Assert::EnvoyBugStackTrace st;
-  st.capture();
-  st.logStackTrace();
-
   return std::make_unique<EnvoyDeterministicConnectionIdGenerator>(
       quic::kQuicDefaultConnectionIdLength);
 }
