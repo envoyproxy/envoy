@@ -257,6 +257,11 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
         }
 
         auto data_or_result = getAndValidateKeyAndVersion(*secret, api);
+
+        // `getAndValidateKeyAndVersion` was called via `addValidationCallback` already, so this
+        // should not be able to fail.
+        ENVOY_BUG(data_or_result.ok(), "quic_lb unexpected error in updating configuration; old "
+                                       "configuration will still be used");
         RETURN_IF_NOT_OK_REF(data_or_result.status());
 
         factory.tls_slot_->runOnAllThreads(
@@ -265,9 +270,12 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
               ASSERT(obj.has_value(),
                      "Guaranteed if `set()` was previously called on the tls slot");
 
-              // TODO: error handling from both of these calls
               auto result = obj->updateKeyAndVersion(data.first, data.second);
-              ASSERT(result.ok(), "Parameters and data was already validated");
+
+              // Because all parameters were validated earlier, it should not be possible for this
+              // to fail.
+              ENVOY_BUG(result.ok(), "quic_lb unexpected error in updating configuration; old "
+                                     "configuration will still be used");
             });
 
         return absl::OkStatus();
