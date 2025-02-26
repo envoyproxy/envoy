@@ -12,11 +12,11 @@ namespace Oci {
 ManifestProvider::ManifestProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
                                    const envoy::config::core::v3::RemoteDataSource& source,
                                    Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
-                                   const envoy::config::core::v3::HttpUri uri,
-                                   std::string credential, bool allow_empty,
+                                   const envoy::config::core::v3::HttpUri& uri,
+                                   const std::string& credential, bool allow_empty,
                                    AsyncDataSourceCb&& callback)
     : RemoteAsyncDataProvider(
-          [this, &cm, uri, credential]() {
+          [this, &cm, &uri, &credential]() {
             return std::make_unique<Extensions::Common::Wasm::Oci::ImageManifestFetcher>(
                 cm, uri, *this, credential);
           },
@@ -26,10 +26,11 @@ ManifestProvider::ManifestProvider(Upstream::ClusterManager& cm, Init::Manager& 
 BlobProvider::BlobProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
                            const envoy::config::core::v3::RemoteDataSource& source,
                            Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
-                           const envoy::config::core::v3::HttpUri uri, std::string credential,
-                           std::string sha256, bool allow_empty, AsyncDataSourceCb&& callback)
+                           const envoy::config::core::v3::HttpUri& uri,
+                           const std::string& credential, const std::string& sha256,
+                           bool allow_empty, AsyncDataSourceCb&& callback)
     : RemoteAsyncDataProvider(
-          [this, &cm, uri, sha256, credential]() {
+          [this, &cm, &uri, &sha256, &credential]() {
             return std::make_unique<Extensions::Common::Wasm::Oci::ImageBlobFetcher>(
                 cm, uri, sha256, *this, credential);
           },
