@@ -26,7 +26,7 @@
 #include "test/test_common/test_runtime.h"
 
 using testing::InvokeWithoutArgs;
-
+using testing::Return;
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -443,6 +443,7 @@ RBqAC6sxyAYn2wbzuyINJdSLpehQKDkKxEnO4QLodClHYV1F9AlAfbSLmIlRFv/y
   std::vector<Filesystem::Watcher::OnChangedCb> watch_cbs_;
   Event::DispatcherPtr dispatcher_;
   Api::ApiPtr api_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
 };
 
 TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, InvalidSource) {
@@ -455,10 +456,8 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, InvalidSource) {
 
   certificate_data_source.set_allocated_watched_directory(watched_dir.release());
   NiceMock<ThreadLocal::MockInstance> tls;
-
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      *api_, tls, *dispatcher_, certificate_data_source, private_key_data_source,
-      cert_chain_data_source);
+      context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   EXPECT_FALSE(provider->getCredentials().certificateChainDerB64().has_value());
 }
 
@@ -473,8 +472,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, InvalidPath) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      *api_, tls, *dispatcher_, certificate_data_source, private_key_data_source,
-      cert_chain_data_source);
+      context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   EXPECT_FALSE(provider->getCredentials().certificateChainDerB64().has_value());
 }
 
@@ -497,8 +495,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, PrivateKeyInvalidPath) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      *api_, tls, *dispatcher_, certificate_data_source, private_key_data_source,
-      cert_chain_data_source);
+      context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   EXPECT_FALSE(provider->getCredentials().certificatePrivateKey().has_value());
 }
 
@@ -539,8 +536,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, UnsupportedAlgorithm) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      *api_, tls, *dispatcher_, certificate_data_source, private_key_data_source,
-      cert_chain_data_source);
+      context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto credentials = provider->getCredentials();
 
   EXPECT_FALSE(credentials.certificateDerB64().has_value());
@@ -570,8 +566,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, MissingSerial) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      *api_, tls, *dispatcher_, certificate_data_source, private_key_data_source,
-      cert_chain_data_source);
+      context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   auto credentials = provider->getCredentials();
 
   EXPECT_FALSE(credentials.certificateDerB64().has_value());
@@ -607,7 +602,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   NiceMock<ThreadLocal::MockInstance> tls;
 
   auto provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      *api_, tls, *dispatcher_, certificate_data_source, private_key_data_source, absl::nullopt);
+      context_, certificate_data_source, private_key_data_source, absl::nullopt);
   auto credentials = provider->getCredentials();
 
   EXPECT_TRUE(credentials.certificateDerB64().has_value());
@@ -656,8 +651,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   provider.reset();
 
   provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      *api_, tls, *dispatcher_, certificate_data_source, private_key_data_source,
-      cert_chain_data_source);
+      context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   credentials = provider->getCredentials();
 
   EXPECT_TRUE(credentials.certificateDerB64().has_value());
@@ -674,39 +668,46 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
 
   // Filesystem - Certs issued from a subordinate to test certificate chain. Verify that we read and
   // convert these correctly.
+  ON_CALL(context_, api()).WillByDefault(testing::ReturnRef(*api_));
 
-  auto filename =
+  auto filename1 =
       TestEnvironment::writeStringToFileForTest("cert", server_subordinate_cert_ecdsa_pem);
+  EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(filename1))
+      .WillRepeatedly(Return(server_subordinate_cert_ecdsa_pem));
 
   TestEnvironment::setEnvVar(cert_env, server_root_cert_ecdsa_pem, 1);
   yaml = fmt::format(R"EOF(
     filename: "{}"
   )EOF",
-                     filename);
+                     filename1);
   TestUtility::loadFromYamlAndValidate(yaml, certificate_data_source);
-  filename =
+  auto filename2 =
       TestEnvironment::writeStringToFileForTest("pkey", server_subordinate_private_key_ecdsa_pem);
+  EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(filename2))
+      .WillRepeatedly(Return(server_subordinate_private_key_ecdsa_pem));
 
   yaml = fmt::format(R"EOF(
     filename: "{}"
   )EOF",
-                     filename);
+                     filename2);
 
   TestUtility::loadFromYamlAndValidate(yaml, private_key_data_source);
-  filename = TestEnvironment::writeStringToFileForTest("chain", server_subordinate_chain_ecdsa_pem);
+  auto filename3 =
+      TestEnvironment::writeStringToFileForTest("chain", server_subordinate_chain_ecdsa_pem);
+  EXPECT_CALL(context_.api_.file_system_, fileReadToEnd(filename3))
+      .WillRepeatedly(Return(server_subordinate_chain_ecdsa_pem));
 
   yaml = fmt::format(R"EOF(
     filename: "{}"
   )EOF",
-                     filename);
+                     filename3);
 
   TestUtility::loadFromYamlAndValidate(yaml, cert_chain_data_source);
 
   provider.reset();
 
   provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      *api_, tls, *dispatcher_, certificate_data_source, private_key_data_source,
-      cert_chain_data_source);
+      context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   credentials = provider->getCredentials();
 
   EXPECT_TRUE(credentials.certificateDerB64().has_value());
@@ -751,8 +752,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   provider.reset();
 
   provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      *api_, tls, *dispatcher_, certificate_data_source, private_key_data_source,
-      cert_chain_data_source);
+      context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   credentials = provider->getCredentials();
 
   EXPECT_TRUE(credentials.certificateDerB64().has_value());
@@ -799,8 +799,7 @@ TEST_F(IAMRolesAnywhereX509CredentialsProviderTest, LoadCredentials) {
   provider.reset();
 
   provider = std::make_unique<IAMRolesAnywhereX509CredentialsProvider>(
-      *api_, tls, *dispatcher_, certificate_data_source, private_key_data_source,
-      cert_chain_data_source);
+      context_, certificate_data_source, private_key_data_source, cert_chain_data_source);
   credentials = provider->getCredentials();
 
   EXPECT_TRUE(credentials.certificateDerB64().has_value());

@@ -27,8 +27,8 @@
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::Eq;
 using testing::InvokeWithoutArgs;
-using testing::ReturnRef;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -203,7 +203,7 @@ public:
     TestUtility::loadFromYamlAndValidate(yaml, cert_chain_data_source_);
 
     iam_roles_anywhere_config_.mutable_certificate_chain()->set_environment_variable("CHAIN");
-    iam_roles_anywhere_config_.mutable_private_key()->set_environment_variable("PKEY");    
+    iam_roles_anywhere_config_.mutable_private_key()->set_environment_variable("PKEY");
     iam_roles_anywhere_config_.mutable_certificate()->set_environment_variable("CERT");
     iam_roles_anywhere_config_.set_role_session_name(session);
     iam_roles_anywhere_config_.mutable_session_duration()->set_seconds(duration);
@@ -219,16 +219,14 @@ public:
 
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
-  
+
     provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
-      context_, manager_optref_, "rolesanywhere.ap-southeast-2.amazonaws.com",
-      [this](Upstream::ClusterManager&, absl::string_view) {
-        metadata_fetcher_.reset(raw_metadata_fetcher_);
-        return std::move(metadata_fetcher_);
-      }, 
-      "ap-southeast-2", refresh_state,
-      initialization_timer, iam_roles_anywhere_config_);
-  
+        context_, manager_optref_, "rolesanywhere.ap-southeast-2.amazonaws.com",
+        [this](Upstream::ClusterManager&, absl::string_view) {
+          metadata_fetcher_.reset(raw_metadata_fetcher_);
+          return std::move(metadata_fetcher_);
+        },
+        "ap-southeast-2", refresh_state, initialization_timer, iam_roles_anywhere_config_);
   }
 
   Event::DispatcherPtr setupDispatcher() {
@@ -439,8 +437,6 @@ public:
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
   std::shared_ptr<AwsClusterManager> base_manager_;
   envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider iam_roles_anywhere_config_;
-
-
 };
 
 // Test cases created from python implementation of iam roles anywhere session
@@ -464,7 +460,7 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
 
   // Kick off a refresh
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
-  provider_friend.onClusterAddOrUpdate();  
+  provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
 
   auto creds = provider_->getCredentials();
@@ -922,7 +918,7 @@ public:
     TestUtility::loadFromYamlAndValidate(yaml, cert_chain_data_source_);
 
     iam_roles_anywhere_config_.mutable_certificate_chain()->set_environment_variable("CHAIN");
-    iam_roles_anywhere_config_.mutable_private_key()->set_environment_variable("PKEY");    
+    iam_roles_anywhere_config_.mutable_private_key()->set_environment_variable("PKEY");
     iam_roles_anywhere_config_.mutable_certificate()->set_environment_variable("CERT");
     mock_manager_ = std::make_shared<MockAwsClusterManager>();
     base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
@@ -933,18 +929,17 @@ public:
 
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
-  
-    provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
-    context_, manager_optref_, "rolesanywhere.ap-southeast-2.amazonaws.com", MetadataFetcher::create, "ap-southeast-2", refresh_state,
-    initialization_timer, iam_roles_anywhere_config_);
 
+    provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
+        context_, manager_optref_, "rolesanywhere.ap-southeast-2.amazonaws.com",
+        MetadataFetcher::create, "ap-southeast-2", refresh_state, initialization_timer,
+        iam_roles_anywhere_config_);
   }
 
   OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
   std::shared_ptr<AwsClusterManager> base_manager_;
   envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider iam_roles_anywhere_config_;
-
 };
 
 TEST_F(IamRolesAnywhereCredentialsProviderBadCredentialsTest, InvalidCertsGivesNoCredentials) {

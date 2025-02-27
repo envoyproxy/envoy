@@ -4,8 +4,8 @@
 #include <memory>
 
 #include "envoy/common/exception.h"
-
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
+
 #include "source/common/common/base64.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/http/message_impl.h"
@@ -929,13 +929,11 @@ CustomCredentialsProviderChain::CustomCredentialsProviderChain(
         context, credential_provider_config.credentials_file_provider()));
   }
 
-  if(credential_provider_config.has_iam_roles_anywhere())
-  {
+  if (credential_provider_config.has_iam_roles_anywhere()) {
     ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
     add(factories.createIAMRolesAnywhereCredentialsProvider(
         context, aws_cluster_manager_, region, credential_provider_config.iam_roles_anywhere()));
   }
-
 }
 
 DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
@@ -985,7 +983,7 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
       web_identity.set_role_session_name(sessionName(api));
     }
 
-        if ((!web_identity.web_identity_token_data_source().filename().empty() ||
+    if ((!web_identity.web_identity_token_data_source().filename().empty() ||
          !web_identity.web_identity_token_data_source().inline_bytes().empty() ||
          !web_identity.web_identity_token_data_source().inline_string().empty() ||
          !web_identity.web_identity_token_data_source().environment_variable().empty()) &&
@@ -1045,11 +1043,11 @@ DefaultCredentialsProviderChain::DefaultCredentialsProviderChain(
         MetadataFetcher::create, refresh_state, initialization_timer, EC2_METADATA_CLUSTER));
   }
 
-  if(credential_provider_config.has_iam_roles_anywhere() && context)
-  {
+  if (credential_provider_config.has_iam_roles_anywhere() && context) {
     ENVOY_LOG(debug, "Using IAM Roles Anywhere credentials provider");
     add(factories.createIAMRolesAnywhereCredentialsProvider(
-        context.value(), aws_cluster_manager_, region, credential_provider_config.iam_roles_anywhere()));
+        context.value(), aws_cluster_manager_, region,
+        credential_provider_config.iam_roles_anywhere()));
   }
 }
 
@@ -1192,7 +1190,8 @@ CredentialsProviderSharedPtr CustomCredentialsProviderChain::createWebIdentityCr
   return credential_provider;
 };
 
-CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
+CredentialsProviderSharedPtr
+DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
     AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
     const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
@@ -1207,13 +1206,14 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createIAMRolesAnyw
   auto status = aws_cluster_manager.ref()->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
 
-    //         Api::Api& api, ServerFactoryContextOptRef context,
-    // AwsClusterManagerOptRef aws_cluster_manager,
-    // absl::string_view cluster_name,
-    //   CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
-    //   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-    //   std::chrono::seconds initialization_timer,
-    //   envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider iam_roles_anywhere_config);
+  //         Api::Api& api, ServerFactoryContextOptRef context,
+  // AwsClusterManagerOptRef aws_cluster_manager,
+  // absl::string_view cluster_name,
+  //   CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view region,
+  //   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+  //   std::chrono::seconds initialization_timer,
+  //   envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
+  //   iam_roles_anywhere_config);
 
   auto credential_provider = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
       context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
@@ -1228,7 +1228,8 @@ CredentialsProviderSharedPtr DefaultCredentialsProviderChain::createIAMRolesAnyw
   return credential_provider;
 };
 
-CredentialsProviderSharedPtr CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
+CredentialsProviderSharedPtr
+CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context,
     AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
     const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&

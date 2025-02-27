@@ -153,7 +153,6 @@ envoy_cc_library(
     deps = [
         ":aws_cluster_manager_lib",
         ":credentials_provider_interface",
-        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_impl_lib",
         ":metadata_fetcher_lib",
         ":sigv4_signer_impl_lib",
         ":utility_lib",
@@ -166,6 +165,8 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_impl_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_x509_credentials_provider_impl_lib",
         "@com_google_absl//absl/time",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",

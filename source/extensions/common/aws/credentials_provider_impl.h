@@ -26,7 +26,6 @@
 
 #include "absl/strings/string_view.h"
 
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -353,10 +352,10 @@ public:
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) const PURE;
 
   virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
-    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
-        iam_roles_anywhere_config) const PURE;
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+          iam_roles_anywhere_config) const PURE;
 };
 
 class CustomCredentialsProviderChainFactories {
@@ -375,11 +374,10 @@ public:
           web_identity_config) const PURE;
 
   virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
-    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
-        iam_roles_anywhere_config) const PURE;
-
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+          iam_roles_anywhere_config) const PURE;
 };
 
 // TODO(nbaws) Add additional providers to the custom chain.
@@ -413,10 +411,10 @@ public:
           web_identity_config) const override;
 
   CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
-    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
-        iam_roles_anywhere_config) const override;
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+          iam_roles_anywhere_config) const override;
 
   AwsClusterManagerPtr aws_cluster_manager_;
 };
@@ -499,10 +497,10 @@ private:
           web_identity_config) const override;
 
   CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
-    const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
-        iam_roles_anywhere_config) const override;
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+          iam_roles_anywhere_config) const override;
 
   AwsClusterManagerPtr aws_cluster_manager_;
 };

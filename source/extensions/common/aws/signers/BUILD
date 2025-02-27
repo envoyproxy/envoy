@@ -2,7 +2,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_extension_package",
-    "envoy_select_boringssl",
 )
 
 licenses(["notice"])  # Apache 2

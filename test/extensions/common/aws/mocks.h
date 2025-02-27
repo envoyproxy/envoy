@@ -4,9 +4,10 @@
 
 #include "source/common/http/message_impl.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider_impl.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider_impl.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/credentials_provider_impl.h"
-#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
 
@@ -110,17 +111,16 @@ public:
   MOCK_METHOD(void, onClusterAddOrUpdate, ());
 };
 
-
 // Friend class for testing callbacks
 class MetadataCredentialsProviderBaseFriend {
-  public:
-    MetadataCredentialsProviderBaseFriend(std::shared_ptr<MetadataCredentialsProviderBase> provider)
-        : provider_(provider) {}
-  
-    void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
-    std::shared_ptr<MetadataCredentialsProviderBase> provider_;
-  };
-  
+public:
+  MetadataCredentialsProviderBaseFriend(std::shared_ptr<MetadataCredentialsProviderBase> provider)
+      : provider_(provider) {}
+
+  void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
+  std::shared_ptr<MetadataCredentialsProviderBase> provider_;
+};
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions
