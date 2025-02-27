@@ -32,6 +32,10 @@ public:
   MOCK_METHOD(Stats::Scope&, statsScope, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
 
+  // Useful for when a test needs to change a static secret, which normally cannot be changed or
+  // re-added after it is set. This creates a new secret manager and deletes the old one.
+  void resetSecretManager();
+
   testing::NiceMock<StatelessMockServerFactoryContext> server_context_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Api::MockApi> api_;
