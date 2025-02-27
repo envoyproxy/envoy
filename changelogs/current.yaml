@@ -270,5 +270,9 @@ new_features:
   change: |
     Added an :ref:`io_uring <envoy_v3_api_field_extensions.network.socket_interface.v3.DefaultSocketInterface.io_uring_options>` option in
     default socket interface to support io_uring.
+- area: golang
+  change: |
+    added http golang filter config destroy callback. When a config gets deleted from envoy, the go plugin calls the `Destroy` function on the config instance.
+    config should implement the new `github.com/envoyproxy/envoy/contrib/golang/common/go/api.Config` interface, implementing the Destroy function.
 
 deprecated:
