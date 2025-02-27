@@ -26,43 +26,19 @@ Configuration Examples
 
 A sample filter configuration for a gRPC authorization server:
 
-.. code-block:: yaml
+.. literalinclude:: _include/ext-authz-grpc-filter.yaml
+    :language: yaml
+    :lines: 26-35
+    :lineno-start: 26
+    :linenos:
+    :caption: :download:`ext-authz-grpc-filter.yaml <_include/ext-authz-grpc-filter.yaml>`
 
-  http_filters:
-    - name: envoy.filters.http.ext_authz
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-        grpc_service:
-          envoy_grpc:
-            cluster_name: ext-authz
-
-          # Default is 200ms; override if your server needs e.g. warmup time.
-          timeout: 0.5s
-        include_peer_certificate: true
-
-.. code-block:: yaml
-
-  clusters:
-    - name: ext-authz
-      type: static
-      typed_extension_protocol_options:
-        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-          explicit_http_config:
-            http2_protocol_options: {}
-      load_assignment:
-        cluster_name: ext-authz
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 10003
-
-      # This timeout controls the initial TCP handshake timeout - not the timeout for the
-      # entire request.
-      connect_timeout: 0.25s
+.. literalinclude:: _include/ext-authz-grpc-filter.yaml
+    :language: yaml
+    :lines: 41-56
+    :lineno-start: 41
+    :linenos:
+    :caption: :download:`ext-authz-grpc-filter.yaml <_include/ext-authz-grpc-filter.yaml>`
 
 .. note::
 
@@ -72,19 +48,12 @@ A sample filter configuration for a gRPC authorization server:
 
   A sample configuration is as follows:
 
-  .. code:: yaml
-
-    http_filters:
-      - name: envoy.filters.http.ext_authz
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-          grpc_service:
-            envoy_grpc:
-              cluster_name: ext-authz
-          with_request_body:
-            max_request_bytes: 1024
-            allow_partial_message: true
-            pack_as_bytes: true
+  .. literalinclude:: _include/ext-authz-grpc-body-filter.yaml
+      :language: yaml
+      :lines: 26-36
+      :lineno-start: 26
+      :linenos:
+      :caption: :download:`ext-authz-grpc-body-filter.yaml <_include/ext-authz-grpc-body-filter.yaml>`
 
   Please note that by default :ref:`check request<envoy_v3_api_msg_service.auth.v3.CheckRequest>`
   carries the HTTP request body as UTF-8 string and it fills the :ref:`body
@@ -98,65 +67,33 @@ A sample filter configuration for a gRPC authorization server:
 
 A sample filter configuration for a raw HTTP authorization server:
 
-.. code-block:: yaml
+.. literalinclude:: _include/ext-authz-http-filter.yaml
+    :language: yaml
+    :lines: 26-36
+    :lineno-start: 26
+    :linenos:
+    :caption: :download:`ext-authz-http-filter.yaml <_include/ext-authz-http-filter.yaml>`
 
-  http_filters:
-    - name: envoy.filters.http.ext_authz
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-        http_service:
-            server_uri:
-              uri: 127.0.0.1:10003
-              cluster: ext-authz
-              timeout: 0.25s
-              failure_mode_allow: false
-        include_peer_certificate: true
-
-.. code-block:: yaml
-
-  clusters:
-    - name: ext-authz
-      connect_timeout: 0.25s
-      type: logical_dns
-      lb_policy: round_robin
-      load_assignment:
-        cluster_name: ext-authz
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 10003
+.. literalinclude:: _include/ext-authz-http-filter.yaml
+    :language: yaml
+    :lines: 41-53
+    :lineno-start: 41
+    :linenos:
+    :caption: :download:`ext-authz-http-filter.yaml <_include/ext-authz-http-filter.yaml>`
 
 Per-Route Configuration
 -----------------------
 
+.. literalinclude:: _include/ext-authz-routes-filter.yaml
+    :language: yaml
+    :lines: 15-38
+    :lineno-start: 15
+    :linenos:
+    :caption: :download:`ext-authz-routes-filter.yaml <_include/ext-authz-routes-filter.yaml>`
+
 A sample virtual host and route filter configuration.
 In this example we add additional context on the virtual host, and disabled the filter for ``/static`` prefixed routes.
 
-.. code-block:: yaml
-
-  route_config:
-    name: local_route
-    virtual_hosts:
-    - name: local_service
-      domains: ["*"]
-      typed_per_filter_config:
-        envoy.filters.http.ext_authz:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
-          check_settings:
-            context_extensions:
-              virtual_host: local_service
-      routes:
-      - match: { prefix: "/static" }
-        route: { cluster: some_service }
-        typed_per_filter_config:
-          envoy.filters.http.ext_authz:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
-            disabled: true
-      - match: { prefix: "/" }
-        route: { cluster: some_service }
 
 Statistics
 ----------

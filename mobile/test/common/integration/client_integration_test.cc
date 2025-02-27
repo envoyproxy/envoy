@@ -16,6 +16,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/test_random_generator.h"
 
+#include "absl/synchronization/notification.h"
 #include "extension_registry.h"
 #include "library/common/bridge/utility.h"
 #include "library/common/http/header_utility.h"
@@ -78,7 +79,7 @@ public:
   }
 
   void initialize() override {
-    builder_.setLogLevel(Logger::Logger::debug);
+    builder_.setLogLevel(Logger::Logger::trace);
     builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
     builder_.addRuntimeGuard("quic_no_tcp_delay", true);
 
@@ -267,7 +268,6 @@ TEST_P(ClientIntegrationTest, BasicWithCares) {
 // resolver.
 #if not defined(__APPLE__)
 TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
-  builder_.setLogLevel(Logger::Logger::debug);
   std::atomic<bool> found_cache_miss{false};
   auto logger = std::make_unique<EnvoyLogger>();
   logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
@@ -297,7 +297,6 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnFailure) {
 #endif
 
 TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
-  builder_.setLogLevel(Logger::Logger::debug);
   std::atomic<bool> found_force_dns_refresh{false};
   auto logger = std::make_unique<EnvoyLogger>();
   logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
@@ -312,6 +311,66 @@ TEST_P(ClientIntegrationTest, DisableDnsRefreshOnNetworkChange) {
   internalEngine()->onDefaultNetworkChanged(1);
 
   EXPECT_FALSE(found_force_dns_refresh);
+}
+
+TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
+  std::atomic<bool> found_force_dns_refresh{false};
+  std::vector<absl::Notification> handled_network_changes(5);
+  std::atomic<int> current_change_event{0};
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
+    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+      found_force_dns_refresh = true;
+    } else if (msg.find("Finished the network changed callback") != std::string::npos) {
+      handled_network_changes[current_change_event].Notify();
+    }
+  };
+  builder_.setLogger(std::move(logger));
+  builder_.setDisableDnsRefreshOnNetworkChange(false);
+  initialize();
+
+  // Set the network type to WIFI. This should trigger a network change.
+  int network = static_cast<int>(NetworkType::WLAN);
+  internalEngine()->onDefaultNetworkChangeEvent(network);
+  handled_network_changes[current_change_event].WaitForNotification();
+  EXPECT_TRUE(found_force_dns_refresh);
+  found_force_dns_refresh = false;
+  ++current_change_event;
+
+  // Set the network type to Cellular 4G. This should trigger a network change.
+  network = static_cast<int>(NetworkType::WWAN);
+  network |= static_cast<int>(NetworkType::WWAN_4G);
+  internalEngine()->onDefaultNetworkChangeEvent(network);
+  handled_network_changes[current_change_event].WaitForNotification();
+  EXPECT_TRUE(found_force_dns_refresh);
+  found_force_dns_refresh = false;
+  ++current_change_event;
+
+  // Set the network type to Cellular 5G. This should not trigger a network change, because the
+  // previous network type was still Cellular.
+  network = static_cast<int>(NetworkType::WWAN);
+  network |= static_cast<int>(NetworkType::WWAN_5G);
+  internalEngine()->onDefaultNetworkChangeEvent(network);
+  handled_network_changes[current_change_event].WaitForNotification();
+  EXPECT_FALSE(found_force_dns_refresh);
+  found_force_dns_refresh = false;
+  ++current_change_event;
+
+  // Set the network type back to WIFI. This should trigger a network change.
+  network = static_cast<int>(NetworkType::WLAN);
+  internalEngine()->onDefaultNetworkChangeEvent(network);
+  handled_network_changes[current_change_event].WaitForNotification();
+  EXPECT_TRUE(found_force_dns_refresh);
+  found_force_dns_refresh = false;
+  ++current_change_event;
+
+  // Set the network type to WIFI, but with a VPN. This should trigger a network change.
+  network = static_cast<int>(NetworkType::WLAN);
+  network |= static_cast<int>(NetworkType::Generic);
+  internalEngine()->onDefaultNetworkChangeEvent(network);
+  handled_network_changes[current_change_event].WaitForNotification();
+  EXPECT_TRUE(found_force_dns_refresh);
+  EXPECT_EQ(4, current_change_event);
 }
 
 TEST_P(ClientIntegrationTest, LargeResponse) {
@@ -1290,7 +1349,6 @@ TEST_P(ClientIntegrationTest, ResetWithBidiTraffic) {
 TEST_P(ClientIntegrationTest, ResetWithBidiTrafficExplicitData) {
   explicit_flow_control_ = true;
   autonomous_upstream_ = false;
-  builder_.setLogLevel(Logger::Logger::debug);
   initialize();
   ConditionalInitializer headers_callback;
 
@@ -1389,6 +1447,21 @@ TEST_P(ClientIntegrationTest, OnNetworkChanged) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
   initialize();
   internalEngine()->onDefaultNetworkChanged(1);
+  basicTest();
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
+  }
+}
+
+// This test is simply to test the IPv6 connectivity check and DNS refresh and make sure the code
+// doesn't crash. It doesn't really test the actual network change event.
+TEST_P(ClientIntegrationTest, OnNetworkChangeEvent) {
+  builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
+  initialize();
+  int network = 0;
+  network |= static_cast<int>(NetworkType::WWAN);
+  network |= static_cast<int>(NetworkType::WWAN_5G);
+  internalEngine()->onDefaultNetworkChangeEvent(network);
   basicTest();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);

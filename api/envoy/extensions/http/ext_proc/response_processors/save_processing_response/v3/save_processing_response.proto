@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.ext_proc.response_processors.save_processing_response.v3";
+option java_outer_classname = "SaveProcessingResponseProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3;save_processing_responsev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Save Processing Response from external processor.]
+// [#extension: envoy.http.ext_proc.response_processors.save_processing_response]
+
+// Extension to save the :ref:`response
+// <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>` from the external processor as
+// filter state with name
+// "envoy.http.ext_proc.response_processors.save_processing_response[.:ref:`filter_state_name_suffix
+// <envoy_v3_api_field_extensions.http.ext_proc.response_processors.save_processing_response.v3.SaveProcessingResponse.filter_state_name>`].
+// This extension supports saving of request and response headers and trailers,
+// and immediate response.
+// [#next-free-field: 7]
+message SaveProcessingResponse {
+  message SaveOptions {
+    // Whether or not to save the response for the response type.
+    bool save_response = 1;
+
+    // When true, saves the response if there was an error when processing
+    // the response from the external processor.
+    bool save_on_error = 2;
+  }
+
+  // The default filter state name is
+  // "envoy.http.ext_proc.response_processors.save_processing_response".
+  // If defined, ``filter_state_name_suffix`` is appended to this.
+  // For example, setting ``filter_state_name_suffix`` to "xyz" will set the
+  // filter state name to "envoy.http.ext_proc.response_processors.save_processing_response.xyz"
+  string filter_state_name_suffix = 1;
+
+  // Save the response to filter state when :ref:`request_headers
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_headers>` is set.
+  SaveOptions save_request_headers = 2;
+
+  // Save the response to filter state when :ref:`response_headers
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_headers>` is set.
+  SaveOptions save_response_headers = 3;
+
+  // Save the response to filter state when :ref:`request_trailers
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.request_trailers>` is set.
+  SaveOptions save_request_trailers = 4;
+
+  // Save the response to filter state when :ref:`response_trailers
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.response_trailers>` is set.
+  SaveOptions save_response_trailers = 5;
+
+  // Save the response to filter state when :ref:`immediate_response
+  // <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.immediate_response>` is set.
+  SaveOptions save_immediate_response = 6;
+}

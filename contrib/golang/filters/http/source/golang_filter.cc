@@ -567,6 +567,43 @@ CAPIStatus Filter::addData(ProcessorState& state, absl::string_view data, bool i
   return CAPIStatus::CAPIYield;
 }
 
+CAPIStatus Filter::injectData(ProcessorState& state, absl::string_view data) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (state.filterState() != FilterState::ProcessingData) {
+    ENVOY_LOG(error, "injectData is not supported when calling without processing data, use "
+                     "`addData` instead.");
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  if (state.isThreadSafe()) {
+    ENVOY_LOG(error, "injectData is not supported when calling inside the callback context");
+    return CAPIStatus::CAPIInvalidScene;
+  }
+
+  auto data_to_write = std::make_shared<Buffer::OwnedImpl>(data);
+  auto weak_ptr = weak_from_this();
+  state.getDispatcher().post([this, &state, weak_ptr, data_to_write] {
+    if (!weak_ptr.expired() && !hasDestroyed()) {
+      ENVOY_LOG(debug, "golang filter inject data to filter chain, length: {}",
+                data_to_write->length());
+      state.injectDataToFilterChain(*data_to_write.get(), false);
+    } else {
+      ENVOY_LOG(debug, "golang filter has gone or destroyed in injectData event");
+    }
+  });
+
+  return CAPIStatus::CAPIOK;
+}
+
 CAPIStatus Filter::getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
                              int* value_len) {
   Thread::LockGuard lock(mutex_);

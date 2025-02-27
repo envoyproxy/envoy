@@ -77,7 +77,8 @@ func handleCApiStatus(status C.CAPIStatus) {
 	case C.CAPIFilterIsGone,
 		C.CAPIFilterIsDestroy,
 		C.CAPINotInGo,
-		C.CAPIInvalidPhase:
+		C.CAPIInvalidPhase,
+		C.CAPIInvalidScene:
 		panic(capiStatusToStr(status))
 	}
 }
@@ -92,6 +93,8 @@ func capiStatusToStr(status C.CAPIStatus) string {
 		return errNotInGo
 	case C.CAPIInvalidPhase:
 		return errInvalidPhase
+	case C.CAPIInvalidScene:
+		return errInvalidScene
 	}
 
 	return "unknown status"
@@ -151,6 +154,13 @@ func (c *httpCApiImpl) HttpSendPanicReply(s unsafe.Pointer, details string) {
 func (c *httpCApiImpl) HttpAddData(s unsafe.Pointer, data []byte, isStreaming bool) {
 	state := (*processState)(s)
 	res := C.envoyGoFilterHttpAddData(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(data)), C.int(len(data)), C.bool(isStreaming))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpInjectData(s unsafe.Pointer, data []byte) {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpInjectData(unsafe.Pointer(state.processState),
+		unsafe.Pointer(unsafe.SliceData(data)), C.int(len(data)))
 	handleCApiStatus(res)
 }
 

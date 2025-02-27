@@ -26,6 +26,10 @@ std::string Engine::dumpStats() { return engine_->dumpStats(); }
 
 envoy_status_t Engine::terminate() { return engine_->terminate(); }
 
+void Engine::onDefaultNetworkChangeEvent(int network) {
+  engine_->onDefaultNetworkChangeEvent(network);
+}
+
 void Engine::onDefaultNetworkChanged(int network) { engine_->onDefaultNetworkChanged(network); }
 
 void Engine::onDefaultNetworkUnavailable() { engine_->onDefaultNetworkUnavailable(); }

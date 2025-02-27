@@ -311,6 +311,22 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "disable_http3_on_linux_ppc64le",
+    match_all = [
+        ":disable_http3",
+        ":linux_ppc64le",
+    ],
+)
+
+selects.config_setting_group(
+    name = "disable_http3_on_not_x86_ppc",
+    match_all = [
+        ":disable_http3",
+        ":not_x86_ppc",
+    ],
+)
+
+selects.config_setting_group(
     name = "disable_http3_on_windows_x86_64",
     match_all = [
         ":disable_http3",
@@ -349,6 +365,14 @@ selects.config_setting_group(
     match_all = [
         ":enable_http3",
         ":linux_ppc",
+    ],
+)
+
+selects.config_setting_group(
+    name = "enable_http3_on_linux_ppc64le",
+    match_all = [
+        ":enable_http3",
+        ":linux_ppc64le",
     ],
 )
 
@@ -503,6 +527,14 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "boringssl_fips_ppc",
+    match_all = [
+        ":boringssl_fips",
+        ":linux_ppc64le",
+    ],
+)
+
 config_setting(
     name = "zlib_ng",
     constraint_values = [
@@ -544,10 +576,12 @@ config_setting(
 # Alias pointing to the selected version of BoringSSL:
 # - BoringSSL FIPS from @boringssl_fips//:ssl,
 # - non-FIPS BoringSSL from @boringssl//:ssl.
+# - aws-lc from @aws_lc//:ssl
 alias(
     name = "boringssl",
     actual = select({
-        "//bazel:boringssl_fips": "@boringssl_fips//:ssl",
+        "//bazel:boringssl_fips_ppc": "@aws_lc//:ssl",
+        "//bazel:boringssl_fips_x86": "@boringssl_fips//:ssl",
         "//conditions:default": "@boringssl//:ssl",
     }),
 )
@@ -555,7 +589,8 @@ alias(
 alias(
     name = "boringcrypto",
     actual = select({
-        "//bazel:boringssl_fips": "@boringssl_fips//:crypto",
+        "//bazel:boringssl_fips_ppc": "@aws_lc//:crypto",
+        "//bazel:boringssl_fips_x86": "@boringssl_fips//:crypto",
         "//conditions:default": "@boringssl//:crypto",
     }),
 )
@@ -580,6 +615,14 @@ config_setting(
     name = "linux_ppc",
     constraint_values = [
         "@platforms//cpu:ppc",
+        "@platforms//os:linux",
+    ],
+)
+
+config_setting(
+    name = "linux_ppc64le",
+    constraint_values = [
+        "@platforms//cpu:ppc64le",
         "@platforms//os:linux",
     ],
 )
@@ -794,6 +837,22 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "not_x86_ppc",
+    match_any = [
+        ":darwin_arm64",
+        ":ios_arm64",
+        ":ios_arm64e",
+        ":ios_armv7",
+        ":ios_armv7s",
+        ":ios_i386",
+        ":ios_sim_arm64",
+        ":linux_aarch64",
+        ":linux_mips64",
+        ":linux_s390x",
+    ],
+)
+
+selects.config_setting_group(
     name = "not_x86",
     match_any = [
         ":darwin_arm64",
@@ -806,6 +865,7 @@ selects.config_setting_group(
         ":linux_aarch64",
         ":linux_mips64",
         ":linux_ppc",
+        ":linux_ppc64le",
         ":linux_s390x",
     ],
 )

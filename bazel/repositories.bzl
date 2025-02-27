@@ -111,7 +111,7 @@ def _go_deps(skip_targets):
 def _rust_deps():
     external_http_archive(
         "rules_rust",
-        patches = ["@envoy//bazel:rules_rust.patch"],
+        patches = ["@envoy//bazel:rules_rust.patch", "@envoy//bazel:rules_rust_ppc64le.patch"],
     )
 
 def envoy_dependencies(skip_targets = []):
@@ -134,6 +134,7 @@ def envoy_dependencies(skip_targets = []):
     # - non-FIPS BoringSSL from @boringssl//:ssl.
     _boringssl()
     _boringssl_fips()
+    _aws_lc()
     native.bind(
         name = "ssl",
         actual = "@envoy//bazel:boringssl",
@@ -266,6 +267,12 @@ def _boringssl_fips():
     external_http_archive(
         name = "boringssl_fips",
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
+    )
+
+def _aws_lc():
+    external_http_archive(
+        name = "aws_lc",
+        build_file = "@envoy//bazel/external:aws_lc.BUILD",
     )
 
 def _com_github_openhistogram_libcircllhist():
@@ -620,7 +627,9 @@ def _com_google_protobuf():
     external_http_archive(
         name = "rules_java",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel:rules_java.patch"],
+        patches = [
+            "@envoy//bazel:rules_java.patch",
+        ],
     )
 
     for platform in PROTOC_VERSIONS:
@@ -715,6 +724,7 @@ def _v8():
         patches = [
             "@envoy//bazel:v8.patch",
             "@envoy//bazel:v8_include.patch",
+            "@envoy//bazel:v8_ppc64le.patch",
         ],
         patch_args = ["-p1"],
     )
