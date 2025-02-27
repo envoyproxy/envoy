@@ -42,8 +42,7 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
             config);
     filter->initializeInModuleFilter();
-    callbacks.addStreamDecoderFilter(filter);
-    callbacks.addStreamEncoderFilter(filter);
+    callbacks.addStreamFilter(filter);
   };
 }
 
