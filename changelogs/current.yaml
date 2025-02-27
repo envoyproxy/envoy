@@ -30,6 +30,11 @@ minor_behavior_changes:
     :ref:`generate_request_id
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.generate_request_id>`
     will generate a request id on non-present and now on empty ``x-request-id`` header.
+- area: aws
+  change: |
+    AWS request signing and AWS Lambda extensions will now no longer return empty credentials (and fail to sign) when
+    credentials are still pending from the async credential providers. If all providers are unable to retrieve credentials
+    then the original behaviour with a signing failure will occur.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

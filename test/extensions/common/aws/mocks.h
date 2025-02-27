@@ -5,6 +5,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credentials_provider.h"
+#include "source/extensions/common/aws/credentials_provider_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
 
@@ -38,6 +39,8 @@ public:
   ~MockCredentialsProvider() override;
 
   MOCK_METHOD(Credentials, getCredentials, ());
+  MOCK_METHOD(bool, credentialsPending, ());
+  MOCK_METHOD(std::string, providerName, ());
 };
 
 class MockSigner : public Signer {
@@ -49,6 +52,7 @@ public:
   MOCK_METHOD(absl::Status, sign, (Http::RequestHeaderMap&, const std::string&, absl::string_view));
   MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, absl::string_view));
   MOCK_METHOD(absl::Status, signUnsignedPayload, (Http::RequestHeaderMap&, absl::string_view));
+  MOCK_METHOD(bool, addCallbackIfCredentialsPending, (CredentialsPendingCallback &&));
 };
 
 class MockFetchMetadata {
@@ -82,6 +86,13 @@ public:
 class MockAwsManagedClusterUpdateCallbacks : public AwsManagedClusterUpdateCallbacks {
 public:
   MOCK_METHOD(void, onClusterAddOrUpdate, ());
+};
+
+class MockCredentialsProviderChain : public CredentialsProviderChain {
+public:
+  MOCK_METHOD(Credentials, chainGetCredentials, ());
+  MOCK_METHOD(bool, addCallbackIfChainCredentialsPending, (CredentialsPendingCallback &&));
+  MOCK_METHOD(void, onCredentialUpdate, ());
 };
 
 } // namespace Aws

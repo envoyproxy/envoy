@@ -37,32 +37,58 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   const auto& host_rewrite = config.hostRewrite();
   const bool use_unsigned_payload = config.useUnsignedPayload();
 
-  absl::Status status;
-
   if (!host_rewrite.empty()) {
     headers.setHost(host_rewrite);
   }
 
+  request_headers_ = &headers;
+
   if (!use_unsigned_payload && !end_stream) {
-    request_headers_ = &headers;
     return Http::FilterHeadersStatus::StopIteration;
   }
 
   ENVOY_LOG(debug, "aws request signing from decodeHeaders use_unsigned_payload: {}",
             use_unsigned_payload);
-  if (use_unsigned_payload) {
-    status = config.signer().signUnsignedPayload(headers);
+
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this, &config]() {
+        continueDecodeHeaders(config);
+        decoder_callbacks_->continueDecoding();
+      },
+      &cancel_callback_);
+
+  if (config.signer().addCallbackIfCredentialsPending(
+          [&dispatcher = decoder_callbacks_->dispatcher(),
+           completion_cb = std::move(completion_cb)]() {
+            dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
+          }) == false) {
+    // We're not pending credentials, so sign immediately
+    continueDecodeHeaders(config);
+    return Http::FilterHeadersStatus::Continue;
   } else {
-    status = config.signer().signEmptyPayload(headers);
+    // Leave and let our callback handle the rest of the processing
+    return Http::FilterHeadersStatus::StopIteration;
   }
+}
+
+void Filter::continueDecodeHeaders(FilterConfig& config) {
+  absl::Status status;
+  if (config.useUnsignedPayload()) {
+    status = config.signer().signUnsignedPayload(*request_headers_);
+
+  } else {
+    status = config.signer().signEmptyPayload(*request_headers_);
+  }
+  addSigningStats(config, status);
+}
+
+void Filter::addSigningStats(FilterConfig& config, absl::Status status) const {
   if (status.ok()) {
     config.stats().signing_added_.inc();
   } else {
     ENVOY_LOG(debug, "signing failed: {}", status.message());
     config.stats().signing_failed_.inc();
   }
-
-  return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -85,17 +111,42 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   ENVOY_LOG(debug, "aws request signing from decodeData");
   ASSERT(request_headers_ != nullptr);
+
+  auto completion_cb = Envoy::CancelWrapper::cancelWrapped(
+      [this, &config, hash]() {
+        continueDecodeData(config, hash);
+        decoder_callbacks_->continueDecoding();
+      },
+      &cancel_callback_);
+
+  if (config.signer().addCallbackIfCredentialsPending(
+          [&dispatcher = decoder_callbacks_->dispatcher(),
+           completion_cb = std::move(completion_cb)]() {
+            dispatcher.post([cb = std::move(completion_cb)]() mutable { cb(); });
+          }) == false) {
+    // We're not pending credentials, so sign immediately
+    continueDecodeData(config, hash);
+    return Http::FilterDataStatus::Continue;
+  } else {
+    // Leave and let our callback handle the rest of the processing
+    return Http::FilterDataStatus::StopIterationAndBuffer;
+  }
+}
+
+void Filter::continueDecodeData(FilterConfig& config, const std::string hash) {
   auto status = config.signer().sign(*request_headers_, hash);
+
+  addSigningStats(config, status);
+  addSigningPayloadStats(config, status);
+}
+
+void Filter::addSigningPayloadStats(FilterConfig& config, absl::Status status) const {
   if (status.ok()) {
-    config.stats().signing_added_.inc();
     config.stats().payload_signing_added_.inc();
   } else {
-    ENVOY_LOG(debug, "signing failed: {}", status.message());
-    config.stats().signing_failed_.inc();
+    ENVOY_LOG(debug, "payload signing failed: {}", status.message());
     config.stats().payload_signing_failed_.inc();
   }
-
-  return Http::FilterDataStatus::Continue;
 }
 
 FilterConfig& Filter::getConfig() const {

@@ -4,6 +4,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/grpc/google_async_client_impl.h"
+#include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/grpc_credentials/aws_iam/config.h"
 
@@ -177,6 +178,8 @@ public:
                     const absl::string_view = "") override {
     return absl::OkStatus();
   };
+  MOCK_METHOD(bool, addCallbackIfCredentialsPending,
+              (Extensions::Common::Aws::CredentialsPendingCallback &&));
 };
 
 class MockAuthContext : public ::grpc::AuthContext {

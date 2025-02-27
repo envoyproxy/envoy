@@ -160,7 +160,6 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4IntegrationDownstream) {
 }
 
 TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationDownstream) {
-
   config_helper_.prependFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4A, true);
   HttpIntegrationTest::initialize();
 
