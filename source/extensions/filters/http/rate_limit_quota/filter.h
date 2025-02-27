@@ -65,7 +65,9 @@ public:
 
   // Perform request matching. It returns the generated bucket ids if the
   // matching succeeded, error status otherwise.
-  absl::StatusOr<Matcher::ActionPtr> requestMatching(const Http::RequestHeaderMap& headers);
+  absl::StatusOr<Matcher::ActionPtr> requestMatching(
+      Matcher::MatchTree<Http::HttpMatchingData>* matcher, const Http::RequestHeaderMap& headers,
+      std::unique_ptr<Matcher::MatchTree<Http::HttpMatchingData>>* matcher_reentrant_out);
 
   Http::Matching::HttpMatchingDataImpl matchingData() {
     ASSERT(data_ptr_ != nullptr);
@@ -73,9 +75,14 @@ public:
   }
 
 private:
+  Http::FilterHeadersStatus executeMatchedAction(const RateLimitOnMatchAction& match_action,
+                                                 bool preview);
   Http::FilterHeadersStatus processCachedBucket(const DenyResponseSettings& deny_response_settings,
-                                                CachedBucket& cached_bucket);
+                                                CachedBucket& cached_bucket, bool preview);
   bool shouldAllowRequest(const CachedBucket& cached_bucket);
+  absl::optional<RateLimitOnMatchAction> findNonPreviewAction(
+      Http::RequestHeaderMap& headers,
+      std::unique_ptr<Matcher::MatchTree<Http::HttpMatchingData>> matcher_reentrant);
 
   FilterConfigConstSharedPtr config_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
