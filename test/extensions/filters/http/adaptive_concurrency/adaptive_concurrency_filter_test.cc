@@ -229,56 +229,6 @@ enabled:
   filter_->encodeComplete();
 }
 
-/**
- * Tests creation of pinned gradient controller.
- */
-TEST_F(AdaptiveConcurrencyFilterTest, CreatePinnedGradientController) {
-  std::string yaml_config =
-      R"EOF(
-pinned_gradient_controller_config:
-  sample_aggregate_percentile:
-    value: 50
-  concurrency_limit_params:
-    max_concurrency_limit:
-    concurrency_update_interval: 0.1s
-  min_rtt: 0.05s
-  min_concurrency: 7
-enabled:
-  default_value: true
-  runtime_key: "adaptive_concurrency.enabled"
-)EOF";
-
-  auto config = makeConfig(yaml_config);
-
-  auto config_ptr = std::make_shared<AdaptiveConcurrencyFilterConfig>(
-      config, runtime_, "testprefix.", stats_, time_system_);
-  filter_ = std::make_unique<AdaptiveConcurrencyFilter>(config_ptr, controller_);
-  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-
-  // The filter should behave as normal here.
-
-  Http::TestRequestHeaderMapImpl request_headers;
-
-  // The filter will be disabled when the flag is overridden. Note there is no expected call to
-  // forwardingDecision() or recordLatencySample().
-
-  EXPECT_CALL(runtime_.snapshot_, getBoolean("adaptive_concurrency.enabled", true))
-      .WillOnce(Return(false));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-
-  Buffer::OwnedImpl request_body;
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(request_body, false));
-
-  Http::TestRequestTrailerMapImpl request_trailers;
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
-
-  Http::TestResponseHeaderMapImpl response_headers;
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
-  filter_->encodeComplete();
-}
-
 TEST_F(AdaptiveConcurrencyFilterTest, DecodeHeadersTestForwarding) {
   Http::TestRequestHeaderMapImpl request_headers;
 
