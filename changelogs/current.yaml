@@ -53,6 +53,11 @@ bug_fixes:
   change: |
     Fixed OAuth2 credential injector to send scope (if specified) to authorization server when requesting new access
     token using ``client_credentials`` flow.
+- area: ext_authz
+  change: |
+    Removed validation constraint on :ref:`disabled <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute.disabled>` so
+    that it can be set to false to enable the filter when it is  by :ref:`default-disabled for the filter chain
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.disabled>`.
 - area: original_src filter
   change: |
     Set IP_BIND_ADDRESS_NO_PORT socket option in the original_src filter to prevent port exhaustion caused by the
