@@ -1,4 +1,3 @@
-#include "source/common/common/random_generator.h"
 #include "source/extensions/load_balancing_policies/least_request/least_request_lb.h"
 
 #include "test/common/upstream/utility.h"
