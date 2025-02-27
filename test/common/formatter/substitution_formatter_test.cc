@@ -49,24 +49,32 @@ namespace Envoy {
 namespace Formatter {
 namespace {
 
-using PlainStringFormatter = PlainStringFormatterBase<HttpFormatterContext>;
-using PlainNumberFormatter = PlainNumberFormatterBase<HttpFormatterContext>;
-
 // Helper class to test StreamInfoFormatter.
-class StreamInfoFormatter : public StreamInfoFormatterWrapper<HttpFormatterContext> {
+class StreamInfoFormatter : public FormatterProvider {
 public:
   StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
-                      absl::optional<size_t> max_length = absl::nullopt)
-      : StreamInfoFormatterWrapper<HttpFormatterContext>(nullptr) {
-    for (const auto& cmd : BuiltInStreamInfoCommandParserFactoryHelper::commandParsers()) {
-      auto formatter = cmd->parse(command, sub_command, max_length);
-      if (formatter) {
-        formatter_ = std::move(formatter);
-        return;
-      }
+                      absl::optional<size_t> max_length = absl::nullopt) {
+    BuiltInStreamInfoCommandParser parser;
+    formatter_ = parser.parse(command, sub_command, max_length);
+    if (formatter_ == nullptr) {
+      throwEnvoyExceptionOrPanic(fmt::format("Not supported command in StreamInfo: {}", command));
     }
-    throwEnvoyExceptionOrPanic(fmt::format("Not supported field in StreamInfo: {}", command));
   }
+
+  // FormatterProvider
+  absl::optional<std::string>
+  formatWithContext(const Context& context,
+                    const StreamInfo::StreamInfo& stream_info) const override {
+    return formatter_->formatWithContext(context, stream_info);
+  }
+  ProtobufWkt::Value
+  formatValueWithContext(const Context& context,
+                         const StreamInfo::StreamInfo& stream_info) const override {
+    return formatter_->formatValueWithContext(context, stream_info);
+  }
+
+private:
+  FormatterProviderPtr formatter_;
 };
 
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
@@ -4972,8 +4980,7 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "%START_TIME(%4On%)%"};
 
   for (const std::string& test_case : test_cases) {
-    EXPECT_THROW(THROW_OR_RETURN_VALUE(parser.parse(test_case),
-                                       std::vector<FormatterProviderBasePtr<HttpFormatterContext>>),
+    EXPECT_THROW(THROW_OR_RETURN_VALUE(parser.parse(test_case), std::vector<FormatterProviderPtr>),
                  EnvoyException)
         << test_case;
   }
