@@ -212,5 +212,8 @@ new_features:
     added :ref:`an option <config_network_filters_tcp_proxy_receive_before_connect>` to allow filters to read from the
     downstream connection before TCP proxy has opened the upstream connection, by setting a filter state object for the key
     ``envoy.tcp_proxy.receive_before_connect``.
-
+- area: golang
+  change: |
+    added http golang filter config destroy callback. When a config gets deleted from envoy, the go plugin calls the `Destroy` function on the config instance.
+    config should implement the new `github.com/envoyproxy/envoy/contrib/golang/common/go/api.Config` interface, implementing the Destroy function.
 deprecated:
