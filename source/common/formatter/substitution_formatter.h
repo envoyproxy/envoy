@@ -115,11 +115,9 @@ public:
 
       bool added = false;
 
-      // The order of the following parsers is because the historical behavior. And we keep it
-      // for backward compatibility.
-
-      // First, try the built-in command parsers.
-      for (const auto& cmd : BuiltInCommandParserFactoryHelper::commandParsers()) {
+      // First try the command parsers provided by the user. This allows the user to override
+      // built-in command parsers.
+      for (const auto& cmd : command_parsers) {
         auto formatter = cmd->parse(command, command_arg, max_len);
         if (formatter) {
           formatters.push_back(std::move(formatter));
@@ -128,9 +126,9 @@ public:
         }
       }
 
-      // Next, try the command parsers provided by the user.
+      // Next, try the built-in command parsers.
       if (!added) {
-        for (const auto& cmd : command_parsers) {
+        for (const auto& cmd : BuiltInCommandParserFactoryHelper::commandParsers()) {
           auto formatter = cmd->parse(command, command_arg, max_len);
           if (formatter) {
             formatters.push_back(std::move(formatter));
