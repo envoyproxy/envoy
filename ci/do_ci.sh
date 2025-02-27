@@ -507,6 +507,14 @@ case $CI_TARGET in
               "${TEST_TARGETS[@]}"
         ;;
 
+    release.contrib)
+        setup_clang_toolchain
+        echo "bazel release build with contrib extensions and tests..."
+        echo "Building..."
+        bazel_contrib_binary_build release
+        ;;
+
+
     distribution)
         echo "Building distro packages..."
         setup_clang_toolchain
