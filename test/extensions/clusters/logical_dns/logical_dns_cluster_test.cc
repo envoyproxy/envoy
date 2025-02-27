@@ -15,7 +15,6 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -83,10 +82,6 @@ protected:
     // Here we tell the DnsClusterImpl it's going to behave like a logic DNS cluster:
     dns_cluster.set_all_addresses_in_single_endpoint(true);
     status_or_cluster =
-        //    LogicalDnsCluster::create(cluster_config, dns_cluster, factory_context,
-        //    dns_resolver_);
-        // Now comes the big change. We can use the feature flag to run tests for both
-        // "to be deprecated" and new implementation.
         DnsClusterImpl::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
     THROW_IF_NOT_OK_REF(status_or_cluster.status());
     cluster_ = std::move(*status_or_cluster);
@@ -111,7 +106,7 @@ protected:
         cluster_config, server_context_, server_context_.cluster_manager_, resolver_fn,
         ssl_context_manager_, nullptr, false);
     if (status_or_cluster.ok()) {
-      cluster_ = std::dynamic_pointer_cast<LogicalDnsCluster>(status_or_cluster->first);
+      cluster_ = std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first);
       priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
           [&](uint32_t, const HostVector&, const HostVector&) {
             membership_updated_.ready();
@@ -683,7 +678,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
     )EOF";
 
   EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_yaml).message(),
-            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+            "DNS clusters must NOT have a custom resolver name set");
 
   const std::string custom_resolver_cluster_type_yaml = R"EOF(
     name: name
@@ -711,7 +706,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
     )EOF";
 
   EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_cluster_type_yaml).message(),
-            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+            "DNS clusters must NOT have a custom resolver name set");
 }
 
 // Test using both types of names in the cluster type.

@@ -25,9 +25,20 @@ DnsClusterFactory::createClusterWithConfig(
       selectDnsResolver(cluster, context);
   RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
+  // TODO: unify this piece of code with ClusterFactoryImplBase::create
+  // If we're using the typed configuration, we rely on the DnsCluster 
+  // proto resolved by the parent class of this factory. Otherwise we check
+  // for legacy configuration fields.
+  envoy::extensions::clusters::dns::v3::DnsCluster typed_config{};
+  if (cluster.has_cluster_type() && cluster.cluster_type().has_typed_config()) {
+    typed_config = proto_config;
+  } else {
+    createDnsClusterFromLegacyFields(cluster, typed_config);
+  }
+
   absl::StatusOr<std::unique_ptr<ClusterImplBase>> cluster_or_error;
   cluster_or_error =
-      DnsClusterImpl::create(cluster, proto_config, context, std::move(*dns_resolver_or_error));
+      DnsClusterImpl::create(cluster, typed_config, context, std::move(*dns_resolver_or_error));
 
   RETURN_IF_NOT_OK(cluster_or_error.status());
   return std::make_pair(std::shared_ptr<ClusterImplBase>(std::move(*cluster_or_error)), nullptr);
@@ -76,15 +87,27 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
 
   std::list<ResolveTargetPtr> resolve_targets;
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
+
+  if (all_addresses_in_single_endpoint_) {
+    if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
+      creation_status = absl::InvalidArgumentError(
+          "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+      return;
+    }
+  }
+
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
-    if (!all_addresses_in_single_endpoint_) {
-      THROW_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
+    const auto validation = validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
+    if (!all_addresses_in_single_endpoint_ && !validation.ok()) {
+        creation_status = validation;
+        return;
     }
 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
       if (!socket_address.resolver_name().empty()) {
-        throw EnvoyException("STRICT_DNS clusters must NOT have a custom resolver name set");
+        creation_status = absl::InvalidArgumentError("DNS clusters must NOT have a custom resolver name set");
+        return;
       }
 
       resolve_targets.emplace_back(new ResolveTarget(
@@ -188,19 +211,24 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
               continue;
             }
 
-            new_hosts.emplace_back(THROW_OR_RETURN_VALUE(
-                HostImpl::create(parent_.info_, hostname_, address,
-                                 // TODO(zyfjeff): Created through metadata shared pool
-                                 std::make_shared<const envoy::config::core::v3::Metadata>(
-                                     lb_endpoint_.metadata()),
-                                 std::make_shared<const envoy::config::core::v3::Metadata>(
-                                     locality_lb_endpoints_.metadata()),
-                                 lb_endpoint_.load_balancing_weight().value(),
-                                 locality_lb_endpoints_.locality(),
-                                 lb_endpoint_.endpoint().health_check_config(),
-                                 locality_lb_endpoints_.priority(), lb_endpoint_.health_status(),
-                                 parent_.time_source_),
-                std::unique_ptr<HostImpl>));
+            auto host_or_error = HostImpl::create(parent_.info_, hostname_, address,
+              // TODO(zyfjeff): Created through metadata shared pool
+              std::make_shared<const envoy::config::core::v3::Metadata>(
+                  lb_endpoint_.metadata()),
+              std::make_shared<const envoy::config::core::v3::Metadata>(
+                  locality_lb_endpoints_.metadata()),
+              lb_endpoint_.load_balancing_weight().value(),
+              locality_lb_endpoints_.locality(),
+              lb_endpoint_.endpoint().health_check_config(),
+              locality_lb_endpoints_.priority(), lb_endpoint_.health_status(),
+              parent_.time_source_);
+            if (!host_or_error.ok()) {
+              ENVOY_LOG(error, "Failed to create host {} with error: {}", address->asString(),
+                        host_or_error.status().message());
+              parent_.info_->configUpdateStats().update_failure_.inc();
+              return;
+            }
+            new_hosts.emplace_back(std::move(host_or_error.value()));
             all_new_hosts.emplace(address->asString());
             ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
 
