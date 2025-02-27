@@ -57,7 +57,7 @@ QuicLbConnectionIdGenerator::appendRoutingId(quic::QuicConnectionId& new_connect
     return {};
   }
 
-  memcpy(buffer, new_connection_id.data(), new_connection_id.length());
+  memcpy(buffer, new_connection_id.data(), new_connection_id.length()); // NOLINT(safe-memcpy)
 
   WorkerRoutingIdValue* routing_info_destination =
       reinterpret_cast<WorkerRoutingIdValue*>(buffer + new_connection_id.length());
@@ -100,7 +100,7 @@ QuicLbConnectionIdGenerator::ThreadLocalData::create(
 absl::Status
 QuicLbConnectionIdGenerator::ThreadLocalData::updateKeyAndVersion(absl::string_view key,
                                                                   uint8_t version) {
-  std::optional<quic::LoadBalancerConfig> lb_config;
+  absl::optional<quic::LoadBalancerConfig> lb_config;
   if (unsafe_unencrypted_testing_mode_) {
     lb_config = quic::LoadBalancerConfig::CreateUnencrypted(version, server_id_.length(),
                                                             nonce_length_bytes_);

@@ -2,6 +2,7 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
 #include "source/common/common/base64.h"
+
 #include "test/integration/http_integration.h"
 #include "test/integration/quic_http_integration_test.h"
 

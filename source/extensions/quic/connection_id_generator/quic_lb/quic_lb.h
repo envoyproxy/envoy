@@ -1,8 +1,9 @@
 #pragma once
 
+#include "envoy/extensions/quic/connection_id_generator/quic_lb/v3/quic_lb.pb.h"
+
 #include "source/common/quic/envoy_quic_connection_id_generator_factory.h"
 
-#include "envoy/extensions/quic/connection_id_generator/quic_lb/v3/quic_lb.pb.h"
 #include "quiche/quic/load_balancer/load_balancer_encoder.h"
 
 #if defined(__linux__)
