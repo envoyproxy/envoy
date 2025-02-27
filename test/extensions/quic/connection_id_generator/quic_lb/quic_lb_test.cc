@@ -259,6 +259,40 @@ TEST(QuicLbTest, WorkerSelector) {
   EXPECT_EQ(3, selector(buffer, default_value));
 }
 
+TEST(QuicLbTest, EmptySecretCallback) {
+  uint8_t id_data[] = {0xab, 0xcd, 0xef, 0x12, 0x34, 0x56};
+  envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config cfg;
+  cfg.mutable_server_id()->set_inline_bytes(id_data, sizeof(id_data));
+  cfg.set_nonce_length_bytes(10);
+  cfg.mutable_encryption_parameters()->set_name(kSecretName);
+  cfg.mutable_encryption_parameters()->mutable_sds_config();
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  auto secret_mgr_unique = std::make_unique<Secret::MockSecretManager>();
+  Secret::MockSecretManager* secret_manager = secret_mgr_unique.get();
+  factory_context.transport_socket_factory_context_.secret_manager_ = std::move(secret_mgr_unique);
+  auto secret_provider = std::make_shared<Secret::MockGenericSecretConfigProvider>();
+
+  EXPECT_CALL(*secret_manager, findOrCreateGenericSecretProvider(_, _, _, _))
+      .WillOnce(testing::Return(secret_provider));
+
+  EXPECT_CALL(*secret_provider, addValidationCallback(_));
+  std::function<absl::Status()> update_callback;
+  EXPECT_CALL(*secret_provider, addUpdateCallback(_))
+      .WillOnce(testing::Invoke([&](std::function<absl::Status()> cb) {
+        update_callback = cb;
+        return nullptr;
+      }));
+  EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(testing::Return(nullptr));
+
+  absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
+      Factory::create(cfg, factory_context);
+  EXPECT_TRUE(factory_or_status.ok());
+
+  auto status = update_callback();
+  EXPECT_EQ(status.message(), "secret update callback called with empty secret");
+}
+
 } // namespace QuicLb
 } // namespace ConnectionIdGenerator
 } // namespace Extensions
