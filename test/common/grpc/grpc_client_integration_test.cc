@@ -88,22 +88,25 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcClientIntegrationTest,
 TEST_P(GrpcClientIntegrationTest, BasicStream) {
   initialize();
   auto stream = createStream(empty_metadata_);
-  // Send request without END_STREAM set to true. By default Envoy gRPC client will reset
-  // the stream upon receiving response with trailers. Google gRPC client will not reset the
-  // stream as it by default supports independent half-close. auto stream =
-  // createStream(empty_metadata_);
+  // Send request without END_STREAM set to true.
+  // gRPC protocol allows server to send trailers before the client half-closed, however
+  // it indicates that the server is no longer interested in the client data (this is relevant when
+  // the client is streaming). gRPC server sends RST_STREAM after trailers if client had not yet
+  // half-closed. It is ok for the client to reset the stream in this case as well.
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  // Skip encoding RST_STREAM to document the behavior of the Envoy and gRPC clients
   dispatcher_helper_.runDispatcher();
 
-  if (clientType() == ClientType::EnvoyGrpc) { // Envoy gRPC based AsyncGrpcClient should reset
-                                               // stream, since server half-closed before client.
+  // The client resets the stream in this case.
+  if (clientType() == ClientType::EnvoyGrpc) {
+    // Envoy gRPC based AsyncGrpcClient also increments a counter.
     EXPECT_EQ(
         cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(), 1);
-    stream->waitForReset();
   }
+  stream->waitForReset();
 }
 
 // Validate that a simple request-reply stream works.
@@ -123,6 +126,31 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamGracefulClose) {
   EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(),
             0);
   stream->waitForEndStream();
+}
+
+TEST_P(GrpcClientIntegrationTest, BasicStreamWithServerReset) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  // Send request without END_STREAM set to true.
+  // gRPC protocol allows server to send trailers before the client half-closed, however
+  // it indicates that the server is no longer interested in the client data (this is relevant when
+  // the client is streaming). gRPC server sends RST_STREAM after trailers if client had not yet
+  // half-closed. It is ok for the client to reset the stream in this case as well.
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  // Compliant gRPC server will reset the stream if it half-closes before the client.
+  stream->sendServerReset();
+  dispatcher_helper_.runDispatcher();
+
+  // The client resets the stream in this case.
+  if (clientType() == ClientType::EnvoyGrpc) {
+    // Envoy gRPC based AsyncGrpcClient also increments a counter.
+    EXPECT_EQ(
+        cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(), 1);
+  }
+  stream->waitForReset();
 }
 
 // A simple request-reply stream, "x-envoy-internal" and `x-forward-for` headers

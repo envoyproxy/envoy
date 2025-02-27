@@ -232,6 +232,8 @@ public:
     }
   }
 
+  void sendServerReset() { fake_stream_->encodeResetStream(); }
+
   void closeStream() {
     grpc_stream_->closeStream();
     waitForEndStream();
