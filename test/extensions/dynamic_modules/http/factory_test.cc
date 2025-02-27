@@ -28,7 +28,72 @@ dynamic_module_config:
     name: no_op
     do_not_close: true
 filter_name: foo
-filter_config: bar
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.StringValue"
+    value: "bar"
+)EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
+  auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
+  EXPECT_TRUE(result.ok());
+  auto factory_cb = result.value();
+  Http::MockFilterChainFactoryCallbacks callbacks;
+
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(testing::_));
+  EXPECT_CALL(callbacks, addStreamEncoderFilter(testing::_));
+  factory_cb(callbacks);
+}
+
+TEST(DynamicModuleConfigFactory, LoadEmpty) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
+      1);
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
+  const std::string yaml = R"EOF(
+dynamic_module_config:
+    name: no_op
+    do_not_close: true
+filter_name: foo
+)EOF";
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
+  auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
+  EXPECT_TRUE(result.ok());
+  auto factory_cb = result.value();
+  Http::MockFilterChainFactoryCallbacks callbacks;
+
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(testing::_));
+  EXPECT_CALL(callbacks, addStreamEncoderFilter(testing::_));
+  factory_cb(callbacks);
+}
+
+TEST(DynamicModuleConfigFactory, LoadBytes) {
+  TestEnvironment::setEnvVar(
+      "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+      TestEnvironment::substitute("{{ test_rundir }}/test/extensions/dynamic_modules/test_data/c"),
+      1);
+
+  envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter config;
+  const std::string yaml = R"EOF(
+dynamic_module_config:
+    name: no_op
+    do_not_close: true
+filter_name: foo
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.BytesValue"
+    value: "YmFy" # echo -n "bar" | base64
 )EOF";
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
@@ -59,7 +124,9 @@ TEST(DynamicModuleConfigFactory, LoadError) {
 dynamic_module_config:
     name: something-not-exist
 filter_name: foo
-filter_config: bar
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.StringValue"
+    value: "bar"
 )EOF";
 
   envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
@@ -94,7 +161,9 @@ filter_config: bar
 dynamic_module_config:
     name: {}
 filter_name: foo
-filter_config: bar
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.StringValue"
+    value: "bar"
 )EOF",
                                          module_name);
     envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter proto_config;
