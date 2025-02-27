@@ -22,34 +22,22 @@ QuicLbConnectionIdGenerator::QuicLbConnectionIdGenerator(
 }
 
 absl::optional<quic::QuicConnectionId>
-QuicLbConnectionIdGenerator::GenerateNextConnectionId(const quic::QuicConnectionId& original) {
-  auto& encoder = tls_slot_->encoder_;
-  if (!encoder.IsEncoding()) {
-    // TODO: metric
-    return absl::nullopt;
-  }
-
+QuicLbConnectionIdGenerator::GenerateNextConnectionId(const quic::QuicConnectionId&) {
   // Encoder doesn't allow generating connection IDs when not using encryption to prevent making
   // a new linkable connection ID.
   //
   // This code is unsafe right now and for testing; override that by calling
   // GenerateConnectionId().
-  auto new_cid = encoder.GenerateConnectionId();
-  return appendRoutingId(new_cid, original);
+  auto new_cid = tls_slot_->encoder_.GenerateConnectionId();
+  return appendRoutingId(new_cid);
 }
 
 absl::optional<quic::QuicConnectionId>
 QuicLbConnectionIdGenerator::MaybeReplaceConnectionId(const quic::QuicConnectionId& original,
                                                       const quic::ParsedQuicVersion& version) {
-  auto& encoder = tls_slot_->encoder_;
-  if (!encoder.IsEncoding()) {
-    // TODO: metric
-    return absl::nullopt;
-  }
-
-  auto new_cid = encoder.MaybeReplaceConnectionId(original, version);
+  auto new_cid = tls_slot_->encoder_.MaybeReplaceConnectionId(original, version);
   if (new_cid.has_value()) {
-    return appendRoutingId(new_cid.value(), original);
+    return appendRoutingId(new_cid.value());
   }
 
   return absl::nullopt;
@@ -60,13 +48,12 @@ uint8_t QuicLbConnectionIdGenerator::ConnectionIdLength(uint8_t first_byte) cons
 }
 
 absl::optional<quic::QuicConnectionId>
-QuicLbConnectionIdGenerator::appendRoutingId(quic::QuicConnectionId& new_connection_id,
-                                             const quic::QuicConnectionId&) {
+QuicLbConnectionIdGenerator::appendRoutingId(quic::QuicConnectionId& new_connection_id) {
   uint8_t buffer[quic::kQuicMaxConnectionIdWithLengthPrefixLength];
 
   const uint16_t new_length = new_connection_id.length() + sizeof(WorkerRoutingIdValue);
   if (new_length > sizeof(buffer)) {
-    IS_ENVOY_BUG("Invalid encoder configuration led to connection id being too long");
+    IS_ENVOY_BUG("Connection id long");
     return {};
   }
 
@@ -86,7 +73,6 @@ QuicLbConnectionIdGenerator::appendRoutingId(quic::QuicConnectionId& new_connect
                  new_length,
                  quic::QuicConnectionId(absl::Span<const uint8_t>(buffer, new_length)).ToString());
 
-  ASSERT(tls_slot_->encoder_.IsEncoding());
   return quic::QuicConnectionId(absl::Span<const uint8_t>(buffer, new_length));
 }
 
@@ -96,7 +82,7 @@ QuicLbConnectionIdGenerator::ThreadLocalData::ThreadLocalData(
     const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config,
     absl::string_view server_id)
     : encoder_(*quic::QuicRandom::GetInstance(), nullptr /* visitor */,
-               config.self_encode_length()),
+               true /* len_self_encoded */),
       unsafe_unencrypted_testing_mode_(config.unsafe_unencrypted_testing_mode()),
       nonce_length_bytes_(config.nonce_length_bytes()), server_id_(server_id) {}
 
@@ -230,12 +216,6 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
     std::string test_key(quic::kLoadBalancerKeyLen, '0');
     auto result = test_instance_or_result.value()->updateKeyAndVersion(test_key, 0);
     RETURN_IF_NOT_OK_REF(result);
-
-    // Record the length of the connection ID so that we know the offset to look for
-    // routing information.
-    ret->connection_id_length_ =
-        test_instance_or_result.value()->encoder_.GenerateConnectionId().length() +
-        QuicLbConnectionIdGenerator::connectionIdLengthAddition();
   }
 
   ret->tls_slot_ = ThreadLocal::TypedSlot<QuicLbConnectionIdGenerator::ThreadLocalData>::makeUnique(
@@ -321,10 +301,10 @@ Factory::createCompatibleLinuxBpfSocketOption(uint32_t concurrency) {
 }
 
 static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint8_t concurrency,
-                                      uint32_t default_value,
-                                      uint8_t short_header_connection_id_length) {
+                                      uint32_t default_value) {
   const uint64_t packet_length = packet.length();
   if (packet_length < 9) {
+    ENVOY_LOG_MISC(trace, "packet length < 9: {}", packet_length);
     return default_value;
   }
 
@@ -340,6 +320,7 @@ static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint8_t co
     constexpr size_t kCIDOffset = 6;
 
     if (packet_length < 14) {
+      ENVOY_LOG_MISC(trace, "long header packet length less than 14: {}", packet_length);
       return default_value;
     }
 
@@ -349,6 +330,8 @@ static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint8_t co
     packet.copyOut(kCIDLenOffset, sizeof(id_len), &id_len);
 
     if (packet_length < (kCIDOffset + id_len)) {
+      ENVOY_LOG_MISC(trace, "long header packet {} length less than CID length {}", packet_length,
+                     id_len);
       return default_value;
     }
 
@@ -357,20 +340,30 @@ static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint8_t co
     ENVOY_LOG_MISC(trace, "long header for worker {}", connection_id_snippet % concurrency);
     return connection_id_snippet % concurrency;
   } else {
-    // IETF QUIC short header, or gQUIC.
+    // IETF QUIC short header.
     // The connection id starts from 2nd byte.
+    // All short headers will have a CID generated by quic-lb.
     constexpr size_t kCIDOffset = 1;
 
+    uint8_t config_version_and_length;
+    packet.copyOut(kCIDOffset, sizeof(config_version_and_length), &config_version_and_length);
+
+    // This length does not include the initial length byte or the trailing worker-id bytes.
+    const uint8_t encrypted_cid_length = config_version_and_length & quic::kLoadBalancerLengthMask;
+
+    const uint8_t worker_id_offset =
+        kCIDOffset + sizeof(encrypted_cid_length) + encrypted_cid_length;
+
     WorkerRoutingIdValue worker_id;
-    if (packet_length < (kCIDOffset + short_header_connection_id_length)) {
-      ENVOY_LOG_MISC(debug, "short header too short");
+    if (packet_length < (worker_id_offset + sizeof(worker_id))) {
+      ENVOY_LOG_MISC(trace, "short header packet length {} shorter than encoded length {}",
+                     packet_length, encrypted_cid_length);
       return default_value;
     }
 
-    packet.copyOut(kCIDOffset + short_header_connection_id_length - sizeof(worker_id),
-                   sizeof(worker_id), &worker_id);
+    packet.copyOut(worker_id_offset, sizeof(worker_id), &worker_id);
     if (worker_id >= concurrency) {
-      ENVOY_LOG_MISC(debug, "short header unexpected value {} >= {}", worker_id, concurrency);
+      ENVOY_LOG_MISC(trace, "short header unexpected value {} >= {}", worker_id, concurrency);
       return default_value;
     }
 
@@ -381,9 +374,8 @@ static uint32_t bpfEquivalentFunction(const Buffer::Instance& packet, uint8_t co
 
 QuicConnectionIdWorkerSelector
 Factory::getCompatibleConnectionIdWorkerSelector(uint32_t concurrency) {
-  return [concurrency, connection_id_length = connection_id_length_](const Buffer::Instance& packet,
-                                                                     uint32_t default_value) {
-    return bpfEquivalentFunction(packet, concurrency, default_value, connection_id_length);
+  return [concurrency](const Buffer::Instance& packet, uint32_t default_value) {
+    return bpfEquivalentFunction(packet, concurrency, default_value);
   };
 }
 

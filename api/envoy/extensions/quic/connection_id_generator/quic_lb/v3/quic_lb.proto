@@ -21,6 +21,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for a connection ID generator implementation for the QUIC-LB draft RFC for
 // routable connection IDs.
+//
+// Connection IDs always have the length self encoded, as described in
+// https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-length-self-description.
+//
 // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers for details.
 //
 // .. warning::
@@ -44,11 +48,6 @@ message Config {
   // The length of server_id and nonce_length_bytes must be 18 bytes or less.
   uint32 nonce_length_bytes = 3 [(validate.rules).uint32 = {gte: 4, lte: 16}];
 
-  // Encode the encrypted connection ID component into the first byte of the connection ID,
-  // as defined in the RFC.
-  // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-length-self-description.
-  bool self_encode_length = 4;
-
   // Configuration to fetch the encryption key and configuration version.
   //
   // The SDS service is for a :ref:`GenericSecret <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.GenericSecret>`.
@@ -58,5 +57,5 @@ message Config {
   //
   // "configuration_version" must contain a 1 byte unsigned integer of value less than 7.
   // See https://datatracker.ietf.org/doc/html/draft-ietf-quic-load-balancers#name-config-rotation.
-  transport_sockets.tls.v3.SdsSecretConfig encryption_parameters = 5 [(validate.rules).message = {required: true}];
+  transport_sockets.tls.v3.SdsSecretConfig encryption_parameters = 4 [(validate.rules).message = {required: true}];
 }

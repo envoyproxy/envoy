@@ -56,6 +56,21 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, QuicLbIntegrationTest,
 
 TEST_P(QuicLbIntegrationTest, Basic) { testRouterHeaderOnlyRequestAndResponse(); }
 
+TEST_P(QuicLbIntegrationTest, SecretsNotReady) {
+  // Write an invalid secret. This will cause the init manager to complete because it found
+  // the file, but won't get loaded because it's invalid.
+  TestEnvironment::writeStringToFileForTest("quic_lb.yaml", R"EOF(
+resources:
+  - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+    name: quic_lb
+    generic_secret:
+      secret: {}
+)EOF",
+                                            false);
+
+  testRouterHeaderOnlyRequestAndResponse();
+}
+
 TEST_P(QuicLbIntegrationTest, MultipleQuicConnections) {
   testMultipleQuicConnections([](size_t index) {
     auto id = quic::test::TestConnectionId(index);

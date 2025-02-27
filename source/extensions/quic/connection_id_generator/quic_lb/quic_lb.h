@@ -51,16 +51,10 @@ public:
                            const quic::ParsedQuicVersion& version) override;
   uint8_t ConnectionIdLength(uint8_t first_byte) const override;
 
-  // Returns the additional length of the connection ID beyond what the `LoadBalancerEncoder`
-  // creates.
-  static uint8_t connectionIdLengthAddition() { return sizeof(WorkerRoutingIdValue); }
-
   // Returns true if all configuration and secrets are valid and configured.
   bool ready() const;
 
-  absl::optional<quic::QuicConnectionId>
-  appendRoutingId(quic::QuicConnectionId& new_connection_id,
-                  const quic::QuicConnectionId& old_connection_id);
+  absl::optional<quic::QuicConnectionId> appendRoutingId(quic::QuicConnectionId& new_connection_id);
 
 private:
   ThreadLocal::TypedSlot<ThreadLocalData>& tls_slot_;
@@ -89,7 +83,6 @@ private:
   Common::CallbackHandlePtr secrets_provider_validation_callback_handle_;
   Common::CallbackHandlePtr secrets_provider_update_callback_handle_;
   ThreadLocal::TypedSlotPtr<QuicLbConnectionIdGenerator::ThreadLocalData> tls_slot_;
-  uint8_t connection_id_length_;
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   sock_fprog prog_;

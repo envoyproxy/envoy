@@ -14,12 +14,34 @@ namespace ConnectionIdGenerator {
 namespace QuicLb {
 
 namespace {
+
+const absl::string_view kSecretName = "test";
+
 std::unique_ptr<QuicLbConnectionIdGenerator> createTypedIdGenerator(Factory& factory,
                                                                     uint32_t worker_index = 0) {
   QuicConnectionIdGeneratorPtr generator = factory.createQuicConnectionIdGenerator(worker_index);
   return std::unique_ptr<QuicLbConnectionIdGenerator>(
       static_cast<QuicLbConnectionIdGenerator*>(generator.release()));
 }
+
+envoy::extensions::transport_sockets::tls::v3::Secret
+encryptionParamaters(uint8_t version_int = 0, std::string key_str = "0123456789abcdef") {
+  envoy::extensions::transport_sockets::tls::v3::Secret encryption_parameters;
+  encryption_parameters.set_name(kSecretName);
+  auto& secrets = *encryption_parameters.mutable_generic_secret()->mutable_secrets();
+  envoy::config::core::v3::DataSource key;
+  key.set_inline_string(key_str);
+  secrets["encryption_key"] = key;
+  envoy::config::core::v3::DataSource version;
+  std::string version_bytes;
+  version_bytes.resize(1);
+  version_bytes.data()[0] = version_int;
+  version.set_inline_bytes(version_bytes);
+  secrets["configuration_version"] = version;
+
+  return encryption_parameters;
+}
+
 } // namespace
 
 TEST(QuicLbTest, InvalidConfig) {
@@ -31,14 +53,14 @@ TEST(QuicLbTest, InvalidConfig) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
   // Missing static secret.
-  cfg.mutable_encryption_parameters()->set_name("test");
+  cfg.mutable_encryption_parameters()->set_name(kSecretName);
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(), "invalid encryption_parameters config");
 
   // Missing encryption key.
   envoy::extensions::transport_sockets::tls::v3::Secret encryption_parameters;
-  encryption_parameters.set_name("test");
+  encryption_parameters.set_name(kSecretName);
   encryption_parameters.mutable_generic_secret();
   auto status = factory_context.transport_socket_factory_context_.secretManager().addStaticSecret(
       encryption_parameters);
@@ -124,33 +146,15 @@ TEST(QuicLbTest, Unencrypted) {
   cfg.set_unsafe_unencrypted_testing_mode(true);
   cfg.mutable_server_id()->set_inline_bytes(id_data, sizeof(id_data));
   cfg.set_nonce_length_bytes(10);
-  cfg.set_self_encode_length(true); // Results in deterministic output.
-  cfg.mutable_encryption_parameters()->set_name("test");
+  cfg.mutable_encryption_parameters()->set_name(kSecretName);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  envoy::extensions::transport_sockets::tls::v3::Secret encryption_parameters;
-  encryption_parameters.set_name("test");
-  auto& secrets = *encryption_parameters.mutable_generic_secret()->mutable_secrets();
-  envoy::config::core::v3::DataSource key;
-  key.set_inline_string("0123456789abcdef");
-  secrets["encryption_key"] = key;
-  envoy::config::core::v3::DataSource version;
-  std::string version_bytes;
-  version_bytes.resize(1);
-  version_bytes.data()[0] = 0;
-  version.set_inline_bytes(version_bytes);
-  secrets["configuration_version"] = version;
-  factory_context.transport_socket_factory_context_.resetSecretManager();
   auto status = factory_context.transport_socket_factory_context_.secretManager().addStaticSecret(
-      encryption_parameters);
+      encryptionParamaters(0));
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
-  EXPECT_TRUE(status.ok());
-  factory_or_status = Factory::create(cfg, factory_context);
-  EXPECT_TRUE(factory_or_status.ok());
   auto generator = createTypedIdGenerator(*factory_or_status.value());
-  EXPECT_TRUE(generator->ready());
   auto new_cid = generator->GenerateNextConnectionId(quic::QuicConnectionId{});
   EXPECT_TRUE(new_cid.has_value());
   uint8_t expected[1 + sizeof(id_data)];
@@ -162,6 +166,97 @@ TEST(QuicLbTest, Unencrypted) {
   // First bytes should be the version followed by unencrypted server ID.
   EXPECT_EQ(absl::Span(reinterpret_cast<const uint8_t*>(new_cid->data()), sizeof(expected)),
             absl::Span(expected, sizeof(expected)));
+}
+
+TEST(QuicLbTest, TooLong) {
+  uint8_t id_data[] = {0xab, 0xcd, 0xef, 0x12, 0x34, 0x56};
+  envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config cfg;
+  cfg.mutable_server_id()->set_inline_bytes(id_data, sizeof(id_data));
+  cfg.set_nonce_length_bytes(10);
+  cfg.mutable_encryption_parameters()->set_name(kSecretName);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  auto status = factory_context.transport_socket_factory_context_.secretManager().addStaticSecret(
+      encryptionParamaters(0));
+  absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
+      Factory::create(cfg, factory_context);
+  auto generator = createTypedIdGenerator(*factory_or_status.value());
+  quic::QuicConnectionId id;
+  id.set_length(21);
+  EXPECT_ENVOY_BUG(generator->appendRoutingId(id), "Connection id long");
+}
+
+TEST(QuicLbTest, WorkerSelector) {
+  uint8_t id_data[] = {0xab, 0xcd, 0xef, 0x12, 0x34, 0x56};
+  envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config cfg;
+  cfg.mutable_server_id()->set_inline_bytes(id_data, sizeof(id_data));
+  cfg.set_nonce_length_bytes(10);
+  cfg.mutable_encryption_parameters()->set_name(kSecretName);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  auto status = factory_context.transport_socket_factory_context_.secretManager().addStaticSecret(
+      encryptionParamaters(0));
+  absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
+      Factory::create(cfg, factory_context);
+  constexpr uint32_t concurrency = 8;
+  QuicConnectionIdWorkerSelector selector =
+      factory_or_status.value()->getCompatibleConnectionIdWorkerSelector(concurrency);
+
+  Buffer::OwnedImpl buffer;
+
+  // Packet too short.
+  buffer.add(std::string(8, 0));
+  const uint32_t default_value = 42;
+  EXPECT_EQ(default_value, selector(buffer, default_value));
+
+  // Long header too short.
+  buffer = Buffer::OwnedImpl();
+  buffer.add(std::string(13, 0));
+  uint8_t* buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
+  buf[0] = 0x80; // Long header
+  buf[5] = 20;   // `DCID` length
+  EXPECT_EQ(default_value, selector(buffer, default_value));
+
+  // Long header: packet shorter than encoded CID length.
+  buffer.add(std::string(5, 0));
+  EXPECT_EQ(default_value, selector(buffer, default_value));
+
+  // Long header: success.
+  buffer = Buffer::OwnedImpl();
+  buffer.add(std::string(32, 0));
+  buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
+  buf[0] = 0x80; // Long header
+  buf[5] = 8;    // `DCID` length
+  buf[5 + 8] = (4 * concurrency) + 3;
+  EXPECT_EQ(3, selector(buffer, default_value));
+
+  // Short header: too short.
+  buffer = Buffer::OwnedImpl();
+  buffer.add(std::string(8, 0));
+  buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
+  buf[0] = 0x00; // Short header
+  buf[1] = 8;    // Encoded length.
+  EXPECT_EQ(default_value, selector(buffer, default_value));
+
+  // Short header: invalid concurrency.
+  buffer = Buffer::OwnedImpl();
+  buffer.add(std::string(12, 0));
+  buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
+  buf[0] = 0x00;                    // Short header
+  buf[1] = 8;                       // Encoded length.
+  buf[1 + 8 + 1] = concurrency + 1; // Worker ID suffix.
+  EXPECT_EQ(default_value, selector(buffer, default_value));
+
+  // Short header: valid.
+  buffer = Buffer::OwnedImpl();
+  buffer.add(std::string(12, 0));
+  buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
+  buf[0] = 0x00;      // Short header
+  buf[1] = 8;         // Encoded length.
+  buf[1 + 8 + 1] = 3; // Worker ID suffix.
+  EXPECT_EQ(3, selector(buffer, default_value));
 }
 
 } // namespace QuicLb
