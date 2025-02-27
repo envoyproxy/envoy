@@ -5,6 +5,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
+#include "contrib/golang/filters/http/test/test_data/destroyconfig/destroyconfig.h"
 
 #include "absl/strings/str_format.h"
 #include "contrib/golang/filters/http/source/config.h"
@@ -102,6 +103,52 @@ TEST(GolangFilterConfigTest, GolangFilterWithNilPluginConfig) {
   EXPECT_TRUE(plugin_config.SerializeToString(&str));
   cb(filter_callback);
 
+  cleanup();
+}
+
+class DestroyableFilterConfig : public FilterConfig {
+public:
+  DestroyableFilterConfig(
+      const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
+      Dso::HttpFilterDsoPtr dso_lib, const std::string& stats_prefix,
+      Server::Configuration::FactoryContext& context)
+      : FilterConfig(proto_config, dso_lib, stats_prefix, context) {}
+
+  bool destroyed{false};
+};
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+void envoyGoConfigDestroy(void* c) {
+  auto config = reinterpret_cast<httpConfigInternal*>(c);
+  auto weak_filter_config = config->weakFilterConfig();
+  auto filter_config = static_pointer_cast<DestroyableFilterConfig>(weak_filter_config.lock());
+  filter_config->destroyed = true;
+}
+#ifdef __cplusplus
+} // extern "C"
+#endif
+
+TEST(GolangFilterConfigTest, GolangFilterDestroyConfig) {
+  const auto yaml_fmt = R"EOF(
+  library_id: %s
+  library_path: %s
+  plugin_name: %s
+  )EOF";
+
+  const std::string DESTROYCONFIG{"destroyconfig"};
+  auto yaml_string = absl::StrFormat(yaml_fmt, DESTROYCONFIG, genSoPath(), DESTROYCONFIG);
+  envoy::extensions::filters::http::golang::v3alpha::Config proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  auto dso_lib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(
+      proto_config.library_id(), proto_config.library_path(), proto_config.plugin_name());
+  auto config = std::make_shared<DestroyableFilterConfig>(proto_config, dso_lib, "", context);
+  config->newGoPluginConfig();
+  dso_lib->envoyGoFilterDestroyHttpPluginConfig(config->getConfigId(), 0);
+  EXPECT_TRUE(config->destroyed);
   cleanup();
 }
 

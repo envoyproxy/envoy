@@ -108,6 +108,10 @@ func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
 func (*PassThroughStreamFilter) OnStreamComplete() {
 }
 
+type Config interface {
+	Destroy()
+}
+
 type StreamFilterConfigParser interface {
 	// Parse the proto message to any Go value, and return error to reject the config.
 	// This is called when Envoy receives the config from the control plane.
