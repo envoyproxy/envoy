@@ -54,8 +54,9 @@ class StreamInfoFormatter : public FormatterProvider {
 public:
   StreamInfoFormatter(const std::string& command, const std::string& sub_command = "",
                       absl::optional<size_t> max_length = absl::nullopt) {
-    BuiltInStreamInfoCommandParser parser;
-    formatter_ = parser.parse(command, sub_command, max_length);
+    DefaultBuiltInStreamInfoCommandParserFactory factory;
+    auto parser = factory.createCommandParser();
+    formatter_ = parser->parse(command, sub_command, max_length);
     if (formatter_ == nullptr) {
       throwEnvoyExceptionOrPanic(fmt::format("Not supported command in StreamInfo: {}", command));
     }

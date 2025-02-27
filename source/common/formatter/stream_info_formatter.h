@@ -278,15 +278,6 @@ private:
   ProtobufWkt::Value str_;
 };
 
-class BuiltInStreamInfoCommandParser : public CommandParser {
-public:
-  BuiltInStreamInfoCommandParser() = default;
-
-  // StreamInfoCommandParser
-  FormatterProviderPtr parse(absl::string_view command, absl::string_view sub_command,
-                             absl::optional<size_t> max_length) const override;
-};
-
 class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {
 public:
   std::string name() const override;
