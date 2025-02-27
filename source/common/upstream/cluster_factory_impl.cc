@@ -63,7 +63,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
       cluster_name = cluster.cluster_type().name();
       if (cluster_name == "envoy.cluster.strict_dns" ||
           cluster_name == "envoy.cluster.logical_dns") {
-          cluster_name = "envoy.cluster.dns";
+        cluster_name = "envoy.cluster.dns";
       }
     }
     factory = Registry::FactoryRegistry<ClusterFactory>::getFactory(cluster_name);
