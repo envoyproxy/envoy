@@ -234,10 +234,10 @@ TEST(QuicLbTest, WorkerSelector) {
 
   // Short header: too short.
   buffer = Buffer::OwnedImpl();
-  buffer.add(std::string(8, 0));
+  buffer.add(std::string(12, 0));
   buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
   buf[0] = 0x00; // Short header
-  buf[1] = 8;    // Encoded length.
+  buf[1] = 12;   // Encoded length.
   EXPECT_EQ(default_value, selector(buffer, default_value));
 
   // Short header: invalid concurrency.

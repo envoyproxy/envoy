@@ -52,9 +52,6 @@ public:
                            const quic::ParsedQuicVersion& version) override;
   uint8_t ConnectionIdLength(uint8_t first_byte) const override;
 
-  // Returns true if all configuration and secrets are valid and configured.
-  bool ready() const;
-
   absl::optional<quic::QuicConnectionId> appendRoutingId(quic::QuicConnectionId& new_connection_id);
 
 private:

@@ -76,8 +76,6 @@ QuicLbConnectionIdGenerator::appendRoutingId(quic::QuicConnectionId& new_connect
   return quic::QuicConnectionId(absl::Span<const uint8_t>(buffer, new_length));
 }
 
-bool QuicLbConnectionIdGenerator::ready() const { return tls_slot_->encoder_.IsEncoding(); }
-
 QuicLbConnectionIdGenerator::ThreadLocalData::ThreadLocalData(
     const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config,
     absl::string_view server_id)
