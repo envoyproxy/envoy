@@ -18,6 +18,7 @@ exports_files([
     "test_for_benchmark_wrapper.sh",
     "repository_locations.bzl",
     "exported_symbols.txt",
+    "exported_symbols_apple.txt",
 ])
 
 sh_library(
