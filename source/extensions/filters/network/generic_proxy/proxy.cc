@@ -6,6 +6,7 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/config/utility.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/network/generic_proxy/interface/filter.h"
@@ -625,8 +626,10 @@ void ActiveStream::completeStream(absl::optional<DownstreamStreamResetReason> re
   }
 
   for (const auto& access_log : parent_.config_->accessLogs()) {
-    const FormatterContext context{request_header_frame_.get(), response_header_frame_.get()};
-    access_log->log(context, stream_info_);
+    const FormatterContextExtension context_extension(request_header_frame_.get(),
+                                                      response_header_frame_.get());
+    Formatter::Context context;
+    access_log->log(context.setExtension(context_extension), stream_info_);
   }
 
   // TODO(wbpcode): use ranges to simplify the code.

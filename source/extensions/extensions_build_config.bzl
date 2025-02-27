@@ -298,6 +298,7 @@ EXTENSIONS = {
 
     "envoy.tracers.opentelemetry.samplers.always_on":         "//source/extensions/tracers/opentelemetry/samplers/always_on:config",
     "envoy.tracers.opentelemetry.samplers.dynatrace":         "//source/extensions/tracers/opentelemetry/samplers/dynatrace:config",
+    "envoy.tracers.opentelemetry.samplers.cel":               "//source/extensions/tracers/opentelemetry/samplers/cel:config",
 
     #
     # Transport sockets

@@ -2,7 +2,10 @@
 #include <string>
 #include <utility>
 
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/common/tracing/tracer_manager_impl.h"
+#include "source/extensions/access_loggers/common/file_access_log_impl.h"
 #include "source/extensions/filters/network/generic_proxy/proxy.h"
 
 #include "test/extensions/filters/network/generic_proxy/fake_codec.h"
@@ -45,7 +48,7 @@ public:
 
 class FilterConfigTest : public testing::Test {
 public:
-  void initializeFilterConfig(bool with_tracing = false, AccessLogInstanceSharedPtr logger = {},
+  void initializeFilterConfig(bool with_tracing = false, AccessLog::InstanceSharedPtr logger = {},
                               bool allow_no_decoder_filter = false) {
     if (with_tracing) {
       tracer_ = std::make_shared<NiceMock<Tracing::MockTracer>>();
@@ -93,7 +96,7 @@ public:
 
     mock_route_entry_ = std::make_shared<NiceMock<MockRouteEntry>>();
 
-    std::vector<AccessLogInstanceSharedPtr> access_logs;
+    std::vector<AccessLog::InstanceSharedPtr> access_logs;
     if (logger) {
       access_logs.push_back(logger);
     }
@@ -104,16 +107,18 @@ public:
         factory_context_);
   }
 
-  AccessLogInstanceSharedPtr loggerFormFormat(const std::string& format = DEFAULT_LOG_FORMAT) {
-    envoy::config::core::v3::SubstitutionFormatString sff_config;
-    sff_config.mutable_text_format_source()->set_inline_string(format);
-    auto formatter =
-        *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig<FormatterContext>(
-            sff_config, factory_context_);
+  AccessLog::InstanceSharedPtr loggerFormFormat(const std::string& format = DEFAULT_LOG_FORMAT) {
+    envoy::extensions::access_loggers::file::v3::FileAccessLog file_log_config;
+    file_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(format);
+    file_log_config.set_path("/fake/log/path");
+    envoy::config::accesslog::v3::AccessLog config;
+    config.mutable_typed_config()->PackFrom(file_log_config);
+    config.set_name("file");
 
-    return std::make_shared<FileAccessLog>(
-        Filesystem::FilePathAndType{}, nullptr, std::move(formatter),
-        factory_context_.server_factory_context_.accessLogManager());
+    std::vector<Formatter::CommandParserPtr> command_parsers;
+    command_parsers.push_back(createGenericProxyCommandParser());
+    return AccessLog::AccessLogFactory::fromProto(config, factory_context_,
+                                                  std::move(command_parsers));
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -189,7 +194,7 @@ TEST_F(FilterConfigTest, CodecFactory) {
 
 class FilterTest : public FilterConfigTest {
 public:
-  void initializeFilter(bool with_tracing = false, AccessLogInstanceSharedPtr logger = {},
+  void initializeFilter(bool with_tracing = false, AccessLog::InstanceSharedPtr logger = {},
                         bool allow_no_decoder_filter = false) {
     FilterConfigTest::initializeFilterConfig(with_tracing, logger, allow_no_decoder_filter);
 
