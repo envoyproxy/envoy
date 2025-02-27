@@ -9,6 +9,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
+#include "source/server/admin/admin_html_util.h"
 #include "source/server/admin/utils.h"
 
 namespace Envoy {
@@ -182,8 +183,37 @@ Http::Code ConfigDumpHandler::handlerConfigDump(Http::ResponseHeaderMap& respons
   }
   MessageUtil::redact(dump);
 
-  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  response.add(MessageUtil::getJsonStringFromMessageOrError(dump, true)); // pretty-print
+#ifdef ENVOY_ADMIN_HTML
+  const absl::optional<std::string> format = Utility::nonEmptyQueryParam(query_params, "format");
+  const bool gen_html = format.has_value() && *format == "html";
+  if (gen_html) {
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
+    AdminHtmlUtil::renderTableBegin(response);
+    AdminHtmlUtil::renderEndpointTableRow(response, *url_handler_, query_params, 1,
+                                          true /* submit_on_change */, false /* active */);
+    AdminHtmlUtil::renderTableEnd(response);
+
+    std::string buf;
+    response.addFragments({"<script>\n", AdminHtmlUtil::getResource("json_viewer.js", buf),
+                           "</script>\n"
+                           "<andypf-json-viewer"
+                           " indent='2'"
+                           " expanded='2'"
+                           " theme='monokai'"
+                           " show-data-types='true'"
+                           " show-toolbar='true'"
+                           " expand-icon-type='square'"
+                           " show-copy='true'"
+                           " show-size='true'>",
+                           MessageUtil::getJsonStringFromMessageOrError(dump, false),
+                           "</andypf-json-viewer>"});
+  } else
+#endif
+  {
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+    response.add(MessageUtil::getJsonStringFromMessageOrError(dump, true)); // pretty-print
+  }
+
   return Http::Code::OK;
 }
 

@@ -28,3 +28,16 @@ echo ')EOF";'
 echo 'constexpr absl::string_view HistogramsJs2 = R"EOF('
 tail --lines=+"$next_lines" "$5"
 echo ')EOF";'
+
+
+bytes=$(wc -c < "$6")
+first_bytes=$((bytes / 2))
+next_bytes=$((first_bytes + 1))
+
+echo 'constexpr absl::string_view JsonViewerJs1 = R"EOF('
+head --bytes="$first_bytes" "$6"
+echo ')EOF";'
+
+echo 'constexpr absl::string_view JsonViewerJs2 = R"EOF('
+tail --bytes=+"$next_bytes" "$6"
+echo ')EOF";'
