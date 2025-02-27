@@ -482,9 +482,16 @@ bool UdpProxyFilter::ActiveSession::onNewSession() {
     }
   }
 
-  if (setClusterInfo() && createUpstream()) {
-    cluster_->sessions_.emplace(this);
-    return true;
+  if (setClusterInfo()) {
+    if (!shouldCreateUpstream()) {
+      return true;
+    }
+
+    if (createUpstream()) {
+      ASSERT(!cluster_->sessions_.contains(this));
+      cluster_->sessions_.emplace(this);
+      return true;
+    }
   }
 
   return false;
@@ -574,22 +581,34 @@ bool UdpProxyFilter::ActiveSession::onContinueFilterChain(ActiveReadFilter* filt
     }
   }
 
-  if (setClusterInfo() && createUpstream()) {
-    cluster_->sessions_.emplace(this);
-    return true;
+  if (setClusterInfo()) {
+    if (!shouldCreateUpstream()) {
+      return true;
+    }
+
+    if (createUpstream()) {
+      ASSERT(!cluster_->sessions_.contains(this));
+      cluster_->sessions_.emplace(this);
+      return true;
+    }
   }
 
   filter_.removeSession(this);
   return false;
 }
 
-bool UdpProxyFilter::UdpActiveSession::createUpstream() {
-  ASSERT(cluster_);
+bool UdpProxyFilter::UdpActiveSession::shouldCreateUpstream() {
   if (udp_socket_) {
     // A session filter may call on continueFilterChain(), after already creating the socket,
     // so we first check that the socket was not created already.
-    return true;
+    return false;
   }
+
+  return true;
+}
+
+bool UdpProxyFilter::UdpActiveSession::createUpstream() {
+  ASSERT(cluster_);
 
   if (!host_) {
     host_ = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
@@ -973,13 +992,17 @@ UdpProxyFilter::TunnelingActiveSession::TunnelingActiveSession(
     UdpProxyFilter& filter, Network::UdpRecvData::LocalPeerAddresses&& addresses)
     : ActiveSession(filter, std::move(addresses), nullptr) {}
 
-bool UdpProxyFilter::TunnelingActiveSession::createUpstream() {
+bool UdpProxyFilter::TunnelingActiveSession::shouldCreateUpstream() {
   if (conn_pool_factory_) {
     // A session filter may call on continueFilterChain(), after already creating the upstream,
     // so we first check that the factory was not created already.
-    return true;
+    return false;
   }
 
+  return true;
+}
+
+bool UdpProxyFilter::TunnelingActiveSession::createUpstream() {
   conn_pool_factory_ = std::make_unique<TunnelingConnectionPoolFactory>();
   load_balancer_context_ = std::make_unique<UdpLoadBalancerContext>(
       filter_.config_->hashPolicy(), addresses_.peer_, &udp_session_info_);
@@ -1012,11 +1035,7 @@ bool UdpProxyFilter::TunnelingActiveSession::createConnectionPool() {
     return false;
   }
 
-  if (connect_attempts_ >= filter_.config_->tunnelingConfig()->maxConnectAttempts()) {
-    udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
-    cluster_->cluster_info_->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
-    return false;
-  } else if (connect_attempts_ >= 1) {
+  if (connect_attempts_ >= 1) {
     cluster_->cluster_info_->trafficStats()->upstream_rq_retry_.inc();
   }
 
@@ -1117,6 +1136,14 @@ void UdpProxyFilter::TunnelingActiveSession::onUpstreamEvent(Network::Connection
     upstream_.reset();
 
     if (!connecting) {
+      filter_.removeSession(this);
+      return;
+    }
+
+    if (connect_attempts_ >= filter_.config_->tunnelingConfig()->maxConnectAttempts()) {
+      udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRetryLimitExceeded);
+      cluster_->cluster_info_->trafficStats()->upstream_cx_connect_attempts_exceeded_.inc();
+      cluster_->cluster_stats_.sess_tunnel_failure_.inc();
       filter_.removeSession(this);
       return;
     }

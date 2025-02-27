@@ -38,16 +38,17 @@ For example, to generate the following descriptor:
 
 .. code-block:: cpp
 
-  ("generic_key", "some_value")
+  ("generic_key", "some_value0")
   ("source_cluster", "from_cluster")
 
 The configuration would be:
 
-.. code-block:: yaml
-
-  actions:
-      - {source_cluster: {}}
-      - {generic_key: {descriptor_value: some_value}}
+.. literalinclude:: _include/rate-limit-routes.yaml
+    :language: yaml
+    :lines: 26-30
+    :lineno-start: 26
+    :linenos:
+    :caption: :download:`rate-limit-routes.yaml <_include/rate-limit-routes.yaml>`
 
 Example 2
 ^^^^^^^^^
@@ -57,13 +58,12 @@ the configuration.
 
 For the following configuration:
 
-.. code-block:: yaml
-
-  actions:
-      - {source_cluster: {}}
-      - {remote_address: {}}
-      - {generic_key: {descriptor_value: some_value}}
-
+.. literalinclude:: _include/rate-limit-routes.yaml
+    :language: yaml
+    :lines: 36-41
+    :lineno-start: 36
+    :linenos:
+    :caption: :download:`rate-limit-routes.yaml <_include/rate-limit-routes.yaml>`
 
 If a request did not set :ref:`x-forwarded-for<config_http_conn_man_headers_x-forwarded-for>`,
 no descriptor is generated.
@@ -73,7 +73,7 @@ the following descriptor is generated:
 
 .. code-block:: cpp
 
-  ("generic_key", "some_value")
+  ("generic_key", "some_value1")
   ("remote_address", "<trusted address from x-forwarded-for>")
   ("source_cluster", "from_cluster")
 
@@ -97,15 +97,12 @@ Example 3
 
 The following configuration
 
-.. code-block:: yaml
-
-  actions:
-      - {generic_key: {descriptor_value: some_value}}
-  limit:
-     metadata_key:
-         key: test.filter.key
-         path:
-             - key: test
+.. literalinclude:: _include/rate-limit-routes.yaml
+    :language: yaml
+    :lines: 47-56
+    :lineno-start: 47
+    :linenos:
+    :caption: :download:`rate-limit-routes.yaml <_include/rate-limit-routes.yaml>`
 
 .. _config_http_filters_rate_limit_override_dynamic_metadata:
 
@@ -117,9 +114,9 @@ the rate limit override of 42 requests per hour will be appended to the rate lim
 .. code-block:: yaml
 
   test.filter.key:
-      test:
-          requests_per_unit: 42
-          unit: HOUR
+    test:
+      requests_per_unit: 42
+      unit: HOUR
 
 Descriptor extensions
 ---------------------
@@ -128,26 +125,21 @@ Rate limit descriptors are extensible with custom descriptors. For example, :ref
 <envoy_v3_api_msg_extensions.rate_limit_descriptors.expr.v3.Descriptor>` extension allows using any of the
 :ref:`request attributes <arch_overview_request_attributes>` as a descriptor value:
 
-.. code-block:: yaml
-
-  actions:
-      - extension:
-            name: custom
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
-              descriptor_key: my_descriptor_name
-              text: request.method
+.. literalinclude:: _include/rate-limit-routes.yaml
+    :language: yaml
+    :lines: 62-69
+    :lineno-start: 62
+    :linenos:
+    :caption: :download:`rate-limit-routes.yaml <_include/rate-limit-routes.yaml>`
 
 :ref:`HTTP matching input functions <arch_overview_matching_api>` are supported as descriptor producers:
 
-.. code-block:: yaml
-
-  actions:
-      - extension:
-            name: custom
-            typed_config:
-                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                header_name: x-header-name
+.. literalinclude:: _include/rate-limit-routes.yaml
+    :language: yaml
+    :lines: 75-81
+    :lineno-start: 75
+    :linenos:
+    :caption: :download:`rate-limit-routes.yaml <_include/rate-limit-routes.yaml>`
 
 The above example produces an entry with the key ``custom`` and the value of
 the request header ``x-header-name``. If the header is absent, then the

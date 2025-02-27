@@ -104,10 +104,17 @@ public:
   void readDisable(bool disable);
   const Http::RequestHeaderMap& headers() {
     absl::MutexLock lock(&lock_);
-    return *headers_;
+    if (client_headers_ != headers_) {
+      client_headers_ = headers_;
+    }
+    return *client_headers_;
   }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
-  const Http::RequestTrailerMapPtr& trailers() { return trailers_; }
+  Http::RequestTrailerMapConstSharedPtr trailers() {
+    absl::MutexLock lock(&lock_);
+    Http::RequestTrailerMapConstSharedPtr trailers{trailers_};
+    return trailers;
+  }
   bool receivedData() { return received_data_; }
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() {
     return encoder_.http1StreamEncoderOptions();
@@ -261,13 +268,43 @@ public:
 
 protected:
   absl::Mutex lock_;
+  // Headers get updated in decodeHeaders() and accessed in headers() methods. Those methods can
+  // be called from different threads, but we can rely on a few assumptions:
+  //
+  // 1. headers() method is only called from a single thread, which may or may not be different
+  //    from the thread that calls decodeHeaders()
+  // 2. headers can only be replaced completely - they are never modified in place.
+  //
+  // With those two assumptions, we can use a synchronization pattern with two header maps, that
+  // allows us to return an unprotected reference to the clients from the headers() method. The
+  // approach works as follows:
+  //
+  // 1. When headers are updated in decodeHeaders(), we store them in the internal headers_ map
+  // 2. When headers() is called, we check if the internal headers_ and external client_headers_
+  //    map point to different places, and if so, we update client_headers_ map to point to the
+  //    same map as internal headers_.
+  //
+  // Because both internal headers_ and client_headers_ are shared pointers, the map will stay
+  // around as long as at least one of those pointers keeps a reference to the map and thus
+  // the returned reference stay valid as well. And because headers() is only called from a single
+  // thread, it's safe to return a reference to client_headers_ from headers() call.
+  //
+  // The reason why we want to return an unprotected reference is because historically that's what
+  // the interface of the FakeStream::headers() was, and over time we accumulated quite a few tests
+  // that rely on that. Changing the interface would require updating all the tests and we decided
+  // not to do that.
+  //
+  // That's why we have both headers_ and client_headers_ map below.
   Http::RequestHeaderMapSharedPtr headers_ ABSL_GUARDED_BY(lock_);
   Buffer::OwnedImpl body_ ABSL_GUARDED_BY(lock_);
   FakeHttpConnection& parent_;
 
 private:
   Http::ResponseEncoder& encoder_;
-  Http::RequestTrailerMapPtr trailers_ ABSL_GUARDED_BY(lock_);
+  // See the comment for headers_ above that explains why we need both headers_ and
+  // client_headers_.
+  Http::RequestHeaderMapSharedPtr client_headers_;
+  Http::RequestTrailerMapSharedPtr trailers_ ABSL_GUARDED_BY(lock_);
   bool end_stream_ ABSL_GUARDED_BY(lock_){};
   bool saw_reset_ ABSL_GUARDED_BY(lock_){};
   Grpc::Decoder grpc_decoder_;

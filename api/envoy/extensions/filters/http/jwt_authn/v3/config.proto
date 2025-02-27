@@ -380,6 +380,11 @@ message JwtProvider {
 message JwtCacheConfig {
   // The unit is number of JWTs, default to 100.
   uint32 jwt_cache_size = 1;
+
+  // The maximum size of a single cached token in bytes.
+  // If this field is not set or is set to 0, then the default value 4096 bytes is used.
+  // The maximum value for a token is inclusive.
+  uint32 jwt_max_token_size = 2;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.
