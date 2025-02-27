@@ -29,7 +29,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     extension_names = ["envoy.quic.connection_id_generator.quic_lb"],
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     tags = ["nofips"],
     deps = [
         "//source/extensions/quic/connection_id_generator/quic_lb:quic_lb_config",
