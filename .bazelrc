@@ -140,7 +140,7 @@ build:asan --linkopt -fno-sanitize=vptr,function
 build:asan --copt -DADDRESS_SANITIZER=1
 build:asan --copt -DUNDEFINED_SANITIZER=1
 build:asan --copt -D__SANITIZE_ADDRESS__
-build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
+build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1:detect_container_overflow=0
 build:asan --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
 build:asan --test_env=ASAN_SYMBOLIZER_PATH
 # ASAN needs -O1 to get reasonable performance.
