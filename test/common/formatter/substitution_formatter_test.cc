@@ -4538,6 +4538,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
       plain_string: plain_string_value
       protocol: '%PROTOCOL%'
     request_key: '%REQ(key_1)%_@!!!_"_%REQ(key_2)%'
+    key: {}
   )EOF",
                             key_mapping);
 
@@ -4557,7 +4558,8 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
       "plain_string": "plain_string_value",
       "protocol": "HTTP/1.1"
     },
-    "request_key": "value_1_@!!!_\"_value_with_quotes_\"_"
+    "request_key": "value_1_@!!!_\"_value_with_quotes_\"_",
+    "key": null
   })EOF";
 
   JsonFormatterImpl formatter(key_mapping, false);

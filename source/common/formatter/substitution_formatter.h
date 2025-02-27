@@ -200,14 +200,7 @@ public:
 
 protected:
   FormatterImpl(absl::Status& creation_status, absl::string_view format,
-                bool omit_empty_values = false)
-      : omit_empty_values_(omit_empty_values) {
-    auto providers_or_error = SubstitutionFormatParser::parse(format);
-    SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
-    providers_ = std::move(*providers_or_error);
-  }
-  FormatterImpl(absl::Status& creation_status, absl::string_view format, bool omit_empty_values,
-                const CommandParsers& command_parsers = {})
+                bool omit_empty_values = false, const CommandParsers& command_parsers = {})
       : omit_empty_values_(omit_empty_values) {
     auto providers_or_error = SubstitutionFormatParser::parse(format, command_parsers);
     SET_AND_RETURN_IF_NOT_OK(providers_or_error.status(), creation_status);
