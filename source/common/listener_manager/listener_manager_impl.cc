@@ -525,8 +525,12 @@ ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
                     "when the reuse port isn't enabled",
                     new_listener.name()));
   }
-
-  if (!(existing_listener.hasCompatibleAddress(new_listener) && same_socket_options)) {
+  if (existing_listener.hasDuplicatedAddress(new_listener) && new_listener.reusePort() == false) {
+    return absl::InvalidArgumentError(fmt::format("Listener {}: doesn't support update addresses "
+                                                  "when the reuse port isn't enabled",
+                                                  new_listener.name()));
+  }
+  if (!existing_listener.hasCompatibleAddress(new_listener)) {
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(new_listener.name(), new_listener));
   } else {
     RETURN_IF_NOT_OK(new_listener.cloneSocketFactoryFrom(existing_listener));

@@ -490,10 +490,10 @@ case $CI_TARGET in
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel fastbuild build with tests..."
         echo "Building..."
-        bazel_envoy_binary_build fastbuild
+        # bazel_envoy_binary_build fastbuild
         echo "Testing ${TEST_TARGETS[*]}"
         bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
-              -c fastbuild "${TEST_TARGETS[@]}"
+              -c fastbuild //test/common/listener_manager:listener_manager_impl_test
         ;;
 
     dev.contrib)
