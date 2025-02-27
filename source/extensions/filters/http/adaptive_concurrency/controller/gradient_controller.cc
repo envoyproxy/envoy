@@ -41,15 +41,15 @@ GradientControllerConfig::GradientControllerConfig(
           PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50)),
       min_concurrency_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(), min_concurrency, 3)),
-      fixed_value_(std::chrono::milliseconds(
-          DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().fixed_value()))),
+      base_value_(std::chrono::milliseconds(
+          DurationUtil::durationToMilliseconds(proto_config.min_rtt_calc_params().base_value()))),
       min_rtt_buffer_pct_(
           PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), buffer, 25)) {
 
   if (min_rtt_calc_interval_ < std::chrono::milliseconds(1) &&
-      fixed_value_ <= std::chrono::milliseconds::zero()) {
+      base_value_ <= std::chrono::milliseconds::zero()) {
     throw EnvoyException(
-        "adaptive_concurrency: neither `concurrency_update_interval` nor `fixed_value` set");
+        "adaptive_concurrency: neither `concurrency_update_interval` nor `base_value` set");
   }
 }
 GradientController::GradientController(GradientControllerConfig config,
@@ -79,13 +79,15 @@ GradientController::GradientController(GradientControllerConfig config,
     sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
   });
 
-  if (isMinRTTSamplingEnabled()) {
-    enterMinRTTSamplingWindow();
-  } else {
-    min_rtt_ = config_.fixedValue();
+  if (config_.baseValue().count() > 0) {
+    min_rtt_ = config_.baseValue();
     stats_.min_rtt_msecs_.set(
         std::chrono::duration_cast<std::chrono::milliseconds>(min_rtt_).count());
     updateConcurrencyLimit(config_.minConcurrency());
+  }
+
+  if (isMinRTTSamplingEnabled()) {
+    enterMinRTTSamplingWindow();
   }
   sample_reset_timer_->enableTimer(config_.sampleRTTCalcInterval());
   stats_.concurrency_limit_.set(concurrency_limit_.load());

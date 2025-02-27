@@ -90,7 +90,7 @@ public:
     return runtime_.snapshot().getInteger(RuntimeKeys::get().MinConcurrencyKey, min_concurrency_);
   }
 
-  std::chrono::milliseconds fixedValue() const { return fixed_value_; }
+  std::chrono::milliseconds baseValue() const { return base_value_; }
 
   // The percentage is normalized to the range [0.0, 1.0].
   double minRTTBufferPercent() const {
@@ -144,8 +144,8 @@ private:
   // The concurrency limit set while measuring the minRTT.
   const uint32_t min_concurrency_;
 
-  // The fixed value of minRTT, if present.
-  const std::chrono::milliseconds fixed_value_;
+  // The base value of minRTT, if present.
+  const std::chrono::milliseconds base_value_;
 
   // The amount added to the measured minRTT as a hedge against natural variability in latency.
   const double min_rtt_buffer_pct_;
@@ -228,7 +228,7 @@ public:
 
   // True if minRTT is sampled.
   bool isMinRTTSamplingEnabled() const {
-    return config_.fixedValue() <= std::chrono::milliseconds::zero();
+    return config_.minRTTCalcInterval() > std::chrono::milliseconds::zero();
   }
 
   // ConcurrencyController.

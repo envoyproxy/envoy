@@ -195,7 +195,7 @@ new_features:
     work as an upstream filter.
 - area: adaptive concurrency
   change: |
-    Allow pinning the minimum RTT by introducing a new gradient concurrency controller, ``PinnedGradientControllerConfig``.
+    Allow fixing the minimum RTT by introducing ``base_value``.
 
 - area: tcp_proxy
   change: |
