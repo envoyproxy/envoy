@@ -54,6 +54,7 @@ envoy_cc_library(
     srcs = ["abi_impl.cc"],
     deps = [
         ":filter_lib",
+        "//source/common/http:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],

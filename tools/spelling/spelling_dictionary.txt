@@ -1458,6 +1458,7 @@ upvalue
 uring
 urlencoded
 urls
+useragent
 userdata
 userinfo
 username

@@ -230,6 +230,147 @@ typedef enum {
   envoy_dynamic_module_type_on_http_filter_response_trailers_status_StopIteration
 } envoy_dynamic_module_type_on_http_filter_response_trailers_status;
 
+/**
+ * envoy_dynamic_module_type_attribute_id represents an attribute described in
+ * https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes
+ */
+typedef enum {
+  // request.path
+  envoy_dynamic_module_type_attribute_id_RequestPath,
+  // request.url_path
+  envoy_dynamic_module_type_attribute_id_RequestUrlPath,
+  // request.host
+  envoy_dynamic_module_type_attribute_id_RequestHost,
+  // request.scheme
+  envoy_dynamic_module_type_attribute_id_RequestScheme,
+  // request.method
+  envoy_dynamic_module_type_attribute_id_RequestMethod,
+  // request.headers
+  envoy_dynamic_module_type_attribute_id_RequestHeaders,
+  // request.referer
+  envoy_dynamic_module_type_attribute_id_RequestReferer,
+  // request.useragent
+  envoy_dynamic_module_type_attribute_id_RequestUserAgent,
+  // request.time
+  envoy_dynamic_module_type_attribute_id_RequestTime,
+  // request.id
+  envoy_dynamic_module_type_attribute_id_RequestId,
+  // request.protocol
+  envoy_dynamic_module_type_attribute_id_RequestProtocol,
+  // request.query
+  envoy_dynamic_module_type_attribute_id_RequestQuery,
+  // request.duration
+  envoy_dynamic_module_type_attribute_id_RequestDuration,
+  // request.size
+  envoy_dynamic_module_type_attribute_id_RequestSize,
+  // request.total_size
+  envoy_dynamic_module_type_attribute_id_RequestTotalSize,
+  // response.code
+  envoy_dynamic_module_type_attribute_id_ResponseCode,
+  // response.code_details
+  envoy_dynamic_module_type_attribute_id_ResponseCodeDetails,
+  // response.flags
+  envoy_dynamic_module_type_attribute_id_ResponseFlags,
+  // response.grpc_status
+  envoy_dynamic_module_type_attribute_id_ResponseGrpcStatus,
+  // response.headers
+  envoy_dynamic_module_type_attribute_id_ResponseHeaders,
+  // response.trailers
+  envoy_dynamic_module_type_attribute_id_ResponseTrailers,
+  // response.size
+  envoy_dynamic_module_type_attribute_id_ResponseSize,
+  // response.total_size
+  envoy_dynamic_module_type_attribute_id_ResponseTotalSize,
+  // response.backend_latency
+  envoy_dynamic_module_type_attribute_id_ResponseBackendLatency,
+  // source.address
+  envoy_dynamic_module_type_attribute_id_SourceAddress,
+  // source.port
+  envoy_dynamic_module_type_attribute_id_SourcePort,
+  // destination.address
+  envoy_dynamic_module_type_attribute_id_DestinationAddress,
+  // destination.port
+  envoy_dynamic_module_type_attribute_id_DestinationPort,
+  // connection.id
+  envoy_dynamic_module_type_attribute_id_ConnectionId,
+  // connection.mtls
+  envoy_dynamic_module_type_attribute_id_ConnectionMtls,
+  // connection.requested_server_name
+  envoy_dynamic_module_type_attribute_id_ConnectionRequestedServerName,
+  // connection.tls_version
+  envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion,
+  // connection.subject_local_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertifica,
+  // connection.subject_peer_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificat,
+  // connection.dns_san_local_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertifica,
+  // connection.dns_san_peer_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificat,
+  // connection.uri_san_local_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertifica,
+  // connection.uri_san_peer_certificate
+  envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificat,
+  // connection.sha256_peer_certificate_digest
+  envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificate,
+  // connection.transport_failure_reason
+  envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReaso,
+  // connection.termination_details
+  envoy_dynamic_module_type_attribute_id_ConnectionTerminationDetails,
+  // upstream.address
+  envoy_dynamic_module_type_attribute_id_UpstreamAddress,
+  // upstream.port
+  envoy_dynamic_module_type_attribute_id_UpstreamPort,
+  // upstream.tls_version
+  envoy_dynamic_module_type_attribute_id_UpstreamTlsVersion,
+  // upstream.subject_local_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamSubjectLocalCertificate,
+  // upstream.subject_peer_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamSubjectPeerCertificate,
+  // upstream.dns_san_local_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamDnsSanLocalCertificate,
+  // upstream.dns_san_peer_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamDnsSanPeerCertificate,
+  // upstream.uri_san_local_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamUriSanLocalCertificate,
+  // upstream.uri_san_peer_certificate
+  envoy_dynamic_module_type_attribute_id_UpstreamUriSanPeerCertificate,
+  // upstream.sha256_peer_certificate_digest
+  envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateD,
+  // upstream.local_address
+  envoy_dynamic_module_type_attribute_id_UpstreamLocalAddress,
+  // upstream.transport_failure_reason
+  envoy_dynamic_module_type_attribute_id_UpstreamTransportFailureReason,
+  // upstream.request_attempt_count
+  envoy_dynamic_module_type_attribute_id_UpstreamRequestAttemptCount,
+  // upstream.cx_pool_ready_duration
+  envoy_dynamic_module_type_attribute_id_UpstreamCxPoolReadyDuration,
+  // upstream.locality
+  envoy_dynamic_module_type_attribute_id_UpstreamLocality,
+  // xds.node
+  envoy_dynamic_module_type_attribute_id_XdsNode,
+  // xds.cluster_name
+  envoy_dynamic_module_type_attribute_id_XdsClusterName,
+  // xds.cluster_metadata
+  envoy_dynamic_module_type_attribute_id_XdsClusterMetadata,
+  // xds.listener_direction
+  envoy_dynamic_module_type_attribute_id_XdsListenerDirection,
+  // xds.listener_metadata
+  envoy_dynamic_module_type_attribute_id_XdsListenerMetadata,
+  // xds.route_name
+  envoy_dynamic_module_type_attribute_id_XdsRouteName,
+  // xds.route_metadata
+  envoy_dynamic_module_type_attribute_id_XdsRouteMetadata,
+  // xds.virtual_host_name
+  envoy_dynamic_module_type_attribute_id_XdsVirtualHostName,
+  // xds.virtual_host_metadata
+  envoy_dynamic_module_type_attribute_id_XdsVirtualHostMetadata,
+  // xds.upstream_host_metadata
+  envoy_dynamic_module_type_attribute_id_XdsUpstreamHostMetadata,
+  // xds.filter_chain_name
+  envoy_dynamic_module_type_attribute_id_XdsFilterChainName,
+} envoy_dynamic_module_type_attribute_id;
+
 // -----------------------------------------------------------------------------
 // ------------------------------- Event Hooks ---------------------------------
 // -----------------------------------------------------------------------------
@@ -845,6 +986,45 @@ bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
  */
 void envoy_dynamic_module_callback_http_clear_route_cache(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_get_attribute_string is called by the module to get
+ * the string attribute value. If the attribute is not accessible or the
+ * value is not a string, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result_buffer_ptr is the pointer to the pointer variable where the pointer to the
+ * buffer of the value will be stored.
+ * @param result_length is the pointer to the variable where the length of the buffer will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id,
+    envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_get_attribute_int is called by the module to get
+ * an integer attribute value. If the attribute is not accessible or the
+ * value is not an integer, this returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param attribute_id is the ID of the attribute.
+ * @param result is the pointer to the variable where the integer value of the attribute will be
+ * stored.
+ * @return true if the operation is successful, false otherwise.
+ *
+ * Note: currently, not all attributes are implemented.
+ */
+bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
 
 #ifdef __cplusplus
 }
