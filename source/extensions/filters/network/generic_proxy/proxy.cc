@@ -762,7 +762,8 @@ void Filter::closeDownstreamConnection() {
 }
 
 void Filter::mayBeDrainClose() {
-  if ((drain_decision_.drainClose() || stream_drain_decision_) && active_streams_.empty()) {
+  if ((drain_decision_.drainClose(Network::DrainDirection::All) || stream_drain_decision_) &&
+      active_streams_.empty()) {
     onDrainCloseAndNoActiveStreams();
   }
 }

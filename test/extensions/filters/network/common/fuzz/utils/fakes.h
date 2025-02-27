@@ -10,20 +10,26 @@ namespace Configuration {
 
 class FakeListenerInfo : public Network::ListenerInfo {
 public:
+  explicit FakeListenerInfo(const envoy::config::listener::v3::Listener& config)
+      : metadata_(config.metadata()), direction_(config.traffic_direction()),
+        is_quic_(config.udp_listener_config().has_quic_options()),
+        bypass_overload_manager_(config.bypass_overload_manager()) {}
+  FakeListenerInfo() = default;
   const envoy::config::core::v3::Metadata& metadata() const override {
     return metadata_.proto_metadata_;
   }
   const Envoy::Config::TypedMetadata& typedMetadata() const override {
     return metadata_.typed_metadata_;
   }
-  envoy::config::core::v3::TrafficDirection direction() const override {
-    return envoy::config::core::v3::UNSPECIFIED;
-  }
-  bool isQuic() const override { return false; }
-  bool shouldBypassOverloadManager() const override { return false; }
+  envoy::config::core::v3::TrafficDirection direction() const override { return direction_; }
+  bool isQuic() const override { return is_quic_; }
+  bool shouldBypassOverloadManager() const override { return bypass_overload_manager_; }
 
 private:
   Envoy::Config::MetadataPack<Envoy::Network::ListenerTypedMetadataFactory> metadata_;
+  envoy::config::core::v3::TrafficDirection direction_ = envoy::config::core::v3::UNSPECIFIED;
+  const bool is_quic_ = false;
+  const bool bypass_overload_manager_ = false;
 };
 
 class FakeFactoryContext : public MockFactoryContext {
