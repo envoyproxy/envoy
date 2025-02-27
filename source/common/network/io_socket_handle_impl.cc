@@ -5,6 +5,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
 #include "source/common/event/file_event_impl.h"
@@ -386,8 +387,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
       if (save_cmsg_config.hasConfig() &&
           cmsg->cmsg_type == static_cast<int>(save_cmsg_config.type.value()) &&
           cmsg->cmsg_level == static_cast<int>(save_cmsg_config.level.value())) {
-        Buffer::RawSlice cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
-        output.msg_[0].saved_cmsg_ = cmsg_slice;
+        Buffer::OwnedImpl cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
+        output.msg_[0].saved_cmsg_ = std::move(cmsg_slice);
       }
       if (output.msg_[0].local_address_ == nullptr) {
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
@@ -496,8 +497,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
         if (save_cmsg_config.hasConfig() &&
             cmsg->cmsg_type == static_cast<int>(save_cmsg_config.type.value()) &&
             cmsg->cmsg_level == static_cast<int>(save_cmsg_config.level.value())) {
-          Buffer::RawSlice cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
-          output.msg_[0].saved_cmsg_ = cmsg_slice;
+          Buffer::OwnedImpl cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
+          output.msg_[0].saved_cmsg_ = std::move(cmsg_slice);
         }
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
         absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);

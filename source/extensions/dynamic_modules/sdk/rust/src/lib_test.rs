@@ -82,7 +82,7 @@ fn test_envoy_dynamic_module_on_http_filter_new_destroy() {
   impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
     for TestHttpFilterConfig
   {
-    fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+    fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
       Box::new(TestHttpFilter)
     }
   }
@@ -95,12 +95,12 @@ fn test_envoy_dynamic_module_on_http_filter_new_destroy() {
     }
   }
 
-  let filter_config = TestHttpFilterConfig;
+  let mut filter_config = TestHttpFilterConfig;
   let result = envoy_dynamic_module_on_http_filter_new_impl(
     &mut EnvoyHttpFilterConfigImpl {
       raw_ptr: std::ptr::null_mut(),
     },
-    &filter_config,
+    &mut filter_config,
   );
   assert!(!result.is_null());
 
@@ -118,7 +118,7 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
   impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
     for TestHttpFilterConfig
   {
-    fn new_http_filter(&self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+    fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
       Box::new(TestHttpFilter)
     }
   }
@@ -185,12 +185,12 @@ fn test_envoy_dynamic_module_on_http_filter_callbacks() {
     }
   }
 
-  let filter_config = TestHttpFilterConfig;
+  let mut filter_config = TestHttpFilterConfig;
   let filter = envoy_dynamic_module_on_http_filter_new_impl(
     &mut EnvoyHttpFilterConfigImpl {
       raw_ptr: std::ptr::null_mut(),
     },
-    &filter_config,
+    &mut filter_config,
   );
 
   unsafe {

@@ -37,7 +37,7 @@ class CdsApiImplTest : public testing::Test {
 protected:
   void setup() {
     envoy::config::core::v3::ConfigSource cds_config;
-    cds_ = CdsApiImpl::create(cds_config, nullptr, cm_, *store_.rootScope(), validation_visitor_);
+    cds_ = *CdsApiImpl::create(cds_config, nullptr, cm_, *store_.rootScope(), validation_visitor_);
     cds_->setInitializedCb([this]() -> void { initialized_.ready(); });
 
     EXPECT_CALL(*cm_.subscription_factory_.subscription_, start(_));

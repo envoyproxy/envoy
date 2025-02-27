@@ -60,7 +60,7 @@ struct JwtConstValueStruct {
   // The header value prefix for Authorization.
   const std::string BearerPrefix{"Bearer "};
 
-  // The default query parameter name to extract JWT token
+  // The default query parameter name to extract JWT
   const std::string AccessTokenParam{"access_token"};
 };
 using JwtConstValues = ConstSingleton<JwtConstValueStruct>;

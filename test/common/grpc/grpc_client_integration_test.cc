@@ -88,11 +88,41 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcClientIntegrationTest,
 TEST_P(GrpcClientIntegrationTest, BasicStream) {
   initialize();
   auto stream = createStream(empty_metadata_);
+  // Send request without END_STREAM set to true. By default Envoy gRPC client will reset
+  // the stream upon receiving response with trailers. Google gRPC client will not reset the
+  // stream as it by default supports independent half-close. auto stream =
+  // createStream(empty_metadata_);
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
+
+  if (clientType() == ClientType::EnvoyGrpc) { // Envoy gRPC based AsyncGrpcClient should reset
+                                               // stream, since server half-closed before client.
+    EXPECT_EQ(
+        cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(), 1);
+    stream->waitForReset();
+  }
+}
+
+// Validate that a simple request-reply stream works.
+TEST_P(GrpcClientIntegrationTest, BasicStreamGracefulClose) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  // Send request with end_stream set to true, causing gRPC client to half close
+  // the stream.
+  RequestArgs request_args{nullptr, true};
+  stream->sendRequest(request_args);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+
+  // AsyncGrpcClient should not cause local reset, completing the stream gracefully.
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(),
+            0);
+  stream->waitForEndStream();
 }
 
 // A simple request-reply stream, "x-envoy-internal" and `x-forward-for` headers

@@ -678,6 +678,21 @@ TEST(ConfigTest, AccessLogConfig) {
   EXPECT_EQ(2, config_obj.accessLogs().size());
 }
 
+TEST(ConfigTest, InvalidBackoffConfig) {
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+backoff_options:
+  base_interval: 5s
+  max_interval: 1s
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  EXPECT_THROW_WITH_MESSAGE(
+      Config config_obj(constructConfigFromYaml(yaml, factory_context)), EnvoyException,
+      "max_backoff_interval must be greater or equal to base_backoff_interval");
+}
+
 class TcpProxyNonDeprecatedConfigRoutingTest : public testing::Test {
 public:
   TcpProxyNonDeprecatedConfigRoutingTest() {
