@@ -785,7 +785,6 @@ exe
 execlp
 exprfor
 expectable
-extensibility
 extrahelp
 faceplant
 facto
