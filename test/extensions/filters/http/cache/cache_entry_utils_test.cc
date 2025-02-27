@@ -11,19 +11,24 @@ namespace Cache {
 namespace {
 
 TEST(Coverage, CacheEntryStatusString) {
-  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Ok), "Ok");
-  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Unusable), "Unusable");
-  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::RequiresValidation), "RequiresValidation");
+  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Hit), "Hit");
+  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Streamed), "Streamed");
+  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Miss), "Miss");
+  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Uncacheable), "Uncacheable");
+  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::Validated), "Validated");
+  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::ValidatedFree), "ValidatedFree");
+  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::FailedValidation), "FailedValidation");
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::FoundNotModified), "FoundNotModified");
   EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::LookupError), "LookupError");
+  EXPECT_EQ(cacheEntryStatusString(CacheEntryStatus::UpstreamReset), "UpstreamReset");
   EXPECT_ENVOY_BUG(cacheEntryStatusString(static_cast<CacheEntryStatus>(99)),
                    "Unexpected CacheEntryStatus");
 }
 
 TEST(Coverage, CacheEntryStatusStream) {
   std::ostringstream stream;
-  stream << CacheEntryStatus::Ok;
-  EXPECT_EQ(stream.str(), "Ok");
+  stream << CacheEntryStatus::Hit;
+  EXPECT_EQ(stream.str(), "Hit");
 }
 
 TEST(CacheEntryUtils, ApplyHeaderUpdateReplacesMultiValues) {
