@@ -13,8 +13,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : api_(api), validation_visitor_(validation_visitor) {}
+IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
+                           Stats::StatNameSetPtr& stat_name_set)
+    : api_(api), validation_visitor_(validation_visitor), stat_name_set_(stat_name_set) {}
 
 LcTrieSharedPtr IpTagsLoader::loadTags(const std::string& ip_tags_path) {
   if (!ip_tags_path.empty()) {
@@ -30,19 +31,16 @@ LcTrieSharedPtr IpTagsLoader::loadTags(const std::string& ip_tags_path) {
     } else if (absl::EndsWith(ip_tags_path, MessageUtil::FileExtensions::get().Json)) {
       MessageUtil::loadFromJson(file_or_error.value(), ip_tags_proto, validation_visitor_);
     }
-    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
-    tag_data.reserve(ip_tags_proto.ip_tags().size());
-    return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
+    return parseIpTags(ip_tags_proto.ip_tags());
   }
   return nullptr;
 }
 
-LcTrieSharedPtr IpTagsLoader::parseInlineIpTags(
-    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
-    Stats::StatNameSetPtr& stat_name_set) {
+LcTrieSharedPtr IpTagsLoader::parseIpTags(
+    const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags) {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
-  tag_data.reserve(config.ip_tags().size());
-  for (const auto& ip_tag : config.ip_tags()) {
+  tag_data.reserve(ip_tags.size());
+  for (const auto& ip_tag : ip_tags) {
     std::vector<Network::Address::CidrRange> cidr_set;
     cidr_set.reserve(ip_tag.ip_list().size());
     for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
@@ -58,7 +56,7 @@ LcTrieSharedPtr IpTagsLoader::parseInlineIpTags(
       }
     }
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
-    stat_name_set->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
+    stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
   }
   return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
@@ -93,7 +91,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
                                 ? config.ip_tag_header().action()
                                 : HeaderAction::IPTagging_IpTagHeader_HeaderAction_SANITIZE),
       ip_tags_path_(config.ip_tags_path()), ip_tags_registry_(ip_tags_registry),
-      tags_loader_(api, validation_visitor) {
+      tags_loader_(api, validation_visitor, stat_name_set_) {
 
   // Once loading IP tags from a file system is supported, the restriction on the size
   // of the set should be removed and observability into what tags are loaded needs
@@ -110,7 +108,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   }
 
   if (!config.ip_tags().empty()) {
-    trie_ = tags_loader_.parseInlineIpTags(config, stat_name_set_);
+    trie_ = tags_loader_.parseIpTags(config.ip_tags());
   } else {
     trie_ = ip_tags_registry_->get(ip_tags_path_, tags_loader_);
   }

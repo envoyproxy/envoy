@@ -9,5 +9,5 @@ envoy_package()
 
 filegroup(
     name = "ip_tagging_files",
-    srcs = glob(["test_data/*"]),
+    srcs = glob(["*"]),
 )

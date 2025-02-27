@@ -30,17 +30,18 @@ using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
 // Support async reload of tags file
 class IpTagsLoader {
 public:
-  IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor);
+  IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
+               Stats::StatNameSetPtr& stat_name_set);
 
   LcTrieSharedPtr loadTags(const std::string& ip_tags_path);
 
   LcTrieSharedPtr
-  parseInlineIpTags(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
-                    Stats::StatNameSetPtr& stat_name_set);
+  parseIpTags(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags);
 
 private:
   Api::Api& api_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Stats::StatNameSetPtr& stat_name_set_;
 };
 
 /**

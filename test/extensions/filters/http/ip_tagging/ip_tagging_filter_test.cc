@@ -128,13 +128,64 @@ ip_tags:
 //                             "Unsupported file format, unable to parse ip tags from file.");
 // }
 
-TEST_F(IpTaggingFilterTest, InternalRequestIpTagsFile) {
+TEST_F(IpTaggingFilterTest, InternalRequestIpTagsYamlFile) {
   const std::string config_yaml = R"EOF(
 request_type: internal
-ip_tags_path: /test/tags.csv
 ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.yaml"
 )EOF";
   initializeFilter(config_yaml, true);
+  EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  // Check external requests don't get a tag.
+  request_headers = Http::TestRequestHeaderMapImpl{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
+}
+
+TEST_F(IpTaggingFilterTest, InternalRequestIpTagsJsonFile) {
+  const std::string config_yaml = R"EOF(
+request_type: internal
+ip_tags_path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.json"
+)EOF";
+  initializeFilter(config_yaml, true);
+  EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  Http::TestRequestTrailerMapImpl request_trailers;
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+
+  // Check external requests don't get a tag.
+  request_headers = Http::TestRequestHeaderMapImpl{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
 }
 
 // TEST_F(IpTaggingFilterTest, InternalRequest) {
