@@ -271,21 +271,6 @@ GrpcStatusFormatter::formatValueWithContext(const HttpFormatterContext& context,
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-StreamInfoRequestHeaderFormatter::StreamInfoRequestHeaderFormatter(
-    const std::string& main_header, const std::string& alternative_header,
-    absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
-
-absl::optional<std::string> StreamInfoRequestHeaderFormatter::formatWithContext(
-    const HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) const {
-  return HeaderFormatter::format(*stream_info.getRequestHeaders());
-}
-
-ProtobufWkt::Value StreamInfoRequestHeaderFormatter::formatValueWithContext(
-    const HttpFormatterContext&, const StreamInfo::StreamInfo& stream_info) const {
-  return HeaderFormatter::formatValue(*stream_info.getRequestHeaders());
-}
-
 QueryParameterFormatter::QueryParameterFormatter(absl::string_view parameter_key,
                                                  absl::optional<size_t> max_length)
     : parameter_key_(parameter_key), max_length_(max_length) {}
@@ -425,7 +410,7 @@ CommandParserPtr DefaultBuiltInHttpCommandParserFactory::createCommandParser() c
   return std::make_unique<BuiltInHttpCommandParser>();
 }
 
-REGISTER_FACTORY(DefaultBuiltInHttpCommandParserFactory, BuiltInHttpCommandParserFactory);
+REGISTER_FACTORY(DefaultBuiltInHttpCommandParserFactory, BuiltInCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy

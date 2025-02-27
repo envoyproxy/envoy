@@ -41,10 +41,10 @@ getAccessLoggerCacheSingleton(Server::Configuration::CommonFactoryContext& conte
       const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
-  auto commands = THROW_OR_RETURN_VALUE(
-      Formatter::SubstitutionFormatStringUtils::parseFormatters(proto_config.formatters(), context,
-                                                                std::move(command_parsers)),
-      std::vector<Formatter::CommandParserBasePtr<Formatter::HttpFormatterContext>>);
+  auto commands =
+      THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::parseFormatters(
+                                proto_config.formatters(), context, std::move(command_parsers)),
+                            std::vector<Formatter::CommandParserPtr>);
 
   return std::make_shared<AccessLog>(
       std::move(filter), proto_config, context.serverFactoryContext().threadLocal(),

@@ -26,8 +26,7 @@ public:
   Formatter::FormatterProviderPtr parse(absl::string_view command, absl::string_view,
                                         absl::optional<size_t>) const override {
     if (command == "TEST_CUSTOM") {
-      return std::make_unique<Formatter::PlainStringFormatterBase<Formatter::HttpFormatterContext>>(
-          "custom");
+      return std::make_unique<Formatter::PlainStringFormatter>("custom");
     }
     return nullptr;
   }

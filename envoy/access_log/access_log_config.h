@@ -15,12 +15,8 @@ namespace AccessLog {
 /**
  * Extension filter factory that reads from ExtensionFilter proto.
  */
-template <class Context> class ExtensionFilterFactoryBase : public Config::TypedFactory {
+class ExtensionFilterFactory : public Config::TypedFactory {
 public:
-  ExtensionFilterFactoryBase() : category_(categoryByType()) {}
-
-  ~ExtensionFilterFactoryBase() override = default;
-
   /**
    * Create a particular extension filter implementation from a config proto. If the
    * implementation is unable to produce a filter with the provided parameters, it should throw an
@@ -29,40 +25,18 @@ public:
    * @param context supplies the factory context.
    * @return an instance of extension filter implementation from a config proto.
    */
-  virtual FilterBasePtr<Context>
-  createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-               Server::Configuration::FactoryContext& context) PURE;
+  virtual FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
+                                 Server::Configuration::FactoryContext& context) PURE;
 
-  std::string category() const override { return category_; }
-
-private:
-  std::string categoryByType() {
-    if constexpr (std::is_same_v<Context, Formatter::HttpFormatterContext>) {
-      // This is a special case for the HTTP formatter context to ensure backwards compatibility.
-      return "envoy.access_loggers.extension_filters";
-    } else {
-      return fmt::format("envoy.{}.access_loggers.extension_filters", Context::category());
-    }
-  }
-
-  const std::string category_;
+  std::string category() const override { return "envoy.access_loggers.extension_filters"; }
 };
-
-/**
- * Extension filter factory that reads from ExtensionFilter proto.
- */
-using ExtensionFilterFactory = ExtensionFilterFactoryBase<Formatter::HttpFormatterContext>;
 
 /**
  * Implemented for each AccessLog::Instance and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-template <class Context> class AccessLogInstanceFactoryBase : public Config::TypedFactory {
+class AccessLogInstanceFactory : public Config::TypedFactory {
 public:
-  AccessLogInstanceFactoryBase() : category_(categoryByType()) {}
-
-  ~AccessLogInstanceFactoryBase() override = default;
-
   /**
    * Create a particular AccessLog::Instance implementation from a config proto. If the
    * implementation is unable to produce a factory with the provided parameters, it should throw an
@@ -74,27 +48,13 @@ public:
    * @param command_parsers vector of command parsers that provide by the caller to be used for
    * parsing custom substitution commands.
    */
-  virtual AccessLog::InstanceBaseSharedPtr<Context> createAccessLogInstance(
-      const Protobuf::Message& config, AccessLog::FilterBasePtr<Context>&& filter,
-      Server::Configuration::FactoryContext& context,
-      std::vector<Formatter::CommandParserBasePtr<Context>>&& command_parsers = {}) PURE;
+  virtual AccessLog::InstanceSharedPtr
+  createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+                          Server::Configuration::FactoryContext& context,
+                          std::vector<Formatter::CommandParserPtr>&& command_parsers = {}) PURE;
 
-  std::string category() const override { return category_; }
-
-private:
-  std::string categoryByType() {
-    if constexpr (std::is_same_v<Context, Formatter::HttpFormatterContext>) {
-      // This is a special case for the HTTP formatter context to ensure backwards compatibility.
-      return "envoy.access_loggers";
-    } else {
-      return fmt::format("envoy.{}.access_loggers", Context::category());
-    }
-  }
-
-  const std::string category_;
+  std::string category() const override { return "envoy.access_loggers"; }
 };
-
-using AccessLogInstanceFactory = AccessLogInstanceFactoryBase<Formatter::HttpFormatterContext>;
 
 } // namespace AccessLog
 } // namespace Envoy
