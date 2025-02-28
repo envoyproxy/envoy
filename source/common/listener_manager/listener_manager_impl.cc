@@ -512,21 +512,12 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
 absl::Status
 ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
                                                    const ListenerImpl& existing_listener) {
-  bool same_socket_options = true;
   if (new_listener.reusePort() != existing_listener.reusePort()) {
     return absl::InvalidArgumentError(fmt::format(
         "Listener {}: reuse port cannot be changed during an update", new_listener.name()));
   }
 
-  same_socket_options = existing_listener.socketOptionsEqual(new_listener);
-  if (!same_socket_options && new_listener.reusePort() == false) {
-    return absl::InvalidArgumentError(
-        fmt::format("Listener {}: doesn't support update any socket options "
-                    "when the reuse port isn't enabled",
-                    new_listener.name()));
-  }
-
-  if (!(existing_listener.hasCompatibleAddress(new_listener) && same_socket_options)) {
+  if (!existing_listener.hasCompatibleAddress(new_listener)) {
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(new_listener.name(), new_listener));
   } else {
     RETURN_IF_NOT_OK(new_listener.cloneSocketFactoryFrom(existing_listener));
@@ -639,9 +630,21 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   return true;
 }
 
-bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& list,
+bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& listener_list,
                                                            const ListenerImpl& listener) {
-  for (const auto& existing_listener : list) {
+  // This is new listener or new version of existing listener but with different addresses
+  // or different socket options.
+  // Check if the listener has duplicated address with existing listeners.
+
+  for (const auto& existing_listener : listener_list) {
+    // If reuse port is enabled, we can skip the check between different versions of the same
+    // listener.
+    // If reuse port is disabled, the duplicated addresses checking is necessary to ensure we
+    // can create new sockets for the new version of the listener as expected.
+    if (listener.reusePort() && existing_listener->name() == listener.name()) {
+      continue;
+    }
+
     if (existing_listener->hasDuplicatedAddress(listener)) {
       return true;
     }
@@ -1180,6 +1183,9 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
     }
   }
 
+  // TODO(wbpcode): if we cannot clone the socket factory from the draining listener, we should
+  // check the duplicated addresses again the draining listeners to avoid the creation failure
+  // of the sockets.
   if (draining_listener_ptr != nullptr) {
     RETURN_IF_NOT_OK(listener.cloneSocketFactoryFrom(*draining_listener_ptr));
   } else {
