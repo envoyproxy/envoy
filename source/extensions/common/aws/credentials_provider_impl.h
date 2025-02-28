@@ -368,7 +368,7 @@ public:
       const MetadataCredentialsProviderBase::CurlMetadataFetcher& fetch_metadata_using_curl,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
-      std::chrono::seconds initialization_timer, absl::string_view cluster_name) const PURE;
+      std::chrono::seconds initialization_timer, absl::string_view cluster_name) PURE;
 
   virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
@@ -390,7 +390,7 @@ public:
       Server::Configuration::ServerFactoryContext& context,
       AwsClusterManagerOptRef aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-          web_identity_config) const PURE;
+          web_identity_config) PURE;
 
   virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,

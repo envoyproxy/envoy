@@ -48,13 +48,17 @@ IAMRolesAnywhereSignerBaseImpl::signUnsignedPayload(Http::RequestHeaderMap& head
               override_region);
 }
 
+bool IAMRolesAnywhereSignerBaseImpl::addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb) {
+  return credentials_provider_chain_->addCallbackIfChainCredentialsPending(std::move(cb));
+}
+
 absl::Status IAMRolesAnywhereSignerBaseImpl::sign(Http::RequestHeaderMap& headers,
                                                   const std::string& content_hash,
                                                   const absl::string_view override_region) {
 
   const auto& x509_credentials = x509_credentials_provider_->getCredentials();
 
-  ASSERT(credentials_provider_ == nullptr);
+  ASSERT(credentials_provider_chain_ == nullptr);
   ASSERT(x509_credentials_provider_ != nullptr);
 
   if (!x509_credentials.certificateDerB64().has_value() ||

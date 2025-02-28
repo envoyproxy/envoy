@@ -46,9 +46,9 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 class IAMRolesAnywhereSignerBaseImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
   IAMRolesAnywhereSignerBaseImpl(absl::string_view service_name, absl::string_view region,
-                                 const CredentialsProviderSharedPtr& credentials_provider,
+                                 const CredentialsProviderChainSharedPtr& credentials_provider_chain,
                                  Server::Configuration::CommonFactoryContext& context)
-      : service_name_(service_name), region_(region), credentials_provider_(credentials_provider),
+      : service_name_(service_name), region_(region), credentials_provider_chain_(credentials_provider_chain),
         time_source_(context.timeSource()),
         long_date_formatter_(std::string(IAMRolesAnywhereSignatureConstants::LongDateFormat)),
         short_date_formatter_(std::string(IAMRolesAnywhereSignatureConstants::ShortDateFormat)) {}
@@ -70,6 +70,7 @@ public:
                                    const absl::string_view override_region = "") override;
   absl::Status sign(Http::RequestHeaderMap& headers, const std::string& content_hash,
                     const absl::string_view override_region = "") override;
+  bool addCallbackIfCredentialsPending(CredentialsPendingCallback&& cb) override;
 
 protected:
   std::string createContentHash(Http::RequestMessage& message, bool sign_body) const;
@@ -100,7 +101,7 @@ protected:
 
   const std::string service_name_;
   const std::string region_;
-  CredentialsProviderSharedPtr credentials_provider_;
+  CredentialsProviderChainSharedPtr credentials_provider_chain_;
   X509CredentialsProviderSharedPtr x509_credentials_provider_;
   TimeSource& time_source_;
   DateFormatter long_date_formatter_;

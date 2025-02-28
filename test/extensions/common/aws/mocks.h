@@ -81,30 +81,6 @@ public:
   MOCK_METHOD(X509Credentials, getCredentials, ());
 };
 
-class MockIAMRolesAnywhereCredentialsProvider : public IAMRolesAnywhereCredentialsProvider {
-public:
-  MockIAMRolesAnywhereCredentialsProvider();
-  ~MockIAMRolesAnywhereCredentialsProvider() override;
-
-  MOCK_METHOD(Credentials, getCredentials, ());
-};
-
-class MockIAMRolesAnywhereX509CredentialsProvider : public IAMRolesAnywhereX509CredentialsProvider {
-public:
-  MockIAMRolesAnywhereX509CredentialsProvider();
-  ~MockIAMRolesAnywhereX509CredentialsProvider() override;
-
-  MOCK_METHOD(X509Credentials, getCredentials, ());
-};
-
-class MockX509CredentialsProvider : public X509CredentialsProvider {
-public:
-  MockX509CredentialsProvider();
-  ~MockX509CredentialsProvider() override;
-
-  MOCK_METHOD(X509Credentials, getCredentials, ());
-};
-
 class MockFetchMetadata {
 public:
   virtual ~MockFetchMetadata() = default;
@@ -148,6 +124,13 @@ public:
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
 };
 
+class MockCredentialsProviderChain : public CredentialsProviderChain {
+  public:
+    MOCK_METHOD(Credentials, chainGetCredentials, ());
+    MOCK_METHOD(bool, addCallbackIfChainCredentialsPending, (CredentialsPendingCallback &&));
+    MOCK_METHOD(void, onCredentialUpdate, ());
+  };
+  
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions
