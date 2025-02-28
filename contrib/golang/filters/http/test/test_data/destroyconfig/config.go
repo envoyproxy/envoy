@@ -9,10 +9,10 @@ package destroyconfig
 */
 import "C"
 import (
-	"google.golang.org/protobuf/types/known/anypb"
-	"unsafe"
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
+	"google.golang.org/protobuf/types/known/anypb"
+	"unsafe"
 )
 
 const Name = "destroyconfig"
