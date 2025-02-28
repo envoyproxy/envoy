@@ -85,6 +85,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "cluster_manager_impl_test",
+    shard_count = 2,
     size = "large",
     srcs = ["cluster_manager_impl_test.cc"],
     rbe_pool = "4core",
@@ -210,7 +211,7 @@ envoy_cc_test(
     srcs = [
         "health_checker_impl_test.cc",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "4core",
     deps = [
         ":utility_lib",
         "//source/common/buffer:buffer_lib",
