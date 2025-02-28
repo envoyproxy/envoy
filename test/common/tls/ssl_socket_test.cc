@@ -635,8 +635,6 @@ void testUtil(const TestUtilOptions& options) {
                   server_connection->ssl()->subjectPeerCertificate());
       }
 
-      // TODO: validate peerCertificateSanMatches
-
       if (options.expectedParsedPeerSubject()) {
         const auto& subject = server_connection->ssl()->parsedSubjectPeerCertificate();
         EXPECT_EQ(options.expectedParsedPeerSubject()->commonName_, subject->commonName_);
