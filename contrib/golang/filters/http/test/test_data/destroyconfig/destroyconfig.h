@@ -2,6 +2,7 @@
 // NOLINT(namespace-envoy)
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #include "api.h"
+
 #ifdef __cplusplus
 struct httpDestroyableConfig : httpConfig {
   int destroyed;
