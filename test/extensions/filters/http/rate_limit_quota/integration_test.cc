@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
 #include "envoy/http/codec.h"
@@ -62,6 +63,8 @@ MATCHER_P2(ProtoEqIgnoringFieldAndOrdering, expected,
 
 using BlanketRule = envoy::type::v3::RateLimitStrategy::BlanketRule;
 using envoy::type::v3::RateLimitStrategy;
+using DenyResponseSettings = envoy::extensions::filters::http::rate_limit_quota::v3::
+    RateLimitQuotaBucketSettings::DenyResponseSettings;
 
 struct ConfigOption {
   bool valid_rlqs_server = true;
@@ -69,6 +72,7 @@ struct ConfigOption {
   bool unsupported_no_assignment_strategy = false;
   absl::optional<RateLimitStrategy> fallback_rate_limit_strategy = std::nullopt;
   int fallback_ttl_sec = 15;
+  absl::optional<DenyResponseSettings> deny_response_settings = std::nullopt;
 };
 
 // These tests exercise the rate limit quota filter through Envoy's integration test
@@ -165,6 +169,11 @@ protected:
             ->set_seconds(config_option.fallback_ttl_sec);
       }
 
+      if (config_option.deny_response_settings.has_value()) {
+        *mutable_bucket_settings.mutable_deny_response_settings() =
+            *config_option.deny_response_settings;
+      }
+
       mutable_config->PackFrom(mutable_bucket_settings);
       proto_config_.mutable_bucket_matchers()->MergeFrom(matcher);
 
@@ -205,11 +214,27 @@ protected:
 
   void TearDown() override { cleanUp(); }
 
-  bool expectDeniedRequest(int expected_status_code) {
+  bool expectDeniedRequest(int expected_status_code,
+                           std::vector<std::pair<std::string, std::string>> expected_headers = {},
+                           std::string expected_body = "") {
     if (!response_->waitForEndStream())
       return false;
     EXPECT_TRUE(response_->complete());
     EXPECT_EQ(response_->headers().getStatusValue(), absl::StrCat(expected_status_code));
+
+    // Check for expected headers & body if set.
+    for (const auto& [key, value] : expected_headers) {
+      Http::HeaderMap::GetResult result = response_->headers().get(Http::LowerCaseString(key));
+      if (result.empty()) {
+        EXPECT_FALSE(result.empty());
+        continue;
+      }
+      EXPECT_THAT(result[0]->value().getStringView(), testing::StrEq(value));
+    }
+    if (!expected_body.empty()) {
+      EXPECT_THAT(response_->body(), testing::StrEq(expected_body));
+    }
+
     cleanupUpstreamAndDownstream();
     return true;
   }
@@ -582,6 +607,117 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAll) {
     // (deny-all here).
     // Verify the response to downstream.
     EXPECT_TRUE(expectDeniedRequest(429));
+  }
+
+  simTime().advanceTimeWait(std::chrono::seconds(report_interval_sec_));
+  RateLimitQuotaUsageReports reports;
+  ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+  ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+  const auto& usage = reports.bucket_quota_usages(0);
+  // The request is denied by no_assignment_behavior.
+  EXPECT_EQ(usage.num_requests_allowed(), 0);
+  EXPECT_EQ(usage.num_requests_denied(), 2);
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAllWithSettings) {
+  ConfigOption option;
+  option.no_assignment_blanket_rule = RateLimitStrategy::DENY_ALL;
+  option.deny_response_settings = DenyResponseSettings();
+  option.deny_response_settings->mutable_http_status()->set_code(
+      envoy::type::v3::StatusCode::Forbidden);
+  *option.deny_response_settings->mutable_http_body()->mutable_value() =
+      "Denied by no-assignment behavior.";
+  envoy::config::core::v3::HeaderValueOption* new_header =
+      option.deny_response_settings->mutable_response_headers_to_add()->Add();
+  new_header->mutable_header()->set_key("custom-denial-header-key");
+  new_header->mutable_header()->set_value("custom-denial-header-value");
+
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+
+  for (int i = 0; i < 3; ++i) {
+    sendClientRequest(&custom_headers);
+
+    if (i == 0) {
+      // Start the gRPC stream to RLQS server on the first request.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+      rlqs_stream_->startGrpcStream();
+
+      // Expect an initial report.
+      RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+
+      // Verify the usage report content.
+      ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+      const auto& usage = reports.bucket_quota_usages(0);
+      // The request is denied by no_assignment_behavior.
+      EXPECT_EQ(usage.num_requests_allowed(), 0);
+      EXPECT_EQ(usage.num_requests_denied(), 1);
+    }
+
+    // No response sent so filter should fallback to NoAssignmentBehavior
+    // (deny-all here with a customized response code + body + headers).
+    // Verify the response to downstream.
+    EXPECT_TRUE(expectDeniedRequest(403,
+                                    {{"custom-denial-header-key", "custom-denial-header-value"}},
+                                    "Denied by no-assignment behavior."));
+  }
+
+  simTime().advanceTimeWait(std::chrono::seconds(report_interval_sec_));
+  RateLimitQuotaUsageReports reports;
+  ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+  ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+  const auto& usage = reports.bucket_quota_usages(0);
+  // The request is denied by no_assignment_behavior.
+  EXPECT_EQ(usage.num_requests_allowed(), 0);
+  EXPECT_EQ(usage.num_requests_denied(), 2);
+}
+
+TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestNoAssignmentDenyAllWithEmptyBodySettings) {
+  ConfigOption option;
+  option.no_assignment_blanket_rule = RateLimitStrategy::DENY_ALL;
+  option.deny_response_settings = DenyResponseSettings();
+  option.deny_response_settings->mutable_http_status()->set_code(
+      envoy::type::v3::StatusCode::Forbidden);
+  envoy::config::core::v3::HeaderValueOption* new_header =
+      option.deny_response_settings->mutable_response_headers_to_add()->Add();
+  new_header->mutable_header()->set_key("custom-denial-header-key");
+  new_header->mutable_header()->set_value("custom-denial-header-value");
+
+  initializeConfig(option);
+  HttpIntegrationTest::initialize();
+  absl::flat_hash_map<std::string, std::string> custom_headers = {{"environment", "staging"},
+                                                                  {"group", "envoy"}};
+
+  for (int i = 0; i < 3; ++i) {
+    sendClientRequest(&custom_headers);
+
+    if (i == 0) {
+      // Start the gRPC stream to RLQS server on the first request.
+      ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, rlqs_connection_));
+      ASSERT_TRUE(rlqs_connection_->waitForNewStream(*dispatcher_, rlqs_stream_));
+      rlqs_stream_->startGrpcStream();
+
+      // Expect an initial report.
+      RateLimitQuotaUsageReports reports;
+      ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
+
+      // Verify the usage report content.
+      ASSERT_THAT(reports.bucket_quota_usages_size(), 1);
+      const auto& usage = reports.bucket_quota_usages(0);
+      // The request is denied by no_assignment_behavior.
+      EXPECT_EQ(usage.num_requests_allowed(), 0);
+      EXPECT_EQ(usage.num_requests_denied(), 1);
+    }
+
+    // No response sent so filter should fallback to NoAssignmentBehavior
+    // (deny-all here with a customized response code + body + headers).
+    // Verify the response to downstream.
+    EXPECT_TRUE(
+        expectDeniedRequest(403, {{"custom-denial-header-key", "custom-denial-header-value"}}, ""));
   }
 
   simTime().advanceTimeWait(std::chrono::seconds(report_interval_sec_));

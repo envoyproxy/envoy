@@ -63,7 +63,7 @@ using AwsSigningHeaderExclusionVector = std::vector<envoy::type::matcher::v3::St
 class SignerBaseImpl : public Signer, public Logger::Loggable<Logger::Id::aws> {
 public:
   SignerBaseImpl(absl::string_view service_name, absl::string_view region,
-                 const CredentialsProviderSharedPtr& credentials_provider,
+                 const CredentialsProviderChainSharedPtr& credentials_provider,
                  Server::Configuration::CommonFactoryContext& context,
                  const AwsSigningHeaderExclusionVector& matcher_config,
                  const bool query_string = false,
@@ -151,7 +151,7 @@ protected:
       Http::Headers::get().ForwardedFor.get(), Http::Headers::get().ForwardedProto.get(),
       "x-amzn-trace-id"};
   std::vector<Matchers::StringMatcherPtr> excluded_header_matchers_;
-  CredentialsProviderSharedPtr credentials_provider_;
+  CredentialsProviderChainSharedPtr credentials_provider_;
   const bool query_string_;
   const uint16_t expiration_time_;
   TimeSource& time_source_;

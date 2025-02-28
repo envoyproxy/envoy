@@ -105,23 +105,28 @@ public:
     return config;
   }
 
-  void setup(uint32_t connections) { setup(connections, false, defaultConfig()); }
+  void setup(uint32_t connections) {
+    setup(connections, /*set_redirect_records=*/false, /*receive_before_connect=*/false,
+          defaultConfig());
+  }
 
   void setup(uint32_t connections,
              const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
-    setup(connections, false, config);
+    setup(connections, /*set_redirect_records=*/false, /*receive_before_connect=*/false, config);
   }
 
-  void setup(uint32_t connections, bool set_redirect_records) {
-    setup(connections, set_redirect_records, defaultConfig());
+  void setup(uint32_t connections, bool set_redirect_records, bool receive_before_connect) {
+    setup(connections, set_redirect_records, receive_before_connect, defaultConfig());
   }
 
   virtual void
-  setup(uint32_t connections, bool set_redirect_records,
+  setup(uint32_t connections, bool set_redirect_records, bool receive_before_connect,
         const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) PURE;
 
-  void raiseEventUpstreamConnected(uint32_t conn_index) {
-    EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
+  void raiseEventUpstreamConnected(uint32_t conn_index, bool expect_read_enable = true) {
+    if (expect_read_enable) {
+      EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
+    }
     EXPECT_CALL(*upstream_connection_data_.at(conn_index), addUpstreamCallbacks(_))
         .WillOnce(Invoke([=, this](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;

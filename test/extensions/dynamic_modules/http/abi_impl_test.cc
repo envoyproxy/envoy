@@ -225,6 +225,14 @@ TEST_P(DynamicModuleHttpFilterSetHeaderValueTest, SetHeaderValue) {
   auto values3 = header_map->get(Envoy::Http::LowerCaseString(key3));
   EXPECT_EQ(values3.size(), 1);
   EXPECT_EQ(values3[0]->value().getStringView(), value3);
+
+  // Remove the key by passing null value.
+  const std::string remove_key = "single";
+  envoy_dynamic_module_type_buffer_envoy_ptr remove_key_ptr = const_cast<char*>(remove_key.data());
+  size_t remove_key_length = remove_key.size();
+  EXPECT_TRUE(callback(filter_.get(), remove_key_ptr, remove_key_length, nullptr, 0));
+  auto removed_values = header_map->get(Envoy::Http::LowerCaseString(remove_key));
+  EXPECT_EQ(removed_values.size(), 0);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -436,6 +444,21 @@ TEST(ABIImpl, dynamic_metadata) {
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, &result_str_ptr,
       &result_str_length));
 
+  // With namespace but non existing key.
+  const char* non_existing_key = "non_existing";
+  envoy_dynamic_module_type_buffer_module_ptr non_existing_key_ptr =
+      const_cast<char*>(non_existing_key);
+  size_t non_existing_key_length = strlen(non_existing_key);
+  // This will create the namespace.
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
+      &filter, namespace_ptr, namespace_length, key_ptr, key_length, value));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
+      &filter, namespace_ptr, namespace_length, non_existing_key_ptr, non_existing_key_length,
+      &result_number));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
+      &filter, namespace_ptr, namespace_length, non_existing_key_ptr, non_existing_key_length,
+      &result_str_ptr, &result_str_length));
+
   // With namespace and key.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, value));
@@ -557,6 +580,17 @@ TEST(ABIImpl, ResponseBody) {
   EXPECT_FALSE(envoy_dynamic_module_callback_http_append_response_body(&filter, nullptr, 0));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_drain_response_body(&filter, 0));
 
+  // Buffer is available via current_response_body_, not the stream encoder.
+  const std::string data = "foo";
+  Buffer::OwnedImpl current_buffer;
+  filter.current_response_body_ = &current_buffer;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_append_response_body(
+      &filter, const_cast<char*>(data.data()), 3));
+  EXPECT_EQ(current_buffer.toString(), data);
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_response_body(&filter, 3));
+  EXPECT_EQ(current_buffer.toString(), "");
+  filter.current_response_body_ = nullptr;
+
   Buffer::OwnedImpl buffer;
   EXPECT_CALL(callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&buffer));
   EXPECT_CALL(callbacks, modifyEncodingBuffer(_))
@@ -569,7 +603,6 @@ TEST(ABIImpl, ResponseBody) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_drain_response_body(&filter, 0));
 
   // Append data to the buffer.
-  const std::string data = "foo";
   envoy_dynamic_module_type_buffer_module_ptr data_ptr = const_cast<char*>(data.data());
   size_t data_length = data.size();
   EXPECT_TRUE(
@@ -612,6 +645,19 @@ TEST(ABIImpl, ResponseBody) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_response_body_vector(
       &filter, result_buffer_vector3.data()));
   EXPECT_EQ(bufferVectorToString(result_buffer_vector3), "rbaz");
+}
+
+TEST(ABIImpl, ClearRouteCache) {
+  DynamicModuleHttpFilter filter{nullptr};
+  Http::MockStreamDecoderFilterCallbacks callbacks;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  filter.setDecoderFilterCallbacks(callbacks);
+  Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
+  EXPECT_CALL(downstream_callbacks, clearRouteCache());
+  EXPECT_CALL(callbacks, downstreamCallbacks())
+      .WillOnce(testing::Return(OptRef(downstream_callbacks)));
+  envoy_dynamic_module_callback_http_clear_route_cache(&filter);
 }
 
 } // namespace HttpFilters

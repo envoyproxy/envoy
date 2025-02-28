@@ -16,7 +16,7 @@ fn init() -> bool {
 fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   _envoy_filter_config: &mut EC,
   name: &str,
-  _config: &str,
+  _config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
   match name {
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
@@ -49,6 +49,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter.clear_route_cache();
+
     // Test single getter API.
     let single_value = envoy_filter
       .get_request_header_value("single")
@@ -71,6 +73,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       .get_request_header_value("new")
       .expect("header new not found");
     assert_eq!(new_value.as_slice(), b"value");
+    envoy_filter.remove_request_header("to-be-deleted");
 
     // Test all getter API.
     let all_headers = envoy_filter.get_request_headers();
@@ -121,6 +124,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       .get_request_trailer_value("new")
       .expect("trailer new not found");
     assert_eq!(&new_value.as_slice(), b"value");
+    envoy_filter.remove_request_trailer("to-be-deleted");
 
     // Test all getter API.
     let all_trailers = envoy_filter.get_request_trailers();
@@ -164,6 +168,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       .get_response_header_value("new")
       .expect("header new not found");
     assert_eq!(&new_value.as_slice(), b"value");
+    envoy_filter.remove_response_header("to-be-deleted");
 
     // Test all getter API.
     let all_headers = envoy_filter.get_response_headers();
@@ -214,6 +219,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       .get_response_trailer_value("new")
       .expect("trailer new not found");
     assert_eq!(&new_value.as_slice(), b"value");
+    envoy_filter.remove_response_trailer("to-be-deleted");
 
     // Test all getter API.
     let all_trailers = envoy_filter.get_response_trailers();
@@ -461,7 +467,6 @@ impl<'a, EHF: EnvoyHttpFilter> BodyWriter<'a, EHF> {
         .get_response_body()
         .expect("response body is None")
     };
-
 
     let buffer_bytes = current_vec
       .iter()
