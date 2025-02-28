@@ -226,7 +226,7 @@ public:
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  const Extensions::TransportSockets::Tls::SanMatcherPtr matcher_;
+  const Ssl::SanMatcherPtr matcher_;
 };
 
 /**

@@ -58,8 +58,7 @@ public:
   MOCK_METHOD(const std::string&, subjectLocalCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, urlEncodedPemEncodedPeerCertificateChain, (), (const));
-  MOCK_METHOD(bool, peerCertificateSanMatches,
-              (const Extensions::TransportSockets::Tls::SanMatcher&), (const));
+  MOCK_METHOD(bool, peerCertificateSanMatches, (const Ssl::SanMatcher&), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, uriSanLocalCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, dnsSansPeerCertificate, (), (const));

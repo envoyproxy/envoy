@@ -12,16 +12,10 @@
 #include "absl/types/span.h"
 
 namespace Envoy {
+namespace Ssl {
 
-namespace Extensions {
-namespace TransportSockets {
-namespace Tls {
 // This is forward declared to avoid needing to forward declare `GENERAL_NAME` from BoringSSL.
 class SanMatcher;
-} // namespace Tls
-} // namespace TransportSockets
-} // namespace Extensions
-namespace Ssl {
 
 /**
  * Base connection interface for all SSL connections.
@@ -132,9 +126,10 @@ public:
 
   /**
    * @return bool whether the provided matcher matches a SAN in the peer certificate.
+   * @note This method takes a matcher, instead of returning the SANs, to avoid putting
+   *       BoringSSL types into interfaces.
    */
-  virtual bool peerCertificateSanMatches(
-      const Extensions::TransportSockets::Tls::SanMatcher& matcher) const PURE;
+  virtual bool peerCertificateSanMatches(const SanMatcher& matcher) const PURE;
 
   /**
    * @return absl::Span<const std::string> the DNS entries in the SAN field of the peer certificate.

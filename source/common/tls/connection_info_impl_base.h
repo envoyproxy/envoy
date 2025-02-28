@@ -32,8 +32,7 @@ public:
   const std::string& subjectLocalCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
-  bool peerCertificateSanMatches(
-      const Extensions::TransportSockets::Tls::SanMatcher& matcher) const override;
+  bool peerCertificateSanMatches(const Ssl::SanMatcher& matcher) const override;
   absl::Span<const std::string> uriSanPeerCertificate() const override;
   absl::Span<const std::string> uriSanLocalCertificate() const override;
   absl::Span<const std::string> dnsSansPeerCertificate() const override;

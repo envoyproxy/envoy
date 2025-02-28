@@ -211,8 +211,7 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateCh
       });
 }
 
-bool ConnectionInfoImplBase::peerCertificateSanMatches(
-    const Extensions::TransportSockets::Tls::SanMatcher& matcher) const {
+bool ConnectionInfoImplBase::peerCertificateSanMatches(const Ssl::SanMatcher& matcher) const {
   const bssl::UniquePtr<GENERAL_NAMES>& sans =
       getCachedValueOrCreate<bssl::UniquePtr<GENERAL_NAMES>>(
           CachedValueTag::PeerCertificateSanMatches,
