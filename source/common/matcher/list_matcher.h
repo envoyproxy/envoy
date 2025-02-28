@@ -19,7 +19,7 @@ public:
   explicit ListMatcher(absl::optional<OnMatch<DataType>> on_no_match) : on_no_match_(on_no_match) {}
 
   typename MatchTree<DataType>::MatchResult match(const DataType& matching_data) override {
-    return match(matching_data, matchers_, on_no_match_);
+    return ListMatcher<DataType>::match(matching_data, matchers_, on_no_match_);
   }
 
   void addMatcher(FieldMatcherPtr<DataType>&& matcher, OnMatch<DataType> action) {
@@ -27,27 +27,27 @@ public:
   }
 
   // Static helper with specifiable starting index.
-  // Static helper with specifiable starting index.
   static typename MatchTree<DataType>::MatchResult
   match(const DataType& matching_data,
         std::vector<std::pair<FieldMatcherPtr<DataType>, OnMatch<DataType>>>& matchers,
         absl::optional<OnMatch<DataType>> on_no_match, int starting_index = 0) {
+    // start traversal from the starting index.
     for (size_t i = starting_index; i < matchers.size(); ++i) {
       const auto& matcher = matchers.at(i);
       const auto maybe_match = matcher.first->match(matching_data);
 
       // One of the matchers don't have enough information, bail on evaluating the match.
       if (maybe_match.match_state_ == MatchState::UnableToMatch) {
-        return {MatchState::UnableToMatch, {}};
+        return {MatchState::UnableToMatch, {}, nullptr};
       }
-
-      if (maybe_match.result()) {
-        // If not at the end of the list, support the option to re-enter from the next index.
-        return {MatchState::MatchComplete, matcher.second,
-                std::make_unique<ListMatcherReentrant<DataType>>(&matchers, on_no_match, i + 1)};
-      }
+      // No match.
+      if (!maybe_match.result())
+        continue;
+      // Provide a reentrant ListMatcher to continue traversal from the next index.
+      return {MatchState::MatchComplete, matcher.second,
+              std::make_unique<ListMatcherReentrant<DataType>>(&matchers, on_no_match, i + 1)};
     }
-    return {MatchState::MatchComplete, on_no_match};
+    return {MatchState::MatchComplete, on_no_match, nullptr};
   }
 
 private:

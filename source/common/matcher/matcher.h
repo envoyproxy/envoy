@@ -42,12 +42,10 @@ struct MaybeMatchResult {
 };
 
 // TODO(snowp): Make this a class that tracks the progress to speed up subsequent traversals.
-// Match evaluation that supports re-entry into the match tree.
 template <class DataType>
-static inline MaybeMatchResult
-evaluateMatch(MatchTree<DataType>& match_tree, const DataType& data,
-              std::unique_ptr<MatchTree<DataType>>* matcher_reentrant_out) {
-  auto result = match_tree.match(data);
+static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
+                                             const DataType& data) {
+  const auto result = match_tree.match(data);
   if (result.match_state_ == MatchState::UnableToMatch) {
     return MaybeMatchResult{nullptr, MatchState::UnableToMatch};
   }
@@ -56,22 +54,67 @@ evaluateMatch(MatchTree<DataType>& match_tree, const DataType& data,
     return {nullptr, MatchState::MatchComplete};
   }
 
-  if (result.matcher_reentrant_ && matcher_reentrant_out) {
-    *matcher_reentrant_out = std::move(result.matcher_reentrant_);
-  }
-
   if (result.on_match_->matcher_) {
     return evaluateMatch(*result.on_match_->matcher_, data);
   }
 
   return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
 }
-// Match evaluation without providing the re-entry option.
-template <class DataType>
-static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
-                                             const DataType& data) {
-  return evaluateMatch<DataType>(match_tree, data, nullptr);
-}
+
+// Re-entry helper class to track and match against nested reentrants for a MatchTree.
+template <class DataType> class ReenterableMatchEvaluator {
+public:
+  ReenterableMatchEvaluator(std::shared_ptr<MatchTree<DataType>> match_tree)
+      : match_tree_(match_tree) {}
+
+  // Match against the reentrant stack (bottom up), cleaning up any that no longer find a match.
+  MaybeMatchResult evaluateMatch(const DataType& data) {
+    // First time matching, match against the parent match_tree.
+    if (!reentrant_stack_) {
+      reentrant_stack_ = std::make_unique<std::vector<std::unique_ptr<MatchTree<DataType>>>>(1);
+      return evaluateMatchForReentry(*match_tree_, data, reentrant_stack_->back());
+    }
+
+    // Iterate through the reentrant stack, clearing any that no longer match, until a match is
+    // found.
+    while (!reentrant_stack_->empty()) {
+      // If this level in the stack is already nulled out by a failed run, no-match, reentrant
+      // exhaustion, etc, delete it and continue up.
+      MatchTree<DataType>* reentrant = reentrant_stack_->back().get();
+      if (!reentrant) {
+        reentrant_stack_->pop_back();
+        continue;
+      }
+      auto result = evaluateMatchForReentry(*reentrant, data, reentrant_stack_->back());
+      if (result.match_state_ == MatchState::UnableToMatch || result.result_) {
+        return result;
+      }
+    }
+    // Out of reentrants to try, return no-match.
+    return {nullptr, MatchState::MatchComplete};
+  }
+
+private:
+  // Helper to evaluate a match and save a reentrant to the stack, if any.
+  MaybeMatchResult evaluateMatchForReentry(MatchTree<DataType>& match_tree, const DataType& data,
+                                           std::unique_ptr<MatchTree<DataType>>& reentrant_out) {
+    auto result = match_tree.match(data);
+    // Safety Note: expect reentrant_out to be nullptr when out of retries at this level of the
+    // stack.
+    reentrant_out = std::move(result.matcher_reentrant_);
+    if (result.match_state_ == MatchState::UnableToMatch || !result.on_match_) {
+      return {nullptr, result.match_state_};
+    }
+    // Recursive execution when hitting a nested matcher, adding to the reentrant stack.
+    if (result.on_match_->matcher_) {
+      return evaluateMatchForReentry(*result.on_match_->matcher_, data,
+                                     reentrant_stack_->emplace_back());
+    }
+    return {result.on_match_->action_cb_, MatchState::MatchComplete};
+  }
+  std::shared_ptr<MatchTree<DataType>> match_tree_;
+  std::unique_ptr<std::vector<std::unique_ptr<MatchTree<DataType>>>> reentrant_stack_ = nullptr;
+};
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
 
