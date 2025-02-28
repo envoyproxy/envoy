@@ -270,7 +270,7 @@ message TcpProxy {
   // parsed by a downstream proxy protocol listener filter, the TLVs specified here are ignored.
   //
   // .. note::
-  //   To ensure specified TLVs are allowed in the upstream PROXY protocol header,  you must also
+  //   To ensure specified TLVs are allowed in the upstream PROXY protocol header, you must also
   //   configure the passthrough TLVs on the upstream proxy protocol transport. See
   //   :ref:`core.v3.ProxyProtocolConfig.pass_through_tlvs <envoy_v3_api_field_config.core.v3.ProxyProtocolConfig.pass_through_tlvs>`
   //   for details.
