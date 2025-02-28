@@ -8,6 +8,9 @@ licenses(["notice"])  # Apache 2
 envoy_cc_test_library(
     name = "destroyconfig_test_lib",
     hdrs = ["destroyconfig.h"],
+    deps = [
+        "//contrib/golang/common/dso:dso_lib",
+    ],
 )
 
 go_library(

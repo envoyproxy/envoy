@@ -1,14 +1,8 @@
 package destroyconfig
 
 /*
-// ref https://github.com/golang/go/issues/25832
-
-#cgo CFLAGS: -I../api
 #cgo linux LDFLAGS: -Wl,-unresolved-symbols=ignore-all
 #cgo darwin LDFLAGS: -Wl,-undefined,dynamic_lookup
-
-#include <stdlib.h>
-#include <string.h>
 
 #include "destroyconfig.h"
 
@@ -24,7 +18,6 @@ import (
 const Name = "destroyconfig"
 
 func init() {
-	http.SetHttpCAPI(&capi{})
 	http.RegisterHttpFilterFactoryAndConfigParser(Name, http.PassThroughFactory, &parser{})
 }
 
@@ -40,22 +33,23 @@ func (c *config) Destroy() {
 	C.envoyGoConfigDestroy(cfgPointer)
 }
 
-type parser struct {
-	api.StreamFilterConfigParser
-}
-
 type capi struct {
 	api.HttpCAPI
 }
 
 func (c *capi) HttpConfigFinalize(_ unsafe.Pointer) {}
 
-func (c *capi) HttpDefineMetric(cfg unsafe.Pointer, metricType api.MetricType, name string) uint32 {
+func (c *capi) HttpDefineMetric(cfg unsafe.Pointer, _ api.MetricType, _ string) uint32 {
 	cfgPointer = cfg
 	return 0
 }
 
+type parser struct {
+	api.StreamFilterConfigParser
+}
+
 func (p *parser) Parse(_ *anypb.Any, cb api.ConfigCallbackHandler) (interface{}, error) {
+	http.SetHttpCAPI(&capi{})
 	conf := &config{cb}
 	return conf, nil
 }
