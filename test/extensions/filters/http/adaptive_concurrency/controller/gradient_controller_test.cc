@@ -160,7 +160,47 @@ TEST_F(GradientControllerConfigTest, MissingMinRTTValues) {
 
   EXPECT_THROW_WITH_MESSAGE(
       makeConfig(yaml, runtime_), EnvoyException,
-      "adaptive_concurrency: neither `concurrency_update_interval` nor `base_value` set");
+      "adaptive_concurrency: neither `min_rtt_calc_interval` nor `base_value` set");
+}
+
+TEST_F(GradientControllerConfigTest, TestNanosValidationFail) {
+  std::string yaml =
+      R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  concurrency_update_interval:
+    nanos: 100000000 # 100ms
+min_rtt_calc_params:
+  interval:
+    nanos: 8
+  request_count: 50
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      makeConfig(yaml, runtime_), EnvoyException,
+      "adaptive_concurrency: `min_rtt_calc_inverval` must not be in range (0, 1ms)");
+}
+
+TEST_F(GradientControllerConfigTest, TestNanosValidationPass) {
+  std::string yaml =
+      R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  concurrency_update_interval:
+    nanos: 100000000 # 100ms
+min_rtt_calc_params:
+  interval:
+    nanos: 1000000 # 1ms
+  request_count: 50
+)EOF";
+
+  auto config = makeConfig(yaml, runtime_);
+  EXPECT_EQ(config.minRTTCalcInterval(), std::chrono::milliseconds(1));
+  EXPECT_EQ(config.sampleRTTCalcInterval(), std::chrono::milliseconds(100));
+  EXPECT_EQ(config.minRTTAggregateRequestCount(), 50);
+  EXPECT_EQ(config.sampleAggregatePercentile(), .5);
 }
 
 TEST_F(GradientControllerConfigTest, Clamping) {

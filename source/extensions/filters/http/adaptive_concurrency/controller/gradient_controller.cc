@@ -46,10 +46,19 @@ GradientControllerConfig::GradientControllerConfig(
       min_rtt_buffer_pct_(
           PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), buffer, 25)) {
 
-  if (min_rtt_calc_interval_ < std::chrono::milliseconds(1) &&
+  auto min_rtt_calc_interval_nanos =
+      std::chrono::nanoseconds(proto_config.min_rtt_calc_params().interval().nanos());
+  if (proto_config.min_rtt_calc_params().interval().seconds() == 0 &&
+      min_rtt_calc_interval_nanos > std::chrono::nanoseconds::zero() &&
+      min_rtt_calc_interval_nanos < std::chrono::milliseconds(1)) {
+    throw EnvoyException(
+        "adaptive_concurrency: `min_rtt_calc_inverval` must not be in range (0, 1ms)");
+  }
+
+  if (min_rtt_calc_interval_ <= std::chrono::milliseconds::zero() &&
       base_value_ <= std::chrono::milliseconds::zero()) {
     throw EnvoyException(
-        "adaptive_concurrency: neither `concurrency_update_interval` nor `base_value` set");
+        "adaptive_concurrency: neither `min_rtt_calc_interval` nor `base_value` set");
   }
 }
 GradientController::GradientController(GradientControllerConfig config,

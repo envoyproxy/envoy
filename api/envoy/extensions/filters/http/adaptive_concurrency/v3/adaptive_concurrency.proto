@@ -54,7 +54,8 @@ message GradientControllerConfig {
         "MinimumRTTCalculationParams";
 
     // The time interval between recalculating the minimum request round-trip time. Has to be
-    // positive. If set to a value less than a millisecond, dynamic sampling of the minRTT is disabled.
+    // positive. If set to zero, dynamic sampling of the minRTT is disabled. This value must not
+    // be set to a value in the range (0, 1ms).
     google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {}}];
 
     // The number of requests to aggregate/sample during the minRTT recalculation window before
