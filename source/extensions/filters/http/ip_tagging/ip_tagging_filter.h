@@ -24,8 +24,8 @@ namespace IpTagging {
 
 using IpTagFileProto = envoy::data::ip_tagging::v3::IPTagFile;
 using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
+
 // TODO supports stats for ip tags
-// Add tests for config and loading from file
 // Add tests for singleton
 // Support async reload of tags file
 class IpTagsLoader {
@@ -42,6 +42,52 @@ private:
   Api::Api& api_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Stats::StatNameSetPtr& stat_name_set_;
+};
+
+class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging> {
+public:
+  IpTagsProvider(const std::string& ip_tags_path, IpTagsLoader& tags_loader,
+                 Event::Dispatcher& dispatcher, Api::Api& api, Singleton::InstanceSharedPtr owner)
+      : ip_tags_path_(ip_tags_path), tags_loader_(tags_loader), owner_(owner) {
+    if (ip_tags_path.empty()) {
+      throw EnvoyException("Cannot load tags from empty file path.");
+    }
+    tags_ = tags_loader_.loadTags(ip_tags_path_);
+    ip_tags_reload_dispatcher_ = api.allocateDispatcher("ip_tags_reload_routine");
+    ip_tags_file_watcher_ = dispatcher.createFilesystemWatcher();
+    ip_tags_reload_thread_ = api.threadFactory().createThread(
+        [this]() -> void {
+          ENVOY_LOG_MISC(debug, "Started ip_tags_reload_routine");
+          THROW_IF_NOT_OK(
+              ip_tags_file_watcher_->addWatch(ip_tags_path_, Filesystem::Watcher::Events::MovedTo,
+                                              [this](uint32_t) { return onIpTagsFileUpdate(); }));
+          ip_tags_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+        },
+        Thread::Options{std::string("ip_tags_reload_routine")});
+  }
+
+  ~IpTagsProvider() {
+    ENVOY_LOG(debug, "Shutting down ip tags provider");
+    if (ip_tags_reload_dispatcher_) {
+      ip_tags_reload_dispatcher_->exit();
+    }
+    if (ip_tags_reload_thread_) {
+      ip_tags_reload_thread_->join();
+      ip_tags_reload_thread_.reset();
+    }
+  };
+
+  absl::Status onIpTagsFileUpdate() { return absl::OkStatus(); }
+
+private:
+  const std::string ip_tags_path_;
+  IpTagsLoader& tags_loader_;
+  LcTrieSharedPtr tags_;
+  Thread::ThreadPtr ip_tags_reload_thread_;
+  Event::DispatcherPtr ip_tags_reload_dispatcher_;
+  Filesystem::WatcherPtr ip_tags_file_watcher_;
+  // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
+  const Singleton::InstanceSharedPtr owner_;
 };
 
 /**
