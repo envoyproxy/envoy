@@ -214,6 +214,7 @@ new_features:
     ``envoy.tcp_proxy.receive_before_connect``.
 - area: golang
   change: |
-    added http golang filter config destroy callback. When a config gets deleted from envoy, the go plugin calls the `Destroy` function on the config instance.
-    config should implement the new `github.com/envoyproxy/envoy/contrib/golang/common/go/api.Config` interface, implementing the Destroy function.
+    added http golang filter config destroy callback. When a config gets deleted from envoy, the go plugin calls the
+    Destroy function on the config instance. config should implement the new 
+    github.com/envoyproxy/envoy/contrib/golang/common/go/api.Config interface, implementing the Destroy function.
 deprecated:
