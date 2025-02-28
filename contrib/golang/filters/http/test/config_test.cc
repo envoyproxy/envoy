@@ -131,6 +131,7 @@ TEST(GolangFilterConfigTest, GolangFilterDestroyConfig) {
   auto config_id_ = dso_lib->envoyGoFilterNewHttpPluginConfig(config_);
   dso_lib->envoyGoFilterDestroyHttpPluginConfig(config_id_, 0);
   EXPECT_TRUE(config_->destroyed);
+  delete config_;
   cleanup();
 }
 
