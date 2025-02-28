@@ -131,11 +131,20 @@ TEST(QuicLbTest, InvalidConfig) {
 
   // Invalid concurrency.
   EXPECT_CALL(factory_context.server_factory_context_.options_, concurrency())
-      .WillOnce(testing::Return(257));
+      .WillOnce(testing::Return(257))
+      .WillRepeatedly(testing::Return(8)); // To make subsequent tests pass.
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(),
             "envoy.quic.connection_id_generator.quic_lb cannot be used "
             "with a concurrency greater than 256");
+
+  // Invalid combined length.
+  cfg.set_nonce_length_bytes(12);
+  cfg.mutable_server_id()->set_inline_string("1234567");
+  factory_or_status = Factory::create(cfg, factory_context);
+  EXPECT_EQ(
+      factory_or_status.status().message(),
+      "'server_id' length (7) and 'nonce_length_bytes' (12) combined must be 18 bytes or less.");
 }
 
 // Validate that the server ID is present in plaintext when `unsafe_unencrypted_testing_mode`

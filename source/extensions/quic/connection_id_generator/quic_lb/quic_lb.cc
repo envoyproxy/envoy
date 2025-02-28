@@ -205,6 +205,17 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
 
   std::string server_id = server_id_or_result.value();
 
+  constexpr auto cid_length_and_version_prefix = sizeof(uint8_t);
+  constexpr auto fixed_components_len =
+      cid_length_and_version_prefix + sizeof(WorkerRoutingIdValue);
+  if ((server_id.size() + config.nonce_length_bytes() + fixed_components_len) >
+      quic::kQuicMaxConnectionIdWithLengthPrefixLength) {
+    static_assert(quic::kQuicMaxConnectionIdWithLengthPrefixLength - fixed_components_len == 18);
+    return absl::InvalidArgumentError(fmt::format(
+        "'server_id' length ({}) and 'nonce_length_bytes' ({}) combined must be 18 bytes or less.",
+        server_id.size(), config.nonce_length_bytes()));
+  }
+
   // Create a test instance using all the same parameters, but with a fake key (because we don't
   // have the real key yet) to surface any errors while we're still in the config loading stage.
   {
