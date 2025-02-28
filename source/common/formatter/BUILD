@@ -35,8 +35,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "substitution_format_string_lib",
-    hdrs = ["substitution_format_string.h"],
     srcs = ["substitution_format_string.cc"],
+    hdrs = ["substitution_format_string.h"],
     deps = [
         ":substitution_formatter_lib",
         "//source/common/config:datasource_lib",
