@@ -1,16 +1,13 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load(
-    "@envoy//bazel:envoy_build_system.bzl",
+    "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
 )
 licenses(["notice"])  # Apache 2
 
 envoy_cc_test_library(
     name = "destroyconfig_test_lib",
-    hdrs = ["destroyconfig.h"],
-    deps = [
-        "//contrib/golang/common/dso:dso_lib",
-    ],
+    hdrs = ["destroyconfig.h", "api.h"],
 )
 
 go_library(
@@ -18,6 +15,7 @@ go_library(
     srcs = [
         "config.go",
         "destroyconfig.h",
+        "api.h",
     ],
     cgo = True,
     importpath = "example.com/test-data/destroyconfig",

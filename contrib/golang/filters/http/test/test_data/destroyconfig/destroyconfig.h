@@ -1,14 +1,13 @@
 #pragma once
+// NOLINT(namespace-envoy)
 #pragma GCC diagnostic ignored "-Wold-style-cast"
-
+#include "api.h"
 #ifdef __cplusplus
-#include "contrib/golang/common/dso/api.h"
 struct httpDestroyableConfig : httpConfig {
     int destroyed;
 } ;
 extern "C" {
 #else
-#include "contrib/golang/common/go/api/api.h"
 typedef struct {
     httpConfig c;
     int destroyed;
