@@ -61,7 +61,8 @@ private:
   const bool allow_renegotiation_;
   const bool enforce_rsa_key_usage_;
   const size_t max_session_keys_;
-  const size_t max_session_cache_upstream_hosts_;
+  const absl::optional<const Ssl::ClientContextConfig::PerHostSessionCacheConfig>
+      per_host_session_cache_config_;
   absl::Mutex session_keys_map_mu_;
   absl::flat_hash_map<uint64_t, std::deque<bssl::UniquePtr<SSL_SESSION>>>
       session_keys_map_ ABSL_GUARDED_BY(session_keys_map_mu_);

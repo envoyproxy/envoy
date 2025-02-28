@@ -178,7 +178,7 @@ new_features:
     work as an upstream filter.
 - area: tls
   change: |
-    Added per-upstream host TLS session key caching via
-    :ref:`max_session_cache_upstream_hosts <envoy_api_field_auth.UpstreamTlsContext.max_session_cache_upstream_hosts>`
-    to optimize session resumption when upstreams use different session keys.
+    Added :ref:`per-upstream session cache <<envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsPerHostSessionCacheConfig>`
+    support to allow the TLS session manager to cache and use session keys by upstream host. This is useful when different
+    upstream hosts serving the same destination use distinct TLS configurations (keys).
 deprecated:

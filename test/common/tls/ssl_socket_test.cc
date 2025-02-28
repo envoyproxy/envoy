@@ -7940,8 +7940,9 @@ TEST_P(SslSocketTest, PerUpstreamResumptionEnabledTls13) {
     tls_params:
       tls_minimum_protocol_version: TLSv1_3
       tls_maximum_protocol_version: TLSv1_3
-  max_session_keys: 1
-  max_session_cache_upstream_hosts: 2
+  per_host_session_cache_config:
+    max_hosts: 2
+    max_session_keys_per_host: 1
 )EOF";
 
   testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, version_, 2);
@@ -7966,8 +7967,9 @@ TEST_P(SslSocketTest, PerUpstreamResumptionEnabledTls12) {
     tls_params:
       tls_minimum_protocol_version: TLSv1_0
       tls_maximum_protocol_version: TLSv1_2
-  max_session_keys: 1
-  max_session_cache_upstream_hosts: 2
+  per_host_session_cache_config:
+    max_hosts: 2
+    max_session_keys_per_host: 1
 )EOF";
 
   testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, version_, 2);
@@ -7993,11 +7995,12 @@ TEST_P(SslSocketTest, PerUpstreamResumptionEnabledForOneUpstreamTls13) {
     tls_params:
       tls_minimum_protocol_version: TLSv1_3
       tls_maximum_protocol_version: TLSv1_3
-  max_session_keys: 1
-  max_session_cache_upstream_hosts: 1
+  per_host_session_cache_config:
+    max_hosts: 1
+    max_session_keys_per_host: 1
 )EOF";
 
-  // Expect no session reuse as cache size is 1.
+  // Expect no re-use as session cache holds sessions from only one host.
   testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, false, version_, 2);
 }
 
@@ -8021,10 +8024,12 @@ TEST_P(SslSocketTest, PerUpstreamResumptionEnabledForOneUpstreamTls12) {
     tls_params:
       tls_minimum_protocol_version: TLSv1_0
       tls_maximum_protocol_version: TLSv1_2
-  max_session_keys: 1
-  max_session_cache_upstream_hosts: 1
+  per_host_session_cache_config:
+    max_hosts: 1
+    max_session_keys_per_host: 1
 )EOF";
 
+  // Expect no re-use as session cache holds sessions from only one host.
   testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, false, version_, 2);
 }
 

@@ -64,7 +64,7 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
       allow_renegotiation_(config.allowRenegotiation()),
       enforce_rsa_key_usage_(config.enforceRsaKeyUsage()),
       max_session_keys_(config.maxSessionKeys()),
-      max_session_cache_upstream_hosts_(config.maxSessionCacheUpstreamHosts()) {
+      per_host_session_cache_config_(config.perHostSessionCacheConfig()) {
   if (!creation_status.ok()) {
     return;
   }
@@ -173,7 +173,7 @@ ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& o
 
   SSL_set_enforce_rsa_key_usage(ssl_con.get(), enforce_rsa_key_usage_);
 
-  if (max_session_keys_ > 0) {
+  if (max_session_keys_ > 0 || per_host_session_cache_config_.has_value()) {
     uint64_t key = sessionCacheKey(host);
     if (session_keys_single_use_) {
       // Stored single-use session keys, use write/write locks.
@@ -214,6 +214,7 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session,
     session_keys_single_use_ = true;
   }
 
+  auto max_session_keys = max_session_keys_;
   uint64_t key = sessionCacheKey(host);
   absl::WriterMutexLock l(&session_keys_map_mu_);
 
@@ -221,8 +222,10 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session,
   if (it == session_keys_map_.end()) {
     std::tie(it, std::ignore) =
         session_keys_map_.emplace(key, std::deque<bssl::UniquePtr<SSL_SESSION>>());
-    if (max_session_cache_upstream_hosts_ > 0) {
-      if (session_keys_map_.size() > max_session_cache_upstream_hosts_) {
+    if (per_host_session_cache_config_.has_value()) {
+      max_session_keys = per_host_session_cache_config_->max_session_keys_per_host_;
+
+      if (session_keys_map_.size() > per_host_session_cache_config_->max_hosts_) {
         // When the cache size has exceeded, remove the key next to the one that was just added
         // for randomization.
         auto next_it = std::next(it);
@@ -233,7 +236,7 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session,
         session_keys_map_.erase(next_it);
       }
     } else {
-      // If cache by upstream is disabled, we fallback to the original behavior by
+      // If per host upstream cache is disabled, we fallback to the original behavior by
       // storing session keys under the first key (0).
       ASSERT(key == 0);
     }
@@ -241,7 +244,7 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session,
 
   auto& session_keys = it->second;
   // Evict oldest entries.
-  while (session_keys.size() >= max_session_keys_) {
+  while (session_keys.size() >= max_session_keys) {
     session_keys.pop_back();
   }
   // Add new session key at the front of the queue, so that it's used first.
@@ -250,9 +253,9 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session,
 }
 
 uint64_t ClientContextImpl::sessionCacheKey(const Upstream::HostDescriptionConstSharedPtr& host) {
-  // If cache by upstream is disabled, we fallback to the original behavior by
+  // If per host upstream cache is disabled, we fallback to the original behavior by
   // storing session keys under the first key (0).
-  if (max_session_cache_upstream_hosts_ == 0 || host == nullptr) {
+  if (!per_host_session_cache_config_.has_value() || host == nullptr) {
     return 0;
   }
 
