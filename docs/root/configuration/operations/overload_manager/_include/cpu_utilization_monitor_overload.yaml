@@ -1,0 +1,55 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - domains:
+              - '*'
+              name: local_service
+              routes:
+              - match: {prefix: "/"}
+                route: {cluster: default_service}
+  clusters:
+  - name: default_service
+    load_assignment:
+      cluster_name: default_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 10001
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
+
+overload_manager:
+  refresh_interval: 0.25s
+  resource_monitors:
+  - name: "envoy.resource_monitors.cpu_utilization"
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig
+  actions:
+  - name: "envoy.overload_actions.stop_accepting_requests"
+    triggers:
+    - name: "envoy.resource_monitors.cpu_utilization"
+      scaled:
+        scaling_threshold: 0.80
+        saturation_threshold: 0.95
