@@ -52,21 +52,12 @@ Configuration
 A simple example of configuring Lua HTTP filter that contains only :ref:`default source code
 <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>` is as follow:
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.lua
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-    default_source_code:
-      inline_string: |
-        -- Called on the request path.
-        function envoy_on_request(request_handle)
-          -- Do something.
-        end
-        -- Called on the response path.
-        function envoy_on_response(response_handle)
-          -- Do something.
-        end
+.. literalinclude:: _include/lua-filter.yaml
+    :language: yaml
+    :lines: 34-46
+    :lineno-start: 34
+    :linenos:
+    :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
 By default, Lua script defined in ``default_source_code`` will be treated as a ``default`` script. Envoy will
 execute it for every HTTP request. This ``default`` script is optional.
@@ -88,62 +79,43 @@ LuaPerRoute provides two ways of overriding the ``default`` Lua script:
 
 As a concrete example, given the following Lua filter configuration:
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.lua
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-    default_source_code:
-      inline_string:
-        function envoy_on_request(request_handle)
-          -- do something
-        end
-    source_codes:
-      hello.lua:
-        inline_string: |
-          function envoy_on_request(request_handle)
-            request_handle:logInfo("Hello World.")
-          end
-      bye.lua:
-        inline_string: |
-          function envoy_on_response(response_handle)
-            response_handle:logInfo("Bye Bye.")
-          end
+.. literalinclude:: _include/lua-filter-override.yaml
+    :language: yaml
+    :lines: 58-76
+    :lineno-start: 58
+    :linenos:
+    :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
 The HTTP Lua filter can be disabled on some virtual host, route, or weighted cluster by the
 :ref:`LuaPerRoute <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` configuration as
 follow:
 
-.. code-block:: yaml
-
-  typed_per_filter_config:
-    envoy.filters.http.lua:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
-      disabled: true
+.. literalinclude:: _include/lua-filter-override.yaml
+    :language: yaml
+    :lines: 31-34
+    :lineno-start: 31
+    :linenos:
+    :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
 We can also refer to a Lua script in the filter configuration by specifying a name in LuaPerRoute.
 The ``default`` Lua script will be overridden by the referenced script:
 
-.. code-block:: yaml
-
-  typed_per_filter_config:
-    envoy.filters.http.lua:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
-      name: hello.lua
+.. literalinclude:: _include/lua-filter-override.yaml
+    :language: yaml
+    :lines: 40-43
+    :lineno-start: 40
+    :linenos:
+    :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
 Or we can define a new Lua script in the LuaPerRoute configuration directly to override the ``default``
 Lua script as follows:
 
-.. code-block:: yaml
-
-  typed_per_filter_config:
-    envoy.filters.http.lua:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
-      source_code:
-        inline_string: |
-          function envoy_on_response(response_handle)
-            response_handle:logInfo("Goodbye.")
-          end
+.. literalinclude:: _include/lua-filter-override.yaml
+    :language: yaml
+    :lines: 49-56
+    :lineno-start: 49
+    :linenos:
+    :caption: :download:`lua-filter-override.yaml <_include/lua-filter-override.yaml>`
 
 Statistics
 ----------
@@ -498,18 +470,15 @@ body. May be nil.
   local metadata = handle:metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
-under the filter name i.e. *envoy.filters.http.lua*. Below is an example of a *metadata* in a
+under the filter name i.e. ``envoy.filters.http.lua``. Below is an example of a ``metadata`` in a
 :ref:`route entry <envoy_v3_api_msg_config.route.v3.Route>`.
 
-.. code-block:: yaml
-
-  metadata:
-    filter_metadata:
-      envoy.filters.http.lua:
-        foo: bar
-        baz:
-          - bad
-          - baz
+.. literalinclude:: _include/lua-filter.yaml
+    :language: yaml
+    :lines: 26-32
+    :lineno-start: 26
+    :linenos:
+    :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
 

@@ -1266,6 +1266,13 @@ envoy.tracers.opentelemetry.samplers.dynatrace:
   status: wip
   type_urls:
   - envoy.extensions.tracers.opentelemetry.samplers.v3.DynatraceSamplerConfig
+envoy.tracers.opentelemetry.samplers.cel:
+  categories:
+  - envoy.tracers.opentelemetry.samplers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.tracers.opentelemetry.samplers.v3.CELSamplerConfig
 envoy.tracers.skywalking:
   categories:
   - envoy.tracers

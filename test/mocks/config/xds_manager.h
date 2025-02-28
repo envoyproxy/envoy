@@ -19,6 +19,7 @@ public:
   MOCK_METHOD(absl::Status, setAdsConfigSource,
               (const envoy::config::core::v3::ApiConfigSource& config_source));
   MOCK_METHOD(OptRef<Config::XdsConfigTracker>, xdsConfigTracker, ());
+  MOCK_METHOD(XdsResourcesDelegateOptRef, xdsResourcesDelegate, ());
 };
 
 } // namespace Config

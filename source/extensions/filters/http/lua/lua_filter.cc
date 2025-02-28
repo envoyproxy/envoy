@@ -790,6 +790,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            Upstream::ClusterManager& cluster_manager, Api::Api& api,
                            Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_manager_(cluster_manager),
+      clear_route_cache_(
+          proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
       stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)) {
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {

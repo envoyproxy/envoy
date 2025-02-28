@@ -15,7 +15,7 @@
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
 /*/extensions/access_loggers/stream @mattklein123 @davinci26
 # alternate protocols cache extensions
-/*/extensions/filters/http/alternate_protocols_cache @RyanTheOptimist @alyssawilk
+/*/extensions/filters/http/alternate_protocols_cache @RyanTheOptimist @abeyad
 # csrf extension
 /*/extensions/filters/http/csrf @dschaller @mattklein123
 # original_src http filter extension
@@ -27,7 +27,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # dubbo_proxy extension
 /*/extensions/filters/network/dubbo_proxy @zyfjeff @wbpcode
 # cdn_loop extension
-/*/extensions/filters/http/cdn_loop @justin-mp @penguingao @alyssawilk
+/*/extensions/filters/http/cdn_loop @justin-mp @penguingao @botengyao
 # external processing filter
 /*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov @yanjunxiang-google
 /*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov
@@ -49,15 +49,15 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tls SPIFFE certificate validator extension
 /*/extensions/transport_sockets/tls/cert_validator/spiffe @mathetake @botengyao @tyxia
 # proxy protocol socket extension
-/*/extensions/transport_sockets/proxy_protocol @alyssawilk @wez470
+/*/extensions/transport_sockets/proxy_protocol @botengyao @wez470
 # common transport socket
-/*/extensions/transport_sockets/common @alyssawilk @wez470
+/*/extensions/transport_sockets/common @botengyao @wez470
 # starttls transport socket
 /*/extensions/transport_sockets/starttls @cpakulski @botengyao @ggreenway
 # proxy transport socket
-/*extensions/transport_sockets/http_11_proxy @alyssawilk @ryantheoptimist
+/*extensions/transport_sockets/http_11_proxy @abeyad @ryantheoptimist
 # internal upstream transport socket
-/*/extensions/transport_sockets/internal_upstream @kyessenov @alyssawilk
+/*/extensions/transport_sockets/internal_upstream @kyessenov @botengyao
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @ggreenway
 # sni_dynamic_forward_proxy extension
@@ -71,9 +71,9 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tracers.opentelemetry extension
 /*/extensions/tracers/opentelemetry @alexanderellis @yanavlasov
 # quic extension
-/*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
+/*/extensions/quic/ @ryantheoptimist @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # UDP packet writer
-/*/extensions/udp_packet_writer/ @danzh2010 @RyanTheOptimist @alyssawilk
+/*/extensions/udp_packet_writer/ @danzh2010 @ryantheoptimist
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123 @weisisea
 /*/extensions/common/redis @msukalski @henryyyang @mattklein123 @weisisea
@@ -81,14 +81,14 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/network/redis_proxy @weisisea @mattklein123
 /*/extensions/filters/network/common/redis @weisisea @mattklein123
 # dynamic forward proxy
-/*/extensions/clusters/dynamic_forward_proxy @mattklein123 @alyssawilk
-/*/extensions/common/dynamic_forward_proxy @mattklein123 @alyssawilk
-/*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @alyssawilk
+/*/extensions/clusters/dynamic_forward_proxy @mattklein123 @ryantheoptimist
+/*/extensions/common/dynamic_forward_proxy @mattklein123 @ryantheoptimist
+/*/extensions/filters/http/dynamic_forward_proxy @mattklein123 @ryantheoptimist
 /*/extensions/filters/http/composite @mattklein123 @tyxia @yanavlasov
 # omit_canary_hosts retry predicate
 /*/extensions/retry/host/omit_canary_hosts @sriduth @mattklein123
 # previous hosts
-/*/extensions/retry/host/previous_hosts @alyssawilk @mattklein123
+/*/extensions/retry/host/previous_hosts @nezdolik @mattklein123
 # HTTP caching extension
 /*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
 /*/extensions/http/cache/simple_http_cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
@@ -117,22 +117,22 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/wasm_runtime/ @mpwarres @kyessenov @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
-/*/extensions/common/proxy_protocol @alyssawilk @wez470
+/*/extensions/common/proxy_protocol @ggreenway @wez470
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
-/*/extensions/filters/http/fault @rshriram @alyssawilk
-/*/extensions/filters/common/fault @rshriram @alyssawilk
+/*/extensions/filters/http/fault @rshriram @kbaichoo
+/*/extensions/filters/common/fault @rshriram @kbaichoo
 /*/extensions/filters/http/grpc_json_reverse_transcoder @numanelahi @yanavlasov
-/*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @alyssawilk
-/*/extensions/filters/http/router @alyssawilk @mattklein123
-/*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
-/*/extensions/filters/http/grpc_web @fengli79 @lizan @alyssawilk
+/*/extensions/filters/http/grpc_json_transcoder @taoxuy @nareddyt @nezdolik
+/*/extensions/filters/http/router @yanavlasov @mattklein123
+/*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway
+/*/extensions/filters/http/grpc_web @fengli79 @kyessenov
 /*/extensions/filters/http/grpc_stats @kyessenov @botengyao @nezdolik
 /*/extensions/filters/http/connect_grpc_bridge @jchadwick-buf @mattklein123
 /*/extensions/filters/common/original_src @klarose @mattklein123
-/*/extensions/filters/listener/tls_inspector @ggreenway @KBaichoo
+/*/extensions/filters/listener/tls_inspector @ggreenway @kbaichoo
 /*/extensions/grpc_credentials/example @wozz @yanavlasov
 /*/extensions/grpc_credentials/file_based_metadata @wozz @yanavlasov
-/*/extensions/internal_redirect @alyssawilk @penguingao
+/*/extensions/internal_redirect @botengyao @penguingao
 /*/extensions/stat_sinks/dog_statsd @taiki45 @jmarantz
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
 /*/extensions/stat_sinks/hystrix @trabetti @jmarantz
@@ -145,28 +145,28 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/resource_monitors/fixed_heap @eziskind @yanavlasov @nezdolik
 /*/extensions/resource_monitors/downstream_connections @nezdolik @mattklein123
 /*/extensions/resource_monitors/cpu_utilization @cancecen @kbaichoo @nix1n
-/*/extensions/retry/priority @alyssawilk @mattklein123
-/*/extensions/retry/priority/previous_priorities @alyssawilk @mattklein123
-/*/extensions/retry/host @alyssawilk @mattklein123
-/*/extensions/filters/network/http_connection_manager @alyssawilk @mattklein123
-/*/extensions/filters/network/tcp_proxy @alyssawilk @zuercher @ggreenway
-/*/extensions/filters/network/echo @yanavlasov @alyssawilk
+/*/extensions/retry/priority @ravenblackx @mattklein123
+/*/extensions/retry/priority/previous_priorities @ravenblackx @mattklein123
+/*/extensions/retry/host @ravenblackx @mattklein123
+/*/extensions/filters/network/http_connection_manager @yanavlasov @mattklein123
+/*/extensions/filters/network/tcp_proxy @zuercher @ggreenway
+/*/extensions/filters/network/echo @yanavlasov @adisuissa
 /*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google
 /*/extensions/filters/network/direct_response @kyessenov @zuercher
 /*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010
 /*/extensions/clusters/aggregate @yxue @mattklein123
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @yanavlasov @kyessenov
-/*/extensions/filters/network/connection_limit @mattklein123 @alyssawilk @delong-coder
+/*/extensions/filters/network/connection_limit @mattklein123 @delong-coder
 /*/extensions/filters/http/aws_request_signing @derekargueta @suniltheta @mattklein123 @marcomagdy @nbaws
 /*/extensions/filters/http/aws_lambda @suniltheta @mattklein123 @marcomagdy @nbaws
-/*/extensions/filters/http/buffer @alyssawilk @mattklein123
-/*/extensions/transport_sockets/raw_buffer @alyssawilk @mattklein123
+/*/extensions/filters/http/buffer @adisuissa @mattklein123
+/*/extensions/transport_sockets/raw_buffer @botengyao @mattklein123
 # Watchdog Extensions
-/*/extensions/watchdog/profile_action @kbaichoo @alyssawilk
+/*/extensions/watchdog/profile_action @kbaichoo @nezdolik
 # Core upstream code
-extensions/upstreams/http @alyssawilk @mattklein123
-extensions/upstreams/tcp @alyssawilk @ggreenway @mattklein123
+extensions/upstreams/http @yanavlasov @mattklein123
+extensions/upstreams/tcp @ggreenway @mattklein123
 # OAuth2
 extensions/filters/http/oauth2 @derekargueta @mattklein123
 # HTTP Local Rate Limit
@@ -196,7 +196,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/io_socket/user_space @kyessenov @lambdai
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
 # Default UUID4 request ID extension
-/*/extensions/request_id/uuid @mattklein123 @alyssawilk
+/*/extensions/request_id/uuid @mattklein123 @jmarantz
 # HTTP header formatters
 /*/extensions/http/header_formatters/preserve_case @mattklein123 @jmarantz
 # External Rate Limit
@@ -212,8 +212,8 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # HTTP API Key Auth
 /*/extensions/filters/http/api_key_auth @wbpcode @sanposhiho
 # Original IP detection
-/*/extensions/http/original_ip_detection/custom_header @alyssawilk @mattklein123
-/*/extensions/http/original_ip_detection/xff @alyssawilk @mattklein123
+/*/extensions/http/original_ip_detection/custom_header @ryantheoptimist @mattklein123
+/*/extensions/http/original_ip_detection/xff @yanavlasov @mattklein123
 # set_filter_state extension
 /*/extensions/filters/common/set_filter_state @kyessenov @wbpcode
 /*/extensions/filters/http/set_filter_state @kyessenov @wbpcode
@@ -226,7 +226,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # IP address input matcher
 /*/extensions/matching/input_matchers/ip @aguinet @mattklein123
 # Key Value store
-/*/extensions/key_value @alyssawilk @ryantheoptimist
+/*/extensions/key_value @abeyad @ryantheoptimist
 # Config Validators
 /*/extensions/config/validators/minimum_clusters @adisuissa @yanavlasov
 # File system based extensions
@@ -238,7 +238,7 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # DNS resolution
 /*/extensions/network/dns_resolver/cares @yanavlasov @mattklein123
 /*/extensions/network/dns_resolver/apple @yanavlasov @mattklein123
-/*/extensions/network/dns_resolver/getaddrinfo @alyssawilk @mattklein123
+/*/extensions/network/dns_resolver/getaddrinfo @fredyw @mattklein123
 # compression code
 /*/extensions/filters/http/decompressor @kbaichoo @mattklein123
 /*/extensions/filters/http/compressor @kbaichoo @mattklein123
@@ -295,18 +295,18 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 # mongo proxy
 /*/extensions/filters/network/mongo_proxy @mythra @giantcroc @mattklein123
 # formatter
-/*/extensions/formatter/req_without_query @alyssawilk @tsaarni @giantcroc
+/*/extensions/formatter/req_without_query @wbpcode @tsaarni @giantcroc
 # cors
 /*/extensions/filters/http/cors @wbpcode @daixiang0
 # Header Validators
-/*/extensions/http/header_validators/envoy_default @yanavlasov @alyssawilk
+/*/extensions/http/header_validators/envoy_default @yanavlasov @wbpcode
 # Thrift
 /*/extensions/filters/network/thrift_proxy @zuercher @JuniorHsu
 /*/extensions/health_checkers/thrift @zuercher @JuniorHsu
 # Thrift to metadata
 /*/extensions/filters/http/thrift_to_metadata @JuniorHsu @zuercher
 # IP tagging
-/*/extensions/filters/http/ip_tagging @alyssawilk @JuniorHsu
+/*/extensions/filters/http/ip_tagging @zuercher @JuniorHsu
 # Header to metadata
 /*/extensions/filters/http/header_to_metadata @zuercher @JuniorHsu
 # Json to metadata
@@ -318,9 +318,9 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/http/custom_response/redirect_policy @pradeepcrao @yanavlasov
 /*/extensions/http/custom_response/local_response_policy @pradeepcrao @yanavlasov
 # path match by pattern
-/*/extensions/path/match/uri_template @alyssawilk @yanjunxiang-google
+/*/extensions/path/match/uri_template @ravenblackx @yanjunxiang-google
 # path rewrite by pattern
-/*/extensions/path/rewrite/uri_template @alyssawilk @yanjunxiang-google
+/*/extensions/path/rewrite/uri_template @ravenblackx @yanjunxiang-google
 # Dubbo codec
 /*/extensions/common/dubbo @wbpcode @UNOWNED
 # upstream load balancing policies
@@ -381,31 +381,31 @@ extensions/filters/http/oauth2 @derekargueta @mattklein123
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
 /*/extensions/clusters/dns @UNOWNED @UNOWNED
-/*/source/extensions/listener_managers/listener_manager @alyssawilk @ggreenway
-/*/source/extensions/listener_managers/validation_listener_manager @alyssawilk @ggreenway
+/*/source/extensions/listener_managers/listener_manager @yanavlasov @ggreenway
+/*/source/extensions/listener_managers/validation_listener_manager @adisuissa @ggreenway
 /*/source/extensions/config_subscription/ @adisuissa @UNOWNED
 /*/source/extensions/config_subscription/grpc @adisuissa @UNOWNED
 
 # URL Pattern Match and Rewrite Library
-/*/extensions/path/uri_template_lib @alyssawilk @yanjunxiang-google
-/*/extensions/path/uri_template_lib/proto @alyssawilk @yanjunxiang-google
+/*/extensions/path/uri_template_lib @wbpcode @yanjunxiang-google
+/*/extensions/path/uri_template_lib/proto @wbpcode @yanjunxiang-google
 
 # mobile
-/mobile/ @RyanTheOptimist @alyssawilk @abeyad @fredyw
+/mobile/ @RyanTheOptimist @abeyad @fredyw
 
 # Contrib
-/contrib/exe/ @mattklein123 @alyssawilk
+/contrib/exe/ @mattklein123 @wbpcode
 /contrib/client_ssl_auth/ @ggreenway @UNOWNED
 /contrib/checksum/ @ravenblackx @phlax
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
-/contrib/squash/ @yuval-k @alyssawilk
+/contrib/squash/ @yuval-k @UNOWNED
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui
 /contrib/mysql_proxy/ @rshriram @venilnoronha
 /contrib/postgres_proxy/ @fabriziomello @cpakulski
-/contrib/sxg/ @cpapazian @alyssawilk
+/contrib/sxg/ @cpapazian @UNOWNED
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
 /contrib/cryptomb/ @giantcroc @soulxu
 /contrib/vcl/ @florincoras @KfreeZ

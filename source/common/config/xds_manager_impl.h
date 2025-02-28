@@ -24,6 +24,10 @@ public:
     return makeOptRefFromPtr<Config::XdsConfigTracker>(xds_config_tracker_.get());
   }
 
+  XdsResourcesDelegateOptRef xdsResourcesDelegate() override {
+    return makeOptRefFromPtr<Config::XdsResourcesDelegate>(xds_resources_delegate_.get());
+  }
+
 private:
   // Validates (syntactically) the config_source by doing the PGV validation.
   absl::Status validateAdsConfig(const envoy::config::core::v3::ApiConfigSource& config_source);
@@ -31,6 +35,7 @@ private:
   Event::Dispatcher& main_thread_dispatcher_;
   Api::Api& api_;
   ProtobufMessage::ValidationContext& validation_context_;
+  XdsResourcesDelegatePtr xds_resources_delegate_;
   Config::XdsConfigTrackerPtr xds_config_tracker_;
   // The cm_ will only be valid after the cluster-manager is initialized.
   // Note that this implies that the xDS-manager must be shut down properly

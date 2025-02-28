@@ -1011,8 +1011,8 @@ std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_head
                       path);
 }
 
-void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
-                                     absl::string_view& path) {
+void Utility::extractSchemeHostPathFromUri(const absl::string_view& uri, absl::string_view& scheme,
+                                           absl::string_view& host, absl::string_view& path) {
   /**
    *  URI RFC: https://www.ietf.org/rfc/rfc2396.txt
    *
@@ -1021,13 +1021,18 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
    *  pos:         ^
    *  host_pos:       ^
    *  path_pos:                       ^
+   *  scheme = "https"
    *  host = "example.com:8443"
    *  path = "/certs"
    */
+
+  // Find end of scheme.
   const auto pos = uri.find("://");
-  // Start position of the host
+  scheme = uri.substr(0, (pos == std::string::npos) ? 0 : pos);
+
+  // Start position of the host.
   const auto host_pos = (pos == std::string::npos) ? 0 : pos + 3;
-  // Start position of the path
+  // Start position of the path.
   const auto path_pos = uri.find('/', host_pos);
   if (path_pos == std::string::npos) {
     // If uri doesn't have "/", the whole string is treated as host.
@@ -1039,6 +1044,12 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   }
 }
 
+void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
+                                     absl::string_view& path) {
+  absl::string_view scheme;
+  extractSchemeHostPathFromUri(uri, scheme, host, path);
+}
+
 std::string Utility::localPathFromFilePath(const absl::string_view& file_path) {
   if (file_path.size() >= 3 && file_path[1] == ':' && file_path[2] == '/' &&
       std::isalpha(file_path[0])) {
@@ -1047,11 +1058,15 @@ std::string Utility::localPathFromFilePath(const absl::string_view& file_path) {
   return absl::StrCat("/", file_path);
 }
 
-RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
-  absl::string_view host, path;
-  extractHostPathFromUri(http_uri.uri(), host, path);
+RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri,
+                                          bool include_scheme) {
+  absl::string_view scheme, host, path;
+  extractSchemeHostPathFromUri(http_uri.uri(), scheme, host, path);
 
   RequestMessagePtr message(new RequestMessageImpl());
+  if (include_scheme && !scheme.empty()) {
+    message->headers().setScheme(scheme);
+  }
   message->headers().setPath(path);
   message->headers().setHost(host);
 
