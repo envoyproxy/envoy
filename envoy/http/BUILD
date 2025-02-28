@@ -117,7 +117,6 @@ envoy_cc_library(
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tracing:tracer_interface",
         "//envoy/upstream:load_balancer_interface",
-        "//source/common/common:scope_tracked_object_stack",
         "@com_google_absl//absl/types:optional",
     ],
 )

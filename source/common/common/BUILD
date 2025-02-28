@@ -404,7 +404,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "scope_tracked_object_stack",
-    srcs = ["scope_tracked_object_stack.cc"],
     hdrs = ["scope_tracked_object_stack.h"],
     deps = [
         "//envoy/common:execution_context",

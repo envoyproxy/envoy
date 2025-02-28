@@ -157,7 +157,6 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   Tracing::Span& activeSpan() override;
   OptRef<const Tracing::Config> tracingConfig() const override;
   const ScopeTrackedObject& scope() override;
-  void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override;
   void resetIdleTimer() override;
   const Router::RouteSpecificFilterConfig* mostSpecificPerFilterConfig() const override;
   Router::RouteSpecificFilterConfigs perFilterConfigs() const override;
@@ -901,8 +900,6 @@ public:
   Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
 
   Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
-
-  void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
   void onDownstreamReset() { state_.saw_downstream_reset_ = true; }
   bool sawDownstreamReset() { return state_.saw_downstream_reset_; }
