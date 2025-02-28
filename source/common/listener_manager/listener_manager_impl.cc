@@ -637,11 +637,11 @@ bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& l
   // Check if the listener has duplicated address with existing listeners.
 
   for (const auto& existing_listener : listener_list) {
-    // If reuse port is enabled, we can skip the check between different versions of the same
-    // listener.
-    // If reuse port is disabled, the duplicated addresses checking is necessary to ensure we
-    // can create new sockets for the new version of the listener as expected.
     if (listener.reusePort() && existing_listener->name() == listener.name()) {
+      // If reuse port is enabled, we can skip the check between different versions of the
+      // same listener as they can create their own sockets anyway.
+      // If reuse port is disabled, the duplicated addresses check is necessary to ensure
+      // there is no address conflict between this two versions.
       continue;
     }
 
