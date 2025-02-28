@@ -119,7 +119,7 @@ TEST(GolangFilterConfigTest, GolangFilterDestroyConfig) {
   TestUtility::loadFromYaml(yaml_string, proto_config);
 
   auto dso_lib = Dso::DsoManager<Dso::HttpFilterDsoImpl>::load(
-    proto_config.library_id(), proto_config.library_path(), proto_config.plugin_name());
+      proto_config.library_id(), proto_config.library_path(), proto_config.plugin_name());
   auto config_ = new httpDestroyableConfig();
   config_->plugin_name_ptr = reinterpret_cast<unsigned long long>(DESTROYCONFIG.data());
   config_->plugin_name_len = DESTROYCONFIG.length();
