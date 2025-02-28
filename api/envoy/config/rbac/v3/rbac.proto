@@ -353,7 +353,7 @@ message Principal {
       option (validate.required) = true;
 
       // Specifies a SAN that must be present in the validated peer certificate.
-      extensions.transport_sockets.tls.v3.SubjectAltNameMatcher san_matcher = 1;
+      envoy.extensions.transport_sockets.tls.v3.SubjectAltNameMatcher san_matcher = 1;
 
       // Only validate that the peer certificate is valid.
       bool any_validated_client_certificate = 2 [(validate.rules).bool = {const: true}];
