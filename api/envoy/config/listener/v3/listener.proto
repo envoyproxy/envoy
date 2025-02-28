@@ -35,6 +35,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // The additional address the listener is listening on.
 message AdditionalAddress {
+  // TcpKeepaliveOverride wraps the TCP keepalive settings for the additional address.
+  // It provides a mechanism to override or disable TCP keepalive on a per-address basis.
+  message TcpKeepaliveOverride {
+    // Configures TCP keepalive for the additional address.
+    core.v3.TcpKeepalive tcp_keepalive = 1;
+  }
+
   core.v3.Address address = 1;
 
   // Additional socket options that may not be present in Envoy source code or
@@ -45,13 +52,6 @@ message AdditionalAddress {
   // or an empty list of :ref:`socket_options <envoy_v3_api_field_config.core.v3.SocketOptionsOverride.socket_options>`,
   // it means no socket option will apply.
   core.v3.SocketOptionsOverride socket_options = 2;
-
-  // TcpKeepaliveOverride wraps the TCP keepalive settings for the additional address.
-  // It provides a mechanism to override or disable TCP keepalive on a per-address basis.
-  message TcpKeepaliveOverride {
-    // Configures TCP keepalive for the additional address.
-    core.v3.TcpKeepalive tcp_keepalive = 1;
-  }
 
   // Configures TCP keepalive settings for the additional address.
   // If specified, this will override the listener :ref:`tcp_keepalive <envoy_v3_api_field_config.listener.v3.Listener.tcp_keepalive>` configuration.
