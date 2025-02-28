@@ -211,14 +211,19 @@ def _envoy_select_perfetto(xs):
     })
 
 def envoy_exported_symbols_input():
-    return ["@envoy//bazel:exported_symbols.txt"]
+    return [
+        "@envoy//bazel:exported_symbols.txt",
+        "@envoy//bazel:exported_symbols_apple.txt",
+    ]
 
 # Default symbols to be exported.
-# TODO(wbpcode): make this work correctly for apple/darwin.
 def _envoy_default_exported_symbols():
     return select({
         "@envoy//bazel:linux": [
             "-Wl,--dynamic-list=$(location @envoy//bazel:exported_symbols.txt)",
+        ],
+        "@envoy//bazel:apple": [
+            "-Wl,-exported_symbols_list,$(location @envoy//bazel:exported_symbols_apple.txt)",
         ],
         "//conditions:default": [],
     })

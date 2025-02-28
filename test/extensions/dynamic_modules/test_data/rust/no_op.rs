@@ -20,10 +20,10 @@ pub extern "C" fn getSomeVariable() -> i32 {
 fn new_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
   _envoy_filter_config: &mut EC,
   name: &str,
-  config: &str,
+  config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
   let name = name.to_string();
-  let config = config.to_string();
+  let config = String::from_utf8(config.to_owned()).unwrap_or_default();
   Some(Box::new(NopHttpFilterConfig { name, config }))
 }
 
