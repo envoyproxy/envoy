@@ -41,6 +41,8 @@ public:
   ~MockCredentialsProvider() override;
 
   MOCK_METHOD(Credentials, getCredentials, ());
+  MOCK_METHOD(bool, credentialsPending, ());
+  MOCK_METHOD(std::string, providerName, ());
 };
 
 class MockSigner : public Signer {
@@ -52,6 +54,31 @@ public:
   MOCK_METHOD(absl::Status, sign, (Http::RequestHeaderMap&, const std::string&, absl::string_view));
   MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, absl::string_view));
   MOCK_METHOD(absl::Status, signUnsignedPayload, (Http::RequestHeaderMap&, absl::string_view));
+  MOCK_METHOD(bool, addCallbackIfCredentialsPending, (CredentialsPendingCallback &&));
+};
+
+class MockIAMRolesAnywhereCredentialsProvider : public IAMRolesAnywhereCredentialsProvider {
+public:
+  MockIAMRolesAnywhereCredentialsProvider();
+  ~MockIAMRolesAnywhereCredentialsProvider() override;
+
+  MOCK_METHOD(Credentials, getCredentials, ());
+};
+
+class MockIAMRolesAnywhereX509CredentialsProvider : public IAMRolesAnywhereX509CredentialsProvider {
+public:
+  MockIAMRolesAnywhereX509CredentialsProvider();
+  ~MockIAMRolesAnywhereX509CredentialsProvider() override;
+
+  MOCK_METHOD(X509Credentials, getCredentials, ());
+};
+
+class MockX509CredentialsProvider : public X509CredentialsProvider {
+public:
+  MockX509CredentialsProvider();
+  ~MockX509CredentialsProvider() override;
+
+  MOCK_METHOD(X509Credentials, getCredentials, ());
 };
 
 class MockIAMRolesAnywhereCredentialsProvider : public IAMRolesAnywhereCredentialsProvider {
