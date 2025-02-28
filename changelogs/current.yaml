@@ -82,7 +82,7 @@ bug_fixes:
     ``envoy.reloadable_features.jwt_fetcher_use_scheme_from_uri`` to false.
 - area: listener
   change: |
-    Fixed a bug where the addresses cannot be updated partially even the reuse port is enabled.
+    Fixed a bug where the addresses cannot be updated partially even if the reuse port is enabled.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
