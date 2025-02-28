@@ -32,8 +32,9 @@ public:
   template <class FormatterContext = HttpFormatterContext>
   static absl::StatusOr<std::vector<CommandParserBasePtr<FormatterContext>>>
   parseFormatters(const FormattersConfig& formatters,
-                  Server::Configuration::GenericFactoryContext& context) {
-    std::vector<CommandParserBasePtr<FormatterContext>> commands;
+                  Server::Configuration::GenericFactoryContext& context,
+                  std::vector<CommandParserBasePtr<FormatterContext>> commands_parsers = {}) {
+    std::vector<CommandParserBasePtr<FormatterContext>> commands = std::move(commands_parsers);
     for (const auto& formatter : formatters) {
       auto* factory =
           Envoy::Config::Utility::getFactory<CommandParserFactoryBase<FormatterContext>>(formatter);
@@ -59,10 +60,13 @@ public:
   template <class FormatterContext = HttpFormatterContext>
   static absl::StatusOr<FormatterBasePtr<FormatterContext>>
   fromProtoConfig(const envoy::config::core::v3::SubstitutionFormatString& config,
-                  Server::Configuration::GenericFactoryContext& context) {
+                  Server::Configuration::GenericFactoryContext& context,
+                  std::vector<CommandParserBasePtr<FormatterContext>>&& command_parsers = {}) {
     // Instantiate formatter extensions.
-    auto commands = parseFormatters<FormatterContext>(config.formatters(), context);
+    auto commands =
+        parseFormatters<FormatterContext>(config.formatters(), context, std::move(command_parsers));
     RETURN_IF_NOT_OK_REF(commands.status());
+
     switch (config.format_case()) {
     case envoy::config::core::v3::SubstitutionFormatString::FormatCase::kTextFormat:
       return FormatterBaseImpl<FormatterContext>::create(config.text_format(),

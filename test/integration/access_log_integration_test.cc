@@ -49,7 +49,6 @@ TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {
         v.set_string_value("%REQ(X-FORWARDED-FOR)%");
         auto fields = json->mutable_fields();
         (*fields)["x_forwarded_for"] = v;
-        log_format->mutable_json_format_options()->set_sort_properties(true);
         access_log_config_to_clobber->mutable_typed_config()->PackFrom(access_log_config);
       });
   testRouterDownstreamDisconnectBeforeRequestComplete();

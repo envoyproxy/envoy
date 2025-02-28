@@ -13,9 +13,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
+absl::StatusOr<IpTaggingFilterConfigSharedPtr> IpTaggingFilterConfig::create(
+    const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
+    const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime) {
+  absl::Status creation_status = absl::OkStatus();
+  auto config_ptr = std::shared_ptr<IpTaggingFilterConfig>(
+      new IpTaggingFilterConfig(config, stat_prefix, scope, runtime, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  return config_ptr;
+}
+
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
-    const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
+    const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+    absl::Status& creation_status)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
@@ -32,7 +43,9 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   // TODO(ccaraman): Remove size check once file system support is implemented.
   // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
   if (config.ip_tags().empty()) {
-    throw EnvoyException("HTTP IP Tagging Filter requires ip_tags to be specified.");
+    creation_status =
+        absl::InvalidArgumentError("HTTP IP Tagging Filter requires ip_tags to be specified.");
+    return;
   }
 
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
@@ -47,9 +60,10 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
       if (cidr_or_error.status().ok()) {
         cidr_set.emplace_back(std::move(cidr_or_error.value()));
       } else {
-        throw EnvoyException(
+        creation_status = absl::InvalidArgumentError(
             fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
                         entry.address_prefix(), entry.prefix_len().value()));
+        return;
       }
     }
 
