@@ -125,6 +125,10 @@ new_features:
   change: |
     Added support to monitor container CPU utilization in Linux K8s environment using
     :ref:`existing extension <envoy_v3_api_msg_extensions.resource_monitors.cpu_utilization.v3.CpuUtilizationConfig>`.
+- area: rbac
+  change: |
+    Added a new :ref:`principal type <envoy_v3_api_msg_config.rbac.v3.Principal.MTlsAuthenticated>` for validating
+    mTLS with more specific matches and better default behavior.
 - area: lua
   change: |
     Added :ref:`virtualClusterName() <config_http_filters_lua_stream_info_virtual_cluster_name>` API to the Stream Info
