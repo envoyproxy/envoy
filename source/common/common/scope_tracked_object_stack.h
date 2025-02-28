@@ -21,23 +21,10 @@ public:
   ScopeTrackedObjectStack(const ScopeTrackedObjectStack&) = delete;
   ScopeTrackedObjectStack& operator=(const ScopeTrackedObjectStack&) = delete;
 
-  void add(const ScopeTrackedObject& object) { tracked_objects_.push_back(object); }
+  void add(const ScopeTrackedObject& object);
 
-  OptRef<const StreamInfo::StreamInfo> trackedStream() const override {
-    for (auto iter = tracked_objects_.rbegin(); iter != tracked_objects_.rend(); ++iter) {
-      OptRef<const StreamInfo::StreamInfo> stream = iter->get().trackedStream();
-      if (stream.has_value()) {
-        return stream;
-      }
-    }
-    return {};
-  }
-
-  void dumpState(std::ostream& os, int indent_level) const override {
-    for (auto iter = tracked_objects_.rbegin(); iter != tracked_objects_.rend(); ++iter) {
-      iter->get().dumpState(os, indent_level);
-    }
-  }
+  OptRef<const StreamInfo::StreamInfo> trackedStream() const override;
+  void dumpState(std::ostream& os, int indent_level) const override;
 
 private:
   std::vector<std::reference_wrapper<const ScopeTrackedObject>> tracked_objects_;
