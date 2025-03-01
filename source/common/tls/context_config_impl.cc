@@ -359,6 +359,15 @@ ClientContextConfigImpl::ClientContextConfigImpl(
         "Multiple TLS certificates are not supported for client contexts");
     return;
   }
+
+  if (config.has_per_host_session_cache_config()) {
+    per_host_session_cache_config_ = Ssl::ClientContextConfig::PerHostSessionCacheConfig{
+        .max_hosts_ =
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.per_host_session_cache_config(), max_hosts, 10),
+        .max_session_keys_per_host_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+            config.per_host_session_cache_config(), max_session_keys_per_host, 2),
+    };
+  }
 }
 
 } // namespace Tls
