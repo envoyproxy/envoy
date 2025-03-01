@@ -698,13 +698,14 @@ SplitRequestPtr TransactionRequest::create(Router& router,
 
 InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                            TimeSource& time_source, bool latency_in_micros,
-                           Common::Redis::FaultManagerPtr&& fault_manager)
+                           Common::Redis::FaultManagerPtr&& fault_manager,
+                           const absl::flat_hash_set<std::string>& custom_commands)
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       keys_handler_(*router_), split_keys_sum_result_handler_(*router_),
       transaction_handler_(*router_), stats_{ALL_COMMAND_SPLITTER_STATS(
                                           POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
-      time_source_(time_source), fault_manager_(std::move(fault_manager)) {
+      time_source_(time_source), fault_manager_(std::move(fault_manager)), custom_commands_(custom_commands) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, simple_command_handler_);
   }
@@ -750,7 +751,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   std::string command_name = absl::AsciiStrToLower(request->asArray()[0].asString());
   // Compatible with redis behavior, if there is an unsupported command, return immediately,
   // this action must be performed before verifying auth, some redis clients rely on this behavior.
-  if (!Common::Redis::SupportedCommands::isSupportedCommand(command_name)) {
+  if (!Common::Redis::SupportedCommands::isSupportedCommand(command_name) && custom_commands_.find(command_name) == custom_commands_.end()) {
     stats_.unsupported_command_.inc();
     callbacks.onResponse(Common::Redis::Utility::makeError(fmt::format(
         "ERR unknown command '{}', with args beginning with: {}", request->asArray()[0].asString(),
