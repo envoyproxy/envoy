@@ -114,6 +114,7 @@ protected:
   ConnPool::InstanceSharedPtr conn_pool_;
   Common::Redis::Client::PoolRequest* handle_{};
   Common::Redis::RespValuePtr incoming_request_;
+  Common::Redis::Client::ConfigSharedPtr config_;
 };
 
 /**
@@ -384,7 +385,8 @@ class InstanceImpl : public Instance, Logger::Loggable<Logger::Id::redis> {
 public:
   InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                TimeSource& time_source, bool latency_in_micros,
-               Common::Redis::FaultManagerPtr&& fault_manager);
+               Common::Redis::FaultManagerPtr&& fault_manager,
+               const absl::flat_hash_set<std::string>& custom_commands);
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
@@ -417,6 +419,7 @@ private:
   InstanceStats stats_;
   TimeSource& time_source_;
   Common::Redis::FaultManagerPtr fault_manager_;
+  absl::flat_hash_set<std::string> custom_commands_;
 };
 
 } // namespace CommandSplitter
