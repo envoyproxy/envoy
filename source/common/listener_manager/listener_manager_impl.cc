@@ -640,8 +640,8 @@ bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& l
     if (listener.reusePort() && existing_listener->name() == listener.name()) {
       // If reuse port is enabled, we can skip the check between different versions of the
       // same listener as they can create their own sockets anyway.
-      // If reuse port is disabled, the duplicated addresses check is necessary to ensure
-      // there is no address conflict between this two versions.
+      // If reuse port is disabled, the duplicated addresses check is necessary to to avoid
+      // attempting to bind to the same address when creating new sockets for the listener.
       continue;
     }
 
@@ -1146,6 +1146,8 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
                     name, absl::StrJoin(listener.addresses(), ",", Network::AddressStrFormatter()));
     ENVOY_LOG(warn, "{}", message);
+    ENVOY_LOG(warn, "To check if the listener has duplicated addresses with other listeners or "
+                    "'enable_reuse_port' is set to 'false' for the listener");
     return absl::InvalidArgumentError(message);
   }
 
