@@ -129,6 +129,7 @@ min_rtt_calc_params:
   interval: 31s
   request_count: 52
   min_concurrency: 8
+  base_value: 42s
 )EOF";
 
   auto config = makeConfig(yaml, runtime_);
@@ -140,6 +141,66 @@ min_rtt_calc_params:
   EXPECT_EQ(config.sampleAggregatePercentile(), .425);
   EXPECT_EQ(config.jitterPercent(), .132);
   EXPECT_EQ(config.minConcurrency(), 8);
+  EXPECT_EQ(config.baseValue(), std::chrono::seconds(42));
+}
+
+TEST_F(GradientControllerConfigTest, MissingMinRTTValues) {
+  const std::string yaml = R"EOF(
+  sample_aggregate_percentile:
+    value: 42.5
+  concurrency_limit_params:
+    max_concurrency_limit: 1337
+    concurrency_update_interval: 0.123s
+  min_rtt_calc_params:
+    jitter:
+      value: 13.2
+    request_count: 52
+    min_concurrency: 8
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      makeConfig(yaml, runtime_), EnvoyException,
+      "adaptive_concurrency: neither `min_rtt_calc_interval` nor `base_value` set");
+}
+
+TEST_F(GradientControllerConfigTest, TestNanosValidationFail) {
+  std::string yaml =
+      R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  concurrency_update_interval:
+    nanos: 100000000 # 100ms
+min_rtt_calc_params:
+  interval:
+    nanos: 8
+  request_count: 50
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      makeConfig(yaml, runtime_), EnvoyException,
+      "adaptive_concurrency: `min_rtt_calc_inverval` must not be in range (0, 1ms)");
+}
+
+TEST_F(GradientControllerConfigTest, TestNanosValidationPass) {
+  std::string yaml =
+      R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  concurrency_update_interval:
+    nanos: 100000000 # 100ms
+min_rtt_calc_params:
+  interval:
+    nanos: 1000000 # 1ms
+  request_count: 50
+)EOF";
+
+  auto config = makeConfig(yaml, runtime_);
+  EXPECT_EQ(config.minRTTCalcInterval(), std::chrono::milliseconds(1));
+  EXPECT_EQ(config.sampleRTTCalcInterval(), std::chrono::milliseconds(100));
+  EXPECT_EQ(config.minRTTAggregateRequestCount(), 50);
+  EXPECT_EQ(config.sampleAggregatePercentile(), .5);
 }
 
 TEST_F(GradientControllerConfigTest, Clamping) {
@@ -347,6 +408,97 @@ min_rtt_calc_params:
   // Verify the minRTT value measured is accurate.
   verifyMinRTTInactive();
   verifyMinRTTValue(std::chrono::milliseconds(13));
+}
+
+TEST_F(GradientControllerTest, BaseMinRTT) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  max_concurrency_limit:
+  concurrency_update_interval: 0.1s
+min_rtt_calc_params:
+  base_value: 0.05s
+  min_concurrency: 7
+)EOF";
+
+  auto controller = makeController(yaml);
+  const auto min_rtt = std::chrono::milliseconds(50);
+
+  verifyMinRTTInactive();
+  EXPECT_EQ(controller->concurrencyLimit(), 7); // there is no sampled latency yet, so the
+                                                // concurrency limit defaults to the min concurrency
+  for (int i = 0; i < 7; ++i) {
+    tryForward(controller, true);
+  }
+  tryForward(controller, false);
+  tryForward(controller, false);
+  time_system_.advanceTimeAndRun(min_rtt, *dispatcher_, Event::Dispatcher::RunType::Block);
+  for (int i = 0; i < 7; ++i) {
+    EXPECT_EQ(controller->concurrencyLimit(), 7);
+    sampleLatency(controller, min_rtt);
+  }
+
+  // Verify the minRTT value hasn't changed
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(101) - min_rtt, *dispatcher_,
+                                 Event::Dispatcher::RunType::Block);
+  verifyMinRTTInactive();
+  verifyMinRTTValue(min_rtt);
+}
+
+TEST_F(GradientControllerTest, BaseMinRTTChangeConcurrency) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  max_concurrency_limit:
+  concurrency_update_interval: 0.1s
+min_rtt_calc_params:
+  base_value: 0.05s
+  min_concurrency: 7
+)EOF";
+
+  auto controller = makeController(yaml);
+  const auto min_rtt = std::chrono::milliseconds(50);
+  int current_concurrency = 7; // there is no sampled latency yet, so the
+                               // concurrency limit defaults to the min concurrency
+
+  // lower sampled latency to trigger increased concurrency
+  verifyMinRTTInactive();
+  for (int i = 0; i < current_concurrency; ++i) {
+    tryForward(controller, true);
+  }
+  time_system_.advanceTimeAndRun(min_rtt, *dispatcher_, Event::Dispatcher::RunType::Block);
+  for (int i = 0; i < current_concurrency; ++i) {
+    sampleLatency(controller, min_rtt - std::chrono::milliseconds(10));
+  }
+
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(101) - min_rtt, *dispatcher_,
+                                 Event::Dispatcher::RunType::Block);
+  EXPECT_GT(controller->concurrencyLimit(), current_concurrency);
+  current_concurrency = controller->concurrencyLimit();
+
+  // Ensure minRTT didn't change
+  verifyMinRTTInactive();
+  verifyMinRTTValue(min_rtt);
+
+  // increase sampled latency to trigger decreased concurrency
+  verifyMinRTTInactive();
+  for (int i = 0; i < current_concurrency; ++i) {
+    tryForward(controller, true);
+  }
+  time_system_.advanceTimeAndRun(min_rtt, *dispatcher_, Event::Dispatcher::RunType::Block);
+  for (int i = 0; i < current_concurrency; ++i) {
+    sampleLatency(controller, min_rtt + std::chrono::milliseconds(50));
+  }
+
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(101) - min_rtt, *dispatcher_,
+                                 Event::Dispatcher::RunType::Block);
+  EXPECT_LT(controller->concurrencyLimit(), current_concurrency);
+
+  // Ensure minRTT didn't change
+  verifyMinRTTInactive();
+  verifyMinRTTValue(min_rtt);
 }
 
 TEST_F(GradientControllerTest, CancelLatencySample) {
