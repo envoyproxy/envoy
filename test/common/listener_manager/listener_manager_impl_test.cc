@@ -400,6 +400,95 @@ filter_chains:
   addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, AllowAddressesUpdateParitially) {
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 1000
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.3
+      port_value: 2000
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest,
+       AllowUpdateSocketOptionsIfNotDuplicatedEvenReusePortIsDisabled) {
+  const std::string yaml1 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.2
+      port_value: 1000
+enable_reuse_port: false
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  const std::string yaml2 = R"EOF(
+name: foo
+address:
+  socket_address:
+    address: 127.0.0.4
+    port_value: 1000
+additional_addresses:
+- address:
+    socket_address:
+      address: 127.0.0.3
+      port_value: 2000
+enable_reuse_port: false
+socket_options:
+    - level: 1
+      name: 9
+      int_value: 1
+filter_chains:
+- filters: []
+  name: foo
+  )EOF";
+
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .Times(2);
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, SetListenerPerConnectionBufferLimit) {
   const std::string yaml = R"EOF(
 address:
