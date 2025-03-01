@@ -386,7 +386,7 @@ public:
   InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::string& stat_prefix,
                TimeSource& time_source, bool latency_in_micros,
                Common::Redis::FaultManagerPtr&& fault_manager,
-               const absl::flat_hash_set<std::string>& custom_commands);
+               absl::flat_hash_set<std::string>&& custom_commands);
 
   // RedisProxy::CommandSplitter::Instance
   SplitRequestPtr makeRequest(Common::Redis::RespValuePtr&& request, SplitCallbacks& callbacks,
