@@ -50,70 +50,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "sigv4_signer_impl_lib",
-    srcs = ["sigv4_signer_impl.cc"],
-    hdrs = [
-        "signer_base_impl.h",
-        "sigv4_signer_impl.h",
-    ],
-    deps = [
-        ":credentials_provider_interface",
-        ":signer_base_impl",
-        ":signer_interface",
-        ":utility_lib",
-        "//source/common/singleton:const_singleton",
-    ],
-)
-
-envoy_cc_library(
-    name = "sigv4a_signer_impl_lib",
-    srcs = ["sigv4a_signer_impl.cc"],
-    hdrs = [
-        "signer_base_impl.h",
-        "sigv4a_signer_impl.h",
-    ],
-    deps = [
-        ":credentials_provider_interface",
-        ":signer_base_impl",
-        ":signer_interface",
-        ":sigv4a_key_derivation_lib",
-        ":utility_lib",
-        "//source/common/singleton:const_singleton",
-    ],
-)
-
-envoy_cc_library(
-    name = "sigv4a_key_derivation_lib",
-    srcs = ["sigv4a_key_derivation.cc"],
-    hdrs = [
-        "sigv4a_key_derivation.h",
-        "sigv4a_signer_impl.h",
-    ],
-    deps = [
-        ":credentials_provider_interface",
-        ":signer_base_impl",
-        ":signer_interface",
-        ":utility_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:hex_lib",
-        "//source/common/common:logger_lib",
-        "//source/common/common:utility_lib",
-        "//source/common/crypto:utility_lib",
-        "//source/common/http:message_lib",
-        "//source/common/singleton:const_singleton",
-    ],
-)
-
-envoy_cc_library(
     name = "credentials_provider_interface",
     hdrs = [
         "credentials_provider.h",
-        "credentials_provider_impl.h",
+        # "credentials_provider_impl.h",
     ],
     deps = [
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
+        ":credentials_provider_base_lib"
     ],
 )
 
@@ -131,11 +77,42 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "credentials_provider_impl_lib",
-    srcs = ["credentials_provider_impl.cc"],
-    hdrs = ["credentials_provider_impl.h"],
+    deps = [
+        # ":credentials_provider_base_lib",
+        "//source/extensions/common/aws/credential_providers:credential_providers_lib"
+    ]
+)
+# envoy_cc_library(
+#     name = "credentials_provider_impl_lib",
+#     srcs = ["credentials_provider_impl.cc"],
+#     hdrs = ["credentials_provider_impl.h"],
+#     deps = [
+#         ":aws_cluster_manager_lib",
+#         ":credentials_provider_interface",
+#         ":metadata_fetcher_lib",
+#         ":utility_lib",
+#         "//envoy/api:api_interface",
+#         "//source/common/common:logger_lib",
+#         "//source/common/common:thread_lib",
+#         "//source/common/config:datasource_lib",
+#         "//source/common/http:utility_lib",
+#         "//source/common/init:target_lib",
+#         "//source/common/json:json_loader_lib",
+#         "//source/common/runtime:runtime_features_lib",
+#         "//source/common/tracing:http_tracer_lib",
+#         "@com_google_absl//absl/time",
+#         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+#         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
+#     ],
+# )
+
+envoy_cc_library(
+    name = "credentials_provider_base_lib",
+    srcs = ["metadata_credentials_provider_base.cc"],
+    hdrs = ["metadata_credentials_provider_base.h", "cached_credentials_provider_base.h"],
     deps = [
         ":aws_cluster_manager_lib",
-        ":credentials_provider_interface",
+        # ":credentials_provider_interface",
         ":metadata_fetcher_lib",
         ":utility_lib",
         "//envoy/api:api_interface",
